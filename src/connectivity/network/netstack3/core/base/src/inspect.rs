@@ -57,6 +57,9 @@ pub trait Inspector: Sized {
         self.record_child(&format!("{name:?}"), f)
     }
 
+    /// Records anything that can be represented by a usize.
+    fn record_usize<T: Into<usize>>(&mut self, name: &str, value: T);
+
     /// Records anything that can be represented by a u64.
     fn record_uint<T: Into<u64>>(&mut self, name: &str, value: T);
 

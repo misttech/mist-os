@@ -21,7 +21,9 @@ use packet_formats::ethernet::testutil::ETHERNET_HDR_LEN_NO_TAG;
 use test_case::test_case;
 
 #[netstack_test]
-async fn inspect_sockets<I: net_types::ip::Ip>(name: &str) {
+#[test_case(false; "bound")]
+#[test_case(true; "listener")]
+async fn inspect_sockets<I: net_types::ip::Ip>(name: &str, listen: bool) {
     type N = netstack_testing_common::realms::Netstack3;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
@@ -59,6 +61,11 @@ async fn inspect_sockets<I: net_types::ip::Ip>(name: &str) {
         .expect("create TCP socket");
     tcp_socket.bind(&addr.into()).expect("bind");
 
+    const BACKLOG: u64 = 123;
+    if listen {
+        tcp_socket.listen(BACKLOG.try_into().unwrap()).expect("listen");
+    }
+
     let data =
         get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
             .await
@@ -72,20 +79,38 @@ async fn inspect_sockets<I: net_types::ip::Ip>(name: &str) {
     assert_eq!(sockets.children.len(), 1);
     let sock_name = sockets.children[0].name.clone();
 
-    match I::VERSION {
-        IpVersion::V4 => {
+    match (I::VERSION, listen) {
+        (IpVersion::V4, false) => {
             diagnostics_assertions::assert_data_tree!(data, "root": contains {
-                    "Sockets": {
-                        sock_name => {
-                            LocalAddress: format!("0.0.0.0:{PORT}"),
-                            RemoteAddress: "[NOT CONNECTED]",
-                            TransportProtocol: "TCP",
-                            NetworkProtocol: "IPv4",
-                        },
-                    }
+                "Sockets": {
+                    sock_name => {
+                        LocalAddress: format!("0.0.0.0:{PORT}"),
+                        RemoteAddress: "[NOT CONNECTED]",
+                        TransportProtocol: "TCP",
+                        NetworkProtocol: "IPv4",
+                    },
+                }
             })
         }
-        IpVersion::V6 => {
+        (IpVersion::V4, true) => {
+            diagnostics_assertions::assert_data_tree!(data, "root": contains {
+                "Sockets": {
+                    sock_name => {
+                        LocalAddress: format!("0.0.0.0:{PORT}"),
+                        RemoteAddress: "[NOT CONNECTED]",
+                        TransportProtocol: "TCP",
+                        NetworkProtocol: "IPv4",
+                        AcceptQueue: {
+                            BacklogSize: BACKLOG,
+                            NumPending: 0u64,
+                            NumReady: 0u64,
+                            Contents: "{}",
+                        }
+                    },
+                }
+            })
+        }
+        (IpVersion::V6, false) => {
             diagnostics_assertions::assert_data_tree!(data, "root": contains {
                 "Sockets": {
                     sock_name => {
@@ -93,6 +118,24 @@ async fn inspect_sockets<I: net_types::ip::Ip>(name: &str) {
                         RemoteAddress: "[NOT CONNECTED]",
                         TransportProtocol: "TCP",
                         NetworkProtocol: "IPv6",
+                    }
+                }
+            })
+        }
+        (IpVersion::V6, true) => {
+            diagnostics_assertions::assert_data_tree!(data, "root": contains {
+                "Sockets": {
+                    sock_name => {
+                        LocalAddress: format!("[{link_local}%{scope}]:{PORT}"),
+                        RemoteAddress: "[NOT CONNECTED]",
+                        TransportProtocol: "TCP",
+                        NetworkProtocol: "IPv6",
+                        AcceptQueue: {
+                            BacklogSize: BACKLOG,
+                            NumPending: 0u64,
+                            NumReady: 0u64,
+                            Contents: "{}",
+                        }
                     }
                 }
             })

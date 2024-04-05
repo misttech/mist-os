@@ -17,6 +17,8 @@ use net_types::{
 };
 use netstack3_core::device::{DeviceId, EthernetLinkDevice, WeakDeviceId};
 
+use tracing::warn;
+
 use crate::bindings::{
     devices::{
         DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, EthernetInfo,
@@ -46,6 +48,14 @@ impl<'a> netstack3_core::inspect::Inspector for BindingsInspector<'a> {
         let Self { node: _, unnamed_count } = self;
         let id = core::mem::replace(unnamed_count, *unnamed_count + 1);
         self.record_child(&format!("{id}"), f)
+    }
+
+    fn record_usize<T: Into<usize>>(&mut self, name: &str, value: T) {
+        let value: u64 = value.into().try_into().unwrap_or_else(|e| {
+            warn!("failed to inspect usize value that does not fit in a u64: {e:?}");
+            u64::MAX
+        });
+        self.node.record_uint(name, value)
     }
 
     fn record_uint<T: Into<u64>>(&mut self, name: &str, value: T) {

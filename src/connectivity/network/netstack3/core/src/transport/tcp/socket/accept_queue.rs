@@ -16,7 +16,7 @@ use core::ops::DerefMut;
 use assert_matches::assert_matches;
 use derivative::Derivative;
 
-use crate::sync::Mutex;
+use crate::{inspect::Inspector, sync::Mutex};
 
 /// A notifier used to tell Bindings about new pending connections for a single
 /// socket.
@@ -157,6 +157,14 @@ where
     pub(crate) fn is_closed(&self) -> bool {
         self.lock().is_closed()
     }
+
+    /// Inspects the queue.
+    pub(crate) fn inspect<I: Inspector>(&self, inspector: &mut I) {
+        let inner = self.lock();
+        inspector.record_usize("NumReady", inner.ready_len());
+        inspector.record_usize("NumPending", inner.pending_len());
+        inspector.record_debug("Contents", &inner.all_sockets);
+    }
 }
 
 impl<S, R, N> AcceptQueueInner<S, R, N>
@@ -208,13 +216,11 @@ where
         all_sockets.len()
     }
 
-    #[cfg(test)]
     fn ready_len(&self) -> usize {
         let AcceptQueueInner { ready_queue, .. } = self;
         ready_queue.len()
     }
 
-    #[cfg(test)]
     fn pending_len(&self) -> usize {
         let AcceptQueueInner { ready_queue, all_sockets, .. } = self;
         all_sockets.len() - ready_queue.len()

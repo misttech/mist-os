@@ -4085,47 +4085,11 @@ where
         N: Inspector
             + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
     {
-        self.core_ctx().for_each_socket(|socket_id, socket_state| {
-            let TcpSocketState { socket_state, ip_options: _ } = socket_state;
-            let (local, remote) = match socket_state {
-                TcpSocketStateInner::Unbound(_) => (None, None),
-                TcpSocketStateInner::Bound(BoundSocketState::Listener((
-                    _state,
-                    _sharing,
-                    addr,
-                ))) => {
-                    let BoundInfo { addr, port, device } = I::get_bound_info(addr);
-                    let local = addr.map_or_else(
-                        || ZonedAddr::Unzoned(I::UNSPECIFIED_ADDRESS),
-                        |addr| maybe_zoned(addr.addr(), &device).into(),
-                    );
-                    (Some((local, port)), None)
-                }
-                TcpSocketStateInner::Bound(BoundSocketState::Connected {
-                    conn: conn_and_addr,
-                    ..
-                }) => {
-                    if I::get_defunct(conn_and_addr) {
-                        return;
-                    }
-                    let ConnectionInfo {
-                        local_addr: SocketAddr { ip, port },
-                        remote_addr,
-                        device: _,
-                    } = I::get_conn_info(conn_and_addr);
-                    (Some((ip.into(), port)), Some(remote_addr))
-                }
-            };
-            inspector.record_debug_child(socket_id, |node| {
-                node.record_str("TransportProtocol", "TCP");
-                node.record_str(
-                    "NetworkProtocol",
-                    match I::VERSION {
-                        IpVersion::V4 => "IPv4",
-                        IpVersion::V6 => "IPv6",
-                    },
-                );
-                match local {
+        let record_socket_addrs =
+            |node: &mut N::ChildInspector<'_>,
+             local_addr_port: Option<(ZonedAddr<_, _>, _)>,
+             remote_addr: Option<SocketAddr<_, _>>| {
+                match local_addr_port {
                     None => node.record_str("LocalAddress", "[NOT BOUND]"),
                     Some((addr, port)) => node.record_display(
                         "LocalAddress",
@@ -4135,15 +4099,65 @@ where
                         ),
                     ),
                 };
-                match remote {
+                match remote_addr {
                     None => node.record_str("RemoteAddress", "[NOT CONNECTED]"),
                     Some(addr) => node.record_display(
                         "RemoteAddress",
                         addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
                     ),
                 };
+            };
+
+        self.core_ctx().for_each_socket(|socket_id, socket_state| {
+            inspector.record_debug_child(socket_id, |node| {
+                node.record_str("TransportProtocol", "TCP");
+                node.record_str(
+                    "NetworkProtocol",
+                    match I::VERSION {
+                        IpVersion::V4 => "IPv4",
+                        IpVersion::V6 => "IPv6",
+                    },
+                );
+                let TcpSocketState { socket_state, ip_options: _ } = socket_state;
+                match socket_state {
+                    TcpSocketStateInner::Unbound(_) => record_socket_addrs(node, None, None),
+                    TcpSocketStateInner::Bound(BoundSocketState::Listener((
+                        state,
+                        _sharing,
+                        addr,
+                    ))) => {
+                        let BoundInfo { addr, port, device } = I::get_bound_info(addr);
+                        let local = addr.map_or_else(
+                            || ZonedAddr::Unzoned(I::UNSPECIFIED_ADDRESS),
+                            |addr| maybe_zoned(addr.addr(), &device).into(),
+                        );
+                        record_socket_addrs(node, Some((local, port)), None);
+                        match state {
+                            MaybeListener::Bound(_bound_state) => {}
+                            MaybeListener::Listener(Listener { accept_queue, backlog, .. }) => node
+                                .record_child("AcceptQueue", |node| {
+                                    node.record_usize("BacklogSize", *backlog);
+                                    accept_queue.inspect(node);
+                                }),
+                        };
+                    }
+                    TcpSocketStateInner::Bound(BoundSocketState::Connected {
+                        conn: conn_and_addr,
+                        ..
+                    }) => {
+                        if I::get_defunct(conn_and_addr) {
+                            return;
+                        }
+                        let ConnectionInfo {
+                            local_addr: SocketAddr { ip, port },
+                            remote_addr,
+                            device: _,
+                        } = I::get_conn_info(conn_and_addr);
+                        record_socket_addrs(node, Some((ip.into(), port)), Some(remote_addr));
+                    }
+                }
             });
-        });
+        })
     }
 }
 
