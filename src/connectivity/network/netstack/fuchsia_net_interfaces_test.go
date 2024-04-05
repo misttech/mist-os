@@ -134,6 +134,15 @@ func (w *watcherHelper) expectIdleEvent(t *testing.T) {
 	}
 }
 
+// Call `Watch` on the provided watcher, expecting the call to block because
+// no `watchResult` is immediately ready.
+//
+// Note: This function makes a best effort attempt to ensure `Watch` has
+// been called before it returning, but it cannot guarantee it. In certain
+// execution contexts (i.e. Fuchsia's CQ) it's possible for `negativeTimeout` to
+// expire, without the watch goroutine having been scheduled. As such, this
+// function should only be used in negative checks (e.g. verifying an event did
+// not occur).
 func (w *watcherHelper) blockingWatch(t *testing.T, ch chan watchResult) {
 	go func() {
 		event, err := w.Watch(context.Background())
@@ -379,21 +388,6 @@ func TestInterfacesWatcher(t *testing.T) {
 	ifs.RemoveByUser()
 	if err := verifyWatchResults(interfaces.EventWithRemoved(uint64(ifs.nicid))); err != nil {
 		t.Fatal(err)
-	}
-
-	blockingWatcher.blockingWatch(t, ch)
-	if err := blockingWatcher.Close(); err != nil {
-		t.Errorf("failed to close blocking Watcher client proxy: %s", err)
-	}
-
-	got, want := <-ch, zx.ErrCanceled
-	switch err := got.err.(type) {
-	case *zx.Error:
-		if err.Status != want {
-			t.Fatalf("watch canceled by channel closure error = %s, want %s", err, want)
-		}
-	default:
-		t.Fatalf("watch canceled by channel closure error = %#v, want %s", got, want)
 	}
 }
 
