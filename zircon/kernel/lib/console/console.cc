@@ -82,11 +82,14 @@ static int cmd_history(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_boot_test_success(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_graceful_shutdown(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_and(int argc, const cmd_args* argv, uint32_t flags);
+static int cmd_repeat(int argc, const cmd_args* argv, uint32_t flags);
 
 STATIC_COMMAND_START
 STATIC_COMMAND_MASKED("help", "this list", &cmd_help, CMD_AVAIL_ALWAYS)
 STATIC_COMMAND_MASKED("echo", NULL, &cmd_echo, CMD_AVAIL_ALWAYS)
 STATIC_COMMAND_MASKED("and", "execute command if last command succeeded", &cmd_and,
+                      CMD_AVAIL_ALWAYS)
+STATIC_COMMAND_MASKED("repeat", "execute command in a loop for N loops or until error", &cmd_repeat,
                       CMD_AVAIL_ALWAYS)
 STATIC_COMMAND_MASKED("test", "test the command processor", &cmd_test, CMD_AVAIL_ALWAYS)
 #if CONSOLE_ENABLE_HISTORY
@@ -871,6 +874,40 @@ static int cmd_and(int argc, const cmd_args* argv, uint32_t flags) {
   }
 
   return cmd->cmd_callback(argc - 1, argv + 1, flags);
+}
+
+static int cmd_repeat(int argc, const cmd_args* argv, uint32_t flags) {
+  if (argc < 3) {
+    printf("Usage: repeat <iterations | -1> COMMAND...\n");
+    return -1;
+  }
+
+  const cmd* cmd = match_command(argv[2].str, CMD_AVAIL_NORMAL);
+  if (!cmd) {
+    printf("command \"%s\" not found\n", argv[2].str);
+    return -1;
+  }
+
+  // negative arguments will cause it to effectively loop forever
+  size_t term = argv[1].i >= 0 ? argv[1].u : SIZE_MAX;
+  for (size_t loop = 0; loop < term; loop++) {
+    if (term == SIZE_MAX) {
+      printf("repeat (%zu): %s", loop + 1, argv[2].str);
+    } else {
+      printf("repeat (%zu/%zu): %s", loop + 1, term, argv[2].str);
+    }
+    for (int a = 3; a < argc; a++) {
+      printf(" %s", argv[a].str);
+    }
+    printf("\n");
+    int err = cmd->cmd_callback(argc - 2, argv + 2, flags);
+    if (err != 0) {
+      printf("stopping repeat due to nonzero status %d\n", err);
+      return err;
+    }
+  }
+
+  return ZX_OK;
 }
 
 static constexpr TimerSlack kSlack{ZX_MSEC(10), TIMER_SLACK_CENTER};
