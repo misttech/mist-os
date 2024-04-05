@@ -122,7 +122,10 @@ class LoadModule {
 
   // If the template parameter is pointer-like, then HasDecoded() is initially
   // false and this must be used to install a pointer.
-  constexpr void set_decoded(DecodedStorage decoded) { decoded_ = std::move(decoded); }
+  constexpr void set_decoded(DecodedStorage decoded) {
+    decoded_ = std::move(decoded);
+    assert(HasDecoded());
+  }
 
   // For convenient container searches, equality comparison against a (hashed)
   // name checks both name fields.  An unloaded module only has a load name.

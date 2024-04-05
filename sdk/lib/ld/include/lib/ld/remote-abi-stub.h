@@ -117,6 +117,16 @@ class RemoteAbiStub : public fbl::RefCounted<RemoteAbiStub<Elf>> {
     return abi_stub;
   }
 
+  // This just rolls in RemoteModule::Create with the Create above.
+  template <class Diagnostics>
+  static Ptr Create(Diagnostics& diag, zx::vmo ld_stub_vmo, size_t page_size) {
+    Ptr result;
+    if (RemoteModulePtr ld_stub = RemoteModule::Create(diag, std::move(ld_stub_vmo), page_size)) {
+      result = Create(diag, std::move(ld_stub));
+    }
+    return result;
+  }
+
  private:
   using Abi = abi::Abi<Elf, elfldltl::RemoteAbiTraits>;
   using RDebug = typename Elf::template RDebug<elfldltl::RemoteAbiTraits>;

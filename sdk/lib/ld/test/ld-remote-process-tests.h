@@ -10,6 +10,7 @@
 #include <lib/ld/remote-abi-heap.h>
 #include <lib/ld/remote-abi-stub.h>
 #include <lib/ld/remote-abi.h>
+#include <lib/ld/remote-dynamic-linker.h>
 #include <lib/ld/remote-load-module.h>
 #include <lib/ld/testing/test-vmo.h>
 #include <lib/zx/thread.h>
@@ -67,6 +68,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
  private:
   class MockLoader;
 
+  using Linker = RemoteDynamicLinker<>;
   using RemoteModule = RemoteLoadModule<>;
 
   static zx::vmo GetTestVmo(std::string_view path);
@@ -75,47 +77,29 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
 
   template <class Diagnostics>
   void Load(Diagnostics& diag, std::string_view executable_name, bool should_fail) {
-    const std::string executable_path = std::filesystem::path("test") / "bin" / executable_name;
+    const size_t page_size = zx_system_get_page_size();
+    Linker linker;
 
+    // Decode the main executable.
+    const std::string executable_path = std::filesystem::path("test") / "bin" / executable_name;
     zx::vmo vmo;
     ASSERT_NO_FATAL_FAILURE(vmo = elfldltl::testing::GetTestLibVmo(executable_path));
+    std::array initial_modules = {Linker::InitModule{
+        .decoded_module = RemoteModule::Decoded::Create(diag, std::move(vmo), page_size),
+    }};
+    ASSERT_TRUE(initial_modules.front().decoded_module);
+
+    // Pre-decode the vDSO.
+    zx::vmo stub_ld_vmo;
+    ASSERT_NO_FATAL_FAILURE(stub_ld_vmo = elfldltl::testing::GetTestLibVmo("ld-stub.so"));
 
     zx::vmo vdso_vmo;
     zx_status_t status = GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vdso_vmo);
     ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
 
-    zx::vmo stub_ld_vmo;
-    stub_ld_vmo = elfldltl::testing::GetTestLibVmo("ld-stub.so");
-
-    // Pre-decode the vDSO and stub modules.
-    constexpr size_t kVdso = 0, kStub = 1;
-    auto predecode = [&diag](RemoteModule& module, std::string_view what, zx::vmo vmo) {
-      // Set a temporary name until we decode the DT_SONAME.
-      module.set_name(what);
-      RemoteModule::size_type tls_id = 0;
-      ASSERT_TRUE(module.Decode(diag, std::move(vmo), -1, tls_id));
-      EXPECT_EQ(tls_id, 0u);
-      EXPECT_THAT(module.decoded().needed(), ::testing::IsEmpty())
-          << what << " cannot have DT_NEEDED";
-      EXPECT_THAT(module.reloc_info().rel_relative(), ::testing::IsEmpty())
-          << what << " cannot have RELATIVE relocations";
-      EXPECT_THAT(module.reloc_info().rel_symbolic(), ::testing::IsEmpty())
-          << what << " cannot have symbolic relocations";
-      EXPECT_THAT(module.reloc_info().relr(), ::testing::IsEmpty())
-          << what << " cannot have RELR relocations";
-      std::visit(
-          [what](const auto& jmprel) {
-            EXPECT_THAT(jmprel, ::testing::IsEmpty())
-                << what << " cannot have DT_JMPREL relocations";
-          },
-          module.reloc_info().jmprel());
-      ASSERT_TRUE(module.HasModule());
-      module.set_name(module.module().soname);
-    };
-    std::array<RemoteModule, 2> predecoded_modules;
-    ASSERT_NO_FATAL_FAILURE(predecode(predecoded_modules[kVdso], "vDSO", std::move(vdso_vmo)));
-    ASSERT_NO_FATAL_FAILURE(
-        predecode(predecoded_modules[kStub], "stub ld.so", std::move(stub_ld_vmo)));
+    std::array predecoded_modules = {Linker::PredecodedModule{
+        .decoded_module = RemoteModule::Decoded::Create(diag, std::move(vdso_vmo), page_size),
+    }};
 
     // Acquire the layout details from the stub.  The same values collected
     // here can be reused along with the decoded RemoteLoadModule for the stub
@@ -123,34 +107,36 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     // any number of separate dynamic linking domains in however many
     // processes.
     RemoteAbiStub<>::Ptr abi_stub =
-        RemoteAbiStub<>::Create(diag, predecoded_modules[kStub].decoded_module());
+        RemoteAbiStub<>::Create(diag, std::move(stub_ld_vmo), page_size);
     EXPECT_TRUE(abi_stub);
     EXPECT_GE(abi_stub->data_size(), sizeof(ld::abi::Abi<>) + sizeof(elfldltl::Elf<>::RDebug<>));
-    EXPECT_LT(abi_stub->data_size(), zx_system_get_page_size());
+    EXPECT_LT(abi_stub->data_size(), page_size);
     EXPECT_LE(abi_stub->abi_offset(), abi_stub->data_size() - sizeof(ld::abi::Abi<>));
     EXPECT_LE(abi_stub->rdebug_offset(), abi_stub->data_size() - sizeof(elfldltl::Elf<>::RDebug<>));
     EXPECT_NE(abi_stub->rdebug_offset(), abi_stub->abi_offset())
         << "with data_size() " << abi_stub->data_size();
 
-    // Verify that the TLSDESC entry points were found in the stub and that their
-    // addresses pass some basic smell tests.
-    const RemoteModule& predecoded_stub = predecoded_modules[kStub];
+    linker.set_abi_stub(abi_stub);
+
+    // Verify that the TLSDESC entry points were found in the stub and that
+    // their addresses pass some basic smell tests.
     std::set<elfldltl::Elf<>::size_type> tlsdesc_entrypoints;
     const auto segment_is_executable = [](const auto& segment) -> bool {
       return segment.executable();
     };
+    const RemoteModule::Decoded& stub_module = *abi_stub->decoded_module();
     for (const elfldltl::Elf<>::size_type entry : abi_stub->tlsdesc_runtime()) {
       // Must be nonzero.
       EXPECT_NE(entry, 0u);
 
       // Must lie within the module bounds.
-      EXPECT_GT(entry, predecoded_stub.decoded().load_info().vaddr_start());
-      EXPECT_LT(entry - predecoded_stub.decoded().load_info().vaddr_start(),
-                predecoded_stub.decoded().load_info().vaddr_size());
+      EXPECT_GT(entry, stub_module.load_info().vaddr_start());
+      EXPECT_LT(entry - stub_module.load_info().vaddr_start(),
+                stub_module.load_info().vaddr_size());
 
       // Must be inside an executable segment.
-      auto segment = predecoded_stub.decoded().load_info().FindSegment(entry);
-      ASSERT_NE(segment, predecoded_stub.decoded().load_info().segments().end());
+      auto segment = stub_module.load_info().FindSegment(entry);
+      ASSERT_NE(segment, stub_module.load_info().segments().end());
       EXPECT_TRUE(std::visit(segment_is_executable, *segment));
 
       // Must be unique.
@@ -160,18 +146,25 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     EXPECT_EQ(tlsdesc_entrypoints.size(), kTlsdescRuntimeCount);
 
     // First just decode all the modules: the executable and dependencies.
-    auto get_dep_vmo = [this](const RemoteModule::Soname& soname) { return GetDepVmo(soname); };
-    auto decode_result = RemoteModule::DecodeModules(diag, std::move(vmo), get_dep_vmo,
-                                                     std::move(predecoded_modules));
-    ASSERT_TRUE(decode_result);
-    auto& modules = decode_result->modules;
+    auto get_dep = [this, page_size,
+                    &diag](const RemoteModule::Soname& soname) -> Linker::GetDepResult {
+      RemoteModule::Decoded::Ptr decoded;
+      if (zx::vmo vmo = GetDepVmo(soname)) [[likely]] {
+        decoded = RemoteModule::Decoded::Create(diag, std::move(vmo), page_size);
+      } else if (!diag.MissingDependency(soname.str())) {
+        return std::nullopt;
+      }
+      return std::move(decoded);
+    };
+    auto init_result = linker.Init(diag, initial_modules, get_dep, std::move(predecoded_modules));
+    ASSERT_TRUE(init_result);
+    auto& modules = linker.modules();
     ASSERT_FALSE(modules.empty());
+
+    const RemoteModule& loaded_vdso = modules[init_result->front()];
 
     RemoteModule& loaded_exec = modules.front();
     const RemoteModule::ExecInfo& exec_info = loaded_exec.decoded().exec_info();
-
-    RemoteModule& loaded_stub = modules[decode_result->predecoded_positions[kStub]];
-    RemoteModule& loaded_vdso = modules[decode_result->predecoded_positions[kStub]];
 
     // Check the loaded-by pointers.
     EXPECT_FALSE(modules.front().loaded_by_modid())
@@ -188,7 +181,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
           next_module->module().symbols_visible) {
         // The second module must be a direct dependency of the executable.
         EXPECT_THAT(next_module->loaded_by_modid(), ::testing::Optional(0u))
-            << " second module loaded by " << loaded_by_name();
+            << " second module " << next_module->name().str() << " loaded by " << loaded_by_name();
       }
       for (; next_module != modules.end(); ++next_module) {
         if (!next_module->HasModule()) {
@@ -211,6 +204,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     // Record any stack size request from the executable's PT_GNU_STACK.
     set_stack_size(exec_info.stack_size);
 
+    const RemoteModule& loaded_stub = linker.abi_stub_module();
     if (!loaded_stub.HasModule()) {
       ASSERT_TRUE(this->HasFailure());
       return;
@@ -232,13 +226,6 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
       EXPECT_EQ(this->HasFailure(), !should_fail);
       return;
     }
-
-    // Now that the set of modules is known, initialize the remote ABI heap in
-    // the loaded_stub module.  This can change that module's vaddr_size.
-    RemoteAbi<> remote_abi;
-    zx::result abi_result =
-        remote_abi.Init(diag, abi_stub, loaded_stub, modules, decode_result->max_tls_modid);
-    ASSERT_TRUE(abi_result.is_ok()) << abi_result.status_string();
 
     // Choose load addresses.
     EXPECT_TRUE(RemoteModule::AllocateModules(diag, modules, root_vmar().borrow()));
@@ -269,8 +256,12 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
       return;
     }
 
+    for (size_t i = 0; i < modules.size(); ++i) {
+      EXPECT_EQ(modules[i].module().symbolizer_modid, i);
+    }
+
     // Now that load addresses have been chosen, populate the remote ABI data.
-    abi_result = std::move(remote_abi).Finish(diag, loaded_stub, modules);
+    auto abi_result = std::move(linker.remote_abi()).Finish(diag, loaded_stub, modules);
     EXPECT_TRUE(abi_result.is_ok()) << abi_result.status_string();
 
     // Finally, all the VMO contents are in place to be mapped into the
