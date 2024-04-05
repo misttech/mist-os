@@ -1368,14 +1368,13 @@ impl FuseMutableState {
         if !self.is_connected() {
             return error!(ECONNABORTED);
         }
-        let operation = Arc::new(operation);
         self.last_unique_id += 1;
         let message = FuseKernelMessage::new(self.last_unique_id, current_task, node, operation)?;
         if let Some(waiter) = waiter {
             self.waiters.wait_async_value(waiter, self.last_unique_id);
         }
         if message.operation.has_response() {
-            self.operations.insert(self.last_unique_id, message.operation.clone().into());
+            self.operations.insert(self.last_unique_id, message.operation.as_running().into());
         }
         self.message_queue.push_back(message);
         self.waiters.notify_fd_events(FdEvents::POLLIN);
@@ -1465,15 +1464,22 @@ impl FuseMutableState {
             data.available(),
         );
         self.waiters.notify_value(header.unique);
-        let running_operation =
-            self.operations.get_mut(&header.unique).ok_or_else(|| errno!(EINVAL))?;
-        let operation = running_operation.operation.clone();
+        let mut running_operation = match self.operations.entry(header.unique) {
+            Entry::Occupied(e) => e,
+            Entry::Vacant(_) => return error!(EINVAL),
+        };
+        let operation = running_operation.get().operation;
+        let is_async = operation.is_async();
         if header.error < 0 {
             log_trace!("Fuse: {operation:?} -> {header:?}");
             let code = i16::try_from(-header.error).unwrap_or(EINVAL.error_code() as i16);
             let errno = errno_from_code!(code);
-            running_operation.response =
-                Some(operation.handle_error(&mut self.operations_state, errno));
+            let response = operation.handle_error(&mut self.operations_state, errno);
+            if is_async {
+                running_operation.remove();
+            } else {
+                running_operation.get_mut().response = Some(response);
+            }
         } else {
             let buffer = data.read_to_vec_limited(payload_size)?;
             if buffer.len() != payload_size {
@@ -1481,32 +1487,19 @@ impl FuseMutableState {
             }
             let response = operation.parse_response(buffer)?;
             log_trace!("Fuse: {operation:?} -> {response:?}");
-            if operation.is_async() {
-                self.handle_async(&operation, response)?;
+            if is_async {
+                if let FuseResponse::Init(init_out) = response {
+                    running_operation.remove();
+                    self.set_configuration(init_out.try_into()?);
+                } else {
+                    // Init is the only async operation.
+                    return error!(EINVAL);
+                }
             } else {
-                running_operation.response = Some(Ok(response));
+                running_operation.get_mut().response = Some(Ok(response));
             }
-        }
-        if operation.is_async() {
-            self.operations.remove(&header.unique);
         }
         Ok(data.bytes_read())
-    }
-
-    fn handle_async(
-        &mut self,
-        operation: &FuseOperation,
-        response: FuseResponse,
-    ) -> Result<(), Errno> {
-        debug_assert!(operation.is_async());
-        if let FuseOperation::Init = operation {
-            if let FuseResponse::Init(init_out) = response {
-                self.set_configuration(init_out.try_into()?);
-            } else {
-                return error!(EINVAL);
-            }
-        }
-        Ok(())
     }
 }
 
@@ -1514,20 +1507,26 @@ impl FuseMutableState {
 /// waiting for a response.
 #[derive(Debug)]
 struct RunningOperation {
-    operation: Arc<FuseOperation>,
+    operation: RunningOperationKind,
     response: Option<Result<FuseResponse, Errno>>,
 }
 
-impl From<Arc<FuseOperation>> for RunningOperation {
-    fn from(operation: Arc<FuseOperation>) -> Self {
+impl From<RunningOperationKind> for RunningOperation {
+    fn from(operation: RunningOperationKind) -> Self {
         Self { operation, response: None }
+    }
+}
+
+impl RunningOperationKind {
+    fn is_async(&self) -> bool {
+        matches!(self, Self::Init)
     }
 }
 
 #[derive(Debug)]
 struct FuseKernelMessage {
     header: uapi::fuse_in_header,
-    operation: Arc<FuseOperation>,
+    operation: FuseOperation,
 }
 
 impl FuseKernelMessage {
@@ -1535,7 +1534,7 @@ impl FuseKernelMessage {
         unique: u64,
         current_task: &CurrentTask,
         node: &FuseNode,
-        operation: Arc<FuseOperation>,
+        operation: FuseOperation,
     ) -> Result<Self, Errno> {
         let creds = current_task.creds();
         Ok(Self {
@@ -1572,6 +1571,210 @@ bitflags::bitflags! {
         const DO_READDIRPLUS = uapi::FUSE_DO_READDIRPLUS;
         const READDIRPLUS_AUTO = uapi::FUSE_READDIRPLUS_AUTO;
         const SETXATTR_EXT = uapi::FUSE_SETXATTR_EXT;
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+enum RunningOperationKind {
+    Access,
+    Flush,
+    Forget,
+    GetAttr,
+    Init,
+    Interrupt,
+    GetXAttr { size: u32 },
+    ListXAttr { size: u32 },
+    Lookup,
+    Mkdir,
+    Mknod,
+    Link,
+    Open { dir: bool },
+    Poll,
+    Read,
+    Readdir { use_readdirplus: bool },
+    Readlink,
+    Release { dir: bool },
+    RemoveXAttr,
+    Seek,
+    SetAttr,
+    SetXAttr,
+    Statfs,
+    Symlink,
+    Unlink,
+    Write,
+}
+
+impl RunningOperationKind {
+    fn opcode(&self) -> u32 {
+        match self {
+            Self::Access => uapi::fuse_opcode_FUSE_ACCESS,
+            Self::Flush => uapi::fuse_opcode_FUSE_FLUSH,
+            Self::Forget => uapi::fuse_opcode_FUSE_FORGET,
+            Self::GetAttr => uapi::fuse_opcode_FUSE_GETATTR,
+            Self::GetXAttr { .. } => uapi::fuse_opcode_FUSE_GETXATTR,
+            Self::Init => uapi::fuse_opcode_FUSE_INIT,
+            Self::Interrupt => uapi::fuse_opcode_FUSE_INTERRUPT,
+            Self::ListXAttr { .. } => uapi::fuse_opcode_FUSE_LISTXATTR,
+            Self::Lookup => uapi::fuse_opcode_FUSE_LOOKUP,
+            Self::Mkdir => uapi::fuse_opcode_FUSE_MKDIR,
+            Self::Mknod => uapi::fuse_opcode_FUSE_MKNOD,
+            Self::Link => uapi::fuse_opcode_FUSE_LINK,
+            Self::Open { dir } => {
+                if *dir {
+                    uapi::fuse_opcode_FUSE_OPENDIR
+                } else {
+                    uapi::fuse_opcode_FUSE_OPEN
+                }
+            }
+            Self::Poll => uapi::fuse_opcode_FUSE_POLL,
+            Self::Read => uapi::fuse_opcode_FUSE_READ,
+            Self::Readdir { use_readdirplus } => {
+                if *use_readdirplus {
+                    uapi::fuse_opcode_FUSE_READDIRPLUS
+                } else {
+                    uapi::fuse_opcode_FUSE_READDIR
+                }
+            }
+            Self::Readlink => uapi::fuse_opcode_FUSE_READLINK,
+            Self::Release { dir } => {
+                if *dir {
+                    uapi::fuse_opcode_FUSE_RELEASEDIR
+                } else {
+                    uapi::fuse_opcode_FUSE_RELEASE
+                }
+            }
+            Self::RemoveXAttr => uapi::fuse_opcode_FUSE_REMOVEXATTR,
+            Self::Seek => uapi::fuse_opcode_FUSE_LSEEK,
+            Self::SetAttr => uapi::fuse_opcode_FUSE_SETATTR,
+            Self::SetXAttr => uapi::fuse_opcode_FUSE_SETXATTR,
+            Self::Statfs => uapi::fuse_opcode_FUSE_STATFS,
+            Self::Symlink => uapi::fuse_opcode_FUSE_SYMLINK,
+            Self::Unlink => uapi::fuse_opcode_FUSE_UNLINK,
+            Self::Write => uapi::fuse_opcode_FUSE_WRITE,
+        }
+    }
+
+    fn to_response<T: FromBytes + AsBytes + NoCell>(buffer: &[u8]) -> T {
+        let mut result = T::new_zeroed();
+        let length_to_copy = std::cmp::min(buffer.len(), std::mem::size_of::<T>());
+        result.as_bytes_mut()[..length_to_copy].copy_from_slice(&buffer[..length_to_copy]);
+        result
+    }
+
+    fn parse_response(&self, buffer: Vec<u8>) -> Result<FuseResponse, Errno> {
+        match self {
+            Self::Access => Ok(FuseResponse::Access(Ok(()))),
+            Self::GetAttr | Self::SetAttr => {
+                Ok(FuseResponse::Attr(Self::to_response::<uapi::fuse_attr_out>(&buffer)))
+            }
+            Self::GetXAttr { size } | Self::ListXAttr { size } => {
+                if *size == 0 {
+                    if buffer.len() < std::mem::size_of::<uapi::fuse_getxattr_out>() {
+                        return error!(EINVAL);
+                    }
+                    let getxattr_out = Self::to_response::<uapi::fuse_getxattr_out>(&buffer);
+                    Ok(FuseResponse::GetXAttr(ValueOrSize::Size(getxattr_out.size as usize)))
+                } else {
+                    Ok(FuseResponse::GetXAttr(FsString::new(buffer).into()))
+                }
+            }
+            Self::Init => Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(&buffer))),
+            Self::Lookup | Self::Mkdir | Self::Mknod | Self::Link | Self::Symlink => {
+                Ok(FuseResponse::Entry(Self::to_response::<uapi::fuse_entry_out>(&buffer)))
+            }
+            Self::Open { .. } => {
+                Ok(FuseResponse::Open(Self::to_response::<uapi::fuse_open_out>(&buffer)))
+            }
+            Self::Poll => Ok(FuseResponse::Poll(Self::to_response::<uapi::fuse_poll_out>(&buffer))),
+            Self::Read | Self::Readlink => Ok(FuseResponse::Read(buffer)),
+            Self::Readdir { use_readdirplus, .. } => {
+                let mut result = vec![];
+                let mut slice = &buffer[..];
+                while !slice.is_empty() {
+                    // If using READDIRPLUS, the data starts with the entry.
+                    let entry = if *use_readdirplus {
+                        if slice.len() < std::mem::size_of::<uapi::fuse_entry_out>() {
+                            return error!(EINVAL);
+                        }
+                        let entry = Self::to_response::<uapi::fuse_entry_out>(slice);
+                        slice = &slice[std::mem::size_of::<uapi::fuse_entry_out>()..];
+                        Some(entry)
+                    } else {
+                        None
+                    };
+                    // The next item is the dirent.
+                    if slice.len() < std::mem::size_of::<uapi::fuse_dirent>() {
+                        return error!(EINVAL);
+                    }
+                    let dirent = Self::to_response::<uapi::fuse_dirent>(slice);
+                    // And it ends with the name.
+                    slice = &slice[std::mem::size_of::<uapi::fuse_dirent>()..];
+                    let namelen = dirent.namelen as usize;
+                    if slice.len() < namelen {
+                        return error!(EINVAL);
+                    }
+                    let name = FsString::from(&slice[..namelen]);
+                    result.push((dirent, name, entry));
+                    let skipped = round_up_to_increment(namelen, 8)?;
+                    if slice.len() < skipped {
+                        return error!(EINVAL);
+                    }
+                    slice = &slice[skipped..];
+                }
+                Ok(FuseResponse::Readdir(result))
+            }
+            Self::Flush
+            | Self::Release { .. }
+            | Self::RemoveXAttr
+            | Self::SetXAttr
+            | Self::Unlink => Ok(FuseResponse::None),
+            Self::Statfs => {
+                Ok(FuseResponse::Statfs(Self::to_response::<uapi::fuse_statfs_out>(&buffer)))
+            }
+            Self::Seek => {
+                Ok(FuseResponse::Seek(Self::to_response::<uapi::fuse_lseek_out>(&buffer)))
+            }
+            Self::Write => {
+                Ok(FuseResponse::Write(Self::to_response::<uapi::fuse_write_out>(&buffer)))
+            }
+            Self::Interrupt | Self::Forget => {
+                panic!("Response for operation without one");
+            }
+        }
+    }
+
+    /// Handles an error from the userspace daemon.
+    ///
+    /// Given the `errno` returned by the userspace daemon, returns the response the caller should
+    /// see. This can also update the `OperationState` to allow shortcircuit on future requests.
+    fn handle_error(
+        &self,
+        state: &mut OperationsState,
+        errno: Errno,
+    ) -> Result<FuseResponse, Errno> {
+        match self {
+            Self::Access if errno == ENOSYS => {
+                state.insert(self.opcode(), Ok(FuseResponse::Access(Errno::fail(ENOSYS))));
+                Ok(FuseResponse::Access(Errno::fail(ENOSYS)))
+            }
+            Self::Flush if errno == ENOSYS => {
+                state.insert(self.opcode(), Ok(FuseResponse::None));
+                Ok(FuseResponse::None)
+            }
+            Self::Seek if errno == ENOSYS => {
+                state.insert(self.opcode(), Err(errno.clone()));
+                Err(errno)
+            }
+            Self::Poll if errno == ENOSYS => {
+                let response = FuseResponse::Poll(uapi::fuse_poll_out {
+                    revents: (FdEvents::POLLIN | FdEvents::POLLOUT).bits(),
+                    padding: 0,
+                });
+                state.insert(self.opcode(), Ok(response.clone()));
+                Ok(response)
+            }
+            _ => Err(errno),
+        }
     }
 }
 
@@ -1833,6 +2036,47 @@ impl FuseOperation {
         }
     }
 
+    fn as_running(&self) -> RunningOperationKind {
+        match self {
+            Self::Access { .. } => RunningOperationKind::Access,
+            Self::Flush(_) => RunningOperationKind::Flush,
+            Self::Forget(_) => RunningOperationKind::Forget,
+            Self::GetAttr => RunningOperationKind::GetAttr,
+            Self::GetXAttr { getxattr_in, .. } => {
+                RunningOperationKind::GetXAttr { size: getxattr_in.size }
+            }
+            Self::Init => RunningOperationKind::Init,
+            Self::Interrupt { .. } => RunningOperationKind::Interrupt,
+            Self::ListXAttr(getxattr_in) => {
+                RunningOperationKind::ListXAttr { size: getxattr_in.size }
+            }
+            Self::Lookup { .. } => RunningOperationKind::Lookup,
+            Self::Mkdir { .. } => RunningOperationKind::Mkdir,
+            Self::Mknod { .. } => RunningOperationKind::Mknod,
+            Self::Link { .. } => RunningOperationKind::Link,
+            Self::Open { flags, mode } => RunningOperationKind::Open {
+                dir: mode.is_dir() || flags.contains(OpenFlags::DIRECTORY),
+            },
+            Self::Poll(_) => RunningOperationKind::Poll,
+            Self::Read(_) => RunningOperationKind::Read,
+            Self::Readdir { use_readdirplus, .. } => {
+                RunningOperationKind::Readdir { use_readdirplus: *use_readdirplus }
+            }
+            Self::Readlink => RunningOperationKind::Readlink,
+            Self::Release { flags, mode, .. } => RunningOperationKind::Release {
+                dir: mode.is_dir() || flags.contains(OpenFlags::DIRECTORY),
+            },
+            Self::RemoveXAttr { .. } => RunningOperationKind::RemoveXAttr,
+            Self::Seek(_) => RunningOperationKind::Seek,
+            Self::SetAttr(_) => RunningOperationKind::SetAttr,
+            Self::SetXAttr { .. } => RunningOperationKind::SetXAttr,
+            Self::Statfs => RunningOperationKind::Statfs,
+            Self::Symlink { .. } => RunningOperationKind::Symlink,
+            Self::Unlink { .. } => RunningOperationKind::Unlink,
+            Self::Write { .. } => RunningOperationKind::Write,
+        }
+    }
+
     fn len(&self) -> usize {
         #[derive(Debug, Default)]
         struct CountingOutputBuffer {
@@ -1893,135 +2137,5 @@ impl FuseOperation {
 
     fn is_async(&self) -> bool {
         matches!(self, Self::Init)
-    }
-
-    fn to_response<T: FromBytes + AsBytes + NoCell>(buffer: &[u8]) -> T {
-        let mut result = T::new_zeroed();
-        let length_to_copy = std::cmp::min(buffer.len(), std::mem::size_of::<T>());
-        result.as_bytes_mut()[..length_to_copy].copy_from_slice(&buffer[..length_to_copy]);
-        result
-    }
-
-    fn parse_response(&self, buffer: Vec<u8>) -> Result<FuseResponse, Errno> {
-        debug_assert!(self.has_response());
-        match self {
-            Self::Access { .. } => Ok(FuseResponse::Access(Ok(()))),
-            Self::GetAttr | Self::SetAttr(_) => {
-                Ok(FuseResponse::Attr(Self::to_response::<uapi::fuse_attr_out>(&buffer)))
-            }
-            Self::GetXAttr { getxattr_in, .. } | Self::ListXAttr(getxattr_in) => {
-                if getxattr_in.size == 0 {
-                    if buffer.len() < std::mem::size_of::<uapi::fuse_getxattr_out>() {
-                        return error!(EINVAL);
-                    }
-                    let getxattr_out = Self::to_response::<uapi::fuse_getxattr_out>(&buffer);
-                    Ok(FuseResponse::GetXAttr(ValueOrSize::Size(getxattr_out.size as usize)))
-                } else {
-                    Ok(FuseResponse::GetXAttr(FsString::new(buffer).into()))
-                }
-            }
-            Self::Init => Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(&buffer))),
-            Self::Lookup { .. }
-            | Self::Mkdir { .. }
-            | Self::Mknod { .. }
-            | Self::Link { .. }
-            | Self::Symlink { .. } => {
-                Ok(FuseResponse::Entry(Self::to_response::<uapi::fuse_entry_out>(&buffer)))
-            }
-            Self::Open { .. } => {
-                Ok(FuseResponse::Open(Self::to_response::<uapi::fuse_open_out>(&buffer)))
-            }
-            Self::Poll(_) => {
-                Ok(FuseResponse::Poll(Self::to_response::<uapi::fuse_poll_out>(&buffer)))
-            }
-            Self::Read(_) | Self::Readlink => Ok(FuseResponse::Read(buffer)),
-            Self::Readdir { use_readdirplus, .. } => {
-                let mut result = vec![];
-                let mut slice = &buffer[..];
-                while !slice.is_empty() {
-                    // If using READDIRPLUS, the data starts with the entry.
-                    let entry = if *use_readdirplus {
-                        if slice.len() < std::mem::size_of::<uapi::fuse_entry_out>() {
-                            return error!(EINVAL);
-                        }
-                        let entry = Self::to_response::<uapi::fuse_entry_out>(slice);
-                        slice = &slice[std::mem::size_of::<uapi::fuse_entry_out>()..];
-                        Some(entry)
-                    } else {
-                        None
-                    };
-                    // The next item is the dirent.
-                    if slice.len() < std::mem::size_of::<uapi::fuse_dirent>() {
-                        return error!(EINVAL);
-                    }
-                    let dirent = Self::to_response::<uapi::fuse_dirent>(slice);
-                    // And it ends with the name.
-                    slice = &slice[std::mem::size_of::<uapi::fuse_dirent>()..];
-                    let namelen = dirent.namelen as usize;
-                    if slice.len() < namelen {
-                        return error!(EINVAL);
-                    }
-                    let name = FsString::from(&slice[..namelen]);
-                    result.push((dirent, name, entry));
-                    let skipped = round_up_to_increment(namelen, 8)?;
-                    if slice.len() < skipped {
-                        return error!(EINVAL);
-                    }
-                    slice = &slice[skipped..];
-                }
-                Ok(FuseResponse::Readdir(result))
-            }
-            Self::Flush(_)
-            | Self::Release { .. }
-            | Self::RemoveXAttr { .. }
-            | Self::SetXAttr { .. }
-            | Self::Unlink { .. } => Ok(FuseResponse::None),
-            Self::Statfs => {
-                Ok(FuseResponse::Statfs(Self::to_response::<uapi::fuse_statfs_out>(&buffer)))
-            }
-            Self::Seek(_) => {
-                Ok(FuseResponse::Seek(Self::to_response::<uapi::fuse_lseek_out>(&buffer)))
-            }
-            Self::Write { .. } => {
-                Ok(FuseResponse::Write(Self::to_response::<uapi::fuse_write_out>(&buffer)))
-            }
-            Self::Interrupt { .. } | Self::Forget(_) => {
-                panic!("Response for operation without one");
-            }
-        }
-    }
-
-    /// Handles an error from the userspace daemon.
-    ///
-    /// Given the `errno` returned by the userspace daemon, returns the response the caller should
-    /// see. This can also update the `OperationState` to allow shortcircuit on future requests.
-    fn handle_error(
-        &self,
-        state: &mut OperationsState,
-        errno: Errno,
-    ) -> Result<FuseResponse, Errno> {
-        match self {
-            Self::Access { .. } if errno == ENOSYS => {
-                state.insert(self.opcode(), Ok(FuseResponse::Access(Errno::fail(ENOSYS))));
-                Ok(FuseResponse::Access(Errno::fail(ENOSYS)))
-            }
-            Self::Flush(_) if errno == ENOSYS => {
-                state.insert(self.opcode(), Ok(FuseResponse::None));
-                Ok(FuseResponse::None)
-            }
-            Self::Seek(_) if errno == ENOSYS => {
-                state.insert(self.opcode(), Err(errno.clone()));
-                Err(errno)
-            }
-            Self::Poll(_) if errno == ENOSYS => {
-                let response = FuseResponse::Poll(uapi::fuse_poll_out {
-                    revents: (FdEvents::POLLIN | FdEvents::POLLOUT).bits(),
-                    padding: 0,
-                });
-                state.insert(self.opcode(), Ok(response.clone()));
-                Ok(response)
-            }
-            _ => Err(errno),
-        }
     }
 }
