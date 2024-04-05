@@ -16,7 +16,7 @@ use {
     async_trait::async_trait,
     bedrock_error::Explain,
     cm_rust::{CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon},
-    cm_types::Name,
+    cm_types::{IterablePath, Name, RelativePath},
     cm_util::TaskGroup,
     fidl_fuchsia_io as fio,
     flyweights::FlyStr,
@@ -448,28 +448,19 @@ impl AnonymizedAggregateServiceDir {
                     .upgrade()
                     .map_err(|err| ModelError::ComponentInstanceError { err })?;
 
-                let source_path_pieces = capability.source_path().unwrap().split();
-
-                let mut curr_path = Vec::new();
-                for piece in source_path_pieces {
+                let mut cur_path = RelativePath::dot();
+                for segment in capability.source_path().unwrap().iter_segments() {
                     let component = component.upgrade()?;
                     let (proxy, server_end) =
                         fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                             .expect("failed to create proxy");
-                    // Start the path with a leading slash since if curr_path is empty, the
-                    // open_outgoing function doesn't work on an empty path string.
-                    // Inside, the "/" is turned into a "." through canonicalize_path.
-                    let curr_path_joined = format!("/{}", curr_path.join("/"));
                     let flags = fio::OpenFlags::DIRECTORY;
                     let mut object_request = flags.to_object_request(server_end);
                     component
                         .open_outgoing(OpenRequest::new(
                             component.execution_scope.clone(),
                             flags,
-                            curr_path_joined
-                                .as_str()
-                                .try_into()
-                                .map_err(|_| ModelError::BadPath)?,
+                            cur_path.to_string().try_into().map_err(|_| ModelError::BadPath)?,
                             &mut object_request,
                         ))
                         .await?;
@@ -480,7 +471,7 @@ impl AnonymizedAggregateServiceDir {
                                 service_name=%self.route.service_name,
                                 error=%err,
                                 "Failed to get the outgoing watcher for the path '{}'.",
-                                curr_path_joined.as_str()
+                                cur_path
                             );
                             ModelError::open_directory_error(
                                 target.moniker.clone(),
@@ -494,7 +485,6 @@ impl AnonymizedAggregateServiceDir {
                         Exit,
                     }
 
-                    let piece_borrow = piece.as_str();
                     let result = watcher
                         .map_err(|e| StreamErrorType::StreamError(e))
                         .try_for_each(|entry| async move {
@@ -510,7 +500,7 @@ impl AnonymizedAggregateServiceDir {
                                 | fuchsia_fs::directory::WatchEvent::EXISTING => {
                                     let filename =
                                         entry.filename.as_path().to_str().unwrap().to_owned();
-                                    if filename.as_str() != piece_borrow {
+                                    if filename.as_str() != segment.as_str() {
                                         return Ok(());
                                     }
 
@@ -549,7 +539,7 @@ impl AnonymizedAggregateServiceDir {
 
                     match result {
                         Err(StreamErrorType::Found) => {
-                            curr_path.push(piece);
+                            cur_path.push(segment.clone());
                             continue;
                         }
                         Err(StreamErrorType::StreamError(err)) => {

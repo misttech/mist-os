@@ -477,7 +477,7 @@ impl Path {
     }
 
     pub fn extend(&mut self, other: RelativePath) {
-        self.0.segments.extend(other.segments);
+        self.0.extend(other);
     }
 }
 
@@ -636,6 +636,10 @@ impl RelativePath {
 
     pub fn extend(&mut self, other: Self) {
         self.segments.extend(other.segments);
+    }
+
+    pub fn push(&mut self, segment: Name) {
+        self.segments.push(segment);
     }
 }
 
