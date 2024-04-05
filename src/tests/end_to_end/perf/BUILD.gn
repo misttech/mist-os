@@ -50,7 +50,11 @@ foreach(target_name, test_list) {
 _tests = [
   {
     name = "flatland_benchmark"
-    expected_metric_filenames = [ "fuchsia.flatland_latency.txt" ]
+    expected_metric_filenames = [ "fuchsia.app_render_latency.txt" ]
+    libraries = [
+      "//src/performance/lib/trace_processing",
+      "//src/performance/lib/perf_publish",
+    ]
   },
   {
     name = "input_latency_benchmark"

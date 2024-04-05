@@ -11,6 +11,7 @@ python_library("trace_processing") {
   sources = [
     "__init__.py",
     "metrics/__init__.py",
+    "metrics/app_render.py",
     "metrics/cpu.py",
     "metrics/fps.py",
     "metrics/scenic.py",

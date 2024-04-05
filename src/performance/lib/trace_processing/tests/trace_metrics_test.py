@@ -11,13 +11,13 @@ from parameterized import parameterized, param
 import tempfile
 import unittest
 
+import trace_processing.metrics.app_render as app_render_metrics
 import trace_processing.metrics.cpu as cpu_metrics
 import trace_processing.metrics.fps as fps_metrics
 import trace_processing.metrics.scenic as scenic_metrics
 import trace_processing.trace_importing as trace_importing
 import trace_processing.trace_metrics as trace_metrics
 import trace_processing.trace_model as trace_model
-
 
 # Boilerplate-busting constants:
 U = trace_metrics.Unit
@@ -349,6 +349,121 @@ class MetricProcessorsTest(unittest.TestCase):
                         label="RenderTotalAverage",
                         unit=U.milliseconds,
                         values=[0.111],
+                    ),
+                ],
+            ),
+            param(
+                "app_render",
+                processor=app_render_metrics.AppRenderLatencyMetricsProcessor(
+                    "flatland-view-provider-example",
+                    aggregates_only=False,
+                ),
+                model_file="app_render_metric.json",
+                expected_results=[
+                    TCR(
+                        label="AppRenderVsyncLatency",
+                        unit=U.milliseconds,
+                        values=[0.004, 0.002, 0.001, 0.006, 0.008],
+                    ),
+                    TCR(
+                        label="AppFps",
+                        unit=U.framesPerSecond,
+                        values=[
+                            125000.0,
+                            111111.11111111111,
+                            66666.66666666667,
+                            83333.33333333333,
+                        ],
+                    ),
+                ],
+            ),
+            param(
+                "app_render_aggregates",
+                processor=app_render_metrics.AppRenderLatencyMetricsProcessor(
+                    "flatland-view-provider-example",
+                    aggregates_only=True,
+                ),
+                model_file="app_render_metric.json",
+                expected_results=[
+                    TCR(
+                        label="AppRenderVsyncLatencyP5",
+                        unit=U.milliseconds,
+                        values=[0.0012000000000000001],
+                    ),
+                    TCR(
+                        label="AppRenderVsyncLatencyP25",
+                        unit=U.milliseconds,
+                        values=[0.002],
+                    ),
+                    TCR(
+                        label="AppRenderVsyncLatencyP50",
+                        unit=U.milliseconds,
+                        values=[0.004],
+                    ),
+                    TCR(
+                        label="AppRenderVsyncLatencyP75",
+                        unit=U.milliseconds,
+                        values=[0.006],
+                    ),
+                    TCR(
+                        label="AppRenderVsyncLatencyP95",
+                        unit=U.milliseconds,
+                        values=[0.007600000000000001],
+                    ),
+                    TCR(
+                        label="AppRenderVsyncLatencyMin",
+                        unit=U.milliseconds,
+                        values=[0.001],
+                    ),
+                    TCR(
+                        label="AppRenderVsyncLatencyMax",
+                        unit=U.milliseconds,
+                        values=[0.008],
+                    ),
+                    TCR(
+                        label="AppRenderVsyncLatencyAverage",
+                        unit=U.milliseconds,
+                        values=[0.0042],
+                    ),
+                    TCR(
+                        label="AppFpsP5",
+                        unit=U.framesPerSecond,
+                        values=[69166.66666666667],
+                    ),
+                    TCR(
+                        label="AppFpsP25",
+                        unit=U.framesPerSecond,
+                        values=[79166.66666666667],
+                    ),
+                    TCR(
+                        label="AppFpsP50",
+                        unit=U.framesPerSecond,
+                        values=[97222.22222222222],
+                    ),
+                    TCR(
+                        label="AppFpsP75",
+                        unit=U.framesPerSecond,
+                        values=[114583.33333333333],
+                    ),
+                    TCR(
+                        label="AppFpsP95",
+                        unit=U.framesPerSecond,
+                        values=[122916.66666666667],
+                    ),
+                    TCR(
+                        label="AppFpsMin",
+                        unit=U.framesPerSecond,
+                        values=[66666.66666666667],
+                    ),
+                    TCR(
+                        label="AppFpsMax",
+                        unit=U.framesPerSecond,
+                        values=[125000.0],
+                    ),
+                    TCR(
+                        label="AppFpsAverage",
+                        unit=U.framesPerSecond,
+                        values=[96527.77777777778],
                     ),
                 ],
             ),

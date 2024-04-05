@@ -21,6 +21,7 @@ if (is_host) {
 
   host_test_data("trace_metrics_test_data") {
     sources = [
+      "data/app_render_metric.json",
       "data/cpu_metric.json",
       "data/cpu_metric_system_metrics_logger.json",
       "data/fps_metric.json",

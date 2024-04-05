@@ -6,18 +6,22 @@
 
 import os
 import time
+from pathlib import Path
 
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import test_runner
 from mobly import asserts
+from trace_processing import trace_importing, trace_metrics, trace_model
+from trace_processing.metrics import app_render, cpu
+from perf_publish import publish
 
 TILE_URL = (
     "fuchsia-pkg://fuchsia.com/flatland-examples#meta/"
     "flatland-view-provider.cm"
 )
-
 BENCHMARK_DURATION_SEC = 10
+TEST_NAME: str = "fuchsia.app_render_latency"
 
 
 class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
@@ -69,7 +73,43 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
             os.path.exists(expected_trace_filename), msg="trace failed"
         )
 
-        # TODO(b/271467734): Process fxt tracing file.
+        json_trace_file: str = trace_importing.convert_trace_file_to_json(
+            expected_trace_filename
+        )
+
+        model: trace_model.Model = trace_importing.create_model_from_file_path(
+            json_trace_file
+        )
+
+        app_render_latency_results: list[
+            trace_metrics.TestCaseResult
+        ] = app_render.metrics_processor(
+            model,
+            {
+                "aggregateMetricsOnly": True,
+                "debug_name": "flatland-view-provider-example",
+            },
+        )
+
+        cpu_results: list[trace_metrics.TestCaseResult] = cpu.metrics_processor(
+            model, {"aggregateMetricsOnly": False}
+        )
+
+        fuchsiaperf_json_path = Path(
+            os.path.join(self.log_path, f"{TEST_NAME}.fuchsiaperf.json")
+        )
+
+        trace_metrics.TestCaseResult.write_fuchsiaperf_json(
+            results=app_render_latency_results + cpu_results,
+            test_suite=f"{TEST_NAME}",
+            output_path=fuchsiaperf_json_path,
+        )
+
+        expected_metrics_file = f"{TEST_NAME}.txt"
+        publish.publish_fuchsiaperf(
+            fuchsia_perf_file_paths=[fuchsiaperf_json_path],
+            expected_metric_names_filename=expected_metrics_file,
+        )
 
 
 if __name__ == "__main__":
