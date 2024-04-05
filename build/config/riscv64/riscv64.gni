@@ -230,9 +230,6 @@ template("riscv64_abi_config") {
       "-march=$_march",
       "-mabi=$fuchsia_riscv_abi",
     ]
-    if (defined(invoker.cflags)) {
-      cflags += invoker.cflags
-    }
 
     ldflags = cflags
     asmflags = cflags

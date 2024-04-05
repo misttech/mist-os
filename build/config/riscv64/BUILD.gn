@@ -6,7 +6,10 @@ import("riscv64.gni")
 
 # Platform baseline.
 # This tracks the minimum hardware requirements for Fuchsia on RISC-V.
-riscv64_abi_config("riscv64") {
+riscv64_abi_config("abi") {
+}
+
+config("riscv64") {
   # TODO(https://fxbug.dev/42076645): Clang should do this everywhere for Fuchsia
   # targets. When it does, put this under `if (is_gcc)`.
   #
@@ -21,6 +24,7 @@ riscv64_abi_config("riscv64") {
   if (!toolchain_variant.is_pic_default) {
     cflags = [ "-msmall-data-limit=0" ]
   }
+  configs = [ ":abi" ]
 }
 
 riscv64_abi_config("no-vector") {
