@@ -114,7 +114,7 @@ class LoadModule : public LoadModuleBase {
   using File = typename OSImpl::File;
   using Relro = typename Loader::Relro;
   using Phdr = Elf::Phdr;
-  using Ehdr = Elf::Ehdr;
+  using Dyn = Elf::Dyn;
   using Soname = elfldltl::Soname<>;
   using LoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StaticVector<kMaxSegments>::Container>;
 
@@ -136,47 +136,66 @@ class LoadModule : public LoadModuleBase {
   // responsibility for managing its lifetime and unmapping.
   std::unique_ptr<ModuleHandle> take_module() && { return std::move(module_); }
 
-  // TODO(https://fxbug.dev/324136435): This is a gutted version of
-  // StartupModule::Load, just to get the basic dlopen test case working, and is
-  // entirely defined in this header file for convenience for now. In a
-  // forthcoming CL we may be able to share a lot of this code with libld.
-  [[nodiscard]] bool Load(Diagnostics& diag, File file) {
-    // Read the file header and program headers into stack buffers and map in
-    // the image.  This fills in load_info() as well as the module vaddr bounds
-    // and phdrs fields.  Note that module().phdrs might remain empty if the
-    // phdrs aren't in the load image, so keep using the stack copy read from
-    // the file instead.
-    Loader loader;
-    auto headers = decoded().LoadFromFile(diag, loader, std::forward<File>(file));
-    if (!headers) [[unlikely]] {
+  // Retrieve the file and load it into the system image, then decode the phdrs
+  // to metadata to attach to the ABI module and store the information needed
+  // for dependency parsing.
+  bool Load(Diagnostics& diag) {
+    auto file = OSImpl::RetrieveFile(diag, module_->name().str());
+    if (!file) [[unlikely]] {
       return false;
     }
 
-    // To finalize the loaded module's mapping, OSImpl::Commit(...) will commit
-    // the loader and return the Relro object that is used to apply relro
-    // protections later.
+    // Read the file header and program headers into stack buffers and map in
+    // the image.  This fills in load_info() as well as the module vaddr bounds
+    // and phdrs fields.
+    Loader loader;
+    auto headers = decoded().LoadFromFile(diag, loader, *std::move(file));
+    if (!headers) [[unlikely]] {
+      return false;
+    }
+    auto& [ehdr_owner, phdrs_owner] = *headers;
+    cpp20::span<const Phdr> phdrs = phdrs_owner;
+
+    // After successfully loading the file, finalize the module's mapping by
+    // calling `Commit` on the loader. Save the returned relro capability
+    // that will be used to apply relro protections later.
     // TODO(https://fxbug.dev/323418587): For now, pass an empty relro_bounds.
     // This will eventually take the decoded relro_phdr.
     loader_relro_ = std::move(loader).Commit(LoadInfo::Region{});
 
-    // TODO(https://fxbug.dev/331804983): Use decoded().DecodeFromMemory
-
-    auto& [ehdr_owner, phdrs_owner] = *headers;
-    const cpp20::span<const Phdr> phdrs = phdrs_owner;
-
-    // TODO(caslyn): comment.
+    // Now that the file is in memory, we can decode the phdrs.
     std::optional<Phdr> dyn_phdr;
     if (!elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(dyn_phdr))) {
       return false;
     }
 
+    // TODO(caslyn): Use ld::DecodeFromMemory with a
+    // elfldltl::DynamicValueCollectionObserver so that we collect the needed
+    // entries into an fbl::Vector<size_type> in one pass. Have this Load
+    // function return the std::optional result of that to pass to EnqueueDeps.
+    // From the dynamic phdr, decode the metadata and dependency information.
     auto memory = ld::ModuleMemory{decoded().module()};
-    return ld::DecodeModuleDynamic(decoded().module(), diag, memory, dyn_phdr).is_ok();
+    auto dyn = DecodeModuleDynamic(
+        decoded().module(), diag, memory, dyn_phdr,
+        elfldltl::DynamicRelocationInfoObserver(decoded().reloc_info()),
+        elfldltl::DynamicTagCountObserver<Elf, elfldltl::ElfDynTag::kNeeded>(needed_count_));
+    if (dyn.is_error()) [[unlikely]] {
+      return {};
+    }
+
+    dynamic_ = dyn.value();
+
+    return true;
   }
 
  private:
   std::unique_ptr<ModuleHandle> module_;
   Relro loader_relro_;
+  // TODO(caslyn): These are stored here for now, for convenience. After
+  // dependency enqueueing and sharing code with //sdk/lib/ld, we will be able
+  // to see more clearly how best to pass these values around.
+  cpp20::span<const Dyn> dynamic_;
+  size_t needed_count_ = 0;
 };
 
 }  // namespace dl

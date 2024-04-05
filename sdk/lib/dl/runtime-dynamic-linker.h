@@ -65,10 +65,8 @@ class RuntimeDynamicLinker {
       return fit::ok(already_loaded.value());
     }
 
-    // A ModuleHandle for `file` does not yet exist, so allocate one now to be
-    // passed to the LoadModule created below. This allocation occurs before
-    // retrieving the file and initializing a diagnostics object so as to return
-    // an OutOfMemory error early if one occurs.
+    // TODO(caslyn): Roll up ModuleHandle allocation with LoadModule allocation,
+    // and add comment on the allocation/relationship.
     fbl::AllocChecker ac;
     auto module = ModuleHandle::Create(Soname{file}, ac);
     if (!ac.check()) [[unlikely]] {
@@ -80,13 +78,8 @@ class RuntimeDynamicLinker {
     // are generated on this module directly, its name does not need to be
     // prefixed to the error, as is the case using ld::ScopedModuleDiagnostics.
     dl::Diagnostics diag;
-    auto lookup = OSImpl::RetrieveFile(diag, file);
-    if (!lookup) [[unlikely]] {
-      return diag.take_error();
-    }
-
     LoadModule<OSImpl> load_module{std::move(module)};
-    if (!load_module.Load(diag, std::move(lookup.value()))) [[unlikely]] {
+    if (!load_module.Load(diag)) [[unlikely]] {
       return diag.take_error();
     }
 
