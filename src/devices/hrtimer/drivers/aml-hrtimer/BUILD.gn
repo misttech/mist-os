@@ -52,6 +52,7 @@ source_set("common") {
   public_deps = [
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.hardware.hrtimer:fuchsia.hardware.hrtimer_cpp",
+    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
     "//sdk/lib/driver/compat/cpp:cpp",
     "//sdk/lib/driver/component/cpp:cpp",
@@ -61,7 +62,6 @@ source_set("common") {
     "//src/devices/bin/driver_runtime",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/mmio",
-    "//src/power/broker:fuchsia.power.broker_cpp",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/zx",
   ]

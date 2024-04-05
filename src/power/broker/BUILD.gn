@@ -7,30 +7,7 @@
 # If you find something broken, we are eager to review fixes.
 
 import("//build/components.gni")
-import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_binary.gni")
-
-fidl("fuchsia.power.broker") {
-  sdk_category = "internal"
-  sources = [ "fidl/broker.fidl" ]
-  public_deps = [ "//zircon/vdso/zx" ]
-
-  # This is still experimental, so restricting visibility for now.
-  visibility = [
-    "//sdk/fidl/fuchsia.hardware.hrtimer/*:*",
-    "//sdk/fidl/fuchsia.power.system/*:*",
-    "//sdk/lib/driver/power/cpp/*:*",
-    "//src/devices/block/drivers/aml-sdmmc/*:*",
-    "//src/devices/bus/drivers/platform/test/*:*",
-    "//src/devices/hrtimer/drivers/aml-hrtimer/*:*",
-    "//src/power/broker/*:*",
-    "//src/power/system-activity-governor/*:*",
-    "//src/power/testing/fake-broker/*:*",
-    "//src/starnix/kernel/*:*",
-    "//src/sys/time/timekeeper/*:*",
-    "//vendor/*",
-  ]
-}
 
 group("broker") {
   deps = [ ":package" ]
@@ -44,6 +21,13 @@ group("tests") {
   ]
 }
 
+# Forwarding declaration for //vendor/* dependencies.
+# Remove after soft transition.
+group("fuchsia.power.broker_rust") {
+  public_deps = [ "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust" ]
+  visibility = [ "//vendor/*" ]
+}
+
 rustc_binary("bin") {
   output_name = "power-broker"
   edition = "2021"
@@ -53,7 +37,7 @@ rustc_binary("bin") {
   with_unit_tests = true
 
   deps = [
-    ":fuchsia.power.broker_rust",
+    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
     "//src/lib/async-utils",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",

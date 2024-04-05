@@ -19,9 +19,9 @@ source_set("cpp") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
+    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
     "//sdk/lib/driver/incoming/cpp",
     "//sdk/lib/fidl",
-    "//src/power/broker:fuchsia.power.broker_cpp",
     "//zircon/system/ulib/zx",
   ]
 
@@ -39,13 +39,13 @@ test("power-test") {
     ":cpp",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
+    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/fidl",
     "//sdk/lib/sys/service/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//src/power/broker:fuchsia.power.broker_cpp",
     "//src/storage/lib/vfs/cpp",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",

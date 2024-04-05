@@ -8,7 +8,7 @@ fidl("fuchsia.power.system") {
   sdk_category = "internal"
   sources = [ "system.fidl" ]
   public_deps = [
-    "//src/power/broker:fuchsia.power.broker",
+    "//sdk/fidl/fuchsia.power.broker",
     "//zircon/vdso/zx",
   ]
 }
