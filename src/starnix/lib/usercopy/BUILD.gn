@@ -32,6 +32,9 @@ template("_hermetic_code_blob") {
     sources = [ "${target_name}.cc" ]
     public_deps = [ "//zircon/system/public" ]
 
+    # TODO(https://fxbug.dev/333105602): Avoid the use of `allow_rodata`.
+    allow_rodata = true
+
     add_configs = [
       # hermetic_copy_error.S assumes it can "unwind" the hermetic code blob from a
       # fault just by popping the frame pointer and returning.  So it needs to know
