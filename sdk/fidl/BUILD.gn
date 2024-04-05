@@ -127,6 +127,7 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.recovery:fuchsia.recovery",
   "//sdk/fidl/fuchsia.recovery.ui:fuchsia.recovery.ui",
   "//sdk/fidl/fuchsia.scenic.scheduling:fuchsia.scenic.scheduling",
+  "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler",
   "//sdk/fidl/fuchsia.session:fuchsia.session",
   "//sdk/fidl/fuchsia.settings:fuchsia.settings",
   "//sdk/fidl/fuchsia.settings.policy:fuchsia.settings.policy",

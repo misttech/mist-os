@@ -288,6 +288,7 @@ fidl_library://fidl/fuchsia.process.lifecycle
 fidl_library://fidl/fuchsia.recovery
 fidl_library://fidl/fuchsia.recovery.ui
 fidl_library://fidl/fuchsia.scenic.scheduling
+fidl_library://fidl/fuchsia.scheduler
 fidl_library://fidl/fuchsia.session
 fidl_library://fidl/fuchsia.settings
 fidl_library://fidl/fuchsia.settings.policy

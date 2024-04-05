@@ -5,8 +5,10 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.scheduler") {
+  sdk_category = "partner"
+  sdk_area = "Kernel"
+
   sources = [ "role.fidl" ]
-  sdk_category = "internal"
   public_deps = [ "//zircon/vdso/zx" ]
 
   enable_hlcpp = true
