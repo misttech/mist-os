@@ -295,25 +295,6 @@
                 source_name: "blob",
                 capability: "directory",
                 target_monikers: [
-                    "/core/pkg-cache",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this
-                    // capability no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
-                ],
-            },
-            {
-                source_moniker: "/bootstrap/fshost",
-                source: "component",
-                source_name: "pkgfs",
-                capability: "directory",
-                target_monikers: [
-                    "/bootstrap",
-                    "/bootstrap/console-launcher",
-                    "/bootstrap/driver_manager",
-                    "/bootstrap/fshost",
-                    "/core/pkg-cache",
-
                     // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
@@ -379,31 +360,6 @@
                     // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
-                ],
-            },
-            {
-                source_moniker: "/core/pkg-cache",
-                source: "component",
-                source_name: "fuchsia.pkg.PackageCache",
-                capability: "protocol",
-                target_monikers: [
-                    "/core/pkg-resolver",
-                    "/core/system-updater",
-                    "/core/system-update/system-updater",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this
-                    // capability no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
-                ],
-            },
-            {
-                source_moniker: "/core/pkg-cache",
-                source: "component",
-                source_name: "fuchsia.pkg.RetainedPackages",
-                capability: "protocol",
-                target_monikers: [
-                    "/core/system-updater",
-                    "/core/system-update/system-updater",
                 ],
             },
             {
