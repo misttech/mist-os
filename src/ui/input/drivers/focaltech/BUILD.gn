@@ -37,7 +37,6 @@ source_set("firmware-sherlock") {
 group("common") {
   public_deps = [
     ":focaltech_touch_bind",
-    "//sdk/banjo/fuchsia.hardware.test:fuchsia.hardware.test_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
