@@ -7,6 +7,7 @@ mod client_fidl;
 mod client_rust;
 mod common;
 mod cvf;
+mod cvm;
 mod dump_values;
 mod validate_package;
 
@@ -16,6 +17,7 @@ use client_cpp::GenerateCppSource;
 use client_fidl::GenerateFidlSource;
 use client_rust::GenerateRustSource;
 use cvf::GenerateValueFile;
+use cvm::GenerateValueManifest;
 use dump_values::DumpValues;
 use validate_package::ValidatePackage;
 
@@ -30,6 +32,7 @@ struct Command {
 #[argh(subcommand)]
 enum Subcommand {
     GenerateValueFile(GenerateValueFile),
+    GenerateValueManifest(GenerateValueManifest),
     GenerateFidlSource(GenerateFidlSource),
     GenerateRustSource(GenerateRustSource),
     GenerateCppSource(GenerateCppSource),
@@ -42,6 +45,7 @@ fn main() -> Result<(), Error> {
 
     match command.sub {
         Subcommand::GenerateValueFile(cmd) => cmd.generate(),
+        Subcommand::GenerateValueManifest(cmd) => cmd.generate(),
         Subcommand::GenerateFidlSource(cmd) => cmd.generate(),
         Subcommand::GenerateRustSource(cmd) => cmd.generate(),
         Subcommand::GenerateCppSource(cmd) => cmd.generate(),

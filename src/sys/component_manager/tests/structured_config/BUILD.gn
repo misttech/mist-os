@@ -6,6 +6,7 @@ group("tests") {
   testonly = true
   deps = [
     "bad_values:tests",
+    "capabilities/config_capability_values:tests",
     "capabilities/dynamic:tests",
     "capabilities/offer_and_expose:tests",
     "capabilities/same_cml:tests",

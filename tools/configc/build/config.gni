@@ -67,6 +67,68 @@ template("cvf") {
   }
 }
 
+# Create a Configuration Value Manifest.
+# This accepts a compiled manifest that is using configuration capabilities,
+# and it produces a Component Manifest that declares those configuration capabilities
+# with specific values and exposes each of these capabilities to it's parent.
+#
+# Parameters
+#
+#   cm (required)
+#     Compiled manifest that contains `uses` for configuration capabilities.
+#     Type: path
+#
+#   value_file (required)
+#     A JSON5 file containing the configuration values to be compiled.
+#     Type: path
+#
+#   deps (optional)
+#   metadata (optional)
+#   output_name (optional)
+#   testonly (optional)
+#   visibility (optional)
+#     Standard GN meaning.
+template("component_value_manifest") {
+  input_manifest = invoker.cm
+  value_file = invoker.value_file
+
+  compiled_action(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "metadata",
+                             "output_name",
+                             "testonly",
+                             "visibility",
+                           ])
+
+    if (!defined(output_name)) {
+      output_name = target_name
+    }
+
+    tool = "//tools/configc"
+    tool_output_name = "configc"
+    mnemonic = "CONFIGC"
+
+    compiled_output = "${target_out_dir}/${output_name}.cm"
+    inputs = [
+      input_manifest,
+      value_file,
+    ]
+    outputs = [ compiled_output ]
+
+    args = [
+      "cvm",
+      "--cm",
+      rebase_path(input_manifest, root_build_dir),
+      "--values",
+      rebase_path(value_file, root_build_dir),
+      "--output",
+      rebase_path(compiled_output, root_build_dir),
+    ]
+  }
+}
+
 # Generate the FIDL client library source files for a configuration declaration.
 #
 # Parameters

@@ -200,6 +200,219 @@ template("fuchsia_structured_config_values") {
   }
 }
 
+# Defines a configuration value manifest that provides configuration values.
+#
+# This accepts a component manifest that `uses` configuration capabilities. It
+# produces a component manifest that defines each of these configuration capabilities
+# and exposes those capabilities to its parent.
+#
+# A config value manifest is produced from a component manifest that contains a schema
+# and a JSON5 file with concrete configuration values.
+#
+# For example, if a component manifest use the `fuchsia.component.EnableFoo` flag:
+#
+# ```
+# // ./meta/my_component.cml
+# {
+#   // ...
+#   use: [
+#   {
+#     config: "fuchsia.component.EnableFoo",
+#     key: "enable_foo",
+#     type: "bool",
+#   },
+#  ]
+# }
+# ```
+#
+# The definition file will need to contain an entry for it and any other fields
+# in its manifest:
+#
+# ```
+# // ./config/my_component.json5
+# {
+#   "enable_foo": true
+# }
+# ```
+#
+# Building the config value file requires the compiled manifest:
+#
+# ```
+# # ./BUILD.gn
+# fuchsia_component_manifest("my_component_manifest") {
+#   component = "my_component"
+#   manifest = "meta/my_component.cml"
+# }
+#
+# fuchsia_component("my_component") {
+#   cm_label = ":my_component_manifest"
+#   deps = [ ... ]
+# }
+#
+# fuchsia_structured_config_values2("my_component_config") {
+#   cm_label = ":my_component_manifest"
+#   values = "config/my_component.json5"
+# }
+# ```
+#
+# You can link your component and its config together in a parent component.
+# ```
+# // ./meta/root.cml
+# {
+#   children: [
+#   { name: "my_component", url: "#meta/my_component.cm", },
+#   { name: "my_config", url: "#meta/my_component_config.cm", },
+#  ],
+#   offer: [
+#    { from: "#my_config", to: "#my_component", config: "fuchsia.config.MyConfig",}
+#  ],
+# }
+# ```
+#
+# Finally, the package must include the value file alongside the manifest:
+#
+# ```
+# # ./BUILD.gn
+# fuchsia_package("my_package") {
+#   deps = [
+#     ":my_component",
+#     ":my_component_config",
+#   ]
+# }
+# ```
+#
+# Parameters
+#
+#   cm_label (required)
+#     The label of the fuchsia_component_manifest target for which the file will be generated.
+#     Type: GN label, e.g. `:my_component_manifest`
+#
+#   values_source -or- values (required)
+#     file: The JSON5 file containing the concrete values for the generated file.
+#     values: A GN scope containing literal values for the generated file.
+#     TODO(https://fxbug.dev/42169169) document this format properly.
+#     Type: path or scope
+#
+#   component_name (optional)
+#     The basename of the component manifest within the package's meta/ dir. If not provided,
+#     derived from the `cm_label` parameter's outputs. Must be specified in order to invoke
+#     this template in a different GN module from where `cm_label` is defined.
+#
+#   output_component_name (optional)
+#     The name of the component that is being produced. Defaults to "${component_name}_config".
+#
+#   data_deps (optional)
+#   deps (optional)
+#   testonly (optional)
+#     Standard GN meaning.
+template("fuchsia_structured_config_values2") {
+  if (current_toolchain == default_toolchain) {
+    assert(
+        defined(invoker.cm_label),
+        "must provide a component manifest label with a configuration declaration")
+
+    _source_defined = defined(invoker.values_source)
+    _values_defined = defined(invoker.values)
+    assert(
+        (_source_defined || _values_defined) &&
+            !(_source_defined && _values_defined),
+        "must provide either `values_source` (path to JSON5 file) or `values` (GN scope with literal values)")
+
+    if (_values_defined) {
+      _generated_values_label = "${target_name}_generated_values"
+      _value_file_deps = [ ":$_generated_values_label" ]
+      _value_file = "$target_gen_dir/${target_name}_values_from_literal.json"
+      generated_file(_generated_values_label) {
+        output_conversion = "json"
+        contents = invoker.values
+        outputs = [ _value_file ]
+      }
+    } else {
+      _value_file_deps = []
+      _value_file = invoker.values_source
+    }
+
+    if (defined(invoker.component_name)) {
+      # we have the component name which means we can infer the output location ourselves
+      component_name = invoker.component_name
+      _cm_out_dir = get_label_info(invoker.cm_label, "target_out_dir")
+      _cm_target_name = get_label_info(invoker.cm_label, "name")
+      compiled_manifest = "$_cm_out_dir/cml/$_cm_target_name/$component_name.cm"
+    } else {
+      # make sure invoker.cm_label is in the same module, i.e. starts with ":"
+      segments = string_split(invoker.cm_label, ":")
+      assert(
+          segments[0] == "",
+          "component_name must be provided if cm_label is in a different module")
+
+      # now we can call get_target_outputs without creating unactionable error messages
+      component_outputs = get_target_outputs(invoker.cm_label)
+      compiled_manifest = component_outputs[0]
+      component_name = get_path_info(compiled_manifest, "name")
+    }
+
+    output_component_name = component_name + "_config"
+    if (defined(invoker.output_component_name)) {
+      output_component_name = invoker.output_component_name
+    }
+
+    # compile the value file
+    resource_target = "${target_name}"
+    cvf_target = "${target_name}_cvf"
+    component_value_manifest(cvf_target) {
+      forward_variables_from(invoker, [ "testonly" ])
+      cm = compiled_manifest
+      value_file = _value_file
+      if (!defined(deps)) {
+        deps = []
+      }
+      deps += [ "${invoker.cm_label}" ] + _value_file_deps
+      visibility = [ ":${resource_target}" ]
+    }
+
+    # package the value file
+    resource(resource_target) {
+      forward_variables_from(invoker,
+                             [
+                               "data_deps",
+                               "deps",
+                               "testonly",
+                               "visibility",
+                             ])
+      sources = get_target_outputs(":${cvf_target}")
+      if (!defined(deps)) {
+        deps = []
+      }
+      deps += [ ":${cvf_target}" ]
+
+      outputs = [ "meta/$output_component_name.cm" ]
+
+      if (defined(visibility)) {
+        # The group we create below for the non-default toolchains needs to depend on this target.
+        # We can't explicitly list all of the toolchain suffixes that might dep on this, because not
+        # all of them have variable shortcuts defined.
+        visibility += [ ":${resource_target}" ]
+      }
+
+      # Avoid picking up transitive dependencies in the cm_label.
+      metadata = {
+        distribution_entries_barrier = []
+      }
+    }
+  } else {
+    # need to have a nop target that can be depended upon by host toolchain targets
+    group(target_name) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      deps = [ ":$target_name($default_toolchain)" ]
+    }
+    not_needed(invoker, "*")
+  }
+}
+
 # Defines a Rust configuration client library for a Fuchsia ELF component.
 #
 # A config client library is produced from a component manifest that contains a schema.
