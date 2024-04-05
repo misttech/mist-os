@@ -380,7 +380,6 @@ impl<T: Routable + 'static> RoutableExt for T {
                     ) -> Result<(), zx::Status> {
                         request.set_scope(self.0.clone());
                         if request.path().is_empty() && !request.requires_event() {
-                            tracing::info!("Spawning on {:?}", self.0);
                             request.spawn(self);
                             Ok(())
                         } else {
