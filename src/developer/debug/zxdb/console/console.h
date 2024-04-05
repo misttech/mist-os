@@ -42,14 +42,15 @@ class Console : debug::LogBackend {
   void Output(const std::string& s);
   void Output(const Err& err);
 
+  // Writes the given output to the console if streaming is enabled.
+  void Stream(const OutputBuffer& output);
+
   // Synchronously prints the output if the async buffer is complete. Otherwise adds a listener and
   // prints the output to the console when it is complete.
   void Output(fxl::RefPtr<AsyncOutputBuffer> output);
 
   // Writes the given output to the console.
   virtual void Write(const OutputBuffer& output, bool add_newline = true) = 0;
-  // Writes the given output to the console only if the console is currently in Embedded mode.
-  virtual void WriteIfEmbedded(const OutputBuffer& output) = 0;
 
   // Clears the contents of the console.
   virtual void Clear() = 0;
@@ -79,6 +80,9 @@ class Console : debug::LogBackend {
   void EnableOutput();
   void DisableOutput();
 
+  void EnableStreaming();
+  void DisableStreaming();
+
   // Implements |LogBackend|.
   void WriteLog(debug::LogSeverity severity, const debug::FileLineFunction& location,
                 std::string log) override;
@@ -89,6 +93,10 @@ class Console : debug::LogBackend {
 
  private:
   bool OutputEnabled();
+
+  // Similarly, returns true if streaming is enabled. False means streaming is
+  // disabled.
+  bool StreamingEnabled() const { return streaming_enabled_ > 0; }
 
   // Track all asynchronous output pending. We want to store a reference and lookup by pointer, so
   // the object is duplicated here (RefPtr doesn't like to be put in a set).
@@ -104,6 +112,15 @@ class Console : debug::LogBackend {
   // or lower. Using a counter lets clients balance calls to EnableOutput and DisableOutput
   // without needing to coordinate with each other.
   int output_enabled_ = 0;
+
+  // Similar to the above counter for output, we enable streaming when this value is greater than 0
+  // and disable streaming when this value is less than or equal to zero. This setting is very
+  // closely tied, but not equivalent to the Embedded* variety of Console modes. The transition
+  // from Embedded to Interactive and vice-versa will toggle the counter in the respective
+  // directions (i.e. Embedded->Interactive will call DisableStreaming and Interactive->Embedded
+  // will call EnableStreaming) but other parts of the system may need to interact with streaming
+  // directly without changing the state of ConsoleMode.
+  int streaming_enabled_ = 0;
 
   fxl::WeakPtrFactory<Console> weak_factory_;
 

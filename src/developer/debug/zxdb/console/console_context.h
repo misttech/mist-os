@@ -133,7 +133,7 @@ class ConsoleContext : public ProcessObserver,
 
   void InitConsoleMode();
   std::string GetConsoleMode();
-  std::string GetEmbeddedModeContext();
+  std::string GetEmbeddedModeContextOrDefault(std::optional<debug_ipc::ExceptionType> type);
   void SetConsoleMode(std::string mode);
 
   // If the current console mode is EmbeddedInteractive, return to Embedded mode (i.e. disable input

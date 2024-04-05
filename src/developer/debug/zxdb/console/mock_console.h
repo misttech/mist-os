@@ -73,7 +73,6 @@ class MockConsole : public Console {
   void Quit() override { has_quit_ = true; }
   void Clear() override;
   void Write(const OutputBuffer& output, bool add_newline) override;
-  void WriteIfEmbedded(const OutputBuffer& output) override {}
   void ModalGetOption(const line_input::ModalPromptOptions& options, OutputBuffer message,
                       const std::string& prompt,
                       line_input::ModalLineInput::ModalCompletionCallback cb) override;

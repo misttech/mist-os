@@ -156,16 +156,6 @@ void ConsoleImpl::Write(const OutputBuffer& output, bool add_newline) {
     fcntl(STDOUT_FILENO, F_SETFL, old_bits);
 }
 
-void ConsoleImpl::WriteIfEmbedded(const OutputBuffer& output) {
-  // For now, when this method is called and we're not in Embedded mode, we discard the incoming
-  // data and will never print it. It may be desireable in the future to instead buffer some amount
-  // of this data and print it out when we return to Embedded mode. This may be tricky with things
-  // that print rapid status updates, like fx test's status output, which updates rapidly and would
-  // fill up a buffer quickly.
-  if (context().GetConsoleMode() == ClientSettings::System::kConsoleMode_Embedded)
-    Write(output, false);
-}
-
 void ConsoleImpl::ModalGetOption(const line_input::ModalPromptOptions& options,
                                  OutputBuffer message, const std::string& prompt,
                                  line_input::ModalLineInput::ModalCompletionCallback cb) {

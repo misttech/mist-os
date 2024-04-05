@@ -452,8 +452,18 @@ std::string ConsoleContext::GetConsoleMode() {
   return session()->system().settings().GetString(ClientSettings::System::kConsoleMode);
 }
 
-std::string ConsoleContext::GetEmbeddedModeContext() {
-  return session()->system().settings().GetString(ClientSettings::System::kEmbeddedModeContext);
+std::string ConsoleContext::GetEmbeddedModeContextOrDefault(
+    std::optional<debug_ipc::ExceptionType> type) {
+  if (auto context_string =
+          session()->system().settings().GetString(ClientSettings::System::kEmbeddedModeContext);
+      !context_string.empty()) {
+    return context_string;
+  } else if (type) {
+    return debug_ipc::ExceptionTypeToString(*type);
+  }
+
+  // Give up and just return something generic.
+  return "error";
 }
 
 void ConsoleContext::SetConsoleMode(std::string mode) {
@@ -488,6 +498,7 @@ void ConsoleContext::InitConsoleMode() {
 
   if (mode == ClientSettings::System::kConsoleMode_Shell ||
       mode == ClientSettings::System::kConsoleMode_EmbeddedInteractive) {
+    console->DisableStreaming();
     console->EnableInput();
     console->EnableOutput();
   }
@@ -734,10 +745,24 @@ void ConsoleContext::WillLoadModuleSymbols(Process* process, int num_modules) {
   if (!process)
     return;
 
-  if (GetConsoleMode() != ClientSettings::System::kConsoleMode_Shell)
-    return;
-
   Console* console = Console::get();
+
+  if (GetConsoleMode() == ClientSettings::System::kConsoleMode_Embedded) {
+    // Disable streaming so we can print out a message. Balanced in |OnThreadStopped| (see the
+    // comment there for details).
+    console->DisableStreaming();
+
+    OutputBuffer out;
+    out.Append(Syntax::kHeading, "\n👋 zxdb is loading symbols to debug " +
+                                     GetEmbeddedModeContextOrDefault(std::nullopt) + " in " +
+                                     process->GetName() + ", please wait.\n");
+
+    // Use Write directly here since we're not transitioning out of Embedded mode yet, but would
+    // like to print something out so the user knows the console is not stuck.
+    console->Write(out);
+
+    return;
+  }
 
   // Disable the console while the symbols are loaded. Once processing has finished, re-enable.
   console->DisableInput();
@@ -840,24 +865,27 @@ void ConsoleContext::OnThreadStopped(Thread* thread, const StopInfo& info) {
   SetActiveFrameIdForThread(thread, 0);
   SetActiveBreakpointForStop(info);
 
-  // We've hit a breakpoint. If we're in kConsoleMode_Embedded, it's time to switch to
-  // kConsoleMode_EmbeddedInteractive.
+  // We should never get here and still be in Embedded mode, since this notification will always
+  // come after symbols are loaded, see |WillLoadModuleSymbols| and |DidLoadAllModuleSymbols|.
   if (GetConsoleMode() == ClientSettings::System::kConsoleMode_Embedded) {
     SetConsoleMode(ClientSettings::System::kConsoleMode_EmbeddedInteractive);
 
-    OutputBuffer out{Syntax::kHeading, "⚠️  zxdb caught"};
-    const OutputBuffer suffix{Syntax::kHeading,
-                              fxl::StringPrintf("in %s, type `frame` to get started.",
-                                                thread->GetProcess()->GetName().c_str())};
-    if (auto embedded_mode_context = GetEmbeddedModeContext(); !embedded_mode_context.empty()) {
-      out.Append(Syntax::kHeading, fxl::StringPrintf(" %s ", embedded_mode_context.c_str()));
-    } else {
-      // Default to printing the exception type if the context string isn't specified.
-      out.Append(Syntax::kHeading,
-                 fxl::StringPrintf(" %s ", debug_ipc::ExceptionTypeToString(info.exception_type)));
-    }
-    out.Append(suffix);
+    // This is counterintuitive here because we just transitioned into EmbeddedInteractive mode
+    // where we do not want streaming to be enabled. However, this is the required balancing for the
+    // DisableStreaming call made in |WillLoadModuleSymbols|. Since we were in Embedded mode, we
+    // know that that the WillLoadModuleSymbols notification will ONLY be sent if we're about to
+    // make the transition to EmbeddedInteractive (otherwise we would never load modules due to the
+    // use of Weak attaching).
+    //
+    // It's important that we do this AFTER setting the console mode, so that the streamer doesn't
+    // flicker the screen between these two calls.
+    Console::get()->EnableStreaming();
 
+    auto embedded_mode_context = GetEmbeddedModeContextOrDefault(info.exception_type);
+
+    OutputBuffer out(Syntax::kHeading, "⚠️  " + embedded_mode_context + " in " +
+                                           thread->GetProcess()->GetName() +
+                                           ", type `frame` or `help` to get started.");
     Console::get()->Output(out);
   }
 
@@ -960,11 +988,13 @@ void ConsoleContext::OnSettingChanged(const SettingStore&, const std::string& se
 
     if (mode == ClientSettings::System::kConsoleMode_Shell ||
         mode == ClientSettings::System::kConsoleMode_EmbeddedInteractive) {
+      console->DisableStreaming();
       console->EnableInput();
       console->EnableOutput();
     } else {
       console->DisableInput();
       console->DisableOutput();
+      console->EnableStreaming();
     }
   } else {
     LOGS(Warn) << "Console context handling invalid setting " << setting_name;

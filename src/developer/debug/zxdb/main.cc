@@ -246,6 +246,14 @@ int ConsoleMain(int argc, const char* argv[]) {
     // Suppress input during startup.
     // Balanced in InitConsole.
     console->DisableInput();
+
+    // Enable streaming as soon as possible. If we're not in embedded mode, it will be disabled
+    // during |InitConsoleMode| below. We do this before registering the streamers with the console
+    // so that there's no flickering between here and initializing the console mode below. If the
+    // program attempting to stream output through zxdb is sensitive to timing issues on the target,
+    // they should be waiting for |signal_when_ready| below to start sending data through the FD.
+    console->EnableStreaming();
+
     // This will enable output from the console if we're not in embedded mode, so we can reliably
     // use the logging macros now.
     console->context().InitConsoleMode();

@@ -34,7 +34,6 @@ class ConsoleImpl : public Console {
   void Init() override;
   void Quit() override;
   void Write(const OutputBuffer& output, bool add_newline) override;
-  void WriteIfEmbedded(const OutputBuffer& output) override;
   void Clear() override;
   void ModalGetOption(const line_input::ModalPromptOptions& options, OutputBuffer message,
                       const std::string& prompt,
