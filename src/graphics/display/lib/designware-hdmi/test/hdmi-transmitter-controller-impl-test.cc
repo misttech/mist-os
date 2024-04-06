@@ -4,8 +4,6 @@
 
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller-impl.h"
 
-#include <lib/ddk/debug.h>
-
 #include <fbl/array.h>
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
