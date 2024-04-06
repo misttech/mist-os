@@ -39,9 +39,9 @@ pub enum DiffType {
 impl From<Option<validate::DiffType>> for DiffType {
     fn from(original: Option<validate::DiffType>) -> Self {
         match original {
-            None | Some(validate::DiffType::Full) => Self::Full,
             Some(validate::DiffType::Diff) => Self::Diff,
             Some(validate::DiffType::Both) => Self::Both,
+            _ => Self::Full,
         }
     }
 }
@@ -320,9 +320,7 @@ pub(crate) mod tests {
                         InspectPuppetRequest::Publish { responder } => {
                             responder.send(TestResult::Unimplemented)?;
                         }
-                        InspectPuppetRequest::Unpublish { responder } => {
-                            responder.send(TestResult::Unimplemented)?;
-                        }
+                        InspectPuppetRequest::_UnknownMethod { .. } => {}
                     }
                 }
                 Ok(())

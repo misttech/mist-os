@@ -228,8 +228,8 @@ impl InspectorConfig {
 impl InspectorConfig {
     /// An Inspector with a readable VMO.
     /// Implicitly no-op.
-    pub fn vmo(mut self, vmo: Arc<zx::Vmo>) -> Self {
-        self.storage = Some(vmo);
+    pub fn vmo(mut self, vmo: zx::Vmo) -> Self {
+        self.storage = Some(Arc::new(vmo));
         self.no_op()
     }
 
@@ -465,8 +465,7 @@ mod fuchsia_tests {
         assert_eq!(initial + 2, is_frozen_result.err().unwrap());
         assert!(is_frozen_result.err().unwrap() % 2 == 0);
 
-        let frozen_insp =
-            Inspector::new(InspectorConfig::default().no_op().vmo(Arc::new(vmo.unwrap())));
+        let frozen_insp = Inspector::new(InspectorConfig::default().no_op().vmo(vmo.unwrap()));
         assert!(frozen_insp.is_frozen().is_ok());
     }
 

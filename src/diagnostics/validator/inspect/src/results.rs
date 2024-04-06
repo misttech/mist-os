@@ -42,6 +42,7 @@ impl Summary for ValueType {
             ValueType::Uint => "Uint",
             ValueType::Double => "Double",
             ValueType::String => "String",
+            _ => "Unknown",
         }
         .to_string()
     }

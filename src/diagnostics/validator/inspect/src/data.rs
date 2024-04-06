@@ -480,6 +480,7 @@ impl Data {
                     validate::ValueType::String => {
                         Payload::StringArray(vec![String::new(); *slots as usize])
                     }
+                    unknown => return Err(format_err!("unknown value type {unknown:?}")),
                 },
             ),
             validate::Action::ArrayAdd(validate::ArrayAdd { id, index, value }) => {

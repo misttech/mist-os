@@ -426,7 +426,7 @@ mod tests {
     #[fuchsia::test]
     async fn reader_server_reports_errors() {
         // This inspector doesn't contain valid inspect data.
-        let vmo = Arc::new(zx::Vmo::create(4096).unwrap());
+        let vmo = zx::Vmo::create(4096).unwrap();
         let inspector = Inspector::new(InspectorConfig::default().vmo(vmo));
         let (_inspect_server, tree_client) =
             service::spawn_tree_server(inspector, TreeServerSendPreference::default()).unwrap();
@@ -466,11 +466,12 @@ mod tests {
 
         let mut clients = HashMap::<String, Vec<TreeProxy>>::new();
         let mut servers = vec![];
-        let vmo = Arc::new(inspector.duplicate_vmo().expect("Failed to duplicate vmo"));
         for (component_name, handle_count) in component_name_handle_counts.clone() {
             for _ in 0..handle_count {
-                let inspector_dup =
-                    Inspector::new(InspectorConfig::default().vmo(Arc::clone(&vmo)));
+                let inspector_dup = Inspector::new(
+                    InspectorConfig::default()
+                        .vmo(inspector.duplicate_vmo().expect("failed to duplicate vmo")),
+                );
                 let (server, client) =
                     service::spawn_tree_server(inspector_dup, TreeServerSendPreference::default())
                         .unwrap();

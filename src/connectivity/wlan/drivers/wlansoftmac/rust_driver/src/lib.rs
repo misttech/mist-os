@@ -587,7 +587,6 @@ mod tests {
         fuchsia_inspect::InspectorConfig,
         futures::{stream::FuturesUnordered, task::Poll},
         pin_utils::pin_mut,
-        std::sync::Arc,
         test_case::test_case,
         wlan_common::assert_variant,
         wlan_mlme::device::test_utils::{FakeDevice, FakeDeviceConfig},
@@ -744,7 +743,6 @@ mod tests {
         assert_eq!(received_legacy_privacy_support, sent_legacy_privacy_support);
 
         // Add a child node through inspect_node and verify the node appears inspect_vmo.
-        let inspect_vmo = Arc::new(inspect_vmo);
         let inspector = Inspector::new(InspectorConfig::default().vmo(inspect_vmo));
         let _a = inspect_node.create_child("a");
         assert_data_tree!(inspector, root: {

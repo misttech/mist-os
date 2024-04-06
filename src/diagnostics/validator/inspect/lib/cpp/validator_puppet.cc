@@ -20,15 +20,17 @@
 
 #include <diagnostics/validate/cpp/fidl.h>
 
+namespace dv = diagnostics::validate;
+
 using cpp17::get;
 using cpp17::holds_alternative;
-using diagnostics::validate::Action;
-using diagnostics::validate::InitializationParams;
-using diagnostics::validate::LazyAction;
-using diagnostics::validate::LinkDisposition;
-using diagnostics::validate::ROOT_ID;
-using diagnostics::validate::TestResult;
-using diagnostics::validate::ValueType;
+using dv::Action;
+using dv::InitializationParams;
+using dv::LazyAction;
+using dv::LinkDisposition;
+using dv::ROOT_ID;
+using dv::TestResult;
+using dv::ValueType;
 using inspect::LazyNode;
 
 using Value =
@@ -598,7 +600,7 @@ class Actor {
   std::map<uint64_t, LazyNode> lazy_children_map_;
 };
 
-class Puppet : public diagnostics::validate::InspectPuppet {
+class Puppet : public dv::InspectPuppet {
  public:
   explicit Puppet(async_dispatcher_t* dispatcher, std::unique_ptr<sys::ComponentContext> context)
       : dispatcher_(dispatcher), context_(std::move(context)) {
@@ -607,21 +609,29 @@ class Puppet : public diagnostics::validate::InspectPuppet {
 
   void Initialize(InitializationParams params, InitializeCallback callback) override {
     if (actor_ != nullptr) {
-      callback(zx::vmo(ZX_HANDLE_INVALID), TestResult::ILLEGAL);
+      callback(
+          dv::InspectPuppet_Initialize_Result::WithResponse(dv::InspectPuppet_Initialize_Response(
+              std::make_tuple(zx::vmo(ZX_HANDLE_INVALID), TestResult::ILLEGAL))));
       return;
     }
     actor_ = std::make_unique<Actor>(inspect::InspectSettings{.maximum_size = params.vmoSize()});
 
     if (!bool(actor_->inspector())) {
-      callback(zx::vmo(ZX_HANDLE_INVALID), TestResult::FAILED);
+      callback(
+          dv::InspectPuppet_Initialize_Result::WithResponse(dv::InspectPuppet_Initialize_Response(
+              std::make_tuple(zx::vmo(ZX_HANDLE_INVALID), TestResult::FAILED))));
     } else {
-      callback(actor_->inspector().DuplicateVmo(), TestResult::OK);
+      callback(
+          dv::InspectPuppet_Initialize_Result::WithResponse(dv::InspectPuppet_Initialize_Response(
+              std::make_tuple(actor_->inspector().DuplicateVmo(), TestResult::OK))));
     }
   }
 
   void InitializeTree(InitializationParams params, InitializeTreeCallback callback) override {
     if (actor_ != nullptr) {
-      callback(nullptr, TestResult::ILLEGAL);
+      callback(dv::InspectPuppet_InitializeTree_Result::WithResponse(
+          dv::InspectPuppet_InitializeTree_Response(
+              std::make_tuple(nullptr, TestResult::ILLEGAL))));
       return;
     }
     actor_ = std::make_unique<Actor>(inspect::InspectSettings{.maximum_size = params.vmoSize()});
@@ -631,46 +641,56 @@ class Puppet : public diagnostics::validate::InspectPuppet {
                                                 std::move(endpoints->server));
     fuchsia::inspect::TreePtr tree_ptr;
     tree_ptr.Bind(endpoints->client.TakeChannel(), dispatcher_);
-    callback(std::move(tree_ptr), TestResult::OK);
+    callback(dv::InspectPuppet_InitializeTree_Result::WithResponse(
+        dv::InspectPuppet_InitializeTree_Response(
+            std::make_tuple(std::move(tree_ptr), TestResult::OK))));
   }
 
-  void GetConfig(GetConfigCallback callback) override { callback("cpp-puppet", {}); }
+  void GetConfig(GetConfigCallback callback) override {
+    callback(dv::InspectPuppet_GetConfig_Result::WithResponse(
+        dv::InspectPuppet_GetConfig_Response(std::make_tuple("cpp-puppet", dv::Options{}))));
+  }
 
   void Publish(PublishCallback callback) override {
     if (actor_ == nullptr) {
-      callback(TestResult::ILLEGAL);
+      callback(dv::InspectPuppet_Publish_Result::WithResponse(
+          dv::InspectPuppet_Publish_Response(TestResult::ILLEGAL)));
       return;
     }
 
     component_inspector_ =
         inspect::ComponentInspector(dispatcher_, {.inspector = actor_->inspector()});
-    callback(TestResult::OK);
+    callback(dv::InspectPuppet_Publish_Result::WithResponse(
+        dv::InspectPuppet_Publish_Response(TestResult::OK)));
   }
-
-  // Unneeded by puppets that use InspectSink; they unpublish by shutting down
-  void Unpublish(UnpublishCallback callback) override { callback(TestResult::OK); }
 
   void Act(Action action, ActCallback callback) override {
     if (actor_ == nullptr) {
-      callback(TestResult::ILLEGAL);
+      callback(dv::InspectPuppet_Act_Result::WithResponse(
+          dv::InspectPuppet_Act_Response(TestResult::ILLEGAL)));
     } else {
-      callback(actor_->Act(action));
+      callback(dv::InspectPuppet_Act_Result::WithResponse(
+          dv::InspectPuppet_Act_Response(actor_->Act(action))));
     }
   }
 
   void ActLazy(LazyAction lazy_action, ActLazyCallback callback) override {
     if (actor_ == nullptr) {
-      callback(TestResult::ILLEGAL);
+      callback(dv::InspectPuppet_ActLazy_Result::WithResponse(
+          dv::InspectPuppet_ActLazy_Response(TestResult::ILLEGAL)));
     } else {
-      callback(actor_->ActLazy(lazy_action));
+      callback(dv::InspectPuppet_ActLazy_Result::WithResponse(
+          dv::InspectPuppet_ActLazy_Response(actor_->ActLazy(lazy_action))));
     }
   }
+
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {}
 
  private:
   async_dispatcher_t* dispatcher_;
   std::unique_ptr<sys::ComponentContext> context_;
   std::optional<inspect::ComponentInspector> component_inspector_ = std::nullopt;
-  fidl::BindingSet<diagnostics::validate::InspectPuppet> bindings_;
+  fidl::BindingSet<dv::InspectPuppet> bindings_;
   std::unique_ptr<Actor> actor_;
 };
 

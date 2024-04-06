@@ -10,7 +10,7 @@ use {
     fidl_fuchsia_kernel::{CounterMarker, CounterProxy},
     fidl_fuchsia_mem::Buffer,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
-    fuchsia_zircon as zx,
+    fuchsia_zircon::{self as zx, HandleBased},
     futures::prelude::*,
     std::sync::Arc,
     tracing::*,
@@ -36,6 +36,7 @@ async fn publish_kcounter_inspect(
         let kcounter = kcounter.clone();
         let vmo = vmo.clone();
         async move {
+            let vmo = vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
             let status = kcounter.update_inspect_vmo().await?;
             let () = zx::ok(status)?;
             Ok(fuchsia_inspect::Inspector::new(

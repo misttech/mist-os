@@ -5,6 +5,19 @@
     include: [ "//src/diagnostics/validator/inspect/meta/puppet.shard.cml" ],
     program: {
         runner: "elf",
-        binary: "bin/puppet_bin",
+        binary: "bin/go-puppet-dispatcher-bin",
     },
+    children: [
+        {
+            name: "puppet-internal",
+            url: "puppet-internal#meta/puppet-internal-component.cm",
+            startup: "eager",
+        },
+    ],
+    use: [
+        {
+            protocol: "diagnostics.validate.deprecated.InspectPuppet",
+            from: "#puppet-internal",
+        },
+    ],
 }

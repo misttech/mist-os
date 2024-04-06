@@ -18,7 +18,7 @@ type InitializationParams = table {
 };
 
 /// TestResult tells the result of executing an Initialize or Act command.
-type TestResult = strict enum {
+type TestResult = flexible enum {
     /// The function call completed without error.
     OK = 0;
     /// The Inspect library doesn't implement a requested feature.
@@ -52,7 +52,7 @@ type DeleteNode = struct {
     id uint32;
 };
 
-type ValueType = strict enum : uint8 {
+type ValueType = flexible enum : uint8 {
     INT = 1;
     UINT = 2;
     DOUBLE = 3;
@@ -247,7 +247,7 @@ type LazyAction = flexible union {
 };
 
 /// Indicate the preferred DiffType on failed tests.
-type DiffType = strict enum {
+type DiffType = flexible enum {
     /// Get the full rendering of both trees.
     FULL = 0;
 
@@ -259,9 +259,9 @@ type DiffType = strict enum {
 };
 
 @discoverable
-closed protocol InspectPuppet {
+open protocol InspectPuppet {
     /// Initializes the Inspect library being tested by the puppet.
-    strict Initialize(struct {
+    flexible Initialize(struct {
         params InitializationParams;
     }) -> (resource struct {
         vmo zx.Handle:optional;
@@ -269,7 +269,7 @@ closed protocol InspectPuppet {
     });
 
     /// Provides configuration values for the validator.
-    strict GetConfig() -> (resource struct {
+    flexible GetConfig() -> (resource struct {
         printable_name string:MAX;
         options resource table {
             /// Defaults to false
@@ -282,7 +282,7 @@ closed protocol InspectPuppet {
 
     /// Use instead of `Initialize` on puppets which support the Tree / Lazy method of getting VMOs.
     /// The root VMO can be obtained via the returned Tree protocol.
-    strict InitializeTree(struct {
+    flexible InitializeTree(struct {
         params InitializationParams;
     }) -> (resource struct {
         tree client_end:<inspect.Tree, optional>;
@@ -293,24 +293,19 @@ closed protocol InspectPuppet {
     ///
     /// Note: It is an error for more than one Validate connection to
     /// Publish at once. Unpublish must be called to cleanup.
-    strict Publish() -> (struct {
-        result TestResult;
-    });
-
-    /// Does nothing in any of the current puppets.
-    strict Unpublish() -> (struct {
+    flexible Publish() -> (struct {
         result TestResult;
     });
 
     /// Modifies the contents of the VMO.
-    strict Act(struct {
+    flexible Act(struct {
         action Action;
     }) -> (struct {
         result TestResult;
     });
 
     /// Modifies the contents of a lazy node.
-    strict ActLazy(struct {
+    flexible ActLazy(struct {
         lazy_action LazyAction;
     }) -> (struct {
         result TestResult;

@@ -9,7 +9,7 @@ use {
     },
     anyhow::{Context, Error},
     core::sync::atomic::AtomicUsize,
-    fidl::endpoints::create_endpoints,
+    fidl::{endpoints::create_endpoints, HandleBased},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device as fidl_dev,
     fidl_fuchsia_wlan_device_service::{self as fidl_svc, DeviceMonitorRequest},
     fidl_fuchsia_wlan_sme as fidl_sme,
@@ -394,9 +394,10 @@ async fn create_iface(
     let inspect_vmo_clone = Arc::clone(&inspect_vmo);
     let inspect_node = ifaces_node.create_lazy_child(iface_node_name, move || {
         let inspect_vmo_inner_clone = Arc::clone(&inspect_vmo_clone);
-        async {
+        async move {
             let iface_inspector = Inspector::new(
-                fuchsia_inspect::InspectorConfig::default().vmo(inspect_vmo_inner_clone),
+                fuchsia_inspect::InspectorConfig::default()
+                    .vmo(inspect_vmo_inner_clone.duplicate_handle(zx::Rights::SAME_RIGHTS)?),
             );
             Ok(iface_inspector)
         }

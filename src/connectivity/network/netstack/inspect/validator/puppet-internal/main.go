@@ -16,8 +16,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/inspect/vmobuffer"
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 
-	"fidl/diagnostics/validate"
-	fidlinspect "fidl/fuchsia/inspect"
+	validate "fidl/diagnostics/validate/deprecated"
 )
 
 type impl struct {
@@ -87,21 +86,12 @@ func (i *impl) Initialize(_ fidl.Context, params validate.InitializationParams) 
 	return h, validate.TestResultOk, nil
 }
 
-func (*impl) InitializeTree(fidl.Context, validate.InitializationParams) (fidlinspect.TreeWithCtxInterface, validate.TestResult, error) {
-	return fidlinspect.TreeWithCtxInterface{}, validate.TestResultUnimplemented, nil
-}
-
 func (i *impl) GetConfig(fidl.Context) (string, validate.Options, error) {
 	return "golang-puppet", validate.Options{}, nil
 }
 
 func (i *impl) Publish(fidl.Context) (validate.TestResult, error) {
 	i.published = true
-	return validate.TestResultOk, nil
-}
-
-func (i *impl) Unpublish(fidl.Context) (validate.TestResult, error) {
-	i.published = false
 	return validate.TestResultOk, nil
 }
 
@@ -128,28 +118,7 @@ func (i *impl) Act(ctx fidl.Context, action validate.Action) (validate.TestResul
 		// need to figure it out when/if we implement deletion.
 		i.nodes[action.Id] = 0
 		return validate.TestResultOk, nil
-	case validate.ActionCreateStringProperty:
-	case validate.ActionDeleteProperty:
-	case validate.ActionSetNumber:
-	case validate.ActionSetString:
-	case validate.ActionSetBytes:
-	case validate.ActionAddNumber:
-	case validate.ActionSubtractNumber:
-	case validate.ActionCreateArrayProperty:
-	case validate.ActionArraySet:
-	case validate.ActionArrayAdd:
-	case validate.ActionArraySubtract:
-	case validate.ActionCreateLinearHistogram:
-	case validate.ActionCreateExponentialHistogram:
-	case validate.ActionInsert:
-	case validate.ActionInsertMultiple:
-	case validate.ActionCreateBoolProperty:
-	case validate.ActionSetBool:
 	}
-	return validate.TestResultUnimplemented, nil
-}
-
-func (*impl) ActLazy(fidl.Context, validate.LazyAction) (validate.TestResult, error) {
 	return validate.TestResultUnimplemented, nil
 }
 
@@ -159,9 +128,7 @@ func main() {
 	i := impl{
 		nodes: make(map[uint32]uint32),
 	}
-	componentCtx.OutgoingService.AddDiagnostics("root", &component.DirectoryWrapper{
-		Directory: &i,
-	})
+
 	stub := validate.InspectPuppetWithCtxStub{Impl: &i}
 	componentCtx.OutgoingService.AddService(
 		validate.InspectPuppetName,

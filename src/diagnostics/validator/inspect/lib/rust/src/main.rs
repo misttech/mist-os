@@ -217,6 +217,7 @@ impl Actor {
                                 self.find_parent(parent)?.create_string_array(name, slots as usize);
                             array
                         }),
+                        unknown => return Err(format_err!("Unknown value type {unknown:?}")),
                     },
                 );
             }
@@ -557,10 +558,7 @@ async fn run_driver_service(
                     responder.send(TestResult::Illegal)?;
                 }
             },
-            // Unneeded by puppets that use InspectSink; they unpublish by shutting down
-            InspectPuppetRequest::Unpublish { responder } => {
-                responder.send(TestResult::Ok)?;
-            }
+            InspectPuppetRequest::_UnknownMethod { .. } => {}
         }
     }
     Ok(())
