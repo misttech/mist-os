@@ -302,7 +302,8 @@ void Linter::AddInvalidCopyrightFinding(SourceSpan span) {
 void Linter::CheckInvalidCopyright(SourceSpan span, std::string line_comment,
                                    std::string line_to_match) {
   if (line_comment == line_to_match ||
-      // TODO(https://fxbug.dev/42145767): Remove this branch once all platform FIDL files are updated.
+      // TODO(https://fxbug.dev/42145767): Remove this branch once all platform FIDL files are
+      // updated.
       line_comment == line_to_match + " All rights reserved.") {
     good_copyright_lines_found_++;
     return;
@@ -576,8 +577,9 @@ Linter::Linter()
       (const RawTypeDeclaration& element) {
         auto* layout_ref = element.type_ctor->layout_ref.get();
 
-        // TODO(https://fxbug.dev/42158155): Delete this check once new-types are supported. Instead, we
-        // should have new-type specific language to report the invalid naming case to the user.
+        // TODO(https://fxbug.dev/42158155): Delete this check once new-types are supported.
+        // Instead, we should have new-type specific language to report the invalid naming case to
+        // the user.
         if (layout_ref->kind == RawLayoutReference::Kind::kNamed) {
           return;
         }
@@ -630,8 +632,6 @@ Linter::Linter()
       [&linter = *this, case_check = invalid_case_for_decl_member, &case_type = lower_snake_]
       //
       (const RawOrdinaledLayoutMember& element) {
-        if (element.reserved)
-          return;
         std::string parent_type = linter.type_stack_.top();
         linter.CheckCase(parent_type + " members", element.identifier, case_check, case_type);
       });

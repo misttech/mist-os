@@ -228,9 +228,8 @@ impl ConvertType for ir::TableDeclaration {
     fn convert(&self, context: Context) -> Result<compare::Type> {
         let mut members = BTreeMap::new();
         for m in &self.members {
-            if let ir::TableMember::Defined { ordinal, name, r#type: t } = m {
-                members.insert(*ordinal, t.convert(context.nest_member(&name, t.identifier()))?);
-            }
+            let t = &m.r#type;
+            members.insert(m.ordinal, t.convert(context.nest_member(&m.name, t.identifier()))?);
         }
         Ok(compare::Type::Table(context.path, members))
     }
@@ -257,9 +256,8 @@ impl ConvertType for ir::UnionDeclaration {
     fn convert(&self, context: Context) -> Result<compare::Type> {
         let mut members = BTreeMap::new();
         for m in &self.members {
-            if let ir::UnionMember::Defined { ordinal, name, r#type: t } = m {
-                members.insert(*ordinal, t.convert(context.nest_member(name, t.identifier()))?);
-            }
+            let t = &m.r#type;
+            members.insert(m.ordinal, t.convert(context.nest_member(&m.name, t.identifier()))?);
         }
         Ok(compare::Type::Union(context.path, convert_strict(self.strict), members))
     }

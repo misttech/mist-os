@@ -900,17 +900,13 @@ type Struct = struct {
 @available(added=1)
 type Table = table {
     @available(added=1)
-    1: reserved;
-    @available(added=1)
-    2: member string;
+    1: member string;
 };
 
 @available(added=1)
 type Union = union {
     @available(added=1)
-    1: reserved;
-    @available(added=1)
-    2: member string;
+    1: member string;
 };
 
 @available(added=1)

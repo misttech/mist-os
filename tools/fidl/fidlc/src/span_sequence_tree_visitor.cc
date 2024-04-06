@@ -144,14 +144,7 @@ void IngestToken(const Token token, const Token prev_token, size_t leading_newli
       break;
     }
     case Token::kIdentifier: {
-      // If we encounter the `reserved` token in this context, it must refer to the keyword and
-      // not an identifier named `reserved` (ex: `protocol reserved { ... };`), because the latter
-      // will always be built by a `TokenBuilder` instead of being ingested.  Because the
-      // `reserved` keyword is always followed by a semicolon (ex: `10: reserved;`) with no space,
-      // make sure to exclude it on this code path.
-      if (token.subkind() != Token::kReserved) {
-        token_span_sequence->SetTrailingSpace(true);
-      }
+      token_span_sequence->SetTrailingSpace(true);
       break;
     }
     default:
@@ -701,12 +694,10 @@ void SpanSequenceTreeVisitor::OnOrdinaledLayoutMember(
       const auto ordinal_name_builder = SpanBuilder<AtomicSpanSequence>(this, element->start_token);
       OnOrdinal64(*element->ordinal);
       building_.top().back()->SetTrailingSpace(true);
-      if (!element->reserved)
-        OnIdentifier(element->identifier);
+      OnIdentifier(element->identifier);
     }
 
-    if (!element->reserved)
-      OnTypeConstructor(element->type_ctor);
+    OnTypeConstructor(element->type_ctor);
     SetSpacesBetweenChildren(building_.top(), true);
     ClearBlankLinesAfterAttributeList(element->attributes, building_.top());
   }

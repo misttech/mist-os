@@ -1387,39 +1387,6 @@ type T = table {
 `,
 		},
 		{
-			name: "table make member reserved",
-			before: `
-library l;
-type T = table {
-  1: foo int32;
-  2: bar int32;
-};
-`,
-			after: `
-library l;
-type T = table {
-  1: reserved;
-  2: bar int32;
-};
-`,
-			expected: `
-{
-    "api_diff": [
-        {
-            "name": "l/T.foo",
-            "before": {
-                "kind": "table/member",
-                "name": "l/T.foo",
-                "ordinal": "1",
-                "type": "int32"
-            },
-            "conclusion": "APIBreaking"
-        }
-    ]
-}
-`,
-		},
-		{
 			name: "table change type",
 			before: `
 library l;
@@ -1467,7 +1434,6 @@ type T = table {
 			after: `
 library l;
 type T = table {
-    1: reserved;
     2: foo int32;
 };
 `,
@@ -1553,98 +1519,6 @@ library l;
                 "kind": "union/member",
                 "name": "l/T.foo",
                 "ordinal": "1",
-                "type": "int32"
-            },
-            "conclusion": "APIBreaking"
-        },
-        {
-            "name": "l/T",
-            "before": {
-                "kind": "union",
-                "name": "l/T",
-                "strictness": "strict"
-            },
-            "conclusion": "APIBreaking"
-        }
-    ]
-}
-`,
-		},
-		{
-			name: "union make reserved",
-			before: `
-library l;
-type T = union {
-  1: foo int32;
-  2: bar int32;
-};
-`,
-			after: `
-library l;
-type T = union {
-  1: reserved;
-  2: bar int32;
-};
-`,
-			expected: `
-{
-    "api_diff": [
-        {
-            "name": "l/T.foo",
-            "before": {
-                "kind": "union/member",
-                "name": "l/T.foo",
-                "ordinal": "1",
-                "type": "int32"
-            },
-            "conclusion": "APIBreaking"
-        }
-    ]
-}
-`,
-		},
-		{
-			name: "union add reserved",
-			before: `
-library l;
-type T = union {
-  1: reserved;
-  2: foo int32;
-};
-`,
-			after: `
-library l;
-type T = union {
-  1: reserved;
-  2: foo int32;
-  3: reserved;
-};
-`,
-			expected: `
-{}
-`,
-		},
-		{
-			name: "union remove with reserved",
-			before: `
-library l;
-type T = strict union {
-  1: reserved;
-  2: foo int32;
-};
-`,
-			after: `
-library l;
-`,
-			expected: `
-{
-    "api_diff": [
-        {
-            "name": "l/T.foo",
-            "before": {
-                "kind": "union/member",
-                "name": "l/T.foo",
-                "ordinal": "2",
                 "type": "int32"
             },
             "conclusion": "APIBreaking"
@@ -1878,7 +1752,6 @@ type T = union {
 			after: `
 library l;
 type T = union {
-    1: reserved;
     2: foo int32;
 };
 `,

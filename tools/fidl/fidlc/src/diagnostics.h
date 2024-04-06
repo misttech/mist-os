@@ -105,8 +105,7 @@ constexpr ErrorDef<45> ErrAttributesNotAllowedOnLibraryImport(
     "attributes and doc comments are not allowed on `using` statements");
 constexpr ErrorDef<46, std::vector<std::string_view>> ErrUnknownLibrary(
     "Could not find library named {0}. Did you include its sources with --files?");
-constexpr ErrorDef<47, SourceSpan> ErrProtocolComposedMultipleTimes(
-    "protocol composed multiple times; previous was at {0}");
+constexpr RetiredDef<47> ErrProtocolComposedMultipleTimes;
 constexpr ErrorDef<48> ErrOptionalTableMember("Table members cannot be optional");
 constexpr ErrorDef<49> ErrOptionalUnionMember("Union members cannot be optional");
 constexpr ErrorDef<50> ErrDeprecatedStructDefaults(
@@ -397,8 +396,7 @@ constexpr ErrorDef<198> ErrOverlayMustBeValue("overlays must be value (not resou
                                               {.documented = false});
 constexpr ErrorDef<199> ErrOverlayMemberMustBeValue("overlays may not contain resource members",
                                                     {.documented = false});
-constexpr ErrorDef<200> ErrOverlayMustNotContainReserved(
-    "overlays may not contain reserved members", {.documented = false});
+constexpr RetiredDef<200> ErrOverlayMustNotContainReserved;
 constexpr ErrorDef<201, std::vector<std::string_view>, Platform> ErrPlatformVersionNotSelected(
     "library '{0}' belongs to platform '{1}', but no version was selected for it; "
     "please choose a version N by passing `--available {1}:N`");

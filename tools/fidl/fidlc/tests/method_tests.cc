@@ -578,28 +578,23 @@ open protocol Example {
   ASSERT_EQ(id->type_decl->kind, Decl::Kind::kUnion);
   auto result_union = static_cast<const Union*>(id->type_decl);
   ASSERT_NE(result_union, nullptr);
-  ASSERT_EQ(result_union->members.size(), 3u);
+  ASSERT_EQ(result_union->members.size(), 2u);
 
   auto anonymous = result_union->name.as_anonymous();
   ASSERT_NE(anonymous, nullptr);
   ASSERT_EQ(anonymous->provenance, Name::Provenance::kGeneratedResultUnion);
 
   const auto& success = result_union->members.at(0);
-  ASSERT_NE(success.maybe_used, nullptr);
-  ASSERT_EQ("response", success.maybe_used->name.data());
+  ASSERT_EQ(success.ordinal->value, 1u);
+  ASSERT_EQ(success.name.data(), "response");
 
-  const Union::Member& error = result_union->members.at(1);
-  ASSERT_EQ(error.maybe_used, nullptr);
-  ASSERT_EQ("err", error.span->data());
-
-  const Union::Member& framework_error = result_union->members.at(2);
-  ASSERT_NE(framework_error.maybe_used, nullptr);
-  ASSERT_EQ("framework_err", framework_error.maybe_used->name.data());
-
-  ASSERT_NE(framework_error.maybe_used->type_ctor->type, nullptr);
-  ASSERT_EQ(framework_error.maybe_used->type_ctor->type->kind, Type::Kind::kInternal);
+  const Union::Member& framework_error = result_union->members.at(1);
+  ASSERT_EQ(framework_error.ordinal->value, 3u);
+  ASSERT_EQ(framework_error.name.data(), "framework_err");
+  ASSERT_NE(framework_error.type_ctor->type, nullptr);
+  ASSERT_EQ(framework_error.type_ctor->type->kind, Type::Kind::kInternal);
   auto framework_err_internal_type =
-      static_cast<const InternalType*>(framework_error.maybe_used->type_ctor->type);
+      static_cast<const InternalType*>(framework_error.type_ctor->type);
   ASSERT_EQ(framework_err_internal_type->subtype, InternalSubtype::kFrameworkErr);
 }
 
@@ -633,26 +628,24 @@ open protocol Example {
   ASSERT_EQ(anonymous->provenance, Name::Provenance::kGeneratedResultUnion);
 
   const auto& success = result_union->members.at(0);
-  ASSERT_NE(success.maybe_used, nullptr);
-  ASSERT_EQ("response", success.maybe_used->name.data());
+  ASSERT_EQ(success.ordinal->value, 1u);
+  ASSERT_EQ(success.name.data(), "response");
 
   const Union::Member& error = result_union->members.at(1);
-  ASSERT_NE(error.maybe_used, nullptr);
-  ASSERT_EQ("err", error.maybe_used->name.data());
-
-  ASSERT_NE(error.maybe_used->type_ctor->type, nullptr);
-  ASSERT_EQ(error.maybe_used->type_ctor->type->kind, Type::Kind::kPrimitive);
-  auto err_primitive_type = static_cast<const PrimitiveType*>(error.maybe_used->type_ctor->type);
+  ASSERT_EQ(error.ordinal->value, 2u);
+  ASSERT_EQ(error.name.data(), "err");
+  ASSERT_NE(error.type_ctor->type, nullptr);
+  ASSERT_EQ(error.type_ctor->type->kind, Type::Kind::kPrimitive);
+  auto err_primitive_type = static_cast<const PrimitiveType*>(error.type_ctor->type);
   ASSERT_EQ(err_primitive_type->subtype, PrimitiveSubtype::kUint32);
 
   const Union::Member& framework_error = result_union->members.at(2);
-  ASSERT_NE(framework_error.maybe_used, nullptr);
-  ASSERT_EQ("framework_err", framework_error.maybe_used->name.data());
-
-  ASSERT_NE(framework_error.maybe_used->type_ctor->type, nullptr);
-  ASSERT_EQ(framework_error.maybe_used->type_ctor->type->kind, Type::Kind::kInternal);
+  ASSERT_EQ(framework_error.ordinal->value, 3u);
+  ASSERT_EQ(framework_error.name.data(), "framework_err");
+  ASSERT_NE(framework_error.type_ctor->type, nullptr);
+  ASSERT_EQ(framework_error.type_ctor->type->kind, Type::Kind::kInternal);
   auto framework_err_internal_type =
-      static_cast<const InternalType*>(framework_error.maybe_used->type_ctor->type);
+      static_cast<const InternalType*>(framework_error.type_ctor->type);
   ASSERT_EQ(framework_err_internal_type->subtype, InternalSubtype::kFrameworkErr);
 }
 }  // namespace

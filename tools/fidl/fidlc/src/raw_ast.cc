@@ -245,9 +245,7 @@ void RawOrdinaledLayoutMember::Accept(TreeVisitor* visitor) const {
   }
 
   visitor->OnOrdinal64(*ordinal);
-  if (!reserved) {
-    visitor->OnIdentifier(identifier);
-  }
+  visitor->OnIdentifier(identifier);
   if (type_ctor != nullptr) {
     visitor->OnTypeConstructor(type_ctor);
   }

@@ -51,16 +51,17 @@ void AvailabilityStep::PopulateLexicalParents() {
   }
   for (auto& decl : library()->declarations.tables) {
     for (auto& member : decl->members) {
-      if (member.maybe_used) {
-        link_anonymous(&member, member.maybe_used->type_ctor.get());
-      }
+      link_anonymous(&member, member.type_ctor.get());
     }
   }
   for (auto& decl : library()->declarations.unions) {
     for (auto& member : decl->members) {
-      if (member.maybe_used) {
-        link_anonymous(&member, member.maybe_used->type_ctor.get());
-      }
+      link_anonymous(&member, member.type_ctor.get());
+    }
+  }
+  for (auto& decl : library()->declarations.overlays) {
+    for (auto& member : decl->members) {
+      link_anonymous(&member, member.type_ctor.get());
     }
   }
   for (auto& protocol : library()->declarations.protocols) {
@@ -377,14 +378,9 @@ class Validator {
     if (element->availability.state() != Availability::State::kInherited) {
       return;
     }
-    auto maybe_name = element->GetName();
-    if (!maybe_name.has_value()) {
-      // This is a reserved field or a protocol composition.
-      return;
-    }
     auto set = element->availability.set();
     auto added = set.ranges().first.pair().first;
-    auto name = maybe_name.value();
+    auto name = element->GetName();
     auto canonical_name = canonicalize(name);
     auto& same_canonical_name = by_canonical_name_[canonical_name];
     CheckForNameCollisions(element, set, name, canonical_name, same_canonical_name);
@@ -412,7 +408,7 @@ class Validator {
         continue;
       }
       auto span = element->GetNameSource();
-      auto other_name = other->GetName().value();
+      auto other_name = other->GetName();
       auto other_span = other->GetNameSource();
       // Use a simplified error message when availabilities are the identical.
       if (set == other_set) {

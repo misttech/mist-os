@@ -2867,7 +2867,7 @@ type MyEmptyTable_Abcdefghij = table {};
 
 type MyPopulatedTable_Abcdefgh = table {
     1: field1_abcdefghijklmnopqrst bool;
-    2: reserved;
+    2: field2 bool;
 
     3: field3_abcdefghijklmnopqr table {
         1: nested1_abc vector<uint8>:16;
@@ -2886,7 +2886,7 @@ library foo.bar;
 type MyEmptyTable_Abcdefghijk = table {};
 type MyPopulatedTable_Abcdefghi = table {
     1: field1_abcdefghijklmnopqrstu bool;
-    2: reserved;
+    2: field2 bool;
 
     3: field3_abcdefghijklmnopqrs table {
         1: nested1_abcd vector<uint8>:16;
@@ -2904,7 +2904,7 @@ type MyPopulatedTable_Abcdefghi
         = table {
     1: field1_abcdefghijklmnopqrstu
             bool;
-    2: reserved;
+    2: field2 bool;
 
     3: field3_abcdefghijklmnopqrs
             table {
@@ -2926,7 +2926,7 @@ type MyEmptyTable_Abcdefghij =   table  { } ;
 
 type MyPopulatedTable_Abcdefgh= table {
     1:   field1_abcdefghijklmnopqrst bool;
-    2  : reserved;
+    2  : field2 bool;
 
     3:field3_abcdefghijklmnopqr    table
 {
@@ -2944,7 +2944,7 @@ type MyEmptyTable_Abcdefghij = table {};
 
 type MyPopulatedTable_Abcdefgh = table {
     1: field1_abcdefghijklmnopqrst bool;
-    2: reserved;
+    2: field2 bool;
 
     3: field3_abcdefghijklmnopqr table {
         1: nested1_abc vector<uint8>:16;
@@ -2961,28 +2961,28 @@ TEST(FormatterTests, TableOrdinalsMultipleDigits) {
 library foo.bar;
 
 type MyTable = table {
-    1: reserved;
+    1: field1 bool;
    12: field12 bool;
     // comment 1
-  123: reserved;
+  123: field123 bool;
  1234: field1234 bool;
-12345: reserved;
+12345: field12345 bool;
 123456: field123456 table {
-        1: reserved;
+        1: field1 bool;
        12: field12 bool;
-      123: reserved;
+      123: field123 bool;
 
         // comment 2
      1234: field1234 bool;
-    12345: reserved;
+    12345: field12345 bool;
    123456: field123456 table {
-            1: reserved;
+            1: field1 bool;
            12: field12 bool;
-          123: reserved;
+          123: field123 bool;
          1234: field1234 bool;
             // comment 3
 
-        12345: reserved;
+        12345: field12345 bool;
        123456: field123456
                     table {};
         };
@@ -2995,28 +2995,28 @@ type MyTable = table {
 library foo.bar;
 
 type MyTable = table {
-    1: reserved;
+    1: field1 bool;
     12: field12 bool;
     // comment 1
-    123: reserved;
+    123: field123 bool;
     1234: field1234 bool;
-    12345: reserved;
+    12345: field12345 bool;
     123456: field123456 table {
-        1: reserved;
+        1: field1 bool;
         12: field12 bool;
-        123: reserved;
+        123: field123 bool;
 
         // comment 2
         1234: field1234 bool;
-        12345: reserved;
+        12345: field12345 bool;
         123456: field123456 table {
-            1: reserved;
+            1: field1 bool;
             12: field12 bool;
-            123: reserved;
+            123: field123 bool;
             1234: field1234 bool;
             // comment 3
 
-            12345: reserved;
+            12345: field12345 bool;
             123456: field123456
                     table {};
         };
@@ -3043,7 +3043,7 @@ library foo.bar;
 
 type MyPopulatedTable_Abcdefgh = table {
     1: field1_abcdefghijklmnopqrst bool;
-    2: reserved;
+    2: field2 bool;
 
   // comment 2
 
@@ -3071,7 +3071,7 @@ type MyEmptyTable_Abcdefghij = table {};
 
 type MyPopulatedTable_Abcdefgh = table {
     1: field1_abcdefghijklmnopqrst bool;
-    2: reserved;
+    2: field2 bool;
 
     // comment 2
 
@@ -3094,7 +3094,7 @@ type MyPopulatedTable_Abcdefgh = table {
 TEST(FormatterTests, TableMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted =
-      R"FIDL(library foo.bar;type MyEmptyTable_Abcdefghij=table{};type MyPopulatedTable_Abcdefgh=table{1:field1_abcdefghijklmnopqrst bool;2:reserved;3:field3_abcdefghijklmnopqr table{1:nested1_abc vector<uint8>:16;};};)FIDL";
+      R"FIDL(library foo.bar;type MyEmptyTable_Abcdefghij=table{};type MyPopulatedTable_Abcdefgh=table{1:field1_abcdefghijklmnopqrst bool;2:field2 bool;3:field3_abcdefghijklmnopqr table{1:nested1_abc vector<uint8>:16;};};)FIDL";
 
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
@@ -3102,7 +3102,7 @@ library foo.bar;
 type MyEmptyTable_Abcdefghij = table {};
 type MyPopulatedTable_Abcdefgh = table {
     1: field1_abcdefghijklmnopqrst bool;
-    2: reserved;
+    2: field2 bool;
     3: field3_abcdefghijklmnopqr table {
         1: nested1_abc vector<uint8>:16;
     };
@@ -3142,7 +3142,8 @@ bool
 ;
 2
 :
-reserved
+field2
+bool
 ;
 3
 :
@@ -3173,7 +3174,7 @@ type MyEmptyTable_Abcdefghij = table {};
 
 type MyPopulatedTable_Abcdefgh = table {
     1: field1_abcdefghijklmnopqrst bool;
-    2: reserved;
+    2: field2 bool;
     3: field3_abcdefghijklmnopqr table {
         1: nested1_abc vector<uint8>:16;
     };
@@ -3192,7 +3193,7 @@ library foo.bar;
 
 type MyUnion_Abcdefghijklmnopq = union {
     1: field1_abcdefghijklmnopqrst bool;
-    2: reserved;
+    2: field2 bool;
 
     3: field3_abcdefghijklmnopqr union {
         1: nested1_abc vector<uint8>:16;
@@ -3210,7 +3211,7 @@ library foo.bar;
 
 type MyUnion_Abcdefghijklmnopqr = union {
     1: field1_abcdefghijklmnopqrstu bool;
-    2: reserved;
+    2: field2 bool;
 
     3: field3_abcdefghijklmnopqrs union {
         1: nested1_abcd vector<uint8>:16;
@@ -3226,7 +3227,7 @@ type MyUnion_Abcdefghijklmnopqr
         = union {
     1: field1_abcdefghijklmnopqrstu
             bool;
-    2: reserved;
+    2: field2 bool;
 
     3: field3_abcdefghijklmnopqrs
             union {
@@ -3246,7 +3247,7 @@ library foo.bar;
 
 type MyUnion_A= strict resource union {
     1:   field1_abcdefghijklmnopqrst bool;
-    2  : reserved;
+    2  : field2 bool;
 
     3:field3_abcdefghijklmnopqr    union
 {
@@ -3262,7 +3263,7 @@ library foo.bar;
 
 type MyUnion_A = strict resource union {
     1: field1_abcdefghijklmnopqrst bool;
-    2: reserved;
+    2: field2 bool;
 
     3: field3_abcdefghijklmnopqr union {
         1: nested1_abc vector<uint8>:16;
@@ -3279,29 +3280,29 @@ TEST(FormatterTests, UnionOrdinalsMultipleDigits) {
 library foo.bar;
 
 type MyUnion = flexible resource union {
-    1: reserved;
+    1: field1 bool;
    12: field12 bool;
     // comment 1
-  123: reserved;
+  123: field123 bool;
  1234: field1234 bool;
-12345: reserved;
+12345: field12345 bool;
 123456: field123456 flexible union {
-        1: reserved;
+        1: field1 bool;
        12: field12 bool;
-      123: reserved;
+      123: field123 bool;
 
         // comment 2
      1234: field1234 bool;
-    12345: reserved;
+    12345: field12345 bool;
    123456: field123456
                 strict union {
-            1: reserved;
+            1: field1 bool;
            12: field12 bool;
-          123: reserved;
+          123: field123 bool;
          1234: field1234 bool;
             // comment 3
 
-        12345: reserved;
+        12345: field12345 bool;
        123456: field123456
                     struct {};
         };
@@ -3314,29 +3315,29 @@ type MyUnion = flexible resource union {
 library foo.bar;
 
 type MyUnion = flexible resource union {
-    1: reserved;
+    1: field1 bool;
     12: field12 bool;
     // comment 1
-    123: reserved;
+    123: field123 bool;
     1234: field1234 bool;
-    12345: reserved;
+    12345: field12345 bool;
     123456: field123456 flexible union {
-        1: reserved;
+        1: field1 bool;
         12: field12 bool;
-        123: reserved;
+        123: field123 bool;
 
         // comment 2
         1234: field1234 bool;
-        12345: reserved;
+        12345: field12345 bool;
         123456: field123456
                 strict union {
-            1: reserved;
+            1: field1 bool;
             12: field12 bool;
-            123: reserved;
+            123: field123 bool;
             1234: field1234 bool;
             // comment 3
 
-            12345: reserved;
+            12345: field12345 bool;
             123456: field123456
                     struct {};
         };
@@ -3360,7 +3361,7 @@ library foo.bar;
    @foo
 type MyUnion_Abcdefgh = resource union {
     1: field1_abcdefghijklmnopqrst bool;
-    2: reserved;
+    2: field2 bool;
 
   // comment 2
 
@@ -3386,7 +3387,7 @@ library foo.bar;
 @foo
 type MyUnion_Abcdefgh = resource union {
     1: field1_abcdefghijklmnopqrst bool;
-    2: reserved;
+    2: field2 bool;
 
     // comment 2
 
@@ -3409,14 +3410,14 @@ type MyUnion_Abcdefgh = resource union {
 TEST(FormatterTests, UnionMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted =
-      R"FIDL(library foo.bar;type MyUnion_Abcdefghijklmnopq=union{1:field1_abcdefghijklmnopqrst bool;2:reserved;3:field3_abcdefghijklmnopqr union{1:nested1_abc vector<uint8>:16;};};)FIDL";
+      R"FIDL(library foo.bar;type MyUnion_Abcdefghijklmnopq=union{1:field1_abcdefghijklmnopqrst bool;2:field2 bool;3:field3_abcdefghijklmnopqr union{1:nested1_abc vector<uint8>:16;};};)FIDL";
 
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
 type MyUnion_Abcdefghijklmnopq = union {
     1: field1_abcdefghijklmnopqrst bool;
-    2: reserved;
+    2: field2 bool;
     3: field3_abcdefghijklmnopqr union {
         1: nested1_abc vector<uint8>:16;
     };
@@ -3448,7 +3449,8 @@ bool
 ;
 2
 :
-reserved
+field2
+bool
 ;
 3
 :
@@ -3477,7 +3479,7 @@ library foo.bar;
 
 type MyUnion_Abcdefghijklmnopq = union {
     1: field1_abcdefghijklmnopqrst bool;
-    2: reserved;
+    2: field2 bool;
     3: field3_abcdefghijklmnopqr union {
         1: nested1_abc vector<uint8>:16;
     };

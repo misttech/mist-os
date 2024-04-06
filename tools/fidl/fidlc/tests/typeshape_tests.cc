@@ -409,43 +409,22 @@ type TableWithBoolAndU64 = table {
                                   }));
 }
 
-TEST(TypeshapeTests, GoodTablesWithReservedFields) {
+TEST(TypeshapeTests, GoodTablesWithOrdinalGaps) {
   TestLibrary library(R"FIDL(
 library example;
 
-type SomeReserved = table {
+type GapInMiddle = table {
     1: b bool;
-    2: reserved;
     3: b2 bool;
-    4: reserved;
 };
 
-type LastNonReserved = table {
-    1: reserved;
-    2: reserved;
+type GapAtStart = table {
     3: b bool;
-};
-
-type LastReserved = table {
-    1: b bool;
-    2: b2 bool;
-    3: reserved;
-    4: reserved;
-};
-
-type AllReserved = table {
-    1: reserved;
-    2: reserved;
-    3: reserved;
-};
-
-type OneReserved = table {
-    1: reserved;
 };
 )FIDL");
   ASSERT_COMPILED(library);
 
-  auto some_reserved = library.LookupTable("SomeReserved");
+  auto some_reserved = library.LookupTable("GapInMiddle");
   EXPECT_TYPE_SHAPE(some_reserved, (TypeShape{
                                        .inline_size = 16,
                                        .alignment = 8,
@@ -455,7 +434,7 @@ type OneReserved = table {
                                        .has_flexible_envelope = true,
                                    }));
 
-  auto last_non_reserved = library.LookupTable("LastNonReserved");
+  auto last_non_reserved = library.LookupTable("GapAtStart");
   EXPECT_TYPE_SHAPE(last_non_reserved, (TypeShape{
                                            .inline_size = 16,
                                            .alignment = 8,
@@ -464,32 +443,6 @@ type OneReserved = table {
                                            .has_padding = true,
                                            .has_flexible_envelope = true,
                                        }));
-
-  auto last_reserved = library.LookupTable("LastReserved");
-  EXPECT_TYPE_SHAPE(last_reserved, (TypeShape{
-                                       .inline_size = 16,
-                                       .alignment = 8,
-                                       .depth = 2,
-                                       .max_out_of_line = 16,
-                                       .has_padding = true,
-                                       .has_flexible_envelope = true,
-                                   }));
-
-  auto all_reserved = library.LookupTable("AllReserved");
-  EXPECT_TYPE_SHAPE(all_reserved, (TypeShape{
-                                      .inline_size = 16,
-                                      .alignment = 8,
-                                      .depth = 1,
-                                      .has_flexible_envelope = true,
-                                  }));
-
-  auto one_reserved = library.LookupTable("OneReserved");
-  EXPECT_TYPE_SHAPE(one_reserved, (TypeShape{
-                                      .inline_size = 16,
-                                      .alignment = 8,
-                                      .depth = 1,
-                                      .has_flexible_envelope = true,
-                                  }));
 }
 
 TEST(TypeshapeTests, GoodSimpleTablesWithHandles) {

@@ -1115,9 +1115,6 @@
           }
         },
         {
-          "is_reserved": true
-        },
-        {
           "is_reserved": false,
           "name": "framework_err",
           "location": {
@@ -1178,9 +1175,6 @@
             "kind": "identifier",
             "is_anonymous": true
           }
-        },
-        {
-          "is_reserved": true
         },
         {
           "is_reserved": false,
@@ -1283,9 +1277,6 @@
           }
         },
         {
-          "is_reserved": true
-        },
-        {
           "is_reserved": false,
           "name": "framework_err",
           "location": {
@@ -1310,9 +1301,6 @@
             "kind": "identifier",
             "is_anonymous": true
           }
-        },
-        {
-          "is_reserved": true
         },
         {
           "is_reserved": false,
@@ -1716,9 +1704,6 @@
           }
         },
         {
-          "is_reserved": true
-        },
-        {
           "is_reserved": false,
           "name": "framework_err",
           "location": {
@@ -1779,9 +1764,6 @@
             "kind": "identifier",
             "is_anonymous": true
           }
-        },
-        {
-          "is_reserved": true
         },
         {
           "is_reserved": false,
@@ -1884,9 +1866,6 @@
           }
         },
         {
-          "is_reserved": true
-        },
-        {
           "is_reserved": false,
           "name": "framework_err",
           "location": {
@@ -1911,9 +1890,6 @@
             "kind": "identifier",
             "is_anonymous": true
           }
-        },
-        {
-          "is_reserved": true
         },
         {
           "is_reserved": false,

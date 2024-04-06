@@ -160,23 +160,17 @@ void ResolveStep::VisitElement(Element* element, Context context) {
     }
     case Element::Kind::kTableMember: {
       auto table_member = static_cast<Table::Member*>(element);
-      if (auto& used = table_member->maybe_used) {
-        VisitTypeConstructor(used->type_ctor.get(), context);
-      }
+      VisitTypeConstructor(table_member->type_ctor.get(), context);
       break;
     }
     case Element::Kind::kUnionMember: {
       auto union_member = static_cast<Union::Member*>(element);
-      if (auto& used = union_member->maybe_used) {
-        VisitTypeConstructor(used->type_ctor.get(), context);
-      }
+      VisitTypeConstructor(union_member->type_ctor.get(), context);
       break;
     }
     case Element::Kind::kOverlayMember: {
       auto overlay_member = static_cast<Overlay::Member*>(element);
-      if (auto& used = overlay_member->maybe_used) {
-        VisitTypeConstructor(used->type_ctor.get(), context);
-      }
+      VisitTypeConstructor(overlay_member->type_ctor.get(), context);
       break;
     }
     case Element::Kind::kProtocolCompose: {

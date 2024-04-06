@@ -175,12 +175,10 @@ void IndexJSONGenerator::Generate(const Union& value) {
 
 void IndexJSONGenerator::Generate(const Union::Member& value) {
   GenerateObject([&]() {
-    GenerateObjectMember("is_reserved", !value.maybe_used, Position::kFirst);
-    if (value.maybe_used) {
-      GenerateObjectMember("name", value.maybe_used->name.data());
-      GenerateObjectMember("location", value.maybe_used->name);
-      GenerateObjectMember("type", value.maybe_used->type_ctor.get());
-    }
+    GenerateObjectMember("is_reserved", false, Position::kFirst);
+    GenerateObjectMember("name", value.name.data());
+    GenerateObjectMember("location", value.name);
+    GenerateObjectMember("type", value.type_ctor.get());
   });
 }
 
@@ -197,12 +195,10 @@ void IndexJSONGenerator::Generate(const Table& value) {
 
 void IndexJSONGenerator::Generate(const Table::Member& value) {
   GenerateObject([&]() {
-    GenerateObjectMember("is_reserved", !value.maybe_used, Position::kFirst);
-    if (value.maybe_used) {
-      GenerateObjectMember("name", value.maybe_used->name.data());
-      GenerateObjectMember("location", value.maybe_used->name);
-      GenerateObjectMember("type", value.maybe_used->type_ctor.get());
-    }
+    GenerateObjectMember("is_reserved", false, Position::kFirst);
+    GenerateObjectMember("name", value.name.data());
+    GenerateObjectMember("location", value.name);
+    GenerateObjectMember("type", value.type_ctor.get());
   });
 }
 

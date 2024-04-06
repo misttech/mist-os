@@ -14,7 +14,6 @@ const std::map<std::string_view, ExperimentalFlag> kAllExperimentalFlags = {
     {"output_index_json", ExperimentalFlag::kOutputIndexJson},
     {"zx_c_types", ExperimentalFlag::kZxCTypes},
     {"allow_arbitrary_error_types", ExperimentalFlag::kAllowArbitraryErrorTypes},
-    {"disallow_reserved", ExperimentalFlag::kDisallowReserved},
 };
 
 }  // namespace fidlc

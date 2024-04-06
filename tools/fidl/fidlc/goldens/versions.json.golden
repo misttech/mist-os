@@ -39,7 +39,6 @@
     }
   ],
   "experiments": [
-    "disallow_reserved",
     "output_index_json"
   ],
   "library_dependencies": [],

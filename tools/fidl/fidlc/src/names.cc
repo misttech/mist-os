@@ -237,7 +237,7 @@ std::string NameHandleZXObjType(HandleSubtype subtype) {
   }
 }
 
-std::string NameUnionTag(std::string_view union_name, const Union::Member::Used& member) {
+std::string NameUnionTag(std::string_view union_name, const Union::Member& member) {
   return std::string(union_name) + "Tag_" + NameIdentifier(member.name);
 }
 

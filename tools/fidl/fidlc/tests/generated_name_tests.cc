@@ -36,7 +36,7 @@ type Foo = table {
   ASSERT_COMPILED(library);
   auto foo = library.LookupTable("Foo");
   ASSERT_NE(foo, nullptr);
-  auto bar_type = foo->members[0].maybe_used->type_ctor->type;
+  auto bar_type = foo->members[0].type_ctor->type;
   EXPECT_EQ(bar_type->name.decl_name(), "Good");
 }
 
@@ -51,7 +51,7 @@ type Foo = union {
   ASSERT_COMPILED(library);
   auto foo = library.LookupUnion("Foo");
   ASSERT_NE(foo, nullptr);
-  auto bar_type = foo->members[0].maybe_used->type_ctor->type;
+  auto bar_type = foo->members[0].type_ctor->type;
   EXPECT_EQ(bar_type->name.decl_name(), "Good");
 }
 
@@ -103,7 +103,7 @@ protocol Foo {
 
   auto id = static_cast<const IdentifierType*>(foo->methods[0].maybe_response->type);
   auto result_union = static_cast<const Union*>(id->type_decl);
-  auto success_type = result_union->members[0].maybe_used->type_ctor->type;
+  auto success_type = result_union->members[0].type_ctor->type;
   EXPECT_EQ(success_type->name.decl_name(), "Good");
 }
 
@@ -121,7 +121,7 @@ protocol Foo {
 
   auto id = static_cast<const IdentifierType*>(foo->methods[0].maybe_response->type);
   auto result_union = static_cast<const Union*>(id->type_decl);
-  auto error_type = result_union->members[1].maybe_used->type_ctor->type;
+  auto error_type = result_union->members[1].type_ctor->type;
   EXPECT_EQ(error_type->name.decl_name(), "Good");
 }
 

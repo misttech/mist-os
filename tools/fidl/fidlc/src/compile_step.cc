@@ -997,9 +997,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
     }
     auto target_protocol = static_cast<Protocol*>(target);
     auto result = scope.Insert(target_protocol, span);
-    if (!result.ok()) {
-      reporter()->Fail(ErrProtocolComposedMultipleTimes, span, result.previous_occurrence());
-    }
+    ZX_ASSERT_MSG(result.ok(), "duplicate composition should have caused name collision earlier");
     CompileDecl(target_protocol);
   }
   for (auto& method : protocol_declaration->methods) {
@@ -1114,8 +1112,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
             ZX_ASSERT(decl->kind == Decl::Kind::kUnion);
             const auto* result_union = static_cast<const Union*>(decl);
             ZX_ASSERT(!result_union->members.empty());
-            ZX_ASSERT(result_union->members[0].maybe_used);
-            const auto* success_variant_type = result_union->members[0].maybe_used->type_ctor->type;
+            const auto* success_variant_type = result_union->members[0].type_ctor->type;
             if (success_variant_type) {
               if (success_variant_type->kind != Type::Kind::kIdentifier) {
                 reporter()->Fail(ErrInvalidMethodPayloadType, method.name, success_variant_type);
@@ -1170,11 +1167,17 @@ void CompileStep::ValidateDomainErrorType(const Union* result_union) {
   if (experimental_flags().IsEnabled(ExperimentalFlag::kAllowArbitraryErrorTypes)) {
     return;
   }
-  auto& error_member = result_union->members[1];
-  if (!error_member.maybe_used) {
+  const Union::Member* error_member = nullptr;
+  for (auto& member : result_union->members) {
+    if (member.ordinal->value == kDomainErrorOrdinal) {
+      error_member = &member;
+      break;
+    }
+  }
+  if (!error_member) {
     return;
   }
-  auto error_type = error_member.maybe_used->type_ctor->type;
+  auto error_type = error_member->type_ctor->type;
   if (!error_type) {
     return;
   }
@@ -1268,24 +1271,20 @@ void CompileStep::CompileTable(Table* table_declaration) {
     if (member.ordinal->value > kMaxTableOrdinals) {
       reporter()->Fail(ErrTableOrdinalTooLarge, member.ordinal->span());
     }
-    if (!member.maybe_used) {
+    CompileTypeConstructor(member.type_ctor.get());
+    if (!member.type_ctor->type) {
       continue;
     }
-    auto& member_used = *member.maybe_used;
-    CompileTypeConstructor(member_used.type_ctor.get());
-    if (!member_used.type_ctor->type) {
-      continue;
-    }
-    if (member_used.type_ctor->type->IsNullable()) {
-      reporter()->Fail(ErrOptionalTableMember, member_used.name);
+    if (member.type_ctor->type->IsNullable()) {
+      reporter()->Fail(ErrOptionalTableMember, member.name);
     }
     if (i == kMaxTableOrdinals - 1) {
-      if (member_used.type_ctor->type->kind != Type::Kind::kIdentifier) {
-        reporter()->Fail(ErrMaxOrdinalNotTable, member_used.name);
+      if (member.type_ctor->type->kind != Type::Kind::kIdentifier) {
+        reporter()->Fail(ErrMaxOrdinalNotTable, member.name);
       } else {
-        auto identifier_type = static_cast<const IdentifierType*>(member_used.type_ctor->type);
+        auto identifier_type = static_cast<const IdentifierType*>(member.type_ctor->type);
         if (identifier_type->type_decl->kind != Decl::Kind::kTable) {
-          reporter()->Fail(ErrMaxOrdinalNotTable, member_used.name);
+          reporter()->Fail(ErrMaxOrdinalNotTable, member.name);
         }
       }
     }
@@ -1296,7 +1295,6 @@ void CompileStep::CompileUnion(Union* union_declaration) {
   Ordinal64Scope ordinal_scope;
 
   CompileAttributeList(union_declaration->attributes.get());
-  bool contains_non_reserved_member = false;
   bool infer_resourceness = !union_declaration->resourceness.has_value();
   auto resourceness = Resourceness::kValue;
   for (const auto& member : union_declaration->members) {
@@ -1306,21 +1304,14 @@ void CompileStep::CompileUnion(Union* union_declaration) {
       reporter()->Fail(ErrDuplicateUnionMemberOrdinal, member.ordinal->span(),
                        ordinal_result.previous_occurrence());
     }
-    if (!member.maybe_used) {
+    CompileTypeConstructor(member.type_ctor.get());
+    if (!member.type_ctor->type) {
       continue;
     }
-
-    contains_non_reserved_member = true;
-    const auto& member_used = *member.maybe_used;
-    CompileTypeConstructor(member_used.type_ctor.get());
-    if (!member_used.type_ctor->type) {
-      continue;
+    if (member.type_ctor->type->IsNullable()) {
+      reporter()->Fail(ErrOptionalUnionMember, member.name);
     }
-    if (member_used.type_ctor->type->IsNullable()) {
-      reporter()->Fail(ErrOptionalUnionMember, member_used.name);
-    }
-    if (infer_resourceness &&
-        member_used.type_ctor->type->Resourceness() == Resourceness::kResource) {
+    if (infer_resourceness && member.type_ctor->type->Resourceness() == Resourceness::kResource) {
       resourceness = Resourceness::kResource;
     }
   }
@@ -1331,7 +1322,7 @@ void CompileStep::CompileUnion(Union* union_declaration) {
     union_declaration->resourceness = resourceness;
   }
 
-  if (union_declaration->strictness == Strictness::kStrict && !contains_non_reserved_member) {
+  if (union_declaration->strictness == Strictness::kStrict && union_declaration->members.empty()) {
     reporter()->Fail(ErrMustHaveOneMember, union_declaration->name.span().value());
   }
 }
@@ -1354,15 +1345,7 @@ void CompileStep::CompileOverlay(Overlay* overlay_declaration) {
       reporter()->Fail(ErrDuplicateUnionMemberOrdinal, member.ordinal->span(),
                        ordinal_result.previous_occurrence());
     }
-    if (!member.maybe_used) {
-      reporter()->Fail(ErrOverlayMustNotContainReserved, member.span.value());
-      continue;
-    }
-    const auto& member_used = *member.maybe_used;
-    CompileTypeConstructor(member_used.type_ctor.get());
-    if (!member_used.type_ctor->type) {
-      continue;
-    }
+    CompileTypeConstructor(member.type_ctor.get());
   }
 }
 

@@ -38,16 +38,13 @@ protocol Example {
   ASSERT_EQ(anonymous->provenance, Name::Provenance::kGeneratedResultUnion);
 
   const auto& success = result_union->members.at(0);
-  ASSERT_NE(success.maybe_used, nullptr);
-  ASSERT_EQ("response", success.maybe_used->name.data());
+  ASSERT_EQ("response", success.name.data());
 
   const Union::Member& error = result_union->members.at(1);
-  ASSERT_NE(error.maybe_used, nullptr);
-  ASSERT_EQ("err", error.maybe_used->name.data());
+  ASSERT_EQ("err", error.name.data());
 
-  ASSERT_NE(error.maybe_used->type_ctor->type, nullptr);
-  ASSERT_EQ(error.maybe_used->type_ctor->type->kind, Type::Kind::kPrimitive);
-  auto primitive_type = static_cast<const PrimitiveType*>(error.maybe_used->type_ctor->type);
+  ASSERT_EQ(error.type_ctor->type->kind, Type::Kind::kPrimitive);
+  auto primitive_type = static_cast<const PrimitiveType*>(error.type_ctor->type);
   ASSERT_EQ(primitive_type->subtype, PrimitiveSubtype::kInt32);
 }
 
@@ -87,7 +84,7 @@ protocol MyProtocol {
   EXPECT_TRUE(response->kind == Decl::Kind::kUnion);
   ASSERT_EQ(response->members.size(), 2u);
 
-  auto empty_struct_name = response->members[0].maybe_used->type_ctor->type->name.decl_name();
+  auto empty_struct_name = response->members[0].type_ctor->type->name.decl_name();
   auto empty_struct = library.LookupStruct(empty_struct_name);
   ASSERT_NE(empty_struct, nullptr);
   auto anonymous = empty_struct->name.as_anonymous();
@@ -224,8 +221,7 @@ protocol Example {
   auto result_id = static_cast<const IdentifierType*>(
       library.LookupProtocol("Example")->methods.at(0).maybe_response->type);
   auto result_union = static_cast<const Union*>(result_id->type_decl);
-  auto error_id =
-      static_cast<const IdentifierType*>(result_union->members.at(1).maybe_used->type_ctor->type);
+  auto error_id = static_cast<const IdentifierType*>(result_union->members.at(1).type_ctor->type);
   ASSERT_EQ(error_id->type_decl->kind, Decl::Kind::kTable);
 }
 

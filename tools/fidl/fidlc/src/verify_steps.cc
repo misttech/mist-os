@@ -38,12 +38,9 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
       const auto* table_decl = static_cast<const Table*>(decl);
       if (table_decl->resourceness == Resourceness::kValue) {
         for (const auto& member : table_decl->members) {
-          if (member.maybe_used) {
-            const auto& used = *member.maybe_used;
-            if (EffectiveResourceness(used.type_ctor->type) == Resourceness::kResource) {
-              reporter()->Fail(ErrTypeMustBeResource, table_decl->name.span().value(),
-                               table_decl->name, used.name.data(), "table");
-            }
+          if (EffectiveResourceness(member.type_ctor->type) == Resourceness::kResource) {
+            reporter()->Fail(ErrTypeMustBeResource, table_decl->name.span().value(),
+                             table_decl->name, member.name.data(), "table");
           }
         }
       }
@@ -53,12 +50,9 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
       const auto* union_decl = static_cast<const Union*>(decl);
       if (union_decl->resourceness == Resourceness::kValue) {
         for (const auto& member : union_decl->members) {
-          if (member.maybe_used) {
-            const auto& used = *member.maybe_used;
-            if (EffectiveResourceness(used.type_ctor->type) == Resourceness::kResource) {
-              reporter()->Fail(ErrTypeMustBeResource, union_decl->name.span().value(),
-                               union_decl->name, used.name.data(), "union");
-            }
+          if (EffectiveResourceness(member.type_ctor->type) == Resourceness::kResource) {
+            reporter()->Fail(ErrTypeMustBeResource, union_decl->name.span().value(),
+                             union_decl->name, member.name.data(), "union");
           }
         }
       }
@@ -68,11 +62,8 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
       const auto* overlay_decl = static_cast<const Overlay*>(decl);
       if (overlay_decl->resourceness == Resourceness::kValue) {
         for (const auto& member : overlay_decl->members) {
-          if (member.maybe_used) {
-            const auto& used = *member.maybe_used;
-            if (EffectiveResourceness(used.type_ctor->type) == Resourceness::kResource) {
-              reporter()->Fail(ErrOverlayMemberMustBeValue, overlay_decl->name.span().value());
-            }
+          if (EffectiveResourceness(member.type_ctor->type) == Resourceness::kResource) {
+            reporter()->Fail(ErrOverlayMemberMustBeValue, overlay_decl->name.span().value());
           }
         }
       }
@@ -172,8 +163,7 @@ Resourceness VerifyResourcenessStep::EffectiveResourceness(const Type* type) {
       break;
     case Decl::Kind::kTable:
       for (const auto& member : static_cast<const Table*>(decl)->members) {
-        const auto& used = member.maybe_used;
-        if (used && EffectiveResourceness(used->type_ctor->type) == Resourceness::kResource) {
+        if (EffectiveResourceness(member.type_ctor->type) == Resourceness::kResource) {
           effective_resourceness_[decl] = Resourceness::kResource;
           return Resourceness::kResource;
         }
@@ -181,8 +171,7 @@ Resourceness VerifyResourcenessStep::EffectiveResourceness(const Type* type) {
       break;
     case Decl::Kind::kUnion:
       for (const auto& member : static_cast<const Union*>(decl)->members) {
-        const auto& used = member.maybe_used;
-        if (used && EffectiveResourceness(used->type_ctor->type) == Resourceness::kResource) {
+        if (EffectiveResourceness(member.type_ctor->type) == Resourceness::kResource) {
           effective_resourceness_[decl] = Resourceness::kResource;
           return Resourceness::kResource;
         }
@@ -319,30 +308,21 @@ void VerifyHandleTransportCompatibilityStep::CheckHandleTransportUsages(
     case Decl::Kind::kTable: {
       const Table* t = static_cast<const Table*>(decl);
       for (auto& member : t->members) {
-        if (member.maybe_used != nullptr) {
-          CheckHandleTransportUsages(member.maybe_used->type_ctor->type, transport, protocol,
-                                     member.maybe_used->name, seen);
-        }
+        CheckHandleTransportUsages(member.type_ctor->type, transport, protocol, member.name, seen);
       }
       return;
     }
     case Decl::Kind::kUnion: {
       const Union* u = static_cast<const Union*>(decl);
       for (auto& member : u->members) {
-        if (member.maybe_used != nullptr) {
-          CheckHandleTransportUsages(member.maybe_used->type_ctor->type, transport, protocol,
-                                     member.maybe_used->name, seen);
-        }
+        CheckHandleTransportUsages(member.type_ctor->type, transport, protocol, member.name, seen);
       }
       return;
     }
     case Decl::Kind::kOverlay: {
       const Overlay* o = static_cast<const Overlay*>(decl);
       for (auto& member : o->members) {
-        if (member.maybe_used != nullptr) {
-          CheckHandleTransportUsages(member.maybe_used->type_ctor->type, transport, protocol,
-                                     member.maybe_used->name, seen);
-        }
+        CheckHandleTransportUsages(member.type_ctor->type, transport, protocol, member.name, seen);
       }
       return;
     }

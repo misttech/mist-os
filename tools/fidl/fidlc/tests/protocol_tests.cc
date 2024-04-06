@@ -405,9 +405,20 @@ TEST(ProtocolTests, BadCannotMutuallyCompose) {
 }
 
 TEST(ProtocolTests, BadCannotComposeSameProtocolTwice) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0047.test.fidl");
-  library.ExpectFail(ErrProtocolComposedMultipleTimes, "bad/fi-0047.test.fidl:11:13");
+  TestLibrary library(R"FIDL(
+library example;
+
+protocol Parent {
+    Method();
+};
+
+protocol Child {
+    compose Parent;
+    compose Parent;
+};
+)FIDL");
+  library.ExpectFail(ErrNameCollision, Element::Kind::kProtocolCompose, "Parent",
+                     Element::Kind::kProtocolCompose, "example.fidl:9:13");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

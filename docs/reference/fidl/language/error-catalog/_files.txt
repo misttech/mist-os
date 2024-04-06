@@ -194,6 +194,7 @@ _fi-0193.md
 _fi-0194.md
 _fi-0195.md
 _fi-0196.md
+_fi-0200.md
 _fi-0201.md
 _fi-0202.md
 _fi-0203.md

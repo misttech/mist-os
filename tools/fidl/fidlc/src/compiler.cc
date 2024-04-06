@@ -215,8 +215,8 @@ static std::vector<const Struct*> ExternalStructs(const Library* target_library,
         if (method->HasResultUnion()) {
           ZX_ASSERT(id->type_decl->kind == Decl::Kind::kUnion);
           const auto* result_union = static_cast<const Union*>(id->type_decl);
-          const auto* success_variant_type = static_cast<const IdentifierType*>(
-              result_union->members[0].maybe_used->type_ctor->type);
+          const auto* success_variant_type =
+              static_cast<const IdentifierType*>(result_union->members[0].type_ctor->type);
           if (success_variant_type->type_decl->kind != Decl::Kind::kStruct) {
             continue;
           }
@@ -297,9 +297,7 @@ class CalcDependencies {
             ZX_ASSERT(response_id->type_decl->kind == Decl::Kind::kUnion);
             auto result_union = static_cast<const Union*>(response_id->type_decl);
             for (const auto& member : result_union->members) {
-              if (auto used = member.maybe_used.get()) {
-                VisitTypeConstructorAndStructFields(used->type_ctor.get());
-              }
+              VisitTypeConstructorAndStructFields(member.type_ctor.get());
             }
           } else if (auto response = method->maybe_response.get()) {
             VisitTypeConstructorAndStructFields(response);
@@ -335,9 +333,7 @@ class CalcDependencies {
       case Decl::Kind::kTable: {
         auto table_decl = static_cast<const Table*>(decl);
         for (auto& member : table_decl->members) {
-          if (auto& used = member.maybe_used) {
-            VisitTypeConstructor(used->type_ctor.get());
-          }
+          VisitTypeConstructor(member.type_ctor.get());
         }
         break;
       }
@@ -354,18 +350,14 @@ class CalcDependencies {
       case Decl::Kind::kUnion: {
         auto union_decl = static_cast<const Union*>(decl);
         for (auto& member : union_decl->members) {
-          if (auto& used = member.maybe_used) {
-            VisitTypeConstructor(used->type_ctor.get());
-          }
+          VisitTypeConstructor(member.type_ctor.get());
         }
         break;
       }
       case Decl::Kind::kOverlay: {
         auto overlay_decl = static_cast<const Overlay*>(decl);
         for (auto& member : overlay_decl->members) {
-          if (auto& used = member.maybe_used) {
-            VisitTypeConstructor(used->type_ctor.get());
-          }
+          VisitTypeConstructor(member.type_ctor.get());
         }
       }
     }

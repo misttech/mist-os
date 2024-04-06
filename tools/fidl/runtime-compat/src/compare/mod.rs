@@ -974,11 +974,9 @@ mod types_tests {
                 // unchanged
                 1: one uint32;
 
-                // defined <-> reserved
+                // removed
                 @available(removed=2)
                 2: two uint32;
-                @available(added=2)
-                2: reserved;
 
                 // incompatible types
                 @available(replaced=2)
@@ -1023,11 +1021,9 @@ mod types_tests {
                 // unchanged
                 1: one uint32;
 
-                // defined <-> reserved
+                // removed
                 @available(removed=2)
                 2: two uint32;
-                @available(added=2)
-                2: reserved;
 
                 // incompatible types
                 @available(replaced=2)

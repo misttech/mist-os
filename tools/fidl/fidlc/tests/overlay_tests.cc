@@ -158,22 +158,6 @@ type Foo = strict overlay {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(OverlayTests, BadReserved) {
-  TestLibrary library(R"FIDL(
-library test;
-
-type Foo = strict overlay {
-    1: flippity int64;
-    2: floppity float64;
-    3: reserved;
-};
-)FIDL");
-  library.EnableFlag(ExperimentalFlag::kZxCTypes);
-
-  library.ExpectFail(ErrOverlayMustNotContainReserved);
-  ASSERT_COMPILER_DIAGNOSTICS(library);
-}
-
 TEST(OverlayTests, BadNoExperimentalFlag) {
   TestLibrary library(R"FIDL(
 library test;

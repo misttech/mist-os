@@ -400,6 +400,8 @@ redirects:
   to: /fuchsia-src/reference/fidl/language/errcat.md#fi-0195
 - from: /fuchsia-src/error/fi-0196
   to: /fuchsia-src/reference/fidl/language/errcat.md#fi-0196
+- from: /fuchsia-src/error/fi-0200
+  to: /fuchsia-src/reference/fidl/language/errcat.md#fi-0200
 - from: /fuchsia-src/error/fi-0201
   to: /fuchsia-src/reference/fidl/language/errcat.md#fi-0201
 - from: /fuchsia-src/error/fi-0202

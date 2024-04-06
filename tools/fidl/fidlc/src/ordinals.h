@@ -17,6 +17,11 @@ struct AttributeList;
 struct RawOrdinal64;
 struct SourceElement;
 
+// Ordinals for method error result unions.
+const uint64_t kSuccessOrdinal = 1;
+const uint64_t kDomainErrorOrdinal = 2;
+const uint64_t kFrameworkErrorOrdinal = 3;
+
 using MethodHasher = fit::function<RawOrdinal64(
     const std::vector<std::string_view>& library_name, const std::string_view& protocol_name,
     const std::string_view& selector_name, const SourceElement& source_element)>;

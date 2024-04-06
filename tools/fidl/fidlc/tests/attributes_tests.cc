@@ -71,8 +71,6 @@ type ExampleStruct = struct {
 type ExampleTable = table {
     @on_table_member
     1: member uint32;
-    @on_reserved_member
-    2: reserved;
 };
 
 @on_alias
@@ -82,8 +80,6 @@ alias ExampleAlias = uint32;
 type ExampleUnion = union {
     @on_union_member
     1: variant uint32;
-    @on_reserved_member
-    2: reserved;
 };
 )FIDL");
   ASSERT_COMPILED(library);
@@ -134,7 +130,6 @@ type ExampleUnion = union {
   ASSERT_NE(example_table, nullptr);
   EXPECT_TRUE(example_table->attributes->Get("on_table"));
   EXPECT_TRUE(example_table->members.front().attributes->Get("on_table_member"));
-  EXPECT_TRUE(example_table->members.back().attributes->Get("on_reserved_member"));
 
   auto example_alias = library.LookupAlias("ExampleAlias");
   ASSERT_NE(example_alias, nullptr);
@@ -144,7 +139,6 @@ type ExampleUnion = union {
   ASSERT_NE(example_union, nullptr);
   EXPECT_TRUE(example_union->attributes->Get("on_union"));
   EXPECT_TRUE(example_union->members.front().attributes->Get("on_union_member"));
-  EXPECT_TRUE(example_union->members.back().attributes->Get("on_reserved_member"));
 }
 
 TEST(AttributesTests, GoodOfficialAttributes) {

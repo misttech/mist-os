@@ -29,7 +29,7 @@ std::string NameRawLiteralKind(RawLiteral::Kind kind);
 std::string NameFlatName(const Name& name);
 std::string NameFlatConstantKind(Constant::Kind kind);
 std::string NameFlatTypeKind(const Type* type);
-std::string NameUnionTag(std::string_view union_name, const Union::Member::Used& member);
+std::string NameUnionTag(std::string_view union_name, const Union::Member& member);
 std::string NameFlatConstant(const Constant* constant);
 std::string NameFlatBinaryOperator(BinaryOperatorConstant::Operator op);
 std::string NameFlatType(const Type* type);

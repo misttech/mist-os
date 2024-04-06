@@ -5,7 +5,6 @@
     "fuchsia": "LEGACY"
   },
   "experiments": [
-    "disallow_reserved",
     "output_index_json",
     "zx_c_types"
   ],

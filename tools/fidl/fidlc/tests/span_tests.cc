@@ -462,7 +462,6 @@ const std::vector<TestCase> kTestCases = {
          R"FIDL(library «x»;
           type «MyUnion» = flexible union {
             1: «intval» «int64»;
-            2: reserved;
           };
          )FIDL",
      }},
@@ -600,12 +599,10 @@ const std::vector<TestCase> kTestCases = {
          R"FIDL(library x;
           type T = table {
             «1: intval int64»;
-            «2: reserved»;
             «@attr 3: floatval float64»;
             «4: stringval string:100»;
             «5: inner union {
               «1: boolval bool»;
-              «2: reserved»;
             }:optional»;
           };
          )FIDL",

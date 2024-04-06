@@ -61,7 +61,7 @@ bool Element::IsAnonymousLayout() const {
   }
 }
 
-std::optional<std::string_view> Element::GetName() const {
+std::string_view Element::GetName() const {
   switch (kind) {
     case Kind::kLibrary:
       ZX_PANIC("should not call GetName() on a library element");
@@ -84,7 +84,7 @@ std::optional<std::string_view> Element::GetName() const {
     case Kind::kEnumMember:
       return static_cast<const Enum::Member*>(this)->name.data();
     case Kind::kProtocolCompose:
-      return std::nullopt;
+      return static_cast<const Protocol::ComposedProtocol*>(this)->reference.span().data();
     case Kind::kProtocolMethod:
       return static_cast<const Protocol::Method*>(this)->name.data();
     case Kind::kResourceProperty:
@@ -94,20 +94,11 @@ std::optional<std::string_view> Element::GetName() const {
     case Kind::kStructMember:
       return static_cast<const Struct::Member*>(this)->name.data();
     case Kind::kTableMember:
-      if (auto& used = static_cast<const Table::Member*>(this)->maybe_used) {
-        return used->name.data();
-      }
-      return std::nullopt;
+      return static_cast<const Table::Member*>(this)->name.data();
     case Kind::kUnionMember:
-      if (auto& used = static_cast<const Union::Member*>(this)->maybe_used) {
-        return used->name.data();
-      }
-      return std::nullopt;
+      return static_cast<const Union::Member*>(this)->name.data();
     case Kind::kOverlayMember:
-      if (auto& used = static_cast<const Overlay::Member*>(this)->maybe_used) {
-        return used->name.data();
-      }
-      return std::nullopt;
+      return static_cast<const Overlay::Member*>(this)->name.data();
   }
 }
 
@@ -134,7 +125,7 @@ SourceSpan Element::GetNameSource() const {
     case Kind::kEnumMember:
       return static_cast<const Enum::Member*>(this)->name;
     case Kind::kProtocolCompose:
-      ZX_PANIC("protocol composition has no name");
+      return static_cast<const Protocol::ComposedProtocol*>(this)->reference.span();
     case Kind::kProtocolMethod:
       return static_cast<const Protocol::Method*>(this)->name;
     case Kind::kResourceProperty:
@@ -144,20 +135,11 @@ SourceSpan Element::GetNameSource() const {
     case Kind::kStructMember:
       return static_cast<const Struct::Member*>(this)->name;
     case Kind::kTableMember:
-      if (auto& used = static_cast<const Table::Member*>(this)->maybe_used) {
-        return used->name;
-      }
-      ZX_PANIC("reserved table field has no name");
+      return static_cast<const Table::Member*>(this)->name;
     case Kind::kUnionMember:
-      if (auto& used = static_cast<const Union::Member*>(this)->maybe_used) {
-        return used->name;
-      }
-      ZX_PANIC("reserved union field has no name");
+      return static_cast<const Union::Member*>(this)->name;
     case Kind::kOverlayMember:
-      if (auto& used = static_cast<const Overlay::Member*>(this)->maybe_used) {
-        return used->name;
-      }
-      ZX_PANIC("reserved overlay field has no name");
+      return static_cast<const Overlay::Member*>(this)->name;
   }
 }
 
@@ -597,21 +579,20 @@ Service::Member Service::Member::Clone() const {
 }
 
 Struct::Member Struct::Member::Clone() const {
-  return Struct::Member(type_ctor->Clone(), name,
-                        maybe_default_value ? maybe_default_value->Clone() : nullptr,
-                        attributes->Clone());
+  return Member(type_ctor->Clone(), name,
+                maybe_default_value ? maybe_default_value->Clone() : nullptr, attributes->Clone());
 }
 
 Table::Member Table::Member::Clone() const {
-  return Member(ordinal, span, maybe_used ? maybe_used->Clone() : nullptr, attributes->Clone());
+  return Member(ordinal, type_ctor->Clone(), name, attributes->Clone());
 }
 
 Union::Member Union::Member::Clone() const {
-  return Member(ordinal, span, maybe_used ? maybe_used->Clone() : nullptr, attributes->Clone());
+  return Member(ordinal, type_ctor->Clone(), name, attributes->Clone());
 }
 
 Overlay::Member Overlay::Member::Clone() const {
-  return Member(ordinal, span, maybe_used ? maybe_used->Clone() : nullptr, attributes->Clone());
+  return Member(ordinal, type_ctor->Clone(), name, attributes->Clone());
 }
 
 Protocol::Method Protocol::Method::Clone() const {

@@ -427,11 +427,9 @@ void JSONGenerator::Generate(const Protocol::MethodWithInfo& method_with_info) {
       auto response_id = static_cast<const IdentifierType*>(value.maybe_response->type);
       ZX_ASSERT(response_id->type_decl->kind == Decl::Kind::kUnion);
       auto result_union = static_cast<const Union*>(response_id->type_decl);
-      GenerateObjectMember("maybe_response_success_type",
-                           result_union->members[0].maybe_used->type_ctor->type);
+      GenerateObjectMember("maybe_response_success_type", result_union->members[0].type_ctor->type);
       if (value.has_error) {
-        GenerateObjectMember("maybe_response_err_type",
-                             result_union->members[1].maybe_used->type_ctor->type);
+        GenerateObjectMember("maybe_response_err_type", result_union->members[1].type_ctor->type);
       }
     }
   });
@@ -633,17 +631,6 @@ void JSONGenerator::Generate(const Struct::Member& value) {
   });
 }
 
-template <typename Member>
-static std::vector<const Member*> NonReservedMembers(const std::vector<Member>& members) {
-  std::vector<const Member*> result;
-  result.reserve(members.size());
-  for (auto& member : members) {
-    if (member.maybe_used)
-      result.push_back(&member);
-  }
-  return result;
-}
-
 void JSONGenerator::Generate(const Table& value) {
   GenerateObject([&]() {
     GenerateDeclName(value.name);
@@ -651,7 +638,7 @@ void JSONGenerator::Generate(const Table& value) {
     GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
-    GenerateObjectMember("members", NonReservedMembers(value.members));
+    GenerateObjectMember("members", value.members);
     GenerateObjectMember("strict", value.strictness);
     GenerateObjectMember("resource", value.resourceness == Resourceness::kResource);
     GenerateObjectMember("type_shape_v2", value.type_shape.value());
@@ -659,12 +646,11 @@ void JSONGenerator::Generate(const Table& value) {
 }
 
 void JSONGenerator::Generate(const Table::Member& value) {
-  ZX_ASSERT_MSG(value.maybe_used, "should only emit non-reserved members");
   GenerateObject([&]() {
     GenerateObjectMember("ordinal", *value.ordinal, Position::kFirst);
-    GenerateTypeAndFromAlias(value.maybe_used->type_ctor.get());
-    GenerateObjectMember("name", value.maybe_used->name);
-    GenerateObjectMember("location", NameSpan(value.maybe_used->name));
+    GenerateTypeAndFromAlias(value.type_ctor.get());
+    GenerateObjectMember("name", value.name);
+    GenerateObjectMember("location", NameSpan(value.name));
     GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty()) {
       GenerateObjectMember("maybe_attributes", value.attributes);
@@ -698,7 +684,7 @@ void JSONGenerator::Generate(const Union& value) {
     GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
-    GenerateObjectMember("members", NonReservedMembers(value.members));
+    GenerateObjectMember("members", value.members);
     GenerateObjectMember("strict", value.strictness);
     GenerateObjectMember("resource", value.resourceness == Resourceness::kResource);
     auto anon = value.name.as_anonymous();
@@ -709,12 +695,11 @@ void JSONGenerator::Generate(const Union& value) {
 }
 
 void JSONGenerator::Generate(const Union::Member& value) {
-  ZX_ASSERT_MSG(value.maybe_used, "should only emit non-reserved members");
   GenerateObject([&]() {
     GenerateObjectMember("ordinal", value.ordinal, Position::kFirst);
-    GenerateObjectMember("name", value.maybe_used->name);
-    GenerateTypeAndFromAlias(value.maybe_used->type_ctor.get());
-    GenerateObjectMember("location", NameSpan(value.maybe_used->name));
+    GenerateObjectMember("name", value.name);
+    GenerateTypeAndFromAlias(value.type_ctor.get());
+    GenerateObjectMember("location", NameSpan(value.name));
     GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty()) {
       GenerateObjectMember("maybe_attributes", value.attributes);
@@ -729,7 +714,7 @@ void JSONGenerator::Generate(const Overlay& value) {
     GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
-    GenerateObjectMember("members", NonReservedMembers(value.members));
+    GenerateObjectMember("members", value.members);
     ZX_ASSERT(value.strictness == Strictness::kStrict);
     GenerateObjectMember("strict", value.strictness);
     ZX_ASSERT(value.resourceness == Resourceness::kValue);
@@ -739,12 +724,11 @@ void JSONGenerator::Generate(const Overlay& value) {
 }
 
 void JSONGenerator::Generate(const Overlay::Member& value) {
-  ZX_ASSERT_MSG(value.maybe_used, "should only emit non-reserved members");
   GenerateObject([&]() {
     GenerateObjectMember("ordinal", value.ordinal, Position::kFirst);
-    GenerateObjectMember("name", value.maybe_used->name);
-    GenerateTypeAndFromAlias(value.maybe_used->type_ctor.get());
-    GenerateObjectMember("location", NameSpan(value.maybe_used->name));
+    GenerateObjectMember("name", value.name);
+    GenerateTypeAndFromAlias(value.type_ctor.get());
+    GenerateObjectMember("location", NameSpan(value.name));
     GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty()) {
       GenerateObjectMember("maybe_attributes", value.attributes);

@@ -1660,48 +1660,6 @@ closed protocol P {
 ]
 `,
 		},
-		{
-			name: "reserved keyword",
-			fidl: `
-library l;
-type E = strict union {
-    1: reserved;
-    2: e int32;
-};
-type T = table {
-    1: reserved;
-    2: e int32;
-};
-`,
-			expected: `[
-    {
-        "kind": "union/member",
-        "name": "l/E.e",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union",
-        "name": "l/E",
-        "strictness": "strict"
-    },
-    {
-        "kind": "table/member",
-        "name": "l/T.e",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "table",
-        "name": "l/T"
-    },
-    {
-        "kind": "library",
-        "name": "l"
-    }
-]
-`,
-		},
 	}
 	runGenerateSummaryTests(t, tests)
 }

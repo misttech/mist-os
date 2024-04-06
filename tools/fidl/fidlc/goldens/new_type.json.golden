@@ -6,7 +6,6 @@
   },
   "experiments": [
     "allow_new_types",
-    "disallow_reserved",
     "output_index_json"
   ],
   "library_dependencies": [],

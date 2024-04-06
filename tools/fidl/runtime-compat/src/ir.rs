@@ -139,10 +139,10 @@ pub struct ProtocolDeclaration {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-#[serde(untagged)]
-pub enum TableMember {
-    Defined { ordinal: u64, name: String, r#type: Type },
-    Reserved { ordinal: u64, reserved: bool },
+pub struct TableMember {
+    pub ordinal: u64,
+    pub name: String,
+    pub r#type: Type,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -166,10 +166,10 @@ pub struct StructDeclaration {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-#[serde(untagged)]
-pub enum UnionMember {
-    Defined { ordinal: u64, name: String, r#type: Type },
-    Reserved { ordinal: u64, reserved: bool },
+pub struct UnionMember {
+    pub ordinal: u64,
+    pub name: String,
+    pub r#type: Type,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -292,7 +292,6 @@ library fuchsia.test.library;
 
 type Foo = table {
     1: bar string;
-    2: reserved;
     3: baz int32;
 };
 

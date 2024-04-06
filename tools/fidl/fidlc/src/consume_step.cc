@@ -283,12 +283,6 @@ bool ConsumeStep::CreateMethodResult(
   auto ordinal_source = SourceElement(Token(), Token());
   std::vector<Union::Member> result_members;
 
-  enum {
-    kSuccessOrdinal = 1,
-    kErrorOrdinal = 2,
-    kFrameworkErrorOrdinal = 3,
-  };
-
   result_members.emplace_back(
       ConsumeOrdinal(std::make_unique<RawOrdinal64>(ordinal_source, kSuccessOrdinal)),
       std::move(success_variant), success_variant_context->name(),
@@ -304,13 +298,8 @@ bool ConsumeStep::CreateMethodResult(
     ZX_ASSERT_MSG(error_type_ctor != nullptr, "missing err type ctor");
 
     result_members.emplace_back(
-        ConsumeOrdinal(std::make_unique<RawOrdinal64>(ordinal_source, kErrorOrdinal)),
+        ConsumeOrdinal(std::make_unique<RawOrdinal64>(ordinal_source, kDomainErrorOrdinal)),
         std::move(error_type_ctor), err_variant_context->name(), std::make_unique<AttributeList>());
-  } else {
-    // If there's no error, the error variant is reserved.
-    result_members.emplace_back(Union::Member::Reserved(
-        ConsumeOrdinal(std::make_unique<RawOrdinal64>(ordinal_source, kErrorOrdinal)),
-        err_variant_context->name(), std::make_unique<AttributeList>()));
   }
 
   if (has_framework_err) {
@@ -395,9 +384,9 @@ void ConsumeStep::ConsumeProtocolDeclaration(
         //     type P_M_Result = union {
         //       // The "success variant".
         //       1: response @generated_name("P_M_Response") [user specified response type];
-        //       // The "error variant". Marked `reserved` if there is no error.
+        //       // Only present for methods using error syntax.
         //       2: err @generated_name("P_M_Error") [user specified error type];
-        //       // Omitted for strict methods.
+        //       // Only present for flexible methods.
         //       3: framework_err fidl.FrameworkErr;
         //     };
         //
@@ -635,11 +624,6 @@ bool ConsumeStep::ConsumeOrdinaledLayout(std::unique_ptr<RawLayout> layout,
     auto member = static_cast<RawOrdinaledLayoutMember*>(mem.get());
     std::unique_ptr<AttributeList> attributes;
     ConsumeAttributeList(std::move(member->attributes), &attributes);
-    if (member->reserved) {
-      members.emplace_back(T::Member::Reserved(ConsumeOrdinal(std::move(member->ordinal)),
-                                               member->span(), std::move(attributes)));
-      continue;
-    }
 
     std::unique_ptr<TypeConstructor> type_ctor;
     if (!ConsumeTypeConstructor(std::move(member->type_ctor),

@@ -597,19 +597,11 @@ struct RawOrdinaledLayoutMember final : public RawLayoutMember {
       : RawLayoutMember(element, Kind::kOrdinaled, std::move(attributes), std::move(identifier)),
         ordinal(std::move(ordinal)),
         type_ctor(std::move(type_ctor)) {}
-  RawOrdinaledLayoutMember(const SourceElement& element,
-                           std::unique_ptr<RawAttributeList> attributes,
-                           std::unique_ptr<RawOrdinal64> ordinal)
-      : RawLayoutMember(element, Kind::kOrdinaled, std::move(attributes), nullptr),
-        ordinal(std::move(ordinal)),
-        type_ctor(nullptr),
-        reserved(true) {}
 
   void Accept(TreeVisitor* visitor) const;
 
   std::unique_ptr<RawOrdinal64> ordinal;
   std::unique_ptr<RawTypeConstructor> type_ctor;
-  const bool reserved = false;
 };
 
 struct RawValueLayoutMember final : public RawLayoutMember {

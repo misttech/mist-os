@@ -127,14 +127,12 @@ TypeShape TypeShapeStep::Calculate(TypeDecl* decl) {
       TypeShape acc;
       uint32_t max_ordinal = 0;
       for (auto& table_member : table_decl->members) {
-        if (auto& used = table_member.maybe_used) {
-          TypeShape envelope = Envelope(Compile(used->type_ctor->type));
-          acc.depth = std::max(acc.depth, envelope.depth);
-          acc.max_handles = AddSat(acc.max_handles, envelope.max_handles);
-          acc.max_out_of_line = AddSat(acc.max_out_of_line, envelope.max_out_of_line);
-          acc.has_padding = acc.has_padding || envelope.has_padding;
-          max_ordinal = std::max(max_ordinal, static_cast<uint32_t>(table_member.ordinal->value));
-        }
+        TypeShape envelope = Envelope(Compile(table_member.type_ctor->type));
+        acc.depth = std::max(acc.depth, envelope.depth);
+        acc.max_handles = AddSat(acc.max_handles, envelope.max_handles);
+        acc.max_out_of_line = AddSat(acc.max_out_of_line, envelope.max_out_of_line);
+        acc.has_padding = acc.has_padding || envelope.has_padding;
+        max_ordinal = std::max(max_ordinal, static_cast<uint32_t>(table_member.ordinal->value));
       }
       return TypeShape{
           .inline_size = 16,
@@ -150,14 +148,12 @@ TypeShape TypeShapeStep::Calculate(TypeDecl* decl) {
       auto union_decl = static_cast<Union*>(decl);
       TypeShape acc;
       for (auto& union_member : union_decl->members) {
-        if (auto& used = union_member.maybe_used) {
-          TypeShape envelope = Envelope(Compile(used->type_ctor->type));
-          acc.depth = std::max(acc.depth, envelope.depth);
-          acc.max_handles = std::max(acc.max_handles, envelope.max_handles);
-          acc.max_out_of_line = std::max(acc.max_out_of_line, envelope.max_out_of_line);
-          acc.has_padding = acc.has_padding || envelope.has_padding;
-          acc.has_flexible_envelope = acc.has_flexible_envelope || envelope.has_flexible_envelope;
-        }
+        TypeShape envelope = Envelope(Compile(union_member.type_ctor->type));
+        acc.depth = std::max(acc.depth, envelope.depth);
+        acc.max_handles = std::max(acc.max_handles, envelope.max_handles);
+        acc.max_out_of_line = std::max(acc.max_out_of_line, envelope.max_out_of_line);
+        acc.has_padding = acc.has_padding || envelope.has_padding;
+        acc.has_flexible_envelope = acc.has_flexible_envelope || envelope.has_flexible_envelope;
       }
       return TypeShape{
           .inline_size = 16,
@@ -175,16 +171,14 @@ TypeShape TypeShapeStep::Calculate(TypeDecl* decl) {
       TypeShape acc;
       uint32_t smallest_member = UINT32_MAX, largest_member = 0;
       for (auto& overlay_member : overlay_decl->members) {
-        if (auto& used = overlay_member.maybe_used) {
-          TypeShape member = Compile(used->type_ctor->type);
-          acc.depth = std::max(acc.depth, member.depth);
-          acc.max_handles = std::max(acc.max_handles, member.max_handles);
-          acc.max_out_of_line = std::max(acc.max_out_of_line, member.max_out_of_line);
-          acc.has_padding = acc.has_padding || member.has_padding;
-          acc.has_flexible_envelope = acc.has_flexible_envelope || member.has_flexible_envelope;
-          smallest_member = std::min(smallest_member, member.inline_size);
-          largest_member = std::max(largest_member, member.inline_size);
-        }
+        TypeShape member = Compile(overlay_member.type_ctor->type);
+        acc.depth = std::max(acc.depth, member.depth);
+        acc.max_handles = std::max(acc.max_handles, member.max_handles);
+        acc.max_out_of_line = std::max(acc.max_out_of_line, member.max_out_of_line);
+        acc.has_padding = acc.has_padding || member.has_padding;
+        acc.has_flexible_envelope = acc.has_flexible_envelope || member.has_flexible_envelope;
+        smallest_member = std::min(smallest_member, member.inline_size);
+        largest_member = std::max(largest_member, member.inline_size);
       }
       auto payload = checked.Add(largest_member, Padding(largest_member, 8));
       return TypeShape{

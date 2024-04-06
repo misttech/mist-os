@@ -21,50 +21,14 @@ type Foo = table {
   ASSERT_COMPILED(library);
 }
 
-TEST(TableTests, GoodReservedFields) {
-  TestLibrary library(R"FIDL(
-library fidl.test.tables;
-
-type Foo = table {
-    1: reserved;
-};
-)FIDL");
-  ASSERT_COMPILED(library);
-}
-
-TEST(TableTests, GoodReservedAndPopulatedFields) {
-  TestLibrary library(R"FIDL(
-library fidl.test.tables;
-
-type Foo = table {
-    1: x int64;
-    2: reserved;
-};
-)FIDL");
-  ASSERT_COMPILED(library);
-}
-
-TEST(TableTests, GoodManyReservedFields) {
-  TestLibrary library(R"FIDL(
-library fidl.test.tables;
-
-type Foo = table {
-    1: reserved;
-    2: reserved;
-    3: reserved;
-};
-)FIDL");
-  ASSERT_COMPILED(library);
-}
-
 TEST(TableTests, GoodOutOfOrderFields) {
   TestLibrary library(R"FIDL(
 library fidl.test.tables;
 
 type Foo = table {
-    3: reserved;
-    1: reserved;
-    2: reserved;
+    3: x int64;
+    1: y int64;
+    2: z int64;
 };
 )FIDL");
   ASSERT_COMPILED(library);
