@@ -55,7 +55,6 @@ type StatusCode = strict enum {
     SENSOR_ERROR = 12;
 
     /// The radar driver or proxy was not in the correct state for this call.
-    @available(added=12)
     BAD_STATE = 13;
 };
 
@@ -65,16 +64,6 @@ type Burst = struct {
 };
 
 closed protocol RadarBurstReader {
-    /// Returns the size in bytes of each burst reported by this driver. Clients
-    /// should use this size to create VMOs to be registered by the driver.
-    ///
-    /// - response `burst_size` the size of each radar burst in bytes.
-    @available(removed=14)
-    strict GetBurstSize() -> (struct {
-        burst_size uint32;
-    });
-
-    @available(added=12)
     strict GetBurstProperties() -> (struct {
         size uint32;
         period zx.Duration;
@@ -160,12 +149,7 @@ closed protocol RadarBurstReader {
         2: error StatusCode;
     });
 
-    @available(replaced=14)
-    strict -> OnBurst(struct {
-        burst Burst;
-    }) error StatusCode;
-
-    @available(added=12, removed=17, legacy=true)
+    @available(removed=17, legacy=true)
     strict -> OnBurst2(flexible union {
         1: burst Burst;
         2: error StatusCode;
@@ -196,7 +180,6 @@ closed protocol RadarBurstReaderProvider {
     }) -> () error StatusCode;
 };
 
-@available(added=12)
 closed protocol RadarSensorInfo {
     /// Returns the size and period of bursts reported by the sensor.
     ///
@@ -208,7 +191,6 @@ closed protocol RadarSensorInfo {
     });
 };
 
-@available(added=12)
 type BurstData = resource struct {
     /// A VMO holding zero or more radar bursts of the size reported by
     /// `GetBurstProperties()`. Bursts are stored contiguously with no padding
@@ -223,7 +205,6 @@ type BurstData = resource struct {
 /// connected at a time. radar-proxy will send epitaph status code
 /// `ZX_ERR_ALREADY_BOUND` to and close channels from any additional clients
 /// that attempt to connect.
-@available(added=12)
 @discoverable
 closed protocol RadarBurstInjector {
     compose RadarSensorInfo;
