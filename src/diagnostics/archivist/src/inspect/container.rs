@@ -185,6 +185,13 @@ impl InspectArtifactsContainer {
     }
 }
 
+#[cfg(test)]
+impl InspectArtifactsContainer {
+    pub(crate) fn handles(&self) -> impl ExactSizeIterator<Item = &Arc<InspectHandle>> {
+        self.inspect_handles.values()
+    }
+}
+
 lazy_static! {
     static ref TIMEOUT_MESSAGE: &'static str =
         "Exceeded per-component time limit for fetching diagnostics data";

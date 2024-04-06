@@ -6,51 +6,9 @@
             "errors": [
                 "Inspecthierarchywasfullyfilteredbyclientprovidedselectors.Nodataremaining."
             ],
-            "filename": "fuchsia.inspect.Tree",
             "timestamp": 0
         },
-        "moniker": "puppet_diagnostics_dir_methods",
-        "payload": null,
-        "version": 1
-    },
-    {
-        "data_source": "Inspect",
-        "metadata": {
-            "component_url": "puppet#meta/puppet.cm",
-            "errors": [
-                "Inspecthierarchywasfullyfilteredbyclientprovidedselectors.Nodataremaining."
-            ],
-            "filename": "fuchsia.inspect.deprecated.Inspect",
-            "timestamp": 0
-        },
-        "moniker": "puppet_diagnostics_dir_methods",
-        "payload": null,
-        "version": 1
-    },
-    {
-        "data_source": "Inspect",
-        "metadata": {
-            "component_url": "puppet#meta/puppet.cm",
-            "errors": [
-                "Inspecthierarchywasfullyfilteredbyclientprovidedselectors.Nodataremaining."
-            ],
-            "filename": "root.inspect",
-            "timestamp": 0
-        },
-        "moniker": "puppet_diagnostics_dir_methods",
-        "payload": null,
-        "version": 1
-    },
-    {
-        "data_source": "Inspect",
-        "metadata": {
-            "component_url": "puppet#meta/puppet.cm",
-            "errors": [
-                "Inspecthierarchywasfullyfilteredbyclientprovidedselectors.Nodataremaining."
-            ],
-            "timestamp": 0
-        },
-        "moniker": "puppet_inspect_sink",
+        "moniker": "puppet",
         "payload": null,
         "version": 1
     }

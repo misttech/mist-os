@@ -11,12 +11,22 @@ async fn accessor_truncation_test() {
     let (builder, test_realm) = test_topology::create(test_topology::Options::default())
         .await
         .expect("create base topology");
-    test_topology::add_eager_child(&test_realm, "child_a", IQUERY_TEST_COMPONENT_URL)
+    for i in 0..3 {
+        test_topology::add_eager_child(
+            &test_realm,
+            &format!("child_a{i}"),
+            IQUERY_TEST_COMPONENT_URL,
+        )
         .await
         .expect("add child a");
-    test_topology::add_eager_child(&test_realm, "child_b", IQUERY_TEST_COMPONENT_URL)
+        test_topology::add_eager_child(
+            &test_realm,
+            &format!("child_b{i}"),
+            IQUERY_TEST_COMPONENT_URL,
+        )
         .await
         .expect("add child b");
+    }
 
     let instance = builder.build().await.expect("create instance");
     let accessor =
@@ -25,7 +35,7 @@ async fn accessor_truncation_test() {
     reader.with_archive(accessor);
     let data = reader
         .with_aggregated_result_bytes_limit(1)
-        .add_selector("child_a:root")
+        .add_selector("child_a*:root")
         .with_minimum_schema_count(3)
         .snapshot::<Inspect>()
         .await
@@ -36,32 +46,8 @@ async fn accessor_truncation_test() {
     assert_eq!(count_dropped_schemas_per_moniker(&data, "child_a"), 3);
 
     let data = reader
-        .with_aggregated_result_bytes_limit(1000)
-        .add_selector("child_a:root")
-        .with_minimum_schema_count(3)
-        .snapshot::<Inspect>()
-        .await
-        .expect("got inspect data");
-
-    assert_eq!(data.len(), 3);
-
-    assert_eq!(count_dropped_schemas_per_moniker(&data, "child_a"), 2);
-
-    let data = reader
-        .with_aggregated_result_bytes_limit(3000)
-        .add_selector("child_a:root")
-        .with_minimum_schema_count(3)
-        .snapshot::<Inspect>()
-        .await
-        .expect("got inspect data");
-
-    assert_eq!(data.len(), 3);
-
-    assert_eq!(count_dropped_schemas_per_moniker(&data, "child_a"), 1);
-
-    let data = reader
-        .with_aggregated_result_bytes_limit(5000)
-        .add_selector("child_a:root")
+        .with_aggregated_result_bytes_limit(4000)
+        .add_selector("child_a*:root")
         .with_minimum_schema_count(3)
         .snapshot::<Inspect>()
         .await
@@ -73,8 +59,8 @@ async fn accessor_truncation_test() {
 
     let data = reader
         .with_aggregated_result_bytes_limit(1)
-        .add_selector("child_b:root")
-        .add_selector("child_a:root")
+        .add_selector("child_b*:root")
+        .add_selector("child_a*:root")
         .with_minimum_schema_count(6)
         .snapshot::<Inspect>()
         .await
@@ -85,23 +71,23 @@ async fn accessor_truncation_test() {
     assert_eq!(count_dropped_schemas_per_moniker(&data, "child_b"), 3);
 
     let data = reader
-        .with_aggregated_result_bytes_limit(5000)
-        .add_selector("child_b:root")
-        .add_selector("child_a:root")
+        .with_aggregated_result_bytes_limit(8000)
+        .add_selector("child_b*:root")
+        .add_selector("child_a*:root")
         .with_minimum_schema_count(6)
         .snapshot::<Inspect>()
         .await
         .expect("got inspect data");
 
     assert_eq!(data.len(), 6);
-    assert_eq!(count_dropped_schemas_per_moniker(&data, "child_a"), 1);
-    assert_eq!(count_dropped_schemas_per_moniker(&data, "child_b"), 1);
+    assert_eq!(count_dropped_schemas_per_moniker(&data, "child_a"), 0);
+    assert_eq!(count_dropped_schemas_per_moniker(&data, "child_b"), 0);
 }
 
-fn count_dropped_schemas_per_moniker(data: &Vec<Data<Inspect>>, moniker: &str) -> i64 {
+fn count_dropped_schemas_per_moniker(data: &[Data<Inspect>], moniker: &str) -> i64 {
     let mut dropped_schema_count = 0;
     for data_entry in data {
-        if data_entry.moniker != moniker {
+        if !data_entry.moniker.contains(moniker) {
             continue;
         }
         if let Some(errors) = &data_entry.metadata.errors {

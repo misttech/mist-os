@@ -59,7 +59,6 @@ impl EventProducer for EventSource {
 pub mod tests {
     use super::*;
     use crate::{events::types::*, identity::ComponentIdentity};
-    use fidl_fuchsia_io as fio;
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
     use futures::{channel::mpsc::UnboundedSender, StreamExt};
@@ -68,34 +67,33 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn event_stream() {
-        let events = BTreeSet::from([EventType::DiagnosticsReady, EventType::LogSinkRequested]);
+        let events = BTreeSet::from([EventType::InspectSinkRequested, EventType::LogSinkRequested]);
         let (mut event_stream, dispatcher) = Dispatcher::new_for_test(events);
         let (stream_server, _server_task, sender) = spawn_fake_event_stream();
         let mut source = EventSource::new_for_test(stream_server);
         source.set_dispatcher(dispatcher);
         let _task = fasync::Task::spawn(async move { source.spawn().await });
 
-        // Send a `DirectoryReady` event for diagnostics.
-        let (node, _) = fidl::endpoints::create_request_stream::<fio::NodeMarker>().unwrap();
+        // Send a `InspectSinkRequested` event for diagnostics.
         sender
             .unbounded_send(fcomponent::Event {
                 header: Some(fcomponent::EventHeader {
-                    event_type: Some(fcomponent::EventType::DirectoryReady),
+                    event_type: Some(fcomponent::EventType::CapabilityRequested),
                     moniker: Some("./foo/bar".to_string()),
                     component_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/bar.cm".to_string()),
                     timestamp: Some(zx::Time::get_monotonic().into_nanos()),
                     ..Default::default()
                 }),
-                payload: Some(fcomponent::EventPayload::DirectoryReady(
-                    fcomponent::DirectoryReadyPayload {
-                        name: Some("diagnostics".to_string()),
-                        node: Some(node),
+                payload: Some(fcomponent::EventPayload::CapabilityRequested(
+                    fcomponent::CapabilityRequestedPayload {
+                        name: Some("fuchsia.inspect.InspectSink".to_string()),
+                        capability: Some(zx::Channel::create().0),
                         ..Default::default()
                     },
                 )),
                 ..Default::default()
             })
-            .expect("send diagnostics ready event ok");
+            .expect("send logsink requested event ok");
 
         // Send a `LogSinkRequested` event.
         sender
@@ -116,7 +114,7 @@ pub mod tests {
                 )),
                 ..Default::default()
             })
-            .expect("send diagnostics ready event ok");
+            .expect("send logsink requested event ok");
 
         let expected_component_id = ExtendedMoniker::parse_str("./foo/bar").unwrap();
         let expected_identity = ComponentIdentity::new(
@@ -124,10 +122,13 @@ pub mod tests {
             "fuchsia-pkg://fuchsia.com/foo#meta/bar.cm",
         );
 
-        // Assert the third received event was a DirectoryReady event for diagnostics.
+        // Assert the third received event was a InsepctSinkRequested event.
         let event = event_stream.next().await.unwrap();
         match event.payload {
-            EventPayload::DiagnosticsReady(DiagnosticsReadyPayload { component, directory: _ }) => {
+            EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
+                component,
+                request_stream: _,
+            }) => {
                 assert_eq!(*component, expected_identity)
             }
             other => panic!("unexpected event payload: {other:?}"),

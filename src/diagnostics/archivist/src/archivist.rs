@@ -126,10 +126,6 @@ impl Archivist {
             events: vec![EventType::LogSinkRequested],
         });
         event_router.add_consumer(ConsumerConfig {
-            consumer: &inspect_repo,
-            events: vec![EventType::DiagnosticsReady],
-        });
-        event_router.add_consumer(ConsumerConfig {
             consumer: &inspect_sink_server,
             events: vec![EventType::InspectSinkRequested],
         });
@@ -245,22 +241,6 @@ impl Archivist {
                 event_router.add_producer(ProducerConfig {
                     producer: &mut event_source,
                     events: vec![EventType::InspectSinkRequested],
-                });
-                incoming_external_event_producers.push(fasync::Task::spawn(async move {
-                    // This should never exit.
-                    let _ = event_source.spawn().await;
-                }));
-            }
-        }
-
-        match EventSource::new("/events/diagnostics_ready_event_stream").await {
-            Err(err) => {
-                warn!(?err, "Failed to create event source for diagnostics ready requests")
-            }
-            Ok(mut event_source) => {
-                event_router.add_producer(ProducerConfig {
-                    producer: &mut event_source,
-                    events: vec![EventType::DiagnosticsReady],
                 });
                 incoming_external_event_producers.push(fasync::Task::spawn(async move {
                     // This should never exit.
@@ -441,12 +421,7 @@ mod tests {
         let mut source = UnattributedSource::<InspectSinkMarker>::default();
         archivist.event_router.add_producer(ProducerConfig {
             producer: &mut source,
-            events: vec![
-                EventType::InspectSinkRequested,
-                // This producer doesn't generate this event, but we can use it to satisfy the
-                // validation.
-                EventType::DiagnosticsReady,
-            ],
+            events: vec![EventType::InspectSinkRequested],
         });
         fs.dir("svc").add_fidl_service(move |stream| {
             source.new_connection(stream);
