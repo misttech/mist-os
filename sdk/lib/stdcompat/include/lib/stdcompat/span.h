@@ -60,7 +60,7 @@ class span {
 
   template <typename It, size_t Extent_ = Extent,
             std::enable_if_t<Extent_ != dynamic_extent, bool> = true>
-  constexpr explicit span(It first, size_type count) : extent_(to_address(first), count) {
+  constexpr explicit span(It first, size_type count) : extent_(cpp20::to_address(first), count) {
     assert((extent == dynamic_extent || count == size()));
   }
 
@@ -75,7 +75,7 @@ class span {
       std::enable_if_t<Extent_ != dynamic_extent && !std::is_convertible<End, size_type>::value,
                        bool> = true>
   constexpr explicit span(It first, End end)
-      : extent_(to_address(first), std::distance(first, end)) {
+      : extent_(cpp20::to_address(first), std::distance(first, end)) {
     assert(
         (static_cast<size_type>(std::distance(first, end)) == extent || extent == dynamic_extent));
   }
@@ -84,7 +84,7 @@ class span {
       typename It, typename End, size_type Extent_ = Extent,
       std::enable_if_t<Extent_ == dynamic_extent && !std::is_convertible<End, size_type>::value,
                        bool> = true>
-  constexpr span(It first, End end) : extent_(to_address(first), std::distance(first, end)) {
+  constexpr span(It first, End end) : extent_(cpp20::to_address(first), std::distance(first, end)) {
     assert(
         (static_cast<size_type>(std::distance(first, end)) == extent || extent == dynamic_extent));
   }
