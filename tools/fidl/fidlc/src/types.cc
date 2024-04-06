@@ -357,9 +357,6 @@ Resourceness Type::Resourceness() const {
   }
 
   const auto* decl = static_cast<const IdentifierType*>(this)->type_decl;
-  ZX_ASSERT_MSG(decl->state == Decl::State::kCompiled,
-                "accessing resourceness of not-yet-compiled decl");
-
   switch (decl->kind) {
     case Decl::Kind::kBits:
     case Decl::Kind::kEnum:
@@ -371,6 +368,9 @@ Resourceness Type::Resourceness() const {
     case Decl::Kind::kTable:
       return static_cast<const Table*>(decl)->resourceness;
     case Decl::Kind::kUnion:
+      ZX_ASSERT_MSG(
+          static_cast<const Union*>(decl)->resourceness.has_value(),
+          "a union with inferred resourceness (i.e. error result union) is in a recursive cycle");
       return static_cast<const Union*>(decl)->resourceness.value();
     case Decl::Kind::kOverlay:
       return static_cast<const Overlay*>(decl)->resourceness;

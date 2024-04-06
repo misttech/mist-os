@@ -12,26 +12,6 @@ namespace fidlc {
 
 struct Element;
 
-class VerifyResourcenessStep : public Compiler::Step {
- public:
-  using Step::Step;
-
- private:
-  void RunImpl() override;
-  void VerifyDecl(const Decl* decl);
-
-  // Returns the effective resourceness of |type|. The set of effective resource
-  // types includes (1) nominal resource types per the FTP-057 definition, and
-  // (2) declarations that have an effective resource member (or equivalently,
-  // transitively contain a nominal resource).
-  Resourceness EffectiveResourceness(const Type* type);
-
-  // Map from struct/table/union declarations to their effective resourceness. A
-  // value of std::nullopt indicates that the declaration has been visited, used
-  // to prevent infinite recursion.
-  std::map<const Decl*, std::optional<Resourceness>> effective_resourceness_;
-};
-
 class VerifyHandleTransportCompatibilityStep : public Compiler::Step {
  public:
   using Step::Step;

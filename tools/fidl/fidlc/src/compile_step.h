@@ -88,6 +88,8 @@ class CompileStep : public Compiler::Step {
   template <typename MemberType>
   bool ValidateEnumMembersAndCalcUnknownValue(Enum* enum_decl, MemberType* out_unknown_value);
   void ValidateDomainErrorType(const Union* result_union);
+  template <typename DeclType>
+  void ValidateResourceness(const DeclType* decl, const typename DeclType::Member& member);
 
   // Decl for the HEAD constant, used in attribute_schema.cc.
   Decl* head_decl;

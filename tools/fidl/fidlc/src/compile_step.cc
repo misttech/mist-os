@@ -1236,6 +1236,16 @@ void CompileStep::CompileService(Service* service_decl) {
   }
 }
 
+template <typename DeclType>
+void CompileStep::ValidateResourceness(const DeclType* decl,
+                                       const typename DeclType::Member& member) {
+  if (decl->resourceness == Resourceness::kValue &&
+      member.type_ctor->type->Resourceness() == Resourceness::kResource) {
+    reporter()->Fail(ErrTypeMustBeResource, decl->name.span().value(), decl->kind, decl->name,
+                     member.name.data(), member.name);
+  }
+}
+
 void CompileStep::CompileStruct(Struct* struct_declaration) {
   CompileAttributeList(struct_declaration->attributes.get());
   for (auto& member : struct_declaration->members) {
@@ -1244,6 +1254,7 @@ void CompileStep::CompileStruct(Struct* struct_declaration) {
     if (!member.type_ctor->type) {
       continue;
     }
+    ValidateResourceness(struct_declaration, member);
     if (member.maybe_default_value) {
       const auto* default_value_type = member.type_ctor->type;
       if (!TypeCanBeConst(default_value_type)) {
@@ -1278,6 +1289,7 @@ void CompileStep::CompileTable(Table* table_declaration) {
     if (member.type_ctor->type->IsNullable()) {
       reporter()->Fail(ErrOptionalTableMember, member.name);
     }
+    ValidateResourceness(table_declaration, member);
     if (i == kMaxTableOrdinals - 1) {
       if (member.type_ctor->type->kind != Type::Kind::kIdentifier) {
         reporter()->Fail(ErrMaxOrdinalNotTable, member.name);
@@ -1311,6 +1323,7 @@ void CompileStep::CompileUnion(Union* union_declaration) {
     if (member.type_ctor->type->IsNullable()) {
       reporter()->Fail(ErrOptionalUnionMember, member.name);
     }
+    ValidateResourceness(union_declaration, member);
     if (infer_resourceness && member.type_ctor->type->Resourceness() == Resourceness::kResource) {
       resourceness = Resourceness::kResource;
     }
@@ -1346,6 +1359,10 @@ void CompileStep::CompileOverlay(Overlay* overlay_declaration) {
                        ordinal_result.previous_occurrence());
     }
     CompileTypeConstructor(member.type_ctor.get());
+    if (!member.type_ctor->type) {
+      continue;
+    }
+    ValidateResourceness(overlay_declaration, member);
   }
 }
 

@@ -215,9 +215,9 @@ constexpr ErrorDef<107, Decl::Kind, std::string_view, std::string_view, SourceSp
         "value of {0} member '{1}' conflicts with previously declared member '{2}' at {3}");
 constexpr RetiredDef<108> ErrDuplicateResourcePropertyName;
 constexpr RetiredDef<109> ErrDuplicateResourcePropertyNameCanonical;
-constexpr ErrorDef<110, Name, std::string_view, std::string_view> ErrTypeMustBeResource(
-    "'{0}' may contain handles (due to member '{1}'), so it must "
-    "be declared with the `resource` modifier: `resource {2} {0}`");
+constexpr ErrorDef<110, Decl::Kind, Name, std::string_view, SourceSpan> ErrTypeMustBeResource(
+    "{0} '{1}' may contain handles (due to member '{2}' at {3}), so it must "
+    "be declared with the `resource` modifier: `resource {0} {1}`");
 constexpr ErrorDef<111, Name, uint32_t, uint32_t> ErrInlineSizeExceedsLimit(
     "'{0}' has an inline size of {1} bytes, which exceeds the maximum allowed "
     "inline size of {2} bytes");

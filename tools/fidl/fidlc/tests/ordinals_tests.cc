@@ -39,7 +39,7 @@ using zx;
 
 protocol Special {
     ClashOne(struct { s string; b bool; }) -> (struct { i int32; });
-    ClashTwo(struct { s string; }) -> (struct { r zx.Handle:CHANNEL; });
+    ClashTwo(struct { s string; }) -> (resource struct { r zx.Handle:CHANNEL; });
 };
 )FIDL");
   library.UseLibraryZx();
@@ -57,7 +57,7 @@ protocol Special {
     @selector("ClashOne")
     foo(struct { s string; b bool; }) -> (struct { i int32; });
     @selector("ClashTwo")
-    bar(struct { s string; }) -> (struct { r zx.Handle:CHANNEL; });
+    bar(struct { s string; }) -> (resource struct { r zx.Handle:CHANNEL; });
 };
 )FIDL");
   library.UseLibraryZx();

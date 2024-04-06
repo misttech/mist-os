@@ -92,8 +92,8 @@ TEST(ResourcenessTests, BadResourceModifierMissing) {
   TestLibrary library;
   library.UseLibraryZx();
   library.AddFile("bad/fi-0110.test.fidl");
-
-  library.ExpectFail(ErrTypeMustBeResource, "Foo", "handle", "struct");
+  library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kStruct, "Foo", "handle",
+                     "bad/fi-0110.test.fidl:9:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -158,7 +158,8 @@ TEST(ResourcenessTests, BadHandlesInValueStruct) {
     std::string fidl_library = "library example;\nusing zx;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    library.ExpectFail(ErrTypeMustBeResource, "Foo", "bad_member", "struct");
+    library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kStruct, "Foo", "bad_member",
+                       "example.fidl:4:21");
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
@@ -173,7 +174,8 @@ TEST(ResourcenessTests, BadHandlesInValueTable) {
     std::string fidl_library = "library example;\nusing zx;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    library.ExpectFail(ErrTypeMustBeResource, "Foo", "bad_member", "table");
+    library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kTable, "Foo", "bad_member",
+                       "example.fidl:4:23");
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
@@ -188,7 +190,8 @@ TEST(ResourcenessTests, BadHandlesInValueUnion) {
     std::string fidl_library = "library example;\nusing zx;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    library.ExpectFail(ErrTypeMustBeResource, "Foo", "bad_member", "union");
+    library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kUnion, "Foo", "bad_member",
+                       "example.fidl:4:23");
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
@@ -209,7 +212,8 @@ protocol Protocol {};
 )FIDL" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    library.ExpectFail(ErrTypeMustBeResource, "Foo", "bad_member", "struct");
+    library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kStruct, "Foo", "bad_member",
+                       "example.fidl:7:21");
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
@@ -231,7 +235,8 @@ type ResourceUnion = resource union { 1: b bool; };
 )FIDL" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    library.ExpectFail(ErrTypeMustBeResource, "Foo", "bad_member", "struct");
+    library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kStruct, "Foo", "bad_member",
+                       "example.fidl:8:21");
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
@@ -262,7 +267,8 @@ type ResourceUnion = resource union { 1: b bool; };
 )FIDL" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    library.ExpectFail(ErrTypeMustBeResource, "Foo", "bad_member", "struct");
+    library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kStruct, "Foo", "bad_member",
+                       "example.fidl:16:21");
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
@@ -290,7 +296,8 @@ type ResourceUnion = resource union { 1: b bool; };
 )FIDL" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    library.ExpectFail(ErrTypeMustBeResource, "Foo", "bad_member", "struct");
+    library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kStruct, "Foo", "bad_member",
+                       "example.fidl:10:21");
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
@@ -309,9 +316,12 @@ type Foo = struct {
 type ResourceStruct = resource struct {};
 )FIDL");
   library.UseLibraryZx();
-  library.ExpectFail(ErrTypeMustBeResource, "Foo", "first", "struct");
-  library.ExpectFail(ErrTypeMustBeResource, "Foo", "second", "struct");
-  library.ExpectFail(ErrTypeMustBeResource, "Foo", "third", "struct");
+  library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kStruct, "Foo", "first",
+                     "example.fidl:6:3");
+  library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kStruct, "Foo", "second",
+                     "example.fidl:7:3");
+  library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kStruct, "Foo", "third",
+                     "example.fidl:8:3");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -345,10 +355,10 @@ type Middle = struct {
 };
 type Bottom = resource struct {};
 )FIDL");
-  // `Top` must be a resource because it includes `middle`, an *effective* resource.
-  library.ExpectFail(ErrTypeMustBeResource, "Top", "middle", "struct");
-  // `Middle` must be a resource because it includes `bottom`, a *nominal* resource.
-  library.ExpectFail(ErrTypeMustBeResource, "Middle", "bottom", "struct");
+  // We only report an error for Middle. Fixing that (if the fix is to make
+  // Middle a resource, not remove the bottom field) will cause an error on Top.
+  library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kStruct, "Middle", "bottom",
+                     "example.fidl:8:3");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -398,7 +408,8 @@ type Boros = struct {
   bad_member box<Ouro>;
 };
 )FIDL");
-  library.ExpectFail(ErrTypeMustBeResource, "Boros", "bad_member", "struct");
+  library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kStruct, "Boros", "bad_member",
+                     "example.fidl:9:3");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

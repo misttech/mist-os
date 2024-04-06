@@ -46,8 +46,6 @@ bool Compiler::Compile() {
     return false;
   if (!TypeShapeStep(this).Run())
     return false;
-  if (!VerifyResourcenessStep(this).Run())
-    return false;
   if (!VerifyHandleTransportCompatibilityStep(this).Run())
     return false;
   if (!VerifyAttributesStep(this).Run())

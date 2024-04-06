@@ -56,7 +56,7 @@ type C = struct { b B; };
 )FIDL");
 
   library.EnableFlag(ExperimentalFlag::kAllowNewTypes);
-  library.ExpectFail(ErrTypeMustBeResource, "C", "b", "struct");
+  library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kStruct, "C", "b", "example.fidl:6:19");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

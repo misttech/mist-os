@@ -154,7 +154,8 @@ type Foo = strict overlay {
 )FIDL");
   library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
-  library.ExpectFail(ErrOverlayMemberMustBeValue);
+  library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kOverlay, "Foo", "floppity",
+                     "example.fidl:7:8");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
