@@ -11,6 +11,8 @@
 
 #include <cstdint>
 
+#include "src/graphics/display/lib/api-types-cpp/image-tiling-type.h"
+
 namespace display {
 
 // Equivalent to the FIDL type [`fuchsia.hardware.display.types/ImageMetadata`].
@@ -53,7 +55,7 @@ class ImageMetadata {
   // Guaranteed to be in [0, `kMaxHeight`].
   constexpr int32_t height() const { return height_; }
 
-  constexpr uint32_t tiling_type() const { return tiling_type_; }
+  constexpr ImageTilingType tiling_type() const { return tiling_type_; }
 
  private:
   // In debug mode, asserts that IsValid() would return true.
@@ -65,7 +67,7 @@ class ImageMetadata {
 
   int32_t width_;
   int32_t height_;
-  uint32_t tiling_type_;
+  ImageTilingType tiling_type_;
 };
 
 // static
@@ -135,7 +137,7 @@ constexpr fuchsia_hardware_display_types::wire::ImageMetadata ImageMetadata::ToF
       // allowed ranges on image widths and heights.
       .width = static_cast<uint32_t>(width_),
       .height = static_cast<uint32_t>(height_),
-      .tiling_type = tiling_type_,
+      .tiling_type = tiling_type_.ToFidl(),
   };
 }
 
@@ -145,7 +147,7 @@ constexpr image_metadata_t ImageMetadata::ToBanjo() const {
       // allowed ranges on image widths and heights.
       .width = static_cast<uint32_t>(width_),
       .height = static_cast<uint32_t>(height_),
-      .tiling_type = tiling_type_,
+      .tiling_type = tiling_type_.ToBanjo(),
   };
 }
 

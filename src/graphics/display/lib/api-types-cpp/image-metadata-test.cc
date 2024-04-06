@@ -9,6 +9,8 @@
 
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/lib/api-types-cpp/image-tiling-type.h"
+
 namespace display {
 
 namespace {
@@ -82,8 +84,7 @@ TEST(ImageMetadataTest, FromFidlImageMetadata) {
   static constexpr ImageMetadata image_metadata(fidl_image_metadata);
   EXPECT_EQ(640, image_metadata.width());
   EXPECT_EQ(480, image_metadata.height());
-  EXPECT_EQ(fuchsia_hardware_display_types::wire::kImageTilingTypeCapture,
-            image_metadata.tiling_type());
+  EXPECT_EQ(kImageTilingTypeCapture, image_metadata.tiling_type());
 }
 
 TEST(ImageMetadataTest, FromBanjoImageMetadata) {
@@ -96,8 +97,7 @@ TEST(ImageMetadataTest, FromBanjoImageMetadata) {
   static constexpr ImageMetadata image_metadata(banjo_image_metadata);
   EXPECT_EQ(640, image_metadata.width());
   EXPECT_EQ(480, image_metadata.height());
-  EXPECT_EQ(fuchsia_hardware_display_types::wire::kImageTilingTypeCapture,
-            image_metadata.tiling_type());
+  EXPECT_EQ(kImageTilingTypeCapture, image_metadata.tiling_type());
 }
 
 TEST(ImageMetadataTest, ToFidlImageMetadata) {
