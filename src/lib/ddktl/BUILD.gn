@@ -280,6 +280,7 @@ source_set("ddktl") {
     "//src/graphics/display/drivers/intel-i915:*",
     "//src/graphics/display/drivers/simple:*",
     "//src/graphics/display/drivers/virtio-guest/v1:*",
+    "//src/graphics/display/lib/driver-framework-migration-utils/*",
     "//src/graphics/display/lib/edid:*",
     "//src/graphics/drivers/aml-gpu:*",
     "//src/graphics/drivers/misc/goldfish:*",

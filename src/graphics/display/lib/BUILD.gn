@@ -8,6 +8,7 @@ group("tests") {
     "api-types-cpp:tests",
     "coordinator-getter:tests",
     "designware-hdmi:tests",
+    "driver-framework-migration-utils:tests",
     "edid:tests",
     "rust:tests",
   ]
