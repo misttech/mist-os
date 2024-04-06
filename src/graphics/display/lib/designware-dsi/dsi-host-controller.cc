@@ -5,7 +5,6 @@
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
 
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
-#include <lib/ddk/debug.h>
 #include <lib/mipi-dsi/mipi-dsi.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <zircon/assert.h>
@@ -16,6 +15,7 @@
 #include <fbl/string_buffer.h>
 
 #include "src/graphics/display/lib/designware-dsi/dw-mipi-dsi-reg.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 // Header Creation Macros
 #define GEN_HDR_WC_MSB(x) ((x & 0xFF) << 16)
