@@ -79,9 +79,15 @@ TEST(RunQueueTests, QueueExpired) {
   thread1.Tick(Capacity(5));
   thread2.Tick(Capacity(2));
   thread3.Tick(Capacity(3));
-  EXPECT_TRUE(thread1.IsExpired(Start(5)));
-  EXPECT_TRUE(thread2.IsExpired(Start(5)));
-  EXPECT_TRUE(thread3.IsExpired(Start(5)));
+
+  EXPECT_EQ(Start(0), thread1.start());
+  EXPECT_EQ(Finish(10), thread1.finish());
+
+  EXPECT_EQ(Start(1), thread2.start());
+  EXPECT_EQ(Finish(11), thread2.finish());
+
+  EXPECT_EQ(Start(2), thread3.start());
+  EXPECT_EQ(Finish(17), thread3.finish());
 
   sched::RunQueue<TestThread> queue;
   queue.Queue(thread1, Start(5));
@@ -91,15 +97,15 @@ TEST(RunQueueTests, QueueExpired) {
   //
   // The threads should have been reactivated.
   //
-  EXPECT_FALSE(thread1.IsExpired(Start(5)));
+  EXPECT_FALSE(queue.IsExpired(thread1, Start(5)));
   EXPECT_EQ(Start(5), thread1.start());
   EXPECT_EQ(Finish(15), thread1.finish());
 
-  EXPECT_FALSE(thread2.IsExpired(Start(5)));
+  EXPECT_FALSE(queue.IsExpired(thread2, Start(5)));
   EXPECT_EQ(Start(5), thread2.start());
   EXPECT_EQ(Finish(15), thread2.finish());
 
-  EXPECT_FALSE(thread3.IsExpired(Start(5)));
+  EXPECT_FALSE(queue.IsExpired(thread3, Start(5)));
   EXPECT_EQ(Start(5), thread3.start());
   EXPECT_EQ(Finish(20), thread3.finish());
 }

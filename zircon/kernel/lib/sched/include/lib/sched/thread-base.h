@@ -28,9 +28,8 @@ struct BandwidthParameters {
   // The duration of the thread's activation period.
   Duration period;
 
-  // The total duration within a given activation period in which a thread is
-  // expected to complete its work. This can be regarded as a measure of the
-  // expected worst-case runtime.
+  // The duration within a given activation period in which a thread is expected
+  // to complete its *required* work.
   Duration firm_capacity;
 };
 
@@ -44,7 +43,7 @@ class ThreadBase {
       : period_(bandwidth.period), firm_capacity_(bandwidth.firm_capacity) {
     ZX_ASSERT(bandwidth.period >= bandwidth.firm_capacity);
     ZX_ASSERT(bandwidth.firm_capacity > 0);
-    ReactivateIfExpired(start);
+    Reactivate(start);
   }
 
   constexpr Duration period() const { return period_; }
@@ -61,22 +60,10 @@ class ThreadBase {
   // period.
   constexpr Duration time_slice_used() const { return time_slice_used_; }
 
-  // The remaining time expected to be scheduled within the current activation
-  // period.
-  constexpr Duration time_slice_remaining() const { return firm_capacity() - time_slice_used(); }
-
-  // Whether the thread has completed its work for the current activation
-  // period or activation period itself has ended.
-  constexpr bool IsExpired(Time now) const {
-    return time_slice_used() >= firm_capacity() || now >= finish();
-  }
-
   // Reactivates the thread in a new activation period beginning `now`.
-  constexpr void ReactivateIfExpired(Time now) {
-    if (IsExpired(now)) {
-      start_ = now;
-      time_slice_used_ = Duration{0};
-    }
+  constexpr void Reactivate(Time now) {
+    start_ = now;
+    time_slice_used_ = Duration{0};
   }
 
   // Accounts for the time in which the thread was executed (as measured outside

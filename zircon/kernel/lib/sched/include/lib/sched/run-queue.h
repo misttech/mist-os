@@ -57,11 +57,34 @@ class RunQueue {
   // Returns the currently scheduled thread, if there is one.
   const Thread* current_thread() const { return current_; }
 
+  // The total duration within the thread's activation period in which the
+  // thread is expected to complete its work. This can be regarded as a measure
+  // of the expected worst-case runtime.
+  Duration CapacityOf(const Thread& thread) const {
+    // TODO(https://fxbug.dev/328641440): Account for flexible capacity when
+    // introduced.
+    return thread.firm_capacity();
+  }
+
+  // The remaining time expected for the thread to be scheduled within its
+  // current activation period.
+  Duration TimesliceRemainingOn(const Thread& thread) const {
+    return CapacityOf(thread) - thread.time_slice_used();
+  }
+
+  // Whether the thread has completed its work for the current activation
+  // period or activation period itself has ended.
+  bool IsExpired(const Thread& thread, Time now) const {
+    return TimesliceRemainingOn(thread) <= 0 || now >= thread.finish();
+  }
+
   // Queues the provided thread, given the current time (so as to ensure that
   // the thread is or will be active).
   void Queue(Thread& thread, Time now) {
     ZX_DEBUG_ASSERT(!thread.IsQueued());
-    thread.ReactivateIfExpired(now);
+    if (IsExpired(thread, now)) {
+      thread.Reactivate(now);
+    }
     ready_.insert(&thread);
   }
 
@@ -102,8 +125,8 @@ class RunQueue {
 
     // Ensure `current` is activated before having it - and its otherwise false
     // finish time - factor into the next round of scheduling decisions.
-    if (current_) {
-      current_->ReactivateIfExpired(now);
+    if (current_ && IsExpired(*current_, now)) {
+      current_->Reactivate(now);
     }
 
     // Try to avoid rebalancing (from tree insertion and deletion) in the case
@@ -120,8 +143,8 @@ class RunQueue {
 
     Time preemption;
     if (next) {
-      Time next_completion = std::min<Time>(now + next->time_slice_remaining(), next->finish());
-      ZX_DEBUG_ASSERT(next->time_slice_remaining() > 0);
+      Time next_completion = std::min<Time>(now + TimesliceRemainingOn(*next), next->finish());
+      ZX_DEBUG_ASSERT(TimesliceRemainingOn(*next) > 0);
       ZX_DEBUG_ASSERT(now < next->finish());
 
       // Check if there is a thread with an earlier finish that will become
