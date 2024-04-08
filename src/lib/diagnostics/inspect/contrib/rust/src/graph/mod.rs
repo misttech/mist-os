@@ -123,19 +123,21 @@
 //! - `event`: the name of the event: `"remove_edge"`.
 //! - `id`: the internally generated Edge ID.
 //!
-use crate::{
-    inspect_log,
-    nodes::{BoundedListNode, NodeExt},
-};
-use fuchsia_inspect::{self as inspect, Property};
+use fuchsia_inspect as inspect;
 use std::{
-    borrow::Cow,
     collections::BTreeMap,
     marker::PhantomData,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Mutex,
-    },
+    sync::atomic::{AtomicU64, Ordering},
+};
+
+mod events;
+mod metadata;
+mod types;
+use events::*;
+use types::*;
+pub use {
+    metadata::{EdgeGraphMetadata, Metadata, MetadataValue, VertexGraphMetadata},
+    types::VertexId,
 };
 
 /// A directed graph on top of Inspect.
@@ -195,50 +197,6 @@ where
     }
 }
 
-/// A metadata item used to initialize metadata key value pairs of nodes and edges.
-pub struct Metadata<'a> {
-    /// The key of the metadata field.
-    key: Cow<'a, str>,
-    /// The value of the metadata field.
-    value: MetadataValue<'a>,
-    /// Whether or not changes to this metadata field should be tracked.
-    track_events: bool,
-}
-
-impl<'a> Metadata<'a> {
-    /// Create a new metadata item with the given `key` and `value`.
-    pub fn new(key: impl Into<Cow<'a, str>>, value: impl Into<MetadataValue<'a>>) -> Self {
-        Self { key: key.into(), value: value.into(), track_events: false }
-    }
-
-    /// Require that changes to this metadata node must be tracked. To support tracking events
-    /// about changes the graph must be configured to support tracking events.
-    pub fn track_events(mut self) -> Self {
-        self.track_events = true;
-        self
-    }
-}
-
-fn record_metadata_items<'a, I>(node: &inspect::Node, metadata: I)
-where
-    I: Iterator<Item = &'a Metadata<'a>>,
-{
-    for meta_item in metadata {
-        if !meta_item.track_events {
-            continue;
-        }
-        match meta_item.value {
-            MetadataValue::Int(value) => node.record_int(meta_item.key.as_ref(), value),
-            MetadataValue::Uint(value) => node.record_uint(meta_item.key.as_ref(), value),
-            MetadataValue::Double(value) => node.record_double(meta_item.key.as_ref(), value),
-            MetadataValue::Str(ref value) => {
-                node.record_string(meta_item.key.as_ref(), value.as_ref())
-            }
-            MetadataValue::Bool(value) => node.record_bool(meta_item.key.as_ref(), value),
-        }
-    }
-}
-
 /// A vertex of the graph. When this is dropped, all the outgoing edges and metadata fields will
 /// removed from Inspect.
 pub struct Vertex<I: VertexId> {
@@ -250,24 +208,6 @@ pub struct Vertex<I: VertexId> {
 }
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
-
-/// The ID of a vertex.
-pub trait VertexId {
-    /// Fetches the ID of a vertex, which must have a string representation.
-    fn get_id(&self) -> Cow<'_, str>;
-}
-
-impl<T: std::fmt::Display> VertexId for T {
-    fn get_id(&self) -> Cow<'_, str> {
-        Cow::Owned(format!("{self}"))
-    }
-}
-
-impl VertexId for str {
-    fn get_id(&self) -> Cow<'_, str> {
-        Cow::Borrowed(self)
-    }
-}
 
 impl<I> Vertex<I>
 where
@@ -290,11 +230,9 @@ where
             let node = parent.create_child(id_str.as_ref());
             let outgoing_edges_node = node.create_child("relationships");
             if let Some(ref events_tracker) = events_tracker {
-                events_tracker.record_added(id_str.as_ref(), metadata_iterator.clone());
+                events_tracker.record_added(&id, metadata_iterator.clone());
             }
-            let metadata = VertexGraphMetadata {
-                inner: GraphMetadata::new(&node, id, metadata_iterator, events_tracker),
-            };
+            let metadata = VertexGraphMetadata::new(&node, id, metadata_iterator, events_tracker);
             Vertex {
                 internal_id,
                 _node: node,
@@ -321,7 +259,7 @@ where
     }
 
     fn id(&self) -> &I {
-        &self.metadata.inner.id
+        &self.metadata.id()
     }
 }
 
@@ -333,34 +271,6 @@ where
         if let Some(ref events_tracker) = self.metadata.events_tracker() {
             events_tracker.record_removed(self.id().get_id().as_ref())
         }
-    }
-}
-
-pub struct VertexGraphMetadata<I>
-where
-    I: VertexId,
-{
-    inner: GraphMetadata<VertexMarker<I>>,
-}
-
-impl<I: VertexId> VertexGraphMetadata<I> {
-    /// Set the value of the metadata field at `key` or insert a new one if not
-    /// present.
-    pub fn set<'a, 'b>(
-        &mut self,
-        key: impl Into<Cow<'a, str>>,
-        value: impl Into<MetadataValue<'b>>,
-    ) {
-        self.inner.set(key, value);
-    }
-
-    /// Remove the metadata field at `key`.
-    pub fn remove(&mut self, key: &str) {
-        self.inner.remove(key);
-    }
-
-    fn events_tracker(&self) -> Option<&GraphObjectEventTracker<VertexMarker<I>>> {
-        self.inner.events_tracker.as_ref()
     }
 }
 
@@ -396,9 +306,7 @@ impl Edge {
                     metadata_iterator.clone(),
                 );
             }
-            let metadata = EdgeGraphMetadata {
-                inner: GraphMetadata::new(&node, id, metadata_iterator, events_tracker),
-            };
+            let metadata = EdgeGraphMetadata::new(&node, id, metadata_iterator, events_tracker);
             (node, metadata)
         });
         // We store the REAL Node in the incoming edges and return an Edge holding a weak reference
@@ -415,7 +323,7 @@ impl Edge {
     }
 
     fn id(&self) -> u64 {
-        self.metadata.inner.id
+        self.metadata.id()
     }
 }
 
@@ -425,351 +333,6 @@ impl Drop for Edge {
         if let Some(ref events_tracker) = self.metadata.events_tracker() {
             events_tracker.record_removed(self.id());
         }
-    }
-}
-
-pub struct EdgeGraphMetadata {
-    inner: GraphMetadata<EdgeMarker>,
-}
-
-impl EdgeGraphMetadata {
-    /// Set the value of the metadata field at `key` or insert a new one if not
-    /// present.
-    pub fn set<'a, 'b>(
-        &mut self,
-        key: impl Into<Cow<'a, str>>,
-        value: impl Into<MetadataValue<'b>>,
-    ) {
-        self.inner.set(key, value);
-    }
-
-    /// Remove the metadata field at `key`.
-    pub fn remove(&mut self, key: &str) {
-        self.inner.remove(key);
-    }
-
-    fn events_tracker(&self) -> Option<&GraphObjectEventTracker<EdgeMarker>> {
-        self.inner.events_tracker.as_ref()
-    }
-}
-
-enum MetadataProperty {
-    Int(inspect::IntProperty),
-    Uint(inspect::UintProperty),
-    Double(inspect::DoubleProperty),
-    Str(inspect::StringProperty),
-    Bool(inspect::BoolProperty),
-}
-
-/// An enum encoding all the possible metadata value types and contents.
-pub enum MetadataValue<'a> {
-    Int(i64),
-    Uint(u64),
-    Double(f64),
-    Str(Cow<'a, str>),
-    Bool(bool),
-}
-
-impl MetadataValue<'_> {
-    fn record_inspect(&self, node: &inspect::Node, key: &str) {
-        match self {
-            Self::Int(value) => node.record_int(key, *value),
-            Self::Uint(value) => node.record_uint(key, *value),
-            Self::Double(value) => node.record_double(key, *value),
-            Self::Str(value) => node.record_string(key, value.as_ref()),
-            Self::Bool(value) => node.record_bool(key, *value),
-        }
-    }
-}
-
-impl<'a, T> From<&'a T> for MetadataValue<'a>
-where
-    T: VertexId,
-{
-    fn from(value: &'a T) -> MetadataValue<'a> {
-        Self::Str(value.get_id())
-    }
-}
-
-macro_rules! impl_from_for_metadata_value {
-    ($([($($type:ty),*), $name:ident, $cast_type:ty]),*) => {
-        $($(
-            impl From<$type> for MetadataValue<'_> {
-                fn from(value: $type) -> MetadataValue<'static> {
-                    MetadataValue::$name(value as $cast_type)
-                }
-            }
-        )*)*
-    };
-}
-
-impl_from_for_metadata_value!(
-    [(i8, i16, i32, i64), Int, i64],
-    [(u8, u16, u32, u64), Uint, u64],
-    [(f32, f64), Double, f64]
-);
-
-impl From<bool> for MetadataValue<'_> {
-    fn from(value: bool) -> MetadataValue<'static> {
-        MetadataValue::Bool(value)
-    }
-}
-
-impl<'a> From<&'a str> for MetadataValue<'a> {
-    fn from(value: &'a str) -> MetadataValue<'a> {
-        MetadataValue::Str(Cow::Borrowed(value))
-    }
-}
-
-impl<'a> From<String> for MetadataValue<'_> {
-    fn from(value: String) -> MetadataValue<'static> {
-        MetadataValue::Str(Cow::Owned(value))
-    }
-}
-
-impl<'a> From<Cow<'a, str>> for MetadataValue<'a> {
-    fn from(value: Cow<'a, str>) -> MetadataValue<'a> {
-        MetadataValue::Str(value)
-    }
-}
-
-trait GraphObject {
-    type Id;
-    fn write_to_node(node: &inspect::Node, id: &Self::Id);
-}
-
-struct VertexMarker<T>(PhantomData<T>);
-struct EdgeMarker;
-
-impl GraphObject for EdgeMarker {
-    type Id = u64;
-
-    fn write_to_node(node: &inspect::Node, id: &Self::Id) {
-        node.record_uint("edge_id", *id);
-    }
-}
-
-impl<T: VertexId> GraphObject for VertexMarker<T> {
-    type Id = T;
-
-    fn write_to_node(node: &inspect::Node, id: &Self::Id) {
-        node.record_string("vertex_id", id.get_id().as_ref());
-    }
-}
-
-/// The metadata of a vertex or edge in the graph.
-struct GraphMetadata<T: GraphObject> {
-    id: T::Id,
-    map: BTreeMap<String, (MetadataProperty, bool)>,
-    events_tracker: Option<GraphObjectEventTracker<T>>,
-    node: inspect::Node,
-}
-
-impl<T> GraphMetadata<T>
-where
-    T: GraphObject,
-{
-    fn new<'a>(
-        parent: &inspect::Node,
-        id: T::Id,
-        initial_metadata: impl Iterator<Item = &'a Metadata<'a>>,
-        events_tracker: Option<GraphObjectEventTracker<T>>,
-    ) -> Self {
-        let node = parent.create_child("meta");
-        let mut map = BTreeMap::default();
-        node.atomic_update(|node| {
-            for Metadata { key, value, track_events } in initial_metadata.into_iter() {
-                Self::insert_to_map(&node, &mut map, key.to_string(), value, *track_events);
-            }
-        });
-        Self { id, node, map, events_tracker }
-    }
-
-    fn set<'a, 'b>(&mut self, key: impl Into<Cow<'a, str>>, value: impl Into<MetadataValue<'b>>) {
-        let key: Cow<'a, str> = key.into();
-        let value = value.into();
-        match (self.map.get(key.as_ref()), &value) {
-            (Some((MetadataProperty::Int(property), track_events)), MetadataValue::Int(x)) => {
-                property.set(*x);
-                if *track_events {
-                    self.log_update_key(key.as_ref(), &value)
-                }
-            }
-            (Some((MetadataProperty::Uint(property), track_events)), MetadataValue::Uint(x)) => {
-                property.set(*x);
-                if *track_events {
-                    self.log_update_key(key.as_ref(), &value)
-                }
-            }
-            (
-                Some((MetadataProperty::Double(property), track_events)),
-                MetadataValue::Double(x),
-            ) => {
-                property.set(*x);
-                if *track_events {
-                    self.log_update_key(key.as_ref(), &value)
-                }
-            }
-            (Some((MetadataProperty::Bool(property), track_events)), MetadataValue::Bool(x)) => {
-                property.set(*x);
-                if *track_events {
-                    self.log_update_key(key.as_ref(), &value)
-                }
-            }
-            (Some((MetadataProperty::Str(property), track_events)), MetadataValue::Str(x)) => {
-                property.set(x.as_ref());
-                if *track_events {
-                    self.log_update_key(key.as_ref(), &value)
-                }
-            }
-            (Some((_, track_events)), value) => {
-                if *track_events {
-                    self.log_update_key(key.as_ref(), &value)
-                }
-                let track_events = *track_events;
-                Self::insert_to_map(
-                    &self.node,
-                    &mut self.map,
-                    key.into_owned(),
-                    &value,
-                    track_events,
-                );
-            }
-            (None, value) => {
-                Self::insert_to_map(&self.node, &mut self.map, key.into_owned(), &value, false);
-            }
-        }
-    }
-
-    fn remove(&mut self, key: &str) {
-        self.map.remove(key);
-    }
-
-    fn log_update_key(&self, key: &str, value: &MetadataValue<'_>) {
-        if let Some(events_tracker) = &self.events_tracker {
-            events_tracker.metadata_updated(&self.id, key, value);
-        }
-    }
-
-    fn insert_to_map(
-        node: &inspect::Node,
-        map: &mut BTreeMap<String, (MetadataProperty, bool)>,
-        key: String,
-        value: &MetadataValue<'_>,
-        track_events: bool,
-    ) {
-        match value {
-            MetadataValue::Int(value) => {
-                let property = node.create_int(&key, *value);
-                map.insert(key, (MetadataProperty::Int(property), track_events));
-            }
-            MetadataValue::Uint(value) => {
-                let property = node.create_uint(&key, *value);
-                map.insert(key, (MetadataProperty::Uint(property), track_events));
-            }
-            MetadataValue::Double(value) => {
-                let property = node.create_double(&key, *value);
-                map.insert(key, (MetadataProperty::Double(property), track_events));
-            }
-            MetadataValue::Str(value) => {
-                let property = node.create_string(&key, value);
-                map.insert(key, (MetadataProperty::Str(property), track_events));
-            }
-            MetadataValue::Bool(value) => {
-                let property = node.create_bool(&key, *value);
-                map.insert(key, (MetadataProperty::Bool(property), track_events));
-            }
-        }
-    }
-}
-
-struct GraphEventsTracker {
-    buffer: Arc<Mutex<BoundedListNode>>,
-}
-
-impl GraphEventsTracker {
-    fn new(list_node: inspect::Node, max_events: usize) -> Self {
-        Self { buffer: Arc::new(Mutex::new(BoundedListNode::new(list_node, max_events))) }
-    }
-
-    fn for_vertex<I>(&self) -> GraphObjectEventTracker<VertexMarker<I>> {
-        GraphObjectEventTracker { buffer: self.buffer.clone(), _phantom: PhantomData }
-    }
-}
-
-struct GraphObjectEventTracker<T> {
-    buffer: Arc<Mutex<BoundedListNode>>,
-    _phantom: PhantomData<T>,
-}
-
-impl<I> GraphObjectEventTracker<VertexMarker<I>> {
-    fn for_edge(&self) -> GraphObjectEventTracker<EdgeMarker> {
-        GraphObjectEventTracker { buffer: self.buffer.clone(), _phantom: PhantomData }
-    }
-
-    fn record_added<'a, M>(&self, id: &str, initial_metadata: M)
-    where
-        M: IntoIterator<Item = &'a Metadata<'a>>,
-    {
-        self.buffer.lock().unwrap().add_entry(|node| {
-            node.record_time("@time");
-            node.record_string("event", "add_vertex");
-            node.record_string("id", &id);
-            let meta_node = node.create_child("meta");
-            record_metadata_items(&meta_node, initial_metadata.into_iter());
-            node.record(meta_node);
-        });
-    }
-
-    fn record_removed(&self, id: &str) {
-        let mut buffer = self.buffer.lock().unwrap();
-        inspect_log!(buffer, {
-            event: "remove_vertex",
-            id: id,
-        });
-    }
-}
-
-impl GraphObjectEventTracker<EdgeMarker> {
-    fn record_added<'a, M>(&self, from: &str, to: &str, id: u64, initial_metadata: M)
-    where
-        M: IntoIterator<Item = &'a Metadata<'a>>,
-    {
-        let mut buffer = self.buffer.lock().unwrap();
-        buffer.add_entry(|node| {
-            node.record_time("@time");
-            node.record_string("event", "add_edge");
-            node.record_string("from", from);
-            node.record_string("to", to);
-            node.record_uint("id", id);
-            let meta_node = node.create_child("meta");
-            record_metadata_items(&meta_node, initial_metadata.into_iter());
-            node.record(meta_node);
-        });
-    }
-
-    fn record_removed(&self, id: u64) {
-        let mut buffer = self.buffer.lock().unwrap();
-        inspect_log!(buffer, {
-            event: "remove_edge",
-            id: id,
-        });
-    }
-}
-
-impl<T> GraphObjectEventTracker<T>
-where
-    T: GraphObject,
-{
-    fn metadata_updated(&self, id: &T::Id, key: &str, value: &MetadataValue<'_>) {
-        let mut buffer = self.buffer.lock().unwrap();
-        buffer.add_entry(|node| {
-            node.record_time("@time");
-            node.record_string("event", "update_key");
-            node.record_string("key", key);
-            value.record_inspect(&node, "update");
-            T::write_to_node(node, id);
-        });
     }
 }
 
