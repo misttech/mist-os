@@ -618,4 +618,76 @@ TEST_P(FsMountTest, ChmodWithDifferentModes) {
   });
 }
 
+TEST_P(FsMountTest, OpenWithTruncAndCreatOnReadOnlyFsReturnsEROFS) {
+  std::string lock_file = mount_path_ + "/lock";
+  int fd = SAFE_SYSCALL(open(lock_file.c_str(), O_CREAT | O_RDWR, 0600));
+  close(fd);
+
+  SAFE_SYSCALL(chown(lock_file.c_str(), kUser1Uid, kUser1Gid));
+
+  // Remount filesystem as read-only.
+  SAFE_SYSCALL(
+      mount(nullptr, mount_path_.c_str(), "ignored", MS_REMOUNT | MS_BIND | MS_RDONLY, ""));
+  auto cleanup = fit::defer([this]() {
+    SAFE_SYSCALL(mount(nullptr, mount_path_.c_str(), "ignored", MS_REMOUNT | MS_BIND, ""));
+  });
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([lock_file] {
+    ASSERT_TRUE(change_ids(kUser1Uid, kUser1Gid));
+    drop_all_capabilities();
+
+    int fd = open(lock_file.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
+    int saved_errno = errno;
+    EXPECT_EQ(fd, -1);
+    EXPECT_EQ(saved_errno, EROFS) << std::strerror(saved_errno);
+
+    if (fd != -1) {
+      SAFE_SYSCALL(close(fd));
+    }
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST_P(FsMountTest, OpenWithTruncAndCreatWithExistingFileSucceeds) {
+  std::string lock_file = mount_path_ + "/lock";
+  int fd = SAFE_SYSCALL(open(lock_file.c_str(), O_CREAT | O_RDWR, 0600));
+  close(fd);
+
+  SAFE_SYSCALL(chown(lock_file.c_str(), kUser1Uid, kUser1Gid));
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([lock_file] {
+    ASSERT_TRUE(change_ids(kUser1Uid, kUser1Gid));
+    drop_all_capabilities();
+
+    int fd = SAFE_SYSCALL(open(lock_file.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600));
+    SAFE_SYSCALL(close(fd));
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST_P(FsMountTest, OpenWithTruncAndCreatWithNoPermsReturnsEACCES) {
+  std::string lock_file = mount_path_ + "/lock";
+  int fd = SAFE_SYSCALL(open(lock_file.c_str(), O_CREAT | O_RDWR, 0600));
+  close(fd);
+
+  SAFE_SYSCALL(chown(lock_file.c_str(), kUser1Uid, kUser1Gid));
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([lock_file] {
+    ASSERT_TRUE(change_ids(kUser2Uid, kUser2Gid));
+    drop_all_capabilities();
+
+    int fd = open(lock_file.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
+    int saved_errno = errno;
+    EXPECT_EQ(fd, -1);
+    EXPECT_EQ(saved_errno, EACCES) << std::strerror(saved_errno);
+    if (fd != -1) {
+      SAFE_SYSCALL(close(fd));
+    }
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
 }  // namespace
