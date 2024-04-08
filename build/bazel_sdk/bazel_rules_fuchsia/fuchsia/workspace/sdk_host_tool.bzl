@@ -15,7 +15,7 @@ def _sdk_host_tool_impl(ctx):
 
     return [DefaultInfo(
         executable = exe,
-        runfiles = ctx.runfiles([file]),
+        runfiles = ctx.runfiles([file] + ctx.files._sdk_runfiles),
     )]
 
 sdk_host_tool = rule(
@@ -34,4 +34,11 @@ sdk_host_tool = rule(
     """,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     executable = True,
+    attrs = {
+        "_sdk_runfiles": attr.label(
+            doc = "Allows the entire SDK to be available for `bazel run` SDK tool invocations.",
+            allow_files = True,
+            default = "@fuchsia_sdk//:all_files",
+        ),
+    },
 )
