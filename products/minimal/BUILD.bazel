@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@legacy_ninja_build_outputs//:build_args.bzl", "authorized_ssh_keys_label")
+load("@fuchsia_build_info//:args.bzl", "authorized_ssh_keys_label")
 load("//build/info:info.bzl", "DEFAULT_PRODUCT_BUILD_INFO")
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
