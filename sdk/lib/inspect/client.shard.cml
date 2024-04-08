@@ -6,26 +6,4 @@
         "inspect/offer.shard.cml",
         "inspect/use.shard.cml",
     ],
-
-    // TODO(https://fxbug.dev/42175119): Remove diagnostics dir
-    capabilities: [
-        {
-            directory: "diagnostics",
-            rights: [
-                "connect",
-                "enumerate",
-                "traverse",
-            ],
-            path: "/diagnostics",
-        },
-    ],
-
-    // TODO(https://fxbug.dev/42175119): Remove diagnostics dir
-    expose: [
-        {
-            directory: "diagnostics",
-            from: "self",
-            to: "framework",
-        },
-    ],
 }
