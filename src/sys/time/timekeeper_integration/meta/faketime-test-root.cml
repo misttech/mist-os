@@ -32,10 +32,7 @@
             to: "#test_suite",
         },
         {
-            event_stream: [
-                "capability_requested",
-                "directory_ready",
-            ],
+            event_stream: [ "capability_requested" ],
             from: "parent",
             to: "#test_realm_factory",
         },
