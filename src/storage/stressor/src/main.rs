@@ -39,7 +39,7 @@ async fn main() {
     std::thread::sleep(std::time::Duration::from_secs(10));
 
     if let Mode::Aggressive(options) = mode {
-        Aggressive::new(options.target_free_bytes).run(8);
+        Aggressive::new("/data", options.target_free_bytes).run(8);
     } else {
         Gentle::new().run(8);
     }

@@ -76,6 +76,8 @@ impl Inner {
 /// Each pass anecdotally takes between 2 and 20 seconds depending on system load,
 /// allocation strategy and fragmentation.
 pub struct Stressor {
+    /// Path prefix to write files to.
+    path_prefix: String,
     /// Inner state tracking which files can be accessed next.
     inner: Mutex<Inner>,
     /// Tracks the number of bytes we have allocated.
@@ -84,7 +86,7 @@ pub struct Stressor {
     target_bytes: u64,
     op_stats: Mutex<[u64; NUM_OPS]>,
     /// A handle to the directory used to query filesystem info periodically.
-    dir: fio::DirectorySynchronousProxy,
+    dir: Option<fio::DirectorySynchronousProxy>,
 }
 
 const READ: usize = 0;
@@ -102,28 +104,35 @@ const DIRENT_CACHE_LIMIT: usize = 8000;
 impl Stressor {
     /// Creates a new aggressive stressor that will try to fill the disk until
     /// `target_free_bytes` of free space remains.
-    pub fn new(target_free_bytes: u64) -> Arc<Self> {
-        let dir = fio::DirectorySynchronousProxy::new(
-            fuchsia_async::Channel::from_channel(
-                fdio::transfer_fd(std::fs::File::open("/data").unwrap()).unwrap().into(),
-            )
-            .into(),
-        );
-        let info = dir.query_filesystem(Time::INFINITE.into()).unwrap().1.unwrap();
+    pub fn new(path_prefix: &str, target_free_bytes: u64) -> Arc<Self> {
+        let (used_bytes, target_bytes, dir) = if !path_prefix.is_empty() {
+            let dir = fio::DirectorySynchronousProxy::new(
+                fuchsia_async::Channel::from_channel(
+                    fdio::transfer_fd(std::fs::File::open("/data").unwrap()).unwrap().into(),
+                )
+                .into(),
+            );
+            let info = dir.query_filesystem(Time::INFINITE.into()).unwrap().1.unwrap();
 
-        tracing::info!(
-            "Aggressive stressor mode targetting {} free bytes on a {} byte volume.",
-            target_free_bytes,
-            info.total_bytes
-        );
+            tracing::info!(
+                "Aggressive stressor mode targetting {} free bytes on a {} byte volume.",
+                target_free_bytes,
+                info.total_bytes
+            );
+            (info.used_bytes, info.total_bytes - target_free_bytes, Some(dir))
+        } else {
+            tracing::info!("Aggressive stressor running without path. Targetting 1MB of space.");
+            (0, 1 << 20, None)
+        };
 
         Arc::new(Stressor {
+            path_prefix: path_prefix.to_owned(),
             inner: Mutex::new(Inner {
                 file_counter: 0,
                 file_map: std::array::from_fn(|i| i as u64),
             }),
-            bytes_stored: AtomicU64::new(info.used_bytes),
-            target_bytes: info.total_bytes - target_free_bytes,
+            bytes_stored: AtomicU64::new(used_bytes),
+            target_bytes,
             op_stats: Default::default(),
             dir,
         })
@@ -138,79 +147,78 @@ impl Stressor {
         // Sleep forever, periodically updating bytes stored.
         // This update is racy but close enough for our purposes.
         loop {
-            let info = self.dir.query_filesystem(Time::INFINITE.into()).unwrap().1.unwrap();
             std::thread::sleep(std::time::Duration::from_secs(10));
+            if let Some(dir) = &self.dir {
+                let info = dir.query_filesystem(Time::INFINITE.into()).unwrap().1.unwrap();
+                self.bytes_stored.store(info.used_bytes, Ordering::SeqCst);
+            }
             tracing::info!(
-                "bytes_stored: {}, target_bytes {}, counts: {:?}, info: {info:?}",
+                "bytes_stored: {}, target_bytes {}, counts: {:?}",
                 self.bytes_stored.load(Ordering::Relaxed),
                 self.target_bytes,
                 self.op_stats.lock().unwrap()
             );
-            self.bytes_stored.store(info.used_bytes, Ordering::SeqCst);
         }
     }
 
-    /// Worker thread function.
-    fn worker(&self) {
-        let mut rng = rand::thread_rng();
-        let mut buf = Vec::new();
-        loop {
-            let bytes_stored = self.bytes_stored.load(Ordering::Relaxed);
-            // Note that truncate is rare until we exceed 100% target utilization, at which point it
-            // becomes as likely as read or write. By the time we hit 105% target utilization,
-            // truncates are 2.6x as likely as read or write.
-            let weights: [f64; NUM_OPS] = [
-                1.0,                                                             /* READ */
-                1.0,                                                             /* WRITE */
-                f64::powf(bytes_stored as f64 / self.target_bytes as f64, 20.0), /* TRUNCATE */
-            ];
-            let op = WeightedIndex::new(weights).unwrap().sample(&mut rng);
-            let file_num = self.inner.lock().unwrap().next_file_num();
-            let path = format!("/data/{}", file_num);
-            match op {
-                READ => match File::options().read(true).write(false).open(&path) {
+    /// The body of the worker loop. Pulled out for testing.
+    fn work_unit(&self, rng: &mut rand::rngs::ThreadRng, buf: &mut Vec<u8>) {
+        let bytes_stored = self.bytes_stored.load(Ordering::Relaxed);
+        // Note that truncate is rare until we exceed 100% target utilization, at which point it
+        // becomes as likely as read or write. By the time we hit 105% target utilization,
+        // truncates are 2.6x as likely as read or write.
+        let weights: [f64; NUM_OPS] = [
+            1.0,                                                             /* READ */
+            1.0,                                                             /* WRITE */
+            f64::powf(bytes_stored as f64 / self.target_bytes as f64, 20.0), /* TRUNCATE */
+        ];
+        let op = WeightedIndex::new(weights).unwrap().sample(rng);
+        let file_num = self.inner.lock().unwrap().next_file_num();
+        let path = format!("{}/{file_num}", self.path_prefix);
+        match op {
+            READ => match File::options().read(true).write(false).open(&path) {
+                Ok(f) => {
+                    let file_len = f.metadata().unwrap().len();
+                    let read_len = rng.gen_range(0..128 * 1024u64);
+                    let end = file_len.saturating_sub(read_len);
+                    let offset = rng.gen_range(0..end + 1);
+                    buf.resize(read_len as usize, 0);
+                    f.read_at(buf, offset).unwrap();
+                }
+                Err(e) => match e.kind() {
+                    ErrorKind::NotFound => {}
+                    error => {
+                        tracing::warn!("Got an open error on READ: {error:?}");
+                    }
+                },
+            },
+            WRITE => {
+                match File::options().create(true).read(true).write(true).open(&path) {
                     Ok(f) => {
                         let file_len = f.metadata().unwrap().len();
-                        let read_len = rng.gen_range(0..128 * 1024u64);
-                        let end = file_len.saturating_sub(read_len);
-                        let offset = rng.gen_range(0..end + 1);
-                        buf.resize(read_len as usize, 0);
-                        f.read_at(&mut buf, offset).unwrap();
-                    }
-                    Err(e) => match e.kind() {
-                        ErrorKind::NotFound => {}
-                        error => {
-                            tracing::warn!("Got an open error on READ: {error:?}");
-                        }
-                    },
-                },
-                WRITE => {
-                    match File::options().create(true).read(true).write(true).open(&path) {
-                        Ok(f) => {
-                            let file_len = f.metadata().unwrap().len();
-                            buf.resize(rng.gen_range(0..128 * 1024), 1);
-                            match f.write_at(&buf, file_len) {
-                                Ok(bytes) => {
-                                    self.bytes_stored.fetch_add(bytes as u64, Ordering::Relaxed);
-                                }
-                                Err(_) => {
-                                    // When a write fails due to space, we truncate.
-                                    // In this way we fill up the disk then start fragmenting it.
-                                    // Until #![feature(io_error_more)] is stable, we have
-                                    // a catch-all here.
-                                    let _ = f.set_len(0).unwrap();
-                                    // Metadata (layer files and such) can take up megabytes of
-                                    // space that is not tracked in `self.bytes_stored`.
-                                    // If we hit this code path then we've blown through
-                                    // available space but not hit our 'bytes_stored' limit.
-                                    //
-                                    // Writes are relatively small compared to the potential
-                                    // layer file size so even though it's a bit racy, we will
-                                    // accept the potential inaccuracy of concurrent writes
-                                    // and adjust bytes_stored here based on the filesystem's
-                                    // internal tally.
-                                    let info = self
-                                        .dir
+                        buf.resize(rng.gen_range(0..128 * 1024), 1);
+                        match f.write_at(&buf, file_len) {
+                            Ok(bytes) => {
+                                self.bytes_stored.fetch_add(bytes as u64, Ordering::Relaxed);
+                            }
+                            Err(_) => {
+                                // When a write fails due to space, we truncate.
+                                // In this way we fill up the disk then start fragmenting it.
+                                // Until #![feature(io_error_more)] is stable, we have
+                                // a catch-all here.
+                                let _ = f.set_len(0).unwrap();
+                                // Metadata (layer files and such) can take up megabytes of
+                                // space that is not tracked in `self.bytes_stored`.
+                                // If we hit this code path then we've blown through
+                                // available space but not hit our 'bytes_stored' limit.
+                                //
+                                // Writes are relatively small compared to the potential
+                                // layer file size so even though it's a bit racy, we will
+                                // accept the potential inaccuracy of concurrent writes
+                                // and adjust bytes_stored here based on the filesystem's
+                                // internal tally.
+                                if let Some(dir) = &self.dir {
+                                    let info = dir
                                         .query_filesystem(Time::INFINITE.into())
                                         .unwrap()
                                         .1
@@ -218,25 +226,49 @@ impl Stressor {
                                     tracing::info!("Correcting bytes_stored. {info:?}");
                                     self.bytes_stored.store(info.used_bytes, Ordering::SeqCst);
                                 }
-                            };
-                        }
-                        // Unfortunately ErrorKind::StorageFull is unstable so
-                        // we rely on a catch-all here and assume write errors are
-                        // due to disk being full. This happens often so we don't log it.
-                        Err(_) => {}
+                            }
+                        };
                     }
-                }
-                TRUNCATE => match File::options().write(true).open(&path) {
-                    Ok(f) => {
-                        let file_len = f.metadata().unwrap().len();
-                        self.bytes_stored.fetch_sub(file_len, Ordering::Relaxed);
-                        let _ = f.set_len(0).unwrap();
-                    }
+                    // Unfortunately ErrorKind::StorageFull is unstable so
+                    // we rely on a catch-all here and assume write errors are
+                    // due to disk being full. This happens often so we don't log it.
                     Err(_) => {}
-                },
-                _ => unreachable!(),
+                }
             }
-            self.op_stats.lock().unwrap()[op] += 1;
+            TRUNCATE => match File::options().write(true).open(&path) {
+                Ok(f) => {
+                    let file_len = f.metadata().unwrap().len();
+                    self.bytes_stored.fetch_sub(file_len, Ordering::Relaxed);
+                    let _ = f.set_len(0).unwrap();
+                }
+                Err(_) => {}
+            },
+            _ => unreachable!(),
         }
+        self.op_stats.lock().unwrap()[op] += 1;
+    }
+
+    /// Worker thread function.
+    fn worker(&self) {
+        let mut rng = rand::thread_rng();
+        let mut buf = Vec::new();
+        loop {
+            self.work_unit(&mut rng, &mut buf);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn stressor() {
+        let stressor = Stressor::new("", 10);
+        let mut rng = rand::thread_rng();
+        let mut buf = Vec::new();
+        stressor.work_unit(&mut rng, &mut buf);
+        assert_eq!(stressor.op_stats.lock().unwrap().iter().sum::<u64>(), 1);
+        stressor.work_unit(&mut rng, &mut buf);
+        assert_eq!(stressor.op_stats.lock().unwrap().iter().sum::<u64>(), 2);
     }
 }
