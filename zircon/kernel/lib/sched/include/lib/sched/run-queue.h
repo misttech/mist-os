@@ -40,82 +40,104 @@ class RunQueue {
  public:
   static_assert(std::is_base_of_v<ThreadBase<Thread>, Thread>);
 
-  ~RunQueue() { tree_.clear(); }
+  ~RunQueue() { ready_.clear(); }
 
   // Threads are iterated through in order of start time.
   using iterator = typename Tree::const_iterator;
 
-  iterator begin() const { return tree_.begin(); }
-  iterator end() const { return tree_.end(); }
+  iterator begin() const { return ready_.begin(); }
+  iterator end() const { return ready_.end(); }
 
-  // Returns the number of queued threads.
-  size_t size() const { return tree_.size(); }
+  // Returns the number of queued, ready threads.
+  size_t size() const { return ready_.size(); }
 
   // Whether no threads are currently queued.
-  bool empty() const { return tree_.is_empty(); }
+  bool empty() const { return ready_.is_empty(); }
+
+  // Returns the currently scheduled thread, if there is one.
+  const Thread* current_thread() const { return current_; }
 
   // Queues the provided thread, given the current time (so as to ensure that
   // the thread is or will be active).
   void Queue(Thread& thread, Time now) {
+    ZX_DEBUG_ASSERT(!thread.IsQueued());
     thread.ReactivateIfExpired(now);
-    tree_.insert(&thread);
+    ready_.insert(&thread);
   }
 
   // Dequeues the thread from the run queue (provided the thread was already
   // contained).
-  void Dequeue(Thread& thread) { tree_.erase(thread); }
+  void Dequeue(Thread& thread) {
+    ZX_DEBUG_ASSERT(thread.IsQueued());
+    ready_.erase(thread);
+  }
 
-  struct EvaluateNextThreadResult {
+  struct SelectNextThreadResult {
     Thread* next = nullptr;
     Time preemption_time = Time::Min();
   };
 
-  // Given the most recently executed thread, evaluates the next thread that
-  // should be scheduled and the time at which the preemption timer should fire
-  // for the subsequent round of scheduling.
+  // Selects the next thread to run and also gives the time at which the
+  // preemption timer should fire for the subsequent round of scheduling.
   //
   // The next thread is the one that is active and has the earliest finish time
   // within its current period. In the event of a tie of finish times, the one
   // with the earlier start time is picked - and then in the event of a tie of
   // start times, the thread with the lowest address is expediently picked
   // (which is a small bias that should not persist across runs of the system).
-  EvaluateNextThreadResult EvaluateNextThread(Thread& current, Time now) {
+  //
+  // If no threads are eligible, nullptr is returned, along with the time at
+  // which the next thread should become eligible.
+  SelectNextThreadResult SelectNextThread(Time now) {
+    // The next eligible might actually be expired (e.g., due to bandwidth
+    // oversubscription), in which case it should be reactivated and
+    // requeued, and our search should begin again for an eligible thread
+    // still in its current period.
+    Thread* next = FindNextEligibleThread(now).CopyPointer();
+    while (next && now >= next->finish()) {
+      Dequeue(*next);
+      Queue(*next, now);
+      next = FindNextEligibleThread(now).CopyPointer();
+    }
+
     // Ensure `current` is activated before having it - and its otherwise false
     // finish time - factor into the next round of scheduling decisions.
-    current.ReactivateIfExpired(now);
-
-    Thread* next = nullptr;
-    while (!next) {
-      // Try to avoid rebalancing (from tree insertion and deletion) in the case
-      // where the next thread is the current one.
-      if (auto it = FindNextEligibleThread(now); it && SchedulesBeforeIfActive(*it, current)) {
-        // The next eligible might actually be expired (e.g., due to bandwidth
-        // oversubscription), in which case it should be reactivated and
-        // requeued, and our search should begin again for an eligible thread
-        // still in its current period.
-        next = it.CopyPointer();
-        Dequeue(*next);
-        Thread& requeued = now < next->finish() ? current : *std::exchange(next, nullptr);
-        Queue(requeued, now);
-      } else {
-        next = &current;
-      }
+    if (current_) {
+      current_->ReactivateIfExpired(now);
     }
 
-    ZX_DEBUG_ASSERT(next->time_slice_remaining() > 0);
-    ZX_DEBUG_ASSERT(now < next->finish());
-    Time next_completion = std::min<Time>(now + next->time_slice_remaining(), next->finish());
-
-    // Check if there is a thread with an earlier finish that will become
-    // eligible before `next` finishes.
-    Time preemption;
-    if (auto it = FindNextEligibleThread(next_completion); it && it->finish() < next->finish()) {
-      preemption = std::min<Time>(next_completion, it->start());
+    // Try to avoid rebalancing (from tree insertion and deletion) in the case
+    // where the next thread is the current one.
+    if (!next || (current_ && SchedulesBeforeIfActive(*current_, *next))) {
+      next = current_;
     } else {
-      preemption = next_completion;
+      Dequeue(*next);
+      if (current_) {
+        Queue(*current_, now);
+      }
+      current_ = next;
     }
 
-    ZX_DEBUG_ASSERT(preemption > now);
+    Time preemption;
+    if (next) {
+      Time next_completion = std::min<Time>(now + next->time_slice_remaining(), next->finish());
+      ZX_DEBUG_ASSERT(next->time_slice_remaining() > 0);
+      ZX_DEBUG_ASSERT(now < next->finish());
+
+      // Check if there is a thread with an earlier finish that will become
+      // eligible before `next` finishes.
+      if (auto it = FindNextEligibleThread(next_completion); it && it->finish() < next->finish()) {
+        preemption = std::min<Time>(next_completion, it->start());
+      } else {
+        preemption = next_completion;
+      }
+    } else {
+      // If there is nothing currently eligible, we should preempt next when
+      // there is.
+      preemption = empty() ? Time::Max() : begin()->start();
+    }
+
+    ZX_DEBUG_ASSERT((!next && preemption == Time::Max()) || preemption > now);
     return {next, preemption};
   }
 
@@ -179,8 +201,8 @@ class RunQueue {
   // Returns the thread eligible to scheduled at a given time with the minimal
   // finish time.
   mutable_iterator FindNextEligibleThread(Time time) {
-    if (tree_.is_empty() || tree_.front().start() > time) {
-      return tree_.end();
+    if (ready_.is_empty() || ready_.front().start() > time) {
+      return ready_.end();
     }
 
     // `node` will follow a search path that partitions the tree into eligible
@@ -190,9 +212,9 @@ class RunQueue {
     // finish time off of the search path. After the search, we will be able to
     // check `path` against `subtree` to determine where the true minimal,
     // eligible finish lies.
-    mutable_iterator node = tree_.root();
-    mutable_iterator path = tree_.end();
-    mutable_iterator subtree = tree_.end();
+    mutable_iterator node = ready_.root();
+    mutable_iterator path = ready_.end();
+    mutable_iterator subtree = ready_.end();
     while (node) {
       // Iterate to the subtree of eligible start times.
       if (node->start() > time) {
@@ -216,8 +238,10 @@ class RunQueue {
       node = node.right();
     }
 
-    // Check if the minimum eligible finish was found along the search path.
-    if (!subtree || SubtreeMinFinish(subtree) >= path->finish()) {
+    // Check if the minimum eligible finish was found along the search path. If
+    // there is an identical finish time in the subtree, respect the documented
+    // tiebreaker policy and go with the subtree's thread.
+    if (!subtree || SubtreeMinFinish(subtree) > path->finish()) {
       return path;
     }
 
@@ -232,7 +256,11 @@ class RunQueue {
     return node;
   }
 
-  Tree tree_;
+  // The thread currently selected to be run.
+  Thread* current_ = nullptr;
+
+  // The tree of threads ready to be run.
+  Tree ready_;
 };
 
 }  // namespace sched

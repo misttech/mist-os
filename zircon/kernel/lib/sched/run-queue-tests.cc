@@ -7,6 +7,7 @@
 #include <lib/sched/run-queue.h>
 
 #include <array>
+#include <cstddef>
 
 #include <gtest/gtest.h>
 
@@ -21,6 +22,7 @@ TEST(RunQueueTests, Empty) {
   sched::RunQueue<TestThread> queue;
   EXPECT_TRUE(queue.empty());
   EXPECT_EQ(queue.begin(), queue.end());
+  EXPECT_EQ(nullptr, queue.current_thread());
 }
 
 TEST(RunQueueTests, QueueNonExpired) {
@@ -146,203 +148,298 @@ TEST(RunQueueTests, OrderedByStartTime) {
   EXPECT_EQ(queue.end(), it);
 }
 
-TEST(RunQueueTests, EvaluateNextThread) {
-  // * Next is current, because there are no other threads.
+TEST(RunQueueTests, SelectNextThread) {
+  // Empty: no next thread.
+  {
+    constexpr Time kNow{Start(0)};
+
+    sched::RunQueue<TestThread> queue;
+    auto [next, preemption] = queue.SelectNextThread(kNow);
+    EXPECT_EQ(nullptr, next);
+    EXPECT_EQ(Time::Max(), preemption);
+
+    EXPECT_EQ(nullptr, queue.current_thread());
+  }
+
+  // * All queued threads are not yet active: no next thread.
+  // * Preemption is at the start time of next eligible.
+  {
+    constexpr Time kNow{Start(0)};
+
+    TestThread threadA{{Period(10), Capacity(5)}, Start(10)};
+    TestThread threadB{{Period(10), Capacity(2)}, Start(12)};
+    TestThread threadC{{Period(15), Capacity(3)}, Start(14)};
+
+    sched::RunQueue<TestThread> queue;
+    queue.Queue(threadA, kNow);
+    queue.Queue(threadB, kNow);
+    queue.Queue(threadC, kNow);
+
+    auto [next, preemption] = queue.SelectNextThread(kNow);
+    EXPECT_EQ(nullptr, next);
+    EXPECT_EQ(threadA.start(), preemption);
+
+    EXPECT_EQ(nullptr, queue.current_thread());
+  }
+
+  // * Next is the only active thread.
   // * No work done in the current activation cycle, so preemption is once
   //   that's done.
   {
-    TestThread current{{Period(10), Capacity(5)}, Start(0)};
+    constexpr Time kNow{Start(5)};
+
+    TestThread threadA{{Period(10), Capacity(5)}, Start(0)};
 
     sched::RunQueue<TestThread> queue;
-    auto [next, preemption] = queue.EvaluateNextThread(current, Start(5));
-    EXPECT_EQ(&current, next);
-    EXPECT_EQ(preemption, Time{10});
+    queue.Queue(threadA, Start(0));
+
+    auto [next, preemption] = queue.SelectNextThread(kNow);
+    EXPECT_EQ(&threadA, next);
+    EXPECT_EQ(kNow + threadA.firm_capacity(), preemption);
+    EXPECT_EQ(Time{10}, preemption);
+
+    EXPECT_EQ(&threadA, queue.current_thread());
   }
 
-  // * Next is current, because there are no other threads.
+  // * Next is the only active thread.
   // * Some work done in the current activation cycle, so preemption should
   //   begin once that's done.
   {
-    TestThread current{{Period(10), Capacity(5)}, Start(5)};
-    current.Tick(Duration{3});
+    constexpr Time kNow{Start(5)};
+    constexpr Duration kRunSoFar{3};
+
+    TestThread threadA{{Period(10), Capacity(5)}, Start(0)};
+    threadA.Tick(kRunSoFar);
 
     sched::RunQueue<TestThread> queue;
-    auto [next, preemption] = queue.EvaluateNextThread(current, Start(5));
-    EXPECT_EQ(&current, next);
-    EXPECT_EQ(preemption, Time{7});
+    queue.Queue(threadA, kNow);
+
+    auto [next, preemption] = queue.SelectNextThread(kNow);
+    EXPECT_EQ(&threadA, next);
+    EXPECT_EQ(kNow + (threadA.firm_capacity() - kRunSoFar), preemption);
+    EXPECT_EQ(Time{7}, preemption);
+
+    EXPECT_EQ(&threadA, queue.current_thread());
   }
 
-  // * Next is current, because the other threads are not yet eligible.
+  // * Next is current, because it is the only eligible thread.
   {
-    TestThread current{{Period(10), Capacity(5)}, Start(0)};
-    TestThread threadA{{Period(10), Capacity(2)}, Start(10)};
-    TestThread threadB{{Period(15), Capacity(3)}, Start(10)};
+    constexpr Time kNow{Start(0)};
+    constexpr Time kLater{Start(10)};
+
+    TestThread threadA{{Period(5), Capacity(5)}, kNow};
+    TestThread threadB{{Period(10), Capacity(2)}, kLater};
+    TestThread threadC{{Period(15), Capacity(3)}, kLater};
+
+    sched::RunQueue<TestThread> queue;
+    queue.Queue(threadA, kNow);
+    queue.Queue(threadB, kNow);
+    queue.Queue(threadC, kNow);
+
+    {
+      auto [next, preemption] = queue.SelectNextThread(kNow);
+      EXPECT_EQ(&threadA, next);
+      EXPECT_EQ(kNow + threadA.firm_capacity(), preemption);
+      EXPECT_EQ(Time{5}, preemption);
+
+      EXPECT_EQ(&threadA, queue.current_thread());
+    }
+
+    {
+      auto [next, preemption] = queue.SelectNextThread(Start(5));
+      EXPECT_EQ(&threadA, next);
+      EXPECT_EQ(kLater, preemption);
+
+      EXPECT_EQ(&threadA, queue.current_thread());
+    }
+  }
+
+  // * Tie between two ready threads.
+  // * Two threads with the same finish times but differing start times: the
+  //   one that starts earlier should be picked.
+  {
+    TestThread threadA = TestThread{{Period(15), Capacity(2)}, Start(0)};
+    TestThread threadB = TestThread{{Period(10), Capacity(5)}, Start(5)};
 
     sched::RunQueue<TestThread> queue;
     queue.Queue(threadA, Start(0));
     queue.Queue(threadB, Start(0));
-    auto [next, preemption] = queue.EvaluateNextThread(current, Start(0));
-    EXPECT_EQ(&current, next);
-    EXPECT_EQ(preemption, Time{5});
-  }
 
-  // * Another thread has same finish time as current and an earlier start.
-  //
-  // The other should win.
-  {
-    TestThread current = TestThread{{Period(9), Capacity(5)}, Start(1)};
-    TestThread threadA = TestThread{{Period(10), Capacity(2)}, Start(0)};
-
-    sched::RunQueue<TestThread> queue;
-    queue.Queue(threadA, Start(0));
-
-    auto [next, preemption] = queue.EvaluateNextThread(current, Start(1));
+    auto [next, preemption] = queue.SelectNextThread(Start(5));
     EXPECT_EQ(&threadA, next);
-    EXPECT_EQ(preemption, Time{3});
+    EXPECT_EQ(Start(5) + threadA.firm_capacity(), preemption);
+    EXPECT_EQ(Time{7}, preemption);
+
+    EXPECT_EQ(&threadA, queue.current_thread());
 
     EXPECT_FALSE(threadA.IsQueued());
-    EXPECT_TRUE(current.IsQueued());
+    EXPECT_TRUE(threadB.IsQueued());
   }
 
-  // * Another thread has same finish time as current and a later start.
-  //
-  // The current should win.
-  {
-    TestThread current = TestThread{{Period(10), Capacity(5)}, Start(0)};
-    TestThread threadA = TestThread{{Period(9), Capacity(2)}, Start(1)};
-
-    sched::RunQueue<TestThread> queue;
-    queue.Queue(threadA, Start(0));
-
-    auto [next, preemption] = queue.EvaluateNextThread(current, Start(1));
-    EXPECT_EQ(&current, next);
-    EXPECT_EQ(preemption, Time{6});
-
-    EXPECT_FALSE(current.IsQueued());
-    EXPECT_TRUE(threadA.IsQueued());
-  }
-
-  // * Another thread has same start and finish time as current.
-  // * Other thread has a lower address.
-  //
-  // The other should win.
+  // * Tie between two ready threads.
+  // * Two threads with the same finish and start times: the one with the lower
+  //   address should be picked.
   {
     // Define in an array together to control for address comparison.
     std::array threads = {
-        TestThread{{Period(10), Capacity(2)}, Start(0)},  // threadA
-        TestThread{{Period(10), Capacity(5)}, Start(0)},  // current
+        TestThread{{Period(10), Capacity(2)}, Start(0)},
+        TestThread{{Period(10), Capacity(5)}, Start(0)},
     };
-
-    TestThread& current = threads[1];
     TestThread& threadA = threads[0];
+    TestThread& threadB = threads[1];
 
     sched::RunQueue<TestThread> queue;
     queue.Queue(threadA, Start(0));
+    queue.Queue(threadB, Start(0));
 
-    auto [next, preemption] = queue.EvaluateNextThread(current, Start(0));
+    auto [next, preemption] = queue.SelectNextThread(Start(0));
     EXPECT_EQ(&threadA, next);
-    EXPECT_EQ(preemption, Time{2});
+    EXPECT_EQ(Start(0) + threadA.firm_capacity(), preemption);
+    EXPECT_EQ(Time{2}, preemption);
+
+    EXPECT_EQ(&threadA, queue.current_thread());
 
     EXPECT_FALSE(threadA.IsQueued());
-    EXPECT_TRUE(current.IsQueued());
+    EXPECT_TRUE(threadB.IsQueued());
   }
 
-  // * Another thread has same start and finish time as current.
-  // * The current thread has a lower address.
-  //
-  // Current should win.
+  // * Tie between the current thread and a ready one.
+  // * The two threads have the same finish times but the ready one has
+  //   an earlier start time after the current is reactivated: the ready one
+  //   should be picked.
+  {
+    TestThread threadA = TestThread{{Period(10), Capacity(5)}, Start(0)};
+    TestThread threadB = TestThread{{Period(15), Capacity(3)}, Start(5)};
+
+    sched::RunQueue<TestThread> queue;
+    queue.Queue(threadA, Start(0));
+    queue.Queue(threadB, Start(0));
+
+    // threadA is now the current.
+    {
+      auto [next, preemption] = queue.SelectNextThread(Start(0));
+      EXPECT_EQ(&threadA, next);
+      EXPECT_EQ(&threadA, queue.current_thread());
+    }
+
+    // Now threadB.
+    {
+      auto [next, preemption] = queue.SelectNextThread(Start(10));
+      EXPECT_EQ(&threadB, next);
+      EXPECT_EQ(&threadB, queue.current_thread());
+    }
+  }
+
+  // * Tie between the current thread and a ready one.
+  // * The two threads the same finish and start times after the current is
+  //   reactivated, with the current having a lower address: the current should
+  //   be picked again.
   {
     // Define in an array together to control for address comparison.
     std::array threads = {
-        TestThread{{Period(10), Capacity(5)}, Start(0)},  // current
-        TestThread{{Period(10), Capacity(2)}, Start(0)},  // threadA
+        TestThread{{Period(10), Capacity(2)}, Start(0)},
+        TestThread{{Period(10), Capacity(5)}, Start(10)},
     };
-
-    TestThread& current = threads[0];
-    TestThread& threadA = threads[1];
+    TestThread& threadA = threads[0];
+    TestThread& threadB = threads[1];
 
     sched::RunQueue<TestThread> queue;
     queue.Queue(threadA, Start(0));
+    queue.Queue(threadB, Start(0));
 
-    auto [next, preemption] = queue.EvaluateNextThread(current, Start(0));
-    EXPECT_EQ(&current, next);
-    EXPECT_EQ(preemption, Time{5});
+    // threadA is now the current.
+    {
+      auto [next, preemption] = queue.SelectNextThread(Start(0));
+      EXPECT_EQ(&threadA, next);
+      EXPECT_EQ(&threadA, queue.current_thread());
+    }
 
-    EXPECT_FALSE(current.IsQueued());
-    EXPECT_TRUE(threadA.IsQueued());
+    // Now threadA again.
+    {
+      auto [next, preemption] = queue.SelectNextThread(Start(10));
+      EXPECT_EQ(&threadA, next);
+      EXPECT_EQ(&threadA, queue.current_thread());
+    }
   }
 
-  // * Next thread has no work yet done.
+  // * Tie between the current thread and a ready one.
+  // * The two threads the same finish and start times after the current is
+  //   reactivated, with the ready one having a lower address: the ready one
+  //   should be picked next.
   {
-    TestThread current{{Period(10), Capacity(5)}, Start(0)};
-    TestThread threadA{{Period(10), Capacity(2)}, Start(5)};
+    // Define in an array together to control for address comparison.
+    std::array threads = {
+        TestThread{{Period(10), Capacity(2)}, Start(10)},
+        TestThread{{Period(10), Capacity(5)}, Start(0)},
+    };
+    TestThread& threadA = threads[1];
+    TestThread& threadB = threads[0];
 
     sched::RunQueue<TestThread> queue;
     queue.Queue(threadA, Start(0));
+    queue.Queue(threadB, Start(0));
 
-    auto [next, preemption] = queue.EvaluateNextThread(current, Start(10));
-    EXPECT_EQ(&threadA, next);
-    EXPECT_EQ(preemption, Time{12});
+    // threadA is now the current.
+    {
+      auto [next, preemption] = queue.SelectNextThread(Start(0));
+      EXPECT_EQ(&threadA, next);
+      EXPECT_EQ(&threadA, queue.current_thread());
+    }
 
-    EXPECT_FALSE(threadA.IsQueued());
-    EXPECT_TRUE(current.IsQueued());
-    EXPECT_EQ(Start(10), current.start());  // Reactivated.
+    // Now threadA again.
+    {
+      auto [next, preemption] = queue.SelectNextThread(Start(10));
+      EXPECT_EQ(&threadB, next);
+      EXPECT_EQ(&threadB, queue.current_thread());
+    }
   }
 
   // * Next thread has had some work done so far.
   {
-    TestThread current{{Period(10), Capacity(5)}, Start(0)};
-    TestThread threadA{{Period(10), Capacity(2)}, Start(5)};
+    TestThread threadA{{Period(10), Capacity(5)}, Start(0)};
     threadA.Tick(Duration{1});
 
     sched::RunQueue<TestThread> queue;
     queue.Queue(threadA, Start(0));
 
-    auto [next, preemption] = queue.EvaluateNextThread(current, Start(10));
+    auto [next, preemption] = queue.SelectNextThread(Start(5));
     EXPECT_EQ(&threadA, next);
-    EXPECT_EQ(preemption, Time{11});
-
-    EXPECT_FALSE(threadA.IsQueued());
-    EXPECT_TRUE(current.IsQueued());
-    EXPECT_EQ(Start(10), current.start());  // Reactivated.
+    EXPECT_EQ(Time{9}, preemption);
   }
 
   // * Next-to-next thread will become eligible before next thread finishes.
   {
-    TestThread current{{Period(15), Capacity(5)}, Start(0)};
-    current.Tick(Duration{5});
-    TestThread threadA{{Period(10), Capacity(7)}, Start(5)};
-    TestThread threadB{{Period(5), Capacity(3)}, Start(7)};
+    TestThread threadA{{Period(10), Capacity(5)}, Start(0)};
+    TestThread threadB{{Period(5), Capacity(1)}, Start(1)};
 
     sched::RunQueue<TestThread> queue;
     queue.Queue(threadA, Start(0));
     queue.Queue(threadB, Start(0));
 
-    auto [next, preemption] = queue.EvaluateNextThread(current, Start(5));
+    auto [next, preemption] = queue.SelectNextThread(Start(0));
     EXPECT_EQ(&threadA, next);
-    EXPECT_EQ(preemption, threadB.start());
-    EXPECT_EQ(preemption, Time{7});
+    EXPECT_EQ(threadB.start(), preemption);
+    EXPECT_EQ(Time{1}, preemption);
   }
 
   // The originally scheduled next two threads are now expired: the third is
   // picked.
   {
-    TestThread current{{Period(4), Capacity(3)}, Start(0)};
-    current.Tick(Duration{3});
-    TestThread threadA{{Period(10), Capacity(7)}, Start(1)};
+    TestThread threadA{{Period(10), Capacity(7)}, Start(0)};
     TestThread threadB{{Period(5), Capacity(3)}, Start(5)};
+    TestThread threadC{{Period(4), Capacity(3)}, Start(10)};
 
     sched::RunQueue<TestThread> queue;
     queue.Queue(threadA, Start(0));
     queue.Queue(threadB, Start(0));
+    queue.Queue(threadC, Start(0));
 
-    // t=11 is past the two periods of threads A and B. We should see
-    // * current reactivated for [11, 15)
-    // * threadA reactivated for [11, 21)
-    // * threadB reactivated for [11, 16)
-    auto [next, preemption] = queue.EvaluateNextThread(current, Start(11));
-    EXPECT_EQ(&current, next);
-    EXPECT_EQ(preemption, Time{14});
+    // t=10 is past the two periods of threads A and B. We should see
+    // * threadA reactivated for [10, 20)
+    // * threadB reactivated for [10, 15)
+    auto [next, preemption] = queue.SelectNextThread(Start(10));
+    EXPECT_EQ(&threadC, next);
+    EXPECT_EQ(Time{13}, preemption);
   }
 }
 

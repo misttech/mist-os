@@ -23,8 +23,8 @@ namespace {
 using Duration = sched::Duration;
 using Time = sched::Time;
 
-Time ConsumeTime(FuzzedDataProvider& provider, Time max = Time::Max()) {
-  return Time{provider.ConsumeIntegralInRange<zx_time_t>(Time::Min().raw_value(), max.raw_value())};
+Time ConsumeTime(FuzzedDataProvider& provider) {
+  return Time{provider.ConsumeIntegral<zx_time_t>()};
 }
 
 Duration ConsumeDuration(FuzzedDataProvider& provider, Duration max = Duration::Max()) {
@@ -33,9 +33,8 @@ Duration ConsumeDuration(FuzzedDataProvider& provider, Duration max = Duration::
 }
 
 TestThread* AllocateNewThread(FuzzedDataProvider& provider,
-                              std::vector<std::unique_ptr<TestThread>>& threads,
-                              Time max_start = Time::Max()) {
-  Time start = ConsumeTime(provider, max_start);
+                              std::vector<std::unique_ptr<TestThread>>& threads) {
+  Time start = ConsumeTime(provider);
   Duration period = ConsumeDuration(provider, (Time::Max() - start) + Time{1});
   Duration firm_capacity = ConsumeDuration(provider, period);
   threads.emplace_back(std::make_unique<TestThread>(
@@ -52,34 +51,34 @@ TestThread* AllocateNewThread(FuzzedDataProvider& provider,
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   FuzzedDataProvider provider(data, size);
 
-  Time now = ConsumeTime(provider);
-
-  // Create the first thread and ensure it's active.
   std::vector<std::unique_ptr<TestThread>> threads;
-  TestThread* current = AllocateNewThread(provider, threads, now);
-  current->ReactivateIfExpired(now);
-
+  Time now = ConsumeTime(provider);
+  TestThread* current = nullptr;
   sched::RunQueue<TestThread> queue;
   while (now < Time::Max() && provider.remaining_bytes() > 0) {
     if (provider.ConsumeBool()) {
       queue.Queue(*AllocateNewThread(provider, threads), now);
     }
 
-    ZX_ASSERT(current);
-    ZX_ASSERT(!current->IsQueued());
-    ZX_ASSERT(current->start() <= now);
+    ZX_ASSERT(current == queue.current_thread());
+    if (current) {
+      ZX_ASSERT(!current->IsQueued());
+      ZX_ASSERT(current->start() <= now);
+    }
 
-    auto [next, preemption] = queue.EvaluateNextThread(*current, now);
+    auto [next, preemption] = queue.SelectNextThread(now);
 
-    ZX_ASSERT(next);
-    ZX_ASSERT(current == next || current->IsQueued());
-    ZX_ASSERT(!next->IsQueued());
-    ZX_ASSERT(next->start() <= now);
-    ZX_ASSERT(now < preemption);
-    ZX_ASSERT(preemption <= next->finish());
+    ZX_ASSERT(current == next || !current || current->IsQueued());
 
-    // Advance time.
-    next->Tick(preemption - now);
+    if (next) {
+      ZX_ASSERT(!next->IsQueued());
+      ZX_ASSERT(next->start() <= now);
+      ZX_ASSERT(now < preemption);
+      ZX_ASSERT(preemption <= next->finish());
+
+      next->Tick(preemption - now);
+    }
+
     now = preemption;
     current = next;
   }
