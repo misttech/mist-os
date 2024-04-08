@@ -123,36 +123,22 @@ if (is_linux) {
     output_name = "hello_starnix"
     sources = [ "hello_starnix.cc" ]
   }
-
-  executable("hello_starnix_exception_bin") {
-    output_name = "hello_starnix_exception"
-    sources = [ "hello_starnix_exception.cc" ]
-  }
 }
 
 # By default, executables in another toolchain will not be included in the package.
 resource("hello_starnix_resource") {
   out_dir = get_label_info(":hello_starnix_bin($target_linux_toolchain)",
                            "root_out_dir")
-  sources = [
-    "${out_dir}/hello_starnix",
-    "${out_dir}/hello_starnix_exception",
-  ]
+  sources = [ "${out_dir}/hello_starnix" ]
 
   # Cannot be in /bin because it's not a Fuchsia executable.
-  outputs = [ "data/bin/{{source_name_part}}" ]
-  deps = [
-    ":hello_starnix_bin($target_linux_toolchain)",
-    ":hello_starnix_exception_bin($target_linux_toolchain)",
-  ]
+  outputs = [ "data/bin/hello_starnix" ]
+  deps = [ ":hello_starnix_bin($target_linux_toolchain)" ]
 }
 
 fuchsia_component("hello_starnix") {
+  deps = [ ":hello_starnix_resource" ]
   manifest = "hello_starnix.cml"
-}
-
-fuchsia_component("hello_starnix_exception") {
-  manifest = "hello_starnix_exception.cml"
 }
 
 fuchsia_package("zxdb_e2e_inferiors") {
@@ -171,11 +157,7 @@ fuchsia_package("zxdb_e2e_inferiors") {
   ]
 
   # Starnix
-  deps += [
-    ":hello_starnix",
-    ":hello_starnix_exception",
-    ":hello_starnix_resource",
-  ]
+  deps += [ ":hello_starnix" ]
   subpackages = starnix_test_subpackages +
                 [ "//src/starnix/containers/debian:debian_package" ]
 }
