@@ -597,6 +597,7 @@ rustc_library("starnix_sync") {
   ]
 
   sources = [
+    "sync/atomic_time.rs",
     "sync/interruptible_event.rs",
     "sync/lib.rs",
     "sync/lock_ordering.rs",
