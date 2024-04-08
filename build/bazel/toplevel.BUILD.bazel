@@ -48,7 +48,17 @@ exports_files(
     glob(["prebuilt/third_party/zoneinfo/**"]) +
 
     # prebuilt drivers
-    glob(["prebuilt/vendor/google/drivers/**/*.far"]),
+    glob(["prebuilt/vendor/google/drivers/**/*.far"]) +
+
+    # build/info
+    [
+        "integration/.git/HEAD",
+        "fuchsia_build_generated/git",
+        "fuchsia_build_generated/jiri_snapshot.xml",
+    ] +
+
+    # end of list.
+    [],
 )
 
 linux_sysroot(

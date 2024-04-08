@@ -114,6 +114,8 @@ action("generate_main_workspace") {
     "${bazel_main_top_dir}/generated-info.json",
     "${bazel_main_top_dir}/workspace/.bazelrc",
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/args.json",
+    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/git",
+    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/jiri_snapshot.xml",
 
     # The list of content hash files
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/bazel_rules_fuchsia.hash",
@@ -182,6 +184,10 @@ action("generate_fuchsia_sdk_repository") {
 
 # Generate a build_args.bzl file that contains Bazel-specific constant
 # declarations that match the current build configuration found in args.gn.
+#
+# NOTE: This is deprecated, use @fuchsia_build_info//:args.bzl to get the
+# same constants now. This GN targets will be removed once the last
+# //vendor/... references to it have been removed.
 #
 # Note that another way to pass configuration information is to add
 # specific lines to the project's auto-generated .bazelrc file, or even

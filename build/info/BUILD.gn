@@ -7,9 +7,9 @@ import("//build/bazel/bazel_inputs.gni")
 import("//build/info/info.gni")
 
 declare_args() {
-  # LINT.IfChange
   # Truncate the date in the build_info to midnight UTC, and replace the commit
   # hash with one that's synthesized from that date.
+  # LINT.IfChange
   truncate_build_info_commit_date = false
   # LINT.ThenChange(//build/bazel/gn_build_args.txt)
 }
@@ -22,6 +22,7 @@ if (current_toolchain == default_toolchain) {
     ]
   }
 
+  # LINT.IfChange
   action("latest-commit-date-and-hash") {
     visibility = [
       ":*",
@@ -64,6 +65,9 @@ if (current_toolchain == default_toolchain) {
     }
   }
 
+  # LINT.ThenChange(//build/info/info.bzl)
+
+  # DEPRECATED: Use //build/info:<name> Bazel targets directly instead!
   bazel_input_resource("build_info.bazel_input") {
     sources = [
       build_info_files.version,

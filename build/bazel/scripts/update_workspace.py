@@ -488,6 +488,26 @@ def find_prebuilt_python_content_files(install_path: str) -> Sequence[str]:
     return result
 
 
+def find_host_binary_path(program: str) -> str:
+    """Find the absolute path of a given program. Like the UNIX `which` command.
+
+    Args:
+        program: Program name.
+    Returns:
+        program's absolute path, found by parsing the content of $PATH.
+        An empty string is returned if nothing is found.
+    """
+    for path in os.environ.get("PATH", "").split(":"):
+        # According to Posix, an empty path component is equivalent to ´.'.
+        if path == "" or path == ".":
+            path = os.getcwd()
+        candidate = os.path.join(path, program)
+        if os.access(candidate, os.R_OK | os.X_OK):
+            return candidate
+
+    return ""
+
+
 _VALID_TARGET_CPUS = ("arm64", "x64", "riscv64")
 
 
@@ -956,6 +976,30 @@ common --enable_bzlmod=false
         os.path.join(gn_output_dir, "args.json"),
     )
     # LINT.ThenChange(//build/bazel/repository_rules.bzl)
+
+    # LINT.IfChange
+    # Create a symlink to the git host executable to make it accessible
+    # when running a Bazel action on bots where it is not installed in
+    # a standard location.
+    git_bin_path = find_host_binary_path("git")
+    assert git_bin_path, "Missing `git` program in current PATH!"
+    generated.add_symlink(
+        os.path.join("workspace", "fuchsia_build_generated", "git"),
+        git_bin_path,
+    )
+    # LINT.ThenChange(//build/info/info.bzl)
+
+    # LINT.IfChange
+    # .jiri_root/ is not exposed to the workspace, but //build/info/BUILD.bazel
+    # needs to access .jiri_root/update_history/latest so create a symlink just
+    # for this file.
+    generated.add_symlink(
+        os.path.join(
+            "workspace", "fuchsia_build_generated", "jiri_snapshot.xml"
+        ),
+        os.path.join(fuchsia_dir, ".jiri_root", "update_history", "latest"),
+    )
+    # LINT.ThenChange(//build/info/info.gni)
 
     # LINT.IfChange
     generated_repositories_inputs["fuchsia_sdk"] = all_fuchsia_idk_metas
