@@ -122,7 +122,7 @@ where
         policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
-                source_name: "fuchsia.boot.RootResource".parse().unwrap(),
+                source_name: "fuchsia.kernel.MmioResource".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
             },
@@ -136,8 +136,8 @@ where
 
         let protocol_capability = CapabilitySource::<C>::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
-                name: "fuchsia.boot.RootResource".parse().unwrap(),
-                source_path: Some("/svc/fuchsia.boot.RootResource".parse().unwrap()),
+                name: "fuchsia.kernel.MmioResource".parse().unwrap(),
+                source_path: Some("/svc/fuchsia.kernel.MmioResource".parse().unwrap()),
                 delivery: Default::default(),
             }),
             top_instance: Weak::new(),
@@ -574,7 +574,7 @@ where
         policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
-                source_name: "fuchsia.boot.RootResource".parse().unwrap(),
+                source_name: "fuchsia.kernel.MmioResource".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
             },
@@ -586,8 +586,8 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let protocol_capability = CapabilitySource::<C>::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
-                name: "fuchsia.boot.RootResource".parse().unwrap(),
-                source_path: Some("/svc/fuchsia.boot.RootResource".parse().unwrap()),
+                name: "fuchsia.kernel.MmioResource".parse().unwrap(),
+                source_path: Some("/svc/fuchsia.kernel.MmioResource".parse().unwrap()),
                 delivery: Default::default(),
             }),
             top_instance: Weak::new(),
@@ -623,7 +623,7 @@ where
         policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
-                source_name: "fuchsia.boot.RootResource".parse().unwrap(),
+                source_name: "fuchsia.kernel.MmioResource".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
             },
@@ -635,8 +635,8 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let protocol_capability = CapabilitySource::<C>::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
-                name: "fuchsia.boot.RootResource".parse().unwrap(),
-                source_path: Some("/svc/fuchsia.boot.RootResource".parse().unwrap()),
+                name: "fuchsia.kernel.MmioResource".parse().unwrap(),
+                source_path: Some("/svc/fuchsia.kernel.MmioResource".parse().unwrap()),
                 delivery: Default::default(),
             }),
             top_instance: Weak::new(),
