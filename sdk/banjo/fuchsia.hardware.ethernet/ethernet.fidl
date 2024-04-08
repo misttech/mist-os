@@ -72,12 +72,6 @@ closed protocol EthernetIfc {
     }) -> ();
 };
 
-type EthDevMetadata = struct {
-    vid uint32;
-    pid uint32;
-    did uint32;
-};
-
 /// Indicates that additional data is available to be sent after this call finishes. Allows an ethernet
 /// driver to batch tx to hardware if possible.
 const ETHERNET_TX_OPT_MORE uint32 = 1;

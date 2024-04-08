@@ -232,22 +232,6 @@ zx_status_t DWMacDevice::Create(void* ctx, zx_device_t* device) {
     return status;
   }
 
-  // Populate board specific information
-  eth_dev_metadata_t phy_info;
-  size_t actual;
-  status = device_get_fragment_metadata(device, kPdevFragment, DEVICE_METADATA_ETH_PHY_DEVICE,
-                                        &phy_info, sizeof(eth_dev_metadata_t), &actual);
-  if (status != ZX_OK || actual != sizeof(eth_dev_metadata_t)) {
-    zxlogf(ERROR, "dwmac: Could not get PHY metadata %d", status);
-    return status;
-  }
-
-  zx_device_prop_t props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, phy_info.vid},
-      {BIND_PLATFORM_DEV_PID, 0, phy_info.pid},
-      {BIND_PLATFORM_DEV_DID, 0, phy_info.did},
-  };
-
   fbl::AllocChecker ac;
   std::unique_ptr<EthMacFunction> mac_function(
       new (&ac) EthMacFunction(mac_device->zxdev(), mac_device.get()));
@@ -256,7 +240,7 @@ zx_status_t DWMacDevice::Create(void* ctx, zx_device_t* device) {
   }
   // TODO(braval): use proper device pointer, depending on how
   //               many PHY devices we have to load, from the metadata.
-  status = mac_function->DdkAdd(ddk::DeviceAddArgs("eth_phy").set_props(props));
+  status = mac_function->DdkAdd(ddk::DeviceAddArgs("eth_phy"));
   if (status != ZX_OK) {
     zxlogf(ERROR, "DdkAdd for Eth Mac Function failed %d", status);
     return status;

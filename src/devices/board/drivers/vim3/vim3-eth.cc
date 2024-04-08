@@ -73,21 +73,6 @@ static const std::vector<fpbus::BootMetadata> eth_mac_metadata{
     }},
 };
 
-static const eth_dev_metadata_t eth_phy_device = {
-    .vid = PDEV_VID_REALTEK,
-    .pid = PDEV_PID_RTL8211F,
-    .did = PDEV_DID_REALTEK_ETH_PHY,
-};
-
-static const std::vector<fpbus::Metadata> eth_mac_device_metadata{
-    {{
-        .type = DEVICE_METADATA_ETH_PHY_DEVICE,
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&eth_phy_device),
-            reinterpret_cast<const uint8_t*>(&eth_phy_device) + sizeof(eth_phy_device)),
-    }},
-};
-
 static const fpbus::Node dwmac_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "dwmac";
@@ -96,7 +81,6 @@ static const fpbus::Node dwmac_dev = []() {
   dev.mmio() = eth_mac_mmios;
   dev.irq() = eth_mac_irqs;
   dev.bti() = eth_mac_btis;
-  dev.metadata() = eth_mac_device_metadata;
   dev.boot_metadata() = eth_mac_metadata;
   return dev;
 }();
