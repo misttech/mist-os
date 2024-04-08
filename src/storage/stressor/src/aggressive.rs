@@ -87,11 +87,6 @@ pub struct Stressor {
     dir: fio::DirectorySynchronousProxy,
 }
 
-#[derive(Eq, PartialEq)]
-struct FileState {
-    path: String,
-}
-
 const READ: usize = 0;
 const WRITE: usize = 1;
 const TRUNCATE: usize = 2;
