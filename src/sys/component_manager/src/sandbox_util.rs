@@ -23,7 +23,7 @@ use {
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{future::BoxFuture, FutureExt},
     sandbox::{Capability, Dict, Message, Open, Sendable, Sender},
-    std::sync::Arc,
+    std::{fmt::Debug, sync::Arc},
     tracing::warn,
     vfs::{
         directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest},
@@ -41,11 +41,6 @@ pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::Requ
 pub trait DictExt {
     /// Returns the capability at the path, if it exists. Returns `None` if path is empty.
     fn get_capability(&self, path: &impl IterablePath) -> Option<Capability>;
-
-    /// Attempts to walk `path` in `self` until a router is found. If one is, it is then downscoped
-    /// to the remaining path. If a router is not found, then a router is returned which will
-    /// unconditionally fail routing requests with `error`.
-    fn get_router_or_error(&self, path: &impl IterablePath, error: RoutingError) -> Router;
 
     /// Inserts the capability at the path. Intermediary dictionaries are created as needed.
     fn insert_capability(&self, path: &impl IterablePath, capability: Capability);
@@ -83,26 +78,6 @@ impl DictExt for Dict {
                 None => return current_dict.lock_entries().get(current_name.as_str()).cloned(),
             }
         }
-    }
-
-    /// Attempts to walk `path` in `self` until a router is found. If one is, it is then downscoped
-    /// to the remaining path. If a router is not found, then a router is returned which will
-    /// unconditionally fail routing requests with `error`.
-    fn get_router_or_error(&self, path: &impl IterablePath, error: RoutingError) -> Router {
-        let mut segments = path.iter_segments();
-        let mut current = self.clone();
-        while let Some(next_element) = segments.next() {
-            match current.get_capability(next_element) {
-                Some(Capability::Dictionary(dictionary)) => current = dictionary,
-                Some(Capability::Router(r)) => {
-                    let segments: Vec<_> = segments.map(|s| s.clone()).collect();
-                    return Router::from_any(r).with_path(segments.into());
-                }
-                Some(cap) if segments.next().is_none() => return Router::new(cap),
-                _ => return Router::new_error(error),
-            }
-        }
-        Router::new_error(error)
     }
 
     fn insert_capability(&self, path: &impl IterablePath, capability: Capability) {
@@ -158,9 +133,9 @@ impl DictExt for Dict {
         }
     }
 
-    async fn get_with_request(
+    async fn get_with_request<'a>(
         &self,
-        path: &impl IterablePath,
+        path: &'a impl IterablePath,
         request: Request,
     ) -> Result<Option<Capability>, BedrockError> {
         let mut current_capability: Capability = self.clone().into();
@@ -327,6 +302,13 @@ pub trait RoutableExt: Routable {
     /// the channel to be readable, then delegates to the current router. The wait
     /// is performed in the provided `scope`.
     fn on_readable(self, scope: ExecutionScope, entry_type: fio::DirentType) -> Router;
+
+    /// Returns a router that requests capabilities from the specified `path` relative to
+    /// the base routable or fails the request with `not_found_error` if the member is not
+    /// found. The base routable should resolve with a dictionary capability.
+    fn lazy_get<P>(self, path: P, not_found_error: impl Into<BedrockError>) -> Router
+    where
+        P: IterablePath + Debug + 'static;
 }
 
 impl<T: Routable + 'static> RoutableExt for T {
@@ -410,6 +392,38 @@ impl<T: Routable + 'static> RoutableExt for T {
 
         let router = Router::new(self);
         Router::new(OnReadableRouter { router, scope, entry_type })
+    }
+
+    fn lazy_get<P>(self, path: P, not_found_error: impl Into<BedrockError>) -> Router
+    where
+        P: IterablePath + Debug + 'static,
+    {
+        #[derive(Debug)]
+        struct ScopedDictRouter<P: IterablePath + Debug + 'static> {
+            router: Router,
+            path: P,
+            not_found_error: BedrockError,
+        }
+
+        #[async_trait]
+        impl<P: IterablePath + Debug + 'static> Routable for ScopedDictRouter<P> {
+            async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+                match self.router.route(request.clone()).await? {
+                    Capability::Dictionary(dict) => {
+                        let maybe_capability =
+                            dict.get_with_request(&self.path, request.clone()).await?;
+                        maybe_capability.ok_or_else(|| self.not_found_error.clone())
+                    }
+                    _ => Err(RoutingError::BedrockMemberAccessUnsupported.into()),
+                }
+            }
+        }
+
+        Router::new(ScopedDictRouter {
+            router: Router::new(self),
+            path,
+            not_found_error: not_found_error.into(),
+        })
     }
 }
 
@@ -685,5 +699,63 @@ pub mod tests {
         assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
         scope.wait().await;
         assert_eq!(route_counter.count(), 0);
+    }
+
+    #[fuchsia::test]
+    async fn lazy_get() {
+        let source = Capability::Data(Data::String("hello".to_string()));
+        let dict1 = Dict::new();
+        dict1.lock_entries().insert("source".parse().unwrap(), source);
+
+        let base_router = Router::new_ok(dict1);
+        let downscoped_router = base_router.lazy_get(
+            RelativePath::new("source").unwrap(),
+            RoutingError::BedrockMemberAccessUnsupported,
+        );
+
+        let capability = downscoped_router
+            .route(Request {
+                availability: Availability::Optional,
+                target: WeakComponentInstance::invalid(),
+            })
+            .await
+            .unwrap();
+        let capability = match capability {
+            Capability::Data(d) => d,
+            c => panic!("Bad enum {:#?}", c),
+        };
+        assert_eq!(capability, Data::String("hello".to_string()));
+    }
+
+    #[fuchsia::test]
+    async fn lazy_get_deep() {
+        let source = Capability::Data(Data::String("hello".to_string()));
+        let dict1 = Dict::new();
+        dict1.lock_entries().insert("source".parse().unwrap(), source);
+        let dict2 = Dict::new();
+        dict2.lock_entries().insert("dict1".parse().unwrap(), Capability::Dictionary(dict1));
+        let dict3 = Dict::new();
+        dict3.lock_entries().insert("dict2".parse().unwrap(), Capability::Dictionary(dict2));
+        let dict4 = Dict::new();
+        dict4.lock_entries().insert("dict3".parse().unwrap(), Capability::Dictionary(dict3));
+
+        let base_router = Router::new_ok(dict4);
+        let downscoped_router = base_router.lazy_get(
+            RelativePath::new("dict3/dict2/dict1/source").unwrap(),
+            RoutingError::BedrockMemberAccessUnsupported,
+        );
+
+        let capability = downscoped_router
+            .route(Request {
+                availability: Availability::Optional,
+                target: WeakComponentInstance::invalid(),
+            })
+            .await
+            .unwrap();
+        let capability = match capability {
+            Capability::Data(d) => d,
+            c => panic!("Bad enum {:#?}", c),
+        };
+        assert_eq!(capability, Data::String("hello".to_string()));
     }
 }

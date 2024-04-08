@@ -287,8 +287,8 @@ pub enum RoutingError {
     #[error("Dictionaries are not yet supported for {cap_type} capabilities")]
     DictionariesNotSupported { cap_type: CapabilityTypeName },
 
-    #[error("The capability does not support routing")]
-    BedrockUnsupportedCapability,
+    #[error("The capability does not support member access")]
+    BedrockMemberAccessUnsupported,
 
     #[error("Item {name} is not present in dictionary")]
     BedrockNotPresentInDictionary { name: String },
@@ -367,7 +367,7 @@ impl Explain for RoutingError {
             | RoutingError::BedrockSourceDictionaryExposeNotFound { .. }
             | RoutingError::BedrockSourceDictionaryCollision { .. }
             | RoutingError::AvailabilityRoutingError(_) => zx::Status::NOT_FOUND,
-            RoutingError::BedrockUnsupportedCapability { .. }
+            RoutingError::BedrockMemberAccessUnsupported { .. }
             | RoutingError::DictionariesNotSupported { .. } => zx::Status::NOT_SUPPORTED,
             RoutingError::MonikerError(_) => zx::Status::INTERNAL,
             RoutingError::ComponentInstanceError(err) => err.as_zx_status(),

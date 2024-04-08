@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::capability::CapabilitySource;
 use crate::model::component::WeakComponentInstance;
-use crate::{capability::CapabilitySource, sandbox_util::DictExt};
 use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
 use async_trait::async_trait;
 use bedrock_error::{BedrockError, Explain};
-use cm_types::{Availability, IterablePath, RelativePath};
+use cm_types::Availability;
 use cm_util::TaskGroup;
 use fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt};
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -119,39 +119,6 @@ impl Router {
     /// Obtain a capability from this router, following the description in `request`.
     pub async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
         self.routable.route(request).await
-    }
-
-    /// Returns an router that requests capabilities from the specified `path` relative
-    /// to the base router, i.e. attenuates the base router to the subset of capabilities
-    /// that live under `path`.
-    pub fn with_path(self, path: RelativePath) -> Router {
-        if path.is_dot() {
-            return self;
-        }
-        let route_fn = move |request: Request| {
-            let router = self.clone();
-            let path = path.clone();
-            async move {
-                match router.route(request.clone()).await? {
-                    Capability::Dictionary(dict) => {
-                        match dict.get_with_request(&path, request.clone()).await? {
-                            Some(cap) => cap.route(request).await,
-                            None => Err(RoutingError::BedrockNotPresentInDictionary {
-                                name: path
-                                    .iter_segments()
-                                    .map(|s| s.as_str())
-                                    .collect::<Vec<_>>()
-                                    .join("/"),
-                            }
-                            .into()),
-                        }
-                    }
-                    _ => Err(RoutingError::BedrockUnsupportedCapability.into()),
-                }
-            }
-            .boxed()
-        };
-        Router::new(route_fn)
     }
 
     /// Returns a router that ensures the capability request has an availability
@@ -408,6 +375,13 @@ impl Routable for Capability {
 }
 
 #[async_trait]
+impl Routable for Dict {
+    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+        Capability::Dictionary(self.clone()).route(request).await
+    }
+}
+
+#[async_trait]
 impl Routable for BedrockError {
     async fn route(&self, _: Request) -> Result<Capability, BedrockError> {
         Err(self.clone())
@@ -516,58 +490,5 @@ mod tests {
         drop(receiver);
         let (ch1, _ch2) = zx::Channel::create();
         assert!(sender.send(Message { channel: ch1 }).is_err());
-    }
-
-    #[fuchsia::test]
-    async fn with_path() {
-        let source = Capability::Data(Data::String("hello".to_string()));
-        let dict1 = Dict::new();
-        dict1.lock_entries().insert("source".parse().unwrap(), source);
-
-        let base_router = Router::new_ok(dict1);
-        let downscoped_router = base_router.with_path(RelativePath::new("source").unwrap());
-
-        let capability = downscoped_router
-            .route(Request {
-                availability: Availability::Optional,
-                target: WeakComponentInstance::invalid(),
-            })
-            .await
-            .unwrap();
-        let capability = match capability {
-            Capability::Data(d) => d,
-            c => panic!("Bad enum {:#?}", c),
-        };
-        assert_eq!(capability, Data::String("hello".to_string()));
-    }
-
-    #[fuchsia::test]
-    async fn with_path_deep() {
-        let source = Capability::Data(Data::String("hello".to_string()));
-        let dict1 = Dict::new();
-        dict1.lock_entries().insert("source".parse().unwrap(), source);
-        let dict2 = Dict::new();
-        dict2.lock_entries().insert("dict1".parse().unwrap(), Capability::Dictionary(dict1));
-        let dict3 = Dict::new();
-        dict3.lock_entries().insert("dict2".parse().unwrap(), Capability::Dictionary(dict2));
-        let dict4 = Dict::new();
-        dict4.lock_entries().insert("dict3".parse().unwrap(), Capability::Dictionary(dict3));
-
-        let base_router = Router::new_ok(dict4);
-        let downscoped_router =
-            base_router.with_path(RelativePath::new("dict3/dict2/dict1/source").unwrap());
-
-        let capability = downscoped_router
-            .route(Request {
-                availability: Availability::Optional,
-                target: WeakComponentInstance::invalid(),
-            })
-            .await
-            .unwrap();
-        let capability = match capability {
-            Capability::Data(d) => d,
-            c => panic!("Bad enum {:#?}", c),
-        };
-        assert_eq!(capability, Data::String("hello".to_string()));
     }
 }

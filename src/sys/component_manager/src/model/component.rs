@@ -1149,6 +1149,51 @@ impl ComponentInstance {
         Ok(self.lock_resolved_state().await?.program_output_dict.clone())
     }
 
+    /// Returns a router that delegates to the program output dict.
+    ///
+    /// This will be helpful in breaking up reference cycles. For example, you can insert
+    /// an item into the program output dict that references another item in the same dict,
+    /// by indirecting through this router.
+    pub fn program_output(self: &Arc<Self>) -> Router {
+        #[derive(Debug)]
+        struct ProgramOutput {
+            component: WeakComponentInstance,
+        }
+
+        #[async_trait]
+        impl Routable for ProgramOutput {
+            async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+                let component = self.component.upgrade().map_err(RoutingError::from)?;
+                component.get_program_output_dict().await?.route(request).await
+            }
+        }
+
+        Router::new(ProgramOutput { component: self.as_weak() })
+    }
+
+    /// Obtains the component output dict.
+    pub async fn get_component_output_dict(self: &Arc<Self>) -> Result<Dict, BedrockError> {
+        Ok(self.lock_resolved_state().await?.component_output_dict.clone())
+    }
+
+    /// Returns a router that delegates to the component output dict.
+    pub fn component_output(self: &Arc<Self>) -> Router {
+        #[derive(Debug)]
+        struct ComponentOutput {
+            component: WeakComponentInstance,
+        }
+
+        #[async_trait]
+        impl Routable for ComponentOutput {
+            async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+                let component = self.component.upgrade().map_err(RoutingError::from)?;
+                component.get_component_output_dict().await?.route(request).await
+            }
+        }
+
+        Router::new(ComponentOutput { component: self.as_weak() })
+    }
+
     /// Opens this instance's exposed directory if it has been resolved.
     pub async fn open_exposed(
         &self,
@@ -2251,7 +2296,6 @@ impl ResolvedInstanceState {
                 component,
                 &self.children,
                 &self.component_input,
-                &self.program_output_dict,
                 &dynamic_offers,
                 &mut child_input,
             );

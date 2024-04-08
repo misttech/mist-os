@@ -10,14 +10,13 @@ use {
             routing::router::{Request, Router},
             structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
         },
-        sandbox_util::{DictExt, LaunchTaskOnReceive},
+        sandbox_util::{DictExt, LaunchTaskOnReceive, RoutableExt},
     },
     ::routing::{
         capability_source::{ComponentCapability, InternalCapability},
         component_instance::ComponentInstanceInterface,
         error::{ComponentInstanceError, RoutingError},
     },
-    bedrock_error::BedrockError,
     cm_rust::{
         CapabilityDecl, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon,
     },
@@ -27,7 +26,7 @@ use {
     itertools::Itertools,
     moniker::{ChildName, ChildNameBase, MonikerBase},
     sandbox::{Capability, Dict, Unit},
-    std::{collections::HashMap, sync::Arc},
+    std::{collections::HashMap, fmt::Debug, sync::Arc},
     tracing::warn,
 };
 
@@ -50,13 +49,7 @@ pub fn build_component_sandbox(
     for environment_decl in &decl.environments {
         environments.insert(
             Name::new(&environment_decl.name).unwrap(),
-            build_environment(
-                component,
-                children,
-                component_input,
-                program_output_dict,
-                environment_decl,
-            ),
+            build_environment(component, children, component_input, environment_decl),
         );
     }
 
@@ -101,14 +94,7 @@ pub fn build_component_sandbox(
     }
 
     for use_ in &decl.uses {
-        extend_dict_with_use(
-            component,
-            children,
-            component_input,
-            program_input_dict,
-            program_output_dict,
-            use_,
-        );
+        extend_dict_with_use(component, children, component_input, program_input_dict, use_);
     }
 
     for offer in &decl.offers {
@@ -146,24 +132,11 @@ pub fn build_component_sandbox(
                 dict
             }
         };
-        extend_dict_with_offer(
-            component,
-            children,
-            component_input,
-            program_output_dict,
-            offer,
-            &mut target_dict,
-        );
+        extend_dict_with_offer(component, children, component_input, offer, &mut target_dict);
     }
 
     for expose in &decl.exposes {
-        extend_dict_with_expose(
-            component,
-            children,
-            program_output_dict,
-            expose,
-            component_output_dict,
-        );
+        extend_dict_with_expose(component, children, expose, component_output_dict);
     }
 }
 
@@ -229,36 +202,29 @@ fn extend_dict_with_dictionary(
             .as_ref()
             .expect("source_dictionary must be set if source is set");
         let source_dict_router = match &source {
-            cm_rust::DictionarySource::Parent => {
-                component_input.capabilities().get_router_or_error(
-                    source_path,
-                    RoutingError::use_from_parent_not_found(
-                        &component.moniker,
-                        source_path.iter_segments().join("/"),
-                    ),
-                )
-            }
-            cm_rust::DictionarySource::Self_ => program_output_dict.get_router_or_error(
-                source_path,
+            cm_rust::DictionarySource::Parent => component_input.capabilities().lazy_get(
+                source_path.to_owned(),
+                RoutingError::use_from_parent_not_found(
+                    &component.moniker,
+                    source_path.iter_segments().join("/"),
+                ),
+            ),
+            cm_rust::DictionarySource::Self_ => component.program_output().lazy_get(
+                source_path.to_owned(),
                 RoutingError::use_from_self_not_found(
                     &component.moniker,
                     source_path.iter_segments().join("/"),
-                )
-                .into(),
+                ),
             ),
             cm_rust::DictionarySource::Child(child_ref) => {
                 assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
                 let child_name =
                     ChildName::parse(child_ref.name.as_str()).expect("invalid child name");
                 match children.get(&child_name) {
-                    Some(child) => {
-                        let child = child.as_weak();
-                        new_forwarding_router_to_child(
-                            child,
-                            source_path.clone(),
-                            RoutingError::BedrockSourceDictionaryExposeNotFound,
-                        )
-                    }
+                    Some(child) => child.component_output().lazy_get(
+                        source_path.to_owned(),
+                        RoutingError::BedrockSourceDictionaryExposeNotFound,
+                    ),
                     None => Router::new_error(RoutingError::use_from_child_instance_not_found(
                         &child_name,
                         &component.moniker,
@@ -279,7 +245,6 @@ fn build_environment(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input: &ComponentInput,
-    program_output_dict: &Dict,
     environment_decl: &cm_rust::EnvironmentDecl,
 ) -> ComponentEnvironment {
     let mut environment = ComponentEnvironment::new();
@@ -296,20 +261,17 @@ fn build_environment(
             cm_rust::RegistrationSource::Parent => {
                 use_from_parent_router(component_input, source_path, component.as_weak())
             }
-            cm_rust::RegistrationSource::Self_ => program_output_dict.get_router_or_error(
-                &source_path,
+            cm_rust::RegistrationSource::Self_ => component.program_output().lazy_get(
+                source_path.clone(),
                 RoutingError::use_from_self_not_found(
                     &component.moniker,
                     source_path.iter_segments().join("/"),
-                )
-                .into(),
+                ),
             ),
             cm_rust::RegistrationSource::Child(child_name) => {
                 let child_name = ChildName::parse(child_name).expect("invalid child name");
                 let Some(child) = children.get(&child_name) else { continue };
-                let weak_child = WeakComponentInstance::new(child);
-                new_forwarding_router_to_child(
-                    weak_child,
+                child.component_output().lazy_get(
                     source_path,
                     RoutingError::use_from_child_expose_not_found(
                         child.moniker.leaf().unwrap(),
@@ -379,7 +341,6 @@ pub fn extend_dict_with_offers(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input: &ComponentInput,
-    program_output_dict: &Dict,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
     target_input: &mut ComponentInput,
 ) {
@@ -388,7 +349,6 @@ pub fn extend_dict_with_offers(
             component,
             children,
             component_input,
-            program_output_dict,
             offer,
             &mut target_input.capabilities(),
         );
@@ -407,7 +367,6 @@ fn extend_dict_with_use(
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input: &ComponentInput,
     program_input_dict: &Dict,
-    program_output_dict: &Dict,
     use_: &cm_rust::UseDecl,
 ) {
     let Some(use_protocol) = supported_use(use_) else {
@@ -419,8 +378,8 @@ fn extend_dict_with_use(
         cm_rust::UseSource::Parent => {
             use_from_parent_router(component_input, source_path.to_owned(), component.as_weak())
         }
-        cm_rust::UseSource::Self_ => program_output_dict.get_router_or_error(
-            &source_path,
+        cm_rust::UseSource::Self_ => component.program_output().lazy_get(
+            source_path.to_owned(),
             RoutingError::use_from_self_not_found(
                 &component.moniker,
                 source_path.iter_segments().join("/"),
@@ -431,9 +390,7 @@ fn extend_dict_with_use(
             let Some(child) = children.get(&child_name) else {
                 panic!("use declaration in manifest for component {} has a source of a nonexistent child {}, this should be prevented by manifest validation", component.moniker, child_name);
             };
-            let weak_child = WeakComponentInstance::new(child);
-            new_forwarding_router_to_child(
-                weak_child,
+            child.component_output().lazy_get(
                 source_path.to_owned(),
                 RoutingError::use_from_child_expose_not_found(
                     child.moniker.leaf().unwrap(),
@@ -474,8 +431,8 @@ fn extend_dict_with_use(
             )
             .into_router()
         }
-        cm_rust::UseSource::Debug => component_input.environment().debug().get_router_or_error(
-            &use_protocol.source_name,
+        cm_rust::UseSource::Debug => component_input.environment().debug().lazy_get(
+            use_protocol.source_name.clone(),
             RoutingError::use_from_environment_not_found(
                 &component.moniker,
                 "protocol",
@@ -497,11 +454,11 @@ fn extend_dict_with_use(
 /// overridden by an eponymous capability in the `program_input_dict_additions` when started.
 fn use_from_parent_router(
     component_input: &ComponentInput,
-    source_path: impl IterablePath + 'static,
+    source_path: impl IterablePath + 'static + Debug,
     weak_component: WeakComponentInstance,
 ) -> Router {
-    let component_input_capability = component_input.capabilities().get_router_or_error(
-        &source_path,
+    let component_input_capability = component_input.capabilities().lazy_get(
+        source_path.clone(),
         RoutingError::use_from_parent_not_found(
             &weak_component.moniker,
             source_path.iter_segments().join("/"),
@@ -558,7 +515,6 @@ fn extend_dict_with_offer(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input: &ComponentInput,
-    program_output_dict: &Dict,
     offer: &cm_rust::OfferDecl,
     target_dict: &mut Dict,
 ) {
@@ -577,15 +533,15 @@ fn extend_dict_with_offer(
         return;
     }
     let router = match offer.source() {
-        cm_rust::OfferSource::Parent => component_input.capabilities().get_router_or_error(
-            &source_path,
+        cm_rust::OfferSource::Parent => component_input.capabilities().lazy_get(
+            source_path.to_owned(),
             RoutingError::offer_from_parent_not_found(
                 &component.moniker,
                 source_path.iter_segments().join("/"),
             ),
         ),
-        cm_rust::OfferSource::Self_ => program_output_dict.get_router_or_error(
-            &source_path,
+        cm_rust::OfferSource::Self_ => component.program_output().lazy_get(
+            source_path.to_owned(),
             RoutingError::offer_from_self_not_found(
                 &component.moniker,
                 source_path.iter_segments().join("/"),
@@ -594,9 +550,7 @@ fn extend_dict_with_offer(
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
             let Some(child) = children.get(&child_name) else { return };
-            let weak_child = WeakComponentInstance::new(child);
-            new_forwarding_router_to_child(
-                weak_child,
+            child.component_output().lazy_get(
                 source_path.to_owned(),
                 RoutingError::offer_from_child_expose_not_found(
                     child.moniker.leaf().unwrap(),
@@ -652,7 +606,6 @@ pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
 fn extend_dict_with_expose(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
-    program_output_dict: &Dict,
     expose: &cm_rust::ExposeDecl,
     target_dict: &Dict,
 ) {
@@ -667,8 +620,8 @@ fn extend_dict_with_expose(
     let target_name = expose.target_name();
 
     let router = match expose.source() {
-        cm_rust::ExposeSource::Self_ => program_output_dict.get_router_or_error(
-            &source_path,
+        cm_rust::ExposeSource::Self_ => component.program_output().lazy_get(
+            source_path.to_owned(),
             RoutingError::expose_from_self_not_found(
                 &component.moniker,
                 source_path.iter_segments().join("/"),
@@ -677,9 +630,7 @@ fn extend_dict_with_expose(
         cm_rust::ExposeSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid static child name");
             if let Some(child) = children.get(&child_name) {
-                let weak_child = WeakComponentInstance::new(child);
-                new_forwarding_router_to_child(
-                    weak_child,
+                child.component_output().lazy_get(
                     source_path.to_owned(),
                     RoutingError::expose_from_child_expose_not_found(
                         child.moniker.leaf().unwrap(),
@@ -733,41 +684,4 @@ fn extend_dict_with_expose(
 
 fn new_unit_router() -> Router {
     Router::new_ok(Unit {})
-}
-
-fn new_forwarding_router_to_child(
-    weak_child: WeakComponentInstance,
-    capability_path: impl IterablePath + 'static,
-    expose_not_found_error: RoutingError,
-) -> Router {
-    Router::new(move |request: Request| {
-        forward_request_to_child(
-            weak_child.clone(),
-            capability_path.clone(),
-            expose_not_found_error.clone(),
-            request,
-        )
-        .boxed()
-    })
-}
-
-async fn forward_request_to_child(
-    weak_child: WeakComponentInstance,
-    capability_path: impl IterablePath + 'static,
-    expose_not_found_error: RoutingError,
-    request: Request,
-) -> Result<Capability, BedrockError> {
-    let router = {
-        let child = weak_child.upgrade().map_err(|e| RoutingError::ComponentInstanceError(e))?;
-        let child_state = child.lock_resolved_state().await.map_err(|e| {
-            RoutingError::ComponentInstanceError(ComponentInstanceError::resolve_failed(
-                child.moniker.clone(),
-                e,
-            ))
-        })?;
-        child_state
-            .component_output_dict
-            .get_router_or_error(&capability_path, expose_not_found_error.clone())
-    };
-    router.route(request).await
 }
