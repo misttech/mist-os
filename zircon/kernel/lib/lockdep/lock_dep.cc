@@ -166,9 +166,15 @@ void SystemLockValidationFatal(AcquiredLockEntry* lock_entry, ThreadLockState* s
 void SystemCircularLockDependencyDetected(ValidatorLockClassState* connected_set_root) {
   KERNEL_OOPS("Circular lock dependency detected:\n");
 
-  for (auto& node : lockdep::ValidatorLockClassState::Iter()) {
-    if (node.connected_set() == connected_set_root)
-      printf("  %s\n", node.name());
+  for (auto& node : ValidatorLockClassState::Iter()) {
+    if (node.connected_set() == connected_set_root) {
+      for (LockClassId dependency_id : node.dependency_set()) {
+        ValidatorLockClassState* dependency = ValidatorLockClassState::Get(dependency_id);
+        if (dependency->connected_set() == connected_set_root) {
+          printf("  %s -> %s\n", dependency->name(), node.name());
+        }
+      }
+    }
   }
 
   printf("\n");
