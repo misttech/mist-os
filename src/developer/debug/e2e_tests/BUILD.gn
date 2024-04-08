@@ -87,14 +87,34 @@ if (is_host && has_board) {
   }
 
   host_test_data("zxdb_e2e_test_data") {
-    sources = []
+    sources = [
+      "scripts/DISABLED_run_test.script",
+      "scripts/async_backtrace.script",
+      "scripts/bitfield.script",
+      "scripts/break_dl_start.script",
+      "scripts/conditional_breakpoint.script",
+      "scripts/cpp_fn_arguments.script",
+      "scripts/cpp_fn_call.script",
+      "scripts/cpp_fn_return_values.script",
+      "scripts/hello_starnix.script",
+      "scripts/hello_starnix_exception.script",
+      "scripts/inlined_frames.script",
+      "scripts/pretty_types.script",
+      "scripts/rust_fn_arguments.script",
+      "scripts/rust_fn_call.script",
+      "scripts/rust_fn_return_values.script",
+      "scripts/simple_breakpoint.script",
+      "scripts/simple_template_names.script",
+      "scripts/status.script",
+      "scripts/step_plt.script",
+      "scripts/template_functions.script",
+      "scripts/unwind_plt.script",
+    ]
 
     # TODO(https://fxbug.dev/42109154): Enable software breakpoint tests on ARM64
     # once they are stable.
     if (target_cpu == "arm64") {
       sources += [ "scripts/hello_starnix_hardware_breakpoint.script" ]
-    } else {
-      sources += [ "scripts" ]
     }
   }
 

@@ -1,0 +1,25 @@
+# Starnix doesn't work with asan right now. LTO can cause execute_syscall to be inlined
+# which breaks unwinding into user code.
+## require is_asan=false
+## require is_lto=false
+## require is_thinlto=false
+## require optimize=none
+## set timeout 30
+
+# TODO(https://fxbug.dev/42077983): attach shouldn't be necessary.
+# The name "hello_starnix_exception" is truncated to "hello_starnix_exceptio" (no trailing 'n').
+[zxdb] attach hello_starnix_exceptio
+Waiting for process matching "hello_starnix_exceptio".
+
+[zxdb] run-test --realm /core/testing:system-tests fuchsia-pkg://fuchsia.com/zxdb_e2e_inferiors#meta/hello_starnix_exception.cm
+Attached Process 1 state=Running koid=?? name=data/bin/hello_starnix_exceptio component=starnix_kernel.cm
+
+🛑 software_break(uint64_t) • backtrace-request.h:??
+
+# Zxdb can unwind into restricted stack.
+[zxdb] f
+# When optimization is on, there might be other inlined frame so we only check
+# the existence of the main function in the backtrace.
+main() • hello_starnix_exception.cc
+
+[zxdb] kill
