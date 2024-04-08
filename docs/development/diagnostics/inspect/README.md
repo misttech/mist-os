@@ -94,7 +94,7 @@ their primary or root tree as `out/diagnostics/root.inspect`.
   [wrappers][cpp-3] that automatically delete the underlying data from the
   buffer when they go out of scope.
 
-  The [sys\_inspect][cpp-4] library provides a simple `ComponentInspector`
+  The [inspect\_component][cpp-4] library provides a simple `ComponentInspector`
   singleton interface to help with the common case of exposing a single
   hierarchy from the component.
 
@@ -212,7 +212,7 @@ ffx target snapshot
 [cpp-1]: /zircon/system/ulib/inspect/include/lib/inspect/cpp/inspect.h
 [cpp-2]: /zircon/system/ulib/inspect/include/lib/inspect/cpp/reader.h
 [cpp-3]: /zircon/system/ulib/inspect/include/lib/inspect/cpp/vmo/types.h
-[cpp-4]: /sdk/lib/sys/inspect
+[cpp-4]: /sdk/lib/inspect/component/cpp
 [cpp-5]: /zircon/system/ulib/inspect/include/lib/inspect/cpp/health.h
 [cpp-6]: /sdk/lib/inspect/testing
 [cpp-reading-1]: /zircon/system/ulib/inspect/include/lib/inspect/cpp/reader.h

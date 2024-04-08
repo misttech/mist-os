@@ -28,7 +28,6 @@ group("tests") {
     "stdcompat:tests",
     "sys/component:tests",
     "sys/cpp:tests",
-    "sys/inspect:tests",
     "sys/service/cpp:tests",
     "syslog:tests",
     "ui/scenic/cpp/tests:scenic_cpp_tests",

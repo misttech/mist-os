@@ -1380,7 +1380,7 @@ For more details on building capability routes, see [Connect components][doc-con
 [rustc-test]: /build/rust/rustc_test.gni
 [source-code-layout]: /docs/development/source_code/layout.md
 [source-expansion-placeholders]: https://gn.googlesource.com/gn/+/HEAD/docs/reference.md#placeholders
-[src-inspect-cpp]: /sdk/lib/sys/inspect/cpp/BUILD.gn
+[src-inspect-cpp]: /sdk/lib/inspect/component/cpp/BUILD.gn
 [src-inspect-include]: /sdk/lib/inspect/BUILD.gn
 [src-inspect-rust]: /src/lib/diagnostics/inspect/runtime/rust/BUILD.gn
 [test-environments]: /docs/contribute/testing/environments.md

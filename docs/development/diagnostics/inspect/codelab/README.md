@@ -50,7 +50,7 @@ Inspect. Some examples include:
 
 * {C++}
 
-[Inspect library documentation](/sdk/lib/sys/inspect/cpp/component.h)
+[Inspect library documentation](/sdk/lib/inspect/component/cpp/component.h)
 
 * {Rust}
 

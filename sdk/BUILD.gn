@@ -605,7 +605,6 @@ sdk_molecule("core_cc_source_libraries") {
     "//sdk/lib/sys/component/cpp/testing:cpp_library_sdk",
     "//sdk/lib/sys/cpp:cpp_sdk",
     "//sdk/lib/sys/cpp/testing:cpp_sdk",
-    "//sdk/lib/sys/inspect/cpp:cpp_sdk",
     "//sdk/lib/sys/testing:testing_sdk",
     "//sdk/lib/syslog/structured_backend:structured_backend_sdk",
     "//sdk/lib/trace",

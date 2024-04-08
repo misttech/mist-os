@@ -100,7 +100,6 @@ cc_source_library://pkg/sync_cpp
 cc_source_library://pkg/sys_component_cpp_testing
 cc_source_library://pkg/sys_cpp
 cc_source_library://pkg/sys_cpp_testing
-cc_source_library://pkg/sys_inspect_cpp
 cc_source_library://pkg/sys_service_cpp
 cc_source_library://pkg/syslog_structured_backend
 cc_source_library://pkg/trace
