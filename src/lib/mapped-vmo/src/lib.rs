@@ -14,6 +14,9 @@ use {
     std::ops::{Deref, DerefMut},
 };
 
+mod immutable;
+pub use immutable::{Error as ImmutableMappingError, ImmutableMapping};
+
 /// A safe wrapper around a mapped region of memory.
 ///
 /// Note: this type implements `Deref`/`DerefMut` to the `SharedBuffer`
