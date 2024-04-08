@@ -147,9 +147,7 @@ impl<BT: BindingsTypes> StackState<BT> {
         &self.ipv6.slaac_counters()
     }
 
-    pub(crate) fn inner_ip_state<I: IpLayerIpExt>(
-        &self,
-    ) -> &IpStateInner<I, BT::Instant, DeviceId<BT>> {
+    pub(crate) fn inner_ip_state<I: IpLayerIpExt>(&self) -> &IpStateInner<I, DeviceId<BT>, BT> {
         I::map_ip((), |()| self.ipv4.inner(), |()| self.ipv6.inner())
     }
 

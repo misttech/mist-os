@@ -41,8 +41,8 @@ use tracing::{debug, trace};
 
 use crate::{
     context::{
-        CounterContext, EventContext, InstantContext, NonTestCtxMarker, TimerHandler,
-        TracingContext,
+        CounterContext, EventContext, InstantBindingsTypes, InstantContext, NonTestCtxMarker,
+        TimerBindingsTypes, TimerHandler, TracingContext,
     },
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
@@ -486,7 +486,7 @@ pub enum Ipv6PresentAddressStatus {
 pub trait IpLayerIpExt: IpExt {
     type AddressStatus;
     type State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>: AsRef<
-        IpStateInner<Self, BT::Instant, StrongDeviceId>,
+        IpStateInner<Self, StrongDeviceId, BT>,
     >;
     type PacketIdState;
     type PacketId;
@@ -641,8 +641,14 @@ impl<
 }
 
 /// A marker trait for bindings types at the IP layer.
-pub trait IpLayerBindingsTypes: FilterBindingsTypes + IcmpBindingsTypes {}
-impl<BT: FilterBindingsTypes + IcmpBindingsTypes> IpLayerBindingsTypes for BT {}
+pub trait IpLayerBindingsTypes:
+    FilterBindingsTypes + IcmpBindingsTypes + IpStateBindingsTypes
+{
+}
+impl<BT: FilterBindingsTypes + IcmpBindingsTypes + IpStateBindingsTypes> IpLayerBindingsTypes
+    for BT
+{
+}
 
 /// The execution context for the IP layer.
 pub trait IpLayerContext<
@@ -1188,7 +1194,7 @@ impl Ipv6StateBuilder {
 }
 
 pub struct Ipv4State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> {
-    pub(super) inner: IpStateInner<Ipv4, BT::Instant, StrongDeviceId>,
+    pub(super) inner: IpStateInner<Ipv4, StrongDeviceId, BT>,
     pub(super) icmp: Icmpv4State<StrongDeviceId::Weak, BT>,
     pub(super) next_packet_id: AtomicU16,
     pub(super) filter: RwLock<crate::filter::State<Ipv4, BT::DeviceClass>>,
@@ -1199,7 +1205,7 @@ impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv4State<StrongDeviceI
         &self.filter
     }
 
-    pub(crate) fn inner(&self) -> &IpStateInner<Ipv4, BT::Instant, StrongDeviceId> {
+    pub(crate) fn inner(&self) -> &IpStateInner<Ipv4, StrongDeviceId, BT> {
         &self.inner
     }
 
@@ -1209,9 +1215,9 @@ impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv4State<StrongDeviceI
 }
 
 impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>
-    AsRef<IpStateInner<Ipv4, BT::Instant, StrongDeviceId>> for Ipv4State<StrongDeviceId, BT>
+    AsRef<IpStateInner<Ipv4, StrongDeviceId, BT>> for Ipv4State<StrongDeviceId, BT>
 {
-    fn as_ref(&self) -> &IpStateInner<Ipv4, BT::Instant, StrongDeviceId> {
+    fn as_ref(&self) -> &IpStateInner<Ipv4, StrongDeviceId, BT> {
         &self.inner
     }
 }
@@ -1223,7 +1229,7 @@ pub(super) fn gen_ip_packet_id<I: IpLayerIpExt, BC, CC: IpDeviceStateContext<I, 
 }
 
 pub struct Ipv6State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> {
-    pub(super) inner: IpStateInner<Ipv6, BT::Instant, StrongDeviceId>,
+    pub(super) inner: IpStateInner<Ipv6, StrongDeviceId, BT>,
     pub(super) icmp: Icmpv6State<StrongDeviceId::Weak, BT>,
     pub(super) slaac_counters: SlaacCounters,
     pub(super) filter: RwLock<crate::filter::State<Ipv6, BT::DeviceClass>>,
@@ -1238,7 +1244,7 @@ impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv6State<StrongDeviceI
         &self.filter
     }
 
-    pub(crate) fn inner(&self) -> &IpStateInner<Ipv6, BT::Instant, StrongDeviceId> {
+    pub(crate) fn inner(&self) -> &IpStateInner<Ipv6, StrongDeviceId, BT> {
         &self.inner
     }
 
@@ -1248,9 +1254,9 @@ impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv6State<StrongDeviceI
 }
 
 impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>
-    AsRef<IpStateInner<Ipv6, BT::Instant, StrongDeviceId>> for Ipv6State<StrongDeviceId, BT>
+    AsRef<IpStateInner<Ipv6, StrongDeviceId, BT>> for Ipv6State<StrongDeviceId, BT>
 {
-    fn as_ref(&self) -> &IpStateInner<Ipv6, BT::Instant, StrongDeviceId> {
+    fn as_ref(&self) -> &IpStateInner<Ipv6, StrongDeviceId, BT> {
         &self.inner
     }
 }
@@ -1489,17 +1495,22 @@ impl<BC: BindingsContext, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::
     }
 }
 
+/// Marker trait for the bindings types required by the IP layer's inner state.
+pub trait IpStateBindingsTypes: TimerBindingsTypes + InstantBindingsTypes {}
+
+impl<BT> IpStateBindingsTypes for BT where BT: TimerBindingsTypes + InstantBindingsTypes {}
+
 #[derive(Derivative, GenericOverIp)]
 #[derivative(Default(bound = ""))]
 #[generic_over_ip(I, Ip)]
-pub struct IpStateInner<I: IpLayerIpExt, Instant: crate::Instant, DeviceId> {
+pub struct IpStateInner<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> {
     table: RwLock<ForwardingTable<I, DeviceId>>,
-    fragment_cache: Mutex<IpPacketFragmentCache<I, Instant>>,
-    pmtu_cache: Mutex<PmtuCache<I, Instant>>,
+    fragment_cache: Mutex<IpPacketFragmentCache<I, BT::Instant>>,
+    pmtu_cache: Mutex<PmtuCache<I, BT::Instant>>,
     counters: IpCounters<I>,
 }
 
-impl<I: IpLayerIpExt, Instant: crate::Instant, DeviceId> IpStateInner<I, Instant, DeviceId> {
+impl<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> IpStateInner<I, DeviceId, BT> {
     pub(crate) fn counters(&self) -> &IpCounters<I> {
         &self.counters
     }
