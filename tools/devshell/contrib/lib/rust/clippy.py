@@ -74,10 +74,11 @@ def main():
         clippy_output = build_dir / clippy_output
         # If we failed to build all targets we can keep going and print any
         # lints that were collected.
-        if returncode != 0 and not clippy_output.exists():
-            continue
-        if os.path.getmtime(clippy_output) < run_time:
-            continue
+        if returncode != 0:
+            if not clippy_output.exists():
+                continue
+            if os.path.getmtime(clippy_output) < run_time:
+                continue
         with open(clippy_output) as f:
             error_reported = False
             for line in f:
