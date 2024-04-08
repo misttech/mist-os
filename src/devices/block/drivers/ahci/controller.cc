@@ -83,8 +83,8 @@ void Controller::Queue(uint32_t portnr, SataTransaction* txn) {
   if (status == ZX_OK) {
     FDF_LOG(TRACE, "ahci.%u: Queue txn %p offset_dev 0x%" PRIx64 " length 0x%x", port->num(), txn,
             txn->bop.rw.offset_dev, txn->bop.rw.length);
-    // hit the worker loop
-    worker_event_completion_.Signal();
+    // hit the worker thread
+    sync_completion_signal(&worker_completion_);
   } else {
     FDF_LOG(INFO, "ahci.%u: Failed to queue txn %p: %s", port->num(), txn,
             zx_status_get_string(status));
@@ -102,7 +102,9 @@ bool Controller::ShouldExit() {
   return threads_should_exit_;
 }
 
-void Controller::WorkerLoop() {
+// worker thread
+
+int Controller::WorkerLoop() {
   Port* port;
   for (;;) {
     // iterate all the ports and run or complete commands
@@ -119,12 +121,12 @@ void Controller::WorkerLoop() {
 
     // Exit only when there are no more transactions in flight.
     if ((!port_active) && ShouldExit()) {
-      return;
+      return 0;
     }
 
     // Wait here until more commands are queued, or a port becomes idle.
-    worker_event_completion_.Wait();
-    worker_event_completion_.Reset();
+    sync_completion_wait(&worker_completion_, ZX_TIME_INFINITE);
+    sync_completion_reset(&worker_completion_);
   }
 }
 
@@ -150,8 +152,8 @@ int Controller::IrqLoop() {
       if (is & 0x1) {
         bool txn_handled = ports_[i].HandleIrq();
         if (txn_handled) {
-          // hit the worker loop to complete commands
-          worker_event_completion_.Signal();
+          // hit the worker thread to complete commands
+          sync_completion_signal(&worker_completion_);
         }
       }
       is >>= 1;
@@ -242,44 +244,30 @@ zx_status_t Controller::Init() {
   return ZX_OK;
 }
 
+// TODO(b/324291694): Switch to using DF's dispatcher threads.
 zx_status_t Controller::LaunchIrqAndWorkerThreads() {
-  // TODO(b/324291694): Switch to using DF's dispatcher thread.
   zx_status_t status = irq_thread_.CreateWithName(IrqThread, this, "ahci-irq");
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Error creating irq thread: %s", zx_status_get_string(status));
     return status;
   }
-
-  auto dispatcher = fdf::SynchronizedDispatcher::Create(
-      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "ahci-worker",
-      [&](fdf_dispatcher_t*) { worker_shutdown_completion_.Signal(); });
-  if (dispatcher.is_error()) {
-    FDF_LOG(ERROR, "Failed to create dispatcher: %s",
-            zx_status_get_string(dispatcher.status_value()));
-    return dispatcher.status_value();
-  }
-  worker_dispatcher_ = *std::move(dispatcher);
-
-  status = async::PostTask(worker_dispatcher_.async_dispatcher(), [this] { WorkerLoop(); });
+  status = worker_thread_.CreateWithName(WorkerThread, this, "ahci-worker");
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Error creating worker loop: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Error creating worker thread: %s", zx_status_get_string(status));
     return status;
   }
   return ZX_OK;
 }
 
 void Controller::Shutdown() {
-  if (worker_dispatcher_.get()) {
-    {
-      fbl::AutoLock lock(&lock_);
-      threads_should_exit_ = true;
-    }
-
-    // Signal the worker loop.
-    worker_event_completion_.Signal();
-    worker_dispatcher_.ShutdownAsync();
-    worker_shutdown_completion_.Wait();
+  {
+    fbl::AutoLock lock(&lock_);
+    threads_should_exit_ = true;
   }
+
+  // Signal the worker thread.
+  sync_completion_signal(&worker_completion_);
+  worker_thread_.Join();
 
   // Signal the interrupt thread to exit.
   bus_->InterruptCancel();

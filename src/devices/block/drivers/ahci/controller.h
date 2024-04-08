@@ -8,7 +8,7 @@
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/sync/cpp/completion.h>
+#include <lib/sync/completion.h>
 #include <lib/zx/time.h>
 #include <zircon/types.h>
 
@@ -79,7 +79,7 @@ class Controller : public fdf::DriverBase {
   zx_status_t SetDevInfo(uint32_t portnr, SataDeviceInfo* devinfo);
   void Queue(uint32_t portnr, SataTransaction* txn);
 
-  void SignalWorker() { worker_event_completion_.Signal(); }
+  void SignalWorker() { sync_completion_signal(&worker_completion_); }
 
   inspect::Inspector& inspector() { return inspector_; }
   inspect::Node& inspect_node() { return inspect_node_; }
@@ -97,8 +97,9 @@ class Controller : public fdf::DriverBase {
   const std::optional<std::string>& driver_node_name() const { return node_name(); }
 
  private:
+  static int WorkerThread(void* arg) { return static_cast<Controller*>(arg)->WorkerLoop(); }
   static int IrqThread(void* arg) { return static_cast<Controller*>(arg)->IrqLoop(); }
-  void WorkerLoop();
+  int WorkerLoop();
   int IrqLoop();
 
   // Initialize controller and detect devices.
@@ -115,13 +116,9 @@ class Controller : public fdf::DriverBase {
   bool threads_should_exit_ __TA_GUARDED(lock_) = false;
 
   ThreadWrapper irq_thread_;
+  ThreadWrapper worker_thread_;
 
-  // Dispatcher for processing queued block requests.
-  fdf::Dispatcher worker_dispatcher_;
-  // Signaled when worker_dispatcher_ is shut down.
-  libsync::Completion worker_shutdown_completion_;
-  // Signaled when there is work to be done in the worker loop.
-  libsync::Completion worker_event_completion_;
+  sync_completion_t worker_completion_;
 
   std::unique_ptr<Bus> bus_;
   Port ports_[AHCI_MAX_PORTS];
