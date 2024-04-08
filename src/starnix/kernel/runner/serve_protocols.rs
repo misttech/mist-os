@@ -25,7 +25,7 @@ use starnix_core::{
     },
 };
 use starnix_logging::{log_error, log_warn};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, TaskRelease};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::{open_flags::OpenFlags, uapi};
 use std::{ffi::CString, ops::DerefMut, sync::Arc};
 
@@ -75,14 +75,10 @@ fn to_winsize(window_size: Option<fstarcontainer::ConsoleWindowSize>) -> uapi::w
         .unwrap_or(uapi::winsize::default())
 }
 
-async fn spawn_console<L>(
-    locked: &mut Locked<'_, L>,
+async fn spawn_console(
     kernel: &Arc<Kernel>,
     payload: fstarcontainer::ControllerSpawnConsoleRequest,
-) -> Result<Result<u8, fstarcontainer::SpawnConsoleError>, Error>
-where
-    L: LockBefore<TaskRelease>,
-{
+) -> Result<Result<u8, fstarcontainer::SpawnConsoleError>, Error> {
     if let (Some(console_in), Some(console_out), Some(binary_path)) =
         (payload.console_in, payload.console_out, payload.binary_path)
     {
@@ -100,7 +96,11 @@ where
             .map(CString::new)
             .collect::<Result<Vec<_>, _>>()?;
         let window_size = to_winsize(payload.window_size);
-        let current_task = CurrentTask::create_init_child_process(locked, kernel, &binary_path)?;
+        let current_task = CurrentTask::create_init_child_process(
+            kernel.kthreads.unlocked_for_async().deref_mut(),
+            kernel,
+            &binary_path,
+        )?;
         let (sender, receiver) = oneshot::channel();
         let pty = execute_task_with_prerun_result(
             current_task,
@@ -162,14 +162,7 @@ pub async fn serve_container_controller(
                     });
                 }
                 fstarcontainer::ControllerRequest::SpawnConsole { payload, responder } => {
-                    responder.send(
-                        spawn_console(
-                            system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
-                            system_task.kernel(),
-                            payload,
-                        )
-                        .await?,
-                    )?;
+                    responder.send(spawn_console(system_task.kernel(), payload).await?)?;
                 }
                 fstarcontainer::ControllerRequest::GetVmoReferences { payload, responder } => {
                     if let Some(koid) = payload.koid {

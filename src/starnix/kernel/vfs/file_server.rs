@@ -290,6 +290,7 @@ impl StarnixNodeConnection {
                 }
                 f => f?,
             };
+            std::mem::drop(locked);
 
             let starnix_file = StarnixNodeConnection::new(self.kernel.clone(), file);
             starnix_file.open(
