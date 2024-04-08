@@ -100,7 +100,6 @@ static_library("cpp") {
       "//zircon/system/ulib/async:async-cpp",
     ]
     deps = [
-      "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp",
       "//sdk/lib/fidl",
       "//zircon/system/ulib/sync",
     ]
@@ -174,8 +173,6 @@ test("fs-connection-test") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_testing",
-    "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_cpp",
-    "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
     "//sdk/lib/zxio",

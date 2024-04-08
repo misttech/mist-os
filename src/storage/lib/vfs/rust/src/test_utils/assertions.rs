@@ -8,7 +8,7 @@
 pub mod reexport {
     pub use {
         crate::directory::test_utils::DirentsSameInodeBuilder, fidl_fuchsia_io as fio,
-        fidl_fuchsia_mem::Buffer, fuchsia_zircon_status::Status, futures::stream::StreamExt,
+        fuchsia_zircon_status::Status, futures::stream::StreamExt,
     };
 
     #[cfg(not(target_os = "fuchsia"))]
