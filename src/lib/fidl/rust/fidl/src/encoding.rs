@@ -16,7 +16,7 @@ use {
     crate::{Error, MethodType, Result},
     bitflags::bitflags,
     fuchsia_zircon_status as zx_status, fuchsia_zircon_types as zx_types,
-    std::{cell::RefCell, cell::RefMut, marker::PhantomData, mem, ptr, str, u32, u64},
+    std::{cell::RefCell, cell::RefMut, marker::PhantomData, mem, ptr, str},
 };
 
 ////////////////////////////////////////////////////////////////////////////////
