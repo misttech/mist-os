@@ -31,7 +31,6 @@ template("starnix_linux_test_rustc_binary") {
                                "testonly",
                                "visibility",
                              ])
-      testonly = true
       output_name = _output_name
 
       # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
@@ -49,7 +48,6 @@ template("starnix_linux_test_rustc_binary") {
   _bin_label = ":${_bin_label}($target_linux_toolchain)"
   _bin_out_dir = get_label_info(_bin_label, "root_out_dir")
   resource(_resource_label) {
-    testonly = true
     forward_variables_from(invoker, [ "visibility" ])
 
     sources = [ "${_bin_out_dir}/${_output_name}" ]

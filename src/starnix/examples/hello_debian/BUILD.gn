@@ -5,7 +5,6 @@
 import("//build/rust/rustc_binary.gni")
 
 group("hello_debian") {
-  testonly = true
   deps = [
     "cpp",
     "rust",

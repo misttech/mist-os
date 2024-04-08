@@ -13,13 +13,11 @@ starnix_linux_test_executable("bin") {
 }
 
 fuchsia_component("hello_debian_cpp") {
-  testonly = true
   manifest = "meta/hello_debian_cpp.cml"
   deps = [ ":bin" ]
 }
 
 fuchsia_package("hello_debian_cpp_package") {
-  testonly = true
   package_name = "hello_debian_cpp"
   deps = [ ":hello_debian_cpp" ]
 }
@@ -49,6 +47,5 @@ group("tests") {
 }
 
 group("cpp") {
-  testonly = true
   deps = [ ":hello_debian_cpp_package" ]
 }

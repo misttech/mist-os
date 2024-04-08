@@ -13,13 +13,11 @@ starnix_linux_test_rustc_binary("bin") {
 }
 
 fuchsia_component("hello_debian_rust") {
-  testonly = true
   manifest = "meta/hello_debian_rust.cml"
   deps = [ ":bin" ]
 }
 
 fuchsia_package("hello_debian_rust_package") {
-  testonly = true
   package_name = "hello_debian_rust"
   deps = [ ":hello_debian_rust" ]
 }
@@ -49,6 +47,5 @@ group("tests") {
 }
 
 group("rust") {
-  testonly = true
   deps = [ ":hello_debian_rust_package" ]
 }
