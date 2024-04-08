@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/config/compiler.gni")
-import("//build/python/python_action.gni")
 import("//build/sdk/config.gni")
 import("//build/toolchain/goma.gni")
 import("//build/toolchain/rbe.gni")
@@ -101,10 +100,10 @@ template("_subbuild") {
   }
 }
 
-# Generate a IDK directory, which combines outputs from different arch-specific
+# Generate a IDK directory, which merges outputs from different arch-specific
 # sub-builds into a single one. The generated directory will include prebuilts
-# for all the given `target_cpus`. On a host Linux machine, the generated
-# archive will have host tools for both Linux/x64 and Linux/arm64.
+# for all the given `target_cpus`. On a host Linux machine, the generated archive
+# will have host tools for both Linux/x64 and Linux/arm64.
 #
 # The generated directory will go into
 # $root_build_dir/sdk/exported/{output_name}
@@ -157,15 +156,14 @@ template("idk") {
   _exported_dir_stamp = _exported_dir + ".stamp"
 
   _sdk_collection_name = get_label_info(invoker.sdk_collection_label, "name")
-  _relative_collection_build_manifest = "sdk/manifest/${_sdk_collection_name}"
+  _relative_collection_exported_dir = "sdk/exported/${_sdk_collection_name}"
 
-  # Targets that must be built before producing the final IDK.
+  # Targets that must be built before merging the final IDK.
   _subbuild_targets = []
 
-  # Build directories for each subbuilds that contribute to the IDK, including
-  # the main build. Note that the contents of the IDK are sensitive to the order
-  # of this list.
-  _subbuild_dirs = []
+  # Directories with all the individual IDKs to merge. Note that the contents of
+  # the merged IDK are sensitive to the order of directories in this list.
+  _merge_input_dirs = []
 
   # First, do subbuilds for the default API level.
   foreach(target_cpu, _target_cpus) {
@@ -173,7 +171,8 @@ template("idk") {
       # Don't do a subbuild for the current CPU - just depend on the
       # `sdk_collection` in the current build.
       _subbuild_targets += [ invoker.sdk_collection_label ]
-      _subbuild_dirs += [ root_build_dir ]
+      _merge_input_dirs +=
+          [ "${root_build_dir}/${_relative_collection_exported_dir}" ]
     } else {
       _subbuild_name = "${target_name}.subbuild-${target_cpu}"
 
@@ -190,7 +189,9 @@ template("idk") {
                                ])
       }
       _subbuild_targets += [ ":$_subbuild_name" ]
-      _subbuild_dirs += [ "${root_build_dir}/build-${_subbuild_name}" ]
+      _merge_input_dirs +=
+          [ root_build_dir +
+            "/build-${_subbuild_name}/${_relative_collection_exported_dir}" ]
     }
   }
 
@@ -231,33 +232,17 @@ template("idk") {
       }
 
       _subbuild_targets += [ ":$_subbuild_name" ]
-      _subbuild_dirs += [ "${root_build_dir}/build-${_subbuild_name}" ]
+      _merge_input_dirs +=
+          [ root_build_dir +
+            "/build-${_subbuild_name}/${_relative_collection_exported_dir}" ]
     }
   }
 
-  if (host_cpu == "x64") {
-    host_triple_cpu = "x86_64"
-  } else if (host_cpu == "arm64") {
-    host_triple_cpu = "aarch64"
-  } else {
-    assert(false, "Unrecognized host CPU: $host_cpu")
-  }
-  if (host_os == "linux") {
-    host_triple_os = "linux-gnu"
-  } else if (host_os == "mac") {
-    host_triple_os = "apple-darwin"
-  } else if (host_os == "fuchsia") {
-    host_triple_os = "fuchsia"
-  } else {
-    assert(false, "Unrecognized host OS: $host_os")
-  }
-  host_triple = "$host_triple_cpu-$host_triple_os"
-
-  # Combine all the individual sdk_collection subbuilds and put the result in
-  # the exported directory.
-  python_action(target_name) {
-    binary_label = "//build/sdk/generate_idk"
-
+  # Merge together all the individual IDKs and put the result in the exported
+  # directory. This only contains symlinks to the real files, but can be used
+  # by other targets that need to use it without a full archive.
+  action(target_name) {
+    script = "//scripts/sdk/merger/merge.py"
     deps = _subbuild_targets
     outputs = [
       _exported_dir_manifest,
@@ -265,35 +250,20 @@ template("idk") {
     ]
 
     args = []
-
-    foreach(dir, _subbuild_dirs) {
+    foreach(input_dir, _merge_input_dirs) {
       args += [
-        "--subbuild-directory",
-        rebase_path(dir, root_build_dir),
+        "--input-directory",
+        rebase_path(input_dir, root_build_dir),
       ]
     }
     args += [
-      "--relative-manifest",
-      _relative_collection_build_manifest,
       "--output-directory",
       rebase_path(_exported_dir, root_build_dir),
       "--stamp-file",
       rebase_path(_exported_dir_stamp, root_build_dir),
-      "--host-arch",
-      host_triple,
-      "--release-version",
-      sdk_id,
     ]
 
-    foreach(cpu, invoker.target_cpus) {
-      args += [
-        "--target-arch",
-        cpu,
-      ]
-    }
-
-    # TODO(https://fxbug.dev/333054435): Generate a depfile to make this
-    # hermetic.
+    # This script cannot be hermetic.
     hermetic_deps = false
 
     forward_variables_from(invoker,
