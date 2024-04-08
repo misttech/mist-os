@@ -60,10 +60,7 @@
             availability: "optional",
         },
         {
-            event_stream: [
-                "capability_requested",
-                "directory_ready",
-            ],
+            event_stream: [ "capability_requested" ],
             from: "parent",
             to: "#realm_factory",
         },

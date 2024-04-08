@@ -164,7 +164,6 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
     builder
         .add_route(
             Route::new()
-                .capability(Capability::event_stream("directory_ready").with_scope(&wrapper_realm))
                 .capability(
                     Capability::event_stream("capability_requested").with_scope(&wrapper_realm),
                 )
@@ -200,7 +199,6 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
     wrapper_realm
         .add_route(
             Route::new()
-                .capability(Capability::event_stream("directory_ready"))
                 .capability(Capability::event_stream("capability_requested"))
                 .from(Ref::parent())
                 .to(&test_case_archivist),

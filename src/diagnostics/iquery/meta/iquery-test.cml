@@ -52,7 +52,6 @@
         {
             event_stream: [
                 "capability_requested",
-                "directory_ready",
                 "stopped",
             ],
             from: "parent",

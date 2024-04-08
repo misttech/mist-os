@@ -35,12 +35,6 @@
             filter: { name: "fuchsia.inspect.InspectSink" },
         },
         {
-            event_stream: [ "directory_ready" ],
-            from: "parent",
-            path: "/events/diagnostics_ready_event_stream",
-            filter: { name: "diagnostics" },
-        },
-        {
             protocol: [ "fuchsia.tracing.provider.Registry" ],
             availability: "optional",
         },

@@ -968,7 +968,6 @@ mod tests {
                             .optional(),
                     )
                     .capability(Capability::event_stream("stopped"))
-                    .capability(Capability::event_stream("directory_ready"))
                     .capability(Capability::event_stream("capability_requested"))
                     .from(Ref::parent())
                     .to(&archivist),

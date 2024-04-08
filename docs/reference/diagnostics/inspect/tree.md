@@ -36,9 +36,8 @@ hosting. Nearly all implementations will eventually use `Tree`.
 `fuchsia.inspect.Tree` supports all features of the Inspect API, and it
 is the recommended way to expose Inspect data from components.
 
-Components host a single service file named `fuchsia.inspect.Tree` under
-a subdirectory called "diagnostics". Multiple such files may exist,
-but they must be in separate subdirectories under "diagnostics".
+Components publish `fuchsia.inspect.Tree` using the
+`fuchsia.inspect.InspectSink` protocol.
 
 #### Implementation
 
@@ -52,7 +51,7 @@ in a "tree of trees."
 
 In the above figure, the tree named "root" handles protocol
 `fuchsia.inspect.Tree` for connections on the top-level service hosted
-under `diagnostics/fuchsia.inspect.Tree`. Child trees may be enumerated
+under `fuchsia.inspect.Tree`. Child trees may be enumerated
 and opened using methods on the protocol. For example, "child B" may
 not exist in memory until opened and read.
 
@@ -77,22 +76,6 @@ The protocol supports this behavior in the following ways:
   This method accepts a request for `fuchsia.inspect.Tree` that will
   be bound to the tree specified by a given name. Using this method a
   client may iterate through all trees exposed over the root iterface.
-
-### `VmoFile` {#vmofile}
-
-Components may expose any number of [Inspect VMOs][vmo-format]
-in their `out/diagnostics` directory ending in the file extension
-`.inspect`. By convention, components expose their "root" inspect tree at
-`diagnostics/root.inspect`.
-
-Note: Reading services may not disambiguate the sources of data in
-a component.
-
-Components may choose to generate the content of the VMO when the file
-is opened if they choose, however, there exists no mechanism to link
-multiple trees created this way together. For this reason, lazy values
-are not supported in the context of a single tree, either the entire
-tree is generated dynamically or none of it is.
 
 ### `fuchsia.inspect.deprecated.Inspect` {#deprecated}
 
@@ -188,30 +171,20 @@ The Archivist is offered events by the root realm. Therefore, it sees events fro
 the whole system. The events it is allowed to see and is subscribed to are the
 following:
 
-- **Started**: sent to the Archivist when a component is started.
-- **Running**: sent to the Archivist when subscribing for components that were
-  already running.
-- **Directory ready**: with a filter for `/diagnostics`. Sent to the Archivist
-  when a component exposes a `/diagnostics` directory to the framework.
-- **Stopped**: sent to the Archivist when a component is stopped.
+- **CapabilityRequested**: sent to the Archivist instead of a regular Directory
+  connection when a component connects to `InspectSink` or `LogSink`. This allows
+  Archivist to know the monikers and URLs of the components connecting to these
+  protocols.
 
-A component that wishes to expose Inspect needs to expose a `/diagnostics`
-directory to the framework. This typically looks as follows:
+A component that wishes to expose Inspect needs to use the `fuchsia.inspect.InspectSink`
+protocol. This typically looks as follows:
 
 ```json5
 {
-    capabilities: [
+    use: [
         {
-            directory: "diagnostics",
-            rights: [ "connect" ],
-            path: "/diagnostics",
-        },
-    ],
-    expose: [
-        {
-            directory: "diagnostics",
-            from: "self",
-            to: "framework",
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
         },
     ],
 }

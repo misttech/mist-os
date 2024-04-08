@@ -110,7 +110,6 @@ pub async fn create(opts: Options) -> Result<(RealmBuilder, SubRealmBuilder), Er
     builder
         .add_route(
             Route::new()
-                .capability(Capability::event_stream("directory_ready").with_scope(&test_realm))
                 .capability(
                     Capability::event_stream("capability_requested").with_scope(&test_realm),
                 )
@@ -122,7 +121,6 @@ pub async fn create(opts: Options) -> Result<(RealmBuilder, SubRealmBuilder), Er
     test_realm
         .add_route(
             Route::new()
-                .capability(Capability::event_stream("directory_ready"))
                 .capability(Capability::event_stream("capability_requested"))
                 .from(Ref::parent())
                 .to(&archivist),
