@@ -23,7 +23,6 @@ namespace debug_agent {
 namespace {
 
 const std::string kCapabilityRequested = "capability_requested";
-const std::string kDirectoryReady = "directory_ready";
 
 // Helper to simplify request pipelining.
 template <typename Protocol>
@@ -130,7 +129,6 @@ fit::result<debug::Status, std::vector<fuchsia_component_decl::Offer>> ValidateA
     return fit::error(debug::Status("Manifest does not offer Realm procotol"));
   }
 
-  bool directory_ready = false;
   bool capability_requested = false;
   std::vector<fuchsia_component_decl::Offer> offers;
   for (auto& offer : *manifest.offers()) {
@@ -142,29 +140,22 @@ fit::result<debug::Status, std::vector<fuchsia_component_decl::Offer>> ValidateA
     }
 
     if (offer.event_stream().has_value()) {
-      // Look for 'directory_ready' or 'capability_requested' event stream offers whose source is
+      // Look for 'capability_requested' event stream offers whose source is
       // parent and whose scope includes |test_collection|.
       auto& event_stream = offer.event_stream().value();
-      if ((event_stream.target_name() == kDirectoryReady ||
-           event_stream.target_name() == kCapabilityRequested) &&
-          event_stream.source().has_value() && event_stream.source()->parent().has_value() &&
-          event_stream.scope().has_value() &&
+      if (event_stream.target_name() == kCapabilityRequested && event_stream.source().has_value() &&
+          event_stream.source()->parent().has_value() && event_stream.scope().has_value() &&
           std::any_of(event_stream.scope()->begin(), event_stream.scope()->end(),
                       [&test_collection](auto& ref) {
                         return ref.collection().has_value() &&
                                ref.collection()->name() == test_collection;
                       })) {
-        // Note 'directory_ready' and 'capability_requested' events.
-        directory_ready |= event_stream.target_name() == kDirectoryReady;
+        // Note 'capability_requested' event.
         capability_requested |= event_stream.target_name() == kCapabilityRequested;
       }
     }
 
     offers.push_back(std::move(offer));
-  }
-
-  if (!directory_ready) {
-    return fit::error(debug::Status("Directory is not ready"));
   }
 
   if (!capability_requested) {
