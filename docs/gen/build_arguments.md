@@ -8045,9 +8045,9 @@ From //build/config/BUILDCONFIG.gn:106
 
 ### truncate_build_info_commit_date
 
-LINT.IfChange
 Truncate the date in the build_info to midnight UTC, and replace the commit
 hash with one that's synthesized from that date.
+LINT.IfChange
 
 **Current value (from the default):** `false`
 
