@@ -8,6 +8,7 @@ package ffxutil
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -33,6 +34,9 @@ const (
 
 	// The environment variable that ffx uses to create an isolated instance.
 	FFXIsolateDirEnvKey = "FFX_ISOLATE_DIR"
+
+	// The name of the ffx env config file.
+	ffxEnvFilename = ".ffx_env"
 )
 
 type LogLevel string
@@ -70,6 +74,12 @@ type FFXInstance struct {
 	isolateDir string
 }
 
+// ConfigSettings contains settings to apply to the ffx configs at the specified config level.
+type ConfigSettings struct {
+	Level    string
+	Settings map[string]any
+}
+
 // FFXWithTarget returns a copy of the provided ffx instance associated with
 // the provided target. This copy should use the same ffx daemon but run
 // commands with the new target.
@@ -94,6 +104,7 @@ func NewFFXInstance(
 	env []string,
 	target, sshKey string,
 	outputDir string,
+	extraConfigSettings ...ConfigSettings,
 ) (*FFXInstance, error) {
 	if ffxPath == "" {
 		return nil, nil
@@ -122,52 +133,93 @@ func NewFFXInstance(
 		env:        env,
 		isolateDir: absOutputDir,
 	}
-	ffxCmds := [][]string{
-		{"config", "set", "log.dir", filepath.Join(absOutputDir, "ffx_logs")},
-		{"config", "set", "ffx.subtool-search-paths", filepath.Dir(absFFXPath)},
-		{"config", "set", "target.default", target},
-		{"config", "set", "test.experimental_json_input", "true"},
-		// Set these fields in the global config for tests that don't use this library
-		// and don't set their own isolated env config.
-		{"config", "env", "set", filepath.Join(outputDir, "global_config.json"), "-l", "global"},
+	ffxEnvFilepath := filepath.Join(ffx.isolateDir, ffxEnvFilename)
+	globalConfigFilepath := filepath.Join(ffx.isolateDir, "global_config.json")
+	userConfigFilepath := filepath.Join(ffx.isolateDir, "user_config.json")
+	ffxEnvSettings := map[string]any{
+		"user":   userConfigFilepath,
+		"global": globalConfigFilepath,
+	}
+	// Set these fields in the global config for tests that don't use this library
+	// and don't set their own isolated env config.
+	globalConfigSettings := map[string]any{
 		// This is a config "alias" for various other config values -- disabling
 		// metrics, device discovery, device auto-connection, etc.
-		{"config", "set", "ffx.isolated", "true", "-l", "global"},
+		"ffx.isolated": true,
+	}
+	configSettings := map[string]any{
+		"log.dir":                      filepath.Join(absOutputDir, "ffx_logs"),
+		"ffx.subtool-search-paths":     filepath.Dir(absFFXPath),
+		"target.default":               target,
+		"test.experimental_json_input": true,
 	}
 	if sshKey != "" {
 		sshKey, err = filepath.Abs(sshKey)
 		if err != nil {
 			return nil, err
 		}
-		ffxCmds = append(ffxCmds, []string{"config", "set", "ssh.priv", fmt.Sprintf("[\"%s\"]", sshKey)})
+		configSettings["ssh.priv"] = []string{sshKey}
+	}
+	for _, settings := range extraConfigSettings {
+		if settings.Level == "global" {
+			for key, val := range settings.Settings {
+				globalConfigSettings[key] = val
+			}
+		} else {
+			for key, val := range settings.Settings {
+				configSettings[key] = val
+			}
+		}
+	}
+	ffxCmds := [][]string{}
+	if deviceAddr := os.Getenv(botanistconstants.DeviceAddrEnvKey); deviceAddr != "" {
+		globalConfigSettings["discovery.mdns.enabled"] = false
+		ffxCmds = append(ffxCmds, []string{"target", "add", deviceAddr, "--nowait"})
+	}
+	if err := writeConfigFile(globalConfigFilepath, globalConfigSettings); err != nil {
+		return nil, fmt.Errorf("failed to write ffx global config at %s: %w", globalConfigFilepath, err)
+	}
+	if err := writeConfigFile(userConfigFilepath, configSettings); err != nil {
+		return nil, fmt.Errorf("failed to write ffx user config at %s: %w", userConfigFilepath, err)
+	}
+	if err := writeConfigFile(ffxEnvFilepath, ffxEnvSettings); err != nil {
+		return nil, fmt.Errorf("failed to write ffx env file at %s: %w", ffxEnvFilepath, err)
 	}
 	for _, args := range ffxCmds {
-		configCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
-		defer cancel()
-		// TODO(https://fxbug.dev/321754579): Remove when no longer needed for debugging.
-		args = append([]string{"-v", "--log-level", "TRACE"}, args...)
-		if err := ffx.Run(configCtx, args...); err != nil {
-			if err := ffx.runner.Run(ctx, []string{"cat", "/proc/meminfo"}, subprocess.RunOptions{}); err != nil {
-				logger.Debugf(ctx, "failed to dump /proc/meminfo")
-			}
-			return nil, err
-		}
-	}
-	if deviceAddr := os.Getenv(botanistconstants.DeviceAddrEnvKey); deviceAddr != "" {
-		if err := ffx.Run(ctx, "config", "set", "discovery.mdns.enabled", "false", "-l", "global"); err != nil {
+		if err := ffx.Run(ctx, args...); err != nil {
 			if stopErr := ffx.Stop(); stopErr != nil {
 				logger.Debugf(ctx, "failed to stop daemon: %s", stopErr)
 			}
-			return nil, err
-		}
-		if err := ffx.Run(ctx, "target", "add", deviceAddr, "--nowait"); err != nil {
-			if stopErr := ffx.Stop(); stopErr != nil {
-				logger.Debugf(ctx, "failed to stop daemon: %s", stopErr)
-			}
-			return nil, err
+			return nil, fmt.Errorf("failed to run ffx cmd: %v: %w", args, err)
 		}
 	}
 	return ffx, nil
+}
+
+func writeConfigFile(configPath string, configSettings map[string]any) error {
+	data := make(map[string]any)
+	for key, val := range configSettings {
+		parts := strings.Split(key, ".")
+		datakey := data
+		for i, subkey := range parts {
+			if i == len(parts)-1 {
+				datakey[subkey] = val
+			} else {
+				if _, ok := datakey[subkey]; !ok {
+					datakey[subkey] = make(map[string]any)
+				}
+				datakey = datakey[subkey].(map[string]any)
+			}
+		}
+	}
+	j, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal ffx config: %w", err)
+	}
+	if err := os.WriteFile(configPath, j, 0o600); err != nil {
+		return fmt.Errorf("writing ffx config to file: %w", err)
+	}
+	return nil
 }
 
 func (f *FFXInstance) Env() []string {
