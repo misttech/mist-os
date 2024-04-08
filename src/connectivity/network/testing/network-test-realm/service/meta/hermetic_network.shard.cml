@@ -86,6 +86,7 @@
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.root.Interfaces",
+                "fuchsia.net.routes.admin.SetProviderV4",
                 "fuchsia.net.stack.Stack",
                 "fuchsia.posix.socket.Provider",
             ],
