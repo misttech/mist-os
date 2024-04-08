@@ -521,8 +521,7 @@ where
         )?,
         BTreeMap::from([("component".into(), TmpFs::new_fs(kernel))]),
     );
-    let mut mappings =
-        vec![("container".into(), container_fs), ("data".into(), TmpFs::new_fs(kernel))];
+    let mut mappings = vec![("container".into(), container_fs)];
     if features.custom_artifacts {
         mappings.push(("custom_artifacts".into(), TmpFs::new_fs(kernel)));
     }

@@ -52,7 +52,7 @@ void RegisterTests() {
   perftest::RegisterTest("Filesystem_Open_DevPts", OpenTest, "/dev/pts");
   perftest::RegisterTest("Filesystem_Open_DevTmpfs", OpenTest, "/dev");
   perftest::RegisterTest("Filesystem_Open_Ext4", OpenTest, "/");
-  perftest::RegisterTest("Filesystem_Open_Remotefs", OpenTest, "/data");
+  perftest::RegisterTest("Filesystem_Open_Remotefs", OpenTest, "/container");
   perftest::RegisterTest("Filesystem_Open_Sysfs", OpenTest, "/sys");
   perftest::RegisterTest("Filesystem_Open_Tmpfs", OpenTest, "/tmp");
 }

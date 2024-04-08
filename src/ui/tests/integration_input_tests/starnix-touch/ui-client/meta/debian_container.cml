@@ -12,7 +12,6 @@
         init: [],
         mounts: [
             "/:remote_bundle:data/system",
-            "/data:remotefs:data",
             "/dev:devtmpfs",
         ],
         rlimits: [ "RLIMIT_NOFILE=131072" ],
