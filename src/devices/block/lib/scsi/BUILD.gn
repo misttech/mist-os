@@ -9,15 +9,15 @@ group("tests") {
   deps = [ "tests" ]
 }
 
-zx_library("scsi") {
+zx_library("scsi-dfv1") {
   sdk = "source"
   sdk_headers = [
-    "lib/scsi/controller.h",
-    "lib/scsi/disk.h",
+    "lib/scsi/controller-dfv1.h",
+    "lib/scsi/disk-dfv1.h",
   ]
   sources = [
-    "controller.cc",
-    "disk.cc",
+    "controller-dfv1.cc",
+    "disk-dfv1.cc",
   ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",

@@ -27,7 +27,7 @@ fuchsia_driver("usb-mass-storage-driver") {
   deps = [
     ":usb_mass_storage_bind",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-    "//src/devices/block/lib/scsi",
+    "//src/devices/block/lib/scsi:scsi-dfv1",
     "//src/devices/lib/driver",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:ums",
@@ -62,7 +62,7 @@ test("ums") {
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
-    "//src/devices/block/lib/scsi",
+    "//src/devices/block/lib/scsi:scsi-dfv1",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk",
     "//src/devices/usb/lib/usb",

@@ -24,7 +24,7 @@ test("disk-test-bin") {
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
-    "//src/devices/block/lib/scsi",
+    "//src/devices/block/lib/scsi:scsi-dfv1",
     "//src/devices/lib/driver",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk",
