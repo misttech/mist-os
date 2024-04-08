@@ -228,7 +228,6 @@ sdk_molecule("fuchsia_idk_atoms") {
 sdk_molecule("fuchsia_idk_atoms_for_each_api_level_and_legacy") {
   deps = [
     ":core_cc_prebuilt_libraries",
-    ":core_loadable_modules",
     ":core_sysroot",
   ]
 }
@@ -253,6 +252,14 @@ if (!sdk_inside_supported_api_sub_build) {
       # This target compiles the FIDL files, but the output used in the SDK is
       # not specific to any API level.
       "//sdk/fidl",
+
+      # TODO(https://fxbug.dev/327223536): `loadable_modules` (a.k.a., the
+      # "Vulkan layers") support being built at individual API levels, but each
+      # of the subbuilds currently puts the build files at the same path, so all
+      # but one of them gets clobbered. Give `loadable_modules` the proper
+      # per-API-level treatment and move this to
+      # :fuchsia_idk_atoms_for_each_api_level_and_legacy.
+      ":core_loadable_modules",
     ]
   }
 
