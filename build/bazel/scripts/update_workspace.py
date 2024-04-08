@@ -501,8 +501,10 @@ def find_host_binary_path(program: str) -> str:
         # According to Posix, an empty path component is equivalent to ´.'.
         if path == "" or path == ".":
             path = os.getcwd()
-        candidate = os.path.join(path, program)
-        if os.access(candidate, os.R_OK | os.X_OK):
+        candidate = os.path.realpath(os.path.join(path, program))
+        if os.path.isfile(candidate) and os.access(
+            candidate, os.R_OK | os.X_OK
+        ):
             return candidate
 
     return ""
