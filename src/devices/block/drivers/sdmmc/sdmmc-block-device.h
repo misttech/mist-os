@@ -202,6 +202,7 @@ class SdmmcBlockDevice {
   fbl::Mutex power_lock_;
   bool power_suspended_ TA_GUARDED(power_lock_) = false;
   bool shutdown_ TA_GUARDED(lock_) = false;
+  trace_async_id_t trace_async_id_;
 
   block_info_t block_info_{};
 

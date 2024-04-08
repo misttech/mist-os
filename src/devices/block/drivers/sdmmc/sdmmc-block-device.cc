@@ -852,7 +852,8 @@ zx_status_t SdmmcBlockDevice::SuspendPower() {
     return status;
   }
 
-  TRACE_DURATION_BEGIN("sdmmc", "suspend");
+  trace_async_id_ = TRACE_NONCE();
+  TRACE_ASYNC_BEGIN("sdmmc", "suspend", trace_async_id_);
   power_suspended_ = true;
   properties_.power_suspended_.Set(power_suspended_);
   return ZX_OK;
@@ -875,7 +876,7 @@ zx_status_t SdmmcBlockDevice::ResumePower() {
     return status;
   }
 
-  TRACE_DURATION_END("sdmmc", "suspend");
+  TRACE_ASYNC_END("sdmmc", "suspend", trace_async_id_);
   power_suspended_ = false;
   properties_.power_suspended_.Set(power_suspended_);
   return ZX_OK;

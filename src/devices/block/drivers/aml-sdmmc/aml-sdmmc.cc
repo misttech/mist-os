@@ -937,7 +937,8 @@ zx_status_t AmlSdmmc::SuspendPower() {
     }
   }
 
-  TRACE_DURATION_BEGIN("aml-sdmmc", "suspend");
+  trace_async_id_ = TRACE_NONCE();
+  TRACE_ASYNC_BEGIN("aml-sdmmc", "suspend", trace_async_id_);
   power_suspended_ = true;
   inspect_.power_suspended.Set(power_suspended_);
   FDF_LOGL(INFO, logger(), "Power suspended.");
@@ -968,7 +969,7 @@ zx_status_t AmlSdmmc::ResumePower() {
   auto clk = AmlSdmmcClock::Get().ReadFrom(&*mmio_);
   clk.set_cfg_div(clk_div_saved_).WriteTo(&*mmio_);
 
-  TRACE_DURATION_END("aml-sdmmc", "suspend");
+  TRACE_ASYNC_END("aml-sdmmc", "suspend", trace_async_id_);
   power_suspended_ = false;
   inspect_.power_suspended.Set(power_suspended_);
   FDF_LOGL(INFO, logger(), "Power resumed.");
