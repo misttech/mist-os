@@ -8,7 +8,7 @@
     ],
     program: {
         binary: "data/tests/fdio-test",
-        args: [ "--gtest_filter=BadFdTest.*:DirectoryTest.*:EventFdTest.*:Poll.*:Pipe2.*:MmapTest.*:UnistdTest.*:-UnistdTest/OpenCreate.*" ],
+        args: [ "--gtest_filter=BadFdTest.*:DirectoryTest.*:EventFDTest.*:Poll.*:Pipe2.*:MmapTest.*:UnistdTest.*:-UnistdTest/OpenCreate.*" ],
         environ: [ "TEST_TMPDIR=/tmp" ],
     },
 }
