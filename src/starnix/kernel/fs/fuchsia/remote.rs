@@ -897,6 +897,7 @@ impl FsNodeOps for RemoteNode {
 
     fn link(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -2196,7 +2197,13 @@ mod test {
                     ns.root()
                         .entry
                         .node
-                        .link(&current_task, &ns.root().mount, "file2".into(), &node.entry.node)
+                        .link(
+                            locked,
+                            &current_task,
+                            &ns.root().mount,
+                            "file2".into(),
+                            &node.entry.node,
+                        )
                         .expect("link failed");
                 }
             })

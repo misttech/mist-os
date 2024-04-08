@@ -1003,7 +1003,7 @@ pub fn sys_linkat(
         current_task,
         new_dir_fd,
         new_user_path,
-        |_, context, parent, basename| {
+        |locked, context, parent, basename| {
             // The path to a new link cannot end in `/`. That would imply that we are dereferencing
             // the link to a directory.
             if context.must_be_directory {
@@ -1012,7 +1012,7 @@ pub fn sys_linkat(
             if target.mount != parent.mount {
                 return error!(EXDEV);
             }
-            parent.link(current_task, basename, &target.entry.node)
+            parent.link(locked, current_task, basename, &target.entry.node)
         },
     )?;
 

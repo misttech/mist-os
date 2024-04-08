@@ -600,6 +600,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Create a hard link with the given name to the given child.
     fn link(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -822,6 +823,7 @@ macro_rules! fs_node_impl_dir_readonly {
 
         fn link(
             &self,
+            _locked: &mut Locked<'_, FileOpsCore>,
             _node: &crate::vfs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::vfs::FsStr,
@@ -1290,13 +1292,17 @@ impl FsNode {
         self.ops().readlink(self, current_task)
     }
 
-    pub fn link(
+    pub fn link<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
         child: &FsNodeHandle,
-    ) -> Result<FsNodeHandle, Errno> {
+    ) -> Result<FsNodeHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         self.check_access(current_task, mount, Access::WRITE)?;
 
         if child.is_dir() {
@@ -1346,7 +1352,8 @@ impl FsNode {
             };
         }
 
-        self.ops().link(self, current_task, name, child)?;
+        let mut locked = locked.cast_locked::<FileOpsCore>();
+        self.ops().link(&mut locked, self, current_task, name, child)?;
         Ok(child.clone())
     }
 

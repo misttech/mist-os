@@ -1166,15 +1166,19 @@ impl NamespaceNode {
         )?))
     }
 
-    pub fn link(
+    pub fn link<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         name: &FsStr,
         child: &FsNodeHandle,
-    ) -> Result<NamespaceNode, Errno> {
+    ) -> Result<NamespaceNode, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         let dir_entry =
             self.entry.create_entry(current_task, &self.mount, name, |dir, mount, name| {
-                dir.link(current_task, mount, name, child)
+                dir.link(locked, current_task, mount, name, child)
             })?;
         Ok(self.with_new_entry(dir_entry))
     }

@@ -642,17 +642,17 @@ impl FsNodeOps for Arc<OverlayNode> {
 
     fn link(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
         let child_overlay = OverlayNode::from_fs_node(child)?;
-        let upper_child = child_overlay.ensure_upper(&mut locked, current_task)?;
-        self.create_entry(&mut locked, current_task, name, |_, dir, temp_name| {
+        let upper_child = child_overlay.ensure_upper(locked, current_task)?;
+        self.create_entry(locked, current_task, name, |locked, dir, temp_name| {
             dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
-                dir_node.link(current_task, mount, name, &upper_child.entry().node)
+                dir_node.link(locked, current_task, mount, name, &upper_child.entry().node)
             })
         })?;
         Ok(())
