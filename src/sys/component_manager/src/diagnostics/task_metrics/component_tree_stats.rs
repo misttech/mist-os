@@ -218,8 +218,8 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
         inspector.root().record_uint("task_count", task_count);
         inspector.root().record(components);
 
-        let stats_node = inspect::stats::Node::snapshot(&inspector, &inspector.root());
-        inspector.root().record(stats_node.take());
+        let stats_node = inspect::stats::StatsNode::new(&inspector);
+        stats_node.record_data_to(inspector.root());
 
         inspector
     }

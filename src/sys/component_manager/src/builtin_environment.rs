@@ -105,7 +105,7 @@ use {
     fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fidl_fuchsia_process as fprocess,
     fidl_fuchsia_sys2 as fsys, fidl_fuchsia_time as ftime, fuchsia_async as fasync,
     fuchsia_component::server::*,
-    fuchsia_inspect::{self as inspect, component, health::Reporter, Inspector},
+    fuchsia_inspect::{component, health::Reporter, stats::InspectorExt, Inspector},
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
     fuchsia_zbi::{ZbiParser, ZbiType},
     fuchsia_zircon::{self as zx, Clock, HandleBased, Resource},
@@ -1145,8 +1145,7 @@ impl BuiltinEnvironment {
         model.root().hooks.install(component_startup_time_stats.hooks()).await;
 
         // Serve stats about inspect in a lazy node.
-        let node = inspect::stats::Node::new(&inspector, inspector.root());
-        inspector.root().record(node.take());
+        inspector.record_lazy_stats();
 
         let root_component_input = root_input_builder.build();
 

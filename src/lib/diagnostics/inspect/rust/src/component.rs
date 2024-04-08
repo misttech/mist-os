@@ -33,7 +33,7 @@
 //! health.set_ok();
 //! ```
 
-use super::{health, stats, Inspector, InspectorConfig, LazyNode};
+use super::{health, stats::InspectorExt, Inspector, InspectorConfig};
 use fuchsia_sync::Mutex;
 use inspect_format::constants;
 use lazy_static::lazy_static;
@@ -49,9 +49,6 @@ lazy_static! {
 
   // Health node based on the global inspector from `inspector()`.
   static ref HEALTH: Arc<Mutex<health::Node>> = Arc::new(Mutex::new(health::Node::new(INSPECTOR.root())));
-
-  // Stats node based on the global inspector from `inspector()`.
-  static ref STATS: stats::Node<LazyNode> = stats::Node::new(&INSPECTOR, INSPECTOR.root());
 }
 
 /// A thread-safe handle to a health reporter.  See `component::health()` for instructions on how
@@ -108,7 +105,7 @@ pub fn health() -> Health {
 /// Serves statistics about inspect such as size or number of dynamic children in the
 /// `fuchsia.inspect.Stats` lazy node.
 pub fn serve_inspect_stats() {
-    lazy_static::initialize(&STATS);
+    INSPECTOR.record_lazy_stats();
 }
 
 #[cfg(test)]

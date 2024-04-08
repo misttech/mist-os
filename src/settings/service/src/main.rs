@@ -8,7 +8,7 @@ use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::OpenFlags;
-use fuchsia_inspect::{self as inspect, component};
+use fuchsia_inspect::component;
 use futures::lock::Mutex;
 use lazy_static::lazy_static;
 use settings::base::get_default_interfaces;
@@ -42,12 +42,13 @@ fn main() -> Result<(), Error> {
     let executor = fasync::LocalExecutor::new();
     tracing::info!("Starting setui-service...");
 
+    let _inspect_server_task = inspect_runtime::publish(
+        component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
+
     // Serve stats about inspect in a lazy node.
-    let inspector = component::inspector();
-    let _inspect_server_task =
-        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
-    let node = inspect::stats::Node::new(inspector, inspector.root());
-    inspector.root().record(node.take());
+    component::serve_inspect_stats();
 
     let default_enabled_interfaces_configuration =
         EnabledInterfacesConfiguration::with_interfaces(get_default_interfaces());

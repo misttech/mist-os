@@ -4,27 +4,37 @@
 //
 //! # Inspect stats node.
 //!
-//! Stats installs a lazy node (or a node with a snapshot) reporting stats about the Inspect being
-//! served by the component (such as size, number of dynamic children, etc).
+//! Stats installs a lazy node (or a node with a snapshot of the current state of things)
+//! reporting stats about the Inspect being served by the component (such as size, number of
+//! dynamic children, etc) at the root of the hierarchy.
+//!
+//! Stats nodes are always at "fuchsia.inspect.Stats".
 //!
 //! # Examples
 //!
 //! ```
-//! use fuchsia_inspect as inspect;
-//! use fuchsia_inspect::stats;
+//! /* This example shows automatically updated stats */
+//!
+//! use fuchsia_inspect::stats::InspectorExt;
 //!
 //! let inspector = /* the inspector of your choice */
-//! let mut root = inspector.root();  // Or perhaps a different Inspect Node of your choice.
-//! let mut stats = stats::Node::new(&inspector, root);
+//! inspector.record_lazy_stats();  // A lazy node containing stats has been installed
+//! ```
+//!
+//! ```
+//! /* This example shows stats which must be manually updated */
+//! use fuchsia_inspect::stats;
+//!
+//! let inspector = ...;  // the inspector you want instrumented
+//! let stats = stats::StatsNode::new(&inspector);
+//! /* do stuff to inspector */
+//! /* ... */
+//! stats.update();  // update the stats node
+//! stats.record_data_to(root);  /* consume the stats node and persist the data */
 //! ```
 
-use super::{private::InspectTypeInternal, InspectType, Inspector, LazyNode, State};
+use super::{private::InspectTypeInternal, Inspector, Node, Property, UintProperty};
 use futures::FutureExt;
-
-/// Contains information about inspect such as size and number of dynamic children.
-pub struct Node<T: InspectType> {
-    inner: T,
-}
 
 // The metric node name, as exposed by the stats node.
 const FUCHSIA_INSPECT_STATS: &str = "fuchsia.inspect.Stats";
@@ -35,52 +45,110 @@ const ALLOCATED_BLOCKS_KEY: &str = "allocated_blocks";
 const DEALLOCATED_BLOCKS_KEY: &str = "deallocated_blocks";
 const FAILED_ALLOCATIONS_KEY: &str = "failed_allocations";
 
-impl<T: InspectType> Node<T> {
-    /// Unwraps the underlying lazy node and returns it.
-    pub fn take(self) -> T {
-        self.inner
-    }
+/// InspectorExt provides a method for installing a "fuchsia.inspect.Stats" lazy node at the root
+/// of the Inspector's hierarchy.
+pub trait InspectorExt {
+    /// Creates a new stats node  that will expose the given `Inspector` stats.
+    fn record_lazy_stats(&self);
 }
 
-impl Node<LazyNode> {
-    /// Creates a new stats node as a child of `parent` that will expose the given `Inspector`
-    /// stats.
-    pub fn new(inspector: &Inspector, parent: &super::Node) -> Self {
-        let weak_root_node = inspector.root().clone_weak();
-        let lazy_node = parent.create_lazy_child(FUCHSIA_INSPECT_STATS, move || {
-            let root_node = weak_root_node.clone_weak();
+impl InspectorExt for Inspector {
+    fn record_lazy_stats(&self) {
+        let weak_root_node = self.root().clone_weak();
+        self.root().record_lazy_child(FUCHSIA_INSPECT_STATS, move || {
+            let weak_root_node = weak_root_node.clone_weak();
             async move {
-                let inspector = Inspector::default();
-                if let Some(state) = root_node.state() {
-                    write_stats(&state, inspector.root());
-                }
-                Ok(inspector)
+                let local_inspector = Inspector::default();
+                let stats =
+                    StatsNode::from_nodes(weak_root_node, local_inspector.root().clone_weak());
+                stats.record_data_to(local_inspector.root());
+                Ok(local_inspector)
             }
             .boxed()
         });
-        Self { inner: lazy_node }
     }
 }
 
-impl Node<super::Node> {
+/// Contains information about inspect such as size and number of dynamic children.
+#[derive(Default)]
+pub struct StatsNode {
+    root_of_instrumented_inspector: Node,
+    stats_root: Node,
+    current_size: UintProperty,
+    maximum_size: UintProperty,
+    total_dynamic_children: UintProperty,
+    allocated_blocks: UintProperty,
+    deallocated_blocks: UintProperty,
+    failed_allocations: UintProperty,
+}
+
+impl StatsNode {
     /// Takes a snapshot of the stats and writes them to the given parent.
-    pub fn snapshot(inspector: &Inspector, parent: &super::Node) -> Self {
-        let node = parent.create_child(FUCHSIA_INSPECT_STATS);
-        if let Some(state) = inspector.state() {
-            write_stats(&state, &node);
-        }
-        Self { inner: node }
+    ///
+    /// The returned `StatsNode` is RAII.
+    pub fn new(inspector: &Inspector) -> Self {
+        let stats_root = inspector.root().create_child(FUCHSIA_INSPECT_STATS);
+        Self::from_nodes(inspector.root().clone_weak(), stats_root)
     }
-}
 
-fn write_stats(state: &State, node: &super::Node) {
-    if let Some(stats) = state.try_lock().ok().map(|state| state.stats()) {
-        node.record_uint(CURRENT_SIZE_KEY, stats.current_size as u64);
-        node.record_uint(MAXIMUM_SIZE_KEY, stats.maximum_size as u64);
-        node.record_uint(TOTAL_DYNAMIC_CHILDREN_KEY, stats.total_dynamic_children as u64);
-        node.record_uint(ALLOCATED_BLOCKS_KEY, stats.allocated_blocks as u64);
-        node.record_uint(DEALLOCATED_BLOCKS_KEY, stats.deallocated_blocks as u64);
-        node.record_uint(FAILED_ALLOCATIONS_KEY, stats.failed_allocations as u64);
+    /// Update the stats with the current state of the Inspector being instrumented.
+    pub fn update(&self) {
+        if let Some(stats) = self
+            .root_of_instrumented_inspector
+            .state()
+            .map(|outer_state| outer_state.try_lock().ok().map(|state| state.stats()))
+            .flatten()
+        {
+            // just piggy-backing on current_size; it doesn't matter how the atomic_update
+            // is triggered
+            self.current_size.atomic_update(|_| {
+                self.current_size.set(stats.current_size as u64);
+                self.maximum_size.set(stats.maximum_size as u64);
+                self.total_dynamic_children.set(stats.total_dynamic_children as u64);
+                self.allocated_blocks.set(stats.allocated_blocks as u64);
+                self.deallocated_blocks.set(stats.deallocated_blocks as u64);
+                self.failed_allocations.set(stats.failed_allocations as u64);
+            });
+        }
+    }
+
+    /// Tie the lifetime of the statistics to the provided `fuchsia_inspect::Node`.
+    pub fn record_data_to(self, lifetime: &Node) {
+        lifetime.record(self.stats_root);
+        lifetime.record(self.current_size);
+        lifetime.record(self.maximum_size);
+        lifetime.record(self.total_dynamic_children);
+        lifetime.record(self.allocated_blocks);
+        lifetime.record(self.deallocated_blocks);
+        lifetime.record(self.failed_allocations);
+    }
+
+    /// Write stats from the state of `root_of_instrumented_inspector` to `stats_root`
+    fn from_nodes(root_of_instrumented_inspector: Node, stats_root: Node) -> Self {
+        if let Some(stats) = root_of_instrumented_inspector
+            .state()
+            .map(|outer_state| outer_state.try_lock().ok().map(|state| state.stats()))
+            .flatten()
+        {
+            let mut n = stats_root.atomic_update(|stats_root| StatsNode {
+                root_of_instrumented_inspector,
+                current_size: stats_root.create_uint(CURRENT_SIZE_KEY, stats.current_size as u64),
+                maximum_size: stats_root.create_uint(MAXIMUM_SIZE_KEY, stats.maximum_size as u64),
+                total_dynamic_children: stats_root
+                    .create_uint(TOTAL_DYNAMIC_CHILDREN_KEY, stats.total_dynamic_children as u64),
+                allocated_blocks: stats_root
+                    .create_uint(ALLOCATED_BLOCKS_KEY, stats.allocated_blocks as u64),
+                deallocated_blocks: stats_root
+                    .create_uint(DEALLOCATED_BLOCKS_KEY, stats.deallocated_blocks as u64),
+                failed_allocations: stats_root
+                    .create_uint(FAILED_ALLOCATIONS_KEY, stats.failed_allocations as u64),
+                ..StatsNode::default()
+            });
+            n.stats_root = stats_root;
+            n
+        } else {
+            StatsNode { root_of_instrumented_inspector, ..StatsNode::default() }
+        }
     }
 }
 
@@ -93,9 +161,19 @@ mod tests {
     #[fuchsia::test]
     fn inspect_stats() {
         let inspector = Inspector::default();
-        let snapshot_parent = inspector.root().create_child("snapshot");
-        let _snapshot_node = super::Node::snapshot(&inspector, &snapshot_parent);
-        let _node = super::Node::new(&inspector, inspector.root());
+        inspector.record_lazy_stats();
+
+        assert_data_tree!(inspector, root: {
+            "fuchsia.inspect.Stats": {
+                current_size: 4096u64,
+                maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
+                total_dynamic_children: 1u64,  // snapshot was taken before adding any lazy node.
+                allocated_blocks: 4u64,
+                deallocated_blocks: 0u64,
+                failed_allocations: 0u64,
+            },
+        });
+
         inspector.root().record_lazy_child("foo", || {
             async move {
                 let inspector = Inspector::default();
@@ -104,28 +182,18 @@ mod tests {
             }
             .boxed()
         });
-        assert_json_diff!(inspector, root: {
+        assert_data_tree!(inspector, root: {
             foo: {
                 a: 1u64,
-            },
-            "snapshot": {
-                "fuchsia.inspect.Stats": {
-                    current_size: 4096u64,
-                    maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
-                    total_dynamic_children: 0u64,  // snapshot was taken before adding any lazy node.
-                    allocated_blocks: 5u64,
-                    deallocated_blocks: 0u64,
-                    failed_allocations: 0u64,
-                },
             },
             "fuchsia.inspect.Stats": {
                 current_size: 4096u64,
                 maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
                 total_dynamic_children: 2u64,
-                allocated_blocks: 22u64,
+                allocated_blocks: 7u64,
                 deallocated_blocks: 0u64,
                 failed_allocations: 0u64,
-            }
+            },
         });
 
         for i in 0..100 {
@@ -141,7 +209,7 @@ mod tests {
                 current_size: 61440u64,
                 maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
                 total_dynamic_children: 2u64,
-                allocated_blocks: 324u64,
+                allocated_blocks: 309u64,
                 // 2 blocks are deallocated because of the "drop" int block and its
                 // STRING_REFERENCE
                 deallocated_blocks: 2u64,
@@ -158,10 +226,75 @@ mod tests {
                 current_size: 262144u64,
                 maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
                 total_dynamic_children: 2u64,
-                allocated_blocks: 680u64,
+                allocated_blocks: 665u64,
                 // 2 additional blocks are deallocated because of the failed allocation
                 deallocated_blocks: 4u64,
                 failed_allocations: 1u64,
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    fn stats_are_updated() {
+        let inspector = Inspector::default();
+        let stats = super::StatsNode::new(&inspector);
+        assert_json_diff!(inspector, root: {
+            "fuchsia.inspect.Stats": {
+                current_size: 4096u64,
+                maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
+                total_dynamic_children: 0u64,
+                allocated_blocks: 3u64,
+                deallocated_blocks: 0u64,
+                failed_allocations: 0u64,
+            }
+        });
+
+        inspector.root().record_int("abc", 5);
+
+        // asserting that everything is the same, since we didn't call `stats.update()`
+        assert_json_diff!(inspector, root: {
+            abc: 5i64,
+            "fuchsia.inspect.Stats": {
+                current_size: 4096u64,
+                maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
+                total_dynamic_children: 0u64,
+                allocated_blocks: 3u64,
+                deallocated_blocks: 0u64,
+                failed_allocations: 0u64,
+            }
+        });
+
+        stats.update();
+
+        assert_json_diff!(inspector, root: {
+            abc: 5i64,
+            "fuchsia.inspect.Stats": {
+                current_size: 4096u64,
+                maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
+                total_dynamic_children: 0u64,
+                allocated_blocks: 17u64,
+                deallocated_blocks: 0u64,
+                failed_allocations: 0u64,
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    fn recorded_stats_are_persisted() {
+        let inspector = Inspector::default();
+        {
+            let stats = super::StatsNode::new(&inspector);
+            stats.record_data_to(inspector.root());
+        }
+
+        assert_data_tree!(inspector, root: {
+            "fuchsia.inspect.Stats": {
+                current_size: 4096u64,
+                maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
+                total_dynamic_children: 0u64,
+                allocated_blocks: 3u64,
+                deallocated_blocks: 0u64,
+                failed_allocations: 0u64,
             }
         });
     }
