@@ -4,13 +4,13 @@
 
 use {
     crate::update::{paver, BuildInfo, SystemInfo},
-    anyhow::anyhow,
+    anyhow::{anyhow, Context as _},
     epoch::EpochFile,
     fidl_fuchsia_mem as fmem,
     fidl_fuchsia_paver::{Asset, BootManagerProxy, DataSinkProxy},
     fuchsia_inspect as inspect,
     serde::{Deserialize, Serialize},
-    std::{convert::TryInto as _, str::FromStr},
+    std::str::FromStr,
     tracing::{error, info, warn},
     update_package::{SystemVersion, UpdatePackage},
 };
@@ -242,19 +242,20 @@ async fn get_vbmeta_and_zbi_hash_from_environment(
 
 // Compute the SHA256 hash of the buffer with the trailing zeros ignored.
 fn sha256_hash_ignore_trailing_zeros(
-    buffer: fmem::Buffer,
+    fmem::Buffer { vmo, size }: fmem::Buffer,
 ) -> Result<fuchsia_hash::Sha256, anyhow::Error> {
-    let mut size = buffer.size.try_into()?;
-    let mut data = vec![0u8; size];
-    buffer.vmo.read(&mut data, 0)?;
-    while size > 0 && data[size - 1] == 0 {
-        size -= 1;
+    let mapping =
+        mapped_vmo::ImmutableMapping::create_from_vmo(&vmo, true).context("mapping the buffer")?;
+    let size: usize = size.try_into().context("buffer size as usize")?;
+    if size > mapping.len() {
+        anyhow::bail!("buffer size {size} larger than vmo size {}", mapping.len());
     }
-    if size == 0 {
-        warn!(size = buffer.size, "entire buffer is 0");
-    }
+    let n = mapping[..size].iter().rposition(|b| *b != 0).map(|p| p + 1).unwrap_or_else(|| {
+        warn!(size, "entire buffer is 0");
+        0
+    });
     Ok(From::from(*AsRef::<[u8; 32]>::as_ref(&<sha2::Sha256 as sha2::Digest>::digest(
-        &data[..size],
+        &mapping[..n],
     ))))
 }
 

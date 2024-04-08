@@ -20,7 +20,6 @@ use {
         Future,
     },
     include_str_from_working_dir::include_str_from_working_dir_env,
-    sha2::Digest as _,
     std::{collections::HashSet, pin::Pin, sync::Arc, time::Duration},
     tracing::{error, info, warn},
 };
@@ -1228,23 +1227,15 @@ async fn get_image_buffer_if_hash_and_size_match(
 fn sha256_buffer(
     fmem::Buffer { vmo, size }: &fmem::Buffer,
 ) -> anyhow::Result<fuchsia_hash::Sha256> {
-    let mut hasher = sha2::Sha256::new();
-    const SCRATCH_SIZE: usize = 1024 * 16;
-    // Guaranteeing SCRATCH_SIZE is a valid u64 means all the following `as` casts never truncate.
-    static_assertions::const_assert_eq!(SCRATCH_SIZE, SCRATCH_SIZE as u64 as usize);
-    let mut scratch = vec![0; SCRATCH_SIZE];
-    let mut offset = 0;
-    loop {
-        let n = (*size - offset).min(SCRATCH_SIZE as u64) as usize;
-        if n == 0 {
-            break;
-        }
-        let slice = &mut scratch[..n];
-        let () = vmo.read(slice, offset).context("reading vmo")?;
-        let () = hasher.update(slice);
-        offset += n as u64;
+    let mapping =
+        mapped_vmo::ImmutableMapping::create_from_vmo(vmo, true).context("mapping the buffer")?;
+    let size: usize = (*size).try_into().context("buffer size as usize")?;
+    if size > mapping.len() {
+        anyhow::bail!("buffer size {size} larger than vmo size {}", mapping.len());
     }
-    Ok(fuchsia_hash::Sha256::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize())))
+    Ok(From::from(*AsRef::<[u8; 32]>::as_ref(&<sha2::Sha256 as sha2::Digest>::digest(
+        &mapping[..size],
+    ))))
 }
 
 async fn sync_package_cache(pkg_cache: &fpkg::PackageCacheProxy) -> Result<(), Error> {

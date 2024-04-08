@@ -18,7 +18,6 @@ use {
     fuchsia_component::client::connect_to_protocol,
     fuchsia_hash::Hash,
     fuchsia_zircon as zx,
-    sha2::Digest as _,
     std::io,
     tracing::{error, info, warn},
 };
@@ -245,36 +244,33 @@ async fn is_image_up_to_date(
     asset: fpaver::Asset,
     latest: &update_package::ImageMetadata,
 ) -> Result<bool, anyhow::Error> {
-    let current_image = asset_reader
+    let mut current_image = asset_reader
         .read_asset(current_config, asset)
         .await
         .context("read_asset fidl error")?
         .map_err(|s| anyhow!("read_asset responded with {}", zx::Status::from_raw(s)))?;
-    let current_hash = sha256_buffer(
-        &current_image,
-        // Caps at the size of the latest image because the paver sometimes returns extra data.
-        current_image.size.min(latest.size()),
-    )
-    .context("hashing current")?;
+    // The size field of the buffer returned by DataSink.ReadAsset will be either the size of the
+    // entire partition or just the image itself.
+    if current_image.size < latest.size() {
+        return Ok(false);
+    }
+    current_image.size = latest.size();
+    let current_hash = sha256_buffer(&current_image).context("hashing current")?;
     Ok(current_hash == latest.sha256())
 }
 
 fn sha256_buffer(
-    buffer: &fmem::Buffer,
-    mut remaining: u64,
-) -> Result<fuchsia_hash::Sha256, anyhow::Error> {
-    let mut hasher = sha2::Sha256::new();
-    let mut offset = 0;
-    let mut tmp = vec![0u8; 32 * 1024];
-    while remaining > 0 {
-        let chunk_len = remaining.min(tmp.len() as u64) as usize;
-        let chunk = &mut tmp[..chunk_len];
-        let () = buffer.vmo.read(chunk, offset).context("reading from image vmo")?;
-        let () = hasher.update(chunk);
-        offset += chunk_len as u64;
-        remaining -= chunk_len as u64;
+    fmem::Buffer { vmo, size }: &fmem::Buffer,
+) -> anyhow::Result<fuchsia_hash::Sha256> {
+    let mapping =
+        mapped_vmo::ImmutableMapping::create_from_vmo(vmo, true).context("mapping the buffer")?;
+    let size: usize = (*size).try_into().context("buffer size as usize")?;
+    if size > mapping.len() {
+        anyhow::bail!("buffer size {size} larger than vmo size {}", mapping.len());
     }
-    Ok(fuchsia_hash::Sha256::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize())))
+    Ok(From::from(*AsRef::<[u8; 32]>::as_ref(&<sha2::Sha256 as sha2::Digest>::digest(
+        &mapping[..size],
+    ))))
 }
 
 #[cfg(test)]
