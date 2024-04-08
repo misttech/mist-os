@@ -44,7 +44,7 @@ use {
     cm_rust::*,
     cm_rust_testing::*,
     cm_types::RelativePath,
-    fasync::{pin_mut, TestExecutor},
+    fasync::TestExecutor,
     fidl::endpoints::{ClientEnd, ProtocolMarker, ServerEnd},
     fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
@@ -3412,8 +3412,7 @@ async fn source_component_stopping_when_routing() {
 
     // Start to stop the component. This will stall because the framework will be
     // waiting the controller to respond.
-    let stop_fut = ActionSet::register(root.clone(), StopAction::new(false));
-    futures::pin_mut!(stop_fut);
+    let mut stop_fut = pin!(ActionSet::register(root.clone(), StopAction::new(false)));
     assert_matches!(TestExecutor::poll_until_stalled(&mut stop_fut).await, Poll::Pending);
 
     // Start to request a capability from the component.
@@ -3916,8 +3915,7 @@ fn capability_requested_protocol_on_delivery_readable() {
         assert!(!provider.is_started().await);
 
         // Make a request by writing to the channel. Provider should only then start.
-        let echo_call = echo_proxy.echo_string(Some("hippos"));
-        pin_mut!(echo_call);
+        let mut echo_call = pin!(echo_proxy.echo_string(Some("hippos")));
         TestExecutor::poll_until_stalled(&mut echo_call)
             .await
             .expect_pending("Request should be buffered in the channel in the event stream");

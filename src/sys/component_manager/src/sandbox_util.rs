@@ -422,10 +422,9 @@ pub mod tests {
     use bedrock_error::DowncastErrorForTest;
     use cm_rust::Availability;
     use cm_types::RelativePath;
-    use fuchsia_async::pin_mut;
     use fuchsia_async::TestExecutor;
     use sandbox::{Data, Receiver};
-    use std::{sync::Weak, task::Poll};
+    use std::{pin::pin, sync::Weak, task::Poll};
 
     #[fuchsia::test]
     async fn get_capability() {
@@ -602,8 +601,7 @@ pub mod tests {
         let route_counter = RouteCounter::new(sender.into());
         let router = route_counter.clone().on_readable(scope.clone(), fio::DirentType::Service);
 
-        let receive = receiver.receive();
-        pin_mut!(receive);
+        let mut receive = pin!(receiver.receive());
         assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
 
         let component = ComponentInstance::new_root(
@@ -650,8 +648,7 @@ pub mod tests {
         let route_counter = RouteCounter::new(sender.into());
         let router = route_counter.clone().on_readable(scope.clone(), fio::DirentType::Service);
 
-        let receive = receiver.receive();
-        pin_mut!(receive);
+        let mut receive = pin!(receiver.receive());
         assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
 
         let component = ComponentInstance::new_root(
