@@ -34,10 +34,7 @@
             to: "#vulkan-tests",
         },
         {
-            event_stream: [
-                "capability_requested",
-                "directory_ready",
-            ],
+            event_stream: [ "capability_requested" ],
             from: "parent",
             to: "#vulkan-tests",
             scope: "#vulkan-tests",
