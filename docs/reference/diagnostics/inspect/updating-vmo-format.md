@@ -14,7 +14,6 @@ to alter the VMO format:
 1. [Update the Rust writer.](#update-rust-writer)
 1. [Update the C++ writer.](#update-cpp-writer)
 1. [(Potentially) Update the validator.](#update-validator-tests)
-1. [Update the Dart writer.](#update-dart)
 1. Update the documentation.
 1. (Not a change)(Optional) Send a feature announcement.
 
@@ -51,12 +50,6 @@ To test a reader and writer:
    them with the original tests that are written in terms of the high level API.
 
 1. Use the two changes for reference and duplicate them in the second language.
-
-   It's much easier now that you aren't designing an API without actually using it.
-   Ideally, you would also update the Dart library at this point.
-   There is no Dart reader, so changes in the Rust/C++ writers won't break the Dart library;
-   however, the ability to read a feature can't be removed from the Rust and C++ libraries unless
-   the Dart one is updated.
 
 1. (Optional) Depending on the contents of your change, you may have to update the
    [validator][validator-tests] tests as you go, since changes to the existing format of existing
@@ -325,30 +318,15 @@ This section describes how to implement the wrapper methods declared previously.
 1. Update [reader unit tests][reader-unittest-cc] with tests for your high-level reader
    implementation.
 
-## Update Dart {#update-dart}
-
-{% comment %}
-TODO([https://fxbug.dev/42119402][update-this-doc-bug])
-{% endcomment %}
-
-## Add to validator tests {#update-validator-tests}
-
-{% comment %}
-TODO([https://fxbug.dev/42119402][update-this-doc-bug])
-{% endcomment %}
 
 ## Example change chain
 
 1. [C++ Reader](https://fuchsia-review.googlesource.com/c/fuchsia/+/603056/6)
 1. [Rust Reader](https://fuchsia-review.googlesource.com/c/fuchsia/+/599946/14)
 1. [Rust Writer](https://fuchsia-review.googlesource.com/c/fuchsia/+/599947)
-
-{% comment %}
-1. TODO([https://fxbug.dev/42119402][update-this-doc-bug]): add C++ writer example
-1. TODO([https://fxbug.dev/42119402][update-this-doc-bug]): add validator changes
-1. TODO([https://fxbug.dev/42119402][update-this-doc-bug]): add documentation changes
-{% endcomment %}
-
+1. [Rust Validator Changes][rust-puppet-validator]
+1. [C++ Validator Changes][cpp-puppet-validator]
+1. [Documentation Updates][document-updates]
 
 <!-- xrefs -->
 [update-this-doc-bug]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=43131
@@ -371,3 +349,7 @@ TODO([https://fxbug.dev/42119402][update-this-doc-bug])
 [types-header]: /zircon/system/ulib/inspect/include/lib/inspect/cpp/vmo/types.h
 [inspect-vmo]: /docs/reference/platform-spec/diagnostics/inspect-vmo-format.md
 [validator-tests]: /src/diagnostics/validator/inspect/src
+[rust-puppet-validator]: https://fuchsia-review.googlesource.com/c/fuchsia/+/643054/
+[cpp-puppet-validator]: https://fuchsia-review.googlesource.com/c/fuchsia/+/642322/
+[document-updates]: https://fuchsia-review.googlesource.com/c/fuchsia/+/642401/
+
