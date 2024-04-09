@@ -48,6 +48,7 @@ enum class Attributes {
   kAttributeCount = 0x30,
 };
 
+// UFS Specification Version 3.1, section 6.4 "Reference Clock".
 enum AttributeReferenceClock {
   k19_2MHz = 0x0,
   k26MHz = 0x1,

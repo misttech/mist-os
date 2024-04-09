@@ -183,6 +183,39 @@ zx::result<> Ufs::Isr() {
   if (interrupt_status.uic_error()) {
     zxlogf(ERROR, "UFS: UIC error on ISR");
     InterruptStatusReg::Get().FromValue(0).set_uic_error(true).WriteTo(&mmio_);
+
+    // UECPA for Host UIC Error Code within PHY Adapter Layer.
+    if (HostUicErrorCodePhyAdapterLayerReg::Get().ReadFrom(&mmio_).uic_phy_adapter_layer_error()) {
+      zxlogf(ERROR, "UECPA error code: 0x%x",
+             HostUicErrorCodePhyAdapterLayerReg::Get()
+                 .ReadFrom(&mmio_)
+                 .uic_phy_adapter_layer_error_code());
+    }
+    // UECDL for Host UIC Error Code within Data Link Layer.
+    if (HostUicErrorCodeDataLinkLayerReg::Get().ReadFrom(&mmio_).uic_data_link_layer_error()) {
+      zxlogf(ERROR, "UECDL error code: 0x%x",
+             HostUicErrorCodeDataLinkLayerReg::Get()
+                 .ReadFrom(&mmio_)
+                 .uic_data_link_layer_error_code());
+    }
+    // UECN for Host UIC Error Code within Network Layer.
+    if (HostUicErrorCodeNetworkLayerReg::Get().ReadFrom(&mmio_).uic_network_layer_error()) {
+      zxlogf(
+          ERROR, "UECN error code: 0x%x",
+          HostUicErrorCodeNetworkLayerReg::Get().ReadFrom(&mmio_).uic_network_layer_error_code());
+    }
+    // UECT for Host UIC Error Code within Transport Layer.
+    if (HostUicErrorCodeTransportLayerReg::Get().ReadFrom(&mmio_).uic_transport_layer_error()) {
+      zxlogf(ERROR, "UECT error code: 0x%x",
+             HostUicErrorCodeTransportLayerReg::Get()
+                 .ReadFrom(&mmio_)
+                 .uic_transport_layer_error_code());
+    }
+    // UECDME for Host UIC Error Code within DME subcomponent.
+    if (HostUicErrorCodeReg::Get().ReadFrom(&mmio_).uic_dme_error()) {
+      zxlogf(ERROR, "UECDME error code: 0x%x",
+             HostUicErrorCodeReg::Get().ReadFrom(&mmio_).uic_dme_error_code());
+    }
   }
   if (interrupt_status.device_fatal_error_status()) {
     zxlogf(ERROR, "UFS: Device fatal error on ISR");
@@ -220,7 +253,6 @@ zx::result<> Ufs::Isr() {
   if (interrupt_status.uic_command_completion_status()) {
     // TODO(https://fxbug.dev/42075643): Handle UIC completion
     zxlogf(ERROR, "UFS: UIC completion not yet implemented");
-    InterruptStatusReg::Get().FromValue(0).set_uic_command_completion_status(true).WriteTo(&mmio_);
   }
 
   return zx::ok();
@@ -506,7 +538,7 @@ zx::result<> Ufs::InitDeviceInterface() {
       .set_uic_link_lost_status_enable(true)
       .set_uic_hibernate_enter_status_enable(false)  // The hibernate commands use polling mode.
       .set_uic_hibernate_exit_status_enable(false)   // The hibernate commands use polling mode.
-      .set_uic_power_mode_status_enable(true)
+      .set_uic_power_mode_status_enable(false)       // The power mode uses polling mode.
       .set_uic_test_mode_status_enable(true)
       .set_uic_error_enable(true)
       .set_uic_dme_endpointreset(true)
@@ -559,6 +591,11 @@ zx::result<> Ufs::InitDeviceInterface() {
 
   if (zx::result<> result = device_manager_->InitReferenceClock(); result.is_error()) {
     zxlogf(ERROR, "Failed to initialize reference clock %s", result.status_string());
+    return result.take_error();
+  }
+
+  if (zx::result<> result = device_manager_->InitUniproAttributes(); result.is_error()) {
+    zxlogf(ERROR, "Failed to initialize Unipro attributes %s", result.status_string());
     return result.take_error();
   }
 

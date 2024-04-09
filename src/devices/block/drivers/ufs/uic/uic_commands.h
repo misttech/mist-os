@@ -20,6 +20,11 @@ constexpr uint16_t PA_AvailRxDataLanes = 0x1540;
 constexpr uint16_t PA_ConnectedTxDataLanes = 0x1561;
 constexpr uint16_t PA_ConnectedRxDataLanes = 0x1581;
 constexpr uint16_t PA_MaxRxHSGear = 0x1587;
+constexpr uint16_t PA_Granularity = 0x15AA;
+constexpr uint16_t PA_TActivate = 0x15A8;
+
+constexpr uint16_t PA_RemoteVerInfo = 0x15A0;
+constexpr uint16_t PA_LocalVerInfo = 0x15A9;
 
 // UFSHCI Specification Version 3.0, section 7.4 "UIC Power Mode Change".
 constexpr uint16_t PA_ActiveTxDataLanes = 0x1560;
@@ -30,8 +35,23 @@ constexpr uint16_t PA_TxTermination = 0x1569;
 constexpr uint16_t PA_RxTermination = 0x1584;
 constexpr uint16_t PA_HSSeries = 0x156A;
 constexpr uint16_t PA_PWRModeUserData0 = 0x15B0;
+constexpr uint16_t PA_PWRModeUserData1 = 0x15B1;
+constexpr uint16_t PA_PWRModeUserData2 = 0x15B2;
+constexpr uint16_t PA_PWRModeUserData3 = 0x15B3;
+constexpr uint16_t PA_PWRModeUserData4 = 0x15B4;
+constexpr uint16_t PA_PWRModeUserData5 = 0x15B5;
+
 constexpr uint16_t PA_TxHsAdaptType = 0x15D4;
 constexpr uint16_t PA_PWRMode = 0x1571;
+
+constexpr uint16_t DME_LocalFC0ProtectionTimeOutVal = 0xD041;
+constexpr uint16_t DME_LocalTC0ReplayTimeOutVal = 0xD042;
+constexpr uint16_t DME_LocalAFC0ReqTimeOutVal = 0xD043;
+
+// Currently, UFS uses TC0 only.
+constexpr uint16_t DL_FC0ProtectionTimeOutVal_Default = 8191;
+constexpr uint16_t DL_TC0ReplayTimeOutVal_Default = 65535;
+constexpr uint16_t DL_AFC0ReqTimeOutVal_Default = 32767;
 
 constexpr uint32_t kUicTimeoutUsec = 5000000;
 
@@ -113,6 +133,30 @@ class DmeSetUicCommand : public UicCommand {
   explicit DmeSetUicCommand(Ufs &ufs, uint16_t mbi_attribute, uint16_t gen_selector_index,
                             uint32_t value)
       : UicCommand(ufs, UicCommandOpcode::kDmeSet, mbi_attribute, gen_selector_index),
+        value_(value) {}
+
+ protected:
+  std::tuple<uint32_t, uint32_t, uint32_t> Arguments() const override;
+
+ private:
+  uint32_t value_;
+};
+
+class DmePeerGetUicCommand : public UicCommand {
+ public:
+  explicit DmePeerGetUicCommand(Ufs &ufs, uint16_t mbi_attribute, uint16_t gen_selector_index)
+      : UicCommand(ufs, UicCommandOpcode::kDmePeerGet, mbi_attribute, gen_selector_index) {}
+
+ protected:
+  std::tuple<uint32_t, uint32_t, uint32_t> Arguments() const override;
+  std::optional<uint32_t> ReturnValue() override;
+};
+
+class DmePeerSetUicCommand : public UicCommand {
+ public:
+  explicit DmePeerSetUicCommand(Ufs &ufs, uint16_t mbi_attribute, uint16_t gen_selector_index,
+                                uint32_t value)
+      : UicCommand(ufs, UicCommandOpcode::kDmePeerSet, mbi_attribute, gen_selector_index),
         value_(value) {}
 
  protected:

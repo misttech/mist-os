@@ -66,6 +66,7 @@ class DeviceManager {
 
   // Device power management.
   zx::result<> InitReferenceClock();
+  zx::result<> InitUniproAttributes();
   zx::result<> InitUicPowerMode();
   zx::result<> InitUfsPowerMode();
 
@@ -88,6 +89,9 @@ class DeviceManager {
 
   zx::result<uint32_t> ReadAttribute(Attributes attribute);
   zx::result<> WriteAttribute(Attributes attribute, uint32_t value);
+  zx::result<uint32_t> DmeGet(uint16_t mbi_attribute);
+  zx::result<uint32_t> DmePeerGet(uint16_t mbi_attribute);
+  zx::result<> DmeSet(uint16_t mbi_attribute, uint32_t value);
 
   zx::result<> SetPowerCondition(scsi::PowerCondition power_condition);
 

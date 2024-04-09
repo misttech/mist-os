@@ -30,6 +30,12 @@ class UicCmdProcessor {
 
   static void DefaultDmeGetHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1, uint32_t ucmdarg2,
                                    uint32_t ucmdarg3);
+  static void DefaultDmeSetHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1, uint32_t ucmdarg2,
+                                   uint32_t ucmdarg3);
+  static void DefaultDmePeerGetHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1,
+                                       uint32_t ucmdarg2, uint32_t ucmdarg3);
+  static void DefaultDmePeerSetHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1,
+                                       uint32_t ucmdarg2, uint32_t ucmdarg3);
   static void DefaultDmeLinkStartUpHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1,
                                            uint32_t ucmdarg2, uint32_t ucmdarg3);
   static void DefaultDmeHibernateEnterHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1,
@@ -39,6 +45,9 @@ class UicCmdProcessor {
 
   DEF_DEFAULT_HANDLER_BEGIN(UicCommandOpcode, UicCmdHandler)
   DEF_DEFAULT_HANDLER(UicCommandOpcode::kDmeGet, DefaultDmeGetHandler)
+  DEF_DEFAULT_HANDLER(UicCommandOpcode::kDmeSet, DefaultDmeSetHandler)
+  DEF_DEFAULT_HANDLER(UicCommandOpcode::kDmePeerGet, DefaultDmePeerGetHandler)
+  DEF_DEFAULT_HANDLER(UicCommandOpcode::kDmePeerSet, DefaultDmePeerSetHandler)
   DEF_DEFAULT_HANDLER(UicCommandOpcode::kDmeLinkStartUp, DefaultDmeLinkStartUpHandler)
   DEF_DEFAULT_HANDLER(UicCommandOpcode::kDmeHibernateEnter, DefaultDmeHibernateEnterHandler)
   DEF_DEFAULT_HANDLER(UicCommandOpcode::kDmeHibernateExit, DefaultDmeHibernateExitHandler)

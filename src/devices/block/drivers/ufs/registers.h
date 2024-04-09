@@ -172,6 +172,71 @@ class HostControllerEnableReg
   static auto Get() { return hwreg::RegisterAddr<HostControllerEnableReg>(RegisterMap::kHCE); }
 };
 
+// UFSHCI Specification Version 3.0, section 5.3.5
+// "Offset 38h: UECPA – Host UIC Error Code PHY Adapter Layer".
+class HostUicErrorCodePhyAdapterLayerReg
+    : public hwreg::RegisterBase<HostUicErrorCodePhyAdapterLayerReg, uint32_t,
+                                 hwreg::EnablePrinter> {
+ public:
+  DEF_BIT(31, uic_phy_adapter_layer_error);
+  DEF_FIELD(4, 0, uic_phy_adapter_layer_error_code);
+
+  static auto Get() {
+    return hwreg::RegisterAddr<HostUicErrorCodePhyAdapterLayerReg>(RegisterMap::kUECPA);
+  }
+};
+
+// UFSHCI Specification Version 3.0, section 5.3.6
+// "Offset 3Ch: UECDL – Host UIC Error Code Data Link Layer".
+class HostUicErrorCodeDataLinkLayerReg
+    : public hwreg::RegisterBase<HostUicErrorCodeDataLinkLayerReg, uint32_t, hwreg::EnablePrinter> {
+ public:
+  DEF_BIT(31, uic_data_link_layer_error);
+  DEF_FIELD(15, 0, uic_data_link_layer_error_code);
+
+  static auto Get() {
+    return hwreg::RegisterAddr<HostUicErrorCodeDataLinkLayerReg>(RegisterMap::kUECDL);
+  }
+};
+
+// UFSHCI Specification Version 3.0, section 5.3.7
+// "Offset 40h: UECN – Host UIC Error Code Network Layer".
+class HostUicErrorCodeNetworkLayerReg
+    : public hwreg::RegisterBase<HostUicErrorCodeNetworkLayerReg, uint32_t, hwreg::EnablePrinter> {
+ public:
+  DEF_BIT(31, uic_network_layer_error);
+  DEF_FIELD(2, 0, uic_network_layer_error_code);
+
+  static auto Get() {
+    return hwreg::RegisterAddr<HostUicErrorCodeNetworkLayerReg>(RegisterMap::kUECN);
+  }
+};
+
+// UFSHCI Specification Version 3.0, section 5.3.8
+// "Offset 44h: UECT – Host UIC Error Code Transport Layer".
+class HostUicErrorCodeTransportLayerReg
+    : public hwreg::RegisterBase<HostUicErrorCodeTransportLayerReg, uint32_t,
+                                 hwreg::EnablePrinter> {
+ public:
+  DEF_BIT(31, uic_transport_layer_error);
+  DEF_FIELD(6, 0, uic_transport_layer_error_code);
+
+  static auto Get() {
+    return hwreg::RegisterAddr<HostUicErrorCodeTransportLayerReg>(RegisterMap::kUECT);
+  }
+};
+
+// UFSHCI Specification Version 3.0, section 5.3.9
+// "Offset 48h: UECDME – Host UIC Error Code".
+class HostUicErrorCodeReg
+    : public hwreg::RegisterBase<HostUicErrorCodeReg, uint32_t, hwreg::EnablePrinter> {
+ public:
+  DEF_BIT(31, uic_dme_error);
+  DEF_FIELD(3, 0, uic_dme_error_code);
+
+  static auto Get() { return hwreg::RegisterAddr<HostUicErrorCodeReg>(RegisterMap::kUECDME); }
+};
+
 // UFSHCI Specification Version 3.0, section 5.4.1
 // "Offset 50h: UTRLBA – UTP Transfer Request List Base Address".
 class UtrListBaseAddressReg

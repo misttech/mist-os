@@ -126,7 +126,7 @@ TEST_F(RegisterTest, InterruptEnable) {
       InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_hibernate_enter_status_enable());
   EXPECT_FALSE(
       InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_hibernate_exit_status_enable());
-  EXPECT_TRUE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_power_mode_status_enable());
+  EXPECT_FALSE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_power_mode_status_enable());
   EXPECT_TRUE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_test_mode_status_enable());
   EXPECT_TRUE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_error_enable());
   EXPECT_TRUE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_dme_endpointreset());
@@ -157,7 +157,7 @@ TEST_F(RegisterTest, HostControllerStatus) {
   EXPECT_EQ(HostControllerStatusReg::Get()
                 .ReadFrom(&ufs_->GetMmio())
                 .uic_power_mode_change_request_status(),
-            0);
+            HostControllerStatusReg::PowerModeStatus::kPowerLocal);
   EXPECT_TRUE(HostControllerStatusReg::Get().ReadFrom(&ufs_->GetMmio()).uic_command_ready());
   EXPECT_TRUE(HostControllerStatusReg::Get()
                   .ReadFrom(&ufs_->GetMmio())
@@ -180,15 +180,18 @@ TEST_F(RegisterTest, HostControllerEnable) {
 }
 
 TEST_F(RegisterTest, UtpTransferRequestListBaseAddress) {
-  // TODO(https://fxbug.dev/42075643): Writing unit test after a transfer request list is implemented
+  // TODO(https://fxbug.dev/42075643): Writing unit test after a transfer request list is
+  // implemented
 }
 
 TEST_F(RegisterTest, UtpTransferRequestListDoorbell) {
-  // TODO(https://fxbug.dev/42075643): Writing unit test after a transfer request list is implemented
+  // TODO(https://fxbug.dev/42075643): Writing unit test after a transfer request list is
+  // implemented
 }
 
 TEST_F(RegisterTest, UtpTransferRequestListRunStop) {
-  // TODO(https://fxbug.dev/42075643): Writing unit test after a transfer request list is implemented
+  // TODO(https://fxbug.dev/42075643): Writing unit test after a transfer request list is
+  // implemented
 }
 
 TEST_F(RegisterTest, UtpTaskManagementRequestListBaseAddress) {

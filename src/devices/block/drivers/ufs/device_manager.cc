@@ -7,6 +7,8 @@
 #include <lib/trace/event.h>
 #include <lib/zx/clock.h>
 
+#include "src/devices/block/drivers/ufs/registers.h"
+#include "src/devices/block/drivers/ufs/transfer_request_processor.h"
 #include "src/devices/block/drivers/ufs/ufs.h"
 #include "src/devices/block/drivers/ufs/upiu/upiu_transactions.h"
 #include "transfer_request_processor.h"
@@ -42,7 +44,7 @@ zx::result<> DeviceManager::DeviceInit() {
     return query_response.take_error();
   }
 
-  zx::time device_init_time_out = device_init_start_time + zx::msec(kDeviceInitTimeoutMs);
+  zx::time device_init_time_out = device_init_start_time + zx::usec(kDeviceInitTimeoutUs);
   while (true) {
     ReadFlagUpiu read_flag_upiu(Flags::fDeviceInit);
     auto response = controller_.GetTransferRequestProcessor()
@@ -57,7 +59,7 @@ zx::result<> DeviceManager::DeviceInit() {
       break;
 
     if (zx::clock::get_monotonic() > device_init_time_out) {
-      zxlogf(ERROR, "Wait for fDeviceInit timed out (%u ms)", kDeviceInitTimeoutMs);
+      zxlogf(ERROR, "Wait for fDeviceInit timed out");
       return zx::error(ZX_ERR_TIMED_OUT);
     }
     usleep(10000);
@@ -129,6 +131,38 @@ zx::result<> DeviceManager::WriteAttribute(Attributes attribute, uint32_t value)
   return zx::ok();
 }
 
+zx::result<uint32_t> DeviceManager::DmeGet(uint16_t mbi_attribute) {
+  DmeGetUicCommand dme_get_command(controller_, mbi_attribute, 0);
+  auto value = dme_get_command.SendCommand();
+  if (value.is_error()) {
+    return value.take_error();
+  }
+  if (!value.value().has_value()) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  return zx::ok(value.value().value());
+}
+
+zx::result<uint32_t> DeviceManager::DmePeerGet(uint16_t mbi_attribute) {
+  DmePeerGetUicCommand dme_peer_get_command(controller_, mbi_attribute, 0);
+  auto value = dme_peer_get_command.SendCommand();
+  if (value.is_error()) {
+    return value.take_error();
+  }
+  if (!value.value().has_value()) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  return zx::ok(value.value().value());
+}
+
+zx::result<> DeviceManager::DmeSet(uint16_t mbi_attribute, uint32_t value) {
+  DmeSetUicCommand dme_set_command(controller_, mbi_attribute, 0, value);
+  if (auto result = dme_set_command.SendCommand(); result.is_error()) {
+    return result.take_error();
+  }
+  return zx::ok();
+}
+
 zx::result<> DeviceManager::CheckBootLunEnabled() {
   // Read bBootLunEn to confirm device interface is ok.
   zx::result<uint32_t> boot_lun_enabled = ReadAttribute(Attributes::bBootLunEn);
@@ -150,48 +184,193 @@ zx::result<UnitDescriptor> DeviceManager::ReadUnitDescriptor(uint8_t lun) {
 }
 
 zx::result<> DeviceManager::InitReferenceClock() {
-  // 26MHz is a default value written in spec.
-  // UFS Specification Version 3.1, section 6.4 "Reference Clock".
-  return WriteAttribute(Attributes::bRefClkFreq, AttributeReferenceClock::k26MHz);
+  // Intel UFSHCI reference clock = 19.2MHz
+  return WriteAttribute(Attributes::bRefClkFreq, AttributeReferenceClock::k19_2MHz);
+}
+
+zx::result<> DeviceManager::InitUniproAttributes() {
+  // UniPro Version
+  // 7~15 = Above 2.0, 6 = 2.0, 5 = 1.8, 4 = 1.61, 3 = 1.6, 2 = 1.41, 1 = 1.40, 0 = Reserved
+  zx::result<uint32_t> remote_version = DmeGet(PA_RemoteVerInfo);
+  if (remote_version.is_error()) {
+    return remote_version.take_error();
+  }
+  zx::result<uint32_t> local_version = DmeGet(PA_LocalVerInfo);
+  if (local_version.is_error()) {
+    return local_version.take_error();
+  }
+  zxlogf(INFO, "UniPro Version: remote version=%d, local version=%d", remote_version.value(),
+         local_version.value());
+
+  // UniPro automatically sets timing information such as PA_TActivate through the
+  // PACP_CAP_EXT1_ind command during Link Startup operation.
+  zx::result<uint32_t> host_t_activate = DmeGet(PA_TActivate);
+  if (host_t_activate.is_error()) {
+    return host_t_activate.take_error();
+  }
+  // Intel Lake-field UFSHCI has a quirk. We need to add 200us to the PEER's PA_TActivate.
+  DmePeerSetUicCommand dme_peer_set_t_activate(controller_, PA_TActivate, 0,
+                                               host_t_activate.value() + 2);
+  if (auto result = dme_peer_set_t_activate.SendCommand(); result.is_error()) {
+    return result.take_error();
+  }
+  zx::result<uint32_t> device_t_activate = DmePeerGet(PA_TActivate);
+  if (device_t_activate.is_error()) {
+    return device_t_activate.take_error();
+  }
+  // PA_Granularity = 100us (1=1us, 2=4us, 3=8us, 4=16us, 5=32us, 6=100us)
+  zx::result<uint32_t> host_granularity = DmeGet(PA_Granularity);
+  if (host_granularity.is_error()) {
+    return host_granularity.take_error();
+  }
+  zx::result<uint32_t> device_granularity = DmePeerGet(PA_Granularity);
+  if (device_granularity.is_error()) {
+    return device_granularity.take_error();
+  }
+  zxlogf(INFO,
+         "host_t_activate=%d, device_t_activate=%d, host_granularity=%d, device_granularity=%d",
+         host_t_activate.value(), device_t_activate.value(), host_granularity.value(),
+         device_granularity.value());
+
+  return zx::ok();
 }
 
 zx::result<> DeviceManager::InitUicPowerMode() {
-  // TODO(https://fxbug.dev/42075643): Get the max gear level using DME_GET command.
-  // TODO(https://fxbug.dev/42075643): Set the gear level for tx/rx lanes.
-
-  // Get connected lanes.
-  DmeGetUicCommand dme_get_connected_tx_lanes_command(controller_, PA_ConnectedTxDataLanes, 0);
-  zx::result<std::optional<uint32_t>> value = dme_get_connected_tx_lanes_command.SendCommand();
-  if (value.is_error()) {
-    return value.take_error();
+  if (zx::result<> result = controller_.Notify(NotifyEvent::kPrePowerModeChange, 0);
+      result.is_error()) {
+    return result.take_error();
   }
-  uint32_t connected_tx_lanes = value.value().value();
-
-  DmeGetUicCommand dme_get_connected_rx_lanes_command(controller_, PA_ConnectedRxDataLanes, 0);
-  value = dme_get_connected_rx_lanes_command.SendCommand();
-  if (value.is_error()) {
-    return value.take_error();
-  }
-  uint32_t connected_rx_lanes = value.value().value();
 
   // Update lanes with available TX/RX lanes.
-  DmeGetUicCommand dme_get_avail_tx_lanes_command(controller_, PA_AvailTxDataLanes, 0);
-  value = dme_get_avail_tx_lanes_command.SendCommand();
-  if (value.is_error()) {
-    return value.take_error();
+  zx::result<uint32_t> tx_lanes = DmeGet(PA_AvailTxDataLanes);
+  if (tx_lanes.is_error()) {
+    return tx_lanes.take_error();
   }
-  uint32_t tx_lanes = value.value().value();
-
-  DmeGetUicCommand dme_get_avail_rx_lanes_command(controller_, PA_AvailRxDataLanes, 0);
-  value = dme_get_avail_rx_lanes_command.SendCommand();
-  if (value.is_error()) {
-    return value.take_error();
+  zx::result<uint32_t> rx_lanes = DmeGet(PA_AvailRxDataLanes);
+  if (rx_lanes.is_error()) {
+    return rx_lanes.take_error();
   }
-  uint32_t rx_lanes = value.value().value();
+  // Get max HS-GEAR.
+  zx::result<uint32_t> max_rx_hs_gear = DmeGet(PA_MaxRxHSGear);
+  if (max_rx_hs_gear.is_error()) {
+    return max_rx_hs_gear.take_error();
+  }
+  zxlogf(INFO, "tx_lanes_=%d, rx_lanes_=%d, max_rx_hs_gear=%d", tx_lanes.value(), rx_lanes.value(),
+         max_rx_hs_gear.value());
 
-  zxlogf(DEBUG, "connected_tx_lanes=%d, connected_rx_lanes=%d", connected_tx_lanes,
-         connected_rx_lanes);
-  zxlogf(DEBUG, "tx_lanes_=%d, rx_lanes_=%d", tx_lanes, rx_lanes);
+  // Set data lanes.
+  if (zx::result<> result = DmeSet(PA_ActiveTxDataLanes, tx_lanes.value()); result.is_error()) {
+    return result.take_error();
+  }
+  if (zx::result<> result = DmeSet(PA_ActiveRxDataLanes, rx_lanes.value()); result.is_error()) {
+    return result.take_error();
+  }
+
+  // Set HS-GEAR to max gear.
+  if (zx::result<> result = DmeSet(PA_TxGear, max_rx_hs_gear.value()); result.is_error()) {
+    return result.take_error();
+  }
+  if (zx::result<> result = DmeSet(PA_RxGear, max_rx_hs_gear.value()); result.is_error()) {
+    return result.take_error();
+  }
+
+  // Set termination.
+  // HS-MODE = ON / LS-MODE = OFF
+  if (zx::result<> result = DmeSet(PA_TxTermination, true); result.is_error()) {
+    return result.take_error();
+  }
+
+  // HS-MODE = ON / LS-MODE = OFF
+  if (zx::result<> result = DmeSet(PA_RxTermination, true); result.is_error()) {
+    return result.take_error();
+  }
+
+  // Set HSSerise (A = 1, B = 2)
+  if (zx::result<> result = DmeSet(PA_HSSeries, 2); result.is_error()) {
+    return result.take_error();
+  }
+
+  // Set Timeout values.
+  if (zx::result<> result = DmeSet(PA_PWRModeUserData0, DL_FC0ProtectionTimeOutVal_Default);
+      result.is_error()) {
+    return result.take_error();
+  }
+  if (zx::result<> result = DmeSet(PA_PWRModeUserData1, DL_TC0ReplayTimeOutVal_Default);
+      result.is_error()) {
+    return result.take_error();
+  }
+  if (zx::result<> result = DmeSet(PA_PWRModeUserData2, DL_AFC0ReqTimeOutVal_Default);
+      result.is_error()) {
+    return result.take_error();
+  }
+  if (zx::result<> result = DmeSet(PA_PWRModeUserData3, DL_FC0ProtectionTimeOutVal_Default);
+      result.is_error()) {
+    return result.take_error();
+  }
+  if (zx::result<> result = DmeSet(PA_PWRModeUserData4, DL_TC0ReplayTimeOutVal_Default);
+      result.is_error()) {
+    return result.take_error();
+  }
+  if (zx::result<> result = DmeSet(PA_PWRModeUserData5, DL_AFC0ReqTimeOutVal_Default);
+      result.is_error()) {
+    return result.take_error();
+  }
+
+  if (zx::result<> result =
+          DmeSet(DME_LocalFC0ProtectionTimeOutVal, DL_FC0ProtectionTimeOutVal_Default);
+      result.is_error()) {
+    return result.take_error();
+  }
+  if (zx::result<> result = DmeSet(DME_LocalTC0ReplayTimeOutVal, DL_TC0ReplayTimeOutVal_Default);
+      result.is_error()) {
+    return result.take_error();
+  }
+  if (zx::result<> result = DmeSet(DME_LocalAFC0ReqTimeOutVal, DL_AFC0ReqTimeOutVal_Default);
+      result.is_error()) {
+    return result.take_error();
+  }
+
+  // Set PWRMode.
+  // Fast_Mode=1, Slow_Mode=2, FastAuto_Mode=4, SlowAuto_Mode=5,
+  if (zx::result<> result = DmeSet(PA_PWRMode, 1 << 4 | 1); result.is_error()) {
+    return result.take_error();
+  }
+
+  // Wait for power mode changed.
+  auto wait_for_completion = [&]() -> bool {
+    return InterruptStatusReg::Get().ReadFrom(&controller_.GetMmio()).uic_power_mode_status();
+  };
+  fbl::String timeout_message = "Timeout waiting for Power Mode Change";
+  if (zx_status_t status =
+          controller_.WaitWithTimeout(wait_for_completion, kDeviceInitTimeoutUs, timeout_message);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  // Clear 'Power Mode completion status'
+  InterruptStatusReg::Get().FromValue(0).set_uic_power_mode_status(true).WriteTo(
+      &controller_.GetMmio());
+
+  HostControllerStatusReg::PowerModeStatus power_mode_status =
+      HostControllerStatusReg::Get()
+          .ReadFrom(&controller_.GetMmio())
+          .uic_power_mode_change_request_status();
+  if (power_mode_status != HostControllerStatusReg::PowerModeStatus::kPowerLocal) {
+    zxlogf(ERROR, "Failed to change power mode: power_mode_status = 0x%x", power_mode_status);
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  if (zx::result<> result = controller_.Notify(NotifyEvent::kPostPowerModeChange, 0);
+      result.is_error()) {
+    return result.take_error();
+  }
+
+  // Intel Lake-field UFSHCI has a quirk. We need to wait 1250us and clear dme error.
+  usleep(1250);
+  // Test with dme_peer_get to make sure there are no errors.
+  zx::result<uint32_t> device_granularity = DmePeerGet(PA_Granularity);
+  if (device_granularity.is_error()) {
+    return device_granularity.take_error();
+  }
 
   return zx::ok();
 }

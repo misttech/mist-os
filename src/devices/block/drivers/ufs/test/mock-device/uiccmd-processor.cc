@@ -19,8 +19,8 @@ void UicCmdProcessor::HandleUicCmd(UicCommandOpcode value) {
   if (auto it = handlers_.find(value); it != handlers_.end()) {
     (it->second)(mock_device_, ucmdarg1, ucmdarg2, ucmdarg3);
   } else {
-    // TODO(https://fxbug.dev/42075643): Revisit it when UICCMD error handling logic is implemented in the
-    // driver.
+    // TODO(https://fxbug.dev/42075643): Revisit it when UICCMD error handling logic is implemented
+    // in the driver.
     zxlogf(ERROR, "UFS MOCK: uiccmd value: 0x%x is not supported",
            static_cast<unsigned int>(value));
   }
@@ -48,9 +48,64 @@ void UicCmdProcessor::DefaultDmeGetHandler(UfsMockDevice &mock_device, uint32_t 
     case PA_ConnectedRxDataLanes:
     case PA_AvailTxDataLanes:
     case PA_AvailRxDataLanes:
+    case PA_ActiveTxDataLanes:
+    case PA_ActiveRxDataLanes:
       mib_value = kConnectedDataLanes;
       break;
-    // UFSHCI Specification Version 3.1, section 7.4 "UIC Power Mode Change".
+    case PA_TxGear:
+    case PA_RxGear:
+      mib_value = kGear;
+      break;
+    case PA_TxTermination:
+    case PA_RxTermination:
+      mib_value = kTermination;
+      break;
+    case PA_HSSeries:
+      mib_value = kHSSeries;
+      break;
+    case PA_PWRModeUserData0:
+    case PA_PWRModeUserData1:
+    case PA_PWRModeUserData2:
+    case PA_PWRModeUserData3:
+    case PA_PWRModeUserData4:
+    case PA_PWRModeUserData5:
+    case DME_LocalFC0ProtectionTimeOutVal:
+    case DME_LocalTC0ReplayTimeOutVal:
+    case DME_LocalAFC0ReqTimeOutVal:
+      mib_value = kPWRModeUserData;
+      break;
+    case PA_TxHsAdaptType:
+      mib_value = kTxHsAdaptType;
+      break;
+    case PA_PWRMode:
+      mib_value = kPWRMode;
+      break;
+    case PA_RemoteVerInfo:
+    case PA_LocalVerInfo:
+      mib_value = kUniproVersion;
+      break;
+    case PA_TActivate:
+      mib_value = kTActivate;
+      break;
+    case PA_Granularity:
+      mib_value = kGranularity;
+      break;
+    default:
+      zxlogf(ERROR, "UFS MOCK: Get attribute 0x%x is not supported", mib_attribute);
+      break;
+  }
+  UicCommandArgument3Reg::Get().FromValue(mib_value).WriteTo(mock_device.GetRegisters());
+}
+
+void UicCmdProcessor::DefaultDmeSetHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1,
+                                           uint32_t ucmdarg2, uint32_t ucmdarg3) {
+  auto mib_attribute = UicCommandArgument1Reg::Get().FromValue(ucmdarg1).mib_attribute();
+  switch (mib_attribute) {
+    case PA_MaxRxHSGear:
+    case PA_ConnectedTxDataLanes:
+    case PA_ConnectedRxDataLanes:
+    case PA_AvailTxDataLanes:
+    case PA_AvailRxDataLanes:
     case PA_ActiveTxDataLanes:
     case PA_ActiveRxDataLanes:
     case PA_TxGear:
@@ -59,15 +114,70 @@ void UicCmdProcessor::DefaultDmeGetHandler(UfsMockDevice &mock_device, uint32_t 
     case PA_RxTermination:
     case PA_HSSeries:
     case PA_PWRModeUserData0:
+    case PA_PWRModeUserData1:
+    case PA_PWRModeUserData2:
+    case PA_PWRModeUserData3:
+    case PA_PWRModeUserData4:
+    case PA_PWRModeUserData5:
+    case DME_LocalFC0ProtectionTimeOutVal:
+    case DME_LocalTC0ReplayTimeOutVal:
+    case DME_LocalAFC0ReqTimeOutVal:
     case PA_TxHsAdaptType:
+    case PA_TActivate:
+    case PA_Granularity:
+      break;
     case PA_PWRMode:
-      zxlogf(ERROR, "UFS MOCK: Get power mode attribute 0x%x is not supported", mib_attribute);
+      HostControllerStatusReg::Get()
+          .ReadFrom(mock_device.GetRegisters())
+          .set_uic_power_mode_change_request_status(
+              HostControllerStatusReg::PowerModeStatus::kPowerLocal)
+          .WriteTo(mock_device.GetRegisters());
+      // Send Power mode interrupt
+      InterruptStatusReg::Get()
+          .ReadFrom(mock_device.GetRegisters())
+          .set_uic_power_mode_status(true)
+          .WriteTo(mock_device.GetRegisters());
+      if (InterruptEnableReg::Get()
+              .ReadFrom(mock_device.GetRegisters())
+              .uic_power_mode_status_enable()) {
+        mock_device.TriggerInterrupt();
+      }
       break;
     default:
-      zxlogf(ERROR, "UFS MOCK: Get attribute 0x%x is not supported", mib_attribute);
+      zxlogf(ERROR, "UFS MOCK: Set attribute 0x%x is not supported", mib_attribute);
+      break;
+  }
+}
+
+void UicCmdProcessor::DefaultDmePeerGetHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1,
+                                               uint32_t ucmdarg2, uint32_t ucmdarg3) {
+  uint32_t mib_value = 0;
+  auto mib_attribute = UicCommandArgument1Reg::Get().FromValue(ucmdarg1).mib_attribute();
+  switch (mib_attribute) {
+    case PA_TActivate:
+      mib_value = kTActivate;
+      break;
+    case PA_Granularity:
+      mib_value = kGranularity;
+      break;
+    default:
+      zxlogf(ERROR, "UFS MOCK: Peer Get attribute 0x%x is not supported", mib_attribute);
       break;
   }
   UicCommandArgument3Reg::Get().FromValue(mib_value).WriteTo(mock_device.GetRegisters());
+}
+
+void UicCmdProcessor::DefaultDmePeerSetHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1,
+                                               uint32_t ucmdarg2, uint32_t ucmdarg3) {
+  auto mib_attribute = UicCommandArgument1Reg::Get().FromValue(ucmdarg1).mib_attribute();
+  switch (mib_attribute) {
+    case PA_TActivate:
+    case PA_Granularity:
+      break;
+    default:
+      zxlogf(ERROR, "UFS MOCK: Peer Set attribute 0x%x is not supported", mib_attribute);
+      break;
+  }
 }
 
 void UicCmdProcessor::DefaultDmeLinkStartUpHandler(UfsMockDevice &mock_device, uint32_t ucmdarg1,

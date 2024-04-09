@@ -35,8 +35,18 @@ constexpr uint32_t kMajorVersion = 3;
 constexpr uint32_t kMinorVersion = 1;
 constexpr uint32_t kVersionSuffix = 2;
 
-constexpr uint32_t kMaxGear = 1;
-constexpr uint32_t kConnectedDataLanes = 1;
+constexpr uint32_t kMaxGear = 4;
+constexpr uint32_t kConnectedDataLanes = 2;
+constexpr uint32_t kGear = 4;
+constexpr uint32_t kTermination = 1;
+constexpr uint32_t kHSSeries = 2;
+constexpr uint32_t kPWRModeUserData = 0xffff;
+constexpr uint32_t kTxHsAdaptType = 3;
+constexpr uint32_t kPWRMode = 0x11;
+
+constexpr uint32_t kUniproVersion = 5;
+constexpr uint32_t kTActivate = 2;
+constexpr uint32_t kGranularity = 6;
 
 class FakeRegisters final {
  public:

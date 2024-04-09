@@ -77,7 +77,11 @@ zx::result<> UicCommand::UicPostProcess() {
   if (uint32_t result_code =
           UicCommandArgument2Reg::Get().ReadFrom(&GetController().GetMmio()).result_code();
       result_code != UicCommandArgument2Reg::GenericErrorCode::kSuccess) {
-    zxlogf(ERROR, "Failed to send UIC command, result_code = %u\n", result_code);
+    auto opcode = UicCommandReg::Get().ReadFrom(&GetController().GetMmio()).command_opcode();
+    auto mib_attribute =
+        UicCommandArgument1Reg::Get().ReadFrom(&GetController().GetMmio()).mib_attribute();
+    zxlogf(ERROR, "Failed to send UIC command, opcode=0x%x, mib_attribute=0x%x, result_code = %u\n",
+           static_cast<uint32_t>(opcode), mib_attribute, result_code);
     return zx::error(ZX_ERR_INTERNAL);
   }
 
@@ -98,6 +102,28 @@ std::optional<uint32_t> DmeGetUicCommand::ReturnValue() {
 }
 
 std::tuple<uint32_t, uint32_t, uint32_t> DmeSetUicCommand::Arguments() const {
+  return std::make_tuple(UicCommandArgument1Reg::Get()
+                             .FromValue(0)
+                             .set_mib_attribute(GetMbiAttribute())
+                             .set_gen_selector_index(GetGenSelectorIndex())
+                             .reg_value(),
+                         0, value_);
+}
+
+std::tuple<uint32_t, uint32_t, uint32_t> DmePeerGetUicCommand::Arguments() const {
+  return std::make_tuple(UicCommandArgument1Reg::Get()
+                             .FromValue(0)
+                             .set_mib_attribute(GetMbiAttribute())
+                             .set_gen_selector_index(GetGenSelectorIndex())
+                             .reg_value(),
+                         0, 0);
+}
+
+std::optional<uint32_t> DmePeerGetUicCommand::ReturnValue() {
+  return UicCommandArgument3Reg::Get().ReadFrom(&GetController().GetMmio()).value();
+}
+
+std::tuple<uint32_t, uint32_t, uint32_t> DmePeerSetUicCommand::Arguments() const {
   return std::make_tuple(UicCommandArgument1Reg::Get()
                              .FromValue(0)
                              .set_mib_attribute(GetMbiAttribute())
