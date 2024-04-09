@@ -26,6 +26,5 @@ group("tests") {
   deps = [
     "component:tests",
     "contrib/cpp:tests",
-    "service/cpp:tests",
   ]
 }

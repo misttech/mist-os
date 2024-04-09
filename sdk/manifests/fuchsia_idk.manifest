@@ -89,7 +89,6 @@ cc_source_library://pkg/images_cpp
 cc_source_library://pkg/input_report_reader
 cc_source_library://pkg/inspect
 cc_source_library://pkg/inspect_component_cpp
-cc_source_library://pkg/inspect_service_cpp
 cc_source_library://pkg/magma_common
 cc_source_library://pkg/media_cpp
 cc_source_library://pkg/media_cpp_no_converters

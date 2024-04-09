@@ -622,7 +622,6 @@ sdk_molecule("core_cc_source_libraries") {
     "//sdk/lib/fit-promise:fit-promise_sdk",
     "//sdk/lib/input_report_reader:input_report_reader_sdk",
     "//sdk/lib/inspect/component/cpp:cpp_sdk",
-    "//sdk/lib/inspect/service/cpp:cpp_sdk",
     "//sdk/lib/magma_common:magma_common_sdk",
     "//sdk/lib/media/cpp:cpp_sdk",
     "//sdk/lib/stdcompat:stdcompat_sdk",
