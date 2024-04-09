@@ -19,11 +19,14 @@ namespace media_audio {
 // Helper functions that are useful for both low- (Device) and high-level (AdrServer) unittests.
 //
 
-////////////////////////
-// Codec-related methods
+///////////////////////////////
+// Codec-related functions
+//
+// From a multi-element collection, each with many fuchsia_hardware_audio:DaiSupportedFormats,
+// get a fuchsia_hardware_audio::DaiFormat.
 fuchsia_hardware_audio::DaiFormat SafeDaiFormatFromElementDaiFormatSets(
-    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets,
-    ElementId element_id) {
+    ElementId element_id,
+    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets) {
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_format_sets;
   for (const auto& element_entry : element_dai_format_sets) {
     if (element_entry.element_id() && *element_entry.element_id() == element_id) {
@@ -36,9 +39,11 @@ fuchsia_hardware_audio::DaiFormat SafeDaiFormatFromElementDaiFormatSets(
   return {{}};
 }
 
+// From a multi-element collection, each with many fuchsia_hardware_audio:DaiSupportedFormats,
+// get a DIFFERENT fuchsia_hardware_audio::DaiFormat.
 fuchsia_hardware_audio::DaiFormat SecondDaiFormatFromElementDaiFormatSets(
-    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets,
-    ElementId element_id) {
+    ElementId element_id,
+    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets) {
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_format_sets;
   for (const auto& element_entry : element_dai_format_sets) {
     if (element_entry.element_id() && *element_entry.element_id() == element_id) {
@@ -50,9 +55,11 @@ fuchsia_hardware_audio::DaiFormat SecondDaiFormatFromElementDaiFormatSets(
   return {{}};
 }
 
+// From a multi-element collection, each with many fuchsia_hardware_audio:DaiSupportedFormats,
+// get a fuchsia_hardware_audio::DaiFormat that is UNSUPPORTED (but still a valid format).
 fuchsia_hardware_audio::DaiFormat UnsupportedDaiFormatFromElementDaiFormatSets(
-    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets,
-    ElementId element_id) {
+    ElementId element_id,
+    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets) {
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_format_sets;
   for (const auto& element_entry : element_dai_format_sets) {
     if (element_entry.element_id() && *element_entry.element_id() == element_id) {
@@ -65,6 +72,8 @@ fuchsia_hardware_audio::DaiFormat UnsupportedDaiFormatFromElementDaiFormatSets(
   return {{}};
 }
 
+// From many fuchsia_hardware_audio:DaiSupportedFormats,
+// get a fuchsia_hardware_audio::DaiFormat.
 fuchsia_hardware_audio::DaiFormat SafeDaiFormatFromDaiFormatSets(
     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
   fuchsia_hardware_audio::DaiFormat dai_format{{
@@ -85,6 +94,8 @@ fuchsia_hardware_audio::DaiFormat SafeDaiFormatFromDaiFormatSets(
   return dai_format;
 }
 
+// From many fuchsia_hardware_audio:DaiSupportedFormats,
+// get a DIFFERENT fuchsia_hardware_audio::DaiFormat.
 fuchsia_hardware_audio::DaiFormat SecondDaiFormatFromDaiFormatSets(
     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
   auto safe_format_2 = SafeDaiFormatFromDaiFormatSets(dai_format_sets);
@@ -127,37 +138,181 @@ fuchsia_hardware_audio::DaiFormat SecondDaiFormatFromDaiFormatSets(
   return safe_format_2;
 }
 
+// From many fuchsia_hardware_audio:DaiSupportedFormats,
+// get a fuchsia_hardware_audio::DaiFormat that is UNSUPPORTED (but still a valid format).
 fuchsia_hardware_audio::DaiFormat UnsupportedDaiFormatFromDaiFormatSets(
     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
   auto dai_format = SafeDaiFormatFromDaiFormatSets(dai_format_sets);
   if (dai_format.number_of_channels() > 1) {
     dai_format.number_of_channels() -= 1;
     dai_format.channels_to_use_bitmask() = (1ull << dai_format.number_of_channels()) - 1ull;
-    FX_LOGS(INFO) << "Returning this invalid format: ";
-    LogDaiFormat(dai_format);
-    return dai_format;
-  }
-  if (dai_format.frame_rate() > kMinSupportedDaiFrameRate) {
+  } else if (dai_format.frame_rate() > kMinSupportedDaiFrameRate) {
     dai_format.frame_rate() -= 1;
-    FX_LOGS(INFO) << "Returning this invalid format: ";
-    LogDaiFormat(dai_format);
-    return dai_format;
-  }
-  if (dai_format.bits_per_slot() > 1) {
+  } else if (dai_format.bits_per_slot() > 1) {
     dai_format.bits_per_slot() -= 1;
-    FX_LOGS(INFO) << "Returning this invalid format: ";
-    LogDaiFormat(dai_format);
-    return dai_format;
-  }
-  if (dai_format.bits_per_sample() > 1) {
+  } else if (dai_format.bits_per_sample() > 1) {
     dai_format.bits_per_sample() -= 1;
-    FX_LOGS(INFO) << "Returning this invalid format: ";
-    LogDaiFormat(dai_format);
-    return dai_format;
+  } else {
+    ADD_FAILURE() << "No unsupported DaiFormat found for these format_sets";
+    return {{}};
   }
+  return dai_format;
+}
 
-  ADD_FAILURE() << "No invalid DaiFormat found for these format_sets";
-  return {{}};
+///////////////////////////////
+// RingBuffer-related functions
+//
+// From many fuchsia_audio_device::PcmFormatSet,
+// get a fuchsia_audio::Format.
+fuchsia_audio::Format SafeRingBufferFormatFromRingBufferFormatSets(
+    const std::vector<fuchsia_audio_device::PcmFormatSet>& ring_buffer_format_sets) {
+  return {{
+      .sample_type = ring_buffer_format_sets.front().sample_types()->front(),
+      .channel_count = ring_buffer_format_sets.front().channel_sets()->front().attributes()->size(),
+      .frames_per_second = ring_buffer_format_sets.front().frame_rates()->front(),
+  }};
+}
+
+// From many fuchsia_audio_device::PcmFormatSet,
+// get a DIFFERENT fuchsia_audio::Format.
+fuchsia_audio::Format SecondRingBufferFormatFromRingBufferFormatSets(
+    const std::vector<fuchsia_audio_device::PcmFormatSet>& ring_buffer_format_sets) {
+  auto safe_format = SafeRingBufferFormatFromRingBufferFormatSets(ring_buffer_format_sets);
+  auto& first_format_set = ring_buffer_format_sets.front();
+  if (first_format_set.channel_sets()->size() > 1) {
+    safe_format.channel_count() = first_format_set.channel_sets()->rbegin()->attributes()->size();
+  } else if (first_format_set.sample_types()->size() > 1) {
+    safe_format.sample_type() = *first_format_set.sample_types()->rbegin();
+  } else if (first_format_set.frame_rates()->size() > 1) {
+    safe_format.frames_per_second() = *first_format_set.frame_rates()->rbegin();
+  } else {
+    ADD_FAILURE() << "SecondRingBufferFormatFromRingBufferFormatSets: Only one format is possible";
+    return {};
+  }
+  return safe_format;
+}
+
+// From a multi-element collection, each with many fuchsia_audio_device::PcmFormatSet,
+// get a fuchsia_audio::Format.
+fuchsia_audio::Format SafeRingBufferFormatFromElementRingBufferFormatSets(
+    ElementId element_id, const std::vector<fuchsia_audio_device::ElementRingBufferFormatSet>&
+                              element_ring_buffer_format_sets) {
+  std::vector<fuchsia_audio::Format> ring_buffer_format_sets;
+  for (const auto& element_entry : element_ring_buffer_format_sets) {
+    if (element_entry.element_id() && *element_entry.element_id() == element_id) {
+      return SafeRingBufferFormatFromRingBufferFormatSets(*element_entry.format_sets());
+    }
+  }
+  ADD_FAILURE()
+      << "SafeRingBufferFormatFromElementRingBufferFormatSets: No element_ring_buffer_format_sets entry found with specified element_id "
+      << element_id;
+  return {};
+}
+
+// From a multi-element collection, each with many fuchsia_audio_device::PcmFormatSet,
+// get a DIFFERENT fuchsia_audio::Format.
+fuchsia_audio::Format SecondRingBufferFormatFromElementRingBufferFormatSets(
+    ElementId element_id, const std::vector<fuchsia_audio_device::ElementRingBufferFormatSet>&
+                              element_ring_buffer_format_sets) {
+  std::vector<fuchsia_audio::Format> ring_buffer_format_sets;
+  for (const auto& element_entry : element_ring_buffer_format_sets) {
+    if (element_entry.element_id() && *element_entry.element_id() == element_id) {
+      return SecondRingBufferFormatFromRingBufferFormatSets(*element_entry.format_sets());
+    }
+  }
+  ADD_FAILURE()
+      << "SecondRingBufferFormatFromElementRingBufferFormatSets: No element_ring_buffer_format_sets entry found with specified element_id "
+      << element_id;
+  return {};
+}
+
+// From many fuchsia_hardware_audio::SupportedFormats,
+// get a fuchsia_hardware_audio::Format.
+fuchsia_hardware_audio::Format SafeDriverRingBufferFormatFromDriverRingBufferFormatSets(
+    const std::vector<fuchsia_hardware_audio::SupportedFormats>& driver_ring_buffer_format_sets) {
+  auto first_format_set = *driver_ring_buffer_format_sets.front().pcm_supported_formats();
+  fuchsia_hardware_audio::Format ring_buffer_format{{
+      .pcm_format = fuchsia_hardware_audio::PcmFormat{{
+          .number_of_channels =
+              static_cast<uint8_t>(first_format_set.channel_sets()->front().attributes()->size()),
+          .sample_format = first_format_set.sample_formats()->front(),
+          .bytes_per_sample = first_format_set.bytes_per_sample()->front(),
+          .valid_bits_per_sample = first_format_set.valid_bits_per_sample()->front(),
+          .frame_rate = first_format_set.frame_rates()->front(),
+      }},
+  }};
+
+  if (ValidateRingBufferFormat(ring_buffer_format) != ZX_OK) {
+    ADD_FAILURE() << "first entries did not create a valid DaiFormat";
+    return {};
+  }
+  return ring_buffer_format;
+}
+
+// From many fuchsia_hardware_audio::SupportedFormats,
+// get a DIFFERENT fuchsia_hardware_audio::Format.
+fuchsia_hardware_audio::Format SecondDriverRingBufferFormatFromDriverRingBufferFormatSets(
+    const std::vector<fuchsia_hardware_audio::SupportedFormats>& driver_ring_buffer_format_sets) {
+  auto safe_format =
+      SafeDriverRingBufferFormatFromDriverRingBufferFormatSets(driver_ring_buffer_format_sets);
+  auto driver_rb_format_set = *driver_ring_buffer_format_sets.begin()->pcm_supported_formats();
+  if (safe_format.pcm_format().has_value()) {
+    if (driver_rb_format_set.channel_sets()->size() > 1) {
+      safe_format.pcm_format()->number_of_channels() =
+          static_cast<uint8_t>(driver_rb_format_set.channel_sets()->rbegin()->attributes()->size());
+      return safe_format;
+    }
+    if (driver_rb_format_set.sample_formats()->size() > 1) {
+      safe_format.pcm_format()->sample_format() = *driver_rb_format_set.sample_formats()->rbegin();
+      return safe_format;
+    }
+    if (driver_rb_format_set.bytes_per_sample()->size() > 1) {
+      safe_format.pcm_format()->bytes_per_sample() =
+          *driver_rb_format_set.bytes_per_sample()->rbegin();
+      return safe_format;
+    }
+    if (driver_rb_format_set.frame_rates()->size() > 1) {
+      safe_format.pcm_format()->frame_rate() = *driver_rb_format_set.frame_rates()->rbegin();
+      return safe_format;
+    }
+  }
+  ADD_FAILURE()
+      << "SecondDriverRingBufferFormatFromDriverRingBufferFormatSets: Only one format is possible";
+  return {};
+}
+
+// From a multi-element collection, each with many fuchsia_hardware_audio::SupportedFormats,
+// get a fuchsia_hardware_audio::Format.
+fuchsia_hardware_audio::Format SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
+    ElementId element_id,
+    const std::vector<std::pair<ElementId, std::vector<fuchsia_hardware_audio::SupportedFormats>>>&
+        element_driver_ring_buffer_format_sets) {
+  for (const auto& element_entry : element_driver_ring_buffer_format_sets) {
+    if (element_entry.first == element_id) {
+      return SafeDriverRingBufferFormatFromDriverRingBufferFormatSets(element_entry.second);
+    }
+  }
+  ADD_FAILURE()
+      << "SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets: No element_driver_ring_buffer_format_sets entry found with specified element_id "
+      << element_id;
+  return {};
+}
+
+// From a multi-element collection, each with many fuchsia_hardware_audio::SupportedFormats,
+// get ANOTHER fuchsia_hardware_audio::Format.
+fuchsia_hardware_audio::Format SecondDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
+    ElementId element_id,
+    const std::vector<std::pair<ElementId, std::vector<fuchsia_hardware_audio::SupportedFormats>>>&
+        element_driver_ring_buffer_format_sets) {
+  for (const auto& element_entry : element_driver_ring_buffer_format_sets) {
+    if (element_entry.first == element_id) {
+      return SecondDriverRingBufferFormatFromDriverRingBufferFormatSets(element_entry.second);
+    }
+  }
+  ADD_FAILURE()
+      << "SecondDriverRingBufferFormatFromElementDriverRingBufferFormatSets: No element_driver_ring_buffer_format_sets entry found with specified element_id "
+      << element_id;
+  return {};
 }
 
 }  // namespace media_audio

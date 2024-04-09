@@ -9,11 +9,9 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <optional>
+#include <utility>
 
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
-#include "src/media/audio/services/device_registry/control_notify.h"
-#include "src/media/audio/services/device_registry/control_server.h"
-#include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"
 
 namespace media_audio {
@@ -29,7 +27,7 @@ std::shared_ptr<ControlCreatorServer> ControlCreatorServer::Create(
 }
 
 ControlCreatorServer::ControlCreatorServer(std::shared_ptr<AudioDeviceRegistry> parent)
-    : parent_(parent) {
+    : parent_(std::move(parent)) {
   ADR_LOG_METHOD(kLogObjectLifetimes);
   ++count_;
   LogObjectCounts();

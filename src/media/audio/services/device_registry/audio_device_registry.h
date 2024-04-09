@@ -91,7 +91,7 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
   std::shared_ptr<RingBufferServer> CreateRingBufferServer(
       fidl::ServerEnd<fuchsia_audio_device::RingBuffer> server_end,
       const std::shared_ptr<ControlServer>& parent,
-      const std::shared_ptr<Device>& device_to_control);
+      const std::shared_ptr<Device>& device_to_control, ElementId element_id);
 
  private:
   static inline const std::string_view kClassName = "AudioDeviceRegistry";

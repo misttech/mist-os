@@ -5,6 +5,7 @@
 #include "src/media/audio/services/device_registry/device_detector.h"
 
 #include <fcntl.h>
+#include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -17,7 +18,6 @@
 
 #include <fbl/unique_fd.h>
 
-#include "fidl/fuchsia.audio.device/cpp/common_types.h"
 #include "src/lib/fsl/io/device_watcher.h"
 #include "src/media/audio/services/device_registry/logging.h"
 

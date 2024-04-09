@@ -22,7 +22,7 @@ class RingBufferServer
   static std::shared_ptr<RingBufferServer> Create(
       std::shared_ptr<const FidlThread> thread,
       fidl::ServerEnd<fuchsia_audio_device::RingBuffer> server_end,
-      std::shared_ptr<ControlServer> parent, std::shared_ptr<Device> device);
+      std::shared_ptr<ControlServer> parent, std::shared_ptr<Device> device, ElementId element_id);
 
   void OnShutdown(fidl::UnbindInfo info) override;
   ~RingBufferServer() override;
@@ -39,6 +39,8 @@ class RingBufferServer
 
   void DelayInfoChanged(const fuchsia_audio_device::DelayInfo& delay_info);
 
+  ElementId element_id() const { return element_id_; }
+
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }
 
@@ -49,10 +51,12 @@ class RingBufferServer
   static inline const std::string_view kClassName = "RingBufferServer";
   static inline uint64_t count_ = 0;
 
-  RingBufferServer(std::shared_ptr<ControlServer> parent, std::shared_ptr<Device> device);
+  RingBufferServer(std::shared_ptr<ControlServer> parent, std::shared_ptr<Device> device,
+                   ElementId element_id);
 
   std::shared_ptr<ControlServer> parent_;
   std::shared_ptr<Device> device_;
+  ElementId element_id_;
 
   std::optional<SetActiveChannelsCompleter::Async> active_channels_completer_;
 

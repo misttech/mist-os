@@ -11,6 +11,7 @@
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 
 #include "src/media/audio/services/common/base_fidl_server.h"
@@ -50,16 +51,16 @@ class ControlServer
 
   // ControlNotify
   //
-  void DeviceDroppedRingBuffer() final;
-  void DelayInfoChanged(const fuchsia_audio_device::DelayInfo&) final;
+  void DeviceDroppedRingBuffer(ElementId element_id) final;
+  void DelayInfoChanged(ElementId element_id, const fuchsia_audio_device::DelayInfo&) final;
   // If `dai_format` contains no value, no DaiFormat is set. The Device might be newly-initialized,
-  // or `CodecReset` may have been called. `SetDaiFormat` must be called.
+  // or `Reset` may have been called. `SetDaiFormat` must be called.
   void DaiFormatChanged(
-      const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
+      ElementId element_id, const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
       const std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info) final;
   // `SetDaiFormat` did not change the format. The previously-set DaiFormat is still be in effect.
-  void DaiFormatNotSet(const fuchsia_hardware_audio::DaiFormat& dai_format,
-                       zx_status_t driver_error) final;
+  void DaiFormatNotSet(ElementId element_id, const fuchsia_hardware_audio::DaiFormat& dai_format,
+                       fuchsia_audio_device::ControlSetDaiFormatError error) final;
   void CodecStarted(const zx::time& start_time) final;
   // A call to `CodecStart` did not succeed.
   void CodecNotStarted() final;
@@ -73,7 +74,7 @@ class ControlServer
   void CreateRingBuffer(CreateRingBufferRequest& request,
                         CreateRingBufferCompleter::Sync& completer) final;
   void SetDaiFormat(SetDaiFormatRequest& request, SetDaiFormatCompleter::Sync& completer) final;
-  void CodecReset(CodecResetCompleter::Sync& completer) final;
+  void Reset(ResetCompleter::Sync& completer) final;
   void CodecStart(CodecStartCompleter::Sync& completer) final;
   void CodecStop(CodecStopCompleter::Sync& completer) final;
 
@@ -113,21 +114,19 @@ class ControlServer
   std::shared_ptr<AudioDeviceRegistry> parent_;
   std::shared_ptr<Device> device_;
 
-  std::optional<CreateRingBufferCompleter::Async> create_ring_buffer_completer_;
-  std::optional<SetDaiFormatCompleter::Async> set_dai_format_completer_;
   std::optional<CodecStartCompleter::Async> codec_start_completer_;
   std::optional<CodecStopCompleter::Async> codec_stop_completer_;
 
-  // Locks weak_ptr ring_buffer_server_ to shared_ptr and returns it.
-  // If it cannot, returns nullptr and resets the optional.
-  std::shared_ptr<RingBufferServer> GetRingBufferServer();
-  std::optional<std::weak_ptr<RingBufferServer>> ring_buffer_server_;
-
-  uint64_t min_ring_buffer_frames_;
-
-  fuchsia_audio_device::DelayInfo delay_info_;
-
   bool device_has_error_ = false;
+
+  // per-ElementId fields:
+  //
+  std::unordered_map<ElementId, SetDaiFormatCompleter::Async> set_dai_format_completers_;
+  std::unordered_map<ElementId, CreateRingBufferCompleter::Async> create_ring_buffer_completers_;
+
+  // Locks a weak_ptr ring_buffer_server_ to shared_ptr and returns it, or returns nullptr.
+  std::shared_ptr<RingBufferServer> TryGetRingBufferServer(ElementId element_id);
+  std::unordered_map<ElementId, std::weak_ptr<RingBufferServer>> ring_buffer_servers_;
 };
 
 }  // namespace media_audio

@@ -4,15 +4,88 @@
 
 #include "src/media/audio/services/device_registry/testing/fake_composite.h"
 
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
+#include <fidl/fuchsia.hardware.audio/cpp/common_types.h>
+#include <fidl/fuchsia.hardware.audio/cpp/markers.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <lib/fit/result.h>
 #include <zircon/errors.h>
+
+#include <unordered_map>
 
 #include <gtest/gtest.h>
 
 namespace media_audio {
 using fuchsia_hardware_audio::Composite;
+
+bool FormatIsSupported(
+    const fuchsia_hardware_audio::Format& format,
+    const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
+  if (!format.pcm_format().has_value()) {
+    return false;
+  }
+
+  for (const auto& format_set : ring_buffer_format_sets) {
+    bool match = false;
+    for (const auto& frame_rate : *format_set.pcm_supported_formats()->frame_rates()) {
+      if (frame_rate == format.pcm_format()->frame_rate()) {
+        match = true;
+        break;
+      }
+    }
+    if (!match) {
+      continue;
+    }
+
+    match = false;
+    for (const auto& sample_format : *format_set.pcm_supported_formats()->sample_formats()) {
+      if (sample_format == format.pcm_format()->sample_format()) {
+        match = true;
+        break;
+      }
+    }
+    if (!match) {
+      continue;
+    }
+
+    match = false;
+    for (const auto& channel_set : *format_set.pcm_supported_formats()->channel_sets()) {
+      if (channel_set.attributes()->size() == format.pcm_format()->number_of_channels()) {
+        match = true;
+        break;
+      }
+    }
+    if (!match) {
+      continue;
+    }
+
+    match = false;
+    for (const auto& bytes_per_sample : *format_set.pcm_supported_formats()->bytes_per_sample()) {
+      if (bytes_per_sample == format.pcm_format()->bytes_per_sample()) {
+        match = true;
+        break;
+      }
+    }
+    if (!match) {
+      continue;
+    }
+
+    match = false;
+    for (const auto& valid_bits : *format_set.pcm_supported_formats()->valid_bits_per_sample()) {
+      if (valid_bits == format.pcm_format()->valid_bits_per_sample()) {
+        match = true;
+        break;
+      }
+    }
+    if (!match) {
+      continue;
+    }
+    return true;
+  }
+
+  return false;
+}
 
 FakeComposite::FakeComposite(zx::channel server_end, zx::channel client_end,
                              async_dispatcher_t* dispatcher)
@@ -146,24 +219,102 @@ void FakeComposite::GetRingBufferFormats(GetRingBufferFormatsRequest& request,
   auto element_id = request.processing_element_id();
   ADR_LOG_METHOD(kLogFakeComposite) << "(" << element_id << ")";
 
-  if (element_id < kMinRingBufferElementId || element_id > kMaxRingBufferElementId) {
-    ADR_WARN_METHOD() << "Element " << element_id << " is out of range";
-    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
+  auto element_pair_iter = elements_.find(element_id);
+  if (element_pair_iter == elements_.end()) {
+    ADR_WARN_METHOD() << "unrecognized element_id " << element_id;
+    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
+    return;
+  }
+  if (*element_pair_iter->second.element.type() !=
+          fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint ||
+      *element_pair_iter->second.element.type_specific()->endpoint()->type() !=
+          fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer) {
+    ADR_WARN_METHOD() << "wrong type for element_id " << element_id;
+    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kWrongType));
+    return;
   }
 
   auto ring_buffer_format_sets = kDefaultRbFormatsMap.find(element_id);
   if (ring_buffer_format_sets == kDefaultRbFormatsMap.end()) {
-    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
+    ADR_WARN_METHOD() << "no ring_buffer_format_sets specified for element_id " << element_id;
+    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
 
   completer.Reply(fit::success(ring_buffer_format_sets->second));
 }
 
+void FakeComposite::ReserveRingBufferSize(ElementId element_id, size_t size) {
+  ring_buffer_allocation_sizes_.insert_or_assign(element_id, size);
+}
+
+void FakeComposite::EnableActiveChannelsSupport(ElementId element_id) {
+  active_channels_support_overrides_.insert_or_assign(element_id, true);
+}
+void FakeComposite::DisableActiveChannelsSupport(ElementId element_id) {
+  active_channels_support_overrides_.insert_or_assign(element_id, false);
+}
+
 void FakeComposite::CreateRingBuffer(CreateRingBufferRequest& request,
                                      CreateRingBufferCompleter::Sync& completer) {
-  [[maybe_unused]] auto element_id = request.processing_element_id();
+  auto element_id = request.processing_element_id();
   ADR_LOG_METHOD(kLogFakeComposite) << "(" << element_id << ")";
+
+  auto element_pair_iter = elements_.find(element_id);
+  if (element_pair_iter == elements_.end()) {
+    ADR_WARN_METHOD() << "unrecognized element_id " << element_id;
+    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
+    return;
+  }
+  if (*element_pair_iter->second.element.type() !=
+          fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint ||
+      *element_pair_iter->second.element.type_specific()->endpoint()->type() !=
+          fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer) {
+    ADR_WARN_METHOD() << "wrong type for element_id " << element_id;
+    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kWrongType));
+    return;
+  }
+  auto ring_buffer_format_sets_iter = kDefaultRbFormatsMap.find(element_id);
+  if (ring_buffer_format_sets_iter == kDefaultRbFormatsMap.end()) {
+    ADR_WARN_METHOD() << "no ring_buffer_format_sets specified for element_id " << element_id;
+    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
+    return;
+  }
+  const auto& ring_buffer_format_sets = ring_buffer_format_sets_iter->second;
+  // Make sure the Format is OK
+  if (!FormatIsSupported(request.format(), ring_buffer_format_sets)) {
+    ADR_WARN_METHOD() << "ring_buffer_format not supported for element_id " << element_id;
+    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kNotSupported));
+    return;
+  }
+
+  // Make sure the server_end is OK
+  if (!request.ring_buffer().is_valid()) {
+    ADR_WARN_METHOD() << "ring_buffer server_end is invalid";
+    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
+    return;
+  }
+
+  size_t ring_buffer_allocated_size = kDefaultRingBufferAllocationSize;
+  auto match = ring_buffer_allocation_sizes_.find(element_id);
+  if (match != ring_buffer_allocation_sizes_.end()) {
+    ring_buffer_allocated_size = match->second;
+  }
+  auto ring_buffer_impl = std::make_unique<FakeCompositeRingBuffer>(
+      element_id, dispatcher(), std::move(request.ring_buffer()), *request.format().pcm_format(),
+      ring_buffer_allocated_size);
+
+  auto match_active_channels = active_channels_support_overrides_.find(element_id);
+  if (match_active_channels != active_channels_support_overrides_.end()) {
+    if (match_active_channels->second) {
+      ring_buffer_impl->enable_active_channels_support();
+    } else {
+      ring_buffer_impl->disable_active_channels_support();
+    }
+  }
+
+  ring_buffers_.erase(element_id);
+  ring_buffers_.insert({element_id, std::move(ring_buffer_impl)});
 
   completer.Reply(fit::ok());
 }
@@ -175,17 +326,103 @@ void FakeComposite::GetDaiFormats(GetDaiFormatsRequest& request,
 
   if (element_id < kMinDaiElementId || element_id > kMaxDaiElementId) {
     ADR_WARN_METHOD() << "Element " << element_id << " is out of range";
-    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
   }
 
   auto dai_format_sets = kDefaultDaiFormatsMap.find(element_id);
   if (dai_format_sets == kDefaultDaiFormatsMap.end()) {
     ADR_WARN_METHOD() << "No DaiFormatSet found for element " << element_id;
-    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
     return;
   }
 
   completer.Reply(fit::success(dai_format_sets->second));
+}
+
+// static
+bool FakeComposite::DaiFormatIsSupported(ElementId element_id,
+                                         const fuchsia_hardware_audio::DaiFormat& format) {
+  auto match = kDefaultDaiFormatsMap.find(element_id);
+  if (match == kDefaultDaiFormatsMap.end()) {
+    return false;
+  }
+
+  if (format.channels_to_use_bitmask() >= (1u << format.number_of_channels())) {
+    return false;
+  }
+
+  auto dai_format_sets = match->second;
+  for (const auto& dai_format_set : dai_format_sets) {
+    bool match = false;
+    for (auto channel_count : dai_format_set.number_of_channels()) {
+      if (channel_count == format.number_of_channels()) {
+        match = true;
+        break;
+      }
+    }
+    if (!match) {
+      continue;
+    }
+
+    match = false;
+    for (auto sample_format : dai_format_set.sample_formats()) {
+      if (sample_format == format.sample_format()) {
+        match = true;
+        break;
+      }
+    }
+    if (!match) {
+      continue;
+    }
+
+    match = false;
+    for (auto frame_format : dai_format_set.frame_formats()) {
+      if (frame_format == format.frame_format()) {
+        match = true;
+        break;
+      }
+    }
+    if (!match) {
+      continue;
+    }
+
+    match = false;
+    for (auto rate : dai_format_set.frame_rates()) {
+      if (rate == format.frame_rate()) {
+        match = true;
+        break;
+      }
+    }
+    if (!match) {
+      continue;
+    }
+
+    match = false;
+    for (auto bits : dai_format_set.bits_per_slot()) {
+      if (bits == format.bits_per_slot()) {
+        match = true;
+        break;
+      }
+    }
+    if (!match) {
+      continue;
+    }
+
+    match = false;
+    for (auto bits : dai_format_set.bits_per_sample()) {
+      if (bits == format.bits_per_sample()) {
+        match = true;
+        break;
+      }
+    }
+    if (!match) {
+      continue;
+    }
+    // This DaiFormatSet survived with a match on all aspects.
+    return true;
+  }
+  // None of the DaiFormatSets survived through all of the aspects.]
+  return false;
 }
 
 void FakeComposite::SetDaiFormat(SetDaiFormatRequest& request,
@@ -195,7 +432,14 @@ void FakeComposite::SetDaiFormat(SetDaiFormatRequest& request,
 
   if (element_id < kMinDaiElementId || element_id > kMaxDaiElementId) {
     ADR_WARN_METHOD() << "Element " << element_id << " is out of range";
-    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
+    return;
+  }
+
+  if (!DaiFormatIsSupported(element_id, request.format())) {
+    ADR_WARN_METHOD() << "Format is not supported for element " << element_id;
+    completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kNotSupported));
+    return;
   }
 
   completer.Reply(fit::ok());
@@ -335,14 +579,14 @@ void FakeComposite::SetTopology(SetTopologyRequest& request,
 
 // Inject std::nullopt to simulate "no topology", such as at power-up or after Reset().
 void FakeComposite::InjectTopologyChange(std::optional<TopologyId> topology_id) {
-  if (topology_id.has_value()) {
+  topology_has_changed_ = topology_id.has_value();
+
+  if (topology_has_changed_) {
     topology_id_ = *topology_id;
-    topology_has_changed_ = true;
 
     CheckForTopologyCompletion();
   } else {
-    topology_id_.reset();
-    topology_has_changed_ = false;  // A new `SetTopology` call must be made
+    topology_id_.reset();  // A new `SetTopology` call must be made
   }
 }
 

@@ -21,6 +21,9 @@ using TopologyId = fuchsia_audio_device::TopologyId;
 using ClockDomain = fuchsia_audio_device::ClockDomain;
 using UniqueId = std::array<uint8_t, fuchsia_audio_device::kUniqueInstanceIdSize>;
 
+// In addition to just mapping the ElementId to its unique Element, we also store the ElementState,
+// as well as conveniently store what is needed to manage the hanging-gets to the driver. This
+// enables us to interact properly with ObserverNotify instances.
 struct ElementRecord {
   fuchsia_hardware_audio_signalprocessing::Element element;
   std::optional<fuchsia_hardware_audio_signalprocessing::ElementState> state;

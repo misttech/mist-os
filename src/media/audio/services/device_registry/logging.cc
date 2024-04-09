@@ -13,7 +13,6 @@
 #include <iomanip>
 #include <string>
 
-#include "fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h"
 #include "src/media/audio/services/device_registry/basic_types.h"
 #include "src/media/audio/services/device_registry/control_creator_server.h"
 #include "src/media/audio/services/device_registry/control_server.h"
@@ -1109,15 +1108,15 @@ void LogDelayInfo(const fuchsia_hardware_audio::DelayInfo& info) {
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/DelayInfo";
   if (info.internal_delay()) {
-    FX_LOGS(INFO) << "    internal_delay       " << *info.internal_delay() << " ns";
+    FX_LOGS(INFO) << "    internal_delay           " << *info.internal_delay() << " ns";
   } else {
-    FX_LOGS(INFO) << "    internal_delay       <none> (non-compliant)";
+    FX_LOGS(INFO) << "    internal_delay           <none> (non-compliant)";
   }
 
   if (info.external_delay()) {
-    FX_LOGS(INFO) << "    external_delay       " << *info.external_delay() << " ns";
+    FX_LOGS(INFO) << "    external_delay           " << *info.external_delay() << " ns";
   } else {
-    FX_LOGS(INFO) << "    external_delay       <none> (0 ns)";
+    FX_LOGS(INFO) << "    external_delay           <none> (0 ns)";
   }
 }
 

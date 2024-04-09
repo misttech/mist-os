@@ -47,7 +47,8 @@ class FakeCodec : public fidl::testing::TestBase<CodecConnector>,
   };
   static constexpr bool kDefaultIsInput = false;
 
-  static constexpr uint32_t kDefaultNumberOfChannels = 2;
+  static constexpr uint32_t kDefaultNumberOfChannels = 1;
+  static constexpr uint32_t kDefaultNumberOfChannels2 = 2;
   static constexpr fuchsia_hardware_audio::DaiSampleFormat kDefaultDaiSampleFormat =
       fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned;
   static constexpr uint32_t kDefaultFrameRates = 48000;

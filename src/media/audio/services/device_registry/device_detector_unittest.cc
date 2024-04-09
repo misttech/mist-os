@@ -16,13 +16,13 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 
 #include <memory>
 
 #include <gtest/gtest.h>
 
-#include "lib/syslog/cpp/macros.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/service.h"

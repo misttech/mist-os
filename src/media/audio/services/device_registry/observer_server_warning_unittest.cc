@@ -85,7 +85,7 @@ class ObserverServerStreamConfigWarningTest : public ObserverServerWarningTest {
 // Codec tests
 //
 // Codec: WatchGainState is unsupported
-TEST_F(ObserverServerCodecWarningTest, WatchGainStateFails) {
+TEST_F(ObserverServerCodecWarningTest, WatchGainStateWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
@@ -177,7 +177,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchPlugStateWhilePending) {
 }
 
 // Codec: GetReferenceClock is unsupported
-TEST_F(ObserverServerCodecWarningTest, GetReferenceClockFails) {
+TEST_F(ObserverServerCodecWarningTest, GetReferenceClockWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
@@ -210,15 +210,14 @@ TEST_F(ObserverServerCodecWarningTest, GetReferenceClockFails) {
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Add negative test cases for WatchTopology and WatchElementState (once implemented)
-//
 // TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
+// Add Codec negative test cases for WatchTopology and WatchElementState (once implemented)
 
 /////////////////////
 // Composite tests
 //
 // Validate that the Observer cannot handle a WatchGainState request from this type of device.
-TEST_F(ObserverServerCompositeWarningTest, WatchGainStateFails) {
+TEST_F(ObserverServerCompositeWarningTest, WatchGainStateWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
@@ -252,7 +251,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchGainStateFails) {
 }
 
 // Validate that the Observer cannot handle a WatchPlugState request from this type of device.
-TEST_F(ObserverServerCompositeWarningTest, WatchPlugStateFails) {
+TEST_F(ObserverServerCompositeWarningTest, WatchPlugStateWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
@@ -284,8 +283,6 @@ TEST_F(ObserverServerCompositeWarningTest, WatchPlugStateFails) {
   EXPECT_EQ(ObserverServer::count(), 1u);
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
-
-// Add negative test cases for WatchTopology and WatchElementState (once implemented)
 
 /////////////////////
 // StreamConfig tests

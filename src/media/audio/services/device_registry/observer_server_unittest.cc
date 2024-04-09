@@ -14,6 +14,7 @@
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
+#include "src/media/audio/services/device_registry/common_unittest.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_composite.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
@@ -81,6 +82,16 @@ class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
     EXPECT_TRUE(observer_client.is_valid());
     return observer_client;
   }
+
+  std::pair<fidl::Client<fuchsia_audio_device::RingBuffer>,
+            fidl::ServerEnd<fuchsia_audio_device::RingBuffer>>
+  CreateRingBufferClient() {
+    auto [ring_buffer_client_end, ring_buffer_server_end] =
+        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+    auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
+        std::move(ring_buffer_client_end), dispatcher());
+    return std::make_pair(std::move(ring_buffer_client), std::move(ring_buffer_server_end));
+  }
 };
 
 class ObserverServerCodecTest : public ObserverServerTest {
@@ -133,16 +144,6 @@ class ObserverServerStreamConfigTest : public ObserverServerTest {
 
     RunLoopUntilIdle();
     return fake_driver;
-  }
-
-  std::pair<fidl::Client<fuchsia_audio_device::RingBuffer>,
-            fidl::ServerEnd<fuchsia_audio_device::RingBuffer>>
-  CreateRingBufferClient() {
-    auto [ring_buffer_client_end, ring_buffer_server_end] =
-        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
-    auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-        std::move(ring_buffer_client_end), dispatcher());
-    return std::make_pair(std::move(ring_buffer_client), std::move(ring_buffer_server_end));
   }
 };
 
@@ -349,11 +350,10 @@ TEST_F(ObserverServerCodecTest, ObserverDoesNotDropIfClientControlDrops) {
   {
     auto received_callback = false;
     auto control = CreateTestControlServer(added_device);
-    control->client()->CodecReset().Then(
-        [&received_callback](fidl::Result<Control::CodecReset>& result) {
-          received_callback = true;
-          EXPECT_TRUE(result.is_ok()) << result.error_value();
-        });
+    control->client()->Reset().Then([&received_callback](fidl::Result<Control::Reset>& result) {
+      received_callback = true;
+      EXPECT_TRUE(result.is_ok()) << result.error_value();
+    });
 
     RunLoopUntilIdle();
     EXPECT_TRUE(received_callback);
@@ -490,14 +490,116 @@ TEST_F(ObserverServerCompositeTest, GetReferenceClock) {
 }
 
 // Validate that an Observer does not drop, if an observed device's driver RingBuffer is dropped.
+TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfDriverRingBufferDrops) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto control = CreateTestControlServer(added_device);
+  auto observer = CreateTestObserverServer(added_device);
+
+  auto ring_buffer_element_id = *added_device->ring_buffer_endpoint_ids().begin();
+  auto format = SafeRingBufferFormatFromElementRingBufferFormatSets(
+      ring_buffer_element_id, added_device->ring_buffer_format_sets());
+  fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+  auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
+  bool received_callback = false;
+
+  control->client()
+      ->CreateRingBuffer({{
+          ring_buffer_element_id,
+          fuchsia_audio_device::RingBufferOptions{{format, 2000}},
+          fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
+      }})
+      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+
+  fake_driver->DropRingBuffer(ring_buffer_element_id);
+
+  RunLoopUntilIdle();
+  EXPECT_EQ(ObserverServer::count(), 1u);
+  EXPECT_TRUE(observer->client().is_valid());
+  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+}
 
 // Validate that an Observer does not drop, if an observed device's RingBuffer client is dropped.
+TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientRingBufferDrops) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto control = CreateTestControlServer(added_device);
+  auto observer = CreateTestObserverServer(added_device);
+
+  auto ring_buffer_element_id = *added_device->ring_buffer_endpoint_ids().begin();
+  auto format = SafeRingBufferFormatFromElementRingBufferFormatSets(
+      ring_buffer_element_id, added_device->ring_buffer_format_sets());
+  fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+  {
+    auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
+    bool received_callback = false;
+
+    control->client()
+        ->CreateRingBuffer({{
+            ring_buffer_element_id,
+            fuchsia_audio_device::RingBufferOptions{{format, 2000}},
+            fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
+        }})
+        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+          received_callback = true;
+          EXPECT_TRUE(result.is_ok()) << result.error_value();
+        });
+
+    RunLoopUntilIdle();
+    EXPECT_TRUE(received_callback);
+  }
+
+  RunLoopUntilIdle();
+  EXPECT_EQ(ObserverServer::count(), 1u);
+  EXPECT_TRUE(observer->client().is_valid());
+  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+}
 
 // Validate that an Observer does not drop, if the observed device's Control client is dropped.
+TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientControlDrops) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
 
-// Add test cases for WatchTopology and WatchElementState (once implemented)
-//
-// TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
+
+  {
+    auto control = CreateTestControlServer(added_device);
+    bool received_callback = false;
+
+    control->client()->Reset().Then([&received_callback](fidl::Result<Control::Reset>& result) {
+      received_callback = true;
+      EXPECT_TRUE(result.is_ok()) << result.error_value();
+    });
+
+    RunLoopUntilIdle();
+    EXPECT_TRUE(received_callback);
+  }
+
+  RunLoopUntilIdle();
+  EXPECT_EQ(ObserverServer::count(), 1u);
+  EXPECT_TRUE(observer->client().is_valid());
+  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+}
 
 /////////////////////
 // StreamConfig tests
@@ -923,7 +1025,7 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientControlDrops) 
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Add test cases for WatchTopology and WatchElementState (once implemented)
+// Add StreamConfig test cases for WatchTopology and WatchElementState (once implemented)
 //
 // TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
 

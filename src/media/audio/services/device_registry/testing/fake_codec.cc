@@ -22,7 +22,7 @@ const fuchsia_hardware_audio::DaiFrameFormat FakeCodec::kDefaultFrameFormat =
         fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S);
 
 const std::vector<uint32_t> FakeCodec::kDefaultNumberOfChannelsSet{
-    FakeCodec::kDefaultNumberOfChannels};
+    FakeCodec::kDefaultNumberOfChannels, FakeCodec::kDefaultNumberOfChannels2};
 const std::vector<fuchsia_hardware_audio::DaiSampleFormat> FakeCodec::kDefaultSampleFormatsSet{
     FakeCodec::kDefaultDaiSampleFormat};
 const std::vector<fuchsia_hardware_audio::DaiFrameFormat> FakeCodec::kDefaultFrameFormatsSet{

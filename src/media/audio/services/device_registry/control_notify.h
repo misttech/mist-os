@@ -21,14 +21,16 @@ namespace media_audio {
 // destroyed at any time.
 class ControlNotify : public ObserverNotify {
  public:
-  virtual void DeviceDroppedRingBuffer() = 0;
-  virtual void DelayInfoChanged(const fuchsia_audio_device::DelayInfo&) = 0;
+  virtual void DeviceDroppedRingBuffer(ElementId element_id) = 0;
+  virtual void DelayInfoChanged(ElementId element_id, const fuchsia_audio_device::DelayInfo&) = 0;
 
   virtual void DaiFormatChanged(
-      const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
+      ElementId element_id, const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
       const std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info) = 0;
-  virtual void DaiFormatNotSet(const fuchsia_hardware_audio::DaiFormat& dai_format,
-                               zx_status_t driver_error) = 0;
+  virtual void DaiFormatNotSet(ElementId element_id,
+                               const fuchsia_hardware_audio::DaiFormat& dai_format,
+                               fuchsia_audio_device::ControlSetDaiFormatError error) = 0;
+
   virtual void CodecStarted(const zx::time& start_time) = 0;
   virtual void CodecNotStarted() = 0;
   virtual void CodecStopped(const zx::time& stop_time) = 0;

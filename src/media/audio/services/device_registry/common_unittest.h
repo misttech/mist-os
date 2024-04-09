@@ -13,22 +13,35 @@
 namespace media_audio {
 
 fuchsia_hardware_audio::DaiFormat SafeDaiFormatFromElementDaiFormatSets(
-    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets,
-    ElementId element_id = fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+    ElementId element_id,
+    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets);
 fuchsia_hardware_audio::DaiFormat SafeDaiFormatFromDaiFormatSets(
     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets);
 
 fuchsia_hardware_audio::DaiFormat SecondDaiFormatFromElementDaiFormatSets(
-    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets,
-    ElementId element_id = fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+    ElementId element_id,
+    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets);
 fuchsia_hardware_audio::DaiFormat SecondDaiFormatFromDaiFormatSets(
     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets);
 
 fuchsia_hardware_audio::DaiFormat UnsupportedDaiFormatFromElementDaiFormatSets(
-    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets,
-    ElementId element_id = fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+    ElementId element_id,
+    const std::vector<fuchsia_audio_device::ElementDaiFormatSet>& element_dai_format_sets);
 fuchsia_hardware_audio::DaiFormat UnsupportedDaiFormatFromDaiFormatSets(
     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets);
+
+fuchsia_audio::Format SafeRingBufferFormatFromElementRingBufferFormatSets(
+    ElementId element_id, const std::vector<fuchsia_audio_device::ElementRingBufferFormatSet>&
+                              element_ring_buffer_format_sets);
+fuchsia_audio::Format SafeRingBufferFormatFromRingBufferFormatSets(
+    const std::vector<fuchsia_audio_device::PcmFormatSet>& ring_buffer_format_sets);
+
+fuchsia_hardware_audio::Format SafeDriverRingBufferFormatFromDriverRingBufferFormatSets(
+    const std::vector<fuchsia_hardware_audio::SupportedFormats>& driver_ring_buffer_format_sets);
+fuchsia_hardware_audio::Format SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
+    ElementId element_id,
+    const std::vector<std::pair<ElementId, std::vector<fuchsia_hardware_audio::SupportedFormats>>>&
+        element_driver_ring_buffer_format_sets);
 
 }  // namespace media_audio
 

@@ -5,13 +5,20 @@
 #ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_COMPOSITE_H_
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_COMPOSITE_H_
 
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/markers.h>
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/test_base.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/test_base.h>
+#include <lib/fidl/cpp/unified_messaging_declarations.h>
+#include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fit/result.h>
+#include <lib/fzl/vmo-mapper.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/clock.h>
+#include <zircon/errors.h>
+#include <zircon/time.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <optional>
@@ -22,13 +29,236 @@
 
 namespace media_audio {
 
+class FakeCompositeRingBuffer : public fidl::testing::TestBase<fuchsia_hardware_audio::RingBuffer> {
+  static constexpr bool kLogFakeCompositeRingBuffer = false;
+  static inline const std::string_view kClassName = "FakeCompositeRingBuffer";
+
+  static constexpr bool kDefaultNeedsCacheFlushInvalidate = false;
+  static constexpr std::optional<int64_t> kDefaultTurnOnDelay = std::nullopt;
+  static constexpr uint32_t kDefaultDriverTransferBytes = 32;
+  static constexpr bool kDefaultSupportsActiveChannels = false;
+  static constexpr std::optional<zx_duration_t> kDefaultInternalDelay = ZX_USEC(20);
+
+ public:
+  FakeCompositeRingBuffer() = default;
+  FakeCompositeRingBuffer(ElementId element_id, async_dispatcher_t* dispatcher,
+                          fidl::ServerEnd<fuchsia_hardware_audio::RingBuffer> server_end,
+                          fuchsia_hardware_audio::PcmFormat format,
+                          size_t ring_buffer_allocated_size)
+      : TestBase(),
+        element_id_(element_id),
+        dispatcher_(dispatcher),
+        format_(std::move(format)),
+        bytes_per_frame_(format_.number_of_channels() * format_.bytes_per_sample()),
+        active_channels_bitmask_((1u << format_.number_of_channels()) - 1u),
+        active_channels_set_time_(zx::clock::get_monotonic()) {
+    ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
+    AllocateRingBuffer(element_id_, ring_buffer_allocated_size);
+    binding_ = fidl::BindServer(dispatcher_, std::move(server_end), this);
+  }
+
+  void AllocateRingBuffer(ElementId element_id, size_t size) {
+    ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
+    FX_CHECK(!vmo_.is_valid()) << "Calling AllocateRingBuffer multiple times is not supported";
+    allocated_size_ = size;
+
+    fzl::VmoMapper mapper;
+    mapper.CreateAndMap(allocated_size_, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr, &vmo_);
+  }
+
+  void Drop() {
+    binding_->Close(ZX_ERR_PEER_CLOSED);
+    binding_.reset();
+  }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    FX_LOGS(WARNING) << "FakeCompositeRingBuffer(" << this << ")::NotImplemented: " << name;
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetProperties(GetPropertiesCompleter::Sync& completer) override {
+    ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
+    fuchsia_hardware_audio::RingBufferProperties props;
+    if (needs_cache_flush_or_invalidate_) {
+      props.needs_cache_flush_or_invalidate(*needs_cache_flush_or_invalidate_);
+    }
+    if (turn_on_delay_) {
+      props.turn_on_delay(*turn_on_delay_);
+    }
+    if (driver_transfer_bytes_) {
+      props.driver_transfer_bytes(*driver_transfer_bytes_);
+    }
+    completer.Reply(props);
+  }
+
+  void GetVmo(GetVmoRequest& request, GetVmoCompleter::Sync& completer) override {
+    ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
+    auto total_requested_size =
+        driver_transfer_bytes_.value_or(0) + request.min_frames() * bytes_per_frame_;
+    if (total_requested_size > allocated_size_) {
+      ADR_WARN_METHOD() << "Requested size " << total_requested_size << " exceeds allocated size "
+                        << allocated_size_;
+      completer.Reply(fit::error(fuchsia_hardware_audio::GetVmoError::kInvalidArgs));
+      return;
+    }
+    clock_recovery_notifications_per_ring_ = request.clock_recovery_notifications_per_ring();
+    requested_frames_ = (total_requested_size - 1) / bytes_per_frame_ + 1;
+
+    // Dup our ring buffer VMO to send over the channel.
+    zx::vmo out_vmo;
+    FX_CHECK(vmo_.duplicate(ZX_RIGHT_SAME_RIGHTS, &out_vmo) == ZX_OK);
+
+    completer.Reply(zx::ok(fuchsia_hardware_audio::RingBufferGetVmoResponse{{
+        .num_frames = requested_frames_,
+        .ring_buffer = std::move(out_vmo),
+    }}));
+  }
+
+  void Start(StartCompleter::Sync& completer) override {
+    ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
+    if (!vmo_.is_valid() || started_) {
+      completer.Close(ZX_ERR_BAD_STATE);
+      return;
+    }
+    started_ = true;
+    start_time_ = zx::clock::get_monotonic();
+    completer.Reply(start_time_.get());
+  }
+
+  void Stop(StopCompleter::Sync& completer) override {
+    ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
+    if (!vmo_.is_valid() || !started_) {
+      completer.Close(ZX_ERR_BAD_STATE);
+      return;
+    }
+    started_ = false;
+    start_time_ = zx::time(0);
+    completer.Reply();
+  }
+
+  void SetActiveChannels(SetActiveChannelsRequest& request,
+                         SetActiveChannelsCompleter::Sync& completer) override {
+    ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
+    if (!supports_active_channels_) {
+      completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+      return;
+    }
+    if (request.active_channels_bitmask() >= (1u << format_.number_of_channels())) {
+      completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+      return;
+    }
+    if (active_channels_bitmask_ != request.active_channels_bitmask()) {
+      active_channels_bitmask_ = request.active_channels_bitmask();
+      active_channels_set_time_ = zx::clock::get_monotonic();
+    }
+    completer.Reply(zx::ok(active_channels_set_time_.get()));
+  }
+
+  void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override {
+    ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
+    if (watch_delay_info_completer_.has_value()) {
+      completer.Close(ZX_ERR_BAD_STATE);
+      return;
+    }
+
+    watch_delay_info_completer_ = completer.ToAsync();
+    MaybeCompleteWatchDelayInfo();
+  }
+
+  void InjectDelayChange(std::optional<zx_duration_t> internal_delay,
+                         std::optional<zx_duration_t> external_delay) {
+    ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
+    if (internal_delay.value_or(0) != internal_delay_.value_or(0) ||
+        external_delay.value_or(0) != external_delay_.value_or(0)) {
+      delays_have_changed_ = true;
+    }
+    internal_delay_ = internal_delay;
+    external_delay_ = external_delay;
+
+    MaybeCompleteWatchDelayInfo();
+  }
+
+  void MaybeCompleteWatchDelayInfo() {
+    ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
+    if (delays_have_changed_ && watch_delay_info_completer_) {
+      delays_have_changed_ = false;
+
+      auto completer = std::move(*watch_delay_info_completer_);
+      watch_delay_info_completer_.reset();
+
+      fuchsia_hardware_audio::DelayInfo info;
+      if (internal_delay_) {
+        info.internal_delay(*internal_delay_);
+      }
+      if (external_delay_) {
+        info.external_delay(*external_delay_);
+      }
+      completer.Reply(std::move(info));
+    }
+  }
+
+  void WatchClockRecoveryPositionInfo(
+      WatchClockRecoveryPositionInfoCompleter::Sync& completer) override {
+    NotImplemented_("WatchClockRecoveryPositionInfo", completer);
+  }
+
+  // Accessors
+  ElementId element_id() const { return element_id_; }
+
+  bool started() const { return started_; }
+  zx::time start_time() const { return start_time_; }
+
+  void enable_active_channels_support() { supports_active_channels_ = true; }
+  void disable_active_channels_support() { supports_active_channels_ = false; }
+  uint64_t active_channels_bitmask() const { return active_channels_bitmask_; }
+  zx::time active_channels_set_time() const { return active_channels_set_time_; }
+
+ private:
+  // ctor
+  ElementId element_id_;
+  async_dispatcher_t* dispatcher_;
+  fuchsia_hardware_audio::PcmFormat format_;
+  uint32_t bytes_per_frame_;
+
+  // Bind
+  std::optional<fidl::ServerBindingRef<fuchsia_hardware_audio::RingBuffer>> binding_;
+
+  // GetProperties
+  std::optional<bool> needs_cache_flush_or_invalidate_ = kDefaultNeedsCacheFlushInvalidate;
+  std::optional<int64_t> turn_on_delay_ = kDefaultTurnOnDelay;
+  std::optional<uint32_t> driver_transfer_bytes_ = kDefaultDriverTransferBytes;
+
+  // GetVmo
+  uint32_t requested_frames_;
+  zx::vmo vmo_;
+  size_t allocated_size_;
+
+  // Start / Stop
+  bool started_ = false;
+  zx::time start_time_;
+
+  // SetActiveChannels
+  bool supports_active_channels_ = kDefaultSupportsActiveChannels;
+  uint64_t active_channels_bitmask_;
+  zx::time active_channels_set_time_;
+
+  // WatchDelayInfo
+  std::optional<WatchDelayInfoCompleter::Async> watch_delay_info_completer_;
+  std::optional<zx_duration_t> internal_delay_ = kDefaultInternalDelay;
+  std::optional<zx_duration_t> external_delay_;
+  bool delays_have_changed_ = true;
+
+  // WatchClockRecoveryPositionInfo
+  uint32_t clock_recovery_notifications_per_ring_ = 0;
+};
+
 // This driver implements the audio driver interface and is configurable to simulate audio hardware.
 using fuchsia_hardware_audio::Composite;
 using fuchsia_hardware_audio::CompositeConnector;
 using fuchsia_hardware_audio_signalprocessing::SignalProcessing;
 class FakeComposite : public fidl::testing::TestBase<Composite>,
                       public fidl::testing::TestBase<SignalProcessing> {
-  static constexpr bool kLogFakeComposite = true;
+  static constexpr bool kLogFakeComposite = false;
 
  public:
   static constexpr char kDefaultManufacturer[] = "fake_composite device manufacturer";
@@ -38,8 +268,10 @@ class FakeComposite : public fidl::testing::TestBase<Composite>,
       0x0E, 0x2C, 0x4A, 0x68, 0x86, 0xA4, 0xC2, 0xE0,
   };
 
-  static constexpr uint32_t kDefaultDaiNumberOfChannels = 2;
-  static constexpr uint32_t kDefaultDaiNumberOfChannels2 = 1;
+  // DaiFormats and format sets
+  //
+  static constexpr uint32_t kDefaultDaiNumberOfChannels = 1;
+  static constexpr uint32_t kDefaultDaiNumberOfChannels2 = 2;
   static constexpr fuchsia_hardware_audio::DaiSampleFormat kDefaultDaiSampleFormat =
       fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned;
   static constexpr fuchsia_hardware_audio::DaiSampleFormat kDefaultDaiSampleFormat2 =
@@ -76,6 +308,7 @@ class FakeComposite : public fidl::testing::TestBase<Composite>,
   static const fuchsia_hardware_audio::DaiFormat kDefaultDaiFormat;
   static const fuchsia_hardware_audio::DaiFormat kDefaultDaiFormat2;
 
+  static constexpr size_t kDefaultRingBufferAllocationSize = 8000;
   // RingBufferFormats and format sets
   //
   static constexpr uint8_t kDefaultRbNumberOfChannels = 2;
@@ -188,6 +421,16 @@ class FakeComposite : public fidl::testing::TestBase<Composite>,
   fidl::ClientEnd<fuchsia_hardware_audio::Composite> Enable();
   void DropComposite();
 
+  void ReserveRingBufferSize(ElementId element_id, size_t size);
+  void EnableActiveChannelsSupport(ElementId element_id);
+  void DisableActiveChannelsSupport(ElementId element_id);
+
+  void DropRingBuffer(ElementId element_id) {
+    if (auto match = ring_buffers_.find(element_id); match != ring_buffers_.end()) {
+      match->second->Drop();
+    }
+  }
+
   async_dispatcher_t* dispatcher() { return dispatcher_; }
   bool is_bound() const { return binding_.has_value(); }
 
@@ -252,6 +495,9 @@ class FakeComposite : public fidl::testing::TestBase<Composite>,
   void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) final;
 
   // Internal implementation methods/members
+  static bool DaiFormatIsSupported(ElementId element_id,
+                                   const fuchsia_hardware_audio::DaiFormat& format);
+
   static void CheckForElementStateCompletion(FakeElementRecord& element_record);
   void CheckForTopologyCompletion();
 
@@ -277,6 +523,10 @@ class FakeComposite : public fidl::testing::TestBase<Composite>,
   std::optional<WatchTopologyCompleter::Async> watch_topology_completer_;
   std::optional<TopologyId> topology_id_ = kFullDuplexTopologyId;
   bool topology_has_changed_ = true;
+
+  std::unordered_map<ElementId, size_t> ring_buffer_allocation_sizes_;
+  std::unordered_map<ElementId, bool> active_channels_support_overrides_;
+  std::unordered_map<ElementId, std::unique_ptr<FakeCompositeRingBuffer>> ring_buffers_;
 };
 
 }  // namespace media_audio

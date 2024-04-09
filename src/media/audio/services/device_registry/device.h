@@ -32,6 +32,8 @@
 
 namespace media_audio {
 
+class Device;
+
 // This class represents a driver and audio device, once it is detected.
 class Device : public std::enable_shared_from_this<Device> {
  public:
@@ -41,6 +43,39 @@ class Device : public std::enable_shared_from_this<Device> {
                                         fuchsia_audio_device::DriverClient driver_client);
   ~Device();
 
+  template <typename ProtocolT>
+  class EndpointFidlErrorHandler : public fidl::AsyncEventHandler<ProtocolT> {
+   public:
+    EndpointFidlErrorHandler(Device* device, ElementId element_id, std::string name)
+        : device_(device), element_id_(element_id), name_(std::move(name)) {}
+    EndpointFidlErrorHandler() = default;
+    void on_fidl_error(fidl::UnbindInfo info) override;
+
+   protected:
+    Device* device() const { return device_; }
+    std::string name() const { return name_; }
+
+   private:
+    Device* device_;
+    ElementId element_id_;
+    std::string name_;
+  };
+
+  template <typename ProtocolT>
+  class FidlErrorHandler : public fidl::AsyncEventHandler<ProtocolT> {
+   public:
+    FidlErrorHandler(Device* device, std::string name) : device_(device), name_(std::move(name)) {}
+    FidlErrorHandler() = default;
+    void on_fidl_error(fidl::UnbindInfo info) override;
+
+   protected:
+    Device* device() const { return device_; }
+    std::string name() const { return name_; }
+
+   private:
+    Device* device_;
+    std::string name_;
+  };
   bool AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add);
 
   void Initialize();
@@ -50,31 +85,34 @@ class Device : public std::enable_shared_from_this<Device> {
   // This also calls AddObserver for the same Notify.
   bool SetControl(std::shared_ptr<ControlNotify> control_notify);
   bool DropControl();
-  void DropRingBuffer();
+  void DropRingBuffer(ElementId element_id);
 
   // Translate from the specified client format to the fuchsia_hardware_audio format that the driver
   // can support, including valid_bits_per_sample (which clients don't specify). If the driver
   // cannot satisfy the requested format, `.pcm_format` will be missing in the returned table.
   std::optional<fuchsia_hardware_audio::Format> SupportedDriverFormatForClientFormat(
+      ElementId element_id,
       // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
-      const fuchsia_audio::Format& client_format,
-      ElementId element_id = fuchsia_audio_device::kDefaultRingBufferElementId);
+      const fuchsia_audio::Format& client_format);
   bool SetGain(fuchsia_hardware_audio::GainState& gain_state);
 
   void RetrieveRingBufferFormatSets(
+      ElementId element_id,
       fit::callback<void(ElementId, const std::vector<fuchsia_hardware_audio::SupportedFormats>&)>
-          ring_buffer_format_sets_callback,
-      ElementId element_id = fuchsia_audio_device::kDefaultRingBufferElementId);
+          ring_buffer_format_sets_callback);
   void RetrieveDaiFormatSets(
+      ElementId element_id,
       fit::callback<void(ElementId,
                          const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>&)>
-          dai_format_sets_callback,
-      ElementId element_id = fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+          dai_format_sets_callback);
 
-  bool CodecSetDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_format);
-  bool CodecReset();
+  void SetDaiFormat(ElementId element_id, const fuchsia_hardware_audio::DaiFormat& dai_formats);
+
+  bool Reset();
   bool CodecStart();
   bool CodecStop();
+
+  bool CompositeReset();
 
   bool SetTopology(TopologyId topology_id);
 
@@ -82,17 +120,21 @@ class Device : public std::enable_shared_from_this<Device> {
     fuchsia_audio::RingBuffer ring_buffer;
     fuchsia_audio_device::RingBufferProperties properties;
   };
-  bool CreateRingBuffer(const fuchsia_hardware_audio::Format& format,
-                        uint32_t requested_ring_buffer_bytes,
-                        fit::callback<void(RingBufferInfo)> create_ring_buffer_callback);
+  bool CreateRingBuffer(
+      ElementId element_id, const fuchsia_hardware_audio::Format& format,
+      uint32_t requested_ring_buffer_bytes,
+      fit::callback<void(
+          fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>)>
+          create_ring_buffer_callback);
 
   // Change the channels that are currently active (powered-up).
-  void SetActiveChannels(uint64_t channel_bitmask,
+  void SetActiveChannels(ElementId element_id, uint64_t channel_bitmask,
                          fit::callback<void(zx::result<zx::time>)> set_active_channels_callback);
   // Start the device ring buffer now (including clock recovery).
-  void StartRingBuffer(fit::callback<void(zx::result<zx::time>)> start_callback);
+  void StartRingBuffer(ElementId element_id,
+                       fit::callback<void(zx::result<zx::time>)> start_callback);
   // Stop the device ring buffer now (including device clock recovery).
-  void StopRingBuffer(fit::callback<void(zx_status_t)> stop_callback);
+  void StopRingBuffer(ElementId element_id, fit::callback<void(zx_status_t)> stop_callback);
 
   // Simple accessors
   // This is the const subset available to device observers.
@@ -121,17 +163,29 @@ class Device : public std::enable_shared_from_this<Device> {
   }
 
   // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
-  const fuchsia_audio::Format& ring_buffer_format() { return vmo_format_; }
-  std::optional<int16_t> valid_bits_per_sample() const {
-    if (!driver_format_ || !driver_format_->pcm_format()) {
-      return std::nullopt;
+  fuchsia_audio::Format ring_buffer_format(ElementId element_id) {
+    if (const auto match = ring_buffer_map_.find(element_id); match != ring_buffer_map_.end()) {
+      return match->second.vmo_format;
     }
-    return driver_format_->pcm_format()->valid_bits_per_sample();
+    return {};
   }
-  std::optional<bool> supports_set_active_channels() const { return supports_set_active_channels_; }
+
+  std::optional<int16_t> valid_bits_per_sample(ElementId element_id) const {
+    auto rb_pair = ring_buffer_map_.find(element_id);
+    return (
+        (rb_pair == ring_buffer_map_.end() || !rb_pair->second.driver_format ||
+         !rb_pair->second.driver_format->pcm_format())
+            ? std::nullopt
+            : std::optional(rb_pair->second.driver_format->pcm_format()->valid_bits_per_sample()));
+  }
+  std::optional<bool> supports_set_active_channels(ElementId element_id) const {
+    auto rb_pair = ring_buffer_map_.find(element_id);
+    return (rb_pair == ring_buffer_map_.end() ? std::nullopt
+                                              : rb_pair->second.supports_set_active_channels);
+  }
 
   bool dai_format_is_set() const { return codec_format_.has_value(); }
-  const fuchsia_hardware_audio::CodecFormatInfo& codec_format_info() const {
+  const fuchsia_hardware_audio::CodecFormatInfo& codec_format_info(ElementId element_id) const {
     return codec_format_->codec_format_info;
   }
   bool codec_is_started() const { return codec_start_state_.started; }
@@ -142,6 +196,11 @@ class Device : public std::enable_shared_from_this<Device> {
   bool has_health_state() const { return health_state_.has_value(); }
   bool dai_format_sets_retrieved() const { return dai_format_sets_retrieved_; }
   bool ring_buffer_format_sets_retrieved() const { return ring_buffer_format_sets_retrieved_; }
+  const std::unordered_set<ElementId>& dai_endpoint_ids() const { return dai_endpoint_ids_; }
+  const std::unordered_set<ElementId>& ring_buffer_endpoint_ids() const {
+    return ring_buffer_endpoint_ids_;
+  }
+
   bool has_plug_state() const { return plug_state_.has_value(); }
   bool has_gain_state() const { return gain_state_.has_value(); }
   bool checked_for_signalprocessing() const { return supports_signalprocessing_.has_value(); }
@@ -244,40 +303,50 @@ class Device : public std::enable_shared_from_this<Device> {
   //   tracks the work to proactively call GetHealthState at some point. We will always surface this
   //   to the client by an error notification, rather than their calling GetHealthState directly.
   //
-  enum class State {
+  enum class State : uint8_t {
     Error,
     DeviceInitializing,
     DeviceInitialized,
-    CreatingRingBuffer,
-    RingBufferStopped,
-    RingBufferStarted,
+  };
+  enum class RingBufferState : uint8_t {
+    NotCreated,
+    Creating,
+    Stopped,
+    Started,
   };
   friend std::ostream& operator<<(std::ostream& out, State device_state);
+  friend std::ostream& operator<<(std::ostream& out, RingBufferState ring_buffer_state);
   void SetError(zx_status_t error);
   void SetState(State new_state);
+  void SetRingBufferState(ElementId element_id, RingBufferState new_ring_buffer_state);
 
   // Start the ongoing process of device clock recovery from position notifications. Before this
   // call, and after StopDeviceClockRecovery(), the device clock should run at the MONOTONIC rate.
   void RecoverDeviceClockFromPositionInfo();
   void StopDeviceClockRecovery();
 
-  void DeviceDroppedRingBuffer();
+  void DeviceDroppedRingBuffer(ElementId element_id);
 
   // Create the driver RingBuffer FIDL connection.
-  bool ConnectRingBufferFidl(fuchsia_hardware_audio::Format format);
+  fuchsia_audio_device::ControlCreateRingBufferError ConnectRingBufferFidl(
+      ElementId element_id, fuchsia_hardware_audio::Format format);
   // Retrieve the underlying RingBufferProperties (turn_on_delay and needs_cache_flush_...).
-  void RetrieveRingBufferProperties();
+  void RetrieveRingBufferProperties(ElementId element_id);
   // Post a WatchDelayInfo hanging-get, for external/internal_delay.
-  void RetrieveDelayInfo();
+  void RetrieveDelayInfo(ElementId element_id);
   // Call the underlying driver RingBuffer::GetVmo method and obtain the VMO and rb_frame_count.
-  void GetVmo(uint32_t min_frames, uint32_t position_notifications_per_ring);
+  void GetVmo(ElementId element_id, uint32_t min_frames, uint32_t position_notifications_per_ring);
   // Check whether the 3 prerequisites are in place, for creating a client RingBuffer connection.
-  void CheckForRingBufferReady();
+  void CheckForRingBufferReady(ElementId element_id);
 
   // RingBuffer FIDL successful-response handler.
-  bool VmoReceived() const { return num_ring_buffer_frames_.has_value(); }
+  bool VmoReceived(ElementId element_id) const {
+    auto rb_pair = ring_buffer_map_.find(element_id);
+    return (rb_pair != ring_buffer_map_.end() &&
+            rb_pair->second.num_ring_buffer_frames.has_value());
+  }
 
-  void CalculateRequiredRingBufferSizes();
+  void CalculateRequiredRingBufferSizes(ElementId element_id);
 
   std::shared_ptr<ControlNotify> GetControlNotify();
 
@@ -289,18 +358,6 @@ class Device : public std::enable_shared_from_this<Device> {
   const std::string name_;
   const fuchsia_audio_device::DeviceType device_type_;
   fuchsia_audio_device::DriverClient driver_client_;
-
-  template <typename ProtocolT>
-  class FidlErrorHandler : public fidl::AsyncEventHandler<ProtocolT> {
-   public:
-    FidlErrorHandler(Device* device, std::string name) : device_(device), name_(std::move(name)) {}
-    FidlErrorHandler() = default;
-    void on_fidl_error(fidl::UnbindInfo info) override;
-
-   private:
-    Device* device_;
-    std::string name_;
-  };
 
   std::optional<fidl::Client<fuchsia_hardware_audio::Codec>> codec_client_;
   FidlErrorHandler<fuchsia_hardware_audio::Codec> codec_handler_;
@@ -337,6 +394,7 @@ class Device : public std::enable_shared_from_this<Device> {
   std::unordered_set<ElementId> dai_endpoint_ids_;
   std::unordered_set<ElementId> temp_dai_endpoint_ids_;
   std::unordered_set<ElementId> ring_buffer_endpoint_ids_;
+  std::unordered_set<ElementId> temp_ring_buffer_endpoint_ids_;
   std::unordered_map<TopologyId, std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>>
       sig_proc_topology_map_;
   std::optional<TopologyId> current_topology_id_;
@@ -375,32 +433,43 @@ class Device : public std::enable_shared_from_this<Device> {
   std::optional<std::weak_ptr<ControlNotify>> control_notify_;
 
   // Members related to driver RingBuffer.
-  std::optional<fidl::Client<fuchsia_hardware_audio::RingBuffer>> ring_buffer_client_;
-  FidlErrorHandler<fuchsia_hardware_audio::RingBuffer> ring_buffer_handler_;
+  //
+  struct RingBufferRecord {
+    RingBufferState ring_buffer_state = RingBufferState::NotCreated;
 
-  fit::callback<void(RingBufferInfo)> create_ring_buffer_callback_;
-  // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
-  fuchsia_audio::Format vmo_format_;
-  zx::vmo ring_buffer_vmo_;
+    std::optional<fidl::Client<fuchsia_hardware_audio::RingBuffer>> ring_buffer_client;
+    std::unique_ptr<EndpointFidlErrorHandler<fuchsia_hardware_audio::RingBuffer>>
+        ring_buffer_handler;
 
-  // TODO(https://fxbug.dev/42069014): consider optional<struct>, to minimize separate optionals.
-  std::optional<fuchsia_hardware_audio::RingBufferProperties> ring_buffer_properties_;
-  std::optional<uint32_t> num_ring_buffer_frames_;
-  std::optional<fuchsia_hardware_audio::DelayInfo> delay_info_;
-  std::optional<fuchsia_hardware_audio::Format> driver_format_;
+    fit::callback<void(
+        fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>)>
+        create_ring_buffer_callback;
 
-  uint64_t bytes_per_frame_ = 0;
-  std::optional<uint32_t> requested_ring_buffer_bytes_;
-  uint64_t requested_ring_buffer_frames_;
+    // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
+    fuchsia_audio::Format vmo_format;
+    zx::vmo ring_buffer_vmo;
 
-  uint64_t ring_buffer_producer_bytes_;
-  uint64_t ring_buffer_consumer_bytes_;
+    // TODO(https://fxbug.dev/42069014): consider optional<struct>, to minimize separate optionals.
+    std::optional<fuchsia_hardware_audio::RingBufferProperties> ring_buffer_properties;
+    std::optional<uint32_t> num_ring_buffer_frames;
+    std::optional<fuchsia_hardware_audio::DelayInfo> delay_info;
+    std::optional<fuchsia_hardware_audio::Format> driver_format;
 
-  std::optional<bool> supports_set_active_channels_;
-  uint64_t active_channels_bitmask_;
-  std::optional<zx::time> active_channels_set_time_;
+    uint64_t bytes_per_frame = 0u;
+    std::optional<uint32_t> requested_ring_buffer_bytes;
+    uint64_t requested_ring_buffer_frames = 0u;
 
-  std::optional<zx::time> start_time_;
+    uint64_t ring_buffer_producer_bytes = 0u;
+    uint64_t ring_buffer_consumer_bytes = 0u;
+
+    std::optional<bool> supports_set_active_channels;
+    uint64_t active_channels_bitmask = 0u;
+    std::optional<zx::time> active_channels_set_time;
+
+    std::optional<zx::time> start_time;
+  };
+
+  std::unordered_map<ElementId, RingBufferRecord> ring_buffer_map_;
 };
 
 inline std::ostream& operator<<(std::ostream& out, Device::State device_state) {
@@ -411,12 +480,23 @@ inline std::ostream& operator<<(std::ostream& out, Device::State device_state) {
       return (out << "DeviceInitializing");
     case Device::State::DeviceInitialized:
       return (out << "DeviceInitialized");
-    case Device::State::CreatingRingBuffer:
-      return (out << "CreatingRingBuffer");
-    case Device::State::RingBufferStopped:
-      return (out << "RingBufferStopped");
-    case Device::State::RingBufferStarted:
-      return (out << "RingBufferStarted");
+    default:
+      return (out << "<unknown enum>");
+  }
+}
+
+inline std::ostream& operator<<(std::ostream& out, Device::RingBufferState ring_buffer_state) {
+  switch (ring_buffer_state) {
+    case Device::RingBufferState::NotCreated:
+      return (out << "NotCreated");
+    case Device::RingBufferState::Creating:
+      return (out << "Creating");
+    case Device::RingBufferState::Stopped:
+      return (out << "Stopped");
+    case Device::RingBufferState::Started:
+      return (out << "Started");
+    default:
+      return (out << "<unknown enum>");
   }
 }
 

@@ -5,6 +5,7 @@
 #ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_LOGGING_H_
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_LOGGING_H_
 
+#include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
@@ -14,7 +15,6 @@
 #include <optional>
 #include <ostream>
 
-#include "fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h"
 #include "src/media/audio/services/device_registry/basic_types.h"
 
 namespace media_audio {
@@ -42,7 +42,7 @@ inline constexpr bool kLogDeviceDetection = false;
 inline constexpr bool kLogDeviceInitializationProgress = false;
 inline constexpr bool kLogAudioDeviceRegistryMethods = false;
 inline constexpr bool kLogSummaryFinalDeviceInfo = true;
-inline constexpr bool kLogDetailedFinalDeviceInfo = false;
+inline constexpr bool kLogDetailedFinalDeviceInfo = true;
 
 inline constexpr bool kLogDeviceMethods = false;
 
@@ -68,6 +68,7 @@ inline constexpr bool kLogSignalProcessingFidlCalls = false;
 inline constexpr bool kLogSignalProcessingFidlResponses = false;
 inline constexpr bool kLogSignalProcessingFidlResponseValues = false;
 
+inline constexpr bool kLogRingBufferState = false;
 inline constexpr bool kLogRingBufferMethods = false;
 inline constexpr bool kLogRingBufferFidlCalls = false;
 inline constexpr bool kLogRingBufferFidlResponses = false;
@@ -336,6 +337,27 @@ inline std::ostream& operator<<(
     }
   }
   return (out << "<none> (non-compliant)");
+}
+inline std::ostream& operator<<(std::ostream& out,
+                                const fuchsia_audio_device::ControlSetDaiFormatError& error) {
+  switch (error) {
+    case fuchsia_audio_device::ControlSetDaiFormatError::kDeviceError:
+      return (out << "DEVICE_ERROR");
+    case fuchsia_audio_device::ControlSetDaiFormatError::kWrongDeviceType:
+      return (out << "WRONG_DEVICE_TYPE");
+    case fuchsia_audio_device::ControlSetDaiFormatError::kAlreadyPending:
+      return (out << "ALREADY_PENDING");
+    case fuchsia_audio_device::ControlSetDaiFormatError::kInvalidElementId:
+      return (out << "INVALID_ELEMENT_ID");
+    case fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat:
+      return (out << "INVALID_DAI_FORMAT");
+    case fuchsia_audio_device::ControlSetDaiFormatError::kFormatMismatch:
+      return (out << "FORMAT_MISMATCH");
+    case fuchsia_audio_device::ControlSetDaiFormatError::kOther:
+      return (out << "OTHER");
+    default:
+      return (out << "[UNKNOWN]");
+  }
 }
 inline std::ostream& operator<<(
     std::ostream& out,

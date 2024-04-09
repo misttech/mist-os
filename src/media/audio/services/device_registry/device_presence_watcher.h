@@ -5,7 +5,7 @@
 #ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_DEVICE_PRESENCE_WATCHER_H_
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_DEVICE_PRESENCE_WATCHER_H_
 
-#include <lib/fidl/cpp/wire/internal/transport.h>
+#include <memory>
 
 namespace media_audio {
 

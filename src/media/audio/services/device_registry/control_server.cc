@@ -5,21 +5,21 @@
 #include "src/media/audio/services/device_registry/control_server.h"
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
-#include <fidl/fuchsia.audio/cpp/common_types.h>
+#include <fidl/fuchsia.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.mem/cpp/natural_types.h>
+#include <lib/fidl/cpp/enum.h>
 #include <lib/fidl/cpp/wire/status.h>
 #include <lib/fit/internal/result.h>
+#include <lib/fit/result.h>
 #include <lib/syslog/cpp/macros.h>
-#include <zircon/compiler.h>
 #include <zircon/errors.h>
 
-#include <cstdint>
 #include <optional>
+#include <utility>
 
 #include "src/media/audio/services/device_registry/device.h"
-#include "src/media/audio/services/device_registry/device_presence_watcher.h"
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/ring_buffer_server.h"
 #include "src/media/audio/services/device_registry/validate.h"
@@ -33,12 +33,13 @@ std::shared_ptr<ControlServer> ControlServer::Create(
     std::shared_ptr<AudioDeviceRegistry> parent, std::shared_ptr<Device> device) {
   ADR_LOG_STATIC(kLogControlServerMethods);
 
-  return BaseFidlServer::Create(std::move(thread), std::move(server_end), parent, device);
+  return BaseFidlServer::Create(std::move(thread), std::move(server_end), std::move(parent),
+                                std::move(device));
 }
 
 ControlServer::ControlServer(std::shared_ptr<AudioDeviceRegistry> parent,
                              std::shared_ptr<Device> device)
-    : parent_(parent), device_(device) {
+    : parent_(std::move(parent)), device_(std::move(device)) {
   ADR_LOG_METHOD(kLogObjectLifetimes);
   ++count_;
   LogObjectCounts();
@@ -59,19 +60,25 @@ void ControlServer::OnShutdown(fidl::UnbindInfo info) {
     ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogObjectLifetimes) << "with status: " << info;
   }
 
-  if (auto ring_buffer = GetRingBufferServer(); ring_buffer) {
-    ring_buffer->ClientDroppedControl();
-    ring_buffer_server_.reset();
+  for (auto& [_, weak_ring_buffer_server] : ring_buffer_servers_) {
+    if (auto sh_ring_buffer_server = weak_ring_buffer_server.lock(); sh_ring_buffer_server) {
+      sh_ring_buffer_server->ClientDroppedControl();
+    }
   }
+  ring_buffer_servers_.clear();
 }
 
 // Called when Device drops its RingBuffer FIDL. Tell RingBufferServer and drop our reference.
-void ControlServer::DeviceDroppedRingBuffer() {
+void ControlServer::DeviceDroppedRingBuffer(ElementId element_id) {
   ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods);
 
-  if (auto ring_buffer = GetRingBufferServer(); ring_buffer) {
-    ring_buffer->DeviceDroppedRingBuffer();
-    ring_buffer_server_.reset();
+  auto ring_buffer_server_iter = ring_buffer_servers_.find(element_id);
+  if (ring_buffer_server_iter != ring_buffer_servers_.end()) {
+    if (auto sh_ring_buffer_server = ring_buffer_server_iter->second.lock();
+        sh_ring_buffer_server) {
+      sh_ring_buffer_server->DeviceDroppedRingBuffer();
+    }
+    ring_buffer_servers_.erase(element_id);
   }
 }
 
@@ -86,22 +93,27 @@ void ControlServer::DeviceHasError() {
 void ControlServer::DeviceIsRemoved() {
   ADR_LOG_METHOD(kLogControlServerMethods);
 
-  if (auto ring_buffer = GetRingBufferServer(); ring_buffer) {
-    ring_buffer->ClientDroppedControl();
-    ring_buffer_server_.reset();
-
-    // We don't explicitly clear our shared_ptr<Device> reference, to ensure we destruct first.
+  for (auto& [_, weak_ring_buffer_server] : ring_buffer_servers_) {
+    if (auto sh_ring_buffer_server = weak_ring_buffer_server.lock(); sh_ring_buffer_server) {
+      sh_ring_buffer_server->ClientDroppedControl();
+    }
   }
+  ring_buffer_servers_.clear();
+
+  // We don't explicitly clear our shared_ptr<Device> reference, to ensure we destruct first.
+
   Shutdown(ZX_ERR_PEER_CLOSED);
 }
 
-std::shared_ptr<RingBufferServer> ControlServer::GetRingBufferServer() {
+std::shared_ptr<RingBufferServer> ControlServer::TryGetRingBufferServer(ElementId element_id) {
   ADR_LOG_METHOD(kLogControlServerMethods);
-  if (ring_buffer_server_) {
-    if (auto sh_ptr_ring_buffer_server = ring_buffer_server_->lock(); sh_ptr_ring_buffer_server) {
-      return sh_ptr_ring_buffer_server;
+  auto ring_buffer_server_iter = ring_buffer_servers_.find(element_id);
+  if (ring_buffer_server_iter != ring_buffer_servers_.end()) {
+    if (auto sh_ring_buffer_server = ring_buffer_server_iter->second.lock();
+        sh_ring_buffer_server) {
+      return sh_ring_buffer_server;
     }
-    ring_buffer_server_.reset();
+    ring_buffer_servers_.erase(element_id);
   }
   return nullptr;
 }
@@ -178,21 +190,39 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
     return;
   }
 
-  if (!device_->is_stream_config()) {
+  if (!device_->is_stream_config() && !device_->is_composite()) {
     ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
     completer.Reply(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kWrongDeviceType));
     return;
   }
+  ElementId element_id = fuchsia_audio_device::kDefaultRingBufferElementId;
+  // Fail on missing parameters.
+  if (device_->is_composite()) {
+    if (!request.element_id()) {
+      ADR_WARN_METHOD() << "required field 'element_id' is missing";
+      completer.Reply(
+          fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kInvalidElementId));
+      return;
+    }
+    element_id = *request.element_id();
+    auto& rb_ids = device_->ring_buffer_endpoint_ids();
+    if (rb_ids.find(element_id) == rb_ids.end()) {
+      ADR_WARN_METHOD()
+          << "required field 'element_id' does not refer to an ENDPOINT of type RING_BUFFER";
+      completer.Reply(
+          fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kInvalidElementId));
+      return;
+    }
+  }
 
-  if (create_ring_buffer_completer_.has_value()) {
+  if (create_ring_buffer_completers_.find(element_id) != create_ring_buffer_completers_.end()) {
     ADR_WARN_METHOD() << "previous `CreateRingBuffer` request has not yet completed";
     completer.Reply(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kAlreadyPending));
     return;
   }
 
-  // Fail on missing parameters.
   if (!request.options()) {
     ADR_WARN_METHOD() << "required field 'options' is missing";
     completer.Reply(
@@ -218,13 +248,14 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kInvalidRingBuffer));
     return;
   }
-  if (GetRingBufferServer()) {
+  if (TryGetRingBufferServer(element_id)) {
     ADR_WARN_METHOD() << "device RingBuffer already exists";
     completer.Reply(
         fit::error(fuchsia_audio_device::wire::ControlCreateRingBufferError::kAlreadyAllocated));
   }
 
-  auto driver_format = device_->SupportedDriverFormatForClientFormat(*request.options()->format());
+  auto driver_format =
+      device_->SupportedDriverFormatForClientFormat(element_id, *request.options()->format());
   // Fail if device cannot satisfy the requested format.
   if (!driver_format) {
     ADR_WARN_METHOD() << "device does not support the specified options";
@@ -233,43 +264,50 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
     return;
   }
 
-  create_ring_buffer_completer_ = completer.ToAsync();
-
+  create_ring_buffer_completers_.insert_or_assign(element_id, completer.ToAsync());
   bool created = device_->CreateRingBuffer(
-      *driver_format, *request.options()->ring_buffer_min_bytes(),
-      [this](Device::RingBufferInfo info) {
+      element_id, *driver_format, *request.options()->ring_buffer_min_bytes(),
+      [this, element_id](
+          fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>
+              result) {
         // If we have no async completer, maybe we're shutting down. Just exit.
-        if (!create_ring_buffer_completer_.has_value()) {
+        if (create_ring_buffer_completers_.find(element_id) ==
+            create_ring_buffer_completers_.end()) {
           ADR_WARN_OBJECT()
               << "create_ring_buffer_completer_ gone by the time the CreateRingBuffer callback ran";
-          if (auto ring_buffer_server = GetRingBufferServer(); ring_buffer_server) {
-            ring_buffer_server_.reset();
-          }
+          device_->DropRingBuffer(element_id);  //  Let this unwind the RingBufferServer.
           return;
         }
 
-        auto completer = std::move(*create_ring_buffer_completer_);
-        create_ring_buffer_completer_.reset();
+        auto completer = std::move(create_ring_buffer_completers_.find(element_id)->second);
+        create_ring_buffer_completers_.erase(element_id);
+
+        if (result.is_error()) {
+          // Based on the driver response, set our ControlServer response
+          completer.Reply(
+              fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kDeviceError));
+          return;
+        }
 
         completer.Reply(fit::success(fuchsia_audio_device::ControlCreateRingBufferResponse{{
-            .properties = info.properties,
-            .ring_buffer = std::move(info.ring_buffer),
+            .properties = result.value().properties,
+            .ring_buffer = std::move(result.value().ring_buffer),
         }}));
       });
 
   if (!created) {
     ADR_WARN_METHOD() << "device cannot create a ring buffer with the specified options";
-    ring_buffer_server_.reset();
-    auto completer = std::move(*create_ring_buffer_completer_);
-    create_ring_buffer_completer_.reset();
+    auto completer = std::move(create_ring_buffer_completers_.find(element_id)->second);
+    create_ring_buffer_completers_.erase(element_id);
     completer.Reply(fidl::Response<fuchsia_audio_device::Control::CreateRingBuffer>(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kBadRingBufferOption)));
     return;
   }
-  auto ring_buffer_server = RingBufferServer::Create(
-      thread_ptr(), std::move(*request.ring_buffer_server()), shared_from_this(), device_);
+  auto ring_buffer_server =
+      RingBufferServer::Create(thread_ptr(), std::move(*request.ring_buffer_server()),
+                               shared_from_this(), device_, element_id);
   AddChildServer(ring_buffer_server);
-  ring_buffer_server_ = ring_buffer_server;
+  ring_buffer_servers_.insert_or_assign(element_id, ring_buffer_server);
 }
 
 // This is only here because ControlNotify includes the methods from ObserverNotify. It might be
@@ -288,15 +326,15 @@ void ControlServer::PlugStateChanged(const fuchsia_audio_device::PlugState& new_
 
 // We receive delay values for the first time during the configuration process. Once we have these
 // values, we can calculate the required ring-buffer size and request the VMO.
-void ControlServer::DelayInfoChanged(const fuchsia_audio_device::DelayInfo& delay_info) {
+void ControlServer::DelayInfoChanged(ElementId element_id,
+                                     const fuchsia_audio_device::DelayInfo& delay_info) {
   ADR_LOG_METHOD(kLogControlServerResponses || kLogNotifyMethods);
 
   // Initialization is complete, so this represents a delay update.
   // If this is eventually exposed to Observers or any other watcher, notify them.
-  if (auto ring_buffer_server = GetRingBufferServer(); ring_buffer_server) {
+  if (auto ring_buffer_server = TryGetRingBufferServer(element_id); ring_buffer_server) {
     ring_buffer_server->DelayInfoChanged(delay_info);
   }
-  delay_info_ = delay_info;
 }
 
 void ControlServer::SetDaiFormat(SetDaiFormatRequest& request,
@@ -307,13 +345,22 @@ void ControlServer::SetDaiFormat(SetDaiFormatRequest& request,
     return;
   }
 
-  if (!device_->is_codec()) {
+  ElementId element_id = fuchsia_audio_device::kDefaultDaiInterconnectElementId;
+  // Fail on missing parameters.
+  if (device_->is_composite()) {
+    if (!request.element_id().has_value()) {
+      ADR_WARN_METHOD() << "required field 'element_id' is missing";
+      completer.Reply(
+          fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kInvalidElementId));
+      return;
+    }
+    element_id = *request.element_id();
+  } else if (!device_->is_codec()) {
     ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
     completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kWrongDeviceType));
     return;
   }
-
-  if (set_dai_format_completer_.has_value()) {
+  if (set_dai_format_completers_.find(element_id) != set_dai_format_completers_.end()) {
     ADR_WARN_METHOD() << "previous `SetDaiFormat` request has not yet completed";
     completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kAlreadyPending));
     return;
@@ -325,72 +372,74 @@ void ControlServer::SetDaiFormat(SetDaiFormatRequest& request,
     return;
   }
 
-  set_dai_format_completer_ = completer.ToAsync();
-
-  if (!device_->CodecSetDaiFormat(*request.dai_format())) {
-    auto set_fmt_completer = std::move(*set_dai_format_completer_);
-    set_dai_format_completer_.reset();
-    set_fmt_completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kOther));
-  }
+  set_dai_format_completers_.insert_or_assign(element_id, completer.ToAsync());
+  device_->SetDaiFormat(element_id, *request.dai_format());
 
   // We need the CodecFormatInfo to complete this, so we wait for the Device to notify us. Besides,
   // it's also possible that the underlying driver will reject the request (e.g. format mismatch).
 }
 
 // The Device's DaiFormat has changed. If `dai_format` is set, this resulted from `SetDaiFormat`
-// being called. Otherwise, the Device is newly-initialized or `CodecReset` was called, so
+// being called. Otherwise, the Device is newly-initialized or `Reset` was called, so
 // SetDaiFormat must be called again.
 void ControlServer::DaiFormatChanged(
-    const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
+    ElementId element_id, const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
     const std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info) {
-  ADR_LOG_METHOD(kLogNotifyMethods);
+  ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods) << "(" << element_id << ")";
 
+  auto completer_match = set_dai_format_completers_.find(element_id);
+
+  // Device must be newly-initialized or Reset was called. Either way we don't expect a completion.
   if (!dai_format.has_value()) {
     FX_DCHECK(!codec_format_info.has_value());
-    set_dai_format_completer_.reset();
+    // If there's a completer, it must have been in-progress when Reset  was called; cancel it.
+    if (completer_match != set_dai_format_completers_.end()) {
+      auto completer = std::move(completer_match->second);
+      set_dai_format_completers_.erase(element_id);
+      completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kOther));
+    }
     return;
   }
 
-  LogDaiFormat(dai_format);
-  LogCodecFormatInfo(codec_format_info);
-
-  if (!set_dai_format_completer_.has_value()) {
+  // SetDaiFormat was called and succeeded, but now we don't have a completer.
+  if (completer_match == set_dai_format_completers_.end()) {
     ADR_WARN_METHOD() << "received Device notification, but completer is gone.";
     return;
   }
 
-  auto completer = std::move(*set_dai_format_completer_);
-  set_dai_format_completer_.reset();
-  completer.Reply(fit::success(
-      fuchsia_audio_device::ControlSetDaiFormatResponse{{.state = device_->codec_format_info()}}));
+  auto completer = std::move(set_dai_format_completers_.find(element_id)->second);
+  set_dai_format_completers_.erase(element_id);
+  if (codec_format_info.has_value()) {
+    completer.Reply(fit::success(
+        fuchsia_audio_device::ControlSetDaiFormatResponse{{.state = *codec_format_info}}));
+  } else {
+    completer.Reply(
+        fit::success(fuchsia_audio_device::ControlSetDaiFormatResponse{{.state = std::nullopt}}));
+  }
 }
 
-// If `driver_error` is ZX_OK, a `SetDaiFormat` call was not an error but resulted in no change.
-void ControlServer::DaiFormatNotSet(const fuchsia_hardware_audio::DaiFormat& dai_format,
-                                    zx_status_t driver_error) {
-  ADR_LOG_METHOD(kLogNotifyMethods);
+void ControlServer::DaiFormatNotSet(ElementId element_id,
+                                    const fuchsia_hardware_audio::DaiFormat& dai_format,
+                                    fuchsia_audio_device::ControlSetDaiFormatError error) {
+  ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods)
+      << "(" << element_id << ", error " << fidl::ToUnderlying(error) << ") for dai_format:";
   LogDaiFormat(dai_format);
 
-  if (!set_dai_format_completer_.has_value()) {
+  // SetDaiFormat was called, but now we don't have a completer.
+  if (set_dai_format_completers_.find(element_id) == set_dai_format_completers_.end()) {
     ADR_WARN_METHOD()
-        << "received Device notification (SetDaiFormat rejected), but completer is gone.";
+        << "SetDaiFormat was called, did not result in change, but completer is gone.";
     return;
   }
 
-  auto completer = std::move(*set_dai_format_completer_);
-  set_dai_format_completer_.reset();
-  if (driver_error == ZX_OK) {
+  auto completer = std::move(set_dai_format_completers_.find(element_id)->second);
+  set_dai_format_completers_.erase(element_id);
+  // If `error` is 0, SetDaiFormat was not an error but resulted in no change, so succeed that call.
+  if (error == fuchsia_audio_device::ControlSetDaiFormatError(0)) {
     completer.Reply(fit::success(fuchsia_audio_device::ControlSetDaiFormatResponse{
-        {.state = device_->codec_format_info()}}));
-    return;
-  }
-
-  if (driver_error == ZX_ERR_NOT_SUPPORTED) {
-    completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kFormatMismatch));
-  } else if (driver_error == ZX_ERR_INVALID_ARGS) {
-    completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat));
+        {.state = device_->codec_format_info(element_id)}}));
   } else {
-    completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kOther));
+    completer.Reply(fit::error(error));
   }
 }
 
@@ -543,26 +592,26 @@ void ControlServer::CodecNotStopped() {
   completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStopError::kOther));
 }
 
-void ControlServer::CodecReset(CodecResetCompleter::Sync& completer) {
+void ControlServer::Reset(ResetCompleter::Sync& completer) {
   if (device_has_error_) {
     ADR_WARN_METHOD() << "device has an error";
-    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecResetError::kDeviceError));
+    completer.Reply(fit::error(fuchsia_audio_device::ControlResetError::kDeviceError));
     return;
   }
 
-  if (!device_->is_codec()) {
+  if (!device_->is_codec() && !device_->is_composite()) {
     ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
-    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecResetError::kWrongDeviceType));
+    completer.Reply(fit::error(fuchsia_audio_device::ControlResetError::kWrongDeviceType));
     return;
   }
 
-  if (!device_->CodecReset()) {
-    ADR_WARN_METHOD() << "device had an error during Device::CodecReset";
-    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecResetError::kDeviceError));
+  if (!device_->Reset()) {
+    ADR_WARN_METHOD() << "device had an error during Device::Reset";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlResetError::kDeviceError));
     return;
   }
 
-  completer.Reply(fit::success(fuchsia_audio_device::ControlCodecResetResponse{}));
+  completer.Reply(fit::success(fuchsia_audio_device::ControlResetResponse{}));
 }
 
 // fuchsia.hardware.audio.signalprocessing support

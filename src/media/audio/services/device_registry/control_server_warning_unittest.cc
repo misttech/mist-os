@@ -21,6 +21,7 @@
 #include "src/media/audio/services/device_registry/common_unittest.h"
 #include "src/media/audio/services/device_registry/control_server.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
+#include "src/media/audio/services/device_registry/testing/fake_composite.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
@@ -74,6 +75,14 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
     EXPECT_TRUE(control_client.is_valid());
     return control_client;
   }
+
+  static ElementId ring_buffer_element_id() { return kRingBufferElementId; }
+  static ElementId dai_element_id() { return kDaiElementId; }
+
+ private:
+  static constexpr ElementId kRingBufferElementId =
+      fuchsia_audio_device::kDefaultRingBufferElementId;
+  static constexpr ElementId kDaiElementId = fuchsia_audio_device::kDefaultDaiInterconnectElementId;
 };
 
 class ControlServerCodecWarningTest : public ControlServerWarningTest {
@@ -86,6 +95,61 @@ class ControlServerCodecWarningTest : public ControlServerWarningTest {
                                            DriverClient::WithCodec(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
+  }
+};
+
+class ControlServerCompositeWarningTest : public ControlServerWarningTest {
+ protected:
+  std::unique_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
+    auto fake_driver = CreateFakeComposite();
+
+    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test composite name",
+                                           fuchsia_audio_device::DeviceType::kComposite,
+                                           DriverClient::WithComposite(fake_driver->Enable())));
+    RunLoopUntilIdle();
+    return fake_driver;
+  }
+
+  void TestCreateRingBufferBadOptions(
+      const std::optional<fuchsia_audio_device::RingBufferOptions>& bad_options,
+      fuchsia_audio_device::ControlCreateRingBufferError expected_error) {
+    auto fake_driver = CreateAndEnableDriverWithDefaults();
+    auto registry = CreateTestRegistryServer();
+
+    auto added_id = WaitForAddedDeviceTokenId(registry->client());
+    auto control_creator = CreateTestControlCreatorServer();
+    auto control_client = ConnectToControl(control_creator->client(), *added_id);
+
+    RunLoopUntilIdle();
+    ASSERT_EQ(ControlServer::count(), 1u);
+    auto device = *adr_service_->devices().begin();
+
+    for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
+      fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+      auto [ring_buffer_client_end, ring_buffer_server_end] =
+          CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+      auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
+          std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler_.get());
+      bool received_callback = false;
+
+      control_client
+          ->CreateRingBuffer({{
+              ring_buffer_element_id,
+              bad_options,
+              fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
+          }})
+          .Then([&received_callback,
+                 expected_error](fidl::Result<Control::CreateRingBuffer>& result) {
+            received_callback = true;
+            ASSERT_TRUE(result.is_error());
+            ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+            EXPECT_EQ(result.error_value().domain_error(), expected_error) << result.error_value();
+          });
+
+      RunLoopUntilIdle();
+      EXPECT_TRUE(received_callback);
+      EXPECT_EQ(ControlServer::count(), 1u);
+    }
   }
 };
 
@@ -187,11 +251,12 @@ class ControlServerStreamConfigWarningTest : public ControlServerWarningTest {
 
 /////////////////////
 // Codec tests
-
+//
 // SetDaiFormat when already pending
 TEST_F(ControlServerCodecWarningTest, SetDaiFormatWhenAlreadyPending) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
   auto device = *adr_service_->devices().begin();
   auto control = CreateTestControlServer(device);
@@ -199,8 +264,10 @@ TEST_F(ControlServerCodecWarningTest, SetDaiFormatWhenAlreadyPending) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
-  auto dai_format2 = SecondDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
+  auto dai_format =
+      SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
+  auto dai_format2 =
+      SecondDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
   auto received_callback = false;
   auto received_callback2 = false;
 
@@ -237,7 +304,8 @@ TEST_F(ControlServerCodecWarningTest, SetDaiFormatInvalidFormat) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto invalid_dai_format = SafeDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
+  auto invalid_dai_format =
+      SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
   invalid_dai_format.bits_per_sample() = invalid_dai_format.bits_per_slot() + 1;
   auto received_callback = false;
 
@@ -269,7 +337,7 @@ TEST_F(ControlServerCodecWarningTest, SetDaiFormatUnsupportedFormat) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
   auto unsupported_dai_format =
-      UnsupportedDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
+      UnsupportedDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
   auto received_callback = false;
 
   control->client()
@@ -299,7 +367,8 @@ TEST_F(ControlServerCodecWarningTest, CodecStartWhenAlreadyPending) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
+  auto dai_format =
+      SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
   auto received_callback = false;
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
@@ -372,7 +441,8 @@ TEST_F(ControlServerCodecWarningTest, CodecStartWhenStarted) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
+  auto dai_format =
+      SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
   auto received_callback = false;
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
@@ -420,7 +490,8 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenAlreadyPending) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
+  auto dai_format =
+      SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
   auto received_callback = false;
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
@@ -502,7 +573,8 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenStopped) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(device->dai_format_sets());
+  auto dai_format =
+      SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
   auto received_callback = false;
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
@@ -531,7 +603,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenStopped) {
 }
 
 // SetGain WRONG_DEVICE_TYPE
-TEST_F(ControlServerCodecWarningTest, SetGainFails) {
+TEST_F(ControlServerCodecWarningTest, SetGainWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
   (void)WaitForAddedDeviceTokenId(registry->client());
@@ -565,8 +637,7 @@ TEST_F(ControlServerCodecWarningTest, SetGainFails) {
   EXPECT_EQ(ControlServer::count(), 1u);
 }
 
-// CreateRingBuffer WRONG_DEVICE_TYPE
-TEST_F(ControlServerCodecWarningTest, CreateRingBufferFails) {
+TEST_F(ControlServerCodecWarningTest, CreateRingBufferWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
   (void)WaitForAddedDeviceTokenId(registry->client());
@@ -616,7 +687,663 @@ TEST_F(ControlServerCodecWarningTest, CreateRingBufferFails) {
 // TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
 
 /////////////////////
+// Composite tests
+//
+// SetDaiFormat when already pending
+TEST_F(ControlServerCompositeWarningTest, SetDaiFormatWhenAlreadyPending) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+
+  for (auto dai_element_id : device->dai_endpoint_ids()) {
+    auto dai_format =
+        SafeDaiFormatFromElementDaiFormatSets(dai_element_id, device->dai_format_sets());
+    auto dai_format2 =
+        SecondDaiFormatFromElementDaiFormatSets(dai_element_id, device->dai_format_sets());
+    auto received_callback = false;
+    auto received_callback2 = false;
+
+    control->client()
+        ->SetDaiFormat({{
+            dai_element_id,
+            dai_format,
+        }})
+        .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+          received_callback = true;
+          EXPECT_TRUE(result.is_ok()) << result.error_value();
+        });
+    control->client()
+        ->SetDaiFormat({{
+            dai_element_id,
+            dai_format2,
+        }})
+        .Then([&received_callback2](fidl::Result<Control::SetDaiFormat>& result) {
+          received_callback2 = true;
+          ASSERT_TRUE(result.is_error());
+          ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+          EXPECT_EQ(result.error_value().domain_error(),
+                    fuchsia_audio_device::ControlSetDaiFormatError::kAlreadyPending)
+              << result.error_value();
+        });
+
+    RunLoopUntilIdle();
+    EXPECT_TRUE(received_callback && received_callback2);
+    EXPECT_EQ(ControlServer::count(), 1u);
+  }
+}
+
+// SetDaiFormat invalid
+TEST_F(ControlServerCompositeWarningTest, SetDaiFormatInvalidFormat) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+
+  for (auto dai_element_id : device->dai_endpoint_ids()) {
+    auto invalid_dai_format =
+        SafeDaiFormatFromElementDaiFormatSets(dai_element_id, device->dai_format_sets());
+    invalid_dai_format.bits_per_sample() = invalid_dai_format.bits_per_slot() + 1;
+    auto received_callback = false;
+
+    control->client()
+        ->SetDaiFormat({{
+            dai_element_id,
+            invalid_dai_format,
+        }})
+        .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+          received_callback = true;
+          ASSERT_TRUE(result.is_error());
+          ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+          EXPECT_EQ(result.error_value().domain_error(),
+                    fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat)
+              << result.error_value();
+        });
+
+    RunLoopUntilIdle();
+    EXPECT_TRUE(received_callback);
+    EXPECT_EQ(ControlServer::count(), 1u);
+  }
+}
+
+// SetDaiFormat unsupported
+// TODO: enable
+TEST_F(ControlServerCompositeWarningTest, SetDaiFormatUnsupportedFormat) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+
+  for (auto dai_element_id : device->dai_endpoint_ids()) {
+    auto unsupported_dai_format =
+        UnsupportedDaiFormatFromElementDaiFormatSets(dai_element_id, device->dai_format_sets());
+    auto received_callback = false;
+
+    control->client()
+        ->SetDaiFormat({{
+            dai_element_id,
+            unsupported_dai_format,
+        }})
+        .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+          received_callback = true;
+          ASSERT_TRUE(result.is_error());
+          ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+          EXPECT_EQ(result.error_value().domain_error(),
+                    fuchsia_audio_device::ControlSetDaiFormatError::kFormatMismatch)
+              << result.error_value();
+        });
+
+    RunLoopUntilIdle();
+    EXPECT_TRUE(received_callback);
+    EXPECT_EQ(ControlServer::count(), 1u);
+  }
+}
+
+// SetDaiFormat on RingBuffer element
+TEST_F(ControlServerCompositeWarningTest, SetDaiFormatWrongElementType) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+
+  auto ring_buffer_element_id = *device->ring_buffer_endpoint_ids().begin();
+  auto dai_element_id_unused = *device->dai_endpoint_ids().begin();
+  auto dai_format =
+      SafeDaiFormatFromElementDaiFormatSets(dai_element_id_unused, device->dai_format_sets());
+  auto received_callback = false;
+
+  control->client()
+      ->SetDaiFormat({{
+          ring_buffer_element_id,
+          dai_format,
+      }})
+      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlSetDaiFormatError::kInvalidElementId)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+}
+
+// SetDaiFormat on unknown element_id
+TEST_F(ControlServerCompositeWarningTest, SetDaiFormatUnknownElementId) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+
+  ElementId ring_buffer_element_id = -1;
+  auto dai_element_id_unused = *device->dai_endpoint_ids().begin();
+  auto dai_format =
+      SafeDaiFormatFromElementDaiFormatSets(dai_element_id_unused, device->dai_format_sets());
+  auto received_callback = false;
+
+  control->client()
+      ->SetDaiFormat({{
+          ring_buffer_element_id,
+          dai_format,
+      }})
+      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlSetDaiFormatError::kInvalidElementId)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+}
+
+TEST_F(ControlServerCompositeWarningTest, SetGainWrongDeviceType) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()
+      ->SetGain({{
+          fuchsia_audio_device::GainState{{
+              .gain_db = 0.0f,
+              .muted = false,
+              .agc_enabled = false,
+          }},
+      }})
+      .Then([&received_callback](fidl::Result<Control::SetGain>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlSetGainError::kWrongDeviceType)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+TEST_F(ControlServerCompositeWarningTest, CodecStartWrongDeviceType) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()->CodecStart().Then([&received_callback](
+                                           fidl::Result<Control::CodecStart>& result) {
+    received_callback = true;
+    ASSERT_TRUE(result.is_error());
+    ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();
+    EXPECT_EQ(result.error_value().domain_error(),
+              fuchsia_audio_device::ControlCodecStartError::kWrongDeviceType)
+        << result.error_value();
+  });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+TEST_F(ControlServerCompositeWarningTest, CodecStopWrongDeviceType) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()->CodecStop().Then([&received_callback](
+                                          fidl::Result<Control::CodecStop>& result) {
+    received_callback = true;
+    ASSERT_TRUE(result.is_error());
+    ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();
+    EXPECT_EQ(result.error_value().domain_error(),
+              fuchsia_audio_device::ControlCodecStopError::kWrongDeviceType)
+        << result.error_value();
+  });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferWrongElementType) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  for (auto dai_element_id : device->dai_endpoint_ids()) {
+    auto [ring_buffer_client_end, ring_buffer_server_end] =
+        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+
+    auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
+        std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler_.get());
+
+    control->client()
+        ->CreateRingBuffer({{
+            dai_element_id,
+            fuchsia_audio_device::RingBufferOptions{{
+                .format = fuchsia_audio::Format{{
+                    .sample_type = fuchsia_audio::SampleType::kInt16,
+                    .channel_count = 2,
+                    .frames_per_second = 48000,
+                }},
+                .ring_buffer_min_bytes = 2000,
+            }},
+            fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
+        }})
+        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+          received_callback = true;
+          ASSERT_TRUE(result.is_error());
+          ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+          EXPECT_EQ(result.error_value().domain_error(),
+                    fuchsia_audio_device::ControlCreateRingBufferError::kInvalidElementId)
+              << result.error_value();
+        });
+
+    RunLoopUntilIdle();
+    EXPECT_TRUE(received_callback);
+    EXPECT_EQ(ControlServer::count(), 1u);
+  }
+}
+
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferMissingOptions) {
+  TestCreateRingBufferBadOptions(
+      std::nullopt,  // entirely missing table
+      fuchsia_audio_device::ControlCreateRingBufferError::kInvalidOptions);
+}
+
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferEmptyOptions) {
+  TestCreateRingBufferBadOptions(
+      fuchsia_audio_device::RingBufferOptions(),  // entirely empty table
+      fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat);
+}
+
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferMissingFormat) {
+  TestCreateRingBufferBadOptions(
+      fuchsia_audio_device::RingBufferOptions{{
+          .format = std::nullopt,  // missing
+          .ring_buffer_min_bytes = 8192,
+      }},
+      fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat);
+}
+
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferEmptyFormat) {
+  TestCreateRingBufferBadOptions(
+      fuchsia_audio_device::RingBufferOptions{{
+          .format = fuchsia_audio::Format(),  // empty
+          .ring_buffer_min_bytes = 8192,
+      }},
+      fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat);
+}
+
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferMissingSampleType) {
+  TestCreateRingBufferBadOptions(
+      fuchsia_audio_device::RingBufferOptions{{
+          .format = fuchsia_audio::Format{{
+              // missing sample_type
+              .channel_count = 2,
+              .frames_per_second = 48000,
+          }},
+          .ring_buffer_min_bytes = 8192,
+      }},
+      fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat);
+}
+
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferBadSampleType) {
+  TestCreateRingBufferBadOptions(
+      fuchsia_audio_device::RingBufferOptions{{
+          .format = fuchsia_audio::Format{{
+              .sample_type = fuchsia_audio::SampleType::kFloat64,  // bad value
+              .channel_count = 2,
+              .frames_per_second = 48000,
+          }},
+          .ring_buffer_min_bytes = 8192,
+      }},
+      fuchsia_audio_device::ControlCreateRingBufferError::kFormatMismatch);
+}
+
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferMissingChannelCount) {
+  TestCreateRingBufferBadOptions(
+      fuchsia_audio_device::RingBufferOptions{{
+          .format = fuchsia_audio::Format{{
+              .sample_type = fuchsia_audio::SampleType::kInt16,
+              // missing channel_count
+              .frames_per_second = 48000,
+          }},
+          .ring_buffer_min_bytes = 8192,
+      }},
+      fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat);
+}
+
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferBadChannelCount) {
+  TestCreateRingBufferBadOptions(
+      fuchsia_audio_device::RingBufferOptions{{
+          .format = fuchsia_audio::Format{{
+              .sample_type = fuchsia_audio::SampleType::kInt16,
+              .channel_count = 7,  // bad value
+              .frames_per_second = 48000,
+          }},
+          .ring_buffer_min_bytes = 8192,
+      }},
+      fuchsia_audio_device::ControlCreateRingBufferError::kFormatMismatch);
+}
+
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferMissingFramesPerSecond) {
+  TestCreateRingBufferBadOptions(
+      fuchsia_audio_device::RingBufferOptions{{
+          .format = fuchsia_audio::Format{{
+              .sample_type = fuchsia_audio::SampleType::kInt16, .channel_count = 2,
+              // missing frames_per_second
+          }},
+          .ring_buffer_min_bytes = 8192,
+      }},
+      fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat);
+}
+
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferBadFramesPerSecond) {
+  TestCreateRingBufferBadOptions(
+      fuchsia_audio_device::RingBufferOptions{{
+          .format = fuchsia_audio::Format{{
+              .sample_type = fuchsia_audio::SampleType::kInt16,
+              .channel_count = 2,
+              .frames_per_second = 97531,  // bad value
+          }},
+          .ring_buffer_min_bytes = 8192,
+      }},
+      fuchsia_audio_device::ControlCreateRingBufferError::kFormatMismatch);
+}
+
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferMissingRingBufferMinBytes) {
+  TestCreateRingBufferBadOptions(
+      fuchsia_audio_device::RingBufferOptions{{
+          .format = fuchsia_audio::Format{{
+              .sample_type = fuchsia_audio::SampleType::kInt16,
+              .channel_count = 2,
+              .frames_per_second = 48000,
+          }},
+          // missing ring_buffer_min_bytes
+      }},
+      fuchsia_audio_device::ControlCreateRingBufferError::kInvalidMinBytes);
+}
+
+// TODO: enable
+TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferWhilePending) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_id = WaitForAddedDeviceTokenId(registry->client());
+  auto control_creator = CreateTestControlCreatorServer();
+  auto control_client = ConnectToControl(control_creator->client(), *added_id);
+
+  RunLoopUntilIdle();
+  auto device = *adr_service_->devices().begin();
+  ASSERT_EQ(ControlServer::count(), 1u);
+
+  for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
+    auto [ring_buffer_client_end1, ring_buffer_server_end1] =
+        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+    auto [ring_buffer_client_end2, ring_buffer_server_end2] =
+        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+
+    fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+    bool received_callback_1 = false, received_callback_2 = false;
+    auto options = fuchsia_audio_device::RingBufferOptions{{
+        .format = SafeRingBufferFormatFromElementRingBufferFormatSets(
+            ring_buffer_element_id, device->ring_buffer_format_sets()),
+        .ring_buffer_min_bytes = 8192,
+    }};
+    control_client
+        ->CreateRingBuffer({{
+            ring_buffer_element_id,
+            options,
+            fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end1)),
+        }})
+        .Then([&received_callback_1](fidl::Result<Control::CreateRingBuffer>& result) {
+          ASSERT_TRUE(result.is_ok()) << result.error_value();
+          received_callback_1 = true;
+        });
+    control_client
+        ->CreateRingBuffer({{
+            ring_buffer_element_id,
+            options,
+            fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end2)),
+        }})
+        .Then([&received_callback_2](fidl::Result<Control::CreateRingBuffer>& result) {
+          ASSERT_TRUE(result.is_error());
+          ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+          EXPECT_EQ(result.error_value().domain_error(),
+                    fuchsia_audio_device::ControlCreateRingBufferError::kAlreadyPending)
+              << result.error_value();
+          received_callback_2 = true;
+        });
+
+    RunLoopUntilIdle();
+    EXPECT_TRUE(received_callback_1 && received_callback_2);
+    EXPECT_EQ(ControlServer::count(), 1u);
+    EXPECT_TRUE(control_client.is_valid());
+  }
+}
+
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferUnknownElementId) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_id = WaitForAddedDeviceTokenId(registry->client());
+  auto control_creator = CreateTestControlCreatorServer();
+  auto control_client = ConnectToControl(control_creator->client(), *added_id);
+
+  RunLoopUntilIdle();
+  auto device = *adr_service_->devices().begin();
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto ring_buffer_element_id_unused = *device->ring_buffer_endpoint_ids().begin();
+  // fake_driver->ReserveRingBufferSize(ring_buffer_element_id_unused, 8192);
+  auto [ring_buffer_client_end, ring_buffer_server_end] =
+      CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+  auto options = fuchsia_audio_device::RingBufferOptions{{
+      .format = SafeRingBufferFormatFromElementRingBufferFormatSets(
+          ring_buffer_element_id_unused, device->ring_buffer_format_sets()),
+      .ring_buffer_min_bytes = 2000,
+  }};
+  ElementId unknown_element_id = -1;
+  bool received_callback = false;
+
+  control_client
+      ->CreateRingBuffer({{
+          unknown_element_id,
+          options,
+          fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
+      }})
+      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlCreateRingBufferError::kInvalidElementId)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_TRUE(control_client.is_valid());
+}
+
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferMissingRingBufferServerEnd) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_id = WaitForAddedDeviceTokenId(registry->client());
+  auto control_creator = CreateTestControlCreatorServer();
+  auto control_client = ConnectToControl(control_creator->client(), *added_id);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto device = *adr_service_->devices().begin();
+  bool received_callback = false;
+
+  for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
+    fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+    control_client
+        ->CreateRingBuffer({{
+            .element_id = ring_buffer_element_id,
+            .options = fuchsia_audio_device::RingBufferOptions{{
+                .format = fuchsia_audio::Format{{
+                    .sample_type = fuchsia_audio::SampleType::kInt16,
+                    .channel_count = 2,
+                    .frames_per_second = 48000,
+                }},
+                .ring_buffer_min_bytes = 8192,
+            }},
+            // missing server_end
+        }})
+        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+          ASSERT_TRUE(result.is_error());
+          ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+          EXPECT_EQ(result.error_value().domain_error(),
+                    fuchsia_audio_device::ControlCreateRingBufferError::kInvalidRingBuffer)
+              << result.error_value();
+          received_callback = true;
+        });
+
+    RunLoopUntilIdle();
+    EXPECT_TRUE(received_callback);
+    EXPECT_EQ(ControlServer::count(), 1u);
+  }
+}
+
+// TODO: enable
+TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferBadRingBufferServerEnd) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_id = WaitForAddedDeviceTokenId(registry->client());
+  auto control_creator = CreateTestControlCreatorServer();
+  auto control_client = ConnectToControl(control_creator->client(), *added_id);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto device = *adr_service_->devices().begin();
+  bool received_callback = false;
+
+  for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
+    fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+    control_client
+        ->CreateRingBuffer({{
+            .options = fuchsia_audio_device::RingBufferOptions{{
+                .format = fuchsia_audio::Format{{
+                    .sample_type = fuchsia_audio::SampleType::kInt16,
+                    .channel_count = 2,
+                    .frames_per_second = 48000,
+                }},
+                .ring_buffer_min_bytes = 8192,
+            }},
+            .ring_buffer_server = fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(),  // bad value
+        }})
+        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+          ASSERT_TRUE(result.is_error());
+          ASSERT_TRUE(result.error_value().is_framework_error()) << result.error_value();
+          EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS)
+              << result.error_value();
+          received_callback = true;
+        });
+
+    RunLoopUntilIdle();
+    EXPECT_TRUE(received_callback);
+    EXPECT_EQ(ControlServer::count(), 0u);
+  }
+}
+
+// TODO(https://fxbug.dev/42069012): Create a unittest to test the upper limit of VMO size (4Gb).
+//     This is not high-priority since even at the service's highest supported bitrate (192kHz,
+//     8-channel, float64), a 4Gb ring-buffer would be 5.8 minutes long!
+//     Note the disabled attempt (for StreamConfig below) to create this.
+// TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferHugeRingBufferMinBytes) {}
+
+/////////////////////
 // StreamConfig tests
+//
 TEST_F(ControlServerStreamConfigWarningTest, SetGainMissingState) {
   TestSetGainBadState(std::nullopt, fuchsia_audio_device::ControlSetGainError::kInvalidGainState);
 }
@@ -1021,7 +1748,7 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferBadRingBufferServer
 // TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
 //   unhealthy before CreateRingBuffer. Expect Obs/Ctl to drop, Reg/WatchRemoved.
 
-TEST_F(ControlServerStreamConfigWarningTest, SetDaiFormatFails) {
+TEST_F(ControlServerStreamConfigWarningTest, SetDaiFormatWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
   (void)WaitForAddedDeviceTokenId(registry->client());
@@ -1060,7 +1787,7 @@ TEST_F(ControlServerStreamConfigWarningTest, SetDaiFormatFails) {
   EXPECT_EQ(ControlServer::count(), 1u);
 }
 
-TEST_F(ControlServerStreamConfigWarningTest, CodecStartFails) {
+TEST_F(ControlServerStreamConfigWarningTest, CodecStartWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
   (void)WaitForAddedDeviceTokenId(registry->client());
@@ -1086,7 +1813,7 @@ TEST_F(ControlServerStreamConfigWarningTest, CodecStartFails) {
   EXPECT_EQ(ControlServer::count(), 1u);
 }
 
-TEST_F(ControlServerStreamConfigWarningTest, CodecStopFails) {
+TEST_F(ControlServerStreamConfigWarningTest, CodecStopWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
   (void)WaitForAddedDeviceTokenId(registry->client());
@@ -1112,7 +1839,7 @@ TEST_F(ControlServerStreamConfigWarningTest, CodecStopFails) {
   EXPECT_EQ(ControlServer::count(), 1u);
 }
 
-TEST_F(ControlServerStreamConfigWarningTest, CodecResetFails) {
+TEST_F(ControlServerStreamConfigWarningTest, ResetWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
   (void)WaitForAddedDeviceTokenId(registry->client());
@@ -1123,13 +1850,12 @@ TEST_F(ControlServerStreamConfigWarningTest, CodecResetFails) {
   ASSERT_EQ(ControlServer::count(), 1u);
   auto received_callback = false;
 
-  control->client()->CodecReset().Then([&received_callback](
-                                           fidl::Result<Control::CodecReset>& result) {
+  control->client()->Reset().Then([&received_callback](fidl::Result<Control::Reset>& result) {
     received_callback = true;
     ASSERT_TRUE(result.is_error());
     ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();
     EXPECT_EQ(result.error_value().domain_error(),
-              fuchsia_audio_device::ControlCodecResetError::kWrongDeviceType)
+              fuchsia_audio_device::ControlResetError::kWrongDeviceType)
         << result.error_value();
   });
   RunLoopUntilIdle();

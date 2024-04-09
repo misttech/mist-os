@@ -124,19 +124,25 @@ closed protocol Control {
         1: target_state GainState;
     }) -> (table {}) error ControlSetGainError;
 
-    /// Create the ring buffer used to pass audio to/from this device.
+    /// Create the ring buffer used to pass audio to/from this device. If the device is
+    /// Composite, then the targeted RING_BUFFER ENDPOINT must be identified by `element_id`.
     ///
-    /// Should only be called for StreamConfig devices.
+    /// Should only be called for Composite and StreamConfig devices.
     strict CreateRingBuffer(resource table {
+        /// The element ID for an `ENDPOINT` of type `RING_BUFFER`.
+        ///
+        /// Required for Composite; ignored for StreamConfig.
+        1: element_id ElementId;
+
         /// Additional requirements about the actual ring buffer being created.
         ///
         /// Required.
-        1: options RingBufferOptions;
+        2: options RingBufferOptions;
 
         /// The server_end of the `RingBuffer` to be created.
         ///
         /// Required.
-        2: ring_buffer_server server_end:RingBuffer;
+        3: ring_buffer_server server_end:RingBuffer;
     }) -> (resource table {
         /// Properties about the ring buffer and active audio stream as created.
         1: properties RingBufferProperties;
@@ -149,10 +155,17 @@ closed protocol Control {
 
     /// Set the wire format for the digital interconnect connected to this Codec endpoint.
     /// This method returns information related to the format that was set, including delay values.
+    /// If the device is Composite, then the targeted DAI_INTERCONNECT ENDPOINT must be identified
+    /// by `element_id`.
     ///
-    /// Should only be called for Codec devices.
+    /// Should only be called for Codec and Composite devices.
     strict SetDaiFormat(table {
-        1: dai_format fuchsia.hardware.audio.DaiFormat;
+        /// The element ID for an `ENDPOINT` of type `DAI_INTERCONNECT`.
+        ///
+        /// Required for Composite; ignored for Codec.
+        1: element_id ElementId;
+
+        2: dai_format fuchsia.hardware.audio.DaiFormat;
     }) -> (table {
         1: state fuchsia.hardware.audio.CodecFormatInfo;
     }) error ControlSetDaiFormatError;
@@ -175,13 +188,19 @@ closed protocol Control {
         1: stop_time zx.Time;
     }) error ControlCodecStopError;
 
-    /// Reset the Codec hardware -- stopping the hardware and clearing any DaiFormat that was set.
-    /// This method returns when the hardware reset is complete. After calling this method,
-    /// `SetDaiFormat` and `CodecStart` must be called (in that order) -- as well as `SetTopology`
-    /// and `SetElementState` if applicable -- to return the Codec to the active operational mode.
+    /// Reset the hardware -- stopping the hardware, releasing any ring buffers, and clearing any
+    /// DaiFormats or RingBufferFormats that were set.
     ///
-    /// Should only be called for Codec devices.
-    strict CodecReset() -> (table {}) error ControlCodecResetError;
+    /// This method returns when the hardware reset is complete.
+    /// After calling this method, the device is still controlled, but any ring buffers must be
+    /// re-created and re-started.
+    /// For devices with DAI_INTERCONNECTs (such as Codecs and some Composites), `SetDaiFormat` and
+    /// `CodecStart` must be called again (in that order) to return the interconnect to the active
+    /// operational mode.
+    /// As applicable, `SetTopology` and `SetElementState` must also be called.
+    ///
+    /// Should only be called for Codec and Composite devices.
+    strict Reset() -> (table {}) error ControlResetError;
 };
 
 /// Errors returned by `Control/SetGain`.
@@ -219,26 +238,32 @@ type ControlCreateRingBufferError = flexible enum {
     /// The previous `CreateRingBuffer` call has not yet completed.
     ALREADY_PENDING = 3;
 
+    /// The required `element_id` is missing or does not refer to a `RING_BUFFER` element.
+    INVALID_ELEMENT_ID = 4;
+
     /// The required `options` is missing.
-    INVALID_OPTIONS = 4;
+    INVALID_OPTIONS = 5;
 
     /// The required `options.format` is missing.
-    INVALID_FORMAT = 5;
+    INVALID_FORMAT = 6;
 
     /// The required `options.ring_buffer_min_bytes` is missing.
-    INVALID_MIN_BYTES = 6;
+    INVALID_MIN_BYTES = 7;
 
     /// The required `ring_buffer_server` is missing.
-    INVALID_RING_BUFFER = 7;
+    INVALID_RING_BUFFER = 8;
 
     /// An active `RingBuffer` instance already exists for this `Control`.
-    ALREADY_ALLOCATED = 8;
+    ALREADY_ALLOCATED = 9;
 
     /// The device does not support the specified format.
-    FORMAT_MISMATCH = 9;
+    FORMAT_MISMATCH = 10;
 
     /// The device cannot create a ring buffer with the specified options.
-    BAD_RING_BUFFER_OPTION = 10;
+    BAD_RING_BUFFER_OPTION = 11;
+
+    /// The driver returned some other error. This call may be retried.
+    OTHER = 12;
 };
 
 /// Errors returned by `Control/SetDaiFormat`.
@@ -252,14 +277,17 @@ type ControlSetDaiFormatError = flexible enum {
     /// The previous `SetDaiFormat` call has not yet completed.
     ALREADY_PENDING = 3;
 
+    /// The required `element_id` is missing or does not refer to a `DAI_INTERCONNECT` element.
+    INVALID_ELEMENT_ID = 4;
+
     /// The required `dai_format` is missing or invalid.
-    INVALID_DAI_FORMAT = 4;
+    INVALID_DAI_FORMAT = 5;
 
     /// The device does not support the specified dai_format.
-    FORMAT_MISMATCH = 5;
+    FORMAT_MISMATCH = 6;
 
     /// The driver returned some other error. This call may be retried.
-    OTHER = 6;
+    OTHER = 7;
 };
 
 /// Errors returned by `Control/CodecStart`.
@@ -305,7 +333,7 @@ type ControlCodecStopError = flexible enum {
 };
 
 /// Errors returned by `Control/CodecReset`.
-type ControlCodecResetError = flexible enum {
+type ControlResetError = flexible enum {
     /// This device has encountered an error and can no longer be controlled.
     DEVICE_ERROR = 1;
 

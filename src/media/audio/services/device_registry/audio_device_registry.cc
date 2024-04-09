@@ -295,10 +295,11 @@ std::shared_ptr<ControlCreatorServer> AudioDeviceRegistry::CreateControlCreatorS
 
 std::shared_ptr<RingBufferServer> AudioDeviceRegistry::CreateRingBufferServer(
     fidl::ServerEnd<fuchsia_audio_device::RingBuffer> server_end,
-    const std::shared_ptr<ControlServer>& parent,
-    const std::shared_ptr<Device>& device_to_control) {
+    const std::shared_ptr<ControlServer>& parent, const std::shared_ptr<Device>& device_to_control,
+    ElementId element_id) {
   ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogRingBufferServerMethods);
-  return RingBufferServer::Create(thread_, std::move(server_end), parent, device_to_control);
+  return RingBufferServer::Create(thread_, std::move(server_end), parent, device_to_control,
+                                  element_id);
 }
 
 }  // namespace media_audio

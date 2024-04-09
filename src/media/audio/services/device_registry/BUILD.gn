@@ -116,7 +116,13 @@ executable("device_registry_warning_unittests_bin") {
 source_set("common") {
   sources = [
     "basic_types.h",
+    "common.cc",
+    "common.h",
     "logging.h",
+    "signal_processing_utils.cc",
+    "signal_processing_utils.h",
+    "validate.cc",
+    "validate.h",
   ]
 
   public_deps = [
@@ -154,10 +160,6 @@ source_set("device_registry_lib") {
     "registry_server.h",
     "ring_buffer_server.cc",
     "ring_buffer_server.h",
-    "signal_processing_utils.cc",
-    "signal_processing_utils.h",
-    "validate.cc",
-    "validate.h",
   ]
 
   public_deps = [

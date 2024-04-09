@@ -9,6 +9,7 @@
 #include <zircon/errors.h>
 
 #include <optional>
+#include <utility>
 
 #include "src/media/audio/services/common/base_fidl_server.h"
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
@@ -22,15 +23,16 @@ namespace media_audio {
 std::shared_ptr<RingBufferServer> RingBufferServer::Create(
     std::shared_ptr<const FidlThread> thread,
     fidl::ServerEnd<fuchsia_audio_device::RingBuffer> server_end,
-    std::shared_ptr<ControlServer> parent, std::shared_ptr<Device> device) {
+    std::shared_ptr<ControlServer> parent, std::shared_ptr<Device> device, ElementId element_id) {
   ADR_LOG_STATIC(kLogObjectLifetimes);
 
-  return BaseFidlServer::Create(std::move(thread), std::move(server_end), parent, device);
+  return BaseFidlServer::Create(std::move(thread), std::move(server_end), std::move(parent),
+                                std::move(device), element_id);
 }
 
 RingBufferServer::RingBufferServer(std::shared_ptr<ControlServer> parent,
-                                   std::shared_ptr<Device> device)
-    : parent_(parent), device_(device) {
+                                   std::shared_ptr<Device> device, ElementId element_id)
+    : parent_(std::move(parent)), device_(std::move(device)), element_id_(element_id) {
   ADR_LOG_METHOD(kLogObjectLifetimes);
   ++count_;
   LogObjectCounts();
@@ -52,7 +54,7 @@ void RingBufferServer::OnShutdown(fidl::UnbindInfo info) {
   }
 
   if (!device_dropped_ring_buffer_) {
-    device_->DropRingBuffer();
+    device_->DropRingBuffer(element_id_);
 
     // We don't explicitly clear our shared_ptr<Device> reference, to ensure we destruct first.
   }
@@ -97,8 +99,8 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
   }
 
   // By this time, the Device should know whether the driver supports this method.
-  FX_CHECK(device_->supports_set_active_channels().has_value());
-  if (!*device_->supports_set_active_channels()) {
+  FX_CHECK(device_->supports_set_active_channels(element_id_).has_value());
+  if (!*device_->supports_set_active_channels(element_id_)) {
     ADR_LOG_METHOD(kLogRingBufferServerMethods) << "device does not support SetActiveChannels";
     completer.Reply(
         fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kMethodNotSupported));
@@ -112,38 +114,41 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
     return;
   }
 
-  FX_CHECK(device_->ring_buffer_format().channel_count());
-  if (*request.channel_bitmask() >= (1u << *device_->ring_buffer_format().channel_count())) {
+  FX_CHECK(device_->ring_buffer_format(element_id_).channel_count());
+  if (*request.channel_bitmask() >=
+      (1u << *device_->ring_buffer_format(element_id_).channel_count())) {
     ADR_WARN_METHOD() << "channel_bitmask (0x0" << std::hex << *request.channel_bitmask()
                       << ") too large, for this " << std::dec
-                      << *device_->ring_buffer_format().channel_count() << "-channel format";
+                      << *device_->ring_buffer_format(element_id_).channel_count()
+                      << "-channel format";
     completer.Reply(
         fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kChannelOutOfRange));
     return;
   }
 
   active_channels_completer_ = completer.ToAsync();
-  device_->SetActiveChannels(*request.channel_bitmask(), [this](zx::result<zx::time> result) {
-    ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "Device/SetActiveChannels response";
-    // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
-    if (!active_channels_completer_) {
-      ADR_WARN_METHOD()
-          << "active_channels_completer_ gone by the time the StartRingBuffer callback ran";
-      return;
-    }
+  device_->SetActiveChannels(
+      element_id_, *request.channel_bitmask(), [this](zx::result<zx::time> result) {
+        ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "Device/SetActiveChannels response";
+        // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
+        if (!active_channels_completer_) {
+          ADR_WARN_OBJECT()
+              << "active_channels_completer_ gone by the time the StartRingBuffer callback ran";
+          return;
+        }
 
-    auto completer = std::move(active_channels_completer_);
-    active_channels_completer_.reset();
-    if (result.is_error()) {
-      ADR_WARN_METHOD() << "SetActiveChannels callback: device has an error";
-      completer->Reply(
-          fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kDeviceError));
-    }
+        auto completer = std::move(active_channels_completer_);
+        active_channels_completer_.reset();
+        if (result.is_error()) {
+          ADR_WARN_OBJECT() << "SetActiveChannels callback: device has an error";
+          completer->Reply(
+              fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kDeviceError));
+        }
 
-    completer->Reply(fit::success(fuchsia_audio_device::RingBufferSetActiveChannelsResponse{{
-        .set_time = result.value().get(),
-    }}));
-  });
+        completer->Reply(fit::success(fuchsia_audio_device::RingBufferSetActiveChannelsResponse{{
+            .set_time = result.value().get(),
+        }}));
+      });
 }
 
 void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& completer) {
@@ -168,7 +173,7 @@ void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& comple
   }
 
   start_completer_ = completer.ToAsync();
-  device_->StartRingBuffer([this](zx::result<zx::time> result) {
+  device_->StartRingBuffer(element_id_, [this](zx::result<zx::time> result) {
     ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "Device/StartRingBuffer response";
     // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
     if (!start_completer_) {
@@ -212,7 +217,7 @@ void RingBufferServer::Stop(StopRequest& request, StopCompleter::Sync& completer
   }
 
   stop_completer_ = completer.ToAsync();
-  device_->StopRingBuffer([this](zx_status_t status) {
+  device_->StopRingBuffer(element_id_, [this](zx_status_t status) {
     ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "Device/StopRingBuffer response";
     if (!stop_completer_) {
       // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.

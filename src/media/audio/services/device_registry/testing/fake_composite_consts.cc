@@ -24,23 +24,26 @@ const fuchsia_hardware_audio::DaiFrameFormat FakeComposite::kDefaultDaiFrameForm
         fuchsia_hardware_audio::DaiFrameFormatStandard::kNone);
 
 const std::vector<uint32_t> FakeComposite::kDefaultDaiNumberOfChannelsSet{
-    kDefaultDaiNumberOfChannels};
+    kDefaultDaiNumberOfChannels, kDefaultDaiNumberOfChannels2};
 const std::vector<uint32_t> FakeComposite::kDefaultDaiNumberOfChannelsSet2{
     kDefaultDaiNumberOfChannels2};
 const std::vector<fuchsia_hardware_audio::DaiSampleFormat>
     FakeComposite::kDefaultDaiSampleFormatsSet{kDefaultDaiSampleFormat};
 const std::vector<fuchsia_hardware_audio::DaiSampleFormat>
-    FakeComposite::kDefaultDaiSampleFormatsSet2{kDefaultDaiSampleFormat2};
+    FakeComposite::kDefaultDaiSampleFormatsSet2{kDefaultDaiSampleFormat, kDefaultDaiSampleFormat2};
 const std::vector<fuchsia_hardware_audio::DaiFrameFormat> FakeComposite::kDefaultDaiFrameFormatsSet{
-    kDefaultDaiFrameFormat};
+    kDefaultDaiFrameFormat, kDefaultDaiFrameFormat2};
 const std::vector<fuchsia_hardware_audio::DaiFrameFormat>
     FakeComposite::kDefaultDaiFrameFormatsSet2{kDefaultDaiFrameFormat2};
 const std::vector<uint32_t> FakeComposite::kDefaultDaiFrameRates{kDefaultDaiFrameRate};
-const std::vector<uint32_t> FakeComposite::kDefaultDaiFrameRates2{kDefaultDaiFrameRate2};
-const std::vector<uint8_t> FakeComposite::kDefaultDaiBitsPerSlotSet{kDefaultDaiBitsPerSlot};
+const std::vector<uint32_t> FakeComposite::kDefaultDaiFrameRates2{kDefaultDaiFrameRate,
+                                                                  kDefaultDaiFrameRate2};
+const std::vector<uint8_t> FakeComposite::kDefaultDaiBitsPerSlotSet{kDefaultDaiBitsPerSlot,
+                                                                    kDefaultDaiBitsPerSlot2};
 const std::vector<uint8_t> FakeComposite::kDefaultDaiBitsPerSlotSet2{kDefaultDaiBitsPerSlot2};
 const std::vector<uint8_t> FakeComposite::kDefaultDaiBitsPerSampleSet{kDefaultDaiBitsPerSample};
-const std::vector<uint8_t> FakeComposite::kDefaultDaiBitsPerSampleSet2{kDefaultDaiBitsPerSample2};
+const std::vector<uint8_t> FakeComposite::kDefaultDaiBitsPerSampleSet2{kDefaultDaiBitsPerSample,
+                                                                       kDefaultDaiBitsPerSample2};
 
 const fuchsia_hardware_audio::DaiSupportedFormats FakeComposite::kDefaultDaiFormatSet{{
     .number_of_channels = kDefaultDaiNumberOfChannelsSet,

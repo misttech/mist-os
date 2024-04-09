@@ -14,7 +14,6 @@
 
 #include <cmath>
 #include <cstdint>
-#include <string>
 #include <unordered_set>
 
 #include "src/media/audio/services/device_registry/logging.h"
