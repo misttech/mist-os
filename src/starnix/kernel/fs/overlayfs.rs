@@ -705,13 +705,13 @@ impl FsNodeOps for Arc<OverlayNode> {
 
     fn truncate(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         length: u64,
     ) -> Result<(), Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
-        let upper = self.ensure_upper(&mut locked, current_task)?;
-        upper.entry().node.truncate(current_task, upper.mount(), length)
+        let upper = self.ensure_upper(locked, current_task)?;
+        upper.entry().node.truncate(locked, current_task, upper.mount(), length)
     }
 
     fn allocate(

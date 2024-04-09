@@ -908,26 +908,26 @@ pub fn sys_readlinkat(
 }
 
 pub fn sys_truncate(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     length: off_t,
 ) -> Result<(), Errno> {
     let length = length.try_into().map_err(|_| errno!(EINVAL))?;
     let name = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
-    name.truncate(current_task, length)?;
+    name.truncate(locked, current_task, length)?;
     Ok(())
 }
 
 pub fn sys_ftruncate(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     length: off_t,
 ) -> Result<(), Errno> {
     let length = length.try_into().map_err(|_| errno!(EINVAL))?;
     let file = current_task.files.get(fd)?;
-    file.ftruncate(current_task, length)?;
+    file.ftruncate(locked, current_task, length)?;
     Ok(())
 }
 

@@ -82,6 +82,7 @@ where
 
     fn truncate(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _length: u64,

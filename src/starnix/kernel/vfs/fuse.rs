@@ -989,6 +989,7 @@ impl FsNodeOps for Arc<FuseNode> {
 
     fn truncate(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         length: u64,

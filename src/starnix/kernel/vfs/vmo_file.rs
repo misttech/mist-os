@@ -86,6 +86,7 @@ impl FsNodeOps for VmoFileNode {
 
     fn truncate(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         length: u64,

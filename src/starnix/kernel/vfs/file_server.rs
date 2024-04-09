@@ -556,7 +556,12 @@ impl file::File for StarnixNodeConnection {
         Ok(())
     }
     async fn truncate(&self, length: u64) -> Result<(), zx::Status> {
-        self.file.name.truncate(&*self.task().await?, length)?;
+        let current_task = self.task().await?;
+        self.file.name.truncate(
+            self.kernel().unwrap().kthreads.unlocked_for_async().deref_mut(),
+            &current_task,
+            length,
+        )?;
         Ok(())
     }
     async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, zx::Status> {

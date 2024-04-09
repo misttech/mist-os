@@ -23,7 +23,7 @@ use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, trace_duration, track_stub, CATEGORY_STARNIX_MM};
-use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
@@ -1337,13 +1337,21 @@ impl FileObject {
         self.ops().fcntl(self, current_task, cmd, arg)
     }
 
-    pub fn ftruncate(&self, current_task: &CurrentTask, length: u64) -> Result<(), Errno> {
+    pub fn ftruncate<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        length: u64,
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         // The file must be opened with write permissions. Otherwise
         // truncating it is forbidden.
         if !self.can_write() {
             return error!(EINVAL);
         }
-        self.node().ftruncate(current_task, length)
+        self.node().ftruncate(locked, current_task, length)
     }
 
     pub fn fallocate(
@@ -1549,9 +1557,9 @@ mod tests {
         let fh = file_handle.clone();
         let done_clone = done.clone();
         let truncate_thread =
-            kernel.kthreads.spawner().spawn_and_get_result(move |_, current_task| {
+            kernel.kthreads.spawner().spawn_and_get_result(move |locked, current_task| {
                 while !done_clone.load(Ordering::SeqCst) {
-                    fh.ftruncate(current_task, 0).expect("truncate failed");
+                    fh.ftruncate(locked, current_task, 0).expect("truncate failed");
                 }
             });
 

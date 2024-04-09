@@ -698,6 +698,7 @@ impl FsNodeOps for RemoteNode {
 
     fn truncate(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         length: u64,
@@ -713,12 +714,14 @@ impl FsNodeOps for RemoteNode {
         offset: u64,
         length: u64,
     ) -> Result<(), Errno> {
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): FsNodeOps.allocate before FileOpsCore
         match mode {
             FallocMode::Allocate { keep_size: false } => {
                 let allocate_size = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
                 let info = node.refresh_info(current_task)?;
                 if (info.size as u64) < allocate_size {
-                    self.truncate(node, current_task, allocate_size)?;
+                    let mut locked = locked.cast_locked::<FileOpsCore>();
+                    self.truncate(&mut locked, node, current_task, allocate_size)?;
                 }
                 Ok(())
             }
@@ -2123,7 +2126,7 @@ mod test {
 
                     // Test that we get expected behaviour for RemoteSpecialNode operation, e.g. test that
                     // truncate should return EINVAL
-                    match fifo_node.truncate(&current_task, 0) {
+                    match fifo_node.truncate(locked, &current_task, 0) {
                         Ok(_) => {
                             panic!("truncate passed for special node")
                         }
@@ -2148,7 +2151,7 @@ mod test {
                         .expect("lookup_child failed");
 
                     // We should be able to perform truncate on regular files
-                    reg_node.truncate(&current_task, 0).expect("truncate failed");
+                    reg_node.truncate(locked, &current_task, 0).expect("truncate failed");
                 }
             })
             .await

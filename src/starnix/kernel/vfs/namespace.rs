@@ -1556,8 +1556,16 @@ impl NamespaceNode {
         self.entry.node.check_o_noatime_allowed(current_task)
     }
 
-    pub fn truncate(&self, current_task: &CurrentTask, length: u64) -> Result<(), Errno> {
-        self.entry.node.truncate(current_task, &self.mount, length)
+    pub fn truncate<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        length: u64,
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
+        self.entry.node.truncate(locked, current_task, &self.mount, length)
     }
 }
 

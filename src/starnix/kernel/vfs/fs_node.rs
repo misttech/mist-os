@@ -625,6 +625,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Change the length of the file.
     fn truncate(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _length: u64,
@@ -1377,24 +1378,36 @@ impl FsNode {
         Ok(())
     }
 
-    pub fn truncate(
+    pub fn truncate<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         length: u64,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         if self.is_dir() {
             return error!(EISDIR);
         }
 
         self.check_access(current_task, mount, Access::WRITE)?;
 
-        self.truncate_common(current_task, length)
+        self.truncate_common(locked, current_task, length)
     }
 
     /// Avoid calling this method directly. You probably want to call `FileObject::ftruncate()`
     /// which will also perform all file-descriptor based verifications.
-    pub fn ftruncate(&self, current_task: &CurrentTask, length: u64) -> Result<(), Errno> {
+    pub fn ftruncate<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        length: u64,
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         if self.is_dir() {
             // When truncating a file descriptor, if the descriptor references a directory,
             // return EINVAL. This is different from the truncate() syscall which returns EISDIR.
@@ -1418,11 +1431,19 @@ impl FsNode {
         // "With ftruncate(), the file must be open for writing; with truncate(),
         // the file must be writable."
 
-        self.truncate_common(current_task, length)
+        self.truncate_common(locked, current_task, length)
     }
 
     // Called by `truncate` and `ftruncate` above.
-    fn truncate_common(&self, current_task: &CurrentTask, length: u64) -> Result<(), Errno> {
+    fn truncate_common<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        length: u64,
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         if length > MAX_LFS_FILESIZE as u64 {
             return error!(EINVAL);
         }
@@ -1433,8 +1454,12 @@ impl FsNode {
         self.clear_suid_and_sgid_bits(current_task)?;
         // We have to take the append lock since otherwise it would be possible to truncate and for
         // an append to continue using the old size.
+        // TODO(https://fxbug.dev/333540469): append lock must be before FileOpsCore, but this
+        // method is also used in truncate
         let _guard = self.append_lock.read(current_task);
-        self.ops().truncate(self, current_task, length)?;
+
+        let mut locked = locked.cast_locked::<FileOpsCore>();
+        self.ops().truncate(&mut locked, self, current_task, length)?;
         self.update_ctime_mtime();
         Ok(())
     }
