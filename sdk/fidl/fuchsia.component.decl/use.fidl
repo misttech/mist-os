@@ -255,7 +255,7 @@ type UseEventStream = table {
 
     /// (Optional) Filter for the event stream. The structure of the filter
     /// depends on the event stream type. Only supported for the
-    /// `DirectoryReady` and `CapabilityRequested` event types.
+    /// `CapabilityRequested` event type.
     @available(added=9)
     6: filter fuchsia.data.Dictionary;
 };

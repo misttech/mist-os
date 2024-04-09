@@ -144,23 +144,6 @@
         "name": "fuchsia.component/DestroyedPayload"
     },
     {
-        "kind": "table/member",
-        "name": "fuchsia.component/DirectoryReadyPayload.name",
-        "ordinal": "1",
-        "type": "string:255"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.component/DirectoryReadyPayload.node",
-        "ordinal": "2",
-        "type": "fuchsia.io/Node"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.component/DirectoryReadyPayload",
-        "resourceness": "resource"
-    },
-    {
         "kind": "table",
         "name": "fuchsia.component/DiscoveredPayload"
     },
@@ -305,12 +288,6 @@
     },
     {
         "kind": "union/member",
-        "name": "fuchsia.component/EventPayload.directory_ready",
-        "ordinal": "3",
-        "type": "fuchsia.component/DirectoryReadyPayload"
-    },
-    {
-        "kind": "union/member",
         "name": "fuchsia.component/EventPayload.discovered",
         "ordinal": "4",
         "type": "fuchsia.component/DiscoveredPayload"
@@ -397,11 +374,6 @@
         "kind": "enum/member",
         "name": "fuchsia.component/EventType.DESTROYED",
         "value": "4"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.component/EventType.DIRECTORY_READY",
-        "value": "2"
     },
     {
         "kind": "enum/member",

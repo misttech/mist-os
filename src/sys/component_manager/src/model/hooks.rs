@@ -113,7 +113,6 @@ macro_rules! external_events {
                     $(
                         fcomponent::EventType::$name => EventType::$name,
                     )*
-                        fcomponent::EventType::DirectoryReady => unreachable!("This isn't used anymore"),
                 }
             }
         }

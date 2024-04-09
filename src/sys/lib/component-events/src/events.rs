@@ -30,7 +30,6 @@ pub fn event_name(event_type: &fcomponent::EventType) -> String {
         fcomponent::EventType::Started => "started",
         fcomponent::EventType::Stopped => "stopped",
         fcomponent::EventType::DebugStarted => "debug_started",
-        fcomponent::EventType::DirectoryReady => unreachable!("directory ready isn't used anymore"),
     }
     .to_string()
 }
