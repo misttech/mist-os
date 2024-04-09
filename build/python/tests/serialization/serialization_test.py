@@ -516,6 +516,19 @@ class SerializeFieldsTest(unittest.TestCase):
             ),
         )
 
+    def test_deserialize_class_with_union_fields_mixed_syntax_second_type(self):
+        @dataclass
+        class SimpleClass:
+            int_field: int
+            union_field: str | List[str]
+
+        self.assertEqual(
+            SimpleClass(42, ["foo"]),
+            instance_from_dict(
+                SimpleClass, {"int_field": 42, "union_field": ["foo"]}
+            ),
+        )
+
     def test_deserialize_class_with_optional_union_fields_new_syntax_first_type(
         self,
     ):

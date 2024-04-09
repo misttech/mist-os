@@ -292,7 +292,25 @@ def _parse_value_into(
         # Unions are special, because we don't know what value we can make, so
         # just try them all, in order, until we get one that works.
         errors = []
-        for type_arg in typing.get_args(cls):
+        type_options = [*typing.get_args(cls)]
+
+        # Strip the Nonetype
+        if types.NoneType in type_options:
+            type_options.remove(types.NoneType)
+
+        # There are some special types that can deserialize nearly anything,
+        # like str, or are very general like dict, set, and list, so lets
+        # extract those, and do them last.
+        possible_special_types = [dict, set, list, str]
+        special_types_to_try = []
+
+        for special_type in possible_special_types:
+            if special_type in type_options:
+                type_options.remove(special_type)
+                special_types_to_try.append(special_type)
+
+        # Now try the "normal" types
+        for type_arg in type_options:
             try:
                 return _parse_value_into(value, type_arg)
             except KeyError as ke:
@@ -301,6 +319,18 @@ def _parse_value_into(
                 errors.append(te)
             except ValueError as ve:
                 errors.append(ve)
+
+        # Now try the "special" types
+        for type_arg in special_types_to_try:
+            try:
+                return _parse_value_into(value, type_arg)
+            except KeyError as ke:
+                errors.append(ke)
+            except TypeError as te:
+                errors.append(te)
+            except ValueError as ve:
+                errors.append(ve)
+
         raise TypeError(
             f"Unable to create an instance of {cls}, from {value}: {errors}"
         )
