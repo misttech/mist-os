@@ -49,6 +49,10 @@ namespace ld {
 //   session is now appropriate only for a single particular process, or a
 //   single zygote that will spawn identical processes.
 //
+// * `Relocate()` fills in all the segment data that will need to be mapped in.
+//   That is, it performs relocation on all modules.
+//   TODO(https://fxbug.dev/326524302): complete passive ABI in this step
+//
 // TODO(https://fxbug.dev/326524302): More steps
 
 template <class Elf = elfldltl::Elf<>, RemoteLoadZygote Zygote = RemoteLoadZygote::kNo>
@@ -61,6 +65,8 @@ class RemoteDynamicLinker {
   using Soname = typename Module::Soname;
   using List = typename Module::List;
   using size_type = typename Elf::size_type;
+  using TlsDescResolver = ld::StaticTlsDescResolver<Elf>;
+  using TlsdescRuntimeHooks = typename TlsDescResolver::RuntimeHooks;
 
   // Each initial module has a name.  For the main executable this is "".
   // For explicitly-loaded modules, it's the name by which they were loaded.
@@ -359,6 +365,56 @@ class RemoteDynamicLinker {
       return module.Allocate(diag, vmar);
     };
     return OnModules(ValidModules(), allocate);
+  }
+
+  // Acquire a StaticTlsDescResolver for Relocate that uses the stub dynamic
+  // linker's TLSDESC entry points.  This resolver handles undefined weak
+  // resolutions and it handles symbols resolved to a definition in a module
+  // using static_tls_bias().  This is what's used by default if Relocate is
+  // called with one argument.
+  //
+  // This can only be used after Allocate(), as that determines the runtime
+  // code addresses for the stub dynamic linker; these addresses are stored in
+  // the returned object.  Note they can also be modified later with e.g.
+  // `.SetHook(TlsdescRuntime::kStatic, custom_hook)`; see <lib/ld/tlsdesc.h>.
+  TlsDescResolver tls_desc_resolver() const {
+    return abi_stub_->tls_desc_resolver(abi_stub_module().load_bias());
+  }
+
+  // Shorthand for the two-argument Relocate method below.
+  template <class Diagnostics>
+  bool Relocate(Diagnostics& diag) {
+    return Relocate(diag, tls_desc_resolver());
+  }
+
+  // Perform relocations on all modules.  The modules() list gives the set and
+  // order of modules used for symbol resolution.
+  //
+  // For dynamic TLS references, the tls_desc_resolver is a callable object
+  // with the signatures of ld::StaticTlsDescResolver (see <lib/ld/tlsdesc.h>),
+  // usually from the tls_desc_resolver() method above to use runtime callbacks
+  // supplied in the stub dynamic linker.
+  //
+  // If any module was not successfully decoded sufficiently to call the
+  // Relocate method on that ld::RemoteLoadModule, then that module is just
+  // skipped.  This doesn't cause a "failure" here because the Diagnostics
+  // object must have reported the failures in decoding and decided to keep
+  // going anyway, so there is nothing new to report.  The caller may have
+  // decided to attempt relocation so as to diagnose all its specific errors,
+  // rather than bailing out immediately after decoding failed on some of the
+  // modules.  Probably callers will more often decide to bail out, since
+  // missing dependency modules is an obvious recipe for undefined symbol
+  // errors that aren't going to be more enlightening to the user.  But this
+  // class supports any policy.
+  template <class Diagnostics, typename TlsDescResolverType>
+  bool Relocate(Diagnostics& diag, TlsDescResolverType&& tls_desc_resolver) {
+    // If any module wasn't decoded successfully, just skip it.
+    auto valid_modules = ValidModules();
+    auto relocate = [&](auto& module) -> bool {
+      // Resolve against the successfully decoded modules, ignoring the others.
+      return module.Relocate(diag, valid_modules, tls_desc_resolver);
+    };
+    return OnModules(valid_modules, relocate);
   }
 
  private:

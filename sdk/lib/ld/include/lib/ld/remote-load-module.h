@@ -173,7 +173,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
     loaded_by_modid_ = loaded_by_modid;
   }
 
-  // Initialize the the loader and allocate the address region for the module,
+  // Initialize the loader and allocate the address region for the module,
   // updating the module's runtime addr fields on success.
   template <class Diagnostics>
   bool Allocate(Diagnostics& diag, const zx::vmar& vmar) {
@@ -215,36 +215,6 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
     auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, tls_desc_resolver);
     return elfldltl::RelocateSymbolic(mutable_memory, diag, this->reloc_info(), this->symbol_info(),
                                       this->load_bias(), resolver);
-  }
-
-  // This returns an OK result only if all modules were fit to be relocated.
-  // If decoding failed earlier, this should only be called if Diagnostics said
-  // to keep going.  In that case, the error value will be true if every
-  // successfully-decoded module's Relocate pass also said to keep going.
-  template <class Diagnostics, typename TlsDescResolver>
-  static bool RelocateModules(Diagnostics& diag, List& modules,
-                              TlsDescResolver&& tls_desc_resolver) {
-    // If any module wasn't decoded successfully, just skip it.  This doesn't
-    // cause a "failure" because the Diagnostics object must have reported the
-    // failures in decoding and decided to keep going anyway, so there is
-    // nothing new to report.  The caller may have decided to attempt
-    // relocation so as to diagnose all its specific errors, rather than
-    // bailing out immediately after decoding failed on some of the modules.
-    // Probably callers will more often decide to bail out, since missing
-    // dependency modules is an obvious recipe for undefined symbol errors that
-    // aren't going to be more enlightening to the user.  But this class
-    // supports any policy.
-    ld::internal::filter_view valid_modules{
-        // The span provides a copyable view of the vector (List), which
-        // can't be (and shouldn't be) copied.
-        cpp20::span{modules},
-        &RemoteLoadModule::HasModule,
-    };
-    auto relocate = [&](auto& module) -> bool {
-      // Resolve against the successfully decoded modules, ignoring the others.
-      return module.Relocate(diag, valid_modules, tls_desc_resolver);
-    };
-    return std::all_of(valid_modules.begin(), valid_modules.end(), relocate);
   }
 
   // Load the module into its allocated vaddr region.

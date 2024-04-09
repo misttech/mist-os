@@ -232,14 +232,8 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     const RemoteModule& loaded_vdso = modules[init_result->front()];
     set_vdso_base(loaded_vdso.module().vaddr_start());
 
-    // Acquire a StaticTlsDescResolver that uses the stub dynamic linker's
-    // entry TLSDESC points.  Note this could in the general case be modified
-    // later by:
-    // `tls_desc_resolver.SetHook(TlsdescRuntime::kStatic, custom_hook);`
-    auto tls_desc_resolver = abi_stub->tls_desc_resolver(loaded_stub.load_bias());
-
     // Apply relocations to segment VMOs.
-    EXPECT_TRUE(RemoteModule::RelocateModules(diag, modules, tls_desc_resolver));
+    EXPECT_TRUE(linker.Relocate(diag));
 
     ASSERT_EQ(IsExpectOkDiagnostics(diag), !should_fail);
     if (should_fail) {
