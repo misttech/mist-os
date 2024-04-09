@@ -33,55 +33,54 @@ bool ClientIsValidForDeviceType(const fuchsia_audio_device::DeviceType& device_t
 std::vector<fuchsia_audio_device::PcmFormatSet> TranslateRingBufferFormatSets(
     const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets);
 
-zx_status_t ValidateStreamProperties(
+bool ValidateStreamProperties(
     const fuchsia_hardware_audio::StreamProperties& stream_props,
     std::optional<const fuchsia_hardware_audio::GainState> gain_state = std::nullopt,
     std::optional<const fuchsia_hardware_audio::PlugState> plug_state = std::nullopt);
-zx_status_t ValidateGainState(
+bool ValidateGainState(
     const fuchsia_hardware_audio::GainState& gain_state,
     std::optional<const fuchsia_hardware_audio::StreamProperties> stream_props = std::nullopt);
-zx_status_t ValidatePlugState(const fuchsia_hardware_audio::PlugState& plug_state,
-                              std::optional<fuchsia_hardware_audio::PlugDetectCapabilities>
-                                  plug_detect_capabilities = std::nullopt);
+bool ValidatePlugState(const fuchsia_hardware_audio::PlugState& plug_state,
+                       std::optional<fuchsia_hardware_audio::PlugDetectCapabilities>
+                           plug_detect_capabilities = std::nullopt);
 
-zx_status_t ValidateCodecProperties(
+bool ValidateCodecProperties(
     const fuchsia_hardware_audio::CodecProperties& codec_props,
     std::optional<const fuchsia_hardware_audio::PlugState> plug_state = std::nullopt);
-zx_status_t ValidateCodecFormatInfo(const fuchsia_hardware_audio::CodecFormatInfo& format_info);
+bool ValidateCodecFormatInfo(const fuchsia_hardware_audio::CodecFormatInfo& format_info);
 
-zx_status_t ValidateCompositeProperties(
+bool ValidateCompositeProperties(
     const fuchsia_hardware_audio::CompositeProperties& composite_props);
 
 bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info);
 
-zx_status_t ValidateElements(
+bool ValidateElements(
     const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements);
-zx_status_t ValidateElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
-zx_status_t ValidateElementState(
+bool ValidateElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateElementState(
     const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
     const fuchsia_hardware_audio_signalprocessing::Element& element);
 
-zx_status_t ValidateTopologies(
+bool ValidateTopologies(
     const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>& topologies,
     const std::unordered_map<ElementId, ElementRecord>& element_map);
-zx_status_t ValidateTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topology,
-                             const std::unordered_map<ElementId, ElementRecord>& element_map);
+bool ValidateTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topology,
+                      const std::unordered_map<ElementId, ElementRecord>& element_map);
 
-zx_status_t ValidateRingBufferFormatSets(
+bool ValidateRingBufferFormatSets(
     const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets);
-zx_status_t ValidateRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_format);
-zx_status_t ValidateSampleFormatCompatibility(uint8_t bytes_per_sample,
-                                              fuchsia_hardware_audio::SampleFormat sample_format);
+bool ValidateRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_format);
+bool ValidateSampleFormatCompatibility(uint8_t bytes_per_sample,
+                                       fuchsia_hardware_audio::SampleFormat sample_format);
 
-zx_status_t ValidateDaiFormatSets(
+bool ValidateDaiFormatSets(
     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets);
-zx_status_t ValidateDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_format);
+bool ValidateDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_format);
 
-zx_status_t ValidateRingBufferProperties(
-    const fuchsia_hardware_audio::RingBufferProperties& rb_props);
-zx_status_t ValidateRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
-                                  const fuchsia_hardware_audio::Format& format);
-zx_status_t ValidateDelayInfo(const fuchsia_hardware_audio::DelayInfo& delay_info);
+bool ValidateRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties& rb_props);
+bool ValidateRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
+                           const fuchsia_hardware_audio::Format& format);
+bool ValidateDelayInfo(const fuchsia_hardware_audio::DelayInfo& delay_info);
 
 }  // namespace media_audio
 

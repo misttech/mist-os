@@ -150,7 +150,7 @@ class ObserverServerStreamConfigTest : public ObserverServerTest {
 /////////////////////
 // Codec tests
 //
-// Validate that an Observer client can drop cleanly (without generating a WARNING or ERROR).
+// Verify that an Observer client can drop cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerCodecTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
@@ -164,7 +164,7 @@ TEST_F(ObserverServerCodecTest, CleanClientDrop) {
   // No WARNING logging should occur during test case shutdown.
 }
 
-// Validate that an Observer server can shutdown cleanly (without generating a WARNING or ERROR).
+// Verify that an Observer server can shutdown cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerCodecTest, CleanServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
@@ -213,7 +213,7 @@ TEST_F(ObserverServerCodecTest, Creation) {
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that when an observed device is removed, the Observer is dropped.
+// Verify that when an observed device is removed, the Observer is dropped.
 TEST_F(ObserverServerCodecTest, ObservedDeviceRemoved) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -239,7 +239,7 @@ TEST_F(ObserverServerCodecTest, ObservedDeviceRemoved) {
   EXPECT_EQ(*observer_fidl_error_status_, ZX_ERR_PEER_CLOSED);
 }
 
-// Validate that the Observer receives the initial plug state of the observed device.
+// Verify that the Observer receives the initial plug state of the observed device.
 // To ensure we correctly receive this, change the default state we we are initially kUnplugged.
 TEST_F(ObserverServerCodecTest, InitialPlugState) {
   auto fake_driver = CreateFakeCodecOutput();
@@ -283,7 +283,7 @@ TEST_F(ObserverServerCodecTest, InitialPlugState) {
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that the Observer receives changes in the plug state of the observed device.
+// Verify that the Observer receives changes in the plug state of the observed device.
 TEST_F(ObserverServerCodecTest, PlugChange) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -336,7 +336,7 @@ TEST_F(ObserverServerCodecTest, PlugChange) {
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that an Observer does not drop, if the observed device's Control client is dropped.
+// Verify that an Observer does not drop, if the observed device's Control client is dropped.
 TEST_F(ObserverServerCodecTest, ObserverDoesNotDropIfClientControlDrops) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -372,7 +372,7 @@ TEST_F(ObserverServerCodecTest, ObserverDoesNotDropIfClientControlDrops) {
 /////////////////////
 // Composite tests
 //
-// Validate that an Observer client can drop cleanly (without generating a WARNING or ERROR).
+// Verify that an Observer client can drop cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerCompositeTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
@@ -386,7 +386,7 @@ TEST_F(ObserverServerCompositeTest, CleanClientDrop) {
   // No WARNING logging should occur during test case shutdown.
 }
 
-// Validate that an Observer server can shutdown cleanly (without generating a WARNING or ERROR).
+// Verify that an Observer server can shutdown cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerCompositeTest, CleanServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
@@ -435,7 +435,7 @@ TEST_F(ObserverServerCompositeTest, Creation) {
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that when an observed device is removed, the Observer is dropped.
+// Verify that when an observed device is removed, the Observer is dropped.
 TEST_F(ObserverServerCompositeTest, ObservedDeviceRemoved) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -460,7 +460,7 @@ TEST_F(ObserverServerCompositeTest, ObservedDeviceRemoved) {
   EXPECT_EQ(*observer_fidl_error_status_, ZX_ERR_PEER_CLOSED);
 }
 
-// Validate that the Observer receives the observed device's reference clock, and that it is valid.
+// Verify that the Observer receives the observed device's reference clock, and that it is valid.
 TEST_F(ObserverServerCompositeTest, GetReferenceClock) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -489,7 +489,7 @@ TEST_F(ObserverServerCompositeTest, GetReferenceClock) {
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that an Observer does not drop, if an observed device's driver RingBuffer is dropped.
+// Verify that an Observer does not drop, if an observed device's driver RingBuffer is dropped.
 TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfDriverRingBufferDrops) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -530,7 +530,7 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfDriverRingBufferDrops) 
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that an Observer does not drop, if an observed device's RingBuffer client is dropped.
+// Verify that an Observer does not drop, if an observed device's RingBuffer client is dropped.
 TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientRingBufferDrops) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -571,7 +571,7 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientRingBufferDrops) 
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that an Observer does not drop, if the observed device's Control client is dropped.
+// Verify that an Observer does not drop, if the observed device's Control client is dropped.
 TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientControlDrops) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -604,7 +604,7 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientControlDrops) {
 /////////////////////
 // StreamConfig tests
 //
-// Validate that an Observer client can drop cleanly (without generating a WARNING or ERROR).
+// Verify that an Observer client can drop cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerStreamConfigTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
@@ -618,7 +618,7 @@ TEST_F(ObserverServerStreamConfigTest, CleanClientDrop) {
   // No WARNING logging should occur during test case shutdown.
 }
 
-// Validate that an Observer server can shutdown cleanly (without generating a WARNING or ERROR).
+// Verify that an Observer server can shutdown cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerStreamConfigTest, CleanServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
@@ -667,7 +667,7 @@ TEST_F(ObserverServerStreamConfigTest, Creation) {
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that when an observed device is removed, the Observer is dropped.
+// Verify that when an observed device is removed, the Observer is dropped.
 TEST_F(ObserverServerStreamConfigTest, ObservedDeviceRemoved) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -692,7 +692,7 @@ TEST_F(ObserverServerStreamConfigTest, ObservedDeviceRemoved) {
   EXPECT_EQ(*observer_fidl_error_status_, ZX_ERR_PEER_CLOSED);
 }
 
-// Validate that the Observer receives the initial gain state of the observed device.
+// Verify that the Observer receives the initial gain state of the observed device.
 TEST_F(ObserverServerStreamConfigTest, InitialGainState) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   constexpr float kGainDb = -2.0f;
@@ -736,7 +736,7 @@ TEST_F(ObserverServerStreamConfigTest, InitialGainState) {
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that the Observer receives changes in the gain state of the observed device.
+// Verify that the Observer receives changes in the gain state of the observed device.
 TEST_F(ObserverServerStreamConfigTest, GainChange) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -791,7 +791,7 @@ TEST_F(ObserverServerStreamConfigTest, GainChange) {
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that the Observer receives the initial plug state of the observed device.
+// Verify that the Observer receives the initial plug state of the observed device.
 TEST_F(ObserverServerStreamConfigTest, InitialPlugState) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   auto initial_plug_time = zx::clock::get_monotonic();
@@ -830,7 +830,7 @@ TEST_F(ObserverServerStreamConfigTest, InitialPlugState) {
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that the Observer receives changes in the plug state of the observed device.
+// Verify that the Observer receives changes in the plug state of the observed device.
 TEST_F(ObserverServerStreamConfigTest, PlugChange) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -879,7 +879,7 @@ TEST_F(ObserverServerStreamConfigTest, PlugChange) {
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that the Observer receives the observed device's reference clock, and that it is valid.
+// Verify that the Observer receives the observed device's reference clock, and that it is valid.
 TEST_F(ObserverServerStreamConfigTest, GetReferenceClock) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -908,7 +908,7 @@ TEST_F(ObserverServerStreamConfigTest, GetReferenceClock) {
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that an Observer does not drop, if the observed device's driver RingBuffer is dropped.
+// Verify that an Observer does not drop, if the observed device's driver RingBuffer is dropped.
 TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfDriverRingBufferDrops) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
@@ -945,7 +945,7 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfDriverRingBufferDrop
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that an Observer does not drop, if the observed device's RingBuffer client is dropped.
+// Verify that an Observer does not drop, if the observed device's RingBuffer client is dropped.
 TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientRingBufferDrops) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
@@ -984,7 +984,7 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientRingBufferDrop
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that an Observer does not drop, if the observed device's Control client is dropped.
+// Verify that an Observer does not drop, if the observed device's Control client is dropped.
 TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientControlDrops) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);

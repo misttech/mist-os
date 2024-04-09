@@ -21,7 +21,7 @@ class ControlCreatorServerStreamConfigTest : public ControlCreatorServerTest {};
 /////////////////////
 // Device-less tests
 //
-// Validate that the ControlCreator client can be dropped cleanly without generating a WARNING.
+// Verify that the ControlCreator client can be dropped cleanly without generating a WARNING.
 TEST_F(ControlCreatorServerTest, CleanClientDrop) {
   auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
@@ -29,7 +29,7 @@ TEST_F(ControlCreatorServerTest, CleanClientDrop) {
   (void)control_creator->client().UnbindMaybeGetEndpoint();
 }
 
-// Validate that the ControlCreator server can shutdown cleanly without generating a WARNING.
+// Verify that the ControlCreator server can shutdown cleanly without generating a WARNING.
 TEST_F(ControlCreatorServerTest, CleanServerShutdown) {
   auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);

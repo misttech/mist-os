@@ -116,7 +116,7 @@ RingBufferServerTest::SetupForCleanShutdownTesting() {
   return std::make_pair(std::move(control), std::move(ring_buffer_client));
 }
 
-// Validate that RingBuffer clients and servers shutdown cleanly (without warnings).
+// Verify that RingBuffer clients and servers shutdown cleanly (without warnings).
 TEST_F(RingBufferServerTest, CleanClientDrop) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
@@ -153,7 +153,7 @@ TEST_F(RingBufferServerTest, DriverStreamConfigDropCausesCleanRingBufferServerSh
   // If RingBufferServer doesn't shutdown cleanly, it emits a WARNING, which will cause a failure.
 }
 
-// Validate that Control/CreateRingBuffer succeeds and returns the expected parameters.
+// Verify that Control/CreateRingBuffer succeeds and returns the expected parameters.
 TEST_F(RingBufferServerTest, CreateRingBufferReturnParameters) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
@@ -204,7 +204,7 @@ TEST_F(RingBufferServerTest, CreateRingBufferReturnParameters) {
   (void)ring_buffer_client.UnbindMaybeGetEndpoint();
 }
 
-// Validate that RingBuffer/SetActiveChannels succeeds and returns an expected set_time.
+// Verify that RingBuffer/SetActiveChannels succeeds and returns an expected set_time.
 TEST_F(RingBufferServerTest, DriverSupportsSetActiveChannels) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
@@ -301,7 +301,7 @@ TEST_F(RingBufferServerTest, DriverDoesNotSupportSetActiveChannels) {
   (void)ring_buffer_client.UnbindMaybeGetEndpoint();
 }
 
-// Validate that RingBuffer/Start and /Stop function as expected, including start_time.
+// Verify that RingBuffer/Start and /Stop function as expected, including start_time.
 TEST_F(RingBufferServerTest, StartAndStop) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->set_active_channels_supported(false);
@@ -376,7 +376,7 @@ TEST_F(RingBufferServerTest, StartAndStop) {
   (void)ring_buffer_client.UnbindMaybeGetEndpoint();
 }
 
-// Validate that RingBuffer/WatchDelayInfo notifies of the delay received during initialization.
+// Verify that RingBuffer/WatchDelayInfo notifies of the delay received during initialization.
 // While we are here, validate a non-default value for turn_on_delay.
 TEST_F(RingBufferServerTest, WatchDelayInfo) {
   auto fake_driver = CreateFakeStreamConfigOutput();
@@ -428,7 +428,7 @@ TEST_F(RingBufferServerTest, WatchDelayInfo) {
   (void)ring_buffer_client.UnbindMaybeGetEndpoint();
 }
 
-// Validate that RingBuffer/WatchDelayInfo notifies of delay changes after initialization.
+// Verify that RingBuffer/WatchDelayInfo notifies of delay changes after initialization.
 TEST_F(RingBufferServerTest, DynamicDelayUpdate) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
@@ -491,7 +491,7 @@ TEST_F(RingBufferServerTest, DynamicDelayUpdate) {
   (void)ring_buffer_client.UnbindMaybeGetEndpoint();
 }
 
-// Validate that the RingBufferServer is destructed if the client drops the Control.
+// Verify that the RingBufferServer is destructed if the client drops the Control.
 TEST_F(RingBufferServerTest, ControlClientDropCausesRingBufferDrop) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
@@ -527,7 +527,7 @@ TEST_F(RingBufferServerTest, ControlClientDropCausesRingBufferDrop) {
   EXPECT_EQ(RingBufferServer::count(), 0u);
 }
 
-// Validate that the RingBufferServer is destructed if the ControlServer shuts down.
+// Verify that the RingBufferServer is destructed if the ControlServer shuts down.
 TEST_F(RingBufferServerTest, ControlServerShutdownCausesRingBufferDrop) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
@@ -564,7 +564,7 @@ TEST_F(RingBufferServerTest, ControlServerShutdownCausesRingBufferDrop) {
   EXPECT_EQ(RingBufferServer::count(), 0u);
 }
 
-// Validate that RingBuffer works as expected, after RingBuffer being created/destroyed/recreated.
+// Verify that RingBuffer works as expected, after RingBuffer being created/destroyed/recreated.
 TEST_F(RingBufferServerTest, SecondRingBufferAfterDrop) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->set_active_channels_supported(false);

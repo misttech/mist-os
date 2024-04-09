@@ -216,7 +216,7 @@ TEST_F(ObserverServerCodecWarningTest, GetReferenceClockWrongDeviceType) {
 /////////////////////
 // Composite tests
 //
-// Validate that the Observer cannot handle a WatchGainState request from this type of device.
+// Verify that the Observer cannot handle a WatchGainState request from this type of device.
 TEST_F(ObserverServerCompositeWarningTest, WatchGainStateWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -250,7 +250,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchGainStateWrongDeviceType) {
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// Validate that the Observer cannot handle a WatchPlugState request from this type of device.
+// Verify that the Observer cannot handle a WatchPlugState request from this type of device.
 TEST_F(ObserverServerCompositeWarningTest, WatchPlugStateWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);

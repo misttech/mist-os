@@ -115,7 +115,7 @@ bool RingBufferFormatIsSupported(
     const std::vector<fuchsia_audio_device::ElementRingBufferFormatSet>&
         element_ring_buffer_format_sets,
     const fuchsia_hardware_audio::Format& format) {
-  if (ValidateRingBufferFormat(format) != ZX_OK) {
+  if (!ValidateRingBufferFormat(format)) {
     return false;
   }
   std::optional<std::vector<fuchsia_audio_device::PcmFormatSet>> ring_buffer_format_sets;

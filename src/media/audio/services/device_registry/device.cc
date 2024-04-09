@@ -645,9 +645,8 @@ void Device::RetrieveStreamProperties() {
         }
 
         ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "StreamConfig/GetProperties: success";
-        auto status = ValidateStreamProperties(result->properties());
-        if (status != ZX_OK) {
-          OnError(status);
+        if (!ValidateStreamProperties(result->properties())) {
+          OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
 
@@ -699,9 +698,8 @@ void Device::RetrieveCodecProperties() {
         }
 
         ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/GetProperties: success";
-        auto status = ValidateCodecProperties(result->properties());
-        if (status != ZX_OK) {
-          OnError(status);
+        if (!ValidateCodecProperties(result->properties())) {
+          OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
 
@@ -750,9 +748,8 @@ void Device::RetrieveCompositeProperties() {
         }
 
         ADR_LOG_OBJECT(kLogCompositeFidlResponses) << "Composite/GetProperties: success";
-        auto status = ValidateCompositeProperties(result->properties());
-        if (status != ZX_OK) {
-          OnError(status);
+        if (!ValidateCompositeProperties(result->properties())) {
+          OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
 
@@ -852,9 +849,8 @@ void Device::RetrieveRingBufferFormatSets(
 
         ADR_LOG_OBJECT(kLogStreamConfigFidlResponses)
             << "StreamConfig/GetSupportedFormats: success";
-        auto status = ValidateRingBufferFormatSets(result->supported_formats());
-        if (status != ZX_OK) {
-          OnError(status);
+        if (!ValidateRingBufferFormatSets(result->supported_formats())) {
+          OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
 
@@ -975,9 +971,8 @@ void Device::RetrieveSignalProcessingElements() {
             }
 
             ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
-            auto status = ValidateElements(result->processing_elements());
-            if (status != ZX_OK) {
-              OnError(status);
+            if (!ValidateElements(result->processing_elements())) {
+              OnError(ZX_ERR_INVALID_ARGS);
               return;
             }
 
@@ -1021,9 +1016,8 @@ void Device::RetrieveSignalProcessingTopologies() {
         }
 
         ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
-        auto status = ValidateTopologies(result->topologies(), sig_proc_element_map_);
-        if (status != ZX_OK) {
-          OnError(status);
+        if (!ValidateTopologies(result->topologies(), sig_proc_element_map_)) {
+          OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
 
@@ -1099,8 +1093,8 @@ void Device::RetrieveCurrentElementStates() {
           }
 
           auto element_state = result->state();
-          if (auto status = ValidateElementState(element_state, element); status != ZX_OK) {
-            OnError(status);
+          if (!ValidateElementState(element_state, element)) {
+            OnError(ZX_ERR_INVALID_ARGS);
             return;
           }
           ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
@@ -1215,8 +1209,8 @@ void Device::RetrieveDaiFormatSets(
 
           ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/GetDaiFormats: success";
 
-          if (auto status = ValidateDaiFormatSets(result->formats()); status != ZX_OK) {
-            OnError(status);
+          if (!ValidateDaiFormatSets(result->formats())) {
+            OnError(ZX_ERR_INVALID_ARGS);
             return;
           }
           callback(element_id, result->formats());
@@ -1237,9 +1231,8 @@ void Device::RetrieveDaiFormatSets(
           if (LogResultError(result, str.c_str())) {
             return;
           }
-          auto status = ValidateDaiFormatSets(result->dai_formats());
-          if (status != ZX_OK) {
-            OnError(status);
+          if (!ValidateDaiFormatSets(result->dai_formats())) {
+            OnError(ZX_ERR_INVALID_ARGS);
             return;
           }
 
@@ -1271,9 +1264,8 @@ void Device::RetrieveCompositeRingBufferFormatSets() {
           if (LogResultError(result, str.c_str())) {
             return;
           }
-          auto status = ValidateRingBufferFormatSets(result->ring_buffer_formats());
-          if (status != ZX_OK) {
-            OnError(status);
+          if (!ValidateRingBufferFormatSets(result->ring_buffer_formats())) {
+            OnError(ZX_ERR_INVALID_ARGS);
             return;
           }
           auto translated_ring_buffer_format_sets =
@@ -1314,9 +1306,8 @@ void Device::RetrieveGainState() {
         }
 
         ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchGainState response";
-        auto status = ValidateGainState(result->gain_state());
-        if (status != ZX_OK) {
-          OnError(status);
+        if (!ValidateGainState(result->gain_state())) {
+          OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
 
@@ -1366,9 +1357,8 @@ void Device::RetrieveStreamPlugState() {
         if (has_stream_config_properties()) {
           plug_detect_capabilities = stream_config_properties_->plug_detect_capabilities();
         }
-        auto status = ValidatePlugState(result->plug_state(), plug_detect_capabilities);
-        if (status != ZX_OK) {
-          OnError(status);
+        if (!ValidatePlugState(result->plug_state(), plug_detect_capabilities)) {
+          OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
 
@@ -1415,9 +1405,8 @@ void Device::RetrieveCodecPlugState() {
         if (has_codec_properties()) {
           plug_detect_capabilities = codec_properties_->plug_detect_capabilities();
         }
-        auto status = ValidatePlugState(result->plug_state(), plug_detect_capabilities);
-        if (status != ZX_OK) {
-          OnError(status);
+        if (!ValidatePlugState(result->plug_state(), plug_detect_capabilities)) {
+          OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
 
@@ -1860,7 +1849,7 @@ void Device::SetDaiFormat(ElementId element_id,
     return;
   }
 
-  if (ValidateDaiFormat(dai_format) != ZX_OK) {
+  if (!ValidateDaiFormat(dai_format)) {
     ADR_WARN_METHOD() << "Invalid dai_format -- cannot SetDaiFormat";
     notify->DaiFormatNotSet(element_id, dai_format,
                             fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat);
@@ -1919,10 +1908,9 @@ void Device::SetDaiFormat(ElementId element_id,
           }
 
           ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/SetDaiFormat: success";
-          zx_status_t status = ValidateCodecFormatInfo(result->state());
-          if (status != ZX_OK) {
+          if (!ValidateCodecFormatInfo(result->state())) {
             FX_LOGS(ERROR) << "Codec/SetDaiFormat error: " << result.error_value();
-            OnError(status);
+            OnError(ZX_ERR_INVALID_ARGS);
             notify->DaiFormatNotSet(
                 element_id, dai_format,
                 fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat);
@@ -2273,17 +2261,13 @@ fuchsia_audio_device::ControlCreateRingBufferError Device::ConnectRingBufferFidl
     return fuchsia_audio_device::ControlCreateRingBufferError::kDeviceError;
   }
 
-  auto status = ValidateRingBufferFormat(driver_format);
-  if (status != ZX_OK) {
-    FX_PLOGS(WARNING, status) << "ValidateRingBufferFormat failed";
+  if (!ValidateRingBufferFormat(driver_format)) {
     return fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat;
   }
 
   auto bytes_per_sample = driver_format.pcm_format()->bytes_per_sample();
   auto sample_format = driver_format.pcm_format()->sample_format();
-  status = ValidateSampleFormatCompatibility(bytes_per_sample, sample_format);
-  if (status != ZX_OK) {
-    FX_PLOGS(WARNING, status) << "ValidateSampleFormatCompatibility failed";
+  if (!ValidateSampleFormatCompatibility(bytes_per_sample, sample_format)) {
     return fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat;
   }
 
@@ -2395,10 +2379,9 @@ void Device::RetrieveRingBufferProperties(ElementId element_id) {
         }
 
         ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/GetProperties: success";
-        auto status = ValidateRingBufferProperties(result->properties());
-        if (status != ZX_OK) {
+        if (!ValidateRingBufferProperties(result->properties())) {
           FX_LOGS(ERROR) << "RingBuffer/GetProperties error: " << result.error_value();
-          OnError(status);
+          OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
 
@@ -2423,9 +2406,8 @@ void Device::RetrieveDelayInfo(ElementId element_id) {
         }
         ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/WatchDelayInfo: success";
 
-        auto status = ValidateDelayInfo(result->delay_info());
-        if (status != ZX_OK) {
-          OnError(status);
+        if (!ValidateDelayInfo(result->delay_info())) {
+          OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
 
@@ -2476,12 +2458,10 @@ void Device::GetVmo(ElementId element_id, uint32_t min_frames,
         }
         ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/GetVmo: success";
 
-        auto status = ValidateRingBufferVmo(result->ring_buffer(), result->num_frames(),
-                                            *ring_buffer.driver_format);
-
-        if (status != ZX_OK) {
-          FX_PLOGS(ERROR, status) << "Error in RingBuffer/GetVmo response";
-          OnError(status);
+        if (!ValidateRingBufferVmo(result->ring_buffer(), result->num_frames(),
+                                   *ring_buffer.driver_format)) {
+          FX_PLOGS(ERROR, ZX_ERR_INVALID_ARGS) << "Error in RingBuffer/GetVmo response";
+          OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
         ring_buffer.ring_buffer_vmo = std::move(result->ring_buffer());

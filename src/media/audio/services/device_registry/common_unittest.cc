@@ -87,7 +87,7 @@ fuchsia_hardware_audio::DaiFormat SafeDaiFormatFromDaiFormatSets(
       .bits_per_slot = dai_format_sets[0].bits_per_slot()[0],
       .bits_per_sample = dai_format_sets[0].bits_per_sample()[0],
   }};
-  if (ValidateDaiFormat(dai_format) != ZX_OK) {
+  if (!ValidateDaiFormat(dai_format)) {
     ADD_FAILURE() << "first entries did not create a valid DaiFormat";
   }
 
@@ -132,7 +132,7 @@ fuchsia_hardware_audio::DaiFormat SecondDaiFormatFromDaiFormatSets(
     ADD_FAILURE() << "Dai format set has only one possible valid format";
     return {{}};
   }
-  if (ValidateDaiFormat(safe_format_2) != ZX_OK) {
+  if (!ValidateDaiFormat(safe_format_2)) {
     ADD_FAILURE() << "Could not create a second valid DaiFormat";
   }
   return safe_format_2;
@@ -242,7 +242,7 @@ fuchsia_hardware_audio::Format SafeDriverRingBufferFormatFromDriverRingBufferFor
       }},
   }};
 
-  if (ValidateRingBufferFormat(ring_buffer_format) != ZX_OK) {
+  if (!ValidateRingBufferFormat(ring_buffer_format)) {
     ADD_FAILURE() << "first entries did not create a valid DaiFormat";
     return {};
   }

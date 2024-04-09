@@ -579,7 +579,7 @@ TEST_F(CompositeWarningTest, SetDaiFormatUnsupportedFormat) {
     notify()->clear_dai_formats();
     auto unsupported_format =
         UnsupportedDaiFormatFromElementDaiFormatSets(dai_element_id, device->dai_format_sets());
-    ASSERT_EQ(ValidateDaiFormat(unsupported_format), ZX_OK);
+    ASSERT_TRUE(ValidateDaiFormat(unsupported_format));
 
     device->SetDaiFormat(dai_element_id, unsupported_format);
 
@@ -847,7 +847,7 @@ TEST_F(StreamConfigWarningTest, CodecDeviceCallsFail) {
 
 // TODO(https://fxbug.dev/42069012): GetVmo size too large; min_frames too large
 
-// Validate that Device can reopen the driver's RingBuffer FIDL channel after closing it.
+// Verify that Device can reopen the driver's RingBuffer FIDL channel after closing it.
 //
 // We perform this positive test here because a potential race can produce a WARNING.
 // Controls are also Observers, and this test drops and then immediately re-adds a Control.

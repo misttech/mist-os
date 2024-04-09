@@ -366,7 +366,7 @@ void ControlServer::SetDaiFormat(SetDaiFormatRequest& request,
     return;
   }
 
-  if (!request.dai_format().has_value() || ValidateDaiFormat(*request.dai_format()) != ZX_OK) {
+  if (!request.dai_format().has_value() || !ValidateDaiFormat(*request.dai_format())) {
     ADR_WARN_METHOD() << "required field 'dai_format' is missing or invalid";
     completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat));
     return;

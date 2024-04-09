@@ -33,7 +33,7 @@ using ::testing::Optional;
 /////////////////////
 // Codec tests
 //
-// Validate that a fake codec is initialized successfully.
+// Verify that a fake codec is initialized successfully.
 TEST_F(CodecTest, Initialization) {
   auto fake_driver = MakeFakeCodecOutput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
@@ -74,7 +74,7 @@ TEST_F(CodecTest, InitializationNoDirection) {
   EXPECT_FALSE(device->info()->is_input().has_value());
 }
 
-// Validate that a fake codec is initialized to the expected default values.
+// Verify that a fake codec is initialized to the expected default values.
 TEST_F(CodecTest, DeviceInfo) {
   auto fake_driver = MakeFakeCodecOutput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
@@ -124,7 +124,7 @@ TEST_F(CodecTest, DeviceInfo) {
   EXPECT_FALSE(info.signal_processing_topologies().has_value());
 }
 
-// Validate that a driver's dropping the Codec causes a DeviceIsRemoved notification.
+// Verify that a driver's dropping the Codec causes a DeviceIsRemoved notification.
 TEST_F(CodecTest, Disconnect) {
   auto fake_driver = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
@@ -148,7 +148,7 @@ TEST_F(CodecTest, Disconnect) {
   EXPECT_EQ(device_presence_watcher()->on_removal_from_ready_count(), 1u);
 }
 
-// Validate that a GetHealthState response of an empty struct is considered "healthy".
+// Verify that a GetHealthState response of an empty struct is considered "healthy".
 TEST_F(CodecTest, EmptyHealthResponse) {
   auto fake_driver = MakeFakeCodecOutput();
   fake_driver->set_health_state(std::nullopt);
@@ -212,7 +212,7 @@ TEST_F(CodecTest, GetDaiFormats) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_get_dai_formats_callback);
-  EXPECT_EQ(ValidateDaiFormatSets(dai_formats), ZX_OK);
+  EXPECT_TRUE(ValidateDaiFormatSets(dai_formats));
 }
 
 // SetDaiFormat is tested (here and in CodecWarningTest) against all states and error cases:
@@ -250,9 +250,9 @@ TEST_F(CodecTest, SetDaiFormat) {
   // check that notify received dai_format and codec_format_info
   RunLoopUntilIdle();
   EXPECT_TRUE(notify()->dai_format());
-  EXPECT_EQ(ValidateDaiFormat(*notify()->dai_format()), ZX_OK);
+  EXPECT_TRUE(ValidateDaiFormat(*notify()->dai_format()));
   EXPECT_TRUE(notify()->codec_format_info(dai_element_id()));
-  EXPECT_EQ(ValidateCodecFormatInfo(*notify()->codec_format_info(dai_element_id())), ZX_OK);
+  EXPECT_TRUE(ValidateCodecFormatInfo(*notify()->codec_format_info(dai_element_id())));
 }
 
 // Start and Stop
@@ -595,7 +595,7 @@ TEST_F(CodecTest, DynamicPlugUpdate) {
 /////////////////////
 // Composite tests
 //
-// Validate that a fake composite is initialized successfully.
+// Verify that a fake composite is initialized successfully.
 TEST_F(CompositeTest, Initialization) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
@@ -614,7 +614,7 @@ TEST_F(CompositeTest, Initialization) {
   EXPECT_FALSE(device->info()->is_input().has_value());
 }
 
-// Validate that a fake composite is initialized to the expected default values.
+// Verify that a fake composite is initialized to the expected default values.
 TEST_F(CompositeTest, DeviceInfo) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
@@ -740,7 +740,7 @@ TEST_F(CompositeTest, DeviceInfo) {
   EXPECT_FALSE(info.signal_processing_topologies()->empty());
 }
 
-// Validate that a driver's dropping the Composite causes a DeviceIsRemoved notification.
+// Verify that a driver's dropping the Composite causes a DeviceIsRemoved notification.
 TEST_F(CompositeTest, Disconnect) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
@@ -764,7 +764,7 @@ TEST_F(CompositeTest, Disconnect) {
   EXPECT_EQ(device_presence_watcher()->on_removal_from_ready_count(), 1u);
 }
 
-// Validate that a GetHealthState response of an empty struct is considered "healthy".
+// Verify that a GetHealthState response of an empty struct is considered "healthy".
 TEST_F(CompositeTest, EmptyHealthResponse) {
   auto fake_driver = MakeFakeComposite();
   fake_driver->set_health_state(std::nullopt);
@@ -939,7 +939,7 @@ TEST_F(CompositeTest, SetDaiFormatChange) {
     auto format_match = notify()->dai_formats().find(dai_element_id);
     ASSERT_NE(format_match, notify()->dai_formats().end());
     ASSERT_TRUE(format_match->second.has_value());
-    EXPECT_EQ(ValidateDaiFormat(format_match->second.value()), ZX_OK);
+    EXPECT_TRUE(ValidateDaiFormat(format_match->second.value()));
     EXPECT_TRUE(notify()->codec_format_infos().empty());
     EXPECT_TRUE(notify()->dai_format_errors().empty());
     notify()->clear_dai_format(dai_element_id);
@@ -947,7 +947,7 @@ TEST_F(CompositeTest, SetDaiFormatChange) {
     device->SetDaiFormat(dai_element_id, safe_format2);
 
     RunLoopUntilIdle();
-    // SetDaiFormat with no-change should cause a DaiElement to emit DaiFormatNotSet(ZX_OK).
+    // SetDaiFormat with no-change should cause a DaiElement to emit a not-set notification with 0.
     format_match = notify()->dai_formats().find(dai_element_id);
     EXPECT_TRUE(ExpectDaiFormatMatches(dai_element_id, safe_format2));
     EXPECT_TRUE(notify()->codec_format_infos().empty());
@@ -1080,7 +1080,7 @@ TEST_F(CompositeTest, CreateRingBuffers) {
 /////////////////////
 // StreamConfig tests
 //
-// Validate that a fake stream_config with default values is initialized successfully.
+// Verify that a fake stream_config with default values is initialized successfully.
 TEST_F(StreamConfigTest, Initialization) {
   auto device = InitializeDeviceForFakeStreamConfig(MakeFakeStreamConfigOutput());
   EXPECT_TRUE(IsInitialized(device));
@@ -1105,7 +1105,7 @@ TEST_F(StreamConfigTest, Initialization) {
   EXPECT_TRUE(device->info().has_value());
 }
 
-// Validate that a driver's dropping the StreamConfig causes a DeviceIsRemoved notification.
+// Verify that a driver's dropping the StreamConfig causes a DeviceIsRemoved notification.
 TEST_F(StreamConfigTest, Disconnect) {
   auto fake_driver = MakeFakeStreamConfigOutput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
@@ -1129,7 +1129,7 @@ TEST_F(StreamConfigTest, Disconnect) {
   EXPECT_EQ(device_presence_watcher()->on_removal_from_ready_count(), 1u);
 }
 
-// Validate that a GetHealthState response of an empty struct is considered "healthy".
+// Verify that a GetHealthState response of an empty struct is considered "healthy".
 TEST_F(StreamConfigTest, EmptyHealthResponse) {
   auto fake_driver = MakeFakeStreamConfigInput();
   fake_driver->set_health_state(std::nullopt);
@@ -1380,7 +1380,7 @@ TEST_F(StreamConfigTest, DynamicPlugUpdate) {
   EXPECT_EQ(notify()->plug_state()->second.get(), unplug_time.get());
 }
 
-// Validate that Device can open the driver's RingBuffer FIDL channel.
+// Verify that Device can open the driver's RingBuffer FIDL channel.
 TEST_F(StreamConfigTest, CreateRingBuffer) {
   auto fake_driver = MakeFakeStreamConfigInput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
@@ -1467,23 +1467,22 @@ TEST_F(StreamConfigTest, InitialDelay) {
   auto created_ring_buffer = false;
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [&created_ring_buffer](
-          fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>
-              result) {
+      [&created_ring_buffer](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
+                                               Device::RingBufferInfo>& result) {
         EXPECT_TRUE(result.is_ok());
         created_ring_buffer = true;
       });
   EXPECT_TRUE(connected_to_ring_buffer_fidl);
   RunLoopUntilIdle();
 
-  // Validate that the device received the expected values.
+  // Verify that the device received the expected values.
   EXPECT_TRUE(created_ring_buffer);
   ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_element_id()));
   ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_element_id())->internal_delay());
   EXPECT_FALSE(DeviceDelayInfo(device, ring_buffer_element_id())->external_delay());
   EXPECT_EQ(*DeviceDelayInfo(device, ring_buffer_element_id())->internal_delay(), 0);
 
-  // Validate that the ControlNotify was sent the expected values.
+  // Verify that the ControlNotify was sent the expected values.
   ASSERT_TRUE(notify()->delay_info()) << "ControlNotify was not notified of initial delay info";
   ASSERT_TRUE(notify()->delay_info()->internal_delay());
   EXPECT_FALSE(notify()->delay_info()->external_delay());
@@ -1499,9 +1498,8 @@ TEST_F(StreamConfigTest, DynamicDelay) {
   auto created_ring_buffer = false;
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [&created_ring_buffer](
-          fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>
-              result) {
+      [&created_ring_buffer](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
+                                               Device::RingBufferInfo>& result) {
         EXPECT_TRUE(result.is_ok());
         created_ring_buffer = true;
       });

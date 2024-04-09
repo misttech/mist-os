@@ -185,7 +185,7 @@ TEST_F(ControlServerCodecTest, ControlCreatorServerShutdownDoesNotAffectControl)
   (void)control_client.UnbindMaybeGetEndpoint();
 }
 
-// Validate that the ControlServer shuts down cleanly if the driver drops its Codec.
+// Verify that the ControlServer shuts down cleanly if the driver drops its Codec.
 TEST_F(ControlServerCodecTest, CodecDropCausesCleanControlServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -225,7 +225,7 @@ TEST_F(ControlServerCodecTest, SetDaiFormat) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->state());
-        EXPECT_EQ(ValidateCodecFormatInfo(*result->state()), ZX_OK);
+        EXPECT_TRUE(ValidateCodecFormatInfo(*result->state()));
       });
 
   RunLoopUntilIdle();
@@ -469,7 +469,7 @@ TEST_F(ControlServerCompositeTest, ControlCreatorServerShutdownDoesNotAffectCont
   (void)control_client.UnbindMaybeGetEndpoint();
 }
 
-// Validate that the ControlServer shuts down cleanly if the driver drops its Composite.
+// Verify that the ControlServer shuts down cleanly if the driver drops its Composite.
 TEST_F(ControlServerCompositeTest, CompositeDropCausesCleanControlServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -597,7 +597,7 @@ TEST_F(ControlServerCompositeTest, CreateRingBuffer) {
   EXPECT_EQ(ControlServer::count(), 1u);
 }
 
-// Validate that the Control lives, even if the client drops its child RingBuffer.
+// Verify that the Control lives, even if the client drops its child RingBuffer.
 TEST_F(ControlServerCompositeTest, ClientRingBufferDropDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -652,7 +652,7 @@ TEST_F(ControlServerCompositeTest, ClientRingBufferDropDoesNotAffectControl) {
   EXPECT_EQ(ControlServer::count(), 1u);
 }
 
-// Validate that the Control lives, even if the driver drops its RingBuffer connection.
+// Verify that the Control lives, even if the driver drops its RingBuffer connection.
 TEST_F(ControlServerCompositeTest, DriverRingBufferDropDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -873,7 +873,7 @@ TEST_F(ControlServerStreamConfigTest, ControlCreatorServerShutdownDoesNotAffectC
   (void)control_client.UnbindMaybeGetEndpoint();
 }
 
-// Validate that the ControlServer shuts down cleanly if the driver drops its StreamConfig.
+// Verify that the ControlServer shuts down cleanly if the driver drops its StreamConfig.
 TEST_F(ControlServerStreamConfigTest, StreamConfigDropCausesCleanControlServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
@@ -923,7 +923,7 @@ TEST_F(ControlServerStreamConfigTest, StreamConfigDropCausesCleanControlServerSh
   EXPECT_TRUE(control->server().WaitForShutdown(zx::sec(5)));
 }
 
-// Validate that the Control lives, even if the client drops its child RingBuffer.
+// Verify that the Control lives, even if the client drops its child RingBuffer.
 TEST_F(ControlServerStreamConfigTest, ClientRingBufferDropDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
@@ -981,7 +981,7 @@ TEST_F(ControlServerStreamConfigTest, ClientRingBufferDropDoesNotAffectControl) 
   EXPECT_EQ(ControlServer::count(), 1u);
 }
 
-// Validate that the Control lives, even if the driver drops its RingBuffer connection.
+// Verify that the Control lives, even if the driver drops its RingBuffer connection.
 TEST_F(ControlServerStreamConfigTest, DriverRingBufferDropDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
@@ -1036,7 +1036,7 @@ TEST_F(ControlServerStreamConfigTest, DriverRingBufferDropDoesNotAffectControl) 
   EXPECT_EQ(ControlServer::count(), 1u);
 }
 
-// Validate that the ControlServer shuts down cleanly if the driver drops its StreamConfig.
+// Verify that the ControlServer shuts down cleanly if the driver drops its StreamConfig.
 TEST_F(ControlServerStreamConfigTest, SetGain) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
