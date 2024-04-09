@@ -1013,9 +1013,9 @@ def get_type_by_identifier(ident: str, loader_ir, recurse_guard=None) -> type:
         )
         if ty == "const":
             # This line might not actually be possible to hit.
-            mod.export_const(ty_definition)
+            mod._export_const(ty_definition)
         else:
-            mod.export_type(ty_definition)
+            mod._export_type(ty_definition)
     return getattr(mod, member_name)
 
 
@@ -1042,66 +1042,66 @@ class FIDLLibraryModule(types.ModuleType):
         )
         self.__all__: List[str] = []
 
-        self.export_bits()
-        self.export_experimental_resources()
-        self.export_enums()
-        self.export_structs()
-        self.export_tables()
-        self.export_unions()
-        self.export_consts()
-        self.export_aliases()
-        self.export_protocols()
+        self._export_bits()
+        self._export_experimental_resources()
+        self._export_enums()
+        self._export_structs()
+        self._export_tables()
+        self._export_unions()
+        self._export_consts()
+        self._export_aliases()
+        self._export_protocols()
 
-    def export_protocols(self):
+    def _export_protocols(self):
         for decl in self.__ir__.protocol_declarations():
             if decl.name() not in self.__all__:
-                self.export_type(protocol_type(decl, self.__ir__))
+                self._export_type(protocol_type(decl, self.__ir__))
 
-    def export_structs(self):
+    def _export_structs(self):
         for decl in self.__ir__.struct_declarations():
             if decl.name() not in self.__all__:
-                self.export_type(struct_type(decl, self.__ir__))
+                self._export_type(struct_type(decl, self.__ir__))
 
-    def export_tables(self):
+    def _export_tables(self):
         for decl in self.__ir__.table_declarations():
             if decl.name() not in self.__all__:
-                self.export_type(table_type(decl, self.__ir__))
+                self._export_type(table_type(decl, self.__ir__))
 
-    def export_experimental_resources(self):
+    def _export_experimental_resources(self):
         for decl in self.__ir__.experimental_resource_declarations():
             if decl.name() not in self.__all__:
-                self.export_type(experimental_resource_type(decl, self.__ir__))
+                self._export_type(experimental_resource_type(decl, self.__ir__))
 
-    def export_bits(self):
+    def _export_bits(self):
         for decl in self.__ir__.bits_declarations():
             if decl.name() not in self.__all__:
-                self.export_type(bits_type(decl))
+                self._export_type(bits_type(decl))
 
-    def export_enums(self):
+    def _export_enums(self):
         for decl in self.__ir__.enum_declarations():
             if decl.name() not in self.__all__:
-                self.export_type(enum_type(decl))
+                self._export_type(enum_type(decl))
 
-    def export_consts(self):
+    def _export_consts(self):
         for decl in self.__ir__.const_declarations():
             if decl.name() not in self.__all__:
-                self.export_fidl_const(const_declaration(decl, self.__ir__))
+                self._export_fidl_const(const_declaration(decl, self.__ir__))
 
-    def export_aliases(self):
+    def _export_aliases(self):
         for decl in self.__ir__.alias_declarations():
             if decl.name() not in self.__all__:
-                self.export_type(alias_declaration(decl, self.__ir__))
+                self._export_type(alias_declaration(decl, self.__ir__))
 
-    def export_unions(self):
+    def _export_unions(self):
         for decl in self.__ir__.union_declarations():
             if decl.name() not in self.__all__:
-                self.export_type(union_type(decl, self.__ir__))
+                self._export_type(union_type(decl, self.__ir__))
 
-    def export_fidl_const(self, c):
+    def _export_fidl_const(self, c):
         setattr(self, c.name, c.value)
         self.__all__.append(c.name)
 
-    def export_type(self, t):
+    def _export_type(self, t):
         def encode_func(obj):
             library = obj.__module__
             library = library.removeprefix("fidl.")
