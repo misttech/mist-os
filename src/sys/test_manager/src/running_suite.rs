@@ -871,9 +871,6 @@ async fn get_realm(
                 .capability(
                     Capability::event_stream("capability_requested").with_scope(test_root.clone()),
                 )
-                .capability(
-                    Capability::event_stream("directory_ready").with_scope(test_root.clone()),
-                )
                 .from(Ref::parent())
                 .to(&archivist),
         )

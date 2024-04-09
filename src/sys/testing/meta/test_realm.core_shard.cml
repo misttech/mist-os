@@ -51,7 +51,6 @@
                 "capability_requested",
                 "debug_started",
                 "destroyed",
-                "directory_ready",
                 "discovered",
                 "started",
                 "stopped",

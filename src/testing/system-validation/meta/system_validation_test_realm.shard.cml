@@ -62,7 +62,6 @@
         {
             event_stream: [
                 "capability_requested",
-                "directory_ready",
                 "started",
                 "stopped",
             ],

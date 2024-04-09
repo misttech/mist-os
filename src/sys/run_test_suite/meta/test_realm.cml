@@ -32,11 +32,6 @@
             environment: "#realm_builder_env",
             durability: "transient",
         },
-        {
-            name: "no_directory_ready_event",
-            environment: "#realm_builder_env",
-            durability: "transient",
-        },
     ],
     offer: [
         {
@@ -50,34 +45,16 @@
             to: [ "#echo_server" ],
         },
         {
-            event_stream: [
-                "capability_requested",
-                "directory_ready",
-            ],
+            event_stream: [ "capability_requested" ],
             from: "parent",
             to: "#echo_test_coll",
             scope: "#echo_test_coll",
         },
         {
-            event_stream: [
-                "capability_requested",
-                "directory_ready",
-            ],
+            event_stream: [ "capability_requested" ],
             from: "parent",
             to: "#hermetic_test_coll",
             scope: "#hermetic_test_coll",
-        },
-        {
-            event_stream: [ "capability_requested" ],
-            from: "parent",
-            to: "#no_directory_ready_event",
-            scope: "#no_directory_ready_event",
-        },
-        {
-            event_stream: [ "directory_ready" ],
-            from: "parent",
-            to: "#no_capability_requested_event",
-            scope: "#no_capability_requested_event",
         },
     ],
     expose: [

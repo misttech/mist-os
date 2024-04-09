@@ -23,12 +23,11 @@ struct CollectionData {
 #[derive(Default)]
 struct RequiredEventStreams {
     capability_requested: bool,
-    directory_ready: bool,
 }
 
 impl RequiredEventStreams {
     fn validate(&self) -> bool {
-        self.capability_requested && self.directory_ready
+        self.capability_requested
     }
 }
 
@@ -57,7 +56,7 @@ impl AboveRootCapabilitiesForTest {
             Some(c) if !c.required_event_streams.validate() => {
                 return Err(format_err!(
                     "The collection `{collection}` must be routed the events \
-                `capability_requested` and `directory_ready` from `parent` scoped \
+                `capability_requested` from `parent` scoped \
                 to it"
                 ));
             }
@@ -170,14 +169,11 @@ impl AboveRootCapabilitiesForTest {
                     // collection scoped to it.
                     let coll_ref =
                         fdecl::Ref::Collection(fdecl::CollectionRef { name: name.clone() });
-                    if (target_name == "capability_requested" || target_name == "directory_ready")
+                    if target_name == "capability_requested"
                         && matches!(source, fdecl::Ref::Parent(_))
                         && scope.map(|s| s.contains(&coll_ref)).unwrap_or(false)
                     {
                         let entry = collection_data.get_mut(name.as_str()).unwrap();
-                        entry.required_event_streams.directory_ready =
-                            entry.required_event_streams.directory_ready
-                                || target_name == "directory_ready";
                         entry.required_event_streams.capability_requested =
                             entry.required_event_streams.capability_requested
                                 || target_name == "capability_requested";

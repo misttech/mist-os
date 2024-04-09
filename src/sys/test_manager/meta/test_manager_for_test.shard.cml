@@ -25,7 +25,6 @@
             event_stream: [
                 "capability_requested",
                 "destroyed",
-                "directory_ready",
                 "started",
                 "stopped",
             ],

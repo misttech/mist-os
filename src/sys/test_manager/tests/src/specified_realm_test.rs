@@ -44,16 +44,10 @@ fn connect_realm() -> Result<ClientEnd<fcomponent::RealmMarker>, Error> {
 }
 
 fn default_event_offers() -> Vec<fdecl::Offer> {
-    vec![
-        fdecl::Offer::EventStream(fdecl::OfferEventStream {
-            target_name: Some("capability_requested".to_string()),
-            ..Default::default()
-        }),
-        fdecl::Offer::EventStream(fdecl::OfferEventStream {
-            target_name: Some("directory_ready".to_string()),
-            ..Default::default()
-        }),
-    ]
+    vec![fdecl::Offer::EventStream(fdecl::OfferEventStream {
+        target_name: Some("capability_requested".to_string()),
+        ..Default::default()
+    })]
 }
 
 async fn run_test_in_echo_test_realm(

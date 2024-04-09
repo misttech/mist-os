@@ -33,19 +33,13 @@
     ],
     offer: [
         {
-            event_stream: [
-                "capability_requested",
-                "directory_ready",
-            ],
+            event_stream: [ "capability_requested" ],
             from: "parent",
             to: "#test_realm",
             scope: "#test_realm",
         },
         {
-            event_stream: [
-                "capability_requested",
-                "directory_ready",
-            ],
+            event_stream: [ "capability_requested" ],
             from: "parent",
             to: "#no_realm_protocol_realm",
             scope: "#no_realm_protocol_realm",

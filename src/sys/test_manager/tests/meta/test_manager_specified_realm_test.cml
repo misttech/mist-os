@@ -33,10 +33,7 @@
     ],
     offer: [
         {
-            event_stream: [
-                "capability_requested",
-                "directory_ready",
-            ],
+            event_stream: [ "capability_requested" ],
             from: "parent",
             to: "#test_realm",
             scope: "#test_realm",

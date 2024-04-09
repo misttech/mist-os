@@ -75,7 +75,6 @@ async fn run_test(
                 .capability(Capability::event_stream("stopped"))
                 .capability(Capability::event_stream("destroyed"))
                 .capability(Capability::event_stream("capability_requested"))
-                .capability(Capability::event_stream("directory_ready"))
                 .from(Ref::parent())
                 .to(&test_manager),
         )

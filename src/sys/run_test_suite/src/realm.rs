@@ -216,7 +216,7 @@ mod test {
 
         let offers = realm.offers.into_iter().map(|o| o.fidl_into_native()).collect::<Vec<_>>();
         // LogSink & InspectSink are offered to all children
-        assert_eq!(offers.len(), 5, "{:?}", offers);
+        assert_eq!(offers.len(), 4, "{:?}", offers);
         offers.iter().for_each(|o| {
             assert_eq!(
                 o.target(),
@@ -239,7 +239,7 @@ mod test {
 
         let offers = realm.offers.into_iter().map(|o| o.fidl_into_native()).collect::<Vec<_>>();
         // LogSink & InspectSink are offered to all children.
-        assert_eq!(offers.len(), 4, "{:?}", offers);
+        assert_eq!(offers.len(), 3, "{:?}", offers);
         offers.iter().for_each(|o| {
             assert_eq!(
                 o.target(),

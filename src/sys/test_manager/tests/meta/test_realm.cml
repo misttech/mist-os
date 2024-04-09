@@ -44,19 +44,13 @@
             ],
         },
         {
-            event_stream: [
-                "capability_requested",
-                "directory_ready",
-            ],
+            event_stream: [ "capability_requested" ],
             from: "parent",
             to: "#echo_test_coll",
             scope: "#echo_test_coll",
         },
         {
-            event_stream: [
-                "capability_requested",
-                "directory_ready",
-            ],
+            event_stream: [ "capability_requested" ],
             from: "parent",
             to: "#hermetic_test_coll",
             scope: "#hermetic_test_coll",
