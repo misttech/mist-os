@@ -12,6 +12,13 @@
                     "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.ETH",
                     "fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID": "0"
                 }
+            },
+            {
+                "name": "Match devicetree",
+                "expected": "match",
+                "device": {
+                    "fuchsia.devicetree.FIRST_COMPATIBLE": "\"amlogic,ethernet-phy\""
+                }
             }
         ]
     },

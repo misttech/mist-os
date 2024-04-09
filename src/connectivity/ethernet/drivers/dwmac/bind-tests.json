@@ -11,6 +11,13 @@
                     "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.designware.platform.BIND_PLATFORM_DEV_DID.ETH_MAC",
                     "fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID": "0"
                 }
+            },
+            {
+                "name": "Match devicetree",
+                "expected": "match",
+                "device": {
+                    "fuchsia.devicetree.FIRST_COMPATIBLE": "\"amlogic,meson-g12a-dwmac\""
+                }
             }
         ]
     },

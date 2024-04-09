@@ -16,6 +16,25 @@
 		#size-cells = <2>;
 		ranges;
 
+		dwmac@ff3f0000 {
+			compatible = "amlogic,meson-g12a-dwmac";
+			reg = <0x0 0xff3f0000 0x0 0x10000>;
+			interrupts = <GIC_SPI 8 GIC_IRQ_MODE_LEVEL_HIGH>;
+			phys = <&ethmac>;
+			iommus = <&dummy_iommu 8>;
+			boot-metadata = <0x43414D6D 0>; /*DEVICE_METADATA_MAC_ADDRESS*/
+		};
+
+		ethmac: ethernet-phy@ff634000 {
+			compatible = "amlogic,ethernet-phy";
+			reg = <0x0 0xff634000 0x0 0x1000>,
+				<0x0 0xff63c000 0x0 0x2000>;
+			gpios = <&gpio A311D_GPIOZ(14) 0>;
+			gpio-names = "ETH_INTERRUPT";
+			pinctrl-0 = <&ethernet_phy_cfg>;
+			#phy-cells = <0>;
+		};
+
 		gpio: gpio-controller@ff634400 {
 			compatible = "amlogic,meson-g12a-gpio";
 			reg = <0x0 A311D_GPIO_BASE 0x0 A311D_GPIO_LENGTH>,
@@ -99,6 +118,16 @@
 				pins = <A311D_GPIOC(5)>;
 				function = <0 1>;
 			};
+
+			ethernet_phy_cfg: ethernet-phy-cfg {
+				pins = <A311D_GPIOZ(0) A311D_GPIOZ(1) A311D_GPIOZ(2) A311D_GPIOZ(3)>,
+					<A311D_GPIOZ(4) A311D_GPIOZ(5) A311D_GPIOZ(6) A311D_GPIOZ(7)>,
+					<A311D_GPIOZ(8) A311D_GPIOZ(9) A311D_GPIOZ(10) A311D_GPIOZ(11)>,
+					<A311D_GPIOZ(12) A311D_GPIOZ(13)>;
+				function = <0 1>;
+				drive-strength-microamp = <0 2500>;
+			};
+
 		};
 
 		cpu_temp: temperature-sensor@ff634800 {

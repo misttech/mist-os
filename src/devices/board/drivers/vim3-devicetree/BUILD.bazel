@@ -34,6 +34,7 @@ fuchsia_package_resource_collection(
         "@internal_sdk//pkg/devicetree-arm-gicv2",
         "@internal_sdk//pkg/devicetree-clockimpl-visitor",
         "@internal_sdk//pkg/devicetree-dwc2-visitor",
+        "@internal_sdk//pkg/devicetree-ethernet-phy-visitor",
         "@internal_sdk//pkg/devicetree-gpioimpl-visitor",
         "@internal_sdk//pkg/devicetree-i2c-bus-visitor",
         "@internal_sdk//pkg/devicetree-mali-gpu-visitor",
