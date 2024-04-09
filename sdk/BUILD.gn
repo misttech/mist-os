@@ -144,9 +144,16 @@ idk_archive("final_fuchsia_idk.archive") {
 }
 
 group("final_fuchsia_idk.validation") {
-  deps = [ ":final_fuchsia_idk_manifest_golden" ]
+  deps = []
   if (host_os == "linux") {
     deps += [
+      # Not everything builds on the mac builders, so not everything shows up in
+      # the golden files.
+      #
+      # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac
+      # builders are inconsistent.
+      ":final_fuchsia_idk_manifest_golden",
+
       # Run the Bazel SDK test suite against the final exported directory,
       # TODO(https://fxbug.dev/42075205): Make the Bazel SDK test suite runnable on MacOS!
       "//build/bazel/bazel_sdk:bazel_sdk_tests_idk",
