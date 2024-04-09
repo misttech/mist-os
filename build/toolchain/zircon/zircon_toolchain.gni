@@ -652,9 +652,9 @@ template("zircon_toolchain") {
               rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
             ] + _link_rbe_exec_strategy_flags +
             [
-              "--label_toolname=$dump_syms",
+              "--label_toolname=$breakpad_dump_syms",
               "--inputs",  # specify executable, due to log_it wrapper
-              "$dump_syms,\"$unstripped_outfile\"",
+              "$breakpad_dump_syms,\"$unstripped_outfile\"",
               "--output_files",
               "\"$breakpad_outfile\"",
               "--preserve_unchanged_output_mtime",
