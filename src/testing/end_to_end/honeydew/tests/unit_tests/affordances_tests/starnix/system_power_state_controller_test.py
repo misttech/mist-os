@@ -59,17 +59,55 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
 
     @mock.patch.object(
         starnix_system_power_state_controller.SystemPowerStateController,
+        "_verify_suspend_resume",
+        autospec=True,
+    )
+    @mock.patch.object(
+        starnix_system_power_state_controller.SystemPowerStateController,
         "_run_starnix_console_shell_cmd",
         autospec=True,
     )
     def test_suspend_resume_to_do_idle_suspend_auto_resume(
-        self, mock_run_starnix_console_shell_cmd
+        self, mock_run_starnix_console_shell_cmd, mock_verify_suspend_resume
     ) -> None:
         """Test case for SystemPowerStateController.suspend_resume()"""
         self.system_power_state_controller_obj.suspend_resume(
             suspend_state=system_power_state_controller_interface.IdleSuspend(),
             resume_mode=system_power_state_controller_interface.AutomaticResume(),
         )
+
+        mock_run_starnix_console_shell_cmd.assert_called_once_with(
+            mock.ANY,
+            cmd=starnix_system_power_state_controller._StarnixCmds.IDLE_SUSPEND,
+            timeout=None,
+        )
+        mock_verify_suspend_resume.assert_called_once_with(
+            mock.ANY,
+            suspend_state=system_power_state_controller_interface.IdleSuspend(),
+            resume_mode=system_power_state_controller_interface.AutomaticResume(),
+            duration=mock.ANY,
+        )
+
+    @mock.patch.object(
+        starnix_system_power_state_controller.SystemPowerStateController,
+        "_run_starnix_console_shell_cmd",
+        autospec=True,
+    )
+    def test_verify_suspend_resume_for_idle_suspend_auto_resume(
+        self, mock_run_starnix_console_shell_cmd
+    ) -> None:
+        """Test case for SystemPowerStateController._verify_suspend_resume()
+        raising an exception."""
+        with self.assertRaisesRegex(
+            errors.SystemPowerStateControllerError,
+            "Putting the 'fuchsia-emulator' into 'IdleSuspend' followed by "
+            "'AutomaticResume after .+sec' operation took .+ seconds instead "
+            "of .+ seconds",
+        ):
+            self.system_power_state_controller_obj.suspend_resume(
+                suspend_state=system_power_state_controller_interface.IdleSuspend(),
+                resume_mode=system_power_state_controller_interface.AutomaticResume(),
+            )
 
         mock_run_starnix_console_shell_cmd.assert_called_once_with(
             mock.ANY,

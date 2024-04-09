@@ -6,6 +6,7 @@
 
 import abc
 from dataclasses import dataclass
+from typing import ClassVar
 
 
 @dataclass(frozen=True)
@@ -28,10 +29,12 @@ class ResumeMode(abc.ABC):
 
 @dataclass(frozen=True)
 class AutomaticResume(ResumeMode):
-    """Automatically resume after 10sec"""
+    """Automatically resume after 5sec"""
+
+    duration: ClassVar[float] = 5
 
     def __str__(self) -> str:
-        return "AutomaticResume after 10sec"
+        return f"AutomaticResume after {self.duration}sec"
 
 
 @dataclass(frozen=True)

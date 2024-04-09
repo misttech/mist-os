@@ -10,6 +10,7 @@ import os
 import pty
 import re
 import subprocess
+import time
 from typing import Any
 
 from honeydew import errors
@@ -115,6 +116,8 @@ class SystemPowerStateController(
             resume_mode,
         )
 
+        start_time: float = time.time()
+
         if isinstance(
             resume_mode, system_power_state_controller_interface.AutomaticResume
         ):
@@ -135,11 +138,17 @@ class SystemPowerStateController(
                 f"supported."
             )
 
+        end_time: float = time.time()
+        duration: float = end_time - start_time
+
+        self._verify_suspend_resume(suspend_state, resume_mode, duration)
+
         _LOGGER.info(
-            "Successfully completed '%s' and '%s' operations on '%s'",
+            "Successfully completed '%s' and '%s' operations on '%s' in '%s' seconds",
             suspend_state,
             resume_mode,
             self._device_name,
+            duration,
         )
 
     def idle_suspend_auto_resume(self) -> None:
@@ -239,3 +248,42 @@ class SystemPowerStateController(
                 f"Starnix console cmd `{starnix_cmd_str}` failed. (See debug "
                 "logs for command output)"
             )
+
+    def _verify_suspend_resume(
+        self,
+        suspend_state: system_power_state_controller_interface.SuspendState,
+        resume_mode: system_power_state_controller_interface.ResumeMode,
+        duration: float,
+    ) -> None:
+        """Verifies suspend resume operation has been indeed performed
+        correctly.
+
+        Args:
+            suspend_state: Which state to suspend the Fuchsia device into.
+            resume_mode: Information about how to resume the device.
+            duration: how long suspend-resume operation took.
+
+        Raises:
+            errors.SystemPowerStateControllerError: In case of verification
+                failure.
+        """
+        if isinstance(
+            resume_mode, system_power_state_controller_interface.AutomaticResume
+        ):
+            buffer_duration: float = 5
+            max_expected_duration: float = (
+                resume_mode.duration + buffer_duration
+            )
+            actual_duration: float = duration
+
+            if (
+                actual_duration < resume_mode.duration
+                or actual_duration > max_expected_duration
+            ):
+                raise errors.SystemPowerStateControllerError(
+                    f"Putting the '{self._device_name}' into '{suspend_state}' "
+                    f"followed by '{resume_mode}' operation took {duration} "
+                    f"seconds instead of {resume_mode.duration} seconds. "
+                    f"Expected duration range: [{resume_mode.duration}, "
+                    f"{max_expected_duration}] seconds.",
+                )
