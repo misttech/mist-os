@@ -9,7 +9,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/irq.h>
-#include <lib/ddk/device.h>
 #include <lib/fit/function.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
@@ -22,6 +21,8 @@
 #include <memory>
 
 #include <fbl/mutex.h>
+
+#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -46,7 +47,7 @@ class HotPlugDetection {
   // `on_state_change` is called when the HPD pin state changes. The initial
   // state is HPD not detected. The target call must outlive the newly created
   // HotPlugDetection instance. The target may be called on an arbitrary thread.
-  static zx::result<std::unique_ptr<HotPlugDetection>> Create(zx_device_t* parent,
+  static zx::result<std::unique_ptr<HotPlugDetection>> Create(display::Namespace& incoming,
                                                               OnStateChangeHandler on_state_change);
 
   // Production code should prefer the Create() factory method.

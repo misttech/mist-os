@@ -16,7 +16,6 @@
 #include <cstdint>
 #include <memory>
 
-#include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"

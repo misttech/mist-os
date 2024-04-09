@@ -14,7 +14,6 @@
 #include <zircon/assert.h>
 #include <zircon/status.h>
 
-#include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
@@ -74,14 +73,14 @@ DsiHost::DsiHost(uint32_t panel_type, const PanelConfig* panel_config,
 }
 
 // static
-zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32_t panel_type,
+zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(display::Namespace& incoming,
+                                                     uint32_t panel_type,
                                                      const PanelConfig* panel_config) {
   ZX_DEBUG_ASSERT(panel_config != nullptr);
 
   static const char kLcdGpioFragmentName[] = "gpio-lcd-reset";
   zx::result lcd_reset_gpio_result =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
-          parent, kLcdGpioFragmentName);
+      incoming.Connect<fuchsia_hardware_gpio::Service::Device>(kLcdGpioFragmentName);
   if (lcd_reset_gpio_result.is_error()) {
     zxlogf(ERROR, "Failed to get gpio protocol from fragment: %s", kLcdGpioFragmentName);
     return lcd_reset_gpio_result.take_error();
@@ -91,8 +90,7 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
 
   static constexpr char kPdevFragmentName[] = "pdev";
   zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-          fuchsia_hardware_platform_device::Service::Device>(parent, kPdevFragmentName);
+      incoming.Connect<fuchsia_hardware_platform_device::Service::Device>(kPdevFragmentName);
   if (pdev_result.is_error()) {
     zxlogf(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
     return pdev_result.take_error();
@@ -124,7 +122,7 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
       std::move(designware_dsi_host_controller_result).value();
 
   zx::result<std::unique_ptr<Lcd>> lcd_result =
-      Lcd::Create(parent, panel_type, panel_config, designware_dsi_host_controller.get(),
+      Lcd::Create(incoming, panel_type, panel_config, designware_dsi_host_controller.get(),
                   kBootloaderDisplayEnabled);
   if (lcd_result.is_error()) {
     zxlogf(ERROR, "Failed to Create Lcd: %s", lcd_result.status_string());

@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 #include <unistd.h>
@@ -18,21 +17,20 @@
 #include <memory>
 #include <utility>
 
-#include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
 #include "src/graphics/display/drivers/amlogic-display/irq-handler-loop-util.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
 // static
 zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(
-    zx_device_t* parent, HotPlugDetection::OnStateChangeHandler on_state_change) {
+    display::Namespace& incoming, HotPlugDetection::OnStateChangeHandler on_state_change) {
   static const char kHpdGpioFragmentName[] = "gpio-hdmi-hotplug-detect";
   zx::result<fidl::ClientEnd<fuchsia_hardware_gpio::Gpio>> pin_gpio_result =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
-          parent, kHpdGpioFragmentName);
+      incoming.Connect<fuchsia_hardware_gpio::Service::Device>(kHpdGpioFragmentName);
   if (pin_gpio_result.is_error()) {
     zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", kHpdGpioFragmentName,
            pin_gpio_result.status_string());

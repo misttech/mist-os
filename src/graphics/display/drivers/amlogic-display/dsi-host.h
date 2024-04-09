@@ -18,6 +18,7 @@
 #include "src/graphics/display/drivers/amlogic-display/mipi-phy.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -32,7 +33,8 @@ class DsiHost {
   // `panel_config` must be non-null and must outlive the `DsiHost` instance.
   //
   // Returns a non-null pointer to the DsiHost instance on success.
-  static zx::result<std::unique_ptr<DsiHost>> Create(zx_device_t* parent, uint32_t panel_type,
+  static zx::result<std::unique_ptr<DsiHost>> Create(display::Namespace& incoming,
+                                                     uint32_t panel_type,
                                                      const PanelConfig* panel_config);
 
   // Production code should prefer using the `Create()` factory method.

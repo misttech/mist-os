@@ -12,7 +12,6 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
-#include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
@@ -25,6 +24,7 @@
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller-impl.h"
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -181,11 +181,10 @@ HdmiHost::HdmiHost(std::unique_ptr<HdmiTransmitter> hdmi_transmitter, fdf::MmioB
 }
 
 // static
-zx::result<std::unique_ptr<HdmiHost>> HdmiHost::Create(zx_device_t* parent) {
+zx::result<std::unique_ptr<HdmiHost>> HdmiHost::Create(display::Namespace& incoming) {
   static constexpr char kPdevFragmentName[] = "pdev";
   zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-          fuchsia_hardware_platform_device::Service::Device>(parent, kPdevFragmentName);
+      incoming.Connect<fuchsia_hardware_platform_device::Service::Device>(kPdevFragmentName);
   if (pdev_result.is_error()) {
     zxlogf(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
     return pdev_result.take_error();

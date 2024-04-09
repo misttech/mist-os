@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_LCD_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <lib/ddk/device.h>
 #include <lib/zx/result.h>
 
 #include <cstdint>
@@ -14,6 +13,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -33,7 +33,7 @@ class Lcd {
   // therefore safe to use when adopting a device previously initialized by
   // the bootloader or another driver.
   static zx::result<std::unique_ptr<Lcd>> Create(
-      zx_device_t* parent, uint32_t panel_type, const PanelConfig* panel_config,
+      display::Namespace& incoming, uint32_t panel_type, const PanelConfig* panel_config,
       designware_dsi::DsiHostController* designware_dsi_host_controller, bool enabled);
 
   // Production code should prefer using the `Create()` factory method.

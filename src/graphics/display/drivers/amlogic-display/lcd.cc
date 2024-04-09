@@ -6,7 +6,6 @@
 
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/mipi-dsi/mipi-dsi.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
@@ -19,11 +18,11 @@
 #include <array>
 #include <cstdint>
 
-#include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -152,16 +151,14 @@ zx::result<uint32_t> GetMipiDsiDisplayId(
 
 // static
 zx::result<std::unique_ptr<Lcd>> Lcd::Create(
-    zx_device_t* parent, uint32_t panel_type, const PanelConfig* panel_config,
+    display::Namespace& incoming, uint32_t panel_type, const PanelConfig* panel_config,
     designware_dsi::DsiHostController* designware_dsi_host_controller, bool enabled) {
-  ZX_DEBUG_ASSERT(parent != nullptr);
   ZX_DEBUG_ASSERT(panel_config != nullptr);
   ZX_DEBUG_ASSERT(designware_dsi_host_controller != nullptr);
 
   static constexpr char kLcdGpioFragmentName[] = "gpio-lcd-reset";
   zx::result<fidl::ClientEnd<fuchsia_hardware_gpio::Gpio>> lcd_reset_gpio_result =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
-          parent, kLcdGpioFragmentName);
+      incoming.Connect<fuchsia_hardware_gpio::Service::Device>(kLcdGpioFragmentName);
   if (lcd_reset_gpio_result.is_error()) {
     zxlogf(ERROR, "Failed to get gpio protocol from fragment: %s", kLcdGpioFragmentName);
     return lcd_reset_gpio_result.take_error();

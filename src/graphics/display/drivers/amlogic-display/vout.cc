@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
@@ -18,8 +17,6 @@
 #include <cstdint>
 #include <memory>
 
-#include <ddktl/device.h>
-#include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/clock.h"
@@ -29,6 +26,7 @@
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -73,9 +71,9 @@ Vout::Vout(std::unique_ptr<HdmiHost> hdmi_host, inspect::Node node)
   node_.RecordInt("vout_type", static_cast<int>(type()));
 }
 
-zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(zx_device_t* parent, uint32_t panel_type,
-                                                      uint32_t width, uint32_t height,
-                                                      inspect::Node node) {
+zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(display::Namespace& incoming,
+                                                      uint32_t panel_type, uint32_t width,
+                                                      uint32_t height, inspect::Node node) {
   zxlogf(INFO, "Fixed panel type is %d", panel_type);
   const PanelConfig* panel_config = GetPanelConfig(panel_type);
   if (panel_config == nullptr) {
@@ -84,7 +82,7 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(zx_device_t* parent, uint3
   }
 
   zx::result<std::unique_ptr<DsiHost>> dsi_host_result =
-      DsiHost::Create(parent, panel_type, panel_config);
+      DsiHost::Create(incoming, panel_type, panel_config);
   if (dsi_host_result.is_error()) {
     zxlogf(ERROR, "Could not create DSI host: %s", dsi_host_result.status_string());
     return dsi_host_result.take_error();
@@ -93,8 +91,7 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(zx_device_t* parent, uint3
 
   static constexpr char kPdevFragmentName[] = "pdev";
   zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-          fuchsia_hardware_platform_device::Service::Device>(parent, kPdevFragmentName);
+      incoming.Connect<fuchsia_hardware_platform_device::Service::Device>(kPdevFragmentName);
   if (pdev_result.is_error()) {
     zxlogf(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
     return pdev_result.take_error();
@@ -144,8 +141,9 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_t
   return zx::ok(std::move(vout));
 }
 
-zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(zx_device_t* parent, inspect::Node node) {
-  zx::result<std::unique_ptr<HdmiHost>> hdmi_host_result = HdmiHost::Create(parent);
+zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(display::Namespace& incoming,
+                                                       inspect::Node node) {
+  zx::result<std::unique_ptr<HdmiHost>> hdmi_host_result = HdmiHost::Create(incoming);
   if (hdmi_host_result.is_error()) {
     zxlogf(ERROR, "Could not create HDMI host: %s", hdmi_host_result.status_string());
     return hdmi_host_result.take_error();

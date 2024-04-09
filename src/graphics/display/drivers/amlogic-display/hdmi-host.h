@@ -15,6 +15,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -70,7 +71,7 @@ class HdmiHost {
   HdmiHost& operator=(const HdmiHost&) = delete;
   HdmiHost& operator=(HdmiHost&&) = delete;
 
-  static zx::result<std::unique_ptr<HdmiHost>> Create(zx_device_t* parent);
+  static zx::result<std::unique_ptr<HdmiHost>> Create(display::Namespace& incoming);
 
   zx_status_t HostOn();
   void HostOff();

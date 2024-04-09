@@ -1016,7 +1016,7 @@ zx_status_t DisplayEngine::SetupHotplugDisplayDetection() {
   ZX_DEBUG_ASSERT_MSG(!hot_plug_detection_, "HPD already set up");
 
   zx::result<std::unique_ptr<HotPlugDetection>> hot_plug_detection_result =
-      HotPlugDetection::Create(bus_device_,
+      HotPlugDetection::Create(incoming_,
                                fit::bind_member<&DisplayEngine::OnHotPlugStateChange>(this));
 
   if (hot_plug_detection_result.is_error()) {
@@ -1031,7 +1031,7 @@ zx_status_t DisplayEngine::InitializeHdmiVout() {
   ZX_DEBUG_ASSERT(vout_ == nullptr);
 
   zx::result<std::unique_ptr<Vout>> create_hdmi_vout_result =
-      Vout::CreateHdmiVout(bus_device_, root_node_.CreateChild("vout"));
+      Vout::CreateHdmiVout(incoming_, root_node_.CreateChild("vout"));
   if (!create_hdmi_vout_result.is_ok()) {
     zxlogf(ERROR, "Failed to initialize HDMI Vout device: %s",
            create_hdmi_vout_result.status_string());
@@ -1050,7 +1050,7 @@ zx_status_t DisplayEngine::InitializeMipiDsiVout(display_panel_t panel_info) {
   {
     fbl::AutoLock lock(&display_mutex_);
     zx::result<std::unique_ptr<Vout>> create_dsi_vout_result =
-        Vout::CreateDsiVout(bus_device_, panel_info.panel_type, panel_info.width, panel_info.height,
+        Vout::CreateDsiVout(incoming_, panel_info.panel_type, panel_info.width, panel_info.height,
                             root_node_.CreateChild("vout"));
     if (!create_dsi_vout_result.is_ok()) {
       zxlogf(ERROR, "Failed to initialize DSI Vout device: %s",
