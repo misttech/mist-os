@@ -82,38 +82,6 @@ kernel.shell has not already been launched. Defaults to false.
 If this is false, it also disables the zircon.autorun.boot and
 zircon.autorun.system options.
 
-## console.allowed\_log\_tags=\<tag\>,\<tag\>...
-
-Add a tag to the allow list. Log entries with matching tags will be output to
-the console. This takes precedent over tags passed via process args.
-
-## console.denied\_log\_tags=\<tag\>,\<tag\>...
-
-Add a tag to the deny list. Log entries with matching tags will be prevented
-from being printed the console. This takes precedent over tags passed via
-process args as well as the allow list.
-
-## driver.\<name>.disable
-
-Disables the driver with the given name. The driver name comes from the
-zircon\_driver\_info, and can be found as the first argument to the
-ZIRCON\_DRIVER\_BEGIN macro.
-
-Example: `driver.usb_audio.disable`
-
-## driver.\<name>.log=\<flags>
-
-Set the minimum log severity for a driver. The textual constants "error",
-"warn", "info", "debug", "trace", may be used, and they map to the corresponding
-bits in DDK\_LOG\_... in `ddk/debug.h`. If an unknown value is passed, the
-minimum log severity will be set to "trace". The default minimum log severity
-for a driver is "info".
-
-Note again that the name of the driver is the "Driver" argument to the
-ZIRCON\_DRIVER macro. It is not, for example, the name of the device, which for
-some drivers is almost identical, except that the device may be named "foo-bar"
-whereas the driver name must use underscores, e.g., "foo_bar".
-
 ## driver.\<name>.tests.enable=\<bool>
 
 Enable the unit tests for an individual driver. The unit tests will run before
@@ -124,16 +92,6 @@ Note again that the name of the driver is the "Driver" argument to the
 ZIRCON\_DRIVER macro. It is not, for example, the name of the device, which for
 some drivers is almost identical, except that the device may be named "foo-bar"
 whereas the driver name must use underscores, e.g., "foo_bar".
-
-## driver.amlogic_display.full_hardware_reset=\<bool>
-
-Most boot software performs basic display engine initialization, in order to
-show a splash screen or textual information. By default, Fuchsia display
-drivers seamlessly take over the display engine, avoiding display glitches
-and reducing boot time. When this option is true, the amlogic-display driver
-will perform a full hardware reset and reinitialize the hardware from scratch.
-This may eliminate display errors caused by bugs in the seamless takeover
-logic.
 
 ## driver.sysmem.contiguous_memory_size=\<num>
 
@@ -150,18 +108,6 @@ pool. Value is in bytes.
 Enable the unit tests for all drivers. The unit tests will run before the
 drivers bind any devices. It's also possible to enable tests for an individual
 driver, see `driver.\<name>.enable_tests`. The default is disabled.
-
-## driver.tracing.enable=\<bool>
-
-Enable or disable support for tracing drivers. When enabled drivers may
-participate in
-[Fuchsia tracing](/docs/development/drivers/diagnostics/tracing.md).
-
-Implementation-wise, what this option does is tell each devhost whether to
-register as "trace provider".
-
-The default is enabled. This options exists to provide a quick fallback should a
-problem arise.
 
 ### x64 specific values
 
@@ -236,16 +182,6 @@ also be mounted as `/system`.
 ## zircon.system.pkgfs.file.*path*=\<blobid>
 
 Used with [`zircon.system.pkgfs.cmd`](#zircon.system.pkgfs.cmd), above.
-
-## zircon.system.volume=\<arg>
-
-This option specifies where to find the "/system" volume.
-
-It may be set to: "any", in which case the first volume of the appropriate type
-will be used. "local" in which the first volume that's non-removable of the
-appropriate type will be used. "none" (default), which avoids mounting anything.
-
-A "/system" ramdisk provided by bootdata always supersedes this option.
 
 ## zircon.system.filesystem-check=\<bool>
 
