@@ -71,11 +71,15 @@
             to: "#archivist",
             availability: "optional",
         },
+
+        // For /boot/config/zxcrypt
         {
             directory: "boot",
             from: "parent",
+            as: "boot-config",
             to: "#miscsvc",
-            rights: [ "rx*" ],
+            rights: [ "r*" ],
+            subdir: "config",
         },
         {
             directory: "boot",

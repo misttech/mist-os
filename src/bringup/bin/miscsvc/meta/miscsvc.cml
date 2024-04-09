@@ -20,12 +20,11 @@
         },
     ],
     use: [
-        // For access to filesystem binaries under /boot/bin/ for mounting.
-        // For access to drivers under /boot/drivers/ for dynamic binding.
+        // For /boot/config/zxcrypt
         {
-            directory: "boot",
-            rights: [ "rx*" ],
-            path: "/boot",
+            directory: "boot-config",
+            rights: [ "r*" ],
+            path: "/boot/config",
         },
 
         // For block and skip-block device access.
