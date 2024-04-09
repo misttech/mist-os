@@ -526,7 +526,6 @@ func TestGenArgs(t *testing.T) {
 			},
 			expectedArgs: []string{
 				`select_variant=["thinlto",{variant="asan-fuzzer"}]`,
-				`thinlto_cache_dir="/cache/thinlto"`,
 			},
 		},
 		{

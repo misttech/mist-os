@@ -329,9 +329,6 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 
 	if len(staticSpec.Variants) != 0 {
 		vars["select_variant"] = staticSpec.Variants
-		if contains(staticSpec.Variants, "thinlto") {
-			vars["thinlto_cache_dir"] = filepath.Join(contextSpec.CacheDir, "thinlto")
-		}
 	}
 	if contextSpec.CollectCoverage && len(contextSpec.ChangedFiles) > 0 {
 		var profileSourceFiles []string
