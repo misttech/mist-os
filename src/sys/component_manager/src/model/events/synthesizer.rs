@@ -4,58 +4,38 @@
 
 use {
     crate::model::{
-        component::ComponentInstance,
         error::ModelError,
         events::{dispatcher::EventDispatcherScope, event::Event, registry::ComponentEventRoute},
         hooks::{Event as HookEvent, EventType},
-        model::Model,
     },
     ::routing::event::EventFilter,
-    async_trait::async_trait,
     cm_types::Name,
     cm_util::TaskGroup,
-    futures::{channel::mpsc, future::join_all, stream, SinkExt, StreamExt},
-    moniker::{ExtendedMoniker, Moniker, MonikerBase},
-    std::{
-        collections::{HashMap, HashSet},
-        sync::{Arc, Weak},
-    },
+    futures::{channel::mpsc, future::join_all, SinkExt},
+    moniker::ExtendedMoniker,
+    std::{collections::HashMap, sync::Arc},
     tracing::error,
 };
 
-/// A component instance or component manager itself
-pub enum ExtendedComponent {
-    ComponentManager,
-    ComponentInstance,
-}
-
 /// Implementors of this trait know how to synthesize an event.
-#[async_trait]
-pub trait EventSynthesisProvider: Send + Sync {
+pub trait ComponentManagerEventSynthesisProvider: Send + Sync {
     /// Provides a synthesized event applying the given `filter` under the given `component`.
-    async fn provide(&self, component: ExtendedComponent, filter: &EventFilter) -> Vec<HookEvent>;
+    fn provide(&self, filter: &EventFilter) -> Option<HookEvent>;
 }
 
 /// Synthesis manager.
+#[derive(Default)]
 pub struct EventSynthesizer {
-    /// A reference to the model.
-    model: Weak<Model>,
-
     /// Maps an event name to the provider for synthesis
-    providers: HashMap<Name, Arc<dyn EventSynthesisProvider>>,
+    providers: HashMap<Name, Arc<dyn ComponentManagerEventSynthesisProvider>>,
 }
 
 impl EventSynthesizer {
-    /// Creates a new event synthesizer.
-    pub fn new(model: Weak<Model>) -> Self {
-        Self { model, providers: HashMap::new() }
-    }
-
     /// Registers a new provider that will be used when synthesizing events of the type `event`.
     pub fn register_provider(
         &mut self,
         event: EventType,
-        provider: Arc<dyn EventSynthesisProvider>,
+        provider: Arc<dyn ComponentManagerEventSynthesisProvider>,
     ) {
         self.providers.insert(event.into(), provider);
     }
@@ -75,16 +55,13 @@ impl EventSynthesizer {
 /// Information about an event that will be synthesized.
 struct EventSynthesisInfo {
     /// The provider of the synthesized event.
-    provider: Arc<dyn EventSynthesisProvider>,
+    provider: Arc<dyn ComponentManagerEventSynthesisProvider>,
 
     /// The scopes under which the event will be synthesized.
     scopes: Vec<EventDispatcherScope>,
 }
 
 struct SynthesisTask {
-    /// A reference to the model.
-    model: Weak<Model>,
-
     /// The sender end of the channel where synthesized events will be sent.
     sender: mpsc::UnboundedSender<(Event, Option<Vec<ComponentEventRoute>>)>,
 
@@ -109,7 +86,7 @@ impl SynthesisTask {
                     .map(|scopes| EventSynthesisInfo { provider: provider.clone(), scopes })
             })
             .collect();
-        Self { model: synthesizer.model.clone(), sender, event_infos }
+        Self { sender, event_infos }
     }
 
     /// Spawns a task that will synthesize all events that were requested when creating the
@@ -119,19 +96,14 @@ impl SynthesisTask {
             return;
         }
         scope.spawn(async move {
-            // If we can't find the component then we can't synthesize events.
-            // This isn't necessarily an error as the model or component might've been
-            // destroyed in the intervening time, so we just exit early.
-            if let Some(model) = self.model.upgrade() {
-                let sender = self.sender;
-                let futs = self
-                    .event_infos
-                    .into_iter()
-                    .map(|event_info| Self::run(&model, sender.clone(), event_info));
-                for result in join_all(futs).await {
-                    if let Err(error) = result {
-                        error!(?error, "Event synthesis failed");
-                    }
+            let sender = self.sender;
+            let futs = self
+                .event_infos
+                .into_iter()
+                .map(|event_info| Self::run(sender.clone(), event_info));
+            for result in join_all(futs).await {
+                if let Err(error) = result {
+                    error!(?error, "Event synthesis failed");
                 }
             }
         });
@@ -143,96 +115,21 @@ impl SynthesisTask {
     /// (there's a provider for them). Those events will only be synthesized if their scope is
     /// within the scope of a Running scope.
     async fn run(
-        model: &Arc<Model>,
         mut sender: mpsc::UnboundedSender<(Event, Option<Vec<ComponentEventRoute>>)>,
         info: EventSynthesisInfo,
     ) -> Result<(), ModelError> {
-        let mut visited_components = HashSet::new();
         for scope in &info.scopes {
             // If the scope is component manager, synthesize the builtin events first and then
             // proceed to synthesize from the root and down.
-            let scope_moniker = match scope.moniker {
-                ExtendedMoniker::ComponentManager => {
+            if matches!(scope.moniker, ExtendedMoniker::ComponentManager) {
+                if let Some(event) = info.provider.provide(&scope.filter) {
+                    let event = Event { event, scope_moniker: scope.moniker.clone() };
                     // Ignore this error. This can occur when the event stream is closed in the
                     // middle of synthesis. We can finish synthesizing if an error happens.
-                    if let Err(_) = Self::send_events(
-                        &info.provider,
-                        &scope,
-                        ExtendedComponent::ComponentManager,
-                        &mut sender,
-                    )
-                    .await
-                    {
-                        return Ok(());
-                    }
-                    Moniker::root()
-                }
-                ExtendedMoniker::ComponentInstance(ref scope_moniker) => scope_moniker.clone(),
-            };
-            let root = model.root().find_and_maybe_resolve(&scope_moniker).await?;
-            let mut component_stream = get_subcomponents(root, visited_components.clone());
-            let mut tasks = vec![];
-            while let Some(component) = component_stream.next().await {
-                visited_components.insert(component.moniker.clone());
-                let provider = info.provider.clone();
-                let scope = scope.clone();
-                let mut sender = sender.clone();
-                tasks.push(fuchsia_async::Task::spawn(async move {
-                    let _ = Self::send_events(
-                        &provider,
-                        &scope,
-                        ExtendedComponent::ComponentInstance,
-                        &mut sender,
-                    )
-                    .await;
-                }));
-            }
-            futures::future::join_all(tasks).await;
-        }
-        Ok(())
-    }
-
-    async fn send_events(
-        provider: &Arc<dyn EventSynthesisProvider>,
-        scope: &EventDispatcherScope,
-        target_component: ExtendedComponent,
-        sender: &mut mpsc::UnboundedSender<(Event, Option<Vec<ComponentEventRoute>>)>,
-    ) -> Result<(), anyhow::Error> {
-        let events = provider.provide(target_component, &scope.filter).await;
-        for event in events {
-            let event = Event { event, scope_moniker: scope.moniker.clone() };
-            sender.send((event, None)).await?;
-        }
-        Ok(())
-    }
-}
-
-/// Returns all components that are under the given `root` component. Skips the ones whose moniker
-/// is contained in the `visited` set.  The visited set is included for early pruning of a tree
-/// branch.
-fn get_subcomponents(
-    root: Arc<ComponentInstance>,
-    visited: HashSet<Moniker>,
-) -> stream::BoxStream<'static, Arc<ComponentInstance>> {
-    let pending = vec![root];
-    stream::unfold((pending, visited), move |(mut pending, mut visited)| async move {
-        loop {
-            match pending.pop() {
-                None => return None,
-                Some(current) => {
-                    if visited.contains(&current.moniker) {
-                        continue;
-                    }
-                    if let Some(resolved_state) = current.lock_state().await.get_resolved_state() {
-                        for (_, child) in resolved_state.children() {
-                            pending.push(child.clone());
-                        }
-                    }
-                    visited.insert(current.moniker.clone());
-                    return Some((current, (pending, visited)));
+                    let _ = sender.send((event, None)).await;
                 }
             }
         }
-    })
-    .boxed()
+        Ok(())
+    }
 }

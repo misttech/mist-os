@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::model::{
-    events::synthesizer::{EventSynthesisProvider, ExtendedComponent},
+    events::synthesizer::ComponentManagerEventSynthesisProvider,
     hooks::{CapabilityReceiver, Event, EventPayload},
 };
 use async_trait::async_trait;
@@ -11,7 +11,7 @@ use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_inspect::InspectSinkMarker;
 use fuchsia_async::TaskGroup;
 use fuchsia_inspect::Inspector;
-use futures::lock::Mutex;
+use fuchsia_sync::Mutex;
 use inspect_runtime::{publish, PublishOptions};
 use moniker::Moniker;
 use routing::event::EventFilter;
@@ -22,7 +22,7 @@ use sandbox::Message;
 pub struct InspectSinkProvider {
     /// This keeps track of living servers for `fuchsia.inspect.Tree`. If archivist restarts,
     /// the existing servers will eventually die and a new one will be inserted here when
-    /// `EventSynthesisProvider::provide` is triggered on reconnect.
+    /// `ComponentManagerEventSynthesisProvider::provide` is triggered on reconnect.
     inspect_tree_server_tasks: Mutex<TaskGroup>,
     inspector: Inspector,
 }
@@ -38,38 +38,29 @@ impl InspectSinkProvider {
 }
 
 #[async_trait]
-impl EventSynthesisProvider for InspectSinkProvider {
-    async fn provide(&self, component: ExtendedComponent, filter: &EventFilter) -> Vec<Event> {
+impl ComponentManagerEventSynthesisProvider for InspectSinkProvider {
+    fn provide(&self, filter: &EventFilter) -> Option<Event> {
         if !filter.contains("name", vec![InspectSinkMarker::PROTOCOL_NAME.into()]) {
-            return vec![];
-        }
-
-        if !matches!(component, ExtendedComponent::ComponentManager) {
-            return vec![];
+            return None;
         }
 
         let (client, server) = fidl::endpoints::create_endpoints();
-
-        if let Some(server_task) =
+        let Some(server_task) =
             publish(&self.inspector, PublishOptions::default().on_inspect_sink_client(client))
-        {
-            self.inspect_tree_server_tasks.lock().await.add(server_task);
+        else {
+            return None;
+        };
+        self.inspect_tree_server_tasks.lock().add(server_task);
 
-            // this value is irrelevant, archivist won't do anything with it but it is part of
-            // the protocol
-            let Ok(source_moniker) = Moniker::try_from("parent") else {
-                return vec![];
-            };
-
-            let (receiver, sender) = CapabilityReceiver::new();
-            let _ = sender.send(Message { channel: server.into_channel() });
-            vec![Event::new_builtin(EventPayload::CapabilityRequested {
-                source_moniker,
-                name: InspectSinkMarker::PROTOCOL_NAME.into(),
-                receiver,
-            })]
-        } else {
-            vec![]
-        }
+        // this value is irrelevant, archivist won't do anything with it but it is part of
+        // the protocol
+        let source_moniker = Moniker::try_from("parent").unwrap();
+        let (receiver, sender) = CapabilityReceiver::new();
+        let _ = sender.send(Message { channel: server.into_channel() });
+        Some(Event::new_builtin(EventPayload::CapabilityRequested {
+            source_moniker,
+            name: InspectSinkMarker::PROTOCOL_NAME.into(),
+            receiver,
+        }))
     }
 }

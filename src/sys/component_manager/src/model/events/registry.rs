@@ -12,7 +12,7 @@ use {
                 dispatcher::{EventDispatcher, EventDispatcherScope},
                 error::EventsError,
                 stream::EventStream,
-                synthesizer::{EventSynthesisProvider, EventSynthesizer},
+                synthesizer::{ComponentManagerEventSynthesisProvider, EventSynthesizer},
             },
             hooks::{Event as ComponentEvent, EventType, HasEventType, Hook, HooksRegistration},
             model::Model,
@@ -139,7 +139,7 @@ impl ComponentEventRoute {
 
 impl EventRegistry {
     pub fn new(model: Weak<Model>) -> Self {
-        let event_synthesizer = EventSynthesizer::new(model.clone());
+        let event_synthesizer = EventSynthesizer::default();
         Self { model, dispatcher_map: Arc::new(Mutex::new(HashMap::new())), event_synthesizer }
     }
 
@@ -159,7 +159,7 @@ impl EventRegistry {
     pub fn register_synthesis_provider(
         &mut self,
         event: EventType,
-        provider: Arc<dyn EventSynthesisProvider>,
+        provider: Arc<dyn ComponentManagerEventSynthesisProvider>,
     ) {
         self.event_synthesizer.register_provider(event, provider);
     }
