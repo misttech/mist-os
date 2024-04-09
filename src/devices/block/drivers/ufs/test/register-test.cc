@@ -12,9 +12,9 @@ using RegisterTest = UfsTest;
 TEST_F(RegisterTest, HostCapabilities) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
   // Read only register
-  EXPECT_FALSE(CapabilityReg::Get().ReadFrom(&ufs_->GetMmio()).crtpto_support());
+  EXPECT_FALSE(CapabilityReg::Get().ReadFrom(&ufs_->GetMmio()).crypto_support());
   EXPECT_FALSE(
-      CapabilityReg::Get().ReadFrom(&ufs_->GetMmio()).uic_dme_test_mode_command_suppoort());
+      CapabilityReg::Get().ReadFrom(&ufs_->GetMmio()).uic_dme_test_mode_command_supported());
   EXPECT_FALSE(
       CapabilityReg::Get().ReadFrom(&ufs_->GetMmio()).out_of_order_data_delivery_supported());
   EXPECT_TRUE(CapabilityReg::Get().ReadFrom(&ufs_->GetMmio())._64_bit_addressing_supported());

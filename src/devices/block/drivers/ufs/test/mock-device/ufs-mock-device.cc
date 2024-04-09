@@ -120,6 +120,7 @@ UfsMockDevice::UfsMockDevice(zx::interrupt irq)
   power_desc_.bLength = sizeof(PowerParametersDescriptor);
   power_desc_.bDescriptorIDN = static_cast<size_t>(DescriptorType::kPower);
 
+  SetAttribute(Attributes::bBootLunEn, true);
   SetAttribute(Attributes::bCurrentPowerMode, static_cast<uint32_t>(UfsPowerMode::kActive));
   SetAttribute(Attributes::bActiveIccLevel, kHighestActiveIcclevel);
 }

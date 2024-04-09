@@ -163,14 +163,14 @@ zx::result<> DeviceManager::DmeSet(uint16_t mbi_attribute, uint32_t value) {
   return zx::ok();
 }
 
-zx::result<> DeviceManager::CheckBootLunEnabled() {
+zx::result<uint32_t> DeviceManager::GetBootLunEnabled() {
   // Read bBootLunEn to confirm device interface is ok.
   zx::result<uint32_t> boot_lun_enabled = ReadAttribute(Attributes::bBootLunEn);
   if (boot_lun_enabled.is_error()) {
     return boot_lun_enabled.take_error();
   }
   zxlogf(DEBUG, "bBootLunEn 0x%0x", boot_lun_enabled.value());
-  return zx::ok();
+  return zx::ok(boot_lun_enabled.value());
 }
 
 zx::result<UnitDescriptor> DeviceManager::ReadUnitDescriptor(uint8_t lun) {
@@ -183,12 +183,36 @@ zx::result<UnitDescriptor> DeviceManager::ReadUnitDescriptor(uint8_t lun) {
   return zx::ok(response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<UnitDescriptor>());
 }
 
-zx::result<> DeviceManager::InitReferenceClock() {
+zx::result<> DeviceManager::InitReferenceClock(inspect::Node &controller_node) {
   // Intel UFSHCI reference clock = 19.2MHz
-  return WriteAttribute(Attributes::bRefClkFreq, AttributeReferenceClock::k19_2MHz);
+  constexpr AttributeReferenceClock reference_clock = AttributeReferenceClock::k19_2MHz;
+  if (auto result = WriteAttribute(Attributes::bRefClkFreq, reference_clock); result.is_error()) {
+    return result.take_error();
+  }
+
+  std::string reference_clock_string;
+  switch (reference_clock) {
+    case AttributeReferenceClock::k19_2MHz:
+      reference_clock_string = "19.2 MHz";
+      break;
+    case AttributeReferenceClock::k26MHz:
+      reference_clock_string = "26 MHz";
+      break;
+    case AttributeReferenceClock::k38_4MHz:
+      reference_clock_string = "38.4 MHz";
+      break;
+    case AttributeReferenceClock::kObsolete:
+      reference_clock_string = "52 MHz (Obsolete))";
+      break;
+    default:
+      return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  controller_node.RecordString("reference_clock", reference_clock_string);
+
+  return zx::ok();
 }
 
-zx::result<> DeviceManager::InitUniproAttributes() {
+zx::result<> DeviceManager::InitUniproAttributes(inspect::Node &unipro_node) {
   // UniPro Version
   // 7~15 = Above 2.0, 6 = 2.0, 5 = 1.8, 4 = 1.61, 3 = 1.6, 2 = 1.41, 1 = 1.40, 0 = Reserved
   zx::result<uint32_t> remote_version = DmeGet(PA_RemoteVerInfo);
@@ -199,8 +223,6 @@ zx::result<> DeviceManager::InitUniproAttributes() {
   if (local_version.is_error()) {
     return local_version.take_error();
   }
-  zxlogf(INFO, "UniPro Version: remote version=%d, local version=%d", remote_version.value(),
-         local_version.value());
 
   // UniPro automatically sets timing information such as PA_TActivate through the
   // PACP_CAP_EXT1_ind command during Link Startup operation.
@@ -227,15 +249,18 @@ zx::result<> DeviceManager::InitUniproAttributes() {
   if (device_granularity.is_error()) {
     return device_granularity.take_error();
   }
-  zxlogf(INFO,
-         "host_t_activate=%d, device_t_activate=%d, host_granularity=%d, device_granularity=%d",
-         host_t_activate.value(), device_t_activate.value(), host_granularity.value(),
-         device_granularity.value());
+
+  unipro_node.RecordUint("remote_version", remote_version.value());
+  unipro_node.RecordUint("local_version", local_version.value());
+  unipro_node.RecordUint("host_t_activate", host_t_activate.value());
+  unipro_node.RecordUint("device_t_activate", device_t_activate.value());
+  unipro_node.RecordUint("host_granularity", host_granularity.value());
+  unipro_node.RecordUint("device_granularity", device_granularity.value());
 
   return zx::ok();
 }
 
-zx::result<> DeviceManager::InitUicPowerMode() {
+zx::result<> DeviceManager::InitUicPowerMode(inspect::Node &unipro_node) {
   if (zx::result<> result = controller_.Notify(NotifyEvent::kPrePowerModeChange, 0);
       result.is_error()) {
     return result.take_error();
@@ -255,8 +280,6 @@ zx::result<> DeviceManager::InitUicPowerMode() {
   if (max_rx_hs_gear.is_error()) {
     return max_rx_hs_gear.take_error();
   }
-  zxlogf(INFO, "tx_lanes_=%d, rx_lanes_=%d, max_rx_hs_gear=%d", tx_lanes.value(), rx_lanes.value(),
-         max_rx_hs_gear.value());
 
   // Set data lanes.
   if (zx::result<> result = DmeSet(PA_ActiveTxDataLanes, tx_lanes.value()); result.is_error()) {
@@ -286,7 +309,8 @@ zx::result<> DeviceManager::InitUicPowerMode() {
   }
 
   // Set HSSerise (A = 1, B = 2)
-  if (zx::result<> result = DmeSet(PA_HSSeries, 2); result.is_error()) {
+  constexpr uint32_t kHsSeries = 2;
+  if (zx::result<> result = DmeSet(PA_HSSeries, kHsSeries); result.is_error()) {
     return result.take_error();
   }
 
@@ -330,9 +354,13 @@ zx::result<> DeviceManager::InitUicPowerMode() {
     return result.take_error();
   }
 
-  // Set PWRMode.
-  // Fast_Mode=1, Slow_Mode=2, FastAuto_Mode=4, SlowAuto_Mode=5,
-  if (zx::result<> result = DmeSet(PA_PWRMode, 1 << 4 | 1); result.is_error()) {
+  // Set TX/RX PWRMode.
+  // TX[3:0], RX[7:4]
+  // Fast_Mode=1, Slow_Mode=2, FastAuto_Mode=4, SlowAuto_Mode=5
+  constexpr uint32_t kFastMode = 1;
+  constexpr uint32_t kRxBitShift = 4;
+  constexpr uint32_t kPwrMode = kFastMode << kRxBitShift | kFastMode;
+  if (zx::result<> result = DmeSet(PA_PWRMode, kPwrMode); result.is_error()) {
     return result.take_error();
   }
 
@@ -371,6 +399,16 @@ zx::result<> DeviceManager::InitUicPowerMode() {
   if (device_granularity.is_error()) {
     return device_granularity.take_error();
   }
+
+  unipro_node.RecordUint("PA_ActiveTxDataLanes", tx_lanes.value());
+  unipro_node.RecordUint("PA_ActiveRxDataLanes", rx_lanes.value());
+  unipro_node.RecordUint("PA_MaxRxHSGear", max_rx_hs_gear.value());
+  unipro_node.RecordUint("PA_TxGear", max_rx_hs_gear.value());
+  unipro_node.RecordUint("PA_RxGear", max_rx_hs_gear.value());
+  unipro_node.RecordBool("tx_termination", true);
+  unipro_node.RecordBool("rx_termination", true);
+  unipro_node.RecordUint("PA_HSSeries", kHsSeries);
+  unipro_node.RecordUint("power_mode", kPwrMode);
 
   return zx::ok();
 }
@@ -477,7 +515,8 @@ zx::result<> DeviceManager::Resume() {
   return zx::ok();
 }
 
-zx::result<> DeviceManager::InitUfsPowerMode() {
+zx::result<> DeviceManager::InitUfsPowerMode(inspect::Node &controller_node,
+                                             inspect::Node &attributes_node) {
   // Read current power mode (bCurrentPowerMode, bActiveIccLevel)
   zx::result<uint32_t> power_mode = ReadAttribute(Attributes::bCurrentPowerMode);
   if (power_mode.is_error()) {
@@ -502,6 +541,11 @@ zx::result<> DeviceManager::InitUfsPowerMode() {
   }
 
   // TODO(https://fxbug.dev/42075643): Enable auto hibernate
+
+  attributes_node.RecordUint("bCurrentPowerMode", static_cast<uint8_t>(current_power_mode_));
+  attributes_node.RecordUint("bActiveICCLevel", kHighestActiveIcclevel);
+  controller_node.RecordUint("PowerCondition", static_cast<uint8_t>(current_power_condition_));
+  controller_node.RecordUint("LinkState", static_cast<uint8_t>(current_link_state_));
 
   return zx::ok();
 }

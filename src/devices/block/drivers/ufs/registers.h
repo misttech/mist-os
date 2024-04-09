@@ -57,8 +57,8 @@ enum RegisterMap {
 // "Offset 00h: CAP – Controller Capabilities".
 class CapabilityReg : public hwreg::RegisterBase<CapabilityReg, uint32_t, hwreg::EnablePrinter> {
  public:
-  DEF_BIT(28, crtpto_support);
-  DEF_BIT(26, uic_dme_test_mode_command_suppoort);
+  DEF_BIT(28, crypto_support);
+  DEF_BIT(26, uic_dme_test_mode_command_supported);
   DEF_BIT(25, out_of_order_data_delivery_supported);
   DEF_BIT(24, _64_bit_addressing_supported);
   DEF_BIT(23, auto_hibernation_support);

@@ -5,6 +5,8 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_UFS_TEST_UNIT_LIB_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_UFS_TEST_UNIT_LIB_H_
 
+#include <lib/inspect/testing/cpp/zxtest/inspect.h>
+
 #include <zxtest/zxtest.h>
 
 #include "mock-device/ufs-mock-device.h"
@@ -13,7 +15,7 @@
 
 namespace ufs {
 
-class UfsTest : public zxtest::Test {
+class UfsTest : public inspect::InspectTestHelper, public zxtest::Test {
  public:
   void SetUp() override;
 

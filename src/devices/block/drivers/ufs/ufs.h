@@ -111,7 +111,8 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
   void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                            uint32_t block_size_bytes, scsi::DiskOp *disk_op, iovec data) override;
 
-  // TODO(https://fxbug.dev/42075643): Implement inspector.
+  inspect::Inspector &inspector() { return inspector_; }
+  inspect::Node &inspect_node() { return inspect_node_; }
 
   fdf::MmioBuffer &GetMmio() { return mmio_; }
 
@@ -175,7 +176,7 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
   // Initialize the UFS controller and bind the logical units.
   zx_status_t Init();
   zx::result<> InitController();
-  zx::result<> InitDeviceInterface();
+  zx::result<> InitDeviceInterface(inspect::Node &controller_node);
   zx::result<> GetControllerDescriptor();
   zx::result<uint32_t> AddLogicalUnits();
 

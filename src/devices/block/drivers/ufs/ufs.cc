@@ -409,15 +409,55 @@ zx_status_t Ufs::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, boo
   return ZX_OK;
 }
 
+static void PopulateVersionInspect(const VersionReg& version_reg, inspect::Node* inspect_node,
+                                   inspect::Inspector* inspector) {
+  auto version = inspect_node->CreateChild("version");
+  version.RecordUint("major_version_number", version_reg.major_version_number());
+  version.RecordUint("minor_version_number", version_reg.minor_version_number());
+  version.RecordUint("version_suffix", version_reg.version_suffix());
+  inspector->emplace(std::move(version));
+
+  zxlogf(INFO, "Controller version %u.%u found", version_reg.major_version_number(),
+         version_reg.minor_version_number());
+}
+
+static void PopulateCapabilitiesInspect(const CapabilityReg& caps_reg, inspect::Node* inspect_node,
+                                        inspect::Inspector* inspector) {
+  auto caps = inspect_node->CreateChild("capabilities");
+  caps.RecordBool("crypto_support", caps_reg.crypto_support());
+  caps.RecordBool("uic_dme_test_mode_command_supported",
+                  caps_reg.uic_dme_test_mode_command_supported());
+  caps.RecordBool("out_of_order_data_delivery_supported",
+                  caps_reg.out_of_order_data_delivery_supported());
+  caps.RecordBool("64_bit_addressing_supported", caps_reg._64_bit_addressing_supported());
+  caps.RecordBool("auto_hibernation_support", caps_reg.auto_hibernation_support());
+  caps.RecordUint("number_of_utp_task_management_request_slots",
+                  caps_reg.number_of_utp_task_management_request_slots());
+  caps.RecordUint("number_of_outstanding_rtt_requests_supported",
+                  caps_reg.number_of_outstanding_rtt_requests_supported());
+  caps.RecordUint("number_of_utp_transfer_request_slots",
+                  caps_reg.number_of_utp_transfer_request_slots());
+  inspector->emplace(std::move(caps));
+}
+
 zx_status_t Ufs::Init() {
   list_initialize(&pending_commands_);
+
+  VersionReg version_reg = VersionReg::Get().ReadFrom(&mmio_);
+  CapabilityReg caps_reg = CapabilityReg::Get().ReadFrom(&mmio_);
+
+  inspect_node_ = inspector_.GetRoot().CreateChild("ufs");
+  PopulateVersionInspect(version_reg, &inspect_node_, &inspector_);
+  PopulateCapabilitiesInspect(caps_reg, &inspect_node_, &inspector_);
+
+  auto controller_node = inspect_node_.CreateChild("controller");
 
   if (zx::result<> result = InitController(); result.is_error()) {
     zxlogf(ERROR, "Failed to initialize UFS controller: %s", result.status_string());
     return result.error_value();
   }
 
-  if (zx::result<> result = InitDeviceInterface(); result.is_error()) {
+  if (zx::result<> result = InitDeviceInterface(controller_node); result.is_error()) {
     zxlogf(ERROR, "Failed to initialize device interface: %s", result.status_string());
     return result.error_value();
   }
@@ -430,6 +470,7 @@ zx_status_t Ufs::Init() {
   // The maximum transfer size supported by UFSHCI spec is 65535 * 256 KiB. However, we limit the
   // maximum transfer size to 1MiB for performance reason.
   max_transfer_bytes_ = kMaxTransferSize1MiB;
+  controller_node.RecordUint("max_transfer_bytes", max_transfer_bytes_);
 
   zx::result<uint32_t> lun_count;
   if (lun_count = AddLogicalUnits(); lun_count.is_error()) {
@@ -442,6 +483,9 @@ zx_status_t Ufs::Init() {
     return ZX_ERR_BAD_STATE;
   }
   logical_unit_count_ = lun_count.value();
+  controller_node.RecordUint("logical_unit_count", logical_unit_count_);
+
+  inspector_.emplace(std::move(controller_node));
   zxlogf(INFO, "Bind Success");
 
   return ZX_OK;
@@ -477,11 +521,6 @@ zx::result<> Ufs::InitController() {
   if (zx::result<> result = Notify(NotifyEvent::kInit, 0); result.is_error()) {
     return result.take_error();
   }
-
-  zxlogf(INFO, "Controller version %u.%u found",
-         VersionReg::Get().ReadFrom(&mmio_).major_version_number(),
-         VersionReg::Get().ReadFrom(&mmio_).minor_version_number());
-  zxlogf(DEBUG, "capabilities 0x%x", CapabilityReg::Get().ReadFrom(&mmio_).reg_value());
 
   auto device_manager = DeviceManager::Create(*this);
   if (device_manager.is_error()) {
@@ -523,7 +562,7 @@ zx::result<> Ufs::InitController() {
   return zx::ok();
 }
 
-zx::result<> Ufs::InitDeviceInterface() {
+zx::result<> Ufs::InitDeviceInterface(inspect::Node& controller_node) {
   // Enable error and UIC/UTP related interrupts.
   InterruptEnableReg::Get()
       .FromValue(0)
@@ -589,32 +628,41 @@ zx::result<> Ufs::InitDeviceInterface() {
     return result.take_error();
   }
 
-  if (zx::result<> result = device_manager_->InitReferenceClock(); result.is_error()) {
+  if (zx::result<> result = device_manager_->InitReferenceClock(controller_node);
+      result.is_error()) {
     zxlogf(ERROR, "Failed to initialize reference clock %s", result.status_string());
     return result.take_error();
   }
 
-  if (zx::result<> result = device_manager_->InitUniproAttributes(); result.is_error()) {
+  auto unipro_node = controller_node.CreateChild("unipro");
+  if (zx::result<> result = device_manager_->InitUniproAttributes(unipro_node); result.is_error()) {
     zxlogf(ERROR, "Failed to initialize Unipro attributes %s", result.status_string());
     return result.take_error();
   }
 
-  if (zx::result<> result = device_manager_->InitUicPowerMode(); result.is_error()) {
+  if (zx::result<> result = device_manager_->InitUicPowerMode(unipro_node); result.is_error()) {
     zxlogf(ERROR, "Failed to initialize UIC power mode %s", result.status_string());
     return result.take_error();
   }
 
-  if (zx::result<> result = device_manager_->InitUfsPowerMode(); result.is_error()) {
+  auto attributes_node = controller_node.CreateChild("attributes");
+  if (zx::result<> result = device_manager_->InitUfsPowerMode(controller_node, attributes_node);
+      result.is_error()) {
     zxlogf(ERROR, "Failed to initialize UFS power mode %s", result.status_string());
     return result.take_error();
   }
 
-  if (zx::result<> result = device_manager_->CheckBootLunEnabled(); result.is_error()) {
+  zx::result<uint32_t> result = device_manager_->GetBootLunEnabled();
+  if (result.is_error()) {
     zxlogf(ERROR, "Failed to check Boot LUN enabled %s", result.status_string());
     return result.take_error();
   }
+  attributes_node.RecordUint("bBootLunEn", result.value());
 
   // TODO(https://fxbug.dev/42075643): Set bMaxNumOfRTT (Read-to-transfer)
+
+  inspector_.emplace(std::move(unipro_node));
+  inspector_.emplace(std::move(attributes_node));
 
   return zx::ok();
 }

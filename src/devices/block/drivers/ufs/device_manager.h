@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_UFS_DEVICE_MANAGER_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_UFS_DEVICE_MANAGER_H_
 
+#include <lib/inspect/cpp/inspect.h>
 #include <lib/scsi/controller.h>
 #include <lib/trace/event.h>
 #include <lib/zx/result.h>
@@ -60,15 +61,15 @@ class DeviceManager {
   // Device initialization.
   zx::result<> SendLinkStartUp();
   zx::result<> DeviceInit();
-  zx::result<> CheckBootLunEnabled();
+  zx::result<uint32_t> GetBootLunEnabled();
   zx::result<> GetControllerDescriptor();
   zx::result<UnitDescriptor> ReadUnitDescriptor(uint8_t lun);
 
   // Device power management.
-  zx::result<> InitReferenceClock();
-  zx::result<> InitUniproAttributes();
-  zx::result<> InitUicPowerMode();
-  zx::result<> InitUfsPowerMode();
+  zx::result<> InitReferenceClock(inspect::Node &controller_node);
+  zx::result<> InitUniproAttributes(inspect::Node &unipro_node);
+  zx::result<> InitUicPowerMode(inspect::Node &unipro_node);
+  zx::result<> InitUfsPowerMode(inspect::Node &controller_node, inspect::Node &attributes_node);
 
   zx::result<> Suspend();
   zx::result<> Resume();

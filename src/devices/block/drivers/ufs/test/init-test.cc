@@ -102,4 +102,49 @@ TEST_F(InitTest, SuspendAndResume) {
             ufs_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
 }
 
+TEST_F(InitTest, Inspect) {
+  ASSERT_NO_FATAL_FAILURE(RunInit());
+  ASSERT_NO_FATAL_FAILURE(ReadInspect(ufs_->inspector().DuplicateVmo()));
+
+  const auto* ufs = hierarchy().GetByPath({"ufs"});
+  ASSERT_NOT_NULL(ufs);
+
+  const auto* version = ufs->GetByPath({"version"});
+  ASSERT_NOT_NULL(version);
+  auto major_version =
+      version->node().get_property<inspect::UintPropertyValue>("major_version_number");
+  ASSERT_NOT_NULL(major_version);
+  EXPECT_EQ(major_version->value(), kMajorVersion);
+  auto minor_version =
+      version->node().get_property<inspect::UintPropertyValue>("minor_version_number");
+  ASSERT_NOT_NULL(minor_version);
+  EXPECT_EQ(minor_version->value(), kMinorVersion);
+  auto version_suffix = version->node().get_property<inspect::UintPropertyValue>("version_suffix");
+  ASSERT_NOT_NULL(version_suffix);
+  EXPECT_EQ(version_suffix->value(), kVersionSuffix);
+
+  const auto* controller = ufs->GetByPath({"controller"});
+  ASSERT_NOT_NULL(controller);
+  auto logical_unit_count =
+      controller->node().get_property<inspect::UintPropertyValue>("logical_unit_count");
+  ASSERT_NOT_NULL(logical_unit_count);
+  EXPECT_EQ(logical_unit_count->value(), 1);
+  auto reference_clock =
+      controller->node().get_property<inspect::StringPropertyValue>("reference_clock");
+  ASSERT_NOT_NULL(reference_clock);
+  EXPECT_EQ(reference_clock->value(), "19.2 MHz");
+
+  const auto* attributes = controller->GetByPath({"attributes"});
+  ASSERT_NOT_NULL(attributes);
+  auto boot_lun_enabled = attributes->node().get_property<inspect::UintPropertyValue>("bBootLunEn");
+  ASSERT_NOT_NULL(boot_lun_enabled);
+  EXPECT_EQ(boot_lun_enabled->value(), 0x01);
+
+  const auto* unipro = controller->GetByPath({"unipro"});
+  ASSERT_NOT_NULL(unipro);
+  auto local_version = unipro->node().get_property<inspect::UintPropertyValue>("local_version");
+  ASSERT_NOT_NULL(local_version);
+  EXPECT_EQ(local_version->value(), kUniproVersion);
+}
+
 }  // namespace ufs
