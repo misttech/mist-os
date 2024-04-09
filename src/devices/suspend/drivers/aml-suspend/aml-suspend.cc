@@ -26,7 +26,9 @@ namespace suspend {
 namespace {
 
 constexpr char kDeviceName[] = "aml-suspend-device";
+// LINT.IfChange
 constexpr zx::duration kDebugSuspendDuration = zx::sec(5);
+// LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/interfaces/affordances/system_power_state_controller.py)
 
 }  // namespace
 
