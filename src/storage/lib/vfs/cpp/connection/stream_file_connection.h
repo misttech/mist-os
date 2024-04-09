@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_LIB_VFS_CPP_STREAM_FILE_CONNECTION_H_
-#define SRC_STORAGE_LIB_VFS_CPP_STREAM_FILE_CONNECTION_H_
+#ifndef SRC_STORAGE_LIB_VFS_CPP_CONNECTION_STREAM_FILE_CONNECTION_H_
+#define SRC_STORAGE_LIB_VFS_CPP_CONNECTION_STREAM_FILE_CONNECTION_H_
 
 #ifndef __Fuchsia__
 #error "Fuchsia-only header"
@@ -12,7 +12,7 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/zx/result.h>
 
-#include "src/storage/lib/vfs/cpp/file_connection.h"
+#include "src/storage/lib/vfs/cpp/connection/file_connection.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
@@ -56,4 +56,4 @@ class StreamFileConnection final : public FileConnection {
 
 }  // namespace fs::internal
 
-#endif  // SRC_STORAGE_LIB_VFS_CPP_STREAM_FILE_CONNECTION_H_
+#endif  // SRC_STORAGE_LIB_VFS_CPP_CONNECTION_STREAM_FILE_CONNECTION_H_

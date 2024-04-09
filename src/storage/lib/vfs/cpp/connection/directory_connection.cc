@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/storage/lib/vfs/cpp/directory_connection.h"
+#include "src/storage/lib/vfs/cpp/connection/directory_connection.h"
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/zx/handle.h>
@@ -20,7 +20,7 @@
 
 #include "fidl/fuchsia.io/cpp/common_types.h"
 #include "fidl/fuchsia.io/cpp/wire_types.h"
-#include "src/storage/lib/vfs/cpp/advisory_lock.h"
+#include "src/storage/lib/vfs/cpp/connection/advisory_lock.h"
 #include "src/storage/lib/vfs/cpp/debug.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"

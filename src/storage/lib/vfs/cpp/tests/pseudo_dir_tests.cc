@@ -4,9 +4,9 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/storage/lib/vfs/cpp/dir_test_util.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/pseudo_file.h"
+#include "src/storage/lib/vfs/cpp/tests/dir_test_util.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 namespace {

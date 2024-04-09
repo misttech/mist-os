@@ -7,9 +7,9 @@
 #include <fbl/vector.h>
 #include <zxtest/zxtest.h>
 
-#include "src/storage/lib/vfs/cpp/dir_test_util.h"
 #include "src/storage/lib/vfs/cpp/lazy_dir.h"
 #include "src/storage/lib/vfs/cpp/pseudo_file.h"
+#include "src/storage/lib/vfs/cpp/tests/dir_test_util.h"
 #include "src/storage/lib/vfs/cpp/vfs.h"
 
 namespace {

@@ -20,11 +20,11 @@
 #include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/storage/lib/vfs/cpp/connection.h"
-#include "src/storage/lib/vfs/cpp/directory_connection.h"
-#include "src/storage/lib/vfs/cpp/node_connection.h"
-#include "src/storage/lib/vfs/cpp/remote_file_connection.h"
-#include "src/storage/lib/vfs/cpp/stream_file_connection.h"
+#include "src/storage/lib/vfs/cpp/connection/connection.h"
+#include "src/storage/lib/vfs/cpp/connection/directory_connection.h"
+#include "src/storage/lib/vfs/cpp/connection/node_connection.h"
+#include "src/storage/lib/vfs/cpp/connection/remote_file_connection.h"
+#include "src/storage/lib/vfs/cpp/connection/stream_file_connection.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fio = fuchsia_io;

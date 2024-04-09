@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_LIB_VFS_CPP_FILE_CONNECTION_H_
-#define SRC_STORAGE_LIB_VFS_CPP_FILE_CONNECTION_H_
+#ifndef SRC_STORAGE_LIB_VFS_CPP_CONNECTION_FILE_CONNECTION_H_
+#define SRC_STORAGE_LIB_VFS_CPP_CONNECTION_FILE_CONNECTION_H_
 
 #ifndef __Fuchsia__
 #error "Fuchsia-only header"
@@ -15,7 +15,7 @@
 
 #include <fbl/ref_ptr.h>
 
-#include "src/storage/lib/vfs/cpp/connection.h"
+#include "src/storage/lib/vfs/cpp/connection/connection.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
@@ -132,4 +132,4 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
 
 }  // namespace fs::internal
 
-#endif  // SRC_STORAGE_LIB_VFS_CPP_FILE_CONNECTION_H_
+#endif  // SRC_STORAGE_LIB_VFS_CPP_CONNECTION_FILE_CONNECTION_H_

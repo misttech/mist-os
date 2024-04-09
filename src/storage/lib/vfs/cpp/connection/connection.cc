@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/storage/lib/vfs/cpp/connection.h"
+#include "src/storage/lib/vfs/cpp/connection/connection.h"
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/fidl/txn_header.h>

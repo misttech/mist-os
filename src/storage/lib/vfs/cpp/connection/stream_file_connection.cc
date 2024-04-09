@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/storage/lib/vfs/cpp/stream_file_connection.h"
+#include "src/storage/lib/vfs/cpp/connection/stream_file_connection.h"
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/zx/handle.h>
@@ -18,9 +18,9 @@
 
 #include <fbl/string_buffer.h>
 
-#include "src/storage/lib/vfs/cpp/connection.h"
+#include "src/storage/lib/vfs/cpp/connection/connection.h"
+#include "src/storage/lib/vfs/cpp/connection/file_connection.h"
 #include "src/storage/lib/vfs/cpp/debug.h"
-#include "src/storage/lib/vfs/cpp/file_connection.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 

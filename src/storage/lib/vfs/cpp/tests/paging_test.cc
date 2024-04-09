@@ -22,7 +22,7 @@
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
-#include "src/storage/lib/vfs/cpp/connection.h"
+#include "src/storage/lib/vfs/cpp/connection/connection.h"
 #include "src/storage/lib/vfs/cpp/paged_vfs.h"
 #include "src/storage/lib/vfs/cpp/paged_vnode.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"

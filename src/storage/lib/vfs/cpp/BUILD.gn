@@ -39,7 +39,6 @@ static_library("cpp") {
 
   if (is_fuchsia) {
     public += [
-      "file_connection.h",
       "fuchsia_vfs.h",
       "lazy_dir.h",
       "managed_vfs.h",
@@ -57,30 +56,30 @@ static_library("cpp") {
       "watcher.h",
     ]
     sources += [
-      "advisory_lock.cc",
-      "advisory_lock.h",
-      "connection.cc",
-      "connection.h",
-      "directory_connection.cc",
-      "directory_connection.h",
-      "file_connection.cc",
-      "file_connection.h",
+      "connection/advisory_lock.cc",
+      "connection/advisory_lock.h",
+      "connection/connection.cc",
+      "connection/connection.h",
+      "connection/directory_connection.cc",
+      "connection/directory_connection.h",
+      "connection/file_connection.cc",
+      "connection/file_connection.h",
+      "connection/node_connection.cc",
+      "connection/node_connection.h",
+      "connection/remote_file_connection.cc",
+      "connection/remote_file_connection.h",
+      "connection/stream_file_connection.cc",
+      "connection/stream_file_connection.h",
       "fuchsia_vfs.cc",
       "lazy_dir.cc",
       "managed_vfs.cc",
-      "node_connection.cc",
-      "node_connection.h",
       "paged_vfs.cc",
       "paged_vnode.cc",
       "pager_thread_pool.cc",
       "pseudo_dir.cc",
       "pseudo_file.cc",
       "remote_dir.cc",
-      "remote_file_connection.cc",
-      "remote_file_connection.h",
       "service.cc",
-      "stream_file_connection.cc",
-      "stream_file_connection.h",
       "synchronous_vfs.cc",
       "vfs_types.cc",
       "vmo_file.cc",
@@ -107,7 +106,7 @@ static_library("cpp") {
 }
 
 source_set("test_support") {
-  public = [ "dir_test_util.h" ]
+  public = [ "tests/dir_test_util.h" ]
   public_deps = [ ":cpp" ]
 }
 
@@ -128,16 +127,16 @@ group("tests") {
 test("fs-vnode-test") {
   output_name = "fs-vnode-test"
   sources = [
-    "lazy_dir_tests.cc",
-    "pseudo_dir_tests.cc",
-    "pseudo_file_tests.cc",
-    "remote_dir_tests.cc",
-    "service_tests.cc",
-    "teardown_tests.cc",
-    "vfs_tests.cc",
-    "vfs_types_tests.cc",
-    "vmo_file_tests.cc",
-    "watcher_test.cc",
+    "tests/lazy_dir_tests.cc",
+    "tests/pseudo_dir_tests.cc",
+    "tests/pseudo_file_tests.cc",
+    "tests/remote_dir_tests.cc",
+    "tests/service_tests.cc",
+    "tests/teardown_tests.cc",
+    "tests/vfs_tests.cc",
+    "tests/vfs_types_tests.cc",
+    "tests/vmo_file_tests.cc",
+    "tests/watcher_test.cc",
   ]
   deps = [
     ":test_support",
@@ -165,11 +164,11 @@ test("fs-vnode-test") {
 test("fs-connection-test") {
   output_name = "fs-connection-test"
   sources = [
-    "advisory_lock_tests.cc",
-    "connection_contract_tests.cc",
-    "connection_integration_tests.cc",
-    "connection_rights_tests.cc",
-    "paging_test.cc",
+    "tests/advisory_lock_tests.cc",
+    "tests/connection_contract_tests.cc",
+    "tests/connection_integration_tests.cc",
+    "tests/connection_rights_tests.cc",
+    "tests/paging_test.cc",
   ]
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_testing",
@@ -193,7 +192,7 @@ test("fs-connection-test") {
 }
 
 fuchsia_library_fuzzer("vmo_file-fuzzer") {
-  sources = [ "vmo_file-fuzzer.cc" ]
+  sources = [ "tests/vmo_file-fuzzer.cc" ]
   deps = [ "//src/storage/lib/vfs/cpp" ]
 }
 

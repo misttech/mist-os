@@ -12,7 +12,7 @@
 #include <memory>
 #include <utility>
 
-#include "src/storage/lib/vfs/cpp/connection.h"
+#include "src/storage/lib/vfs/cpp/connection/connection.h"
 
 namespace fs {
 

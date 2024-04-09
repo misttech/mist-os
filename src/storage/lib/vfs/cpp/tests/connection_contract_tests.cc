@@ -10,7 +10,7 @@
 #include <sanitizer/lsan_interface.h>
 #include <zxtest/zxtest.h>
 
-#include "src/storage/lib/vfs/cpp/connection.h"
+#include "src/storage/lib/vfs/cpp/connection/connection.h"
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 

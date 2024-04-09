@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_LIB_VFS_CPP_CONNECTION_H_
-#define SRC_STORAGE_LIB_VFS_CPP_CONNECTION_H_
+#ifndef SRC_STORAGE_LIB_VFS_CPP_CONNECTION_CONNECTION_H_
+#define SRC_STORAGE_LIB_VFS_CPP_CONNECTION_CONNECTION_H_
 
 #ifndef __Fuchsia__
 #error "Fuchsia-only header"
@@ -136,4 +136,4 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
 
 }  // namespace fs::internal
 
-#endif  // SRC_STORAGE_LIB_VFS_CPP_CONNECTION_H_
+#endif  // SRC_STORAGE_LIB_VFS_CPP_CONNECTION_CONNECTION_H_

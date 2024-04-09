@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/storage/lib/vfs/cpp/advisory_lock.h"
+#include "src/storage/lib/vfs/cpp/connection/advisory_lock.h"
 
 namespace fs {
 
