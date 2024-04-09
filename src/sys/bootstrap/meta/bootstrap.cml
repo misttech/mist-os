@@ -8,12 +8,6 @@
             url: "fuchsia-boot:///archivist#meta/archivist.cm",
         },
         {
-            name: "fshost",
-            url: "fuchsia-boot:///#meta/fshost.cm",
-            environment: "#fshost-env",
-            on_terminate: "reboot",
-        },
-        {
             name: "miscsvc",
             url: "fuchsia-boot:///miscsvc#meta/miscsvc.cm",
         },
@@ -74,19 +68,13 @@
         {
             protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",
-            to: [
-                "#archivist",
-                "#fshost",
-            ],
+            to: "#archivist",
             availability: "optional",
         },
         {
             directory: "boot",
             from: "parent",
-            to: [
-                "#fshost",
-                "#miscsvc",
-            ],
+            to: "#miscsvc",
             rights: [ "rx*" ],
         },
         {
@@ -104,22 +92,6 @@
             to: "#role_manager",
             rights: [ "r*" ],
             subdir: "config/profiles",
-        },
-        {
-            protocol: [
-                "fuchsia.boot.Arguments",
-                "fuchsia.boot.Items",
-                "fuchsia.feedback.CrashReporter",
-                "fuchsia.process.Launcher",
-            ],
-            from: "parent",
-            to: "#fshost",
-        },
-        {
-            protocol: [ "fuchsia.memorypressure.Provider" ],
-            from: "parent",
-            to: "#fshost",
-            availability: "optional",
         },
         {
             protocol: [
@@ -145,35 +117,14 @@
             protocol: [ "fuchsia.boot.WriteOnlyLog" ],
             from: "parent",
             to: [
-                "#fshost",
                 "#pwrbtn-monitor",
                 "#shutdown_shim",
             ],
         },
         {
-            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
-            from: "parent",
-            to: "#fshost",
-        },
-        {
-            protocol: [ "fuchsia.kernel.VmexResource" ],
-            from: "parent",
-            to: "#fshost",
-        },
-        {
             protocol: [ "fuchsia.kernel.ProfileResource" ],
             from: "parent",
             to: [ "#role_manager" ],
-        },
-        {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
-            from: "#role_manager",
-            to: [ "#fshost" ],
-        },
-        {
-            directory: "dev-topological",
-            from: "#devfs",
-            to: [ "#fshost" ],
         },
         {
             directory: "dev-topological",
@@ -207,18 +158,12 @@
             source_availability: "unknown",
         },
         {
-            protocol: [ "fuchsia.device.manager.Administrator" ],
-            from: "#driver_manager",
-            to: "#fshost",
-        },
-        {
             protocol: [
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
             ],
             from: "#archivist",
             to: [
-                "#fshost",
                 "#miscsvc",
                 "#pwrbtn-monitor",
                 "#role_manager",
@@ -290,30 +235,6 @@
     ],
     expose: [
         {
-            directory: [
-                "blob",
-                "data",
-                "factory",
-                "tmp",
-            ],
-            from: "#fshost",
-        },
-        {
-            protocol: [
-                "fuchsia.fshost.Admin",
-                "fuchsia.fshost.BlockWatcher",
-            ],
-            from: "#fshost",
-        },
-        {
-            protocol: "fuchsia.update.verify.BlobfsVerifier",
-            from: "#fshost",
-        },
-        {
-            protocol: "fuchsia.device.NameProvider",
-            from: "#device_name_provider",
-        },
-        {
             protocol: "fuchsia.hardware.pty.Device",
             from: "#ptysvc",
             source_availability: "unknown",
@@ -373,15 +294,6 @@
                 "fuchsia.scheduler.RoleManager",
             ],
             from: "#role_manager",
-        },
-    ],
-    environments: [
-        {
-            name: "fshost-env",
-            extends: "realm",
-
-            // 20 minutes
-            __stop_timeout_ms: 1200000,
         },
     ],
 }

@@ -32,6 +32,20 @@ if (is_fuchsia) {
     platform = {
       build_type = "eng"
       feature_set_level = "utility"
+      storage = {
+        configure_fshost = true
+        filesystems = {
+          image_name = "fx_publish"
+          volume = {
+            fvm = {
+              data = {
+              }
+              blob = {
+              }
+            }
+          }
+        }
+      }
     }
   }
 

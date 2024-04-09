@@ -2286,6 +2286,17 @@ assembly_input_bundle("factory_data") {
 assembly_input_bundle("fshost_common") {
   compiled_packages = [
     {
+      name = "bootstrap"
+      component_shards = [
+        {
+          component_name = "bootstrap"
+          shards = rebase_path(
+                  [ "//src/storage/fshost/meta/fshost.bootstrap_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+    {
       bootfs_unpackaged = true
       name = "fshost"
       components = [

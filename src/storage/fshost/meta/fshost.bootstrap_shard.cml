@@ -1,0 +1,97 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "fshost",
+            url: "fuchsia-boot:///#meta/fshost.cm",
+            environment: "#fshost-env",
+            on_terminate: "reboot",
+        },
+    ],
+    offer: [
+        {
+            directory: "boot",
+            from: "parent",
+            to: "#fshost",
+            rights: [ "rx*" ],
+        },
+        {
+            protocol: [
+                "fuchsia.boot.Arguments",
+                "fuchsia.boot.Items",
+                "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.feedback.CrashReporter",
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.metrics.MetricEventLoggerFactory",
+                "fuchsia.process.Launcher",
+            ],
+            from: "parent",
+            to: "#fshost",
+        },
+        {
+            protocol: [
+                "fuchsia.memorypressure.Provider",
+                "fuchsia.tracing.provider.Registry",
+            ],
+            from: "parent",
+            to: "#fshost",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.scheduler.RoleManager",
+            from: "#role_manager",
+            to: [ "#fshost" ],
+        },
+        {
+            directory: "dev-topological",
+            from: "#devfs",
+            to: [ "#fshost" ],
+        },
+        {
+            protocol: [ "fuchsia.device.manager.Administrator" ],
+            from: "#driver_manager",
+            to: "#fshost",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: "#fshost",
+        },
+    ],
+    expose: [
+        {
+            directory: [
+                "blob",
+                "data",
+                "factory",
+                "tmp",
+            ],
+            from: "#fshost",
+        },
+        {
+            protocol: [
+                "fuchsia.fshost.Admin",
+                "fuchsia.fshost.BlockWatcher",
+            ],
+            from: "#fshost",
+        },
+        {
+            protocol: "fuchsia.update.verify.BlobfsVerifier",
+            from: "#fshost",
+        },
+    ],
+    environments: [
+        {
+            name: "fshost-env",
+            extends: "realm",
+
+            // 20 minutes
+            __stop_timeout_ms: 1200000,
+        },
+    ],
+}
