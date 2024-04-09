@@ -41,7 +41,6 @@ gn_labels_for_bazel_inputs = [
                                "//build/bazel/tests/build_action:bazel_inputs",
                                "//build/bazel:build_args_bazel_inputs",
                                "//build/images/flash:esp.bazel_input",
-                               "//build/info:build_info.bazel_input",
                                "//build/images/updates/tests:fx_publish_test.gn_assembly.bazel_legacy_aib",
                                "//src/fonts/asset_providers:bazel_inputs",
                                "//sdk:core",

@@ -66,21 +66,4 @@ if (current_toolchain == default_toolchain) {
   }
 
   # LINT.ThenChange(//build/info/info.bzl)
-
-  # DEPRECATED: Use //build/info:<name> Bazel targets directly instead!
-  bazel_input_resource("build_info.bazel_input") {
-    sources = [
-      build_info_files.version,
-      build_info_files.jiri_snapshot,
-      build_info_files.latest_commit_date,
-      build_info_files.minimum_utc_stamp,
-    ]
-    outputs = [
-      "build_info_version.txt",
-      "jiri_snapshot.xml",
-      "latest-commit-date.txt",
-      "minimum-utc-stamp.txt",
-    ]
-    deps = [ ":build_info_files" ]
-  }
 }
