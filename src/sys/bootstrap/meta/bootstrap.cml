@@ -310,10 +310,6 @@
             from: "#fshost",
         },
         {
-            protocol: "fuchsia.fxfs.Volumes",
-            from: "#fshost",
-        },
-        {
             protocol: "fuchsia.device.NameProvider",
             from: "#device_name_provider",
         },
