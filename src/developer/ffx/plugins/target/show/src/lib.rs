@@ -42,113 +42,52 @@ pub struct ShowTool {
 
 fho::embedded_plugin!(ShowTool);
 
-type Writer = <ShowTool as FfxMain>::Writer;
-
 #[async_trait(?Send)]
 impl FfxMain for ShowTool {
     type Writer = VerifiedMachineWriter<Vec<ShowEntry>>;
     /// Main entry point for the `show` subcommand.
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        let ShowTool {
-            cmd,
-            target_proxy,
-            channel_control_proxy,
-            board_proxy,
-            device_proxy,
-            product_proxy,
-            build_info_proxy,
-            device_id_proxy,
-            last_reboot_info_proxy,
-        } = self;
-        show_cmd(
-            channel_control_proxy,
-            board_proxy,
-            device_proxy,
-            product_proxy,
-            build_info_proxy,
-            device_id_proxy.await.ok(),
-            last_reboot_info_proxy,
-            target_proxy,
-            cmd,
-            &mut writer,
-        )
-        .await?;
+        self.show_cmd(&mut writer).await.map_err(|e| e.into())
+    }
+}
+
+impl ShowTool {
+    async fn show_cmd(self, writer: &mut <ShowTool as fho::FfxMain>::Writer) -> Result<()> {
+        if self.cmd.version && !writer.is_machine() {
+            eprintln!("WARNING: `--version` is deprecated since it is meaningless");
+            writeln!(writer, "ffx target show version 0.1")?;
+            return Ok(());
+        }
+        // To add more show information, add a `gather_*_show(*) call to this
+        // list, as well as the labels in the Ok() and vec![] just below.
+        let show = match futures::try_join!(
+            gather_target_show(self.target_proxy),
+            gather_board_show(self.board_proxy),
+            gather_device_show(self.device_proxy),
+            gather_product_show(self.product_proxy),
+            gather_update_show(self.channel_control_proxy),
+            gather_build_info_show(self.build_info_proxy),
+            gather_device_id_show(self.device_id_proxy),
+            gather_last_reboot_info_show(self.last_reboot_info_proxy),
+        ) {
+            Ok((target, board, device, product, update, build, Some(device_id), reboot_info)) => {
+                vec![target, board, device, product, update, build, device_id, reboot_info]
+            }
+            Ok((target, board, device, product, update, build, None, reboot_info)) => {
+                vec![target, board, device, product, update, build, reboot_info]
+            }
+            Err(e) => bail!(e),
+        };
+        if writer.is_machine() {
+            writer.machine(&show)?;
+        } else if self.cmd.json {
+            eprintln!("WARNING: `--json` is deprecated. Use `--machine json`");
+            show::output_for_machine(&show, &self.cmd, writer)?;
+        } else {
+            show::output_for_human(&show, &self.cmd, writer)?;
+        }
         Ok(())
     }
-}
-
-async fn show_cmd(
-    channel_control_proxy: ChannelControlProxy,
-    board_proxy: BoardProxy,
-    device_proxy: DeviceProxy,
-    product_proxy: ProductProxy,
-    build_info_proxy: ProviderProxy,
-    device_id_proxy: Option<DeviceIdProviderProxy>,
-    last_reboot_info_proxy: LastRebootInfoProviderProxy,
-    target_proxy: TargetProxy,
-    target_show_args: args::TargetShow,
-    writer: &mut Writer,
-) -> Result<()> {
-    show_cmd_impl(
-        channel_control_proxy,
-        board_proxy,
-        device_proxy,
-        product_proxy,
-        build_info_proxy,
-        device_id_proxy,
-        last_reboot_info_proxy,
-        target_proxy,
-        target_show_args,
-        writer,
-    )
-    .await
-}
-
-// Implementation of the target show command.
-async fn show_cmd_impl(
-    channel_control_proxy: ChannelControlProxy,
-    board_proxy: BoardProxy,
-    device_proxy: DeviceProxy,
-    product_proxy: ProductProxy,
-    build_info_proxy: ProviderProxy,
-    device_id_proxy: Option<DeviceIdProviderProxy>,
-    last_reboot_info_proxy: LastRebootInfoProviderProxy,
-    target_proxy: TargetProxy,
-    target_show_args: args::TargetShow,
-    writer: &mut Writer,
-) -> Result<()> {
-    if target_show_args.version {
-        writeln!(writer, "ffx target show version 0.1")?;
-        return Ok(());
-    }
-    // To add more show information, add a `gather_*_show(*) call to this
-    // list, as well as the labels in the Ok() and vec![] just below.
-    let show = match futures::try_join!(
-        gather_target_show(target_proxy),
-        gather_board_show(board_proxy),
-        gather_device_show(device_proxy),
-        gather_product_show(product_proxy),
-        gather_update_show(channel_control_proxy),
-        gather_build_info_show(build_info_proxy),
-        gather_device_id_show(device_id_proxy),
-        gather_last_reboot_info_show(last_reboot_info_proxy),
-    ) {
-        Ok((target, board, device, product, update, build, Some(device_id), reboot_info)) => {
-            vec![target, board, device, product, update, build, device_id, reboot_info]
-        }
-        Ok((target, board, device, product, update, build, None, reboot_info)) => {
-            vec![target, board, device, product, update, build, reboot_info]
-        }
-        Err(e) => bail!(e),
-    };
-    if writer.is_machine() {
-        writer.machine(&show)?;
-    } else if target_show_args.json {
-        show::output_for_machine(&show, &target_show_args, writer)?;
-    } else {
-        show::output_for_human(&show, &target_show_args, writer)?;
-    }
-    Ok(())
 }
 
 /// Determine target information.
@@ -208,12 +147,11 @@ async fn gather_target_show(target_proxy: TargetProxy) -> Result<ShowEntry> {
 
 /// Determine the device id for the target.
 async fn gather_device_id_show(
-    device_id: Option<DeviceIdProviderProxy>,
+    device_id_proxy: Deferred<DeviceIdProviderProxy>,
 ) -> Result<Option<ShowEntry>> {
-    match device_id {
-        None => Ok(None),
-        Some(dev_id) => {
-            let info = dev_id.get_id().await?;
+    match device_id_proxy.await {
+        Ok(device_id) => {
+            let info = device_id.get_id().await?;
             Ok(Some(ShowEntry::group(
                 "Feedback",
                 "feedback",
@@ -225,6 +163,10 @@ async fn gather_device_id_show(
                     &Some(info),
                 )],
             )))
+        }
+        Err(e) => {
+            tracing::warn!("Error getting device id proxy: {e}");
+            Ok(None)
         }
     }
 }
@@ -446,6 +388,7 @@ async fn gather_last_reboot_info_show(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fho::{Format, TestBuffers};
     use fidl_fuchsia_buildinfo::{BuildInfo, ProviderRequest};
     use fidl_fuchsia_developer_ffx::{TargetInfo, TargetIp, TargetRequest};
     use fidl_fuchsia_feedback::{
@@ -585,75 +528,70 @@ mod tests {
         })
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_show_cmd_impl() {
-        let buffers = ffx_writer::TestBuffers::default();
-        let mut output = Writer::new_test(None, &buffers);
-        show_cmd_impl(
-            setup_fake_channel_control_server(),
-            setup_fake_board_server(),
-            setup_fake_device_server(),
-            setup_fake_product_server(),
-            setup_fake_build_info_server(),
-            Some(setup_fake_device_id_server()),
-            setup_fake_last_reboot_info_server(),
-            setup_fake_target_server(),
-            args::TargetShow::default(),
-            &mut output,
-        )
-        .await
-        .expect("show_cmd_impl");
+        let buffers = TestBuffers::default();
+        let output = VerifiedMachineWriter::<Vec<ShowEntry>>::new_test(None, &buffers);
+        let tool = ShowTool {
+            cmd: args::TargetShow { json: false, ..Default::default() },
+            target_proxy: setup_fake_target_server(),
+            channel_control_proxy: setup_fake_channel_control_server(),
+            board_proxy: setup_fake_board_server(),
+            device_proxy: setup_fake_device_server(),
+            product_proxy: setup_fake_product_server(),
+            build_info_proxy: setup_fake_build_info_server(),
+            device_id_proxy: Deferred::from_output(Ok(setup_fake_device_id_server())),
+            last_reboot_info_proxy: setup_fake_last_reboot_info_server(),
+        };
+        tool.main(output).await.expect("show tool main");
         // Convert to a readable string instead of using a byte string and comparing that. Unless
         // you can read u8 arrays well, this helps debug the output.
         let (stdout, _stderr) = buffers.into_strings();
         assert_eq!(stdout, TEST_OUTPUT_HUMAN);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_show_cmd_impl_json() {
-        for format in [None, Some(ffx_writer::Format::Json)] {
-            let buffers = ffx_writer::TestBuffers::default();
-            let mut output = Writer::new_test(format, &buffers);
-            show_cmd_impl(
-                setup_fake_channel_control_server(),
-                setup_fake_board_server(),
-                setup_fake_device_server(),
-                setup_fake_product_server(),
-                setup_fake_build_info_server(),
-                Some(setup_fake_device_id_server()),
-                setup_fake_last_reboot_info_server(),
-                setup_fake_target_server(),
-                args::TargetShow { json: true, ..Default::default() },
-                &mut output,
-            )
-            .await
-            .expect("show_cmd_impl");
-            let (stdout, _stderr) = buffers.into_strings();
-            let v: Value = serde_json::from_str(&stdout).expect("Valid JSON");
-            assert!(v.is_array());
-            assert_eq!(v.as_array().unwrap().len(), 8);
+        let buffers = TestBuffers::default();
+        let output =
+            VerifiedMachineWriter::<Vec<ShowEntry>>::new_test(Some(Format::JsonPretty), &buffers);
+        let tool = ShowTool {
+            cmd: args::TargetShow { ..Default::default() },
+            target_proxy: setup_fake_target_server(),
+            channel_control_proxy: setup_fake_channel_control_server(),
+            board_proxy: setup_fake_board_server(),
+            device_proxy: setup_fake_device_server(),
+            product_proxy: setup_fake_product_server(),
+            build_info_proxy: setup_fake_build_info_server(),
+            device_id_proxy: Deferred::from_output(Ok(setup_fake_device_id_server())),
+            last_reboot_info_proxy: setup_fake_last_reboot_info_server(),
+        };
+        tool.main(output).await.expect("main");
+        let (stdout, _stderr) = buffers.into_strings();
+        let v: Value = serde_json::from_str(&stdout).expect("Valid JSON");
+        assert!(v.is_array());
+        assert_eq!(v.as_array().unwrap().len(), 8);
 
-            assert_eq!(v[0]["label"], Value::String("target".to_string()));
-            assert_eq!(v[1]["label"], Value::String("board".to_string()));
-            assert_eq!(v[2]["label"], Value::String("device".to_string()));
-            assert_eq!(v[3]["label"], Value::String("product".to_string()));
-            assert_eq!(v[4]["label"], Value::String("update".to_string()));
-            assert_eq!(v[5]["label"], Value::String("build".to_string()));
-            assert_eq!(v[6]["label"], Value::String("feedback".to_string()));
-            assert_eq!(v[7]["label"], Value::String("last_reboot".to_string()));
+        assert_eq!(v[0]["label"], Value::String("target".to_string()));
+        assert_eq!(v[1]["label"], Value::String("board".to_string()));
+        assert_eq!(v[2]["label"], Value::String("device".to_string()));
+        assert_eq!(v[3]["label"], Value::String("product".to_string()));
+        assert_eq!(v[4]["label"], Value::String("update".to_string()));
+        assert_eq!(v[5]["label"], Value::String("build".to_string()));
+        assert_eq!(v[6]["label"], Value::String("feedback".to_string()));
+        assert_eq!(v[7]["label"], Value::String("last_reboot".to_string()));
 
-            assert_eq!(v[0]["child"].as_array().unwrap().len(), 4);
-            assert_eq!(v[1]["child"].as_array().unwrap().len(), 3);
-            assert_eq!(v[2]["child"].as_array().unwrap().len(), 3);
-            assert_eq!(v[3]["child"].as_array().unwrap().len(), 16);
-            assert_eq!(v[4]["child"].as_array().unwrap().len(), 2);
-            assert_eq!(v[5]["child"].as_array().unwrap().len(), 4);
-            assert_eq!(v[6]["child"].as_array().unwrap().len(), 1);
-            assert_eq!(v[7]["child"].as_array().unwrap().len(), 3);
-        }
+        assert_eq!(v[0]["child"].as_array().unwrap().len(), 4);
+        assert_eq!(v[1]["child"].as_array().unwrap().len(), 3);
+        assert_eq!(v[2]["child"].as_array().unwrap().len(), 3);
+        assert_eq!(v[3]["child"].as_array().unwrap().len(), 16);
+        assert_eq!(v[4]["child"].as_array().unwrap().len(), 2);
+        assert_eq!(v[5]["child"].as_array().unwrap().len(), 4);
+        assert_eq!(v[6]["child"].as_array().unwrap().len(), 1);
+        assert_eq!(v[7]["child"].as_array().unwrap().len(), 3);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_gather_board_show() {
         let test_proxy = setup_fake_board_server();
         let result = gather_board_show(test_proxy).await.expect("gather board show");
@@ -682,7 +620,7 @@ mod tests {
         })
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_gather_device_show() {
         let test_proxy = setup_fake_device_server();
         let result = gather_device_show(test_proxy).await.expect("gather device show");
@@ -726,7 +664,7 @@ mod tests {
         })
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_gather_product_show() {
         let test_proxy = setup_fake_product_server();
         let result = gather_product_show(test_proxy).await.expect("gather product show");
@@ -753,7 +691,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_gather_last_reboot_info_show() {
         let test_proxy = setup_fake_last_reboot_info_server();
         let result =
@@ -779,7 +717,7 @@ mod tests {
         })
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_gather_update_show() {
         let test_proxy = setup_fake_channel_control_server();
         let result = gather_update_show(test_proxy).await.expect("gather update show");
@@ -790,10 +728,38 @@ mod tests {
         assert_eq!(result.child[1].value, Some(ShowValue::StringValue("fake_target".to_string())));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_arch_to_string() {
         assert_eq!(arch_to_string(Some(Architecture::X64)), Some("x64".to_string()));
         assert_eq!(arch_to_string(Some(Architecture::Arm64)), Some("arm64".to_string()));
         assert_eq!(arch_to_string(None), None);
+    }
+
+    #[fuchsia::test]
+    async fn test_verify_machine_schema() {
+        let buffers = TestBuffers::default();
+        let mut output =
+            VerifiedMachineWriter::<Vec<ShowEntry>>::new_test(Some(Format::JsonPretty), &buffers);
+        let tool = ShowTool {
+            cmd: args::TargetShow { ..Default::default() },
+            target_proxy: setup_fake_target_server(),
+            channel_control_proxy: setup_fake_channel_control_server(),
+            board_proxy: setup_fake_board_server(),
+            device_proxy: setup_fake_device_server(),
+            product_proxy: setup_fake_product_server(),
+            build_info_proxy: setup_fake_build_info_server(),
+            device_id_proxy: Deferred::from_output(Ok(setup_fake_device_id_server())),
+            last_reboot_info_proxy: setup_fake_last_reboot_info_server(),
+        };
+        tool.show_cmd(&mut output).await.expect("main");
+        let (stdout, _stderr) = buffers.into_strings();
+        let data: Value = serde_json::from_str(&stdout).expect("Valid JSON");
+        match output.verify_schema(&data) {
+            Ok(_) => (),
+            Err(e) => {
+                println!("Error verifying schema: {e}");
+                println!("{data:?}");
+            }
+        };
     }
 }

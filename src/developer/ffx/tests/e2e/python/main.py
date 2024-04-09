@@ -44,7 +44,9 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_target_show(self) -> None:
         """Test `ffx target show` output returns as expected."""
-        output = self.dut.ffx.run(["target", "show", "--json"])
+        output = self.dut.ffx.run(
+            ["--machine", "json", "target", "show", "--json"]
+        )
         output_json = json.loads(output)
         got_device_name = output_json[0]["child"][0]["value"]
         # Assert FFX's target show device name matches Honeydew's.
