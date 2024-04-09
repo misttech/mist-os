@@ -968,15 +968,17 @@ mod tests {
             directory::FxDirectory,
             file::FxFile,
             fuchsia::testing::{
-                close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
-                open_file_checked, TestFixture, TestFixtureOptions,
+                close_dir_checked, close_file_checked, open2_dir, open2_dir_checked, open_dir,
+                open_dir_checked, open_file, open_file_checked, TestFixture, TestFixtureOptions,
             },
         },
         assert_matches::assert_matches,
         fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd},
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_fs::directory::{DirEntry, DirentKind},
-        fuchsia_fs::file,
+        fuchsia_fs::{
+            directory::{DirEntry, DirentKind},
+            file,
+        },
         fuchsia_zircon as zx,
         futures::StreamExt,
         fxfs::object_store::Timestamp,
@@ -2389,6 +2391,90 @@ mod tests {
             .map_err(zx::ok)
             .expect("get_attributes failed");
         assert!(immutable_attributes_after_update.change_time > immutable_attributes.change_time);
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_open_deleted_self() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let dir =
+            open_dir_checked(&root, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, "foo")
+                .await;
+
+        root.unlink("foo", &fio::UnlinkOptions::default())
+            .await
+            .expect("FIDL call failed")
+            .expect("unlink failed");
+
+        assert_eq!(
+            open_dir(&root, fio::OpenFlags::DIRECTORY, "foo")
+                .await
+                .expect_err("Open succeeded")
+                .root_cause()
+                .downcast_ref::<zx::Status>()
+                .expect("No status"),
+            &zx::Status::NOT_FOUND,
+        );
+
+        open_dir_checked(&dir, fio::OpenFlags::DIRECTORY, ".").await;
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_open2_deleted_self() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        const PATH: &str = "foo";
+
+        let dir =
+            open_dir_checked(&root, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, PATH).await;
+
+        root.unlink(PATH, &fio::UnlinkOptions::default())
+            .await
+            .expect("FIDL call failed")
+            .expect("unlink failed");
+
+        assert_eq!(
+            open2_dir(
+                &root,
+                &fio::ConnectionProtocols::Node(fio::NodeOptions {
+                    protocols: Some(fio::NodeProtocols {
+                        directory: Some(fio::DirectoryProtocolOptions::default()),
+                        ..Default::default()
+                    }),
+                    mode: Some(vfs::CreationMode::Never.into()),
+                    flags: Some(fio::NodeFlags::GET_REPRESENTATION),
+                    ..Default::default()
+                }),
+                PATH
+            )
+            .await
+            .expect_err("Open2 succeeded")
+            .root_cause()
+            .downcast_ref::<zx::Status>()
+            .expect("No status"),
+            &zx::Status::NOT_FOUND,
+        );
+
+        open2_dir_checked(
+            &dir,
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    directory: Some(fio::DirectoryProtocolOptions::default()),
+                    ..Default::default()
+                }),
+                mode: Some(vfs::CreationMode::Never.into()),
+                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
+                ..Default::default()
+            }),
+            ".",
+        )
+        .await;
+
         fixture.close().await;
     }
 }

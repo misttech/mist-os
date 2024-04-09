@@ -418,6 +418,41 @@ TEST_P(DirectoryTest, RmdirOnlyAllowsDirectories) {
   EXPECT_EQ(rmdir(baz.c_str()), 0);
 }
 
+TEST_P(DirectoryTest, RmdirOpenFailsAfterwards) {
+  const std::string foo = GetPath("foo");
+  ASSERT_EQ(mkdir(foo.c_str(), 0755), 0);
+  EXPECT_EQ(rmdir(foo.c_str()), 0);
+  ASSERT_EQ(open(foo.c_str(), O_RDWR | O_DIRECTORY, 0644), -1);
+  ASSERT_EQ(errno, ENOENT);
+}
+
+TEST_P(DirectoryTest, RmdirOpenAtDotPassesAfterwards) {
+  const std::string path = GetPath("foo");
+  ASSERT_EQ(mkdir(path.c_str(), 0755), 0);
+
+  fbl::unique_fd fd1(open(path.c_str(), O_RDONLY | O_DIRECTORY, 0644));
+  ASSERT_TRUE(fd1);
+
+  ASSERT_EQ(rmdir(path.c_str()), 0);
+  // Whilst POSIX documentation suggests that dot and dot-dot entries should be removed after
+  // unlinking (see https://pubs.opengroup.org/onlinepubs/009696799/functions/rmdir.html), we want
+  // to match Linux which returns success for `openat(fd, ".", flags)`.
+  fbl::unique_fd fd2(openat(fd1.get(), ".", O_RDONLY | O_DIRECTORY, 0644));
+  ASSERT_TRUE(fd2);
+}
+
+TEST_P(DirectoryTest, RmdirFstatPassesAfterwards) {
+  const std::string path = GetPath("foo");
+  ASSERT_EQ(mkdir(path.c_str(), 0755), 0);
+
+  fbl::unique_fd fd(open(path.c_str(), O_RDONLY | O_DIRECTORY, 0644));
+  ASSERT_TRUE(fd);
+
+  ASSERT_EQ(rmdir(path.c_str()), 0);
+  struct stat stat;
+  EXPECT_EQ(fstat(fd.get(), &stat), 0);
+}
+
 TEST_P(DirectoryTest, Deep) {
   // Make sure it's possible to create a directory that's 200 levels deep.
   std::string path = GetPath("a");

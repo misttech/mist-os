@@ -572,6 +572,20 @@ impl<S: HandleOwner> Directory<S> {
     }
 
     pub async fn get_properties(&self) -> Result<ObjectProperties, Error> {
+        if self.is_deleted() {
+            return Ok(ObjectProperties {
+                refs: 0,
+                allocated_size: 0,
+                data_attribute_size: 0,
+                creation_time: Timestamp::zero(),
+                modification_time: Timestamp::zero(),
+                access_time: Timestamp::zero(),
+                change_time: Timestamp::zero(),
+                sub_dirs: 0,
+                posix_attributes: None,
+            });
+        }
+
         let item = self
             .store()
             .tree()
