@@ -20,11 +20,7 @@ async fn start_nested_cm_and_wait_for_clean_stop(root_url: &str, moniker_to_wait
                 .capability(Capability::event_stream("started").with_scope(&root))
                 .capability(Capability::event_stream("stopped").with_scope(&root))
                 .capability(Capability::event_stream("destroyed").with_scope(&root))
-                .capability(Capability::event_stream("directory_ready").with_scope(&root))
                 .capability(Capability::event_stream("capability_requested").with_scope(&root))
-                .capability(
-                    Capability::event_stream("directory_ready").as_("directory_ready_unscoped"),
-                )
                 .from(Ref::parent())
                 .to(&root),
         )
@@ -63,11 +59,7 @@ async fn from_framework_should_not_work() {
                 .capability(Capability::event_stream("started").with_scope(&root))
                 .capability(Capability::event_stream("stopped").with_scope(&root))
                 .capability(Capability::event_stream("destroyed").with_scope(&root))
-                .capability(Capability::event_stream("directory_ready").with_scope(&root))
                 .capability(Capability::event_stream("capability_requested").with_scope(&root))
-                .capability(
-                    Capability::event_stream("directory_ready").as_("directory_ready_unscoped"),
-                )
                 .from(Ref::framework())
                 .to(&root),
         )
@@ -118,16 +110,6 @@ async fn nested_event_source_test() {
 }
 
 #[fasync::run_singlethreaded(test)]
-async fn event_directory_ready() {
-    start_nested_cm_and_wait_for_clean_stop("#meta/directory_ready_root.cm", "./root").await;
-}
-
-#[fasync::run_singlethreaded(test)]
 async fn event_capability_requested() {
     start_nested_cm_and_wait_for_clean_stop("#meta/capability_requested_root.cm", "./root").await;
-}
-
-#[fasync::run_singlethreaded(test)]
-async fn synthesis_test() {
-    start_nested_cm_and_wait_for_clean_stop("#meta/synthesis_reporter.cm", "./root").await;
 }

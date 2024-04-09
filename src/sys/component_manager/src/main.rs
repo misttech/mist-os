@@ -34,7 +34,6 @@ mod builtin_environment;
 mod capability;
 mod constants;
 mod diagnostics;
-mod directory_ready_notifier;
 mod framework;
 mod inspect_sink_provider;
 mod model;

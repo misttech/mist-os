@@ -287,11 +287,6 @@
             to: "#archivist",
         },
         {
-            event_stream: "directory_ready",
-            from: "parent",
-            to: "#archivist",
-        },
-        {
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.WriteOnlyLog",

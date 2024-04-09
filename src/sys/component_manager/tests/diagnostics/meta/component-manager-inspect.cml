@@ -46,11 +46,6 @@
             to: "#reporter",
         },
         {
-            event_stream: "directory_ready",
-            from: "parent",
-            to: "#archivist",
-        },
-        {
             event_stream: "capability_requested",
             from: "parent",
             to: "#archivist",

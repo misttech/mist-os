@@ -113,6 +113,7 @@ macro_rules! external_events {
                     $(
                         fcomponent::EventType::$name => EventType::$name,
                     )*
+                        fcomponent::EventType::DirectoryReady => unreachable!("This isn't used anymore"),
                 }
             }
         }
@@ -135,8 +136,6 @@ events!([
     /// After a CapabilityProvider has been selected, the CapabilityRequested event is dispatched
     /// with the ServerEnd of the channel for the capability.
     (CapabilityRequested, capability_requested),
-    /// A directory exposed to the framework by a component is available.
-    (DirectoryReady, directory_ready),
     /// A component instance was discovered.
     (Discovered, discovered),
     /// Destruction of an instance has begun. The instance may/may not be stopped by this point.
@@ -158,7 +157,6 @@ events!([
 
 external_events!(
     CapabilityRequested,
-    DirectoryReady,
     Discovered,
     Destroyed,
     Resolved,
@@ -245,10 +243,6 @@ pub enum EventPayload {
         name: String,
         receiver: CapabilityReceiver,
     },
-    DirectoryReady {
-        name: String,
-        node: fio::NodeProxy,
-    },
     Discovered,
     Destroyed,
     Resolved {
@@ -293,9 +287,6 @@ impl fmt::Debug for EventPayload {
         let mut formatter = fmt.debug_struct("EventPayload");
         formatter.field("type", &self.event_type());
         match self {
-            EventPayload::DirectoryReady { name, .. } => {
-                formatter.field("name", &name.as_str()).finish()
-            }
             EventPayload::CapabilityRequested { name, .. } => {
                 formatter.field("name", &name).finish()
             }
@@ -425,7 +416,6 @@ impl TransferEvent for Event {
 impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let payload = match &self.payload {
-            EventPayload::DirectoryReady { name, .. } => format!("serving {}", name),
             EventPayload::CapabilityRequested { source_moniker, name, .. } => {
                 format!("requested '{}' from '{}'", name.to_string(), source_moniker)
             }

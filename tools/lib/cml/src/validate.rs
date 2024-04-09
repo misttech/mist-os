@@ -2717,18 +2717,6 @@ mod tests {
             }),
             Err(Error::Validate { err, .. }) if &err == "\"#something\" is an \"offer\" target from \"framework\" but it does not appear in \"children\" or \"collections\""
         ),
-        test_cml_offer_event_stream_directory_ready_with_filter(
-            json!({
-                "offer": [
-                    {
-                        "event_stream": "directory_ready",
-                        "from" : "framework",
-                        "to": "#something",
-                    },
-                ]
-            }),
-            Err(Error::Validate { err, .. }) if &err == "\"#something\" is an \"offer\" target from \"framework\" but it does not appear in \"children\" or \"collections\""
-        ),
         test_cml_offer_event_stream_multiple_as(
             json!({
                 "offer": [

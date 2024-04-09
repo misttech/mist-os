@@ -56,9 +56,6 @@
             resolver: "boot_resolver",
         },
         {
-            event_stream: "directory_ready",
-        },
-        {
             event_stream: "debug_started",
         },
         {

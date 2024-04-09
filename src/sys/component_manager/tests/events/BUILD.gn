@@ -38,18 +38,6 @@ fuchsia_component("capability_requested_root") {
   manifest = "components/capability_requested/meta/root.cml"
 }
 
-fuchsia_component("directory_ready_child") {
-  testonly = true
-  deps = [ "components:directory_ready_child_bin" ]
-  manifest = "components/directory_ready/meta/child.cml"
-}
-
-fuchsia_component("directory_ready_root") {
-  testonly = true
-  deps = [ "components:directory_ready_root_bin" ]
-  manifest = "components/directory_ready/meta/root.cml"
-}
-
 fuchsia_component("echo_realm") {
   testonly = true
   manifest = "components/scoped/meta/echo_realm.cml"
@@ -91,12 +79,6 @@ fuchsia_component("stub_component") {
   manifest = "components/stub/meta/component.cml"
 }
 
-fuchsia_component("synthesis_reporter") {
-  testonly = true
-  deps = [ "components:synthesis_reporter_bin" ]
-  manifest = "components/synthesis/meta/reporter.cml"
-}
-
 fuchsia_component("realm_offered_reporter") {
   testonly = true
   deps = [ "components:realm_offered_bin" ]
@@ -120,8 +102,6 @@ fuchsia_unittest_package("events_integration_test") {
     ":async_reporter",
     ":capability_requested_child",
     ":capability_requested_root",
-    ":directory_ready_child",
-    ":directory_ready_root",
     ":echo_client",
     ":echo_realm",
     ":echo_reporter",
@@ -133,7 +113,6 @@ fuchsia_unittest_package("events_integration_test") {
     ":realm_offered_reporter",
     ":realm_offered_root",
     ":stub_component",
-    ":synthesis_reporter",
     "//src/sys/component_manager:component-manager-realm-builder-debug-cmp",
   ]
 }

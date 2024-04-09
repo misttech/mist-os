@@ -19,7 +19,6 @@ async fn start_nested_cm_and_wait_for_clean_stop(root_url: &str, moniker_to_wait
                 .capability(Capability::event_stream("destroyed"))
                 .capability(Capability::event_stream("started"))
                 .capability(Capability::event_stream("capability_requested"))
-                .capability(Capability::event_stream("directory_ready"))
                 .from(Ref::parent())
                 .to(&root),
         )

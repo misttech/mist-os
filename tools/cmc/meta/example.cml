@@ -110,12 +110,6 @@
             to: "#modular",
         },
         {
-            event_stream: "directory_ready",
-            from: "parent",
-            to: "#logger",
-            availability: "same_as_target",
-        },
-        {
             event_stream: [
                 "started",
                 "stopped",

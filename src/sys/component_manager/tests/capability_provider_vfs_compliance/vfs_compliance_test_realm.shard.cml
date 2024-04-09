@@ -41,10 +41,7 @@
             to: [ "#vfs-compliance-tests" ],
         },
         {
-            event_stream: [
-                "capability_requested",
-                "directory_ready",
-            ],
+            event_stream: [ "capability_requested" ],
             from: "parent",
             to: "#vfs-compliance-tests",
             scope: "#vfs-compliance-tests",

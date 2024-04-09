@@ -32,7 +32,6 @@ async fn verify_routing_failure_messages() {
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                 .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
                 .capability(Capability::event_stream("capability_requested").with_scope(&root))
-                .capability(Capability::event_stream("directory_ready").with_scope(&root))
                 .from(Ref::parent())
                 .to(&root),
         )

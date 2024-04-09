@@ -23,7 +23,6 @@ lazy_static! {
 pub fn event_name(event_type: &fcomponent::EventType) -> String {
     match event_type {
         fcomponent::EventType::CapabilityRequested => "capability_requested",
-        fcomponent::EventType::DirectoryReady => "directory_ready",
         fcomponent::EventType::Discovered => "discovered",
         fcomponent::EventType::Destroyed => "destroyed",
         fcomponent::EventType::Resolved => "resolved",
@@ -31,6 +30,7 @@ pub fn event_name(event_type: &fcomponent::EventType) -> String {
         fcomponent::EventType::Started => "started",
         fcomponent::EventType::Stopped => "stopped",
         fcomponent::EventType::DebugStarted => "debug_started",
+        fcomponent::EventType::DirectoryReady => unreachable!("directory ready isn't used anymore"),
     }
     .to_string()
 }
@@ -378,31 +378,6 @@ create_event!(
         server_protocols: {},
     },
     error_payload: {}
-);
-create_event!(
-    event_type: DirectoryReady,
-    event_name: directory_ready,
-    payload: {
-        data: {
-            {
-                name: name,
-                ty: String,
-            }
-        },
-        client_protocols: {
-            {
-                name: node,
-                ty: fio::NodeProxy,
-            }
-        },
-        server_protocols: {},
-    },
-    error_payload: {
-        {
-            name: name,
-            ty: String,
-        }
-    }
 );
 create_event!(
     event_type: CapabilityRequested,

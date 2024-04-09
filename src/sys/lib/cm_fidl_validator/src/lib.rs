@@ -4460,13 +4460,6 @@ mod tests {
                         target_name: Some("started".to_string()),
                         ..Default::default()
                     }),
-                    fdecl::Offer::EventStream(fdecl::OfferEventStream {
-                        source_name: Some("diagnostics_ready".to_string()),
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test".to_string(), collection: None})),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test2".to_string(), collection: None})),
-                        target_name: Some("diagnostics_ready".to_string()),
-                        ..Default::default()
-                    }),
                 ]);
                 decl.children = Some(vec![fdecl::Child{
                     name: Some("test".to_string()),
@@ -4507,13 +4500,6 @@ mod tests {
                         target_name: Some("started".to_string()),
                         ..Default::default()
                     }),
-                    fdecl::Offer::EventStream(fdecl::OfferEventStream {
-                        source_name: Some("diagnostics_ready".to_string()),
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test".to_string(), collection: None})),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test2".to_string(), collection: None})),
-                        target_name: Some("diagnostics_ready".to_string()),
-                        ..Default::default()
-                    }),
                 ]);
                 decl.children = Some(vec![fdecl::Child{
                     name: Some("test".to_string()),
@@ -4549,13 +4535,6 @@ mod tests {
                         target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test2".to_string(), collection: None})),
                         scope: Some(vec![]),
                         target_name: Some("started".to_string()),
-                        ..Default::default()
-                    }),
-                    fdecl::Offer::EventStream(fdecl::OfferEventStream {
-                        source_name: Some("diagnostics_ready".to_string()),
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test".to_string(), collection: None})),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test2".to_string(), collection: None})),
-                        target_name: Some("diagnostics_ready".to_string()),
                         ..Default::default()
                     }),
                 ]);
@@ -4594,13 +4573,6 @@ mod tests {
                         target_name: Some("started".to_string()),
                         ..Default::default()
                     }),
-                    fdecl::Offer::EventStream(fdecl::OfferEventStream {
-                        source_name: Some("diagnostics_ready".to_string()),
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test".to_string(), collection: None})),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test2".to_string(), collection: None})),
-                        target_name: Some("diagnostics_ready".to_string()),
-                        ..Default::default()
-                    }),
                 ]);
                 decl.children = Some(vec![fdecl::Child{
                     name: Some("test".to_string()),
@@ -4637,13 +4609,6 @@ mod tests {
                         target_name: Some("started".to_string()),
                         ..Default::default()
                     }),
-                    fdecl::Offer::EventStream(fdecl::OfferEventStream {
-                        source_name: Some("diagnostics_ready".to_string()),
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test".to_string(), collection: None})),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test2".to_string(), collection: None})),
-                        target_name: Some("diagnostics_ready".to_string()),
-                        ..Default::default()
-                    }),
                 ]);
                 decl.children = Some(vec![fdecl::Child{
                     name: Some("test".to_string()),
@@ -4678,13 +4643,6 @@ mod tests {
                         target_name: Some("started".to_string()),
                         ..Default::default()
                     }),
-                    fdecl::Offer::EventStream(fdecl::OfferEventStream {
-                        source_name: Some("directory_ready".to_string()),
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test".to_string(), collection: None})),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test2".to_string(), collection: None})),
-                        target_name: Some("diagnostics_ready".to_string()),
-                        ..Default::default()
-                    }),
                 ]);
                 decl.children = Some(vec![fdecl::Child{
                     name: Some("test".to_string()),
@@ -4717,13 +4675,6 @@ mod tests {
                         target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test2".to_string(), collection: None})),
                         scope: Some(vec![fdecl::Ref::Child(fdecl::ChildRef{name: "test2".to_string(), collection: None})]),
                         target_name: Some("started".to_string()),
-                        ..Default::default()
-                    }),
-                    fdecl::Offer::EventStream(fdecl::OfferEventStream {
-                        source_name: Some("diagnostics_ready".to_string()),
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test".to_string(), collection: None})),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test2".to_string(), collection: None})),
-                        target_name: Some("diagnostics_ready".to_string()),
                         ..Default::default()
                     }),
                 ]);
@@ -4769,10 +4720,10 @@ mod tests {
                         ..Default::default()
                     }),
                     fdecl::Offer::EventStream(fdecl::OfferEventStream {
-                        source_name: Some("diagnostics_ready".to_string()),
+                        source_name: Some("capability_requested".to_string()),
                         source: Some(fdecl::Ref::Debug(fdecl::DebugRef{})),
                         target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test2".to_string(), collection: None})),
-                        target_name: Some("diagnostics_ready".to_string()),
+                        target_name: Some("capability_requested".to_string()),
                         ..Default::default()
                     }),
                 ]);
@@ -4819,9 +4770,9 @@ mod tests {
                         ..Default::default()
                     }),
                     fdecl::Offer::EventStream(fdecl::OfferEventStream {
-                        source_name: Some("diagnostics_ready".to_string()),
+                        source_name: Some("capability_requested".to_string()),
                         target: Some(fdecl::Ref::Child(fdecl::ChildRef{name: "test2".to_string(), collection: None})),
-                        target_name: Some("diagnostics_ready".to_string()),
+                        target_name: Some("capability_requested".to_string()),
                         ..Default::default()
                     }),
                 ]);

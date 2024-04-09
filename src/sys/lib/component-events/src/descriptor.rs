@@ -21,10 +21,6 @@ impl TryFrom<&fcomponent::Event> for EventDescriptor {
         let event_type = event.header.as_ref().and_then(|header| header.event_type.clone());
         let target_moniker = event.header.as_ref().and_then(|header| header.moniker.clone());
         let capability_name = match &event.payload {
-            Some(fcomponent::EventPayload::DirectoryReady(fcomponent::DirectoryReadyPayload {
-                name,
-                ..
-            })) => name.clone(),
             Some(fcomponent::EventPayload::CapabilityRequested(
                 fcomponent::CapabilityRequestedPayload { name, .. },
             )) => name.clone(),

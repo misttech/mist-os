@@ -218,14 +218,6 @@ fn example_cml_integration_test() {
 
     let offers = vec![
         Offer::EventStream(OfferEventStream {
-            source_name: Some("directory_ready".to_string()),
-            source: Some(Ref::Parent(ParentRef {})),
-            target: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
-            target_name: Some("directory_ready".to_string()),
-            availability: Some(Availability::SameAsTarget),
-            ..Default::default()
-        }),
-        Offer::EventStream(OfferEventStream {
             source_name: Some("started".to_string()),
             source: Some(Ref::Parent(ParentRef {})),
             target: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),

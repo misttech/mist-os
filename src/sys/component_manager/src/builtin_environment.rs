@@ -48,7 +48,6 @@ use {
         },
         capability::{BuiltinCapability, CapabilitySource, DerivedCapability, FrameworkCapability},
         diagnostics::{startup::ComponentEarlyStartupTimeStats, task_metrics::ComponentTreeStats},
-        directory_ready_notifier::DirectoryReadyNotifier,
         framework::{
             binder::BinderFrameworkCapability,
             factory::{FactoryCapabilityHost, FactoryFrameworkCapability},
@@ -494,9 +493,6 @@ pub struct BuiltinEnvironment {
     pub event_source_factory: Arc<EventSourceFactory>,
     pub factory_capability_host: Arc<FactoryCapabilityHost>,
     pub stop_notifier: Arc<RootStopNotifier>,
-    // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
-    #[allow(dead_code)]
-    pub directory_ready_notifier: Arc<DirectoryReadyNotifier>,
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
     pub inspect_sink_provider: Arc<InspectSinkProvider>,
@@ -1028,21 +1024,12 @@ impl BuiltinEnvironment {
             },
         );
 
-        // Set up the directory ready notifier.
-        let directory_ready_notifier =
-            Arc::new(DirectoryReadyNotifier::new(Arc::downgrade(&model)));
-        model.root().hooks.install(directory_ready_notifier.hooks()).await;
-
         // Set up the Inspect sink provider.
         let inspect_sink_provider = Arc::new(InspectSinkProvider::new(inspector));
 
         // Set up the event registry.
         let event_registry = {
             let mut event_registry = EventRegistry::new(Arc::downgrade(&model));
-            event_registry.register_synthesis_provider(
-                EventType::DirectoryReady,
-                directory_ready_notifier.clone(),
-            );
             event_registry.register_synthesis_provider(
                 EventType::CapabilityRequested,
                 inspect_sink_provider.clone(),
@@ -1157,7 +1144,6 @@ impl BuiltinEnvironment {
             event_source_factory,
             factory_capability_host,
             stop_notifier,
-            directory_ready_notifier,
             inspect_sink_provider,
             event_stream_provider,
             event_logger,

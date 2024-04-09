@@ -356,9 +356,6 @@ fn create_event_payloads(
     event_payload: &EventPayload,
 ) -> BoxStream<Result<fcomponent::EventPayload, fidl::Error>> {
     match event_payload {
-        EventPayload::DirectoryReady { name, node, .. } => {
-            stream_once(create_directory_ready_payload(name.to_string(), node))
-        }
         EventPayload::CapabilityRequested { name, receiver, .. } => {
             create_capability_requested_payload(name.to_string(), receiver.clone())
         }
@@ -390,26 +387,6 @@ fn create_event_payloads(
             _ => unreachable!("Unsupported event type"),
         })),
     }
-}
-
-fn create_directory_ready_payload(
-    name: String,
-    node: &fio::NodeProxy,
-) -> Result<fcomponent::EventPayload, fidl::Error> {
-    let node = {
-        let (node_clone, server_end) = fidl::endpoints::create_proxy()?;
-        node.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end)?;
-        let node_client_end = node_clone
-            .into_channel()
-            .expect("could not convert directory to channel")
-            .into_zx_channel()
-            .into();
-        Some(node_client_end)
-    };
-
-    let payload =
-        fcomponent::DirectoryReadyPayload { name: Some(name), node, ..Default::default() };
-    Ok(fcomponent::EventPayload::DirectoryReady(payload))
 }
 
 fn create_capability_requested_payload(

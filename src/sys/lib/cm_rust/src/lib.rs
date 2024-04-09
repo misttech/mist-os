@@ -3102,17 +3102,6 @@ mod tests {
                         availability: Some(fdecl::Availability::Required),
                         ..Default::default()
                     }),
-                    fdecl::Offer::EventStream (
-                        fdecl::OfferEventStream {
-                            source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
-                            source_name: Some("diagnostics_ready".to_string()),
-                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {name: "netstack".to_string(), collection: None})),
-                            scope: Some(vec![fdecl::Ref::Child(fdecl::ChildRef{name: "netstack".to_string(), collection: None})]),
-                            target_name: Some("diagnostics_ready".to_string()),
-                            availability: Some(fdecl::Availability::Optional),
-                            ..Default::default()
-                        }
-                    ),
                     fdecl::Offer::Dictionary(fdecl::OfferDictionary {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         source_name: Some("bundle".to_string()),
@@ -3512,16 +3501,6 @@ mod tests {
                             target_name: "mynetstack3".parse().unwrap(),
                             availability: Availability::Required,
                         }),
-                        OfferDecl::EventStream (
-                            OfferEventStreamDecl {
-                                source: OfferSource::Parent,
-                                source_name: "diagnostics_ready".parse().unwrap(),
-                                target: OfferTarget::Child(ChildRef{name: "netstack".into(), collection: None}),
-                                scope: Some(vec![EventScope::Child(ChildRef{ name: "netstack".into(), collection: None})]),
-                                target_name: "diagnostics_ready".parse().unwrap(),
-                                availability: Availability::Optional,
-                            }
-                        ),
                         OfferDecl::Dictionary(OfferDictionaryDecl {
                             source: OfferSource::Parent,
                             source_name: "bundle".parse().unwrap(),

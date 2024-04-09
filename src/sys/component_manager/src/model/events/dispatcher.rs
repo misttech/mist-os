@@ -150,9 +150,6 @@ impl EventDispatcherScope {
             EventPayload::CapabilityRequested { name, .. } => Some(btreemap! {
                 "name".to_string() => DictionaryValue::Str(name.into())
             }),
-            EventPayload::DirectoryReady { name, .. } => Some(btreemap! {
-                "name".to_string() => DictionaryValue::Str(name.into())
-            }),
             _ => None,
         };
         self.filter.has_fields(&filterable_fields)

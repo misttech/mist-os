@@ -38,9 +38,6 @@
             resolver: "realm_builder_resolver",
         },
         {
-            event_stream: "directory_ready",
-        },
-        {
             event_stream: "started",
         },
         {
