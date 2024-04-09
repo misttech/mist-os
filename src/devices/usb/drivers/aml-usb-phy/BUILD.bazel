@@ -1,0 +1,150 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_driver",
+    "fuchsia_cc_test",
+    "fuchsia_component_manifest",
+    "fuchsia_driver_bind_bytecode",
+    "fuchsia_driver_component",
+    "fuchsia_package",
+    "fuchsia_unittest_package",
+)
+
+fuchsia_driver_bind_bytecode(
+    name = "aml-usb-phy-bind",
+    output = "aml-usb-phy.bindbc",
+    rules = "aml_usb_phy.bind",
+    deps = [
+        "@fuchsia_sdk//bind/fuchsia.amlogic.platform",
+        "@fuchsia_sdk//bind/fuchsia.clock",
+        "@fuchsia_sdk//bind/fuchsia.devicetree",
+        "@fuchsia_sdk//bind/fuchsia.gpio",
+        "@fuchsia_sdk//bind/fuchsia.platform",
+        "@fuchsia_sdk//bind/fuchsia.register",
+        "@internal_sdk//fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_bindlib",
+    ],
+)
+
+fuchsia_cc_driver(
+    name = "aml-usb-phy-driver",
+    srcs = [
+        "aml-usb-phy.cc",
+        "aml-usb-phy.h",
+        "aml-usb-phy-device.cc",
+        "aml-usb-phy-device.h",
+        "power-regs.h",
+        "usb-phy-base.h",
+        "usb-phy-regs.h",
+        "usb-phy2.cc",
+        "usb-phy2.h",
+        "usb-phy2-regs.h",
+        "usb-phy3.cc",
+        "usb-phy3.h",
+        "usb-phy3-regs.h",
+    ],
+    defines = [
+        "ZX_ASSERT_LEVEL=2",
+        "_ALL_SOURCE",
+    ],
+    output_name = "aml-usb-phy",
+    deps = [
+        "//src/devices/lib/amlogic",
+        "@fuchsia_sdk//bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cc",
+        "@fuchsia_sdk//bind/fuchsia:fuchsia_cc",
+        "@fuchsia_sdk//bind/fuchsia.platform:fuchsia.platform_cc",
+        "@fuchsia_sdk//bind/fuchsia.register:fuchsia.register_cc",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+        "@fuchsia_sdk//pkg/ddk",
+        "@fuchsia_sdk//pkg/driver_component_cpp",
+        "@fuchsia_sdk//pkg/driver_runtime",
+        "@fuchsia_sdk//pkg/hwreg",
+        "@fuchsia_sdk//pkg/mmio",
+        "@fuchsia_sdk//pkg/zx",
+        "@internal_sdk//fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+        "@internal_sdk//fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
+        "@internal_sdk//fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
+        "@internal_sdk//pkg/ddk-platform-defs",
+        "@internal_sdk//pkg/driver_compat",
+    ],
+)
+
+fuchsia_component_manifest(
+    name = "manifest",
+    src = "meta/aml-usb-phy.cml",
+)
+
+fuchsia_driver_component(
+    name = "component",
+    bind_bytecode = ":aml-usb-phy-bind",
+    driver_lib = ":aml-usb-phy-driver",
+    manifest = ":manifest",
+)
+
+fuchsia_package(
+    name = "aml-usb-phy",
+    package_name = "aml-usb-phy",
+    components = [":component"],
+    fuchsia_api_level = "HEAD",
+    package_repository_name = "fuchsia.com",
+    visibility = ["//visibility:public"],
+)
+
+# Tests
+fuchsia_cc_test(
+    name = "aml-usb-phy-test-bin",
+    size = "small",
+    srcs = [
+        "aml-usb-phy.cc",
+        "aml-usb-phy.h",
+        "aml-usb-phy-device.cc",
+        "aml-usb-phy-device.h",
+        "aml-usb-phy-test.cc",
+        "power-regs.h",
+        "usb-phy-base.h",
+        "usb-phy-regs.h",
+        "usb-phy2.cc",
+        "usb-phy2.h",
+        "usb-phy2-regs.h",
+        "usb-phy3.cc",
+        "usb-phy3.h",
+        "usb-phy3-regs.h",
+    ],
+    defines = [
+        "_ALL_SOURCE",
+    ],
+    deps = [
+        "//src/devices/lib/amlogic",
+        "@com_google_googletest//:gtest_main",
+        "@fuchsia_sdk//bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cc",
+        "@fuchsia_sdk//bind/fuchsia:fuchsia_cc",
+        "@fuchsia_sdk//bind/fuchsia.platform:fuchsia.platform_cc",
+        "@fuchsia_sdk//bind/fuchsia.register:fuchsia.register_cc",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+        "@fuchsia_sdk//pkg/async_patterns_testing_cpp",
+        "@fuchsia_sdk//pkg/ddk",
+        "@fuchsia_sdk//pkg/driver_component_cpp",
+        "@fuchsia_sdk//pkg/driver_runtime",
+        "@fuchsia_sdk//pkg/driver_testing_cpp",
+        "@fuchsia_sdk//pkg/hwreg",
+        "@fuchsia_sdk//pkg/mmio",
+        "@fuchsia_sdk//pkg/zx",
+        "@internal_sdk//fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+        "@internal_sdk//fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
+        "@internal_sdk//fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
+        "@internal_sdk//pkg/ddk-platform-defs",
+        "@internal_sdk//pkg/driver_compat",
+        "@internal_sdk//pkg/fake-mmio-reg",
+        "@internal_sdk//pkg/mock-registers",
+    ],
+)
+
+fuchsia_unittest_package(
+    name = "aml-usb-phy-test-package",
+    package_name = "aml-usb-phy-test",
+    fuchsia_api_level = "HEAD",
+    unit_tests = [":aml-usb-phy-test-bin"],
+    visibility = ["//visibility:public"],
+)

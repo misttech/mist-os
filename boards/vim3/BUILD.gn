@@ -223,7 +223,7 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/dwc2.cm" ]
     },
     {
-      package_target = "//src/devices/usb/drivers/aml-usb-phy:package"
+      package_target = "//src/devices/usb/drivers/aml-usb-phy:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-usb-phy.cm" ]
     },

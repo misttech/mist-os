@@ -15,8 +15,8 @@
 #include <lib/zx/interrupt.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
+#include <gtest/gtest.h>
 #include <soc/aml-common/aml-registers.h>
-#include <zxtest/zxtest.h>
 
 #include "src/devices/registers/testing/mock-registers/mock-registers.h"
 #include "src/devices/usb/drivers/aml-usb-phy/usb-phy-regs.h"
@@ -47,7 +47,7 @@ class FakeMmio {
 class FakePDev : public fidl::testing::WireTestBase<fuchsia_hardware_platform_device::Device> {
  public:
   FakePDev() {
-    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &interrupt_));
+    EXPECT_EQ(ZX_OK, zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &interrupt_));
   }
 
   fuchsia_hardware_platform_device::Service::InstanceHandler GetInstanceHandler(
@@ -124,7 +124,7 @@ struct IncomingNamespace {
 };
 
 // Fixture that supports tests of AmlUsbPhy::Create.
-class AmlUsbPhyTest : public zxtest::Test {
+class AmlUsbPhyTest : public testing::Test {
  public:
   void SetUp() override {
     static constexpr uint32_t kMagicNumbers[8] = {};
@@ -151,16 +151,16 @@ class AmlUsbPhyTest : public zxtest::Test {
       // Serve metadata.
       auto status = incoming->device_server_.AddMetadata(DEVICE_METADATA_PRIVATE, &kMagicNumbers,
                                                          sizeof(kMagicNumbers));
-      EXPECT_OK(status);
+      EXPECT_EQ(ZX_OK, status);
       status = incoming->device_server_.AddMetadata(
           DEVICE_METADATA_PRIVATE_PHY_TYPE | DEVICE_METADATA_PRIVATE, &kPhyType, sizeof(kPhyType));
-      EXPECT_OK(status);
+      EXPECT_EQ(ZX_OK, status);
       status = incoming->device_server_.AddMetadata(DEVICE_METADATA_USB_MODE, kPhyModes.data(),
                                                     kPhyModes.size() * sizeof(kPhyModes[0]));
-      EXPECT_OK(status);
+      EXPECT_EQ(ZX_OK, status);
       status = incoming->device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                               &incoming->env_.incoming_directory());
-      EXPECT_OK(status);
+      EXPECT_EQ(ZX_OK, status);
 
       // Serve pdev_server.
       auto result =
@@ -295,21 +295,21 @@ TEST_F(AmlUsbPhyTest, ConnectStatusChanged) {
   CheckDevices(phy, {"xhci"});
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints);
+  ASSERT_TRUE(endpoints.is_ok());
   auto status = fdio_open_at(outgoing_.handle()->get(), "/svc",
                              static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
                              endpoints->server.TakeChannel().release());
-  ASSERT_OK(status);
+  EXPECT_EQ(ZX_OK, status);
 
   auto result = fdf::internal::DriverTransportConnect<fuchsia_hardware_usb_phy::Service::Device>(
       endpoints->client, "xhci");
-  ASSERT_OK(result);
+  ASSERT_TRUE(result.is_ok());
 
   runtime_.PerformBlockingWork([&result]() {
     fdf::Arena arena('TEST');
     fdf::WireUnownedResult wire_result =
         fdf::WireCall(*result).buffer(arena)->ConnectStatusChanged(true);
-    ASSERT_OK(wire_result.status());
+    EXPECT_EQ(ZX_OK, wire_result.status());
     ASSERT_TRUE(wire_result.value().is_ok());
   });
 

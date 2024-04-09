@@ -139,6 +139,7 @@ group("non_hermetic_deps") {
     "//src/devices/board/drivers/vim3-devicetree:*",
     "//src/devices/gpio/drivers/aml-gpio:*",
     "//src/devices/i2c/drivers/aml-i2c:*",
+    "//src/devices/usb/drivers/aml-usb-phy:*",
   ]
 
   # Bluetooth Bazel test packages are wrapped in the bazel_fuchsia_test_package

@@ -258,7 +258,6 @@ source_set("ddktl") {
     "//src/devices/tpm/drivers/cr50-spi:*",
     "//src/devices/tpm/drivers/tpm:*",
     "//src/devices/tpm/drivers/tpm-lpc:*",
-    "//src/devices/usb/drivers/aml-usb-phy:*",
     "//src/devices/usb/drivers/crg-udc:*",
     "//src/devices/usb/drivers/dwc2:*",
     "//src/devices/usb/drivers/dwc3:*",
