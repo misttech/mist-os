@@ -8,10 +8,6 @@
             url: "fuchsia-boot:///archivist#meta/archivist.cm",
         },
         {
-            name: "device_name_provider",
-            url: "fuchsia-boot:///device-name-provider#meta/device-name-provider.cm",
-        },
-        {
             name: "fshost",
             url: "fuchsia-boot:///#meta/fshost.cm",
             environment: "#fshost-env",
@@ -146,14 +142,6 @@
             to: "#svchost",
         },
         {
-            protocol: [
-                "fuchsia.boot.Arguments",
-                "fuchsia.boot.WriteOnlyLog",
-            ],
-            from: "parent",
-            to: "#device_name_provider",
-        },
-        {
             protocol: [ "fuchsia.boot.WriteOnlyLog" ],
             from: "parent",
             to: [
@@ -193,13 +181,6 @@
             to: "#miscsvc",
         },
         {
-            directory: "dev-class",
-            from: "#devfs-with-pkg",
-            as: "dev-class-network",
-            to: "#device_name_provider",
-            subdir: "network",
-        },
-        {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "#shutdown_shim",
             to: [
@@ -237,7 +218,6 @@
             ],
             from: "#archivist",
             to: [
-                "#device_name_provider",
                 "#fshost",
                 "#miscsvc",
                 "#pwrbtn-monitor",
