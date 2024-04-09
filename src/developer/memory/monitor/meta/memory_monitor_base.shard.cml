@@ -22,7 +22,6 @@
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
-                "fuchsia.memory.report.SnapshotProvider",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.scheduler.RoleManager",
             ],

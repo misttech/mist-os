@@ -71,8 +71,12 @@ pub enum JobError {
 pub enum StartInfoError {
     #[error(transparent)]
     StartInfoError(#[from] runner::StartInfoError),
+    #[error("missing outgoing dir")]
+    MissingOutgoingDir,
     #[error("missing runtime dir")]
     MissingRuntimeDir,
+    #[error("missing component instance token")]
+    MissingComponentInstanceToken,
     #[error("component resolved URL is malformed: {_0}")]
     BadResolvedUrl(String),
     #[error("program is invalid: {_0}")]
@@ -84,7 +88,9 @@ impl StartInfoError {
     pub fn as_zx_status(&self) -> zx::Status {
         match self {
             StartInfoError::StartInfoError(err) => err.as_zx_status(),
+            StartInfoError::MissingOutgoingDir => zx::Status::INVALID_ARGS,
             StartInfoError::MissingRuntimeDir => zx::Status::INVALID_ARGS,
+            StartInfoError::MissingComponentInstanceToken => zx::Status::INVALID_ARGS,
             StartInfoError::BadResolvedUrl(_) => zx::Status::INVALID_ARGS,
             StartInfoError::ProgramError(err) => err.as_zx_status(),
         }

@@ -8,7 +8,7 @@
     },
     capabilities: [
         { protocol: "fuchsia.component.runner.ComponentRunner" },
-        { protocol: "fuchsia.memory.report.SnapshotProvider" },
+        { protocol: "fuchsia.memory.attribution.Provider" },
         {
             runner: "elf",
             path: "/svc/fuchsia.component.runner.ComponentRunner",
@@ -27,7 +27,7 @@
             from: "self",
         },
         {
-            protocol: "fuchsia.memory.report.SnapshotProvider",
+            protocol: "fuchsia.memory.attribution.Provider",
             from: "self",
         },
     ],

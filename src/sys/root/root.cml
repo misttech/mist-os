@@ -198,7 +198,7 @@
             to: "#core",
         },
         {
-            protocol: [ "fuchsia.memory.report.SnapshotProvider" ],
+            protocol: [ "fuchsia.memory.attribution.Provider" ],
             from: "#elf_runner",
             to: "#core",
         },

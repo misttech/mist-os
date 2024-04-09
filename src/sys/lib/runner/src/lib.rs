@@ -335,6 +335,17 @@ pub struct StartInfo {
     /// they drop the other side of the eventpair, which is sent in the payload of
     /// the DebugStarted event in fuchsia.component.events.
     pub break_on_start: Option<zx::EventPair>,
+
+    /// An opaque token that represents the component instance.
+    ///
+    /// The `fuchsia.component/Introspector` protocol may be used to get the
+    /// string moniker of the instance from this token.
+    ///
+    /// Runners may publish this token as part of diagnostics information, to
+    /// identify the running component without knowing its moniker.
+    ///
+    /// The token is invalidated when the component instance is destroyed.
+    pub component_instance: Option<zx::Event>,
 }
 
 impl TryFrom<fcrunner::ComponentStartInfo> for StartInfo {
@@ -352,6 +363,7 @@ impl TryFrom<fcrunner::ComponentStartInfo> for StartInfo {
             numbered_handles: start_info.numbered_handles.unwrap_or_else(|| Vec::new()),
             encoded_config: start_info.encoded_config,
             break_on_start: start_info.break_on_start,
+            component_instance: start_info.component_instance,
         })
     }
 }

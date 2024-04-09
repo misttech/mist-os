@@ -17,6 +17,7 @@ const STOP_EVENT_KEY: &str = "lifecycle.stop_event";
 const STOP_EVENT_VARIANTS: [&'static str; 2] = ["notify", "ignore"];
 const USE_NEXT_VDSO_KEY: &str = "use_next_vdso";
 const JOB_WITH_AVAILABLE_EXCEPTION_CHANNEL_KEY: &str = "job_with_available_exception_channel";
+const MEMORY_ATTRIBUTION: &str = "memory_attribution";
 
 /// Target sink for stdout and stderr output streams.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -34,7 +35,7 @@ impl Default for StreamSink {
 }
 
 /// Parsed representation of the `ComponentStartInfo.program` dictionary.
-#[derive(Debug, Default, Eq, PartialEq)]
+#[derive(Debug, Default, Eq, PartialEq, Clone)]
 pub struct ElfProgramConfig {
     pub binary: String,
     pub args: Vec<String>,
@@ -45,6 +46,7 @@ pub struct ElfProgramConfig {
     pub is_shared_process: bool,
     pub use_next_vdso: bool,
     pub job_with_available_exception_channel: bool,
+    pub memory_attribution: bool,
     pub stdout_sink: StreamSink,
     pub stderr_sink: StreamSink,
     pub environ: Option<Vec<String>>,
@@ -102,6 +104,7 @@ impl ElfProgramConfig {
                 program,
                 JOB_WITH_AVAILABLE_EXCEPTION_CHANNEL_KEY,
             )?,
+            memory_attribution: runner::get_bool(program, MEMORY_ATTRIBUTION)?,
             stdout_sink: get_stream_sink(&program, FORWARD_STDOUT_KEY)?,
             stderr_sink: get_stream_sink(&program, FORWARD_STDERR_KEY)?,
             environ: runner::get_environ(&program)?,

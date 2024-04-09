@@ -33,7 +33,8 @@ use {
     fidl_fuchsia_diagnostics_types::{
         ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
     },
-    fidl_fuchsia_memory_report as freport, fidl_fuchsia_process as fproc,
+    fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
+    fidl_fuchsia_process as fproc,
     fidl_fuchsia_process_lifecycle::LifecycleMarker,
     fuchsia_async::{self as fasync, TimeoutExt},
     fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType},
@@ -91,7 +92,8 @@ pub struct ElfRunner {
     /// Tracks the ELF components that are currently running under this runner.
     components: Arc<ComponentSet>,
 
-    memory_reporter: Arc<MemoryReporter>,
+    /// Tracks reporting memory changes to an observer.
+    memory_reporter: MemoryReporter,
 }
 
 /// The job for a component.
@@ -124,7 +126,7 @@ impl ElfRunner {
         crash_records: CrashRecords,
     ) -> ElfRunner {
         let components = ComponentSet::new();
-        let memory_reporter = Arc::new(MemoryReporter::new(components.clone()));
+        let memory_reporter = MemoryReporter::new(components.clone());
         ElfRunner { job, launcher_connector, utc_clock, crash_records, components, memory_reporter }
     }
 
@@ -341,6 +343,28 @@ impl ElfRunner {
             .job_id(job_koid)
             .serve();
 
+        // If the component supports memory attribution, clone its outgoing directory connection
+        // so that we may later connect to it.
+        let outgoing_directory = if program_config.memory_attribution {
+            let Some(outgoing_dir) = start_info.outgoing_dir else {
+                return Err(StartComponentError::StartInfoError(
+                    StartInfoError::MissingOutgoingDir,
+                ));
+            };
+            let (outgoing_dir_client, outgoing_dir_server) = fidl::endpoints::create_endpoints();
+            start_info.outgoing_dir = Some(outgoing_dir_server);
+            fdio::open_at(
+                outgoing_dir_client.channel(),
+                ".",
+                fio::OpenFlags::DIRECTORY,
+                outgoing_dir.into_channel(),
+            )
+            .unwrap();
+            Some(outgoing_dir_client)
+        } else {
+            None
+        };
+
         // Create procarg handles.
         let mut handle_infos = ElfRunner::create_handle_infos(
             start_info.outgoing_dir.map(|dir| dir.into_channel()),
@@ -449,6 +473,11 @@ impl ElfRunner {
             program_config.main_process_critical,
             stdout_and_stderr_tasks,
             resolved_url.clone(),
+            outgoing_directory,
+            program_config,
+            start_info.component_instance.ok_or(StartComponentError::StartInfoError(
+                StartInfoError::MissingComponentInstanceToken,
+            ))?,
         ))
     }
 
@@ -459,17 +488,8 @@ impl ElfRunner {
         Arc::new(ScopedElfRunner { runner: self, checker })
     }
 
-    pub fn serve_memory_reporter(&self, stream: freport::SnapshotProviderRequestStream) {
-        let memory_reporter = self.memory_reporter.clone();
-        fasync::Task::spawn(async move {
-            match memory_reporter.serve(stream).await {
-                Err(err) => {
-                    tracing::error!("Error serving SnapshotProvider: {err}");
-                }
-                Ok(()) => {}
-            }
-        })
-        .detach();
+    pub fn serve_memory_reporter(&self, stream: fattribution::ProviderRequestStream) {
+        self.memory_reporter.serve(stream);
     }
 }
 
@@ -599,7 +619,7 @@ async fn start(
     .detach();
 
     let mut elf_component = elf_component;
-    runner.components.clone().add(&mut elf_component).await;
+    runner.components.clone().add(&mut elf_component);
 
     // Create a future which owns and serves the controller
     // channel. The `epitaph_fn` future completes when the
@@ -739,6 +759,7 @@ mod tests {
             ns: Some(ns),
             outgoing_dir: None,
             runtime_dir: Some(runtime_dir),
+            component_instance: Some(zx::Event::create()),
             ..Default::default()
         }
     }
@@ -765,6 +786,7 @@ mod tests {
             ns: Some(ns),
             outgoing_dir: None,
             runtime_dir: Some(runtime_dir),
+            component_instance: Some(zx::Event::create()),
             ..Default::default()
         }
     }
@@ -806,6 +828,7 @@ mod tests {
             ns: Some(ns),
             outgoing_dir: None,
             runtime_dir: Some(runtime_dir),
+            component_instance: Some(zx::Event::create()),
             ..Default::default()
         }
     }
@@ -834,6 +857,9 @@ mod tests {
             critical,
             Vec::new(),
             "".to_string(),
+            None,
+            Default::default(),
+            zx::Event::create(),
         );
         (job, component)
     }
@@ -1280,6 +1306,7 @@ mod tests {
             ns: Some(ns),
             outgoing_dir: None,
             runtime_dir: Some(runtime_dir),
+            component_instance: Some(zx::Event::create()),
             ..Default::default()
         }
     }
@@ -1537,12 +1564,9 @@ mod tests {
 
         // Initially there are zero components.
         let count = Arc::new(AtomicUsize::new(0));
-        components
-            .clone()
-            .visit(|_, _| {
-                count.fetch_add(1, Ordering::SeqCst);
-            })
-            .await;
+        components.clone().visit(|_, _| {
+            count.fetch_add(1, Ordering::SeqCst);
+        });
         assert_eq!(count.load(Ordering::SeqCst), 0);
 
         // Run a component.
@@ -1556,16 +1580,13 @@ mod tests {
 
         // There should now be one component in the set.
         let count = Arc::new(AtomicUsize::new(0));
-        components
-            .clone()
-            .visit(|elf_component: &ElfComponentInfo, _| {
-                assert_eq!(
-                    elf_component.get_url().as_str(),
-                    "fuchsia-pkg://fuchsia.com/lifecycle-example#meta/lifecycle.cm"
-                );
-                count.fetch_add(1, Ordering::SeqCst);
-            })
-            .await;
+        components.clone().visit(|elf_component: &ElfComponentInfo, _| {
+            assert_eq!(
+                elf_component.get_url().as_str(),
+                "fuchsia-pkg://fuchsia.com/lifecycle-example#meta/lifecycle.cm"
+            );
+            count.fetch_add(1, Ordering::SeqCst);
+        });
         assert_eq!(count.load(Ordering::SeqCst), 1);
 
         // Stop the component.
@@ -1576,12 +1597,9 @@ mod tests {
         // Keep retrying until the component is asynchronously deregistered.
         loop {
             let count = Arc::new(AtomicUsize::new(0));
-            components
-                .clone()
-                .visit(|_, _| {
-                    count.fetch_add(1, Ordering::SeqCst);
-                })
-                .await;
+            components.clone().visit(|_, _| {
+                count.fetch_add(1, Ordering::SeqCst);
+            });
             let count = count.load(Ordering::SeqCst);
             assert!(count == 0 || count == 1);
             if count == 0 {
@@ -1639,6 +1657,7 @@ mod tests {
             ns: Some(ns),
             outgoing_dir: Some(outgoing_dir),
             runtime_dir: Some(runtime_dir),
+            component_instance: Some(zx::Event::create()),
             ..Default::default()
         }
     }

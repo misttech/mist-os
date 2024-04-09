@@ -41,7 +41,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
-    "//sdk/fidl/fuchsia.memory.report:fuchsia.memory.report_rust",
+    "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/fidl/fuchsia.time:fuchsia.time_rust",

@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::{runtime_dir::RuntimeDirectory, Job},
+    crate::{config::ElfProgramConfig, runtime_dir::RuntimeDirectory, Job},
     async_trait::async_trait,
+    fidl::endpoints::ClientEnd,
     fidl::endpoints::Proxy,
     fidl_fuchsia_component_runner::ComponentControllerOnEscrowRequest,
+    fidl_fuchsia_io as fio,
     fidl_fuchsia_process_lifecycle::{LifecycleEvent, LifecycleProxy},
     fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Process, Task},
@@ -31,6 +33,9 @@ pub struct ElfComponentInfo {
     /// Moniker of the ELF component.
     moniker: Moniker,
 
+    /// Instance token of the component.
+    component_instance: zx::Event,
+
     /// Job in which the underlying process that represents the component is
     /// running.
     job: Arc<Job>,
@@ -41,6 +46,15 @@ pub struct ElfComponentInfo {
 
     /// URL with which the component was launched.
     component_url: String,
+
+    /// A connection to the component's outgoing directory.
+    ///
+    /// This option will be present if the ELF runner needs to open capabilities
+    /// exposed by the ELF component.
+    outgoing_directory_for_memory_attribution: Option<ClientEnd<fio::DirectoryMarker>>,
+
+    /// Configurations from the program block.
+    program_config: ElfProgramConfig,
 }
 
 impl ElfComponentInfo {
@@ -57,6 +71,14 @@ impl ElfComponentInfo {
         self.job.clone()
     }
 
+    pub fn get_outgoing_directory(&self) -> Option<&ClientEnd<fio::DirectoryMarker>> {
+        self.outgoing_directory_for_memory_attribution.as_ref()
+    }
+
+    pub fn get_program_config(&self) -> &ElfProgramConfig {
+        &self.program_config
+    }
+
     /// Return a handle to the Job containing the process for this component.
     ///
     /// The rights of the job will be set such that the resulting handle will be appropriate to
@@ -64,6 +86,10 @@ impl ElfComponentInfo {
     /// INSPECT).
     pub fn copy_job_for_diagnostics(&self) -> Result<zx::Job, zx::Status> {
         self.job.top().duplicate_handle(zx::Rights::BASIC)
+    }
+
+    pub fn copy_instance_token(&self) -> Result<zx::Event, zx::Status> {
+        self.component_instance.duplicate_handle(zx::Rights::SAME_RIGHTS)
     }
 }
 
@@ -92,7 +118,7 @@ pub struct ElfComponent {
     tasks: Option<Vec<fasync::Task<()>>>,
 
     /// A closure to be invoked when the object is dropped.
-    on_drop: Mutex<Option<Box<dyn FnOnce() + Send + 'static>>>,
+    on_drop: Mutex<Option<Box<dyn FnOnce(&ElfComponentInfo) + Send + 'static>>>,
 }
 
 impl ElfComponent {
@@ -105,14 +131,20 @@ impl ElfComponent {
         main_process_critical: bool,
         tasks: Vec<fasync::Task<()>>,
         component_url: String,
+        outgoing_directory: Option<ClientEnd<fio::DirectoryMarker>>,
+        program_config: ElfProgramConfig,
+        component_instance: zx::Event,
     ) -> Self {
         Self {
             _runtime_dir,
             info: Arc::new(ElfComponentInfo {
                 moniker,
+                component_instance,
                 job: Arc::new(job),
                 main_process_critical,
                 component_url,
+                outgoing_directory_for_memory_attribution: outgoing_directory,
+                program_config,
             }),
             process: Some(Arc::new(process)),
             lifecycle_channel,
@@ -122,11 +154,11 @@ impl ElfComponent {
     }
 
     /// Sets a closure to be invoked when the object is dropped. Can only be done once.
-    pub fn set_on_drop(&self, func: impl FnOnce() + Send + 'static) {
+    pub fn set_on_drop(&self, func: impl FnOnce(&ElfComponentInfo) + Send + 'static) {
         let mut on_drop = self.on_drop.lock().unwrap();
         let previous = std::mem::replace(
             on_drop.deref_mut(),
-            Some(Box::new(func) as Box<dyn FnOnce() + Send + 'static>),
+            Some(Box::new(func) as Box<dyn FnOnce(&ElfComponentInfo) + Send + 'static>),
         );
         assert!(previous.is_none());
     }
@@ -272,16 +304,15 @@ impl Controllable for ElfComponent {
 
 impl Drop for ElfComponent {
     fn drop(&mut self) {
+        // notify others that this object is being dropped
+        if let Some(on_drop) = self.on_drop.lock().unwrap().take() {
+            on_drop(self.info().as_ref());
+        }
         // just in case we haven't killed the job already
         self.info()
             .job
             .top()
             .kill()
             .unwrap_or_else(|error| error!(%error, "failed to kill job in drop"));
-
-        // notify others that this object is being dropped
-        if let Some(on_drop) = self.on_drop.lock().unwrap().take() {
-            on_drop();
-        }
     }
 }

@@ -31,7 +31,6 @@
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
                 "fuchsia.logger.LogSink",
-                "fuchsia.memory.report.SnapshotProvider",
                 "fuchsia.scheduler.RoleManager",
             ],
             from: "parent",

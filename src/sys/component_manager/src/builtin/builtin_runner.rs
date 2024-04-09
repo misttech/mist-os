@@ -10,7 +10,7 @@ use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream, ServerEnd};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner as fcrunner;
 use fidl_fuchsia_io as fio;
-use fidl_fuchsia_memory_report as freport;
+use fidl_fuchsia_memory_attribution as fattribution;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Clock};
 use futures::{future::BoxFuture, Future, FutureExt, TryStreamExt};
@@ -245,13 +245,11 @@ impl ElfRunnerProgram {
         let inner_clone = inner.clone();
         let snapshot_provider = Arc::new(LaunchTaskOnReceive::new(
             task_group.as_weak(),
-            freport::SnapshotProviderMarker::PROTOCOL_NAME,
+            fattribution::ProviderMarker::PROTOCOL_NAME,
             None,
             Arc::new(move |server_end, _| {
                 inner_clone.clone().elf_runner.serve_memory_reporter(
-                    sandbox_util::take_handle_as_stream::<freport::SnapshotProviderMarker>(
-                        server_end,
-                    ),
+                    sandbox_util::take_handle_as_stream::<fattribution::ProviderMarker>(server_end),
                 );
                 std::future::ready(Result::<(), anyhow::Error>::Ok(())).boxed()
             }),
@@ -265,7 +263,7 @@ impl ElfRunnerProgram {
                 elf_runner.into_sender(WeakComponentInstance::invalid()).into(),
             );
             entries.insert(
-                freport::SnapshotProviderMarker::PROTOCOL_NAME.parse().unwrap(),
+                fattribution::ProviderMarker::PROTOCOL_NAME.parse().unwrap(),
                 snapshot_provider.into_sender(WeakComponentInstance::invalid()).into(),
             );
         }
