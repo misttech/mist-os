@@ -96,7 +96,8 @@ impl FileOps for PowerStateFile {
         debug_assert!(offset == 0);
         let bytes = data.read_all()?;
         let state_str = std::str::from_utf8(&bytes).map_err(|_| errno!(EINVAL))?;
-        let state: SuspendState = state_str.try_into()?;
+        let clean_state_str = state_str.split('\n').next().unwrap_or("");
+        let state: SuspendState = clean_state_str.try_into()?;
 
         let power_manager = &current_task.kernel().suspend_resume_manager;
         let supported_states = power_manager.suspend_states();

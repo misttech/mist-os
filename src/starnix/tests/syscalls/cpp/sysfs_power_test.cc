@@ -94,6 +94,11 @@ TEST_F(SysfsPowerTest, SuspendStateFileContainsExpectedContents) {
 
 TEST_F(SysfsPowerTest, SuspendStateFileWrite) {
   ASSERT_TRUE(files::WriteFile("/sys/power/state", "mem"));
+  ASSERT_TRUE(files::WriteFile("/sys/power/state", "mem\n"));
+  ASSERT_TRUE(files::WriteFile("/sys/power/state", "mem\nfoobar"));
+  ASSERT_TRUE(files::WriteFile("/sys/power/state", "freeze"));
+  ASSERT_TRUE(files::WriteFile("/sys/power/state", "freeze\n"));
+  ASSERT_TRUE(files::WriteFile("/sys/power/state", "freeze\nfoobar"));
 }
 
 TEST_F(SysfsPowerTest, SuspendStateFileWriteFails) {
