@@ -269,14 +269,36 @@ pub fn connect_to_service_instance_at<S: ServiceMarker>(
 
 /// Connect to the "default" instance of a FIDL service hosted on the directory protocol
 /// channel `directory`.
+pub fn connect_to_default_instance_in_service_dir<S: ServiceMarker>(
+    directory: &fio::DirectoryProxy,
+) -> Result<S::Proxy, Error> {
+    connect_to_instance_in_service_dir::<S>(directory, DEFAULT_SERVICE_INSTANCE)
+}
+
+/// Connect to an instance of a FIDL service hosted on the directory protocol channel `directory`.
+/// `instance` is a path of one or more components.
+pub fn connect_to_instance_in_service_dir<S: ServiceMarker>(
+    directory: &fio::DirectoryProxy,
+    instance: &str,
+) -> Result<S::Proxy, Error> {
+    let directory_proxy = fuchsia_fs::directory::open_directory_no_describe(
+        directory,
+        &instance.to_string(),
+        fio::OpenFlags::empty(),
+    )?;
+    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
+}
+
+/// Connect to the "default" instance of a FIDL service hosted in the service subdirectory under
+/// the directory protocol channel `directory`
 pub fn connect_to_service_at_dir<S: ServiceMarker>(
     directory: &fio::DirectoryProxy,
 ) -> Result<S::Proxy, Error> {
     connect_to_service_instance_at_dir::<S>(directory, DEFAULT_SERVICE_INSTANCE)
 }
 
-/// Connect to an instance of a FIDL service hosted on the directory protocol channel `directory`.
-/// `instance` is a path of one or more components.
+/// Connect to a named instance of a FIDL service hosted in the service subdirectory under the
+/// directory protocol channel `directory`
 // NOTE: We would like to use impl AsRef<T> to accept a wide variety of string-like
 // inputs but Rust limits specifying explicit generic parameters when `impl-traits`
 // are present.
