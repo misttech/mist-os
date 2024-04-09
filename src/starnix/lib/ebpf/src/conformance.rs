@@ -568,6 +568,17 @@ pub mod test {
         }
     }
 
+    fn null_or(
+        _context: &mut (),
+        s1: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+    ) -> BpfValue {
+        s1
+    }
+
     pub fn parse_asm(data: &str) -> Vec<bpf_insn> {
         let mut pairs =
             TestGrammar::parse(Rule::ASM_INSTRUCTIONS, data).expect("Parsing must be successful");
@@ -720,6 +731,7 @@ pub mod test {
     #[test_case(ubpf_test_data!("stxw.data"))]
     #[test_case(ubpf_test_data!("subnet.data"))]
     #[test_case(local_test_data!("err-write-r10.data"))]
+    #[test_case(local_test_data!("null-checks-propagated.data"))]
     fn test_ebpf_conformance(content: &str) {
         let Some(mut test_case) = TestCase::parse(content) else {
             // Special case that only test the test framework.
@@ -805,6 +817,19 @@ pub mod test {
                     // are correctly 0 terminated.
                     args: &[],
                     return_value: Type::unknown_written_scalar_value(),
+                },
+            })
+            .expect("register");
+        builder
+            .register(&EbpfHelper {
+                index: 100,
+                name: "null_or",
+                function_pointer: Arc::new(null_or),
+                signature: FunctionSignature {
+                    args: &[Type::ScalarValueParameter],
+                    return_value: Type::NullOrParameter(Box::new(
+                        Type::unknown_written_scalar_value(),
+                    )),
                 },
             })
             .expect("register");

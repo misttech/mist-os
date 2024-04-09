@@ -92,7 +92,9 @@ pub static BPF_HELPERS: Lazy<Vec<EbpfHelper<HelperFunctionContextMarker>>> = Laz
             function_pointer: Arc::new(bpf_map_lookup_elem),
             signature: FunctionSignature {
                 args: &[Type::ConstPtrToMapParameter, Type::MapKeyParameter { map_ptr_index: 0 }],
-                return_value: Type::NullOr(Box::new(Type::MapValueParameter { map_ptr_index: 0 })),
+                return_value: Type::NullOrParameter(Box::new(Type::MapValueParameter {
+                    map_ptr_index: 0,
+                })),
             },
         },
         EbpfHelper {

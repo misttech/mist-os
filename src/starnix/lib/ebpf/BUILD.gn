@@ -28,7 +28,6 @@ rustc_library("ebpf") {
   deps = [
     "//src/starnix/lib/linux_uapi",
     "//third_party/rust_crates:byteorder",
-    "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",
@@ -47,6 +46,7 @@ rustc_library("ebpf") {
   inputs = [
     "src/test_grammar.pest",
     "src/tests/err-write-r10.data",
+    "src/tests/null-checks-propagated.data",
     "//third_party/ubpf/src/tests/add64.data",
     "//third_party/ubpf/src/tests/add.data",
     "//third_party/ubpf/src/tests/alu64-arith.data",

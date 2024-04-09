@@ -11,7 +11,6 @@ use crate::{
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian};
 use linux_uapi::bpf_insn;
-use once_cell::sync::Lazy;
 use std::{collections::HashMap, ops::Deref};
 use zerocopy::AsBytes;
 
@@ -191,7 +190,7 @@ pub enum Type {
     /// `PtrToArray` with the same `id`.
     PtrToEndArray { id: MemoryId },
     /// A pointer that might be null and must be validated before being referenced.
-    NullOr(Box<Type>),
+    NullOr { id: MemoryId, inner: Box<Type> },
     /// A function parameter that must be a `ScalarValue` when called.
     ScalarValueParameter,
     /// A function parameter that must be a `ConstPtrToMap` when called.
@@ -219,9 +218,11 @@ pub enum Type {
         /// The index in the argument list of the parameter that has the type of this return value.
         parameter_index: u8,
     },
+    /// A function return value that is either null, or the given type.
+    NullOrParameter(Box<Type>),
 }
 
-const NotInit: Type = Type::ScalarValue {
+const NOT_INIT: Type = Type::ScalarValue {
     value: 0,
     unknown_mask: u64::max_value(),
     unwritten_mask: u64::max_value(),
@@ -236,7 +237,7 @@ impl From<u64> for Type {
 impl Default for Type {
     /// A new instance of `Type` where no bit has been written yet.
     fn default() -> Self {
-        NotInit.clone()
+        NOT_INIT.clone()
     }
 }
 
@@ -301,29 +302,36 @@ impl Type {
                 JumpWidth::W64,
                 JumpType::Eq,
                 Self::ScalarValue { value: 0, unknown_mask: 0, .. },
-                Self::NullOr(_),
+                Self::NullOr { id, .. },
             )
             | (
                 JumpWidth::W64,
                 JumpType::Eq,
-                Self::NullOr(_),
+                Self::NullOr { id, .. },
                 Self::ScalarValue { value: 0, unknown_mask: 0, .. },
             ) => {
+                context.null_states.insert(id.clone(), true);
                 let zero = Type::from(0);
                 (zero.clone(), zero)
             }
             (
                 JumpWidth::W64,
                 jump_type,
-                Self::NullOr(t),
+                Self::NullOr { id, inner },
                 Self::ScalarValue { value: 0, unknown_mask: 0, .. },
-            ) if jump_type.is_strict() => (*t.clone(), type2),
+            ) if jump_type.is_strict() => {
+                context.null_states.insert(id.clone(), false);
+                (*inner.clone(), type2)
+            }
             (
                 JumpWidth::W64,
                 jump_type,
                 Self::ScalarValue { value: 0, unknown_mask: 0, .. },
-                Self::NullOr(t),
-            ) if jump_type.is_strict() => (type1, *t.clone()),
+                Self::NullOr { id, inner },
+            ) if jump_type.is_strict() => {
+                context.null_states.insert(id.clone(), false);
+                (type1, *inner.clone())
+            }
 
             (
                 JumpWidth::W64,
@@ -684,7 +692,8 @@ impl Stack {
                         _ => {
                             // The value in the stack is not a scalar. Let consider it an scalar
                             // value with no written bits.
-                            let Type::ScalarValue { value, unknown_mask, unwritten_mask } = NotInit
+                            let Type::ScalarValue { value, unknown_mask, unwritten_mask } =
+                                NOT_INIT
                             else {
                                 unreachable!();
                             };
@@ -728,18 +737,18 @@ impl Stack {
         }
 
         let index = offset.array_index();
-        let loaded_type = &self.data[index];
+        let loaded_type = context.resolve(self.data[index].clone());
         if width == DataWidth::U64 {
-            Ok(loaded_type.clone())
+            Ok(loaded_type)
         } else {
             match loaded_type {
                 Type::ScalarValue { value, unknown_mask, unwritten_mask } => {
                     let sub_index = offset.sub_index();
-                    let value = Self::extract_sub_value(*value, sub_index, width.bytes());
+                    let value = Self::extract_sub_value(value, sub_index, width.bytes());
                     let unknown_mask =
-                        Self::extract_sub_value(*unknown_mask, sub_index, width.bytes());
+                        Self::extract_sub_value(unknown_mask, sub_index, width.bytes());
                     let unwritten_mask =
-                        Self::extract_sub_value(*unwritten_mask, sub_index, width.bytes());
+                        Self::extract_sub_value(unwritten_mask, sub_index, width.bytes());
                     Ok(Type::ScalarValue { value, unknown_mask, unwritten_mask })
                 }
                 _ => Err(format!("incorrect load of {} bytes at pc {}", width.bytes(), context.pc)),
@@ -767,20 +776,29 @@ struct ComputationContext {
     pc: ProgramCounter,
     /// The dynamically known bounds of buffers indexed by their ids.
     array_bounds: HashMap<MemoryId, u64>,
+    /// The dynamically known null state of nullable entities indexed by their ids.
+    null_states: HashMap<MemoryId, bool>,
 }
 
 impl ComputationContext {
-    fn reg(&self, index: Register) -> Result<&Type, String> {
-        static StackTop: Lazy<Type> =
-            Lazy::new(|| Type::PtrToStack { offset: StackOffset::default() });
-
+    fn resolve(&self, t: Type) -> Type {
+        match t {
+            Type::NullOr { id, inner } => match self.null_states.get(&id) {
+                None => Type::NullOr { id, inner },
+                Some(true) => Type::from(0),
+                Some(false) => *inner,
+            },
+            t => t,
+        }
+    }
+    fn reg(&self, index: Register) -> Result<Type, String> {
         if index >= REGISTER_COUNT {
             return Err(format!("R{index} is invalid at pc {}", self.pc));
         }
         if index < GENERAL_REGISTER_COUNT {
-            Ok(&self.registers[index as usize])
+            Ok(self.resolve(self.registers[index as usize].clone()))
         } else {
-            Ok(&StackTop)
+            Ok(Type::PtrToStack { offset: StackOffset::default() })
         }
     }
 
@@ -799,7 +817,7 @@ impl ComputationContext {
             .or_insert(new_bound);
     }
 
-    fn get_map_schema(&self, argument: u8) -> Result<&MapSchema, String> {
+    fn get_map_schema(&self, argument: u8) -> Result<MapSchema, String> {
         match self.reg(argument + 1)? {
             Type::ConstPtrToMap { schema, .. } => Ok(schema),
             _ => Err(format!("No map found at argument {argument} at pc {}", self.pc)),
@@ -954,11 +972,13 @@ impl ComputationContext {
         return_value: &Type,
     ) -> Result<Type, String> {
         match return_value {
-            Type::AliasParameter { parameter_index } => {
-                self.reg(parameter_index + 1).map(Clone::clone)
-            }
-            Type::NullOr(t) => {
-                Ok(Type::NullOr(Box::new(self.resolve_return_value(verification_context, t)?)))
+            Type::AliasParameter { parameter_index } => self.reg(parameter_index + 1),
+            Type::NullOrParameter(t) => {
+                let id = verification_context.next_id();
+                Ok(Type::NullOr {
+                    id: id.into(),
+                    inner: Box::new(self.resolve_return_value(verification_context, t)?),
+                })
             }
             Type::MapValueParameter { map_ptr_index } => {
                 let schema = self.get_map_schema(*map_ptr_index)?;
@@ -977,7 +997,7 @@ impl ComputationContext {
 
     fn compute_source(&self, src: Source) -> Result<Type, String> {
         match src {
-            Source::Reg(reg) => self.reg(reg).cloned(),
+            Source::Reg(reg) => self.reg(reg),
             Source::Value(v) => Ok(v.into()),
         }
     }
@@ -1220,7 +1240,7 @@ impl ComputationContext {
         let dst = self.load_memory(addr.clone(), field)?;
         let value = self.reg(src)?;
         let r0 = self.reg(0)?;
-        let branch = self.compute_branch(jump_width, &dst, r0, op)?;
+        let branch = self.compute_branch(jump_width, &dst, &r0, op)?;
         // r0 = dst
         if branch.unwrap_or(true) {
             let mut next = self.next()?;
@@ -1261,9 +1281,9 @@ impl ComputationContext {
         let value = self.reg(dst)?;
         let new_value = match value {
             Type::ScalarValue { value, unknown_mask, unwritten_mask } => Type::ScalarValue {
-                value: bit_op(*value),
-                unknown_mask: bit_op(*unknown_mask),
-                unwritten_mask: bit_op(*unwritten_mask),
+                value: bit_op(value),
+                unknown_mask: bit_op(unknown_mask),
+                unwritten_mask: bit_op(unwritten_mask),
             },
             _ => Type::default(),
         };
@@ -1295,11 +1315,11 @@ impl ComputationContext {
             | (
                 JumpWidth::W64,
                 Type::ScalarValue { value: 0, unknown_mask: 0, .. },
-                Type::NullOr(_),
+                Type::NullOr { .. },
             )
             | (
                 JumpWidth::W64,
-                Type::NullOr(_),
+                Type::NullOr { .. },
                 Type::ScalarValue { value: 0, unknown_mask: 0, .. },
             ) => Ok(None),
 
@@ -1371,7 +1391,7 @@ impl ComputationContext {
             }
             Ok(next)
         };
-        let branch = self.compute_branch(jump_width, op1, &op2, op)?;
+        let branch = self.compute_branch(jump_width, &op1, &op2, op)?;
         if branch.unwrap_or(true) {
             // Do the jump
             verification_context
@@ -1779,11 +1799,11 @@ impl BpfVisitor for ComputationContext {
                     Type::PtrToMemory { offset, buffer_size, .. },
                 ) => {
                     let schema = self.get_map_schema(*map_ptr_index)?;
-                    self.check_memory_access(*offset, *buffer_size, 0, schema.key_size as usize)
+                    self.check_memory_access(offset, buffer_size, 0, schema.key_size as usize)
                 }
                 (Type::MapKeyParameter { map_ptr_index }, Type::PtrToStack { offset }) => {
                     let schema = self.get_map_schema(*map_ptr_index)?;
-                    if !self.stack.can_read_data_ptr(*offset, schema.key_size as u64) {
+                    if !self.stack.can_read_data_ptr(offset, schema.key_size as u64) {
                         Err(format!("cannot read key buffer from the stack at pc {}", self.pc))
                     } else {
                         Ok(())
@@ -1794,11 +1814,11 @@ impl BpfVisitor for ComputationContext {
                     Type::PtrToMemory { offset, buffer_size, .. },
                 ) => {
                     let schema = self.get_map_schema(*map_ptr_index)?;
-                    self.check_memory_access(*offset, *buffer_size, 0, schema.value_size as usize)
+                    self.check_memory_access(offset, buffer_size, 0, schema.value_size as usize)
                 }
                 (Type::MapValueParameter { map_ptr_index }, Type::PtrToStack { offset }) => {
                     let schema = self.get_map_schema(*map_ptr_index)?;
-                    if !self.stack.can_read_data_ptr(*offset, schema.value_size as u64) {
+                    if !self.stack.can_read_data_ptr(offset, schema.value_size as u64) {
                         Err(format!("cannot read value buffer from the stack at pc {}", self.pc))
                     } else {
                         Ok(())
@@ -1811,7 +1831,7 @@ impl BpfVisitor for ComputationContext {
                     let length_type = self.reg(memory_length_index + 1)?;
                     match length_type {
                         Type::ScalarValue { value, unknown_mask: 0, .. } => {
-                            if *value <= *buffer_size - *offset {
+                            if value <= buffer_size - offset {
                                 Ok(())
                             } else {
                                 Err(format!("out of bound read at pc {}", self.pc))
@@ -1825,7 +1845,7 @@ impl BpfVisitor for ComputationContext {
                     let length_type = self.reg(memory_length_index + 1)?;
                     match length_type {
                         Type::ScalarValue { value, unknown_mask: 0, .. } => {
-                            if self.stack.can_read_data_ptr(*offset, *value) {
+                            if self.stack.can_read_data_ptr(offset, value) {
                                 Ok(())
                             } else {
                                 Err(format!("out of bound read at pc {}", self.pc))
