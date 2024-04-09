@@ -26,7 +26,12 @@ class DirectoryConnection final : public Connection,
   ~DirectoryConnection() final;
 
  private:
-  std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) override;
+  //
+  // |fs::Connection| Implementation
+  //
+
+  void BindImpl(zx::channel channel, OnUnbound on_unbound) final;
+  zx::result<> Unbind() final;
   zx::result<> WithRepresentation(fit::callback<void(fuchsia_io::wire::Representation)> handler,
                                   std::optional<fuchsia_io::NodeAttributesQuery> query) const final;
   zx::result<> WithNodeInfoDeprecated(
@@ -110,6 +115,8 @@ class DirectoryConnection final : public Connection,
   //
 
   void AdvisoryLock(AdvisoryLockRequestView request, AdvisoryLockCompleter::Sync& _completer) final;
+
+  std::optional<fidl::ServerBindingRef<fuchsia_io::Directory>> binding_;
 
   // Directory cookie for readdir operations.
   fs::VdirCookie dircookie_;

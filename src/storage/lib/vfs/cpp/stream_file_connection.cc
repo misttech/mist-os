@@ -166,10 +166,6 @@ void StreamFileConnection::Seek(SeekRequestView request, SeekCompleter::Sync& co
 
 void StreamFileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
   if constexpr (ZX_DEBUG_ASSERT_IMPLEMENTED) {
-    // Validate that the connection's append mode matches the flags.
-    if (append()) {
-      ZX_ASSERT_MSG(NodeGetFlags() & fio::OpenFlags::kAppend, "Append mode set but missing flag!");
-    }
     // Validate that the connection's append mode and the stream's append mode match.
     uint8_t mode_append;
     if (zx_status_t status = stream_.get_prop_mode_append(&mode_append); status != ZX_OK) {
@@ -180,7 +176,7 @@ void StreamFileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
     ZX_ASSERT_MSG(stream_append == append(), "stream append: %d flags append: %d", stream_append,
                   append());
   }
-  completer.Reply(ZX_OK, NodeGetFlags());
+  FileConnection::GetFlags(completer);
 }
 
 void StreamFileConnection::SetFlags(SetFlagsRequestView request,

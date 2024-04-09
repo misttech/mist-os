@@ -18,7 +18,6 @@
 
 #include <fbl/intrusive_double_list.h>
 
-#include "src/storage/lib/vfs/cpp/connection.h"
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 
 namespace fs {

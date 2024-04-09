@@ -40,18 +40,22 @@ VnodeConnectionOptions VnodeConnectionOptions::FromIoV1Flags(fio::OpenFlags fidl
 }
 
 fio::OpenFlags VnodeConnectionOptions::ToIoV1Flags() const {
-  fio::OpenFlags fidl_flags = flags;
+  return flags | RightsToOpenFlags(rights);
+}
+
+fio::OpenFlags RightsToOpenFlags(fio::Rights rights) {
+  fio::OpenFlags flags = {};
   // Map io2 rights to io1 flags only if all constituent io2 rights are present.
   if ((rights & fio::kRStarDir) == fio::kRStarDir) {
-    fidl_flags |= fio::OpenFlags::kRightReadable;
+    flags |= fio::OpenFlags::kRightReadable;
   }
   if ((rights & fio::kWStarDir) == fio::kWStarDir) {
-    fidl_flags |= fio::OpenFlags::kRightWritable;
+    flags |= fio::OpenFlags::kRightWritable;
   }
   if ((rights & fio::kXStarDir) == fio::kXStarDir) {
-    fidl_flags |= fio::OpenFlags::kRightExecutable;
+    flags |= fio::OpenFlags::kRightExecutable;
   }
-  return fidl_flags;
+  return flags;
 }
 
 fio::wire::NodeAttributes VnodeAttributes::ToIoV1NodeAttributes() const {

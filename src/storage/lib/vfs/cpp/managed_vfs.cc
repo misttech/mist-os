@@ -12,6 +12,8 @@
 #include <memory>
 #include <utility>
 
+#include "src/storage/lib/vfs/cpp/connection.h"
+
 namespace fs {
 
 ManagedVfs::ManagedVfs(async_dispatcher_t* dispatcher) : FuchsiaVfs(dispatcher) {
@@ -60,7 +62,7 @@ void ManagedVfs::CloseAllConnectionsForVnode(const Vnode& node,
     std::lock_guard lock(lock_);
     for (internal::Connection& connection : connections_) {
       if (connection.vnode().get() == &node) {
-        connection.Unbind();
+        [[maybe_unused]] zx::result result = connection.Unbind();
         closing_connections_.emplace(&connection, closer);
       }
     }
@@ -99,8 +101,7 @@ zx_status_t ManagedVfs::RegisterConnection(std::unique_ptr<internal::Connection>
     return ZX_ERR_CANCELED;
   }
   connections_.push_back(std::move(connection));
-  connections_.back().StartDispatching(std::move(channel), [this](
-                                                               internal::Connection* connection) {
+  connections_.back().Bind(std::move(channel), [this](internal::Connection* connection) {
     std::shared_ptr<fit::deferred_action<fit::callback<void()>>> closer;  // Must go before lock.
     std::lock_guard lock(lock_);
 

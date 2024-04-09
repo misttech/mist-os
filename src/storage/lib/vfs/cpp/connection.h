@@ -29,8 +29,6 @@
 
 namespace fs::internal {
 
-class Binding;
-
 // Perform basic flags sanitization.
 // Returns false if the flags combination is invalid.
 bool PrevalidateFlags(fuchsia_io::wire::OpenFlags flags);
@@ -59,17 +57,24 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   // destroyed on the wait handler's dispatch thread to prevent a race.
   virtual ~Connection();
 
-  // Triggers asynchronous closure of the receiver.
-  void Unbind();
-
   using OnUnbound = fit::function<void(Connection*)>;
 
   // Begins waiting for messages on the channel. |channel| is the channel on which the FIDL protocol
-  // will be served.
+  // will be served. Once called, connections are responsible for closing the underlying vnode.
   //
   // Before calling this function, the connection ownership must be transferred to the Vfs through
   // |RegisterConnection|. Cannot be called more than once in the lifetime of the connection.
-  void StartDispatching(zx::channel channel, OnUnbound on_unbound);
+  void Bind(zx::channel channel, OnUnbound on_unbound) {
+    ZX_DEBUG_ASSERT(channel);
+    ZX_DEBUG_ASSERT(vfs()->dispatcher());
+    ZX_DEBUG_ASSERT_MSG(InContainer(), "Connection must be managed by Vfs!");
+    BindImpl(std::move(channel), std::move(on_unbound));
+  }
+
+  // Triggers asynchronous closure of the receiver. Will invoke the |on_unbound| callback passed to
+  // |Bind| after unbinding the FIDL server from the channel. Implementations should close the vnode
+  // if required once unbinding the server. If not bound or already unbound, has no effect.
+  virtual zx::result<> Unbind() = 0;
 
   // Invokes |handler| with the Representation event for this connection. |query| specifies which
   // attributes, if any, should be included with the event.
@@ -81,92 +86,52 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   virtual zx::result<> WithNodeInfoDeprecated(
       fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler) const = 0;
 
-  fbl::RefPtr<fs::Vnode>& vnode() { return vnode_; }
   const fbl::RefPtr<fs::Vnode>& vnode() const { return vnode_; }
 
  protected:
-  virtual std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) = 0;
   // Create a connection bound to a particular vnode.
   //
   // The VFS will be notified when remote side closes the connection.
   //
   // |vfs| is the VFS which is responsible for dispatching operations to the vnode.
   // |vnode| is the vnode which will handle I/O requests.
-  // |protocol| is the type of protocol this connection uses (e.g. Node, File, Directory).
   // |rights| are the resulting rights for this connection.
-  Connection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol,
-             fuchsia_io::Rights rights);
+  Connection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, fuchsia_io::Rights rights);
 
   fuchsia_io::Rights rights() const { return rights_; }
 
-  FuchsiaVfs* vfs() const { return vfs_; }
+  FuchsiaVfs* vfs() { return vfs_; }
 
   zx::event& token() { return token_; }
 
+  // Begin waiting for messages on the channel. |channel| is the channel on which the FIDL protocol
+  // will be served. Should only be called once per connection.
+  virtual void BindImpl(zx::channel channel, OnUnbound on_unbound) = 0;
+
   // Node operations. Note that these provide the shared implementation of |fuchsia.io/Node|
-  // methods, used by all connection subclasses.
-  //
-  // To simplify ownership handling, prefer using the |Vnode_*| types in return values, while using
-  // the generated FIDL types in method arguments. This is because return values must recursively
-  // own any child objects and handles to avoid a dangling reference.
+  // methods, used by all connection subclasses. Use caution when working with FIDL wire types,
+  // as certain wire types may reference external data.
 
   void NodeClone(fuchsia_io::wire::OpenFlags flags, fidl::ServerEnd<fuchsia_io::Node> server_end);
-  zx::result<> NodeClose();
-  fidl::VectorView<uint8_t> NodeQuery();
-  void NodeSync(fit::callback<void(zx_status_t)> callback);
-  zx::result<VnodeAttributes> NodeGetAttr();
+  zx::result<VnodeAttributes> NodeGetAttr() const;
   zx::result<> NodeSetAttr(fuchsia_io::wire::NodeAttributeFlags flags,
                            const fuchsia_io::wire::NodeAttributes& attributes);
-  virtual fuchsia_io::OpenFlags NodeGetFlags() const;
-  zx::result<fuchsia_io::wire::FilesystemInfo> NodeQueryFilesystem();
+  zx::result<fuchsia_io::wire::FilesystemInfo> NodeQueryFilesystem() const;
 
  private:
-  // The contract of the Vnode API is that there should be a balancing |Close| call for every |Open|
-  // call made on a vnode. Calls |Close| on the underlying vnode explicitly if necessary.
-  zx_status_t EnsureVnodeClosed();
-
-  bool vnode_is_open_;
-
   // The Vfs instance which owns this connection. Connections must not outlive the Vfs, hence this
   // borrowing is safe.
   fs::FuchsiaVfs* const vfs_;
 
-  fbl::RefPtr<fs::Vnode> vnode_;
-
-  // State related to FIDL message dispatching. See |Binding|.
-  std::unique_ptr<Binding> binding_;
-
-  // The operational protocol that is used to interact with the vnode over this connection.
-  VnodeProtocol protocol_;
+  fbl::RefPtr<fs::Vnode> const vnode_;
 
   // Rights are hierarchical over Open/Clone. It is never allowed to derive a Connection with more
   // rights than the originating connection.
-  fuchsia_io::Rights rights_;
+  fuchsia_io::Rights const rights_;
 
   // Handle to event which allows client to refer to open vnodes in multi-path operations (see:
   // link, rename). Defaults to ZX_HANDLE_INVALID. Validated on the server-side using cookies.
-  zx::event token_ = {};
-};
-
-class Binding {
- public:
-  virtual ~Binding() = default;
-
-  virtual void Unbind() = 0;
-  virtual void Close(zx_status_t) = 0;
-};
-
-template <typename Protocol>
-class TypedBinding : public Binding {
- public:
-  explicit TypedBinding(fidl::ServerBindingRef<Protocol> binding) : binding(binding) {}
-  ~TypedBinding() override { binding.Unbind(); }
-
- private:
-  void Unbind() override { return binding.Unbind(); }
-  void Close(zx_status_t epitaph) override { return binding.Close(epitaph); }
-
-  fidl::ServerBindingRef<Protocol> binding;
+  zx::event token_;
 };
 
 }  // namespace fs::internal

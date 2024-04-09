@@ -316,15 +316,22 @@ zx_status_t FuchsiaVfs::Link(zx::event token, fbl::RefPtr<Vnode> oldparent, std:
   return ZX_OK;
 }
 
-zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
+zx_status_t FuchsiaVfs::Serve(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
                               VnodeConnectionOptions options) {
+  zx_status_t status = ServeImpl(vnode, std::move(server_end), options);
+  if (status != ZX_OK && !(options.flags & fio::OpenFlags::kNodeReference)) {
+    vnode->Close();
+  }
+  return status;
+}
+
+zx_status_t FuchsiaVfs::ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
+                                  VnodeConnectionOptions options) {
   if (zx::result result = vnode->ValidateOptions(options); result.is_error()) {
     return result.error_value();
   }
-  VnodeProtocol protocol;
-  if (options.flags & fio::OpenFlags::kNodeReference) {
-    protocol = VnodeProtocol::kNode;
-  } else {
+  VnodeProtocol protocol = VnodeProtocol::kNode;
+  if (!(options.flags & fio::OpenFlags::kNodeReference)) {
     zx::result negotiated = NegotiateProtocol(options.protocols() & vnode->GetProtocols());
     if (negotiated.is_error()) {
       return negotiated.error_value();
@@ -346,14 +353,14 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
       bool append = static_cast<bool>(options.flags & fio::OpenFlags::kAppend);
       if (stream.is_ok()) {
         connection = std::make_unique<internal::StreamFileConnection>(
-            this, std::move(vnode), options.rights, append, std::move(*stream), *koid);
+            this, vnode, options.rights, append, std::move(*stream), *koid);
         break;
       }
       if (stream.error_value() != ZX_ERR_NOT_SUPPORTED) {
         return stream.error_value();
       }
-      connection = std::make_unique<internal::RemoteFileConnection>(this, std::move(vnode),
-                                                                    options.rights, append, *koid);
+      connection = std::make_unique<internal::RemoteFileConnection>(this, vnode, options.rights,
+                                                                    append, *koid);
       break;
     }
     case VnodeProtocol::kDirectory: {
@@ -361,13 +368,12 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
       if (koid.is_error()) {
         return koid.error_value();
       }
-      connection = std::make_unique<internal::DirectoryConnection>(this, std::move(vnode),
-                                                                   options.rights, *koid);
+      connection =
+          std::make_unique<internal::DirectoryConnection>(this, vnode, options.rights, *koid);
       break;
     }
     case VnodeProtocol::kNode: {
-      connection =
-          std::make_unique<internal::NodeConnection>(this, std::move(vnode), options.rights);
+      connection = std::make_unique<internal::NodeConnection>(this, vnode, options.rights);
       break;
     }
     case VnodeProtocol::kService: {
@@ -416,7 +422,7 @@ zx_status_t FuchsiaVfs::ServeDirectory(fbl::RefPtr<fs::Vnode> vn,
     return status;
   }
 
-  return Serve(std::move(vn), server_end.TakeChannel(), options);
+  return Serve(vn, server_end.TakeChannel(), options);
 }
 
 }  // namespace fs

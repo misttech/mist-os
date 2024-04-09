@@ -29,18 +29,28 @@ namespace internal {
 
 FileConnection::FileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                fuchsia_io::Rights rights, bool append, zx_koid_t koid)
-    : Connection(vfs, std::move(vnode), fs::VnodeProtocol::kFile, rights),
-      koid_(koid),
-      append_(append) {}
+    : Connection(vfs, std::move(vnode), rights), koid_(koid), append_(append) {}
 
-FileConnection::~FileConnection() { vnode()->DeleteFileLockInTeardown(koid_); }
+FileConnection::~FileConnection() {
+  [[maybe_unused]] zx::result result = Unbind();
+  vnode()->DeleteFileLockInTeardown(koid_);
+}
 
-std::unique_ptr<Binding> FileConnection::Bind(async_dispatcher_t* dispatcher, zx::channel channel,
-                                              OnUnbound on_unbound) {
-  return std::make_unique<TypedBinding<fio::File>>(fidl::BindServer(
-      dispatcher, fidl::ServerEnd<fio::File>{std::move(channel)}, this,
-      [on_unbound = std::move(on_unbound)](FileConnection* self, fidl::UnbindInfo,
-                                           fidl::ServerEnd<fio::File>) { on_unbound(self); }));
+void FileConnection::BindImpl(zx::channel channel, OnUnbound on_unbound) {
+  ZX_DEBUG_ASSERT(!binding_);
+  binding_.emplace(fidl::BindServer(vfs()->dispatcher(),
+                                    fidl::ServerEnd<fuchsia_io::File>{std::move(channel)}, this,
+                                    [on_unbound = std::move(on_unbound)](
+                                        FileConnection* self, fidl::UnbindInfo,
+                                        fidl::ServerEnd<fuchsia_io::File>) { on_unbound(self); }));
+}
+
+zx::result<> FileConnection::Unbind() {
+  if (std::optional binding = std::exchange(binding_, std::nullopt); binding) {
+    binding->Unbind();
+    return zx::make_result(vnode()->Close());
+  }
+  return zx::ok();
 }
 
 void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
@@ -52,17 +62,13 @@ void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& compl
   Connection::NodeClone(request->flags | inherited_flags, std::move(request->object));
 }
 
-void FileConnection::Close(CloseCompleter::Sync& completer) {
-  zx::result result = Connection::NodeClose();
-  if (result.is_error()) {
-    completer.ReplyError(result.status_value());
-  } else {
-    completer.ReplySuccess();
-  }
-}
+void FileConnection::Close(CloseCompleter::Sync& completer) { completer.Reply(Unbind()); }
 
 void FileConnection::Query(QueryCompleter::Sync& completer) {
-  completer.Reply(Connection::NodeQuery());
+  std::string_view protocol = fio::kFileProtocolName;
+  // TODO(https://fxbug.dev/42052765): avoid the const cast.
+  uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(protocol.data()));
+  completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, protocol.size()));
 }
 
 zx::result<> FileConnection::WithNodeInfoDeprecated(
@@ -143,7 +149,7 @@ void FileConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& complet
 }
 
 void FileConnection::Sync(SyncCompleter::Sync& completer) {
-  Connection::NodeSync([completer = completer.ToAsync()](zx_status_t sync_status) mutable {
+  vnode()->Sync([completer = completer.ToAsync()](zx_status_t sync_status) mutable {
     if (sync_status != ZX_OK) {
       completer.ReplyError(sync_status);
     } else {
@@ -171,7 +177,11 @@ void FileConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync&
 }
 
 void FileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
-  completer.Reply(ZX_OK, NodeGetFlags());
+  fio::OpenFlags flags = RightsToOpenFlags(rights());
+  if (append()) {
+    flags |= fio::OpenFlags::kAppend;
+  }
+  completer.Reply(ZX_OK, flags);
 }
 
 void FileConnection::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) {
@@ -241,14 +251,6 @@ void FileConnection::AdvisoryLock(fidl::WireServer<fio::File>::AdvisoryLockReque
       });
 
   advisory_lock(koid_, vnode(), true, request->request, std::move(callback));
-}
-
-fio::OpenFlags FileConnection::NodeGetFlags() const {
-  fio::OpenFlags flags = Connection::NodeGetFlags();
-  if (append()) {
-    flags |= fio::OpenFlags::kAppend;
-  }
-  return flags;
 }
 
 }  // namespace internal

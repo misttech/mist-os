@@ -33,10 +33,13 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   bool& append() { return append_; }
   bool append() const { return append_; }
   virtual const zx::stream* stream() const { return nullptr; }
-  fuchsia_io::OpenFlags NodeGetFlags() const final;
 
- private:
-  std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) final;
+  //
+  // |fs::Connection| Implementation
+  //
+
+  void BindImpl(zx::channel channel, OnUnbound on_unbound) final;
+  zx::result<> Unbind() final;
   zx::result<> WithRepresentation(fit::callback<void(fuchsia_io::wire::Representation)> handler,
                                   std::optional<fuchsia_io::NodeAttributesQuery> query) const final;
   zx::result<> WithNodeInfoDeprecated(
@@ -121,6 +124,8 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   zx_status_t ResizeInternal(uint64_t length);
   zx_status_t GetBackingMemoryInternal(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo);
 
+ private:
+  std::optional<fidl::ServerBindingRef<fuchsia_io::File>> binding_;
   const zx_koid_t koid_;
   bool append_;
 };

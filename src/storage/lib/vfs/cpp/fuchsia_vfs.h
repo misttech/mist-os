@@ -99,7 +99,10 @@ class FuchsiaVfs : public Vfs {
   //
   // |server_end| usually speaks a protocol that composes |fuchsia.io/Node|, but may speak an
   // arbitrary arbitrary protocol for service connections.
-  zx_status_t Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
+  //
+  // For non-node reference connections, |vnode| should be opened before calling this function, and
+  // will be closed on failure.
+  zx_status_t Serve(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
                     VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
 
   // Serves a Vnode over the specified channel (used for creating new filesystems); the Vnode must
@@ -122,6 +125,11 @@ class FuchsiaVfs : public Vfs {
   bool IsTokenAssociatedWithVnode(zx::event token) __TA_EXCLUDES(vfs_lock_);
 
  protected:
+  // On success, |vnode| will automatically be closed when fuchsia.io/Node.Close is called, or
+  // |server_end| is closed. On failure, callers must close |vnode| if it was opened.
+  zx_status_t ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
+                        VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
+
   // Vfs protected overrides.
   zx::result<bool> EnsureExists(fbl::RefPtr<Vnode> vndir, std::string_view path,
                                 fbl::RefPtr<Vnode>* out_vn, fs::VnodeConnectionOptions options,
@@ -129,10 +137,7 @@ class FuchsiaVfs : public Vfs {
       __TA_REQUIRES(vfs_lock_);
 
   // Starts FIDL message dispatching on |channel|, at the same time starts to manage the lifetime of
-  // the connection.
-  //
-  // Implementations must ensure |connection| continues to live on, until |UnregisterConnection| is
-  // called on the pointer to destroy it.
+  // |connection|. On error registering a connection, callers must close the associated vnode.
   virtual zx_status_t RegisterConnection(std::unique_ptr<internal::Connection> connection,
                                          zx::channel channel) = 0;
 

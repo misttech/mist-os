@@ -173,6 +173,8 @@ struct VnodeConnectionOptions {
 #endif  // __Fuchsia__
 };
 
+fuchsia_io::OpenFlags RightsToOpenFlags(fuchsia_io::Rights rights);
+
 // Objective information about a filesystem node, used to implement |Vnode::GetAttributes|.
 struct VnodeAttributes {
   uint32_t mode = {};

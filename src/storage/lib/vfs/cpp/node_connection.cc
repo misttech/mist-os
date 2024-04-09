@@ -6,12 +6,10 @@
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/zx/handle.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <zircon/assert.h>
 
-#include <memory>
 #include <utility>
 
 #include <fbl/string_buffer.h>
@@ -27,32 +25,41 @@ namespace internal {
 
 NodeConnection::NodeConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                fuchsia_io::Rights rights)
-    : Connection(vfs, std::move(vnode), fs::VnodeProtocol::kNode, rights) {
+    : Connection(vfs, std::move(vnode), rights) {
   // Only Rights.GET_ATTRIBUTES is allowed for node connections.
   ZX_DEBUG_ASSERT(!(rights - fio::Rights::kGetAttributes));
 }
 
-std::unique_ptr<Binding> NodeConnection::Bind(async_dispatcher_t* dispatcher, zx::channel channel,
-                                              OnUnbound on_unbound) {
-  return std::make_unique<TypedBinding<fio::Node>>(fidl::BindServer(
-      dispatcher, fidl::ServerEnd<fio::Node>{std::move(channel)}, this,
-      [on_unbound = std::move(on_unbound)](NodeConnection* self, fidl::UnbindInfo,
-                                           fidl::ServerEnd<fio::Node>) { on_unbound(self); }));
+NodeConnection::~NodeConnection() { [[maybe_unused]] zx::result result = Unbind(); }
+
+void NodeConnection::BindImpl(zx::channel channel, OnUnbound on_unbound) {
+  ZX_DEBUG_ASSERT(!binding_);
+  binding_.emplace(fidl::BindServer(vfs()->dispatcher(),
+                                    fidl::ServerEnd<fuchsia_io::Node>{std::move(channel)}, this,
+                                    [on_unbound = std::move(on_unbound)](
+                                        NodeConnection* self, fidl::UnbindInfo,
+                                        fidl::ServerEnd<fuchsia_io::Node>) { on_unbound(self); }));
 }
 
+zx::result<> NodeConnection::Unbind() {
+  if (std::optional binding = std::exchange(binding_, std::nullopt); binding) {
+    binding->Unbind();
+  }
+  return zx::ok();
+}
 void NodeConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
   // The NODE_REFERENCE flag should be preserved when cloning a node connection.
   Connection::NodeClone(request->flags | fio::OpenFlags::kNodeReference,
                         std::move(request->object));
 }
 
-void NodeConnection::Close(CloseCompleter::Sync& completer) {
-  zx::result<> result = Connection::NodeClose();
-  completer.Reply(result);
-}
+void NodeConnection::Close(CloseCompleter::Sync& completer) { completer.Reply(Unbind()); }
 
 void NodeConnection::Query(QueryCompleter::Sync& completer) {
-  completer.Reply(Connection::NodeQuery());
+  std::string_view protocol = fio::kNodeProtocolName;
+  // TODO(https://fxbug.dev/42052765): avoid the const cast.
+  uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(protocol.data()));
+  completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, protocol.size()));
 }
 
 void NodeConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
@@ -61,9 +68,7 @@ void NodeConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& complet
 }
 
 void NodeConnection::Sync(SyncCompleter::Sync& completer) {
-  Connection::NodeSync([completer = completer.ToAsync()](zx_status_t status) mutable {
-    completer.Reply(zx::make_result(status));
-  });
+  completer.Reply(zx::make_result(ZX_ERR_BAD_HANDLE));
 }
 
 void NodeConnection::GetAttr(GetAttrCompleter::Sync& completer) {
@@ -78,7 +83,7 @@ void NodeConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync&
 }
 
 void NodeConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
-  completer.Reply(ZX_OK, Connection::NodeGetFlags());
+  completer.Reply(ZX_OK, fio::OpenFlags::kNodeReference);
 }
 
 void NodeConnection::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) {

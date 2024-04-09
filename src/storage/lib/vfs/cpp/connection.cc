@@ -54,46 +54,18 @@ bool PrevalidateFlags(fio::OpenFlags flags) {
   return true;
 }
 
-Connection::Connection(FuchsiaVfs* vfs, fbl::RefPtr<Vnode> vnode, VnodeProtocol protocol,
-                       fuchsia_io::Rights rights)
-    : vnode_is_open_(protocol != VnodeProtocol::kNode),
-      vfs_(vfs),
-      vnode_(std::move(vnode)),
-      protocol_(protocol),
-      rights_(rights) {
+Connection::Connection(FuchsiaVfs* vfs, fbl::RefPtr<Vnode> vnode, fuchsia_io::Rights rights)
+    : vfs_(vfs), vnode_(std::move(vnode)), rights_(rights) {
   ZX_DEBUG_ASSERT(vfs);
   ZX_DEBUG_ASSERT(vnode_);
 }
 
 Connection::~Connection() {
-  // Invoke a "close" call on the underlying vnode if we haven't already.
-  EnsureVnodeClosed();
-
   // Release the token associated with this connection's vnode since the connection will be
   // releasing the vnode's reference once this function returns.
   if (token_) {
     vfs_->TokenDiscard(std::move(token_));
   }
-}
-
-void Connection::Unbind() { binding_.reset(); }
-
-void Connection::StartDispatching(zx::channel channel, OnUnbound on_unbound) {
-  ZX_DEBUG_ASSERT(channel);
-  ZX_DEBUG_ASSERT(!binding_);
-  ZX_DEBUG_ASSERT(vfs_->dispatcher());
-  ZX_DEBUG_ASSERT_MSG(InContainer(),
-                      "Connection must be managed by the Vfs when dispatching FIDL messages.");
-
-  binding_ = Bind(vfs_->dispatcher(), std::move(channel), std::move(on_unbound));
-}
-
-zx_status_t Connection::EnsureVnodeClosed() {
-  if (!vnode_is_open_) {
-    return ZX_OK;
-  }
-  vnode_is_open_ = false;
-  return vnode_->Close();
 }
 
 void Connection::NodeClone(fio::OpenFlags flags, fidl::ServerEnd<fio::Node> server_end) {
@@ -144,46 +116,7 @@ void Connection::NodeClone(fio::OpenFlags flags, fidl::ServerEnd<fio::Node> serv
   vfs_->Serve(vn, server_end.TakeChannel(), clone_options);
 }
 
-zx::result<> Connection::NodeClose() {
-  Unbind();
-  return zx::make_result(EnsureVnodeClosed());
-}
-
-fidl::VectorView<uint8_t> Connection::NodeQuery() {
-  const std::string_view kProtocol = [protocol = protocol_]() {
-    switch (protocol) {
-      case VnodeProtocol::kDirectory: {
-        return fio::kDirectoryProtocolName;
-      }
-      case VnodeProtocol::kFile: {
-        return fio::kFileProtocolName;
-      }
-      case VnodeProtocol::kNode:
-      case VnodeProtocol::kService: {
-        return fio::kNodeProtocolName;
-      }
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-      case VnodeProtocol::kSymlink: {
-        return fio::kSymlinkProtocolName;
-      }
-#endif
-    }
-  }();
-  // TODO(https://fxbug.dev/42052765): avoid the const cast.
-  uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
-  return fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size());
-}
-
-void Connection::NodeSync(fit::callback<void(zx_status_t)> callback) {
-  FS_PRETTY_TRACE_DEBUG("[NodeSync] options: ", options());
-  if (protocol_ == VnodeProtocol::kNode) {
-    callback(ZX_ERR_BAD_HANDLE);
-    return;
-  }
-  vnode_->Sync(Vnode::SyncCallback(std::move(callback)));
-}
-
-zx::result<VnodeAttributes> Connection::NodeGetAttr() {
+zx::result<VnodeAttributes> Connection::NodeGetAttr() const {
   FS_PRETTY_TRACE_DEBUG("[NodeGetAttr] options: ", options());
   // TODO(https://fxbug.dev/324080764): This io1 operation should require the GET_ATTRIBUTES right.
   fs::VnodeAttributes attr;
@@ -209,26 +142,7 @@ zx::result<> Connection::NodeSetAttr(fio::NodeAttributeFlags flags,
   return zx::make_result(vnode_->SetAttributes(update));
 }
 
-fio::OpenFlags Connection::NodeGetFlags() const {
-  fio::OpenFlags flags = {};
-  // Map io2 rights to io1 flags only if all constituent io2 rights are present.
-  if ((rights_ & fio::kRStarDir) == fio::kRStarDir) {
-    flags |= fio::OpenFlags::kRightReadable;
-  }
-  if ((rights_ & fio::kWStarDir) == fio::kWStarDir) {
-    flags |= fio::OpenFlags::kRightWritable;
-  }
-  if ((rights_ & fio::kXStarDir) == fio::kXStarDir) {
-    flags |= fio::OpenFlags::kRightExecutable;
-  }
-  // Handle node reference.
-  if (protocol_ == VnodeProtocol::kNode) {
-    flags |= fio::OpenFlags::kNodeReference;
-  }
-  return flags;
-}
-
-zx::result<fio::wire::FilesystemInfo> Connection::NodeQueryFilesystem() {
+zx::result<fio::wire::FilesystemInfo> Connection::NodeQueryFilesystem() const {
   zx::result<FilesystemInfo> info = vfs_->GetFilesystemInfo();
   if (info.is_error()) {
     return info.take_error();

@@ -12,7 +12,6 @@
 #include <sys/stat.h>
 #include <zircon/assert.h>
 
-#include <memory>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -82,16 +81,29 @@ namespace internal {
 
 DirectoryConnection::DirectoryConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                          fuchsia_io::Rights rights, zx_koid_t koid)
-    : Connection(vfs, std::move(vnode), fs::VnodeProtocol::kDirectory, rights), koid_(koid) {}
+    : Connection(vfs, std::move(vnode), rights), koid_(koid) {}
 
-DirectoryConnection::~DirectoryConnection() { vnode()->DeleteFileLockInTeardown(koid_); }
+DirectoryConnection::~DirectoryConnection() {
+  [[maybe_unused]] zx::result result = Unbind();
+  vnode()->DeleteFileLockInTeardown(koid_);
+}
 
-std::unique_ptr<Binding> DirectoryConnection::Bind(async_dispatcher_t* dispatcher,
-                                                   zx::channel channel, OnUnbound on_unbound) {
-  return std::make_unique<TypedBinding<fio::Directory>>(fidl::BindServer(
-      dispatcher, fidl::ServerEnd<fio::Directory>{std::move(channel)}, this,
+void DirectoryConnection::BindImpl(zx::channel channel, OnUnbound on_unbound) {
+  ZX_DEBUG_ASSERT(!binding_);
+  binding_.emplace(fidl::BindServer(
+      vfs()->dispatcher(), fidl::ServerEnd<fuchsia_io::Directory>{std::move(channel)}, this,
       [on_unbound = std::move(on_unbound)](DirectoryConnection* self, fidl::UnbindInfo,
-                                           fidl::ServerEnd<fio::Directory>) { on_unbound(self); }));
+                                           fidl::ServerEnd<fuchsia_io::Directory>) {
+        on_unbound(self);
+      }));
+}
+
+zx::result<> DirectoryConnection::Unbind() {
+  if (std::optional binding = std::exchange(binding_, std::nullopt); binding) {
+    binding->Unbind();
+    return zx::make_result(vnode()->Close());
+  }
+  return zx::ok();
 }
 
 void DirectoryConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
@@ -99,17 +111,13 @@ void DirectoryConnection::Clone(CloneRequestView request, CloneCompleter::Sync& 
   Connection::NodeClone(request->flags | fio::OpenFlags::kDirectory, std::move(request->object));
 }
 
-void DirectoryConnection::Close(CloseCompleter::Sync& completer) {
-  zx::result result = Connection::NodeClose();
-  if (result.is_error()) {
-    completer.ReplyError(result.status_value());
-  } else {
-    completer.ReplySuccess();
-  }
-}
+void DirectoryConnection::Close(CloseCompleter::Sync& completer) { completer.Reply(Unbind()); }
 
 void DirectoryConnection::Query(QueryCompleter::Sync& completer) {
-  completer.Reply(Connection::NodeQuery());
+  std::string_view protocol = fio::kDirectoryProtocolName;
+  // TODO(https://fxbug.dev/42052765): avoid the const cast.
+  uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(protocol.data()));
+  completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, protocol.size()));
 }
 
 void DirectoryConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
@@ -118,7 +126,7 @@ void DirectoryConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& co
 }
 
 void DirectoryConnection::Sync(SyncCompleter::Sync& completer) {
-  Connection::NodeSync([completer = completer.ToAsync()](zx_status_t sync_status) mutable {
+  vnode()->Sync([completer = completer.ToAsync()](zx_status_t sync_status) mutable {
     if (sync_status != ZX_OK) {
       completer.ReplyError(sync_status);
     } else {
@@ -146,7 +154,7 @@ void DirectoryConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::
 }
 
 void DirectoryConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
-  completer.Reply(ZX_OK, Connection::NodeGetFlags());
+  completer.Reply(ZX_OK, RightsToOpenFlags(rights()));
 }
 
 void DirectoryConnection::SetFlags(SetFlagsRequestView request,

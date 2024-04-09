@@ -22,10 +22,15 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
   // Refer to documentation for |Connection::Connection|.
   NodeConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, fuchsia_io::Rights rights);
 
-  ~NodeConnection() final = default;
+  ~NodeConnection() final;
 
  private:
-  std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) final;
+  //
+  // |fs::Connection| Implementation
+  //
+
+  void BindImpl(zx::channel channel, OnUnbound on_unbound) final;
+  zx::result<> Unbind() final;
   zx::result<> WithRepresentation(fit::callback<void(fuchsia_io::wire::Representation)> handler,
                                   std::optional<fuchsia_io::NodeAttributesQuery> query) const final;
   zx::result<> WithNodeInfoDeprecated(
@@ -75,6 +80,8 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 #endif
+
+  std::optional<fidl::ServerBindingRef<fuchsia_io::Node>> binding_;
 };
 
 }  // namespace fs::internal

@@ -11,6 +11,8 @@
 #include <mutex>
 #include <utility>
 
+#include "src/storage/lib/vfs/cpp/connection.h"
+
 namespace fs {
 
 SynchronousVfs::SynchronousVfs(async_dispatcher_t* dispatcher) : FuchsiaVfs(dispatcher) {}
@@ -40,7 +42,7 @@ void SynchronousVfs::CloseAllConnectionsForVnode(const Vnode& node,
     std::lock_guard<std::mutex> lock(connections_->lock);
     for (internal::Connection& connection : connections_->inner) {
       if (connection.vnode().get() == &node) {
-        connection.Unbind();
+        [[maybe_unused]] zx::result result = connection.Unbind();
       }
     }
   }
@@ -72,16 +74,16 @@ zx_status_t SynchronousVfs::RegisterConnection(std::unique_ptr<internal::Connect
   // `internal::Connection::Unbind` at the same time that (a) the connections container is being
   // modified and (b) a particular connection is being destroyed. Access to the connections
   // container is guarded by a lock to mitigate this.
-  added.StartDispatching(std::move(channel),
-                         [weak = std::weak_ptr(connections_)](internal::Connection* connection) {
-                           if (std::shared_ptr connections = weak.lock(); connections != nullptr) {
-                             // Release the lock before dropping the connection.
-                             std::unique_ptr removed = [&]() {
-                               std::lock_guard<std::mutex> lock(connections->lock);
-                               return connections->inner.erase(*connection);
-                             }();
-                           }
-                         });
+  auto on_unbound = [weak = std::weak_ptr(connections_)](internal::Connection* connection) {
+    if (std::shared_ptr connections = weak.lock(); connections != nullptr) {
+      // Release the lock before dropping the connection.
+      std::unique_ptr removed = [&]() {
+        std::lock_guard<std::mutex> lock(connections->lock);
+        return connections->inner.erase(*connection);
+      }();
+    }
+  };
+  added.Bind(std::move(channel), std::move(on_unbound));
   return ZX_OK;
 }
 

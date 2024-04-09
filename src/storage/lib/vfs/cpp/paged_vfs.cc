@@ -10,6 +10,7 @@
 
 #include <fbl/auto_lock.h>
 
+#include "src/storage/lib/vfs/cpp/connection.h"
 #include "src/storage/lib/vfs/cpp/paged_vnode.h"
 
 namespace fs {

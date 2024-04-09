@@ -16,7 +16,7 @@
 
 namespace {
 
-// Base class used to define fake Vfs objects to test |Connection::StartDispatching|.
+// Base class used to define fake Vfs objects to test |Connection::Bind|.
 class NoOpVfs : public fs::FuchsiaVfs {
  public:
   using FuchsiaVfs::FuchsiaVfs;
@@ -46,7 +46,7 @@ class NoOpVfsGood : public NoOpVfs {
   zx_status_t RegisterConnection(std::unique_ptr<fs::internal::Connection> connection,
                                  zx::channel server_end) final {
     connections_.push_back(std::move(connection));
-    connections_.back().StartDispatching(std::move(server_end), [](fs::internal::Connection*) {});
+    connections_.back().Bind(std::move(server_end), [](fs::internal::Connection*) {});
     return ZX_OK;
   }
 };
@@ -61,7 +61,7 @@ class NoOpVfsBad : public NoOpVfs {
  private:
   zx_status_t RegisterConnection(std::unique_ptr<fs::internal::Connection> connection,
                                  zx::channel server_end) final {
-    connection->StartDispatching(std::move(server_end), [](fs::internal::Connection*) {});
+    connection->Bind(std::move(server_end), [](fs::internal::Connection*) {});
     connections_.push_back(std::move(connection));
     return ZX_OK;
   }
@@ -77,13 +77,13 @@ void RunTest(async::Loop* loop, VfsType&& vfs) {
   loop->RunUntilIdle();
 }
 
-TEST(ConnectionTest, StartDispatchingRequiresVfsManagingConnection_Positive) {
+TEST(ConnectionTest, BindRequiresVfsManagingConnection_Positive) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   RunTest(&loop, NoOpVfsGood(loop.dispatcher()));
 }
 
-TEST(ConnectionDeathTest, StartDispatchingRequiresVfsManagingConnection_Negative) {
-  // StartDispatching requires registering the connection in a list first.
+TEST(ConnectionDeathTest, BindRequiresVfsManagingConnection_Negative) {
+  // Bind requires registering the connection in a list first.
   if (ZX_DEBUG_ASSERT_IMPLEMENTED) {
     async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
     ASSERT_DEATH([&] {
