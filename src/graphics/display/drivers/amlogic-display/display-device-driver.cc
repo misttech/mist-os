@@ -18,6 +18,8 @@
 #include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 
+#include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter-dfv1.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace-dfv1.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
@@ -34,8 +36,18 @@ zx_status_t DisplayDeviceDriver::Create(zx_device_t* parent) {
   }
   std::unique_ptr<display::Namespace> incoming = std::move(create_incoming_result).value();
 
+  zx::result<std::unique_ptr<display::MetadataGetter>> create_metadata_getter_result =
+      display::MetadataGetterDfv1::Create(parent);
+  if (create_metadata_getter_result.is_error()) {
+    zxlogf(ERROR, "Failed to create Metadata getter: %s",
+           create_metadata_getter_result.status_string());
+    return create_metadata_getter_result.status_value();
+  }
+  std::unique_ptr<display::MetadataGetter> metadata_getter =
+      std::move(create_metadata_getter_result).value();
+
   zx::result<std::unique_ptr<DisplayEngine>> display_engine_result =
-      DisplayEngine::Create(parent, incoming.get());
+      DisplayEngine::Create(parent, incoming.get(), metadata_getter.get());
   if (display_engine_result.is_error()) {
     zxlogf(ERROR, "Failed to create DisplayEngine instance: %s",
            display_engine_result.status_string());
@@ -47,7 +59,8 @@ zx_status_t DisplayDeviceDriver::Create(zx_device_t* parent) {
 
   fbl::AllocChecker alloc_checker;
   auto display_device_driver = fbl::make_unique_checked<DisplayDeviceDriver>(
-      &alloc_checker, parent, std::move(incoming), std::move(display_engine));
+      &alloc_checker, parent, std::move(incoming), std::move(metadata_getter),
+      std::move(display_engine));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for DisplayDeviceDriver");
     return ZX_ERR_NO_MEMORY;
@@ -67,9 +80,11 @@ zx_status_t DisplayDeviceDriver::Create(zx_device_t* parent) {
 
 DisplayDeviceDriver::DisplayDeviceDriver(zx_device_t* parent,
                                          std::unique_ptr<display::Namespace> incoming,
+                                         std::unique_ptr<display::MetadataGetter> metadata_getter,
                                          std::unique_ptr<DisplayEngine> display_engine)
     : DeviceType(parent),
       incoming_(std::move(incoming)),
+      metadata_getter_(std::move(metadata_getter)),
       display_engine_(std::move(display_engine)) {}
 
 DisplayDeviceDriver::~DisplayDeviceDriver() = default;

@@ -9,10 +9,11 @@
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <lib/component/incoming/cpp/constants.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/device-protocol/display-panel.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
 #include <lib/image-format/image_format.h>
@@ -42,6 +43,7 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -1068,26 +1070,20 @@ zx_status_t DisplayEngine::InitializeMipiDsiVout(display_panel_t panel_info) {
 zx_status_t DisplayEngine::InitializeVout() {
   ZX_ASSERT(vout_ == nullptr);
 
-  display_panel_t panel_info;
-  size_t actual_bytes;
-
-  zx_status_t status = device_get_metadata(bus_device_, DEVICE_METADATA_DISPLAY_PANEL_CONFIG,
-                                           &panel_info, sizeof(display_panel_t), &actual_bytes);
-  if (status == ZX_ERR_NOT_FOUND) {
-    return InitializeHdmiVout();
-  }
-
-  if (status == ZX_OK) {
-    if (actual_bytes != sizeof(display_panel_t)) {
-      zxlogf(ERROR, "Display panel metadata size mismatch: Got %zu bytes, expected %zu bytes",
-             actual_bytes, sizeof(display_panel_t));
-      return ZX_ERR_INTERNAL;
-    }
+  zx::result<std::unique_ptr<display_panel_t>> metadata_result =
+      metadata_getter_.Get<display_panel_t>(DEVICE_METADATA_DISPLAY_PANEL_CONFIG,
+                                            component::kDefaultInstance);
+  if (metadata_result.is_ok()) {
+    display_panel_t panel_info = *std::move(metadata_result).value();
     return InitializeMipiDsiVout(panel_info);
   }
 
-  zxlogf(ERROR, "Failed to get display panel metadata: %s", zx_status_get_string(status));
-  return status;
+  if (metadata_result.status_value() == ZX_ERR_NOT_FOUND) {
+    return InitializeHdmiVout();
+  }
+
+  zxlogf(ERROR, "Failed to get display panel metadata: %s", metadata_result.status_string());
+  return metadata_result.status_value();
 }
 
 zx_status_t DisplayEngine::GetCommonProtocolsAndResources() {
@@ -1256,17 +1252,20 @@ zx_status_t DisplayEngine::Initialize() {
   return ZX_OK;
 }
 
-DisplayEngine::DisplayEngine(zx_device_t* bus_device, display::Namespace* incoming)
-    : bus_device_(bus_device), incoming_(*incoming) {
+DisplayEngine::DisplayEngine(zx_device_t* bus_device, display::Namespace* incoming,
+                             display::MetadataGetter* metadata_getter)
+    : bus_device_(bus_device), incoming_(*incoming), metadata_getter_(*metadata_getter) {
   ZX_DEBUG_ASSERT(incoming != nullptr);
+  ZX_DEBUG_ASSERT(metadata_getter != nullptr);
 }
 DisplayEngine::~DisplayEngine() {}
 
 // static
-zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(zx_device_t* parent,
-                                                                 display::Namespace* incoming) {
+zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
+    zx_device_t* parent, display::Namespace* incoming, display::MetadataGetter* metadata_getter) {
   fbl::AllocChecker alloc_checker;
-  auto display_engine = fbl::make_unique_checked<DisplayEngine>(&alloc_checker, parent, incoming);
+  auto display_engine =
+      fbl::make_unique_checked<DisplayEngine>(&alloc_checker, parent, incoming, metadata_getter);
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);

@@ -13,6 +13,7 @@
 #include <ddktl/device.h>
 
 #include "src/graphics/display/drivers/amlogic-display/display-engine.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
@@ -33,6 +34,7 @@ class DisplayDeviceDriver final : public DeviceType {
   //
   // `incoming` must outlive `display_engine`.
   explicit DisplayDeviceDriver(zx_device_t* parent, std::unique_ptr<display::Namespace> incoming,
+                               std::unique_ptr<display::MetadataGetter> metadata_getter,
                                std::unique_ptr<DisplayEngine> display_engine);
 
   DisplayDeviceDriver(const DisplayDeviceDriver&) = delete;
@@ -54,6 +56,8 @@ class DisplayDeviceDriver final : public DeviceType {
  private:
   // `incoming_` must outlive `display_engine_`.
   std::unique_ptr<display::Namespace> incoming_;
+  // `metadata_getter_` must outlive `display_engine_`.
+  std::unique_ptr<display::MetadataGetter> metadata_getter_;
   std::unique_ptr<DisplayEngine> display_engine_;
 };
 
