@@ -11,13 +11,17 @@ group("testing") {
   deps = [
     ":tests",
     ":timekeeper_integration",
+    "example",
     "realm-proxy",
   ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ "fidl" ]
+  deps = [
+    "example:tests",
+    "fidl",
+  ]
 }
 
 rustc_library("timekeeper_integration") {
