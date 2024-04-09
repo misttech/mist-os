@@ -161,11 +161,6 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     auto& modules = linker.modules();
     ASSERT_FALSE(modules.empty());
 
-    const RemoteModule& loaded_vdso = modules[init_result->front()];
-
-    RemoteModule& loaded_exec = modules.front();
-    const RemoteModule::ExecInfo& exec_info = loaded_exec.decoded().exec_info();
-
     // Check the loaded-by pointers.
     EXPECT_FALSE(modules.front().loaded_by_modid())
         << "executable loaded by " << modules[*modules.front().loaded_by_modid()].name();
@@ -201,9 +196,6 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
       }
     }
 
-    // Record any stack size request from the executable's PT_GNU_STACK.
-    set_stack_size(exec_info.stack_size);
-
     const RemoteModule& loaded_stub = linker.abi_stub_module();
     if (!loaded_stub.HasModule()) {
       ASSERT_TRUE(this->HasFailure());
@@ -229,6 +221,16 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
 
     // Choose load addresses.
     EXPECT_TRUE(linker.Allocate(diag, root_vmar().borrow()));
+
+    // Use the executable's entry point at its runtime load address.
+    set_entry(linker.main_entry());
+
+    // Record any stack size request from the executable's PT_GNU_STACK.
+    set_stack_size(linker.main_stack_size());
+
+    // Locate the loaded vDSO to pass its base pointer to the test process.
+    const RemoteModule& loaded_vdso = modules[init_result->front()];
+    set_vdso_base(loaded_vdso.module().vaddr_start());
 
     // Acquire a StaticTlsDescResolver that uses the stub dynamic linker's
     // entry TLSDESC points.  Note this could in the general case be modified
@@ -267,12 +269,6 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     // Finally, all the VMO contents are in place to be mapped into the
     // process.
     EXPECT_TRUE(RemoteModule::LoadModules(diag, modules));
-
-    // Use the executable's entry point at its loaded address.
-    set_entry(exec_info.relative_entry + loaded_exec.load_bias());
-
-    // Locate the loaded vDSO to pass its base pointer to the test process.
-    set_vdso_base(loaded_vdso.module().vaddr_start());
 
     RemoteModule::CommitModules(modules);
   }

@@ -125,6 +125,24 @@ class RemoteDynamicLinker {
   Module& abi_stub_module() { return modules_[stub_modid_]; }
   const Module& abi_stub_module() const { return modules_[stub_modid_]; }
 
+  // When loading a main executable in the normal fashion, it's always the
+  // first of the root modules given to Init() and so the first in the
+  // modules() list.
+  Module& main_module() { return modules_.front(); }
+  const Module& main_module() const { return modules_.front(); }
+
+  // Return the runtime address for the main module's Ehdr::e_entry PC address.
+  // This should be used after Allocate(), below.
+  size_type main_entry() const {
+    const Module& main = main_module();
+    return main.decoded().exec_info().relative_entry + main.load_bias();
+  }
+
+  // Return any PT_GNU_STACK size request from the main module.
+  std::optional<size_type> main_stack_size() const {
+    return main_module().decoded().exec_info().stack_size;
+  }
+
   // Find an existing Module in the modules() list by name or SONAME.  Returns
   // nullptr if none matches.  The returned pointer is invalidated by adding
   // modules to the list.
