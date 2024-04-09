@@ -71,8 +71,9 @@
         },
         {
             from: "parent",
-            to: [ "#boot-drivers" ],
+            to: "#boot-drivers",
             config: [
+                "fuchsia.driver.UseHardwareIommu",
                 "fuchsia.power.SuspendEnabled",
                 "fuchsia.usb.PeripheralConfig.Functions",
             ],

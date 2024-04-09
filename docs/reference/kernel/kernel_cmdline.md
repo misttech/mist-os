@@ -163,11 +163,6 @@ register as "trace provider".
 The default is enabled. This options exists to provide a quick fallback should a
 problem arise.
 
-## driver.iommu.enable=\<bool>
-
-This option (disabled by default) allows the system to use a hardware IOMMU if
-present.
-
 ### x64 specific values
 
 On x64, some additional values are supported for configuring 8250-like UARTs:

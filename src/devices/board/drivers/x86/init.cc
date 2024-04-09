@@ -10,6 +10,7 @@
 #include "acpi-private.h"
 #include "dev.h"
 #include "errors.h"
+#include "src/devices/board/drivers/x86/x86_config.h"
 #include "src/devices/board/lib/acpi/acpi.h"
 #include "src/devices/board/lib/acpi/util.h"
 #include "x86.h"
@@ -17,15 +18,12 @@
 namespace x86 {
 
 bool use_hardware_iommu(zx_device_t* dev) {
-  char value[32];
-  auto status = device_get_variable(dev, "driver.iommu.enable", value, sizeof(value), nullptr);
-  if (status != ZX_OK) {
-    return false;  // Default to false currently
-  } else if (!strcmp(value, "0") || !strcmp(value, "false") || !strcmp(value, "off")) {
+  zx::vmo config_vmo;
+  if (device_get_config_vmo(dev, config_vmo.reset_and_get_address()) != ZX_OK) {
     return false;
-  } else {
-    return true;
   }
+  auto config = x86_config::Config::CreateFromVmo(std::move(config_vmo));
+  return config.use_hardware_iommu();
 }
 
 zx_status_t X86::EarlyAcpiInit() {

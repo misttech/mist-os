@@ -70,6 +70,7 @@ fuchsia_driver("platform-bus-x86-driver") {
   configs += [ ":config" ]
   deps = [
     ":x64-bind",
+    ":x86-config",
     "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
     "//sdk/fidl/fuchsia.acpi.tables:fuchsia.acpi.tables_cpp",
@@ -114,11 +115,19 @@ fuchsia_driver("platform-bus-x86-driver") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-fuchsia_driver_component("platform-bus-x86") {
+fuchsia_component_manifest("manifest") {
   component_name = "platform-bus-x86"
+  manifest = "meta/platform-bus-x86.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("x86-config") {
+  cm_label = ":manifest"
+}
+
+fuchsia_driver_component("platform-bus-x86") {
+  cm_label = ":manifest"
   deps = [ ":platform-bus-x86-driver" ]
   info = "platform-bus-x86-info.json"
-  manifest = "meta/platform-bus-x86.cml"
 }
 
 fuchsia_driver_package("package") {

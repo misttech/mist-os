@@ -15,6 +15,13 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
         driver_framework_config: &DriverFrameworkConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
+        // This is always set to false, but should be configurable once drivers actually support
+        // using a hardware iommu.
+        builder.set_config_capability(
+            "fuchsia.driver.UseHardwareIommu",
+            Config::new(ConfigValueType::Bool, false.into()),
+        )?;
+
         let mut disabled_drivers = driver_framework_config.disabled_drivers.clone();
         // TODO(https://fxbug.dev/42052994): Remove this once DFv2 is enabled by default and there
         // exists only one da7219 driver.

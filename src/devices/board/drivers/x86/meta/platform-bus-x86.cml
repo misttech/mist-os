@@ -19,6 +19,12 @@
     ],
     use: [
         {
+            // Whether or not a hardware iommu should be used.
+            config: "fuchsia.driver.UseHardwareIommu",
+            key: "use_hardware_iommu",
+            type: "bool",
+        },
+        {
             protocol: [
                 "fuchsia.kernel.IommuResource",
                 "fuchsia.kernel.IoportResource",
