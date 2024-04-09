@@ -8,17 +8,12 @@ using fuchsia.amlogic.platform;
 using fuchsia.gpio;
 using fuchsia.hardware.gpio;
 using fuchsia.platform;
-using fuchsia.devicetree;
 
 primary node "pdev" {
-  if fuchsia.devicetree.FIRST_COMPATIBLE == "amlogic,ethernet-phy" {
-    true;
-  } else {
-    fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
-    fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
-    fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D;
-    fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.ETH;
-  }
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
+  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.ETH;
 }
 
 node "gpio-init" {

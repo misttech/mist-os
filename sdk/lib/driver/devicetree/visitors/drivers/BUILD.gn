@@ -7,7 +7,6 @@ import("//build/devicetree/devicetree_visitor.gni")
 group("tests") {
   deps = [
     "clock-controllers:tests",
-    "ethernet:tests",
     "gpio-controllers:tests",
     "i2c-controllers:tests",
     "interrupt-controllers:tests",
@@ -24,7 +23,6 @@ group("tests") {
 devicetree_visitor_collection("all-driver-visitors") {
   deps = [
     "//sdk/lib/driver/devicetree/visitors/drivers/clock-controllers/clockimpl-visitor",
-    "//sdk/lib/driver/devicetree/visitors/drivers/ethernet/ethernet-phy:ethernet-phy-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/gpio-controllers/gpioimpl-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/i2c-controllers/i2c-bus-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gicv2",

@@ -7,19 +7,14 @@ composite dwmac;
 using fuchsia.designware.platform;
 using fuchsia.hardware.ethernet.board;
 using fuchsia.platform;
-using fuchsia.devicetree;
 
 primary node "eth-board" {
   fuchsia.hardware.ethernet.board.Service == fuchsia.hardware.ethernet.board.Service.ZirconTransport;
 }
 
 node "pdev" {
-  if fuchsia.devicetree.FIRST_COMPATIBLE == "amlogic,meson-g12a-dwmac" {
-    true;
-  } else {
-    fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
-    fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.designware.platform.BIND_PLATFORM_DEV_VID.DESIGNWARE;
-    fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.designware.platform.BIND_PLATFORM_DEV_DID.ETH_MAC;
-    fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
-  }
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.designware.platform.BIND_PLATFORM_DEV_VID.DESIGNWARE;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.designware.platform.BIND_PLATFORM_DEV_DID.ETH_MAC;
+  fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
 }
