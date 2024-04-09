@@ -248,22 +248,8 @@ zx_status_t BlockDevice::FormatInternal() {
 }
 
 bool BlockDevice::InitFtl() {
-  char value[32];
-  zx_status_t status =
-      device_get_variable(parent(), "driver.ftl.original-size", value, sizeof(value), nullptr);
-
-  uint32_t ftl_original_size;
-  if (status == ZX_OK) {
-    ftl_original_size = static_cast<uint32_t>(strtoul(value, nullptr, 0));
-  } else {
-    if (status != ZX_ERR_NOT_FOUND) {
-      zxlogf(WARNING, "device_get_variable returned %s", zx_status_get_string(status));
-    }
-    ftl_original_size = 0;
-  }
-
   std::unique_ptr<NandDriver> driver =
-      NandDriver::CreateWithCounters(&parent_, &bad_block_, &nand_counters_, ftl_original_size);
+      NandDriver::CreateWithCounters(&parent_, &bad_block_, &nand_counters_, 0);
   const char* error = driver->Init();
   if (error) {
     zxlogf(ERROR, "Failed to init FTL driver: %s", error);
