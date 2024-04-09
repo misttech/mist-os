@@ -303,10 +303,6 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 			if err := t.bootZedboot(ctx, imgs); err != nil {
 				return err
 			}
-		} else if t.opts.Netboot {
-			if err := t.ffx.BootloaderBoot(ctx, t.config.FastbootSernum, pbPath); err != nil {
-				return err
-			}
 		} else {
 			maxAllowedAttempts := 1
 			if t.config.MaxFlashAttempts > maxAllowedAttempts {
@@ -315,9 +311,16 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 			var err error
 			for attempt := 1; attempt <= maxAllowedAttempts; attempt++ {
 				logger.Debugf(ctx, "Starting flash attempt %d/%d", attempt, maxAllowedAttempts)
-				if err = t.flash(ctx, pbPath); err == nil {
-					// If successful, early exit.
-					break
+				if t.opts.Netboot {
+					if err = t.ffx.BootloaderBoot(ctx, t.config.FastbootSernum, pbPath); err == nil {
+						// If successful, early exit.
+						break
+					}
+				} else {
+					if err = t.flash(ctx, pbPath); err == nil {
+						// If successful, early exit.
+						break
+					}
 				}
 				if attempt == maxAllowedAttempts {
 					logger.Errorf(ctx, "Flashing attempt %d/%d failed: %s.", attempt, maxAllowedAttempts, err)
