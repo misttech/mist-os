@@ -64,7 +64,7 @@ test("ahci-unittest-bin") {
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/lib/mmio",
     "//src/devices/testing/fake-bti",
-    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zxtest",
   ]
 }
@@ -94,7 +94,7 @@ source_set("shared") {
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
     "//src/devices/bin/driver_runtime",
     "//src/devices/block/lib/common:common",
-    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zx",
   ]
   public_deps = [
