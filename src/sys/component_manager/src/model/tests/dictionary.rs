@@ -4,8 +4,8 @@
 
 use {
     crate::model::testing::routing_test_helpers::*, cm_rust::*, cm_rust_testing::*,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx, routing_test_helpers::RoutingTestModel,
-    std::path::PathBuf,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx, moniker::Moniker,
+    routing_test_helpers::RoutingTestModel, std::path::PathBuf, test_case::test_case,
 };
 
 #[fuchsia::test]
@@ -1931,6 +1931,67 @@ async fn expose_from_dictionary_availability_invalid() {
             path: "/svc/C".parse().unwrap(),
             expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
         },
+    )
+    .await;
+}
+
+enum Statement {
+    Declare,
+    Extend,
+}
+
+/// Tests extending a dictionary, when the source dictionary is defined by self.
+/// Additionally, the source dictionary may be defined before or after the target dictionary.
+#[test_case(Statement::Declare, Statement::Extend)]
+#[test_case(Statement::Extend, Statement::Declare)]
+#[fuchsia::test]
+async fn dict_extend_from_self_different_decl_ordering(first: Statement, second: Statement) {
+    let mut root = ComponentDeclBuilder::new().child_default("leaf").use_(
+        UseBuilder::protocol().source(UseSource::Self_).name("foo").from_dictionary("target"),
+    );
+    for statement in [first, second] {
+        root = match statement {
+            Statement::Declare => root.capability(
+                CapabilityBuilder::dictionary()
+                    .name("source")
+                    .source_dictionary(
+                        DictionarySource::Child(ChildRef { name: "leaf".into(), collection: None }),
+                        "child_dict",
+                    )
+                    .build(),
+            ),
+            Statement::Extend => root.capability(
+                CapabilityBuilder::dictionary()
+                    .name("target")
+                    .source_dictionary(DictionarySource::Self_, "source")
+                    .build(),
+            ),
+        }
+    }
+    let root = root.build();
+
+    let components = vec![
+        ("root", root),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .protocol_default("foo")
+                .dictionary_default("child_dict")
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("child_dict".parse().unwrap())),
+                )
+                .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    test.check_use(
+        Moniker::default(),
+        CheckUse::Protocol { path: "/svc/foo".parse().unwrap(), expected_res: ExpectedResult::Ok },
     )
     .await;
 }
