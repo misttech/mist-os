@@ -1257,7 +1257,8 @@ PosixErrorOr<FileDescriptor> nonBlockingConnectNoListener(
 
   // Wait for the connect to fail.
   struct pollfd poll_fd = {s.get(), POLLERR, 0};
-  EXPECT_THAT(RetryEINTR(poll)(&poll_fd, 1, 1000), SyscallSucceedsWithValue(1));
+  EXPECT_THAT(RetryEINTR(poll)(&poll_fd, 1, kTimeoutMillis),
+              SyscallSucceedsWithValue(1));
   return std::move(s);
 }
 
@@ -1732,7 +1733,8 @@ TEST_P(SimpleTcpSocketTest, NonBlockingConnectRefused) {
   // We don't need to specify any events to get POLLHUP or POLLERR as these
   // are added before the poll.
   struct pollfd poll_fd = {s.get(), /*events=*/0, 0};
-  EXPECT_THAT(RetryEINTR(poll)(&poll_fd, 1, 1000), SyscallSucceedsWithValue(1));
+  EXPECT_THAT(RetryEINTR(poll)(&poll_fd, 1, kTimeoutMillis),
+              SyscallSucceedsWithValue(1));
 
   // The ECONNREFUSED should cause us to be woken up with POLLHUP.
   EXPECT_NE(poll_fd.revents & (POLLHUP | POLLERR), 0);
@@ -2696,6 +2698,15 @@ TEST_P(SimpleTcpSocketTest, EpollListeningSocket) {
   save_and_connect_thread.Join();
 }
 
+TEST_P(SimpleTcpSocketTest, SetTCPCorkOff) {
+  int fd;
+  ASSERT_THAT(fd = socket(GetParam(), SOCK_STREAM, IPPROTO_TCP),
+              SyscallSucceeds());
+
+  ASSERT_THAT(
+      setsockopt(fd, IPPROTO_TCP, TCP_CORK, &kSockOptOff, sizeof(kSockOptOff)),
+      SyscallSucceeds());
+}
 #endif  // __linux__
 
 INSTANTIATE_TEST_SUITE_P(AllInetTests, SimpleTcpSocketTest,

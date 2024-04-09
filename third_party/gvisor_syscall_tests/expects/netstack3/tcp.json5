@@ -108,6 +108,8 @@
                 "AllTCPSockets/TCPSocketPairTest.SetOffLingerOption/*",
                 "AllTCPSockets/TCPSocketPairTest.CloseWithLingerOption/*",
                 "AllTCPSockets/TCPSocketPairTest.ResetWithSoLingerZeroTimeoutOption/*",
+                "AllTCPSockets/TCPSocketPairTest.WaitTillMSSWithCorkOption/*",
+                "AllTCPSockets/TCPSocketPairTest.WaitTillTimeoutWithCorkOption/*",
             ],
         },
     ],
