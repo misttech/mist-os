@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/amlogic-display/hdmi-host.h"
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/result.h>
 #include <unistd.h>
@@ -24,6 +23,7 @@
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller-impl.h"
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {

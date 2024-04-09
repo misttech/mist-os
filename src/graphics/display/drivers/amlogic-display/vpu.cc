@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/amlogic-display/vpu.h"
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
@@ -24,6 +23,7 @@
 #include "src/graphics/display/drivers/amlogic-display/video-input-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 

@@ -5,8 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_COMMON_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_COMMON_H_
 
-#include <lib/ddk/debug.h>
-
 #include <hwreg/mmio.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"

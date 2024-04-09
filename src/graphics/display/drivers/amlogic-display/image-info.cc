@@ -5,7 +5,8 @@
 #include "src/graphics/display/drivers/amlogic-display/image-info.h"
 
 #include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
-#include <lib/ddk/debug.h>
+
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 

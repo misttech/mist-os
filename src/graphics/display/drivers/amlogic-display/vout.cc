@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <lib/ddk/debug.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
@@ -26,6 +25,7 @@
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {

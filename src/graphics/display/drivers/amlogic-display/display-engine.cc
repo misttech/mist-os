@@ -43,6 +43,7 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 #include "src/lib/fxl/strings/string_printf.h"

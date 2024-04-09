@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/amlogic-display/lcd.h"
 
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
-#include <lib/ddk/debug.h>
 #include <lib/mipi-dsi/mipi-dsi.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
@@ -22,6 +21,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {

@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter.h"
 
 #include <fuchsia/hardware/i2cimpl/c/banjo.h>
-#include <lib/ddk/debug.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
 #include <unistd.h>
@@ -22,6 +21,7 @@
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/designware-hdmi/color-param.h"
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 // References
 //

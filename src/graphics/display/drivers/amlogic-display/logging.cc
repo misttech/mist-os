@@ -4,12 +4,11 @@
 
 #include "src/graphics/display/drivers/amlogic-display/logging.h"
 
-#include <lib/ddk/debug.h>
-
 #include <cinttypes>
 
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 

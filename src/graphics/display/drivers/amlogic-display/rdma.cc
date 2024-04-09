@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/amlogic-display/rdma.h"
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/bti.h>
@@ -32,6 +31,7 @@
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 

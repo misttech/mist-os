@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <lib/ddk/debug.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 #include <unistd.h>
@@ -21,6 +20,7 @@
 #include <fbl/auto_lock.h>
 
 #include "src/graphics/display/drivers/amlogic-display/irq-handler-loop-util.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {

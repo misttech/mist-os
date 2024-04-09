@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
@@ -13,6 +12,8 @@
 #include <zircon/status.h>
 
 #include <cstdint>
+
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 

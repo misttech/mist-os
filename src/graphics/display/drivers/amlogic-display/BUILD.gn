@@ -109,6 +109,8 @@ source_set("common_srcs") {
     "//src/graphics/display/lib/designware-dsi:dsi-host-controller",
     "//src/graphics/display/lib/designware-hdmi:hdmi-transmitter-controller-impl",
     "//src/graphics/display/lib/device-protocol-display",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
     "//src/graphics/display/lib/driver-framework-migration-utils/metadata:metadata-getter",
     "//src/graphics/display/lib/driver-framework-migration-utils/metadata:metadata-getter-dfv1",
     "//src/graphics/display/lib/driver-framework-migration-utils/namespace",

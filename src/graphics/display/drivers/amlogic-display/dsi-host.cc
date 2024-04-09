@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/fit/function.h>
 #include <lib/mmio/mmio-buffer.h>
@@ -24,6 +23,7 @@
 #include "src/graphics/display/drivers/amlogic-display/mipi-phy.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 

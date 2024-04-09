@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -27,6 +26,7 @@
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 
