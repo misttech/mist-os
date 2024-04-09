@@ -14,6 +14,16 @@
             },
             {
                 "notes": [
+                    "Understand what check-licenses is attempting to parse.",
+                    "It may have to do with the SPDX file, since this tool cannot parse it.",
+                    "Investigation in https://fxbug.dev/333576929"
+                ],
+                "paths": [
+                    "prebuilt/bt-host"
+                ]
+            },
+            {
+                "notes": [
                     "Temporary skip, to allow landing of shac check repos in fuchsia.git"
                 ],
                 "paths": [
