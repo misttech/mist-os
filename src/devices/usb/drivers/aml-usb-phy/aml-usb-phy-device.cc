@@ -9,15 +9,15 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
+#include <mutex>
+
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
-#include <fbl/auto_lock.h>
 
 #include "src/devices/usb/drivers/aml-usb-phy/aml-usb-phy.h"
 #include "src/devices/usb/drivers/aml-usb-phy/power-regs.h"
 #include "src/devices/usb/drivers/aml-usb-phy/usb-phy-regs.h"
-
 namespace aml_usb_phy {
 
 namespace {
@@ -337,7 +337,7 @@ zx::result<> AmlUsbPhyDevice::CreateNode() {
 }
 
 AmlUsbPhyDevice::ChildNode& AmlUsbPhyDevice::ChildNode::operator++() {
-  fbl::AutoLock _(&lock_);
+  std::lock_guard<std::mutex> _(lock_);
   count_++;
   if (count_ != 1) {
     return *this;
@@ -395,7 +395,7 @@ AmlUsbPhyDevice::ChildNode& AmlUsbPhyDevice::ChildNode::operator++() {
 }
 
 AmlUsbPhyDevice::ChildNode& AmlUsbPhyDevice::ChildNode::operator--() {
-  fbl::AutoLock _(&lock_);
+  std::lock_guard<std::mutex> _(lock_);
   if (count_ == 0) {
     // Nothing to remove.
     return *this;

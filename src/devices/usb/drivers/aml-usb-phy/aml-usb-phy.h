@@ -10,6 +10,8 @@
 #include <lib/mmio/mmio.h>
 #include <lib/zx/interrupt.h>
 
+#include <fbl/macros.h>
+
 #include "src/devices/usb/drivers/aml-usb-phy/aml-usb-phy-device.h"
 #include "src/devices/usb/drivers/aml-usb-phy/usb-phy2.h"
 #include "src/devices/usb/drivers/aml-usb-phy/usb-phy3.h"

@@ -12,8 +12,7 @@
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/mmio/mmio-buffer.h>
 
-#include <fbl/mutex.h>
-
+#include <mutex>
 namespace aml_usb_phy {
 
 class AmlUsbPhy;
@@ -35,7 +34,7 @@ class AmlUsbPhyDevice : public fdf::DriverBase {
     const std::string_view name_;
     const uint32_t property_did_;
 
-    fbl::Mutex lock_;
+    std::mutex lock_;
     fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_ __TA_GUARDED(lock_);
     compat::SyncInitializedDeviceServer compat_server_ __TA_GUARDED(lock_);
     std::atomic_uint32_t count_ __TA_GUARDED(lock_) = 0;
