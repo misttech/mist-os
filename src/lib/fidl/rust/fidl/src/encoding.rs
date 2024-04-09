@@ -2923,7 +2923,7 @@ mod test {
     use super::*;
     use crate::handle::{convert_handle_dispositions_to_infos, AsHandleRef};
     use assert_matches::assert_matches;
-    use std::{f32, f64, fmt, i64};
+    use std::fmt;
 
     const CONTEXTS: [Context; 1] = [Context { wire_format_version: WireFormatVersion::V2 }];
 
