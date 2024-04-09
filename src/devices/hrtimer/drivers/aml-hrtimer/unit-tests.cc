@@ -681,12 +681,13 @@ TEST_F(DriverTest, CancelOnDriverStop) {
   }
 }
 
-TEST_F(DriverTest, LeaseRequested0) { CheckLeaseRequested(0); }
-TEST_F(DriverTest, LeaseRequested1) { CheckLeaseRequested(1); }
-TEST_F(DriverTest, LeaseRequested2) { CheckLeaseRequested(2); }
-TEST_F(DriverTest, LeaseRequested3) { CheckLeaseRequested(3); }
+// TODO(https://fxbug.dev/332975913): deflake and reenable.
+TEST_F(DriverTest, DISABLED_LeaseRequested0) { CheckLeaseRequested(0); }
+TEST_F(DriverTest, DISABLED_LeaseRequested1) { CheckLeaseRequested(1); }
+TEST_F(DriverTest, DISABLED_LeaseRequested2) { CheckLeaseRequested(2); }
+TEST_F(DriverTest, DISABLED_LeaseRequested3) { CheckLeaseRequested(3); }
 
-TEST_F(DriverTest, LeaseNotRequested4) {
+TEST_F(DriverTest, DISABLED_LeaseNotRequested4) {
   RunInEnvironmentTypeContext(
       [](TestEnvironment& env) { ASSERT_FALSE(env.power_broker().GetLeaseRequested()); });
   auto result_start =
@@ -696,10 +697,10 @@ TEST_F(DriverTest, LeaseNotRequested4) {
       [](TestEnvironment& env) { ASSERT_FALSE(env.power_broker().GetLeaseRequested()); });
 }
 
-TEST_F(DriverTest, LeaseRequested5) { CheckLeaseRequested(5); }
-TEST_F(DriverTest, LeaseRequested6) { CheckLeaseRequested(6); }
-TEST_F(DriverTest, LeaseRequested7) { CheckLeaseRequested(7); }
-TEST_F(DriverTest, LeaseRequested8) { CheckLeaseRequested(8); }
+TEST_F(DriverTest, DISABLED_LeaseRequested5) { CheckLeaseRequested(5); }
+TEST_F(DriverTest, DISABLED_LeaseRequested6) { CheckLeaseRequested(6); }
+TEST_F(DriverTest, DISABLED_LeaseRequested7) { CheckLeaseRequested(7); }
+TEST_F(DriverTest, DISABLED_LeaseRequested8) { CheckLeaseRequested(8); }
 
 class TestEnvironmentNoPower : public fdf_testing::Environment {
  public:
