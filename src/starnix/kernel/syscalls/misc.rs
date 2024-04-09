@@ -8,6 +8,7 @@ use bstr::ByteSlice;
 use fidl_fuchsia_buildinfo as buildinfo;
 use fidl_fuchsia_hardware_power_statecontrol as fpower;
 use fuchsia_component::client::connect_to_protocol_sync;
+use linux_uapi::LINUX_REBOOT_CMD_POWER_OFF;
 use starnix_sync::{Locked, Unlocked};
 
 use crate::{
@@ -220,7 +221,22 @@ pub fn sys_reboot(
         // Suspend is not implemented.
         LINUX_REBOOT_CMD_SW_SUSPEND => error!(ENOSYS),
 
-        LINUX_REBOOT_CMD_HALT | LINUX_REBOOT_CMD_RESTART | LINUX_REBOOT_CMD_RESTART2 => {
+        LINUX_REBOOT_CMD_HALT | LINUX_REBOOT_CMD_POWER_OFF => {
+            let proxy = connect_to_protocol_sync::<fpower::AdminMarker>()
+                .expect("couldn't connect to fuchsia.hardware.power.statecontrol.Admin");
+
+            match proxy.poweroff(zx::Time::INFINITE) {
+                Ok(_) => {
+                    log_info!("Powering off device.");
+                    // System is rebooting... wait until runtime ends.
+                    zx::Time::INFINITE.sleep();
+                }
+                Err(e) => panic!("Failed to power off, status: {e}"),
+            }
+            Ok(())
+        }
+
+        LINUX_REBOOT_CMD_RESTART | LINUX_REBOOT_CMD_RESTART2 => {
             // This is an arbitrary limit that should be large enough.
             const MAX_REBOOT_ARG_LEN: usize = 256;
             let arg_bytes = current_task
