@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
-#define SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
-
 #include <dirent.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -694,5 +691,3 @@ TEST_F(FuseServerTest, OverlongHeaderLength) {
   ASSERT_TRUE(fd.is_valid());
   fd.reset();
 }
-
-#endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
