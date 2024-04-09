@@ -16,7 +16,6 @@ The IDK contains metadata that can be used by an [IDK backend](README.md#backend
 generate an SDK for a specific build system.
 
 * [Linux](https://chrome-infra-packages.appspot.com/p/fuchsia/sdk/core/linux-amd64/+/latest)
-* [MacOS](https://chrome-infra-packages.appspot.com/p/fuchsia/sdk/core/mac-amd64/+/latest)
 
 ## Qemu
 
@@ -25,4 +24,3 @@ with Fuchsia system images contained in the IDK.
 
 * [Linux (amd64)](https://chrome-infra-packages.appspot.com/p/fuchsia/qemu/linux-amd64/+/latest)
 * [Linux (arm64)](https://chrome-infra-packages.appspot.com/p/fuchsia/qemu/linux-arm64/+/latest)
-* [MacOS (amd64)](https://chrome-infra-packages.appspot.com/p/fuchsia/qemu/mac-amd64/+/latest)

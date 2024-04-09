@@ -64,10 +64,6 @@ To download the latest IDK, you can use the following:
 # For Linux
 cipd install fuchsia/sdk/core/linux-amd64 latest -root ${IDK_DIR}
 
-# For macOS
-cipd install fuchsia/sdk/core/mac-amd64 latest -root ${IDK_DIR}
-```
-
 #### Generating RISC-V Libraries and Sysroot for the Fuchsia IDK
 
 To build RISC-V LLVM runtime libraries for Fuchsia, you need to generate
