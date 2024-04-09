@@ -211,27 +211,26 @@ pub fn sys_reboot(
         return error!(EPERM);
     }
 
+    let proxy = connect_to_protocol_sync::<fpower::AdminMarker>().or_else(|_| error!(EINVAL))?;
+
     match cmd {
         // CAD on/off commands turn Ctrl-Alt-Del keystroke on or off without halting the system.
         LINUX_REBOOT_CMD_CAD_ON | LINUX_REBOOT_CMD_CAD_OFF => Ok(()),
 
         // `kexec_load()` is not supported.
-        LINUX_REBOOT_CMD_KEXEC => error!(ENOSYS),
+        LINUX_REBOOT_CMD_KEXEC => error!(EINVAL),
 
         // Suspend is not implemented.
-        LINUX_REBOOT_CMD_SW_SUSPEND => error!(ENOSYS),
+        LINUX_REBOOT_CMD_SW_SUSPEND => error!(EINVAL),
 
         LINUX_REBOOT_CMD_HALT | LINUX_REBOOT_CMD_POWER_OFF => {
-            let proxy = connect_to_protocol_sync::<fpower::AdminMarker>()
-                .expect("couldn't connect to fuchsia.hardware.power.statecontrol.Admin");
-
             match proxy.poweroff(zx::Time::INFINITE) {
                 Ok(_) => {
                     log_info!("Powering off device.");
                     // System is rebooting... wait until runtime ends.
                     zx::Time::INFINITE.sleep();
                 }
-                Err(e) => panic!("Failed to power off, status: {e}"),
+                Err(e) => return error!(EINVAL, format!("Failed to power off, status: {e}")),
             }
             Ok(())
         }
@@ -244,17 +243,14 @@ pub fn sys_reboot(
                 .unwrap_or_default();
             let reboot_args: Vec<_> = arg_bytes.split_str(b",").collect();
 
-            let proxy = connect_to_protocol_sync::<fpower::AdminMarker>()
-                .expect("couldn't connect to fuchsia.hardware.power.statecontrol.Admin");
-
             if reboot_args.contains(&&b"bootloader"[..]) {
+                log_info!("Rebooting to bootloader");
                 match proxy.reboot_to_bootloader(zx::Time::INFINITE) {
                     Ok(_) => {
-                        log_info!("Rebooting to bootloader");
                         // System is rebooting... wait until runtime ends.
                         zx::Time::INFINITE.sleep();
                     }
-                    Err(e) => panic!("Failed to reboot, status: {e}"),
+                    Err(e) => return error!(EINVAL, format!("Failed to reboot, status: {e}")),
                 }
             }
 
@@ -274,15 +270,16 @@ pub fn sys_reboot(
                     TODO("https://fxbug.dev/322874610"),
                     "unknown reboot args, see logs for strings"
                 );
-                return error!(ENOSYS);
+                fpower::RebootReason::UserRequest
             };
+
+            log_info!("Rebooting... reason: {:?}", reboot_reason);
             match proxy.reboot(reboot_reason, zx::Time::INFINITE) {
                 Ok(_) => {
-                    log_info!("Rebooting... reason: {:?}", reboot_reason);
                     // System is rebooting... wait until runtime ends.
                     zx::Time::INFINITE.sleep();
                 }
-                Err(e) => panic!("Failed to reboot, status: {e}"),
+                Err(e) => return error!(EINVAL, format!("Failed to reboot, status: {e}")),
             }
             Ok(())
         }
