@@ -38,6 +38,8 @@ type moblyTestCase struct {
 	Result        string `yaml:"Result,omitempty"`
 	TestClass     string `yaml:"Test Class,omitempty"`
 	TestName      string `yaml:"Test Name,omitempty"`
+	// TerminationSignal is name of the Python exception class raised on crash/failure.
+	TerminationSignal string `yaml:"Termination Signal Type,omitempty"`
 	// Type describes the Mobly YAML document entry type which is in the set of
 	// (Record, TestNameList, Summary, ControllerInfo, UserData)
 	Type string `yaml:"Type,omitempty"`
@@ -100,9 +102,14 @@ func parseMoblyTest(lines [][]byte) []runtests.TestCaseResult {
 			status = runtests.TestCrashed
 		}
 
+		failureReason := tc.Details
+		if len(tc.TerminationSignal) != 0 {
+			failureReason = fmt.Sprintf("[%s] %s", tc.TerminationSignal, failureReason)
+		}
+
 		res = append(res, runtests.TestCaseResult{
 			DisplayName: fmt.Sprintf("%s.%s", tc.TestClass, tc.TestName),
-			FailReason:  tc.Details,
+			FailReason:  failureReason,
 			SuiteName:   tc.TestClass,
 			CaseName:    tc.TestName,
 			Status:      status,

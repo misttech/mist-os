@@ -18,17 +18,18 @@ Support for several common test frameworks and runtimes is provided:
 *   Generic Test Runner Framework tests (agnostic of language & runtime)
 *   Specialized Zircon unit testing framework
 *   Specialized Vulkan CTS testing framework
+*   Lacewing Python E2E testing framework (via Mobly)
 
 This library is designed to be extensible and testable.
 Adding support for new test frameworks is easy, simple, and fun!
 
 ## Building
 
-`fx set --with //tools/testing/testparser`
+`fx set core.x64 --with //tools/testing/testparser`
 
 ## Testing
 
 ```
-fx set --with //tools/testing/testparser:tests
-fx test testparser_tests
+fx set core.x64 --with-host //tools/testing/testparser:tests
+fx test //tools/testing/testparser
 ```

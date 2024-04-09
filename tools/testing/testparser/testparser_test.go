@@ -1342,7 +1342,7 @@ Type: Record
 UID: null
 ---
 Begin Time: 1668122321143
-Details: null
+Details: Real test failure
 End Time: 1668122321149
 Extra Errors: {}
 Extras: null
@@ -1350,7 +1350,7 @@ Result: FAIL
 Retry Parent: null
 Signature: test_hello-1668122321143
 Stacktrace: null
-Termination Signal Type: null
+Termination Signal Type: TestFailure
 Test Class: GreetingsTest
 Test Name: test_hello
 Type: Record
@@ -1380,7 +1380,7 @@ Result: ERROR
 Retry Parent: null
 Signature: test_error-1668122321143
 Stacktrace: null
-Termination Signal Type: null
+Termination Signal Type: FuchsiaDeviceError
 Test Class: GreetingsTest
 Test Name: test_error
 Type: Record
@@ -1408,7 +1408,7 @@ Type: Summary
 		},
 		{
 			DisplayName: "GreetingsTest.test_hello",
-			FailReason:  "",
+			FailReason:  "[TestFailure] Real test failure",
 			SuiteName:   "GreetingsTest",
 			CaseName:    "test_hello",
 			Status:      runtests.TestFailure,
@@ -1426,7 +1426,7 @@ Type: Summary
 		},
 		{
 			DisplayName: "GreetingsTest.test_error",
-			FailReason:  "Some multi-line error: line-1, line-2",
+			FailReason:  "[FuchsiaDeviceError] Some multi-line error: line-1, line-2",
 			SuiteName:   "GreetingsTest",
 			CaseName:    "test_error",
 			Status:      runtests.TestCrashed,
