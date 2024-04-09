@@ -68,7 +68,6 @@ def main():
     )
     parser.add_argument(
         "--depfile",
-        type=argparse.FileType("w"),
         required=True,
         help="The path to the depfile for this script",
     )
@@ -113,9 +112,8 @@ def main():
                         inputs.add(script["path"])
 
     if deps:
-        dep_file = DepFile(args.output)
-        dep_file.update(deps)
-        dep_file.write_to(args.depfile)
+        with open(args.depfile, "w") as depfile:
+            DepFile.from_deps(args.output, deps).write_to(depfile)
 
     with open(args.output, "w") as f:
         for input in inputs:

@@ -217,9 +217,9 @@ def main():
     )
     parser.add_argument("--python-path", required=True)
     parser.add_argument("--avbtool-path", required=True)
-    parser.add_argument("--depfile", type=argparse.FileType("w"), required=True)
-    parser.add_argument("--output1", type=argparse.FileType("w"), required=True)
-    parser.add_argument("--output2", type=argparse.FileType("w"), required=True)
+    parser.add_argument("--depfile", required=True)
+    parser.add_argument("--output1", required=True)
+    parser.add_argument("--output2", required=True)
     parser.add_argument("--exclude-packages", required=False, nargs="*")
     parser.add_argument("--exclude-images", required=False, nargs="*")
 
@@ -273,12 +273,13 @@ def main():
 
     # Write the cleaned-up output out to files so we can diff them outside the
     # test with some other tool
-    args.output1.write(images_manifest_gn_str)
-    args.output2.write(images_manifest_bzl_str)
+    with open(args.output1, "w") as output1:
+        output1.write(images_manifest_gn_str)
+    with open(args.output2, "w") as output2:
+        output2.write(images_manifest_bzl_str)
 
-    args.depfile.write(
-        "{}: {}".format(args.output1.name, " ".join(extra_files_read))
-    )
+    with open(args.depfile, "w") as depfile:
+        depfile.write("{}: {}".format(args.output1, " ".join(extra_files_read)))
 
     # These files are very large and single-threaded difflib is too slow when in the quadratic case
 

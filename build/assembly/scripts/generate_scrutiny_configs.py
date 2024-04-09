@@ -179,12 +179,20 @@ def main():
     if args.bootfs_files_input:
         bootfs_files.add_optional(args.bootfs_files_input.readlines())
 
-    static_packages.write(args.static_packages_output)
-    bootfs_packages.write(args.bootfs_packages_output)
-    bootfs_files.write(args.bootfs_files_output)
-    kernel_cmdline.write(args.kernel_cmdline_output)
+    with args.static_packages_output as static_packages_output:
+        static_packages.write(static_packages_output)
+
+    with args.bootfs_packages_output as bootfs_packages_output:
+        bootfs_packages.write(bootfs_packages_output)
+
+    with args.bootfs_files_output as bootfs_files_output:
+        bootfs_files.write(bootfs_files_output)
+
+    with args.kernel_cmdline_output as kernel_cmdline_output:
+        kernel_cmdline.write(kernel_cmdline_output)
 
     if args.depfile:
-        DepFile.from_deps(args.static_packages_output.name, deps).write_to(
-            args.depfile
-        )
+        with args.depfile as depfile:
+            DepFile.from_deps(args.static_packages_output.name, deps).write_to(
+                depfile
+            )

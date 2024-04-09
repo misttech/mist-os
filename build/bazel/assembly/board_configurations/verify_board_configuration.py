@@ -100,8 +100,8 @@ def main():
         help="Directory where paths in --golden_json5 are relative to",
         required=True,
     )
-    parser.add_argument("--depfile", type=argparse.FileType("w"), required=True)
-    parser.add_argument("--output", type=argparse.FileType("w"), required=True)
+    parser.add_argument("--depfile", required=True)
+    parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
     generated = json.load(args.generated_board_config)
@@ -130,11 +130,13 @@ def main():
     )
 
     diffstr = "\n".join(diff)
-    args.output.write(diffstr)
+    with open(args.output, "w") as output:
+        output.write(diffstr)
 
-    args.depfile.write(
-        "{}: {}".format(args.output.name, " ".join(extra_files_read))
-    )
+    with open(args.depfile, "w") as depfile:
+        depfile.write(
+            "{}: {}".format(args.output.name, " ".join(extra_files_read))
+        )
 
     if len(diffstr) != 0:
         print(

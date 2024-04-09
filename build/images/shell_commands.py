@@ -32,13 +32,11 @@ def main():
     parser.add_argument(
         "--output-distribution-manifest",
         required=True,
-        type=argparse.FileType("w"),
         help="Path to write output distribution manifest",
     )
     parser.add_argument(
         "--depfile",
         required=True,
-        type=argparse.FileType("w"),
         help="Depfile for listing generated shebang files as additional inputs",
     )
     args = parser.parse_args()
@@ -62,19 +60,23 @@ def main():
             )
         output_dist.append(dict(dist, source=shebang_file))
 
-    json.dump(
-        output_dist,
-        args.output_distribution_manifest,
-        indent=2,
-        sort_keys=True,
-        separators=(",", ": "),
-    )
-
-    args.depfile.write(
-        "{}: {}\n".format(
-            args.output_distribution_manifest.name, " ".join(shebang_files)
+    with open(
+        args.output_distribution_manifest, "w"
+    ) as output_distribution_manifest:
+        json.dump(
+            output_dist,
+            output_distribution_manifest,
+            indent=2,
+            sort_keys=True,
+            separators=(",", ": "),
         )
-    )
+
+    with open(args.depfile, "w") as depfile:
+        depfile.write(
+            "{}: {}\n".format(
+                args.output_distribution_manifest.name, " ".join(shebang_files)
+            )
+        )
 
     return 0
 

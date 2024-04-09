@@ -391,7 +391,8 @@ def diff_bundles(args: argparse.Namespace) -> None:
     second = AssemblyInputBundle.json_load(args.second)
     result = first.difference(second)
     if args.output:
-        result.json_dump(args.output)
+        with open(args.output, "w") as output:
+            result.json_dump(output)
     else:
         print(result)
 
@@ -402,7 +403,8 @@ def intersect_bundles(args: argparse.Namespace) -> None:
     for next_bundle in bundles[1:]:
         result = result.intersection(next_bundle)
     if args.output:
-        result.json_dump(args.output)
+        with open(args.output, "w") as output:
+            result.json_dump(output)
     else:
         print(result)
 
@@ -586,7 +588,6 @@ def main():
     diff_bundles_parser.add_argument(
         "--output",
         help="A file to write the output to, instead of stdout.",
-        type=argparse.FileType("w"),
     )
     diff_bundles_parser.set_defaults(handler=diff_bundles)
 
@@ -607,7 +608,6 @@ def main():
     intersect_bundles_parser.add_argument(
         "--output",
         help="A file to write the output to, instead of stdout.",
-        type=argparse.FileType("w"),
     )
     intersect_bundles_parser.set_defaults(handler=intersect_bundles)
 

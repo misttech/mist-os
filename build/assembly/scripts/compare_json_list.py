@@ -99,7 +99,8 @@ def main():
         return len(missing) + len(extra)
 
     # Writes an empty file because GN requires targets to have an output.
-    args.stamp.write("")
+    with args.stamp as stamp:
+        stamp.write("")
 
     return 0
 

@@ -26,7 +26,6 @@ def main() -> int:
     )
     parser.add_argument(
         "--output",
-        type=argparse.FileType("w"),
         required=True,
         help="The path to the hermetic inputs file to write",
     )
@@ -44,8 +43,9 @@ def main() -> int:
         additional_inputs = args.additional_hermetic_inputs.readlines()
         additional_inputs = [i.strip() for i in additional_inputs]
         inputs.extend(additional_inputs)
-    for input in inputs:
-        args.output.write(input + "\n")
+    with open(args.output, "w") as output:
+        for input in inputs:
+            output.write(input + "\n")
     return 0
 
 

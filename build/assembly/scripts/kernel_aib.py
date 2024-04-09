@@ -39,7 +39,6 @@ def main():
     parser.add_argument("--outdir", required=True)
     parser.add_argument(
         "--export-manifest",
-        type=argparse.FileType("w"),
         help="Path to write a FINI manifest of the contents of the AIB",
     )
     args = parser.parse_args()
@@ -69,9 +68,10 @@ def main():
     # Write out a fini manifest of the files that have been copied, to create a
     # package or archive that contains all of the files in the bundle.
     if args.export_manifest:
-        assembly_input_bundle.write_fini_manifest(
-            args.export_manifest, base_dir=args.outdir
-        )
+        with open(args.export_manifest, "w") as export_manifest:
+            assembly_input_bundle.write_fini_manifest(
+                export_manifest, base_dir=args.outdir
+            )
 
 
 if __name__ == "__main__":

@@ -300,7 +300,7 @@ def main():
         help="Directory where paths in --product_config2 are relative to",
         required=True,
     )
-    parser.add_argument("--depfile", type=argparse.FileType("w"), required=True)
+    parser.add_argument("--depfile", required=True)
     parser.add_argument(
         "--config_data_to_ignore",
         nargs="*",
@@ -309,7 +309,7 @@ def main():
             The entries should be of the form [package_name]:[destination]""",
         required=False,
     )
-    parser.add_argument("--output", type=argparse.FileType("w"), required=True)
+    parser.add_argument("--output", required=True)
 
     args = parser.parse_args()
 
@@ -345,11 +345,11 @@ def main():
         lineterm="",
     )
     diffstr = "\n".join(diff)
-    args.output.write(diffstr)
+    with open(args.output, "w") as output:
+        output.write(diffstr)
 
-    args.depfile.write(
-        "{}: {}".format(args.output.name, " ".join(extra_files_read))
-    )
+    with open(args.depfile, "w") as depfile:
+        depfile.write("{}: {}".format(args.output, " ".join(extra_files_read)))
 
     if len(diffstr) != 0:
         print(f"Error: non-empty diff product configs:\n{diffstr}")

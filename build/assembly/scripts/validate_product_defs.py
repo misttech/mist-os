@@ -155,16 +155,18 @@ def main():
 
     if args.depfile:
         if args.output:
-            depfile = DepFile(args.output.name)
-            depfile.update(product_def_paths)
-            depfile.write_to(args.depfile)
+            with args.depfile as depfile:
+                DepFile.from_deps(args.output.name, product_def_paths).write_to(
+                    depfile
+                )
         else:
             error("Cannot create a depfile without an output file")
             return -2
 
     if args.output:
-        for line in output:
-            print(line, file=args.output)
+        with args.output as output_file:
+            for line in output:
+                print(line, file=output_file)
 
     return 0
 

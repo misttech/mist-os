@@ -151,8 +151,8 @@ def main():
 
     parser.add_argument("--config-data-entries", type=argparse.FileType("r"))
     parser.add_argument("--outdir", required=True)
-    parser.add_argument("--depfile", type=argparse.FileType("w"))
-    parser.add_argument("--export-manifest", type=argparse.FileType("w"))
+    parser.add_argument("--depfile")
+    parser.add_argument("--export-manifest")
     parser.add_argument(
         "--base-driver-packages-list", type=argparse.FileType("r")
     )
@@ -291,15 +291,17 @@ def main():
     # Write out a fini manifest of the files that have been copied, to create a
     # package or archive that contains all of the files in the bundle.
     if args.export_manifest:
-        assembly_input_bundle.write_fini_manifest(
-            args.export_manifest, base_dir=args.outdir
-        )
+        with open(args.export_manifest, "w") as export_manifest:
+            assembly_input_bundle.write_fini_manifest(
+                export_manifest, base_dir=args.outdir
+            )
 
     # Write out a depfile.
     if args.depfile:
-        dep_file = DepFile(assembly_config_manifest_path)
-        dep_file.update(deps)
-        dep_file.write_to(args.depfile)
+        with open(args.depfile, "w") as depfile:
+            DepFile.from_deps(assembly_config_manifest_path, deps).write_to(
+                depfile
+            )
 
 
 if __name__ == "__main__":

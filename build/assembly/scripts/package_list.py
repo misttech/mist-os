@@ -56,9 +56,10 @@ def main():
         "version": "1",
     }
 
-    args.output.write(
-        json.dumps(out_package_manifest_list, indent=2, sort_keys=True)
-    )
+    with args.output as output:
+        output.write(
+            json.dumps(out_package_manifest_list, indent=2, sort_keys=True)
+        )
 
     return 0
 

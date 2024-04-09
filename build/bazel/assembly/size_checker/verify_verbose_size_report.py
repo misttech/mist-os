@@ -42,19 +42,9 @@ def main():
     parser.add_argument(
         "--verbose_size_report2", type=argparse.FileType("r"), required=True
     )
-    parser.add_argument(
-        "--normalized_report_output1",
-        type=argparse.FileType("w"),
-        required=True,
-    )
-    parser.add_argument(
-        "--normalized_report_output2",
-        type=argparse.FileType("w"),
-        required=True,
-    )
-    parser.add_argument(
-        "--diff_output", type=argparse.FileType("w"), required=True
-    )
+    parser.add_argument("--normalized_report_output1", required=True)
+    parser.add_argument("--normalized_report_output2", required=True)
+    parser.add_argument("--diff_output", required=True)
 
     args = parser.parse_args()
 
@@ -63,8 +53,10 @@ def main():
 
     norm1 = json.dumps(size_report1, sort_keys=True, indent=2)
     norm2 = json.dumps(size_report2, sort_keys=True, indent=2)
-    args.normalized_report_output1.write(norm1)
-    args.normalized_report_output2.write(norm2)
+    with open(args.normalized_report_output1, "w") as normalized_report_output1:
+        normalized_report_output1.write(norm1)
+    with open(args.normalized_report_output2, "w") as normalized_report_output2:
+        normalized_report_output2.write(norm2)
 
     diff = difflib.unified_diff(
         norm1.splitlines(),
@@ -74,7 +66,8 @@ def main():
         lineterm="",
     )
     diffstr = "\n".join(diff)
-    args.diff_output.write(diffstr)
+    with open(args.diff_output, "w") as diff_output:
+        diff_output.write(diffstr)
 
     if len(diffstr) != 0:
         print(
