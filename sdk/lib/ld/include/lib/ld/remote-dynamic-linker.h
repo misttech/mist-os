@@ -292,13 +292,20 @@ class RemoteDynamicLinker {
 
     // If it's in the predecoded_modules list, then return that decoded module
     // and update predecoded_positions accordingly.
-    auto find_predecoded = [&predecoded_modules, &predecoded_positions](
+    auto find_predecoded = [this, &predecoded_modules, &predecoded_positions](
                                const Soname& soname, uint32_t modid) -> DecodedModulePtr {
+      // The stub is an always-injected predecoded module.  Its location in the
+      // list needs to be recorded specially so abi_stub_module() can find it.
+      if (soname == kStubSoname) {
+        stub_modid_ = modid;
+        return abi_stub_->decoded_module();
+      }
+
       for (size_t i = 0; i < PredecodedCount; ++i) {
         size_t& pos = predecoded_positions[i];
         PredecodedModule& predecoded = predecoded_modules[i];
         if (pos != kNpos) {
-          // This one was already been used.
+          // This one has already been used.
           assert(!predecoded.decoded_module);
           continue;
         }
@@ -307,6 +314,7 @@ class RemoteDynamicLinker {
           return std::exchange(predecoded.decoded_module, {});
         }
       }
+
       return {};
     };
 
@@ -323,25 +331,25 @@ class RemoteDynamicLinker {
 
       if (!mod.HasDecoded()) {
         // This isn't one of the initial modules, so it's only a needed SONAME.
-        if (mod.name() == kStubSoname) {
-          // The stub dynamic linker is a predecoded module that's handled
-          // specially.
-          stub_modid_ = modid;
-          mod.set_decoded(abi_stub_->decoded_module(), modid, true, max_tls_modid_);
-        } else if (auto predecoded = find_predecoded(mod.name(), modid)) {
-          // The SONAME matches one of the predecoded modules.
+
+        if (auto predecoded = find_predecoded(mod.name(), modid)) {
+          // The SONAME matches one of the predecoded modules.  Importantly,
+          // these modules' DT_NEEDED lists are not examined to enqueue more
+          // dependencies.  This module is in this dynamic linking namespace,
+          // but its dependencies are not necessarily in the same namespace.
           mod.set_decoded(std::move(predecoded), modid, true, max_tls_modid_);
-        } else {
-          // Use the callback to get a DecodedModulePtr for the SONAME.
-          GetDepResult result = get_dep(mod.name());
-          if (!result) [[unlikely]] {
-            return {};
-          }
+          continue;
+        }
+
+        // Use the callback to get a DecodedModulePtr for the SONAME.
+        if (GetDepResult result = get_dep(mod.name())) [[likely]] {
           if (!*result) [[unlikely]] {
             // The get_dep function failed, but said to keep going anyway.
             continue;
           }
           mod.set_decoded(std::move(*result), modid, true, max_tls_modid_);
+        } else {
+          return {};
         }
       }
 
@@ -358,18 +366,20 @@ class RemoteDynamicLinker {
         assert(!predecoded_modules[i].decoded_module);
         continue;
       }
-      DecodedModulePtr& decoded = predecoded_modules[i].decoded_module;
-      assert(decoded);
-      EmplaceModule(decoded->soname(), std::nullopt, std::move(decoded), false);
+      EmplaceUnreferenced(std::move(predecoded_modules[i].decoded_module));
     }
 
     // And finally the same for the stub dynamic linker.
     if (stub_modid_ == 0) {
       stub_modid_ = static_cast<uint32_t>(modules_.size());
-      DecodedModulePtr decoded = abi_stub_->decoded_module();
-      EmplaceModule(kStubSoname, std::nullopt, std::move(decoded), false);
+      EmplaceUnreferenced(abi_stub_->decoded_module());
     }
 
+    // Now that the full module list is set, the RemoteAbi can be initialized.
+    // To do the passive ABI layout, that needs to know both the total number
+    // of modules and the number of modules that have PT_TLS segments.  That
+    // layout might change the vaddr_size() of the abi_stub_module(), so this
+    // must happen before Allocate.
     zx::result abi_result =
         remote_abi_.Init(diag, abi_stub_, abi_stub_module(), modules_, max_tls_modid_);
     if (abi_result.is_error() &&
@@ -512,6 +522,16 @@ class RemoteDynamicLinker {
         EmplaceModule(soname, loaded_by_modid);
       }
     }
+  }
+
+  // Call EmplaceModule for a predecoded module that was never referenced by
+  // any DT_NEEDED.  This module will use its DT_SONAME as its name, and it
+  // will be recorded as not being loaded by any other module.  This tells the
+  // ABI remoting that the name string is found in its own RODATA (where its
+  // DT_STRTAB is) rather than in a referring module's RODATA (its DT_STRTAB).
+  void EmplaceUnreferenced(DecodedModulePtr decoded) {
+    assert(decoded);
+    EmplaceModule(decoded->soname(), std::nullopt, std::move(decoded), false);
   }
 
   template <class Diagnostics>
