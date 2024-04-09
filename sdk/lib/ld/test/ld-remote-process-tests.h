@@ -220,7 +220,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     // library to decide whether to attempt later stages with an incomplete
     // module list.  The library code endeavors to ensure it will be safe to
     // make the attempt with missing or partially-decoded modules in the list.
-    if (!RemoteModule::AllModulesDecoded(modules)) {
+    if (!linker.AllModulesValid()) {
       // Whatever the failures were have already been diagnosed.
       // This isn't a test failure in LoadAndFail tests.
       EXPECT_EQ(this->HasFailure(), !should_fail);
@@ -228,7 +228,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     }
 
     // Choose load addresses.
-    EXPECT_TRUE(RemoteModule::AllocateModules(diag, modules, root_vmar().borrow()));
+    EXPECT_TRUE(linker.Allocate(diag, root_vmar().borrow()));
 
     // Acquire a StaticTlsDescResolver that uses the stub dynamic linker's
     // entry TLSDESC points.  Note this could in the general case be modified

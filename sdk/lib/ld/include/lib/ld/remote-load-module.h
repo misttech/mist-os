@@ -187,12 +187,6 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
     return true;
   }
 
-  template <class Diagnostics>
-  static bool AllocateModules(Diagnostics& diag, List& modules, zx::unowned_vmar vmar) {
-    auto allocate = [&diag, &vmar](auto& module) { return module.Allocate(diag, *vmar); };
-    return OnModules(modules, allocate);
-  }
-
   // Before relocation can mutate any segments, load_info() needs to be set up
   // with its own copies of the segments, including copy-on-write cloning any
   // per-segment VMOs that decoded() owns.  This can be done earlier if the
@@ -251,15 +245,6 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
       return module.Relocate(diag, valid_modules, tls_desc_resolver);
     };
     return std::all_of(valid_modules.begin(), valid_modules.end(), relocate);
-  }
-
-  // This returns false if any module was not successfully decoded enough to
-  // attempt relocation on it.
-  static bool AllModulesDecoded(const List& modules) {
-    constexpr auto has_module = [](const RemoteLoadModule& module) -> bool {
-      return module.HasModule();
-    };
-    return std::all_of(modules.begin(), modules.end(), has_module);
   }
 
   // Load the module into its allocated vaddr region.
