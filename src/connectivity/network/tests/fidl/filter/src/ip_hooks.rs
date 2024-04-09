@@ -45,6 +45,7 @@ use netstack_testing_common::{
 };
 use netstack_testing_macros::netstack_test;
 use test_case::test_case;
+use tracing::info;
 
 use crate::matchers::{
     AllTraffic, DstAddressRange, DstAddressSubnet, Icmp, InterfaceDeviceClass, InterfaceId,
@@ -90,6 +91,8 @@ macro_rules! generate_test_cases_for_all_matchers {
                     name: &str,
                     matcher: M,
                 ) {
+                    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
+                        .expect("initialize logging");
                     $test::<I, M>(name, matcher).await;
                 }
             }
@@ -102,6 +105,8 @@ macro_rules! generate_test_cases_for_all_matchers {
                     name: &str,
                     matcher: M,
                 ) {
+                    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
+                        .expect("initialize logging");
                     $test::<I, M>(name, $hook, matcher).await;
                 }
             }
@@ -111,7 +116,7 @@ macro_rules! generate_test_cases_for_all_matchers {
 
 const NEGATIVE_CHECK_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(1);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) enum ExpectedConnectivity {
     TwoWay,
     ClientToServerOnly,
@@ -175,6 +180,7 @@ impl SocketType for IrrelevantToTest {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct TcpSocket;
 
 impl SocketType for TcpSocket {
@@ -236,6 +242,11 @@ impl SocketType for TcpSocket {
     ) {
         let Sockets { client, mut server } = sockets;
         let SockAddrs { client: client_addr, server: server_addr } = sock_addrs;
+
+        info!(
+            "running {Self:?} test client={client_addr} server={server_addr} \
+            expected={expected_connectivity:?}",
+        );
 
         let server_fut = async move {
             match expected_connectivity {
@@ -325,6 +336,7 @@ impl SocketType for TcpSocket {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct UdpSocket;
 
 impl SocketType for UdpSocket {
@@ -364,6 +376,11 @@ impl SocketType for UdpSocket {
     ) {
         let Sockets { client, server } = sockets;
         let SockAddrs { client: client_addr, server: server_addr } = sock_addrs;
+
+        info!(
+            "running {Self:?} test client={client_addr} server={server_addr} \
+            expected={expected_connectivity:?}",
+        );
 
         let server_fut = async move {
             let mut buf = [0u8; 1024];
