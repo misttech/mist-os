@@ -522,7 +522,6 @@ class IncomingNamespace {
     std::map<std::string, std::string> arguments;
     arguments["kernel.shell"] = "true";
     arguments["driver.foo"] = "true";
-    arguments["clock.backstop"] = "0";
     boot_args_ = mock_boot_arguments::Server(std::move(arguments));
 
     // Setup and bind "/pkg" directory.
@@ -1010,10 +1009,6 @@ TEST_F(DriverTest, GetVariable) {
             device_get_variable(v1_test->zxdev, "driver.foo", variable, sizeof(variable), &actual));
   ASSERT_EQ(actual, 4u);
   ASSERT_EQ(strncmp(variable, "true", sizeof(variable)), 0);
-  ASSERT_EQ(ZX_OK, device_get_variable(v1_test->zxdev, "clock.backstop", variable, sizeof(variable),
-                                       &actual));
-  ASSERT_EQ(actual, 1u);
-  ASSERT_EQ(strncmp(variable, "0", sizeof(variable)), 0);
   // Invalid variable name
   ASSERT_EQ(ZX_ERR_NOT_FOUND, device_get_variable(v1_test->zxdev, "kernel.shell", variable,
                                                   sizeof(variable), &actual));

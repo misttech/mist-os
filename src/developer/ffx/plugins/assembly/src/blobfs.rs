@@ -80,7 +80,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
-        let image_config = ImageAssemblyConfig::new_for_testing("kernel", 0);
+        let image_config = ImageAssemblyConfig::new_for_testing("kernel");
         let blobfs_config = BlobFS {
             name: "blob".into(),
             layout: BlobfsLayout::Compact,
@@ -160,7 +160,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
-        let image_config = ImageAssemblyConfig::new_for_testing("kernel", 0);
+        let image_config = ImageAssemblyConfig::new_for_testing("kernel");
         let blobfs_config = BlobFS {
             name: "blob".into(),
             layout: BlobfsLayout::Compact,

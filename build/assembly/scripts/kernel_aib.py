@@ -33,9 +33,6 @@ def main():
         "--kernel-image-metadata", type=argparse.FileType("r"), required=True
     )
     parser.add_argument("--kernel-image-name", required=True)
-    parser.add_argument(
-        "--kernel-clock-backstop", type=argparse.FileType("r"), required=True
-    )
     parser.add_argument("--outdir", required=True)
     parser.add_argument(
         "--export-manifest",
@@ -54,7 +51,6 @@ def main():
     ]
     kernel = KernelInfo()
     kernel.path = kernel_path
-    kernel.clock_backstop = json.load(args.kernel_clock_backstop)
 
     aib_creator = AIBCreator(args.outdir)
     aib_creator.kernel = kernel

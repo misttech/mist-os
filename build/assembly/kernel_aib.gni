@@ -169,8 +169,6 @@ template("kernel_assembly_input_bundle") {
       rebase_path(files.kernel_image_metadata, root_build_dir),
       "--kernel-image-name",
       kernel_image_name,
-      "--kernel-clock-backstop",
-      rebase_path(build_info_files.minimum_utc_stamp, root_build_dir),
       "--outdir",
       rebase_path(files.assembly_input_bundle_dir, root_build_dir),
     ]
@@ -185,14 +183,8 @@ template("kernel_assembly_input_bundle") {
       outputs += [ files.assembly_input_bundle_manifest ]
     }
 
-    inputs = [
-      files.kernel_image_metadata,
-      build_info_files.minimum_utc_stamp,
-    ]
-    deps = [
-      ":${labels.kernel_image_metadata}",
-      "//build/info:build_info_files",
-    ]
+    inputs = [ files.kernel_image_metadata ]
+    deps = [ ":${labels.kernel_image_metadata}" ]
 
     metadata = {
       images_barrier = []

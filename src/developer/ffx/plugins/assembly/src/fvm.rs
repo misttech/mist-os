@@ -356,7 +356,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
-        let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel", 0);
+        let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
         let mut assembly_manifest = AssemblyManifest::default();
         let base_package = BasePackage {
@@ -393,7 +393,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
-        let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel", 0);
+        let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
         let mut assembly_manifest = AssemblyManifest::default();
         let base_package = BasePackage {
@@ -448,7 +448,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
-        let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel", 0);
+        let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
         let mut assembly_manifest = AssemblyManifest::default();
         let base_package = BasePackage {
@@ -560,7 +560,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
-        let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel", 0);
+        let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
         let mut assembly_manifest = AssemblyManifest::default();
 
@@ -663,7 +663,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
-        let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel", 0);
+        let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
         let mut assembly_manifest = AssemblyManifest::default();
 

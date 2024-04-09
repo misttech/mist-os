@@ -27,7 +27,6 @@ class KernelInfo:
 
     path: Optional[FilePath] = None
     args: Set[str] = field(default_factory=set)
-    clock_backstop: Optional[int] = None
 
 
 @dataclass
