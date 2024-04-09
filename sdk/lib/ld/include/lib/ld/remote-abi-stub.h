@@ -75,6 +75,19 @@ class RemoteAbiStub : public fbl::RefCounted<RemoteAbiStub<Elf>> {
   // the same pointer that was given to Create().
   const RemoteModulePtr& decoded_module() const { return decoded_module_; }
 
+  // Return the module-relative vaddr of the data segment.
+  size_type data_vaddr() const {
+    const auto& load_info = decoded_module_->load_info();
+    size_type vaddr;
+    load_info.VisitSegment(
+        [&vaddr](const auto& segment) -> bool {
+          vaddr = segment.vaddr();
+          return true;
+        },
+        load_info.segments().back());
+    return vaddr;
+  }
+
   // Exact size of the data segment.  This includes whatever file data gives it
   // a page-aligned starting vaddr, but the total size is not page-aligned.
   // Space directly after this can be used to lengthen the segment.
@@ -85,6 +98,12 @@ class RemoteAbiStub : public fbl::RefCounted<RemoteAbiStub<Elf>> {
 
   // Offset into the segment where _r_debug sits.
   size_type rdebug_offset() const { return rdebug_offset_; }
+
+  // Return the module-relative vaddr of _ld_abi.
+  size_type abi_vaddr() const { return data_vaddr() + abi_offset_; }
+
+  // Return the module-relative vaddr of _r_debug.
+  size_type rdebug_vaddr() const { return data_vaddr() + rdebug_offset_; }
 
   // Module-relative addresses of the TLSDESC runtime entry points.
   const TlsdescRuntimeHooks& tlsdesc_runtime() const { return tlsdesc_runtime_; }

@@ -196,12 +196,6 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
       }
     }
 
-    const RemoteModule& loaded_stub = linker.abi_stub_module();
-    if (!loaded_stub.HasModule()) {
-      ASSERT_TRUE(this->HasFailure());
-      return;
-    }
-
     // If not all modules could be decoded, don't bother with relocation to
     // diagnose symbol resolution errors since many are likely without all the
     // modules there and they are unlikely to add any helpful information
@@ -255,10 +249,6 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     for (size_t i = 0; i < modules.size(); ++i) {
       EXPECT_EQ(modules[i].module().symbolizer_modid, i);
     }
-
-    // Now that load addresses have been chosen, populate the remote ABI data.
-    auto abi_result = std::move(linker.remote_abi()).Finish(diag, loaded_stub, modules);
-    EXPECT_TRUE(abi_result.is_ok()) << abi_result.status_string();
 
     // Finally, all the VMO contents are in place to be mapped into the
     // process.

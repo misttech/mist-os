@@ -50,8 +50,8 @@ namespace ld {
 //   single zygote that will spawn identical processes.
 //
 // * `Relocate()` fills in all the segment data that will need to be mapped in.
-//   That is, it performs relocation on all modules.
-//   TODO(https://fxbug.dev/326524302): complete passive ABI in this step
+//   That is, it performs relocation on all modules and completes the passive
+//   ABI data in the stub dynamic linker module.
 //
 // * `Load()` loads all the segments finalized by `Relocate()` into the VMARs
 //   created by `Allocate()`.
@@ -162,6 +162,18 @@ class RemoteDynamicLinker {
   // Return any PT_GNU_STACK size request from the main module.
   std::optional<size_type> main_stack_size() const {
     return main_module().decoded().exec_info().stack_size;
+  }
+
+  // Return the runtime address of the _ld_abi symbol in the stub dynamic
+  // linker, which is the root of the passive ABI for this dynamic linking
+  // namespace.  This should be used after Allocate(), below.  The data
+  // structure to be mapped at that address will be completed by Relocate().
+  size_type abi_vaddr() const { return abi_stub_->abi_vaddr() + abi_stub_module().load_bias(); }
+
+  // Return the runtime address of the traditional r_debug struct for this
+  // dynamic linking namespace, which might be understood by a debugger.
+  size_type rdebug_vaddr() const {
+    return abi_stub_->rdebug_vaddr() + abi_stub_module().load_bias();
   }
 
   // Find an existing Module in the modules() list by name or SONAME.  Returns
@@ -358,9 +370,8 @@ class RemoteDynamicLinker {
       EmplaceModule(kStubSoname, std::nullopt, std::move(decoded), false);
     }
 
-    Module& stub_module = modules_[stub_modid_];
     zx::result abi_result =
-        remote_abi_.Init(diag, abi_stub_, stub_module, modules_, max_tls_modid_);
+        remote_abi_.Init(diag, abi_stub_, abi_stub_module(), modules_, max_tls_modid_);
     if (abi_result.is_error() &&
         !diag.SystemError("cannot initialize remote ABI heap",
                           elfldltl::ZirconError{abi_result.error_value()})) {
@@ -429,7 +440,7 @@ class RemoteDynamicLinker {
       // Resolve against the successfully decoded modules, ignoring the others.
       return module.Relocate(diag, valid_modules, tls_desc_resolver);
     };
-    return OnModules(valid_modules, relocate);
+    return OnModules(valid_modules, relocate) && FinishAbi(diag);
   }
 
   // Load each module into the VMARs created by Allocate.  This should only be
@@ -501,6 +512,22 @@ class RemoteDynamicLinker {
         EmplaceModule(soname, loaded_by_modid);
       }
     }
+  }
+
+  template <class Diagnostics>
+  bool FinishAbi(Diagnostics& diag) {
+    if (stub_modid_ == 0) [[unlikely]] {
+      // The Diagnostics object must have said to keep going after a previous
+      // failure, since the stub module should always have been placed by now.
+      return true;
+    }
+    assert(!modules().empty());
+    zx::result<> result = std::move(remote_abi_).Finish(diag, abi_stub_module(), modules());
+    if (result.is_error()) [[unlikely]] {
+      return diag.SystemError("cannot complete passive ABI setup: ",
+                              elfldltl::ZirconError{result.error_value()});
+    }
+    return true;
   }
 
   template <typename List, typename T>
