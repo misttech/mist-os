@@ -170,16 +170,18 @@ class FuseServer {
   virtual testing::AssertionResult HandleFuseMessage(const std::vector<std::byte>& message) {
     const struct fuse_in_header* in_header =
         reinterpret_cast<const struct fuse_in_header*>(message.data());
+    // The operation-specific payload for the fuse request begins after the header.
+    const void* in_payload = in_header + 1;
     switch (in_header->opcode) {
       case FUSE_INIT: {
         struct fuse_init_in init_in = {};
-        memcpy(&init_in, message.data(), sizeof(init_in));
+        memcpy(&init_in, in_payload, sizeof(init_in));
         OK_OR_RETURN(HandleInit(in_header, &init_in, message));
         break;
       }
       case FUSE_ACCESS: {
         struct fuse_access_in access_in = {};
-        memcpy(&access_in, message.data(), sizeof(access_in));
+        memcpy(&access_in, in_payload, sizeof(access_in));
         OK_OR_RETURN(HandleAccess(in_header, &access_in, message));
         break;
       }
@@ -189,19 +191,19 @@ class FuseServer {
       }
       case FUSE_OPEN: {
         struct fuse_open_in open_in = {};
-        memcpy(&open_in, message.data(), sizeof(open_in));
+        memcpy(&open_in, in_payload, sizeof(open_in));
         OK_OR_RETURN(HandleOpen(in_header, &open_in, message));
         break;
       }
       case FUSE_FLUSH: {
         struct fuse_flush_in flush_in = {};
-        memcpy(&flush_in, message.data(), sizeof(flush_in));
+        memcpy(&flush_in, in_payload, sizeof(flush_in));
         OK_OR_RETURN(HandleFlush(in_header, &flush_in, message));
         break;
       }
       case FUSE_RELEASE: {
         struct fuse_release_in release_in = {};
-        memcpy(&release_in, message.data(), sizeof(release_in));
+        memcpy(&release_in, in_payload, sizeof(release_in));
         OK_OR_RETURN(HandleRelease(in_header, &release_in, message));
         break;
       }
