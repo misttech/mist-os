@@ -92,9 +92,7 @@ template("_bind_library_sdk") {
     id = "sdk://bind/$library_name"
 
     category = invoker.sdk_category
-    if (defined(invoker.sdk_area)) {
-      area = invoker.sdk_area
-    }
+    forward_variables_from(invoker, [ "sdk_area" ])
 
     meta = {
       source = meta_file

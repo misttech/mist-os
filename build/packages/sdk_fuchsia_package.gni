@@ -46,6 +46,10 @@ import("//tools/cmc/build/expect_includes.gni")
 #     See //build/sdk/sdk_atom.gni for more.
 #     Type: string.
 #
+#   sdk_area (optional)
+#     [string] The API area responsible for maintaining this package.
+#     See //build/sdk/sdk_atom.gni.
+#
 #   api_level_added
 #     API level at which the package was added to the SDK. API level defined at:
 #     https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0002_platform_versioning#sdk
@@ -262,10 +266,14 @@ template("sdk_fuchsia_package") {
     }
 
     sdk_atom(target_name) {
-      forward_variables_from(invoker, [ "testonly" ])
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "category",
+                               "sdk_area",
+                             ])
 
       id = "sdk://packages/${_distribution_name}"
-      category = invoker.category
 
       meta = {
         schema = "package"
@@ -286,10 +294,14 @@ template("sdk_fuchsia_package") {
   } else if (!package_in_target_api_level) {
     # Current API level is not supported, so create an empty atom.
     sdk_noop_atom(target_name) {
-      forward_variables_from(invoker, [ "testonly" ])
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "category",
+                               "sdk_area",
+                             ])
 
       id = "sdk://packages/${invoker.distribution_name}"
-      category = invoker.category
       type = "package"
     }
 

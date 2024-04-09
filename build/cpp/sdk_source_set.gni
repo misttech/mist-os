@@ -19,6 +19,10 @@ import("//build/sdk/sdk_atom.gni")
 #     Publication level of the library in SDKs.
 #     See //build/sdk/sdk_atom.gni.
 #
+#   sdk_area (optional)
+#     [string] The API area responsible for maintaining this library.
+#     See //build/sdk/sdk_atom.gni.
+#
 #   api (optional)
 #     Path to the file representing the API of this library.
 #     This file is used to ensure modifications to the library's API are
@@ -115,6 +119,7 @@ template("sdk_source_set") {
                            [
                              "api",
                              "category",
+                             "sdk_area",
                              "include_base",
                              "metadata",
                              "non_sdk_deps",
@@ -322,10 +327,11 @@ template("sdk_source_set") {
                            [
                              "source_dir",
                              "testonly",
+                             "category",
+                             "sdk_area",
                            ])
 
     id = sdk_id
-    category = invoker.category
 
     if (defined(api_reference)) {
       api = api_reference

@@ -42,7 +42,7 @@ import("config.gni")
 #       - partner          : the atom may be used by select partners;
 #       - public           : the atom may be included in published SDKs.
 #
-#   area (optional)
+#   sdk_area (optional)
 #     The API area responsible for maintaining this SDK atom. See
 #     docs/contribute/governance/areas/_areas.yaml for the list of areas.
 #     "Unknown" is also a valid option. By default, the area will be `null` in
@@ -353,10 +353,10 @@ template("sdk_atom") {
              "--deps",
            ] + rebase_path(dep_manifests, root_build_dir) + file_args
 
-    if (defined(invoker.area)) {
+    if (defined(invoker.sdk_area)) {
       args += [
         "--area",
-        invoker.area,
+        invoker.sdk_area,
       ]
     }
 

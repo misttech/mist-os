@@ -12,6 +12,10 @@ import("//build/sdk/sdk_atom.gni")
 #     Publication level of the document set in SDKs.
 #     See //build/sdk/sdk_atom.gni.
 #
+#   sdk_area (optional)
+#     [string] The API area responsible for maintaining this documentation.
+#     See //build/sdk/sdk_atom.gni.
+#
 #   name (required)
 #     Name of the document set in the SDK.
 #
@@ -34,6 +38,7 @@ template("sdk_documentation") {
     forward_variables_from(invoker,
                            [
                              "category",
+                             "sdk_area",
                              "files",
                              "non_sdk_deps",
                              "testonly",

@@ -12,6 +12,10 @@ import("//build/sdk/sdk_atom.gni")
 #     Publication level of the data set in SDKs.
 #     See //build/sdk/sdk_atom.gni.
 #
+#   sdk_area (optional)
+#     [string] The API area responsible for maintaining this atom.
+#     See //build/sdk/sdk_atom.gni.
+#
 #   name (required)
 #     Name of the data set in the SDK.
 #
@@ -56,6 +60,7 @@ template("sdk_data") {
     forward_variables_from(invoker,
                            [
                              "category",
+                             "sdk_area",
                              "non_sdk_deps",
                            ])
 

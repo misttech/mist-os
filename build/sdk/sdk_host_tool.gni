@@ -12,6 +12,10 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     Publication level of the executable in SDKs.
 #     See //build/sdk/sdk_atom.gni.
 #
+#   sdk_area (optional)
+#     [string] The API area responsible for maintaining this host tool.
+#     See //build/sdk/sdk_atom.gni.
+#
 #   sdk_name (optional)
 #     Name of the library in the SDK.
 #
@@ -58,9 +62,13 @@ template("sdk_host_tool") {
   }
 
   sdk_atom(target_name) {
-    id = "sdk://$file_base"
+    forward_variables_from(invoker,
+                           [
+                             "category",
+                             "sdk_area",
+                           ])
 
-    category = invoker.category
+    id = "sdk://$file_base"
 
     meta = {
       dest = "$file_base-meta.json"

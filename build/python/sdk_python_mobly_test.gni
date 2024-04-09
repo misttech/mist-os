@@ -39,6 +39,10 @@ import("//build/sdk/sdk_atom.gni")
 #     See //build/sdk/sdk_atom.gni for more.
 #     Type: string.
 #
+#   sdk_area (optional)
+#     [string] The API area responsible for maintaining this library.
+#     See //build/sdk/sdk_atom.gni.
+#
 #   min_python_version
 #     The minimum Python version (Major.Minor) this the test is compatible with
 #     - e.g. "3.11".
@@ -158,9 +162,13 @@ template("sdk_python_mobly_test") {
     }
 
     sdk_atom(target_name) {
-      id = "sdk://python/${_sdk_name}"
+      forward_variables_from(invoker,
+                             [
+                               "category",
+                               "sdk_area",
+                             ])
 
-      category = invoker.category
+      id = "sdk://python/${_sdk_name}"
 
       meta = {
         schema = "experimental_python_e2e_test"

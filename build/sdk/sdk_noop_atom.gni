@@ -23,7 +23,7 @@ import("//build/python/python_action.gni")
 #     If this attribute is set, "id" and "type" must be set as well.
 #     Type: string
 #
-#   area (optional)
+#   sdk_area (optional)
 #     The API area responsible for maintaining this SDK atom. See
 #     docs/contribute/governance/areas/_areas.yaml for the list of areas.
 #     "Unknown" is also a valid option. By default, the area will be `null` in
@@ -86,10 +86,10 @@ template("sdk_noop_atom") {
         "--noop-atom",
       ]
 
-      if (defined(invoker.area)) {
+      if (defined(invoker.sdk_area)) {
         args += [
           "--area",
-          invoker.area,
+          invoker.sdk_area,
         ]
       }
     }

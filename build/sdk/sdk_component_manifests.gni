@@ -12,6 +12,10 @@ import("//build/sdk/sdk_atom.gni")
 #     Publication level of the data set in SDKs.
 #     See //build/sdk/sdk_atom.gni.
 #
+#   sdk_area (optional)
+#     [string] The API area responsible for maintaining this shard.
+#     See //build/sdk/sdk_atom.gni.
+#
 #   name (required)
 #     Name of the component manifest in the SDK.
 #
@@ -51,6 +55,7 @@ template("sdk_component_manifests") {
     forward_variables_from(invoker,
                            [
                              "category",
+                             "sdk_area",
                              "non_sdk_deps",
                            ])
     id = "sdk://component_manifest/${invoker.name}"

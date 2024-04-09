@@ -68,6 +68,10 @@ import("//build/toolchain/concurrent_jobs.gni")
 #     Publication level of the library in SDKs.
 #     See //build/sdk/sdk_atom.gni.
 #
+#   sdk_area (optional)
+#     [string] The API area responsible for maintaining this library.
+#     See //build/sdk/sdk_atom.gni.
+#
 #   extra_sources (optional)
 #     Additional sources to consider for analysis.
 #
@@ -420,6 +424,8 @@ if (current_toolchain == dart_toolchain) {
       }
 
       sdk_atom("${target_name}_sdk") {
+        forward_variables_from(invoker, [ "sdk_area" ])
+
         id = "sdk://dart/${invoker.package_name}"
 
         category = invoker.sdk_category

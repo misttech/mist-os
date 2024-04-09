@@ -468,12 +468,11 @@ template("fidl_library") {
     }
 
     sdk_atom("${target_name}_sdk") {
+      forward_variables_from(invoker, [ "sdk_area" ])
+
       id = "sdk://fidl/$library_name"
 
       category = sdk_category
-      if (defined(invoker.sdk_area)) {
-        area = invoker.sdk_area
-      }
       if (defined(api_reference)) {
         api = api_reference
         api_contents = [

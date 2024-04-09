@@ -66,6 +66,10 @@ import("//build/toolchain/toolchain_environment.gni")
 #     Type: bool, or a string indicating an SDK category.
 #     Default: false
 #
+#   sdk_area (optional)
+#     [string] The API area responsible for maintaining this library.
+#     See //build/sdk/sdk_atom.gni.
+#
 #   sdk_headers
 #     Optional: Required, except if the global `is_kernel` is true.
 #     This must list all the public header files in the library's `include/`
@@ -190,20 +194,22 @@ template("zx_library") {
             build_as_static = true
             category = sdk_category
             sdk_name = name
-            if (defined(invoker.sdk_headers_for_internal_use)) {
-              sdk_headers_for_internal_use =
-                  invoker.sdk_headers_for_internal_use
-            }
+            forward_variables_from(invoker,
+                                   [
+                                     "sdk_headers_for_internal_use",
+                                     "sdk_area",
+                                   ])
           }
         } else {
           extra_target_args = {
             category = sdk_category
             sdk_name = name
             build_as_static = true
-            if (defined(invoker.sdk_headers_for_internal_use)) {
-              sdk_headers_for_internal_use =
-                  invoker.sdk_headers_for_internal_use
-            }
+            forward_variables_from(invoker,
+                                   [
+                                     "sdk_headers_for_internal_use",
+                                     "sdk_area",
+                                   ])
           }
         }
       } else {
@@ -218,20 +224,22 @@ template("zx_library") {
             category = sdk_category
             libcxx_linkage = "static"
             sdk_name = target_name
-            if (defined(invoker.sdk_headers_for_internal_use)) {
-              sdk_headers_for_internal_use =
-                  invoker.sdk_headers_for_internal_use
-            }
+            forward_variables_from(invoker,
+                                   [
+                                     "sdk_headers_for_internal_use",
+                                     "sdk_area",
+                                   ])
           }
         } else {
           extra_target_args = {
             category = sdk_category
             sdk_name = target_name
             libcxx_linkage = "static"
-            if (defined(invoker.sdk_headers_for_internal_use)) {
-              sdk_headers_for_internal_use =
-                  invoker.sdk_headers_for_internal_use
-            }
+            forward_variables_from(invoker,
+                                   [
+                                     "sdk_headers_for_internal_use",
+                                     "sdk_area",
+                                   ])
           }
         }
       } else {
@@ -247,20 +255,22 @@ template("zx_library") {
             libcxx_linkage = "static"
             sdk_name = target_name
             symbols_api = "//sdk/lib/$target_name/$target_name.ifs"
-            if (defined(invoker.sdk_headers_for_internal_use)) {
-              sdk_headers_for_internal_use =
-                  invoker.sdk_headers_for_internal_use
-            }
+            forward_variables_from(invoker,
+                                   [
+                                     "sdk_headers_for_internal_use",
+                                     "sdk_area",
+                                   ])
           }
         } else {
           extra_target_args = {
             category = sdk_category
             sdk_name = target_name
             libcxx_linkage = "static"
-            if (defined(invoker.sdk_headers_for_internal_use)) {
-              sdk_headers_for_internal_use =
-                  invoker.sdk_headers_for_internal_use
-            }
+            forward_variables_from(invoker,
+                                   [
+                                     "sdk_headers_for_internal_use",
+                                     "sdk_area",
+                                   ])
           }
         }
       } else {

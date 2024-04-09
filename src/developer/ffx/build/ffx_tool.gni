@@ -24,6 +24,10 @@ import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
 #      The sdk category this will be installed to.
 #      See `sdk_atom`'s `category` argument for more information.
 #
+#   sdk_area (optional)
+#     [string] The API area responsible for maintaining this tool.
+#     See //build/sdk/sdk_atom.gni.
+#
 #    sdk_deps (optional, ignored if `sdk_target_name` not set)
 #      Dependencies for inclusion in the sdk. See `sdk_atom` for more
 #      information on this.
@@ -104,6 +108,7 @@ template("ffx_tool") {
                              "output_name",
                              "sdk_target_name",
                              "sdk_category",
+                             "sdk_area",
                              "sdk_deps",
                              "assert_no_deps",
                            ])
@@ -186,6 +191,8 @@ template("ffx_tool") {
     # for the moment this goes directly to sdk_atom because this is a 'weird'
     # host tool that includes a json metadata file.
     sdk_atom(invoker.sdk_target_name) {
+      forward_variables_from(invoker, [ "sdk_area" ])
+
       id = "sdk://$file_base"
 
       category = invoker.sdk_category

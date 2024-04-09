@@ -16,6 +16,7 @@ template("zx_host_tool") {
                              [
                                "target_name",
                                "testonly",
+                               "sdk_area",
                              ])
       forward_variables_from(invoker, [ "testonly" ])
       if (!defined(deps)) {
@@ -64,6 +65,8 @@ template("zx_host_tool") {
     }
 
     sdk_atom("${tool_name}_sdk") {
+      forward_variables_from(invoker, [ "sdk_area" ])
+
       id = "sdk://$file_base"
       category = "partner"
 

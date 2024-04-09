@@ -20,6 +20,10 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     Publication level of the library in SDKs.
 #     See //build/sdk/sdk_atom.gni.
 #
+#   sdk_area (optional)
+#     [string] The API area responsible for maintaining this library.
+#     See //build/sdk/sdk_atom.gni.
+#
 #   api (optional)
 #     Path to the file representing the API of this library.
 #     This file is used to ensure modifications to the library's API are
@@ -187,6 +191,7 @@ template("sdk_shared_library") {
                            [
                              "api",
                              "category",
+                             "sdk_area",
                              "include_base",
                              "no_headers",
                              "sdk_headers_for_internal_use",
@@ -482,7 +487,11 @@ template("sdk_shared_library") {
   }
 
   sdk_atom(manifest_target_name) {
-    forward_variables_from(invoker, [ "testonly" ])
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "sdk_area",
+                           ])
 
     id = sdk_id
 
