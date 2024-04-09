@@ -22,14 +22,13 @@ import (
 )
 
 type UpdatePackage struct {
-	r                 *Repository
 	p                 Package
 	packages          map[string]build.MerkleRoot
 	hasImagesManifest bool
 	images            util.ImagesManifest
 }
 
-func newUpdatePackage(ctx context.Context, r *Repository, p Package) (*UpdatePackage, error) {
+func newUpdatePackage(ctx context.Context, p Package) (*UpdatePackage, error) {
 	// Parse the images manifest, if it exists.
 	hasImagesManifest := false
 	var images util.ImagesManifest
@@ -60,12 +59,20 @@ func newUpdatePackage(ctx context.Context, r *Repository, p Package) (*UpdatePac
 	}
 
 	return &UpdatePackage{
-		r:                 r,
 		p:                 p,
 		packages:          packages,
 		hasImagesManifest: hasImagesManifest,
 		images:            images,
 	}, nil
+}
+
+// Repository returns the repository that contains this package.
+func (p *UpdatePackage) Repository() *Repository {
+	return p.p.Repository()
+}
+
+func (p *UpdatePackage) String() string {
+	return p.p.String()
 }
 
 func (u *UpdatePackage) Path() string {
@@ -86,7 +93,7 @@ func (u *UpdatePackage) OpenPackage(ctx context.Context, path string) (Package, 
 		return Package{}, fmt.Errorf("could not find %s merkle in update package %s", path, u.p.Path())
 	}
 
-	return newPackage(ctx, u.r, path, merkle)
+	return newPackage(ctx, u.Repository(), path, merkle)
 }
 
 func (u *UpdatePackage) OpenSystemImagePackage(ctx context.Context) (*SystemImagePackage, error) {
@@ -168,7 +175,7 @@ func (u *UpdatePackage) OpenUpdateImages(ctx context.Context) (*UpdateImages, er
 		return nil, err
 	}
 
-	return newUpdateImages(ctx, u.r, images)
+	return newUpdateImages(ctx, u.Repository(), images)
 }
 
 // Extract the update package `srcUpdatePackage` into a temporary directory,
@@ -183,7 +190,7 @@ func (u *UpdatePackage) EditContents(
 		return nil, err
 	}
 
-	return newUpdatePackage(ctx, u.r, p)
+	return newUpdatePackage(ctx, p)
 }
 
 // Extract the update package `srcUpdatePackage` into a temporary directory,
@@ -197,7 +204,7 @@ func (u *UpdatePackage) EditPackage(
 		return nil, err
 	}
 
-	return newUpdatePackage(ctx, u.r, p)
+	return newUpdatePackage(ctx, p)
 }
 
 // EditSystemImage will extract the system image into a temporary directory,
@@ -443,7 +450,7 @@ func (u *UpdatePackage) editZbiAndVbmeta(
 		return err
 	}
 
-	updateImages, err := newUpdateImages(ctx, u.r, images)
+	updateImages, err := newUpdateImages(ctx, u.Repository(), images)
 	if err != nil {
 		return err
 	}
@@ -495,10 +502,7 @@ func (u *UpdatePackage) replaceUpdateImages(
 	srcUpdateImages *UpdateImages,
 	editFunc func(tempDir string, zbiName string, vbmetaName string) error,
 ) error {
-	dstUpdatePackageParts := strings.Split(dstUpdatePackagePath, "/")
-	dstUpdatePackageName := dstUpdatePackageParts[0]
-	dstZbiPackagePath := fmt.Sprintf("%s_update_images_zbi", dstUpdatePackageName)
-
+	dstZbiPackagePath := util.AddSuffixToPackageName(dstUpdatePackagePath, "update-images-zbi")
 	dstUpdateImages, err := srcUpdateImages.EditZbiAndVbmetaContents(
 		ctx,
 		dstZbiPackagePath,

@@ -14,7 +14,6 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -381,7 +380,6 @@ func initializeDevice(
 	if err := check.ValidateDevice(
 		ctx,
 		device,
-		repo,
 		expectedSystemImage,
 		currentBootSlot,
 		c.checkABR,
@@ -415,7 +413,6 @@ func systemOTA(
 		ctx,
 		rand,
 		device,
-		repo,
 		currentBootSlot,
 		updatePackage,
 		"ota-test-update/0",
@@ -505,7 +502,6 @@ func systemPrimeOTA(
 		ctx,
 		rand,
 		device,
-		repo,
 		currentBootSlot,
 		dstUpdate,
 		"ota-test-update_prime2/0",
@@ -517,7 +513,6 @@ func otaToPackage(
 	ctx context.Context,
 	rand *rand.Rand,
 	device *device.Client,
-	repo *packages.Repository,
 	currentBootSlot *sl4f.Configuration,
 	srcUpdate *packages.UpdatePackage,
 	dstUpdatePath string,
@@ -526,20 +521,12 @@ func otaToPackage(
 	dstUpdate, dstSystemImage, err := AddRandomFilesToUpdate(
 		ctx,
 		rand,
-		repo,
 		srcUpdate,
 		dstUpdatePath,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create update package %s: %w", dstUpdatePath, err)
 	}
-
-	dstUpdatePackageUrl := fmt.Sprintf(
-		"fuchsia-pkg://fuchsia.com/%s?hash=%s",
-		dstUpdatePath,
-		dstUpdate.Merkle(),
-	)
-	logger.Infof(ctx, "Generated update package %s", dstUpdatePackageUrl)
 
 	upToDate, err := check.IsDeviceUpToDate(ctx, device, dstSystemImage)
 	if err != nil {
@@ -552,16 +539,12 @@ func otaToPackage(
 		)
 	}
 
-	u, err := c.installerConfig.Updater(
-		repo,
-		dstUpdatePackageUrl,
-		checkForUnknownFirmware,
-	)
+	u, err := c.installerConfig.Updater(checkForUnknownFirmware)
 	if err != nil {
 		return fmt.Errorf("failed to create updater: %w", err)
 	}
 
-	if err := u.Update(ctx, device); err != nil {
+	if err := u.Update(ctx, device, dstUpdate); err != nil {
 		return fmt.Errorf("failed to download OTA: %w", err)
 	}
 
@@ -581,7 +564,6 @@ func otaToPackage(
 	if err := check.ValidateDevice(
 		ctx,
 		device,
-		repo,
 		dstSystemImage,
 		currentBootSlot,
 		c.checkABR,
@@ -589,7 +571,7 @@ func otaToPackage(
 		return fmt.Errorf("failed to validate after OTA: %w", err)
 	}
 
-	if err := script.RunScript(ctx, device, repo, c.afterTestScript); err != nil {
+	if err := script.RunScript(ctx, device, dstUpdate.Repository(), c.afterTestScript); err != nil {
 		return fmt.Errorf("failed to run test script after OTA: %w", err)
 	}
 
@@ -603,7 +585,6 @@ func otaToPackage(
 func AddRandomFilesToUpdate(
 	ctx context.Context,
 	rand *rand.Rand,
-	repo *packages.Repository,
 	srcUpdate *packages.UpdatePackage,
 	dstUpdatePath string,
 ) (*packages.UpdatePackage, *packages.SystemImagePackage, error) {
@@ -627,9 +608,7 @@ func AddRandomFilesToUpdate(
 		return nil, nil, fmt.Errorf("error determining system image size: %w", err)
 	}
 
-	dstUpdateParts := strings.Split(dstUpdatePath, "/")
-	dstUpdateName := dstUpdateParts[0]
-	dstSystemImagePath := fmt.Sprintf("%s_system_image/0", dstUpdateName)
+	dstSystemImagePath := util.AddSuffixToPackageName(dstUpdatePath, "system-image")
 
 	// Add random files to the system image package in the update. Clamp the
 	// package size to the upper bound if we have one, otherwise we'll just add
@@ -676,7 +655,7 @@ func AddRandomFilesToUpdate(
 
 	// Optionally add random files to zbi package in the update images.
 	if c.maxUpdateImagesSize != 0 {
-		dstZbiPath := fmt.Sprintf("%s_update_images_zbi/0", dstUpdateName)
+		dstZbiPath := util.AddSuffixToPackageName(dstUpdatePath, "update-images-zbi")
 		dstUpdate, _, err = dstUpdate.EditUpdateImages(
 			ctx,
 			dstUpdatePath,

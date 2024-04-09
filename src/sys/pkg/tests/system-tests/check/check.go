@@ -27,7 +27,7 @@ func IsDeviceUpToDate(
 	}
 
 	logger.Infof(ctx, "current system image merkle:  %q", remoteSystemImageMerkle)
-	logger.Infof(ctx, "expected system image merkle: %q", expectedSystemImage.Merkle())
+	logger.Infof(ctx, "expected system image: %q", expectedSystemImage)
 
 	return expectedSystemImage.Merkle() == remoteSystemImageMerkle, nil
 }
@@ -128,7 +128,6 @@ func checkABRConfig(
 func ValidateDevice(
 	ctx context.Context,
 	device *device.Client,
-	repo *packages.Repository,
 	expectedSystemImage *packages.SystemImagePackage,
 	expectedConfig *sl4f.Configuration,
 	checkABR bool,
@@ -142,7 +141,7 @@ func ValidateDevice(
 			return fmt.Errorf("failed to check if device is up to date: %w", err)
 		}
 		if !upToDate {
-			return fmt.Errorf("system version failed to update to %q", expectedSystemImage.Merkle())
+			return fmt.Errorf("system version failed to update to %q", expectedSystemImage)
 		}
 	}
 
@@ -152,7 +151,7 @@ func ValidateDevice(
 	}
 
 	if checkABR {
-		if err := checkABRConfig(ctx, device, repo, expectedConfig); err != nil {
+		if err := checkABRConfig(ctx, device, expectedSystemImage.Repository(), expectedConfig); err != nil {
 			return fmt.Errorf("failed to validate device: %w", err)
 		}
 	}

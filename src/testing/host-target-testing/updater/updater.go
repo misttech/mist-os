@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"regexp"
 	"time"
@@ -19,6 +18,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/avb"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/omaha_tool"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/zbi"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 
@@ -27,6 +27,9 @@ import (
 
 const (
 	updateErrorSleepTime = 30 * time.Second
+
+	// The default fuchsia update package path.
+	defaultUpdatePackagePath = "update/0"
 )
 
 type client interface {
@@ -43,7 +46,11 @@ type client interface {
 }
 
 type Updater interface {
-	Update(ctx context.Context, c client) error
+	Update(
+		ctx context.Context,
+		c client,
+		updatePackage *packages.UpdatePackage,
+	) error
 }
 
 func checkSyslogForUnknownFirmware(ctx context.Context, c client) error {
@@ -91,33 +98,31 @@ func checkSyslogForUnknownFirmware(ctx context.Context, c client) error {
 
 // SystemUpdateChecker uses `update check-now` to install a package.
 type SystemUpdateChecker struct {
-	repo                   *packages.Repository
-	updatePackageUrl       string
+	updatePackage          *packages.UpdatePackage
 	checkForUnkownFirmware bool
 }
 
-func NewSystemUpdateChecker(
-	repo *packages.Repository,
-	updatePackageUrl string,
-	checkForUnkownFirmware bool,
-) *SystemUpdateChecker {
+func NewSystemUpdateChecker(checkForUnkownFirmware bool) *SystemUpdateChecker {
 	return &SystemUpdateChecker{
-		repo:                   repo,
-		updatePackageUrl:       updatePackageUrl,
 		checkForUnkownFirmware: checkForUnkownFirmware,
 	}
 }
 
-const (
-	// The default fuchsia update package URL.
-	defaultUpdatePackageURL = "fuchsia-pkg://fuchsia.com/update/0"
-)
-
-func (u *SystemUpdateChecker) Update(ctx context.Context, c client) error {
+func (u *SystemUpdateChecker) Update(
+	ctx context.Context,
+	c client,
+	srcUpdatePackage *packages.UpdatePackage,
+) error {
 	// If we're using the default update package url, we can directly update
 	// with it.
-	if u.updatePackageUrl == defaultUpdatePackageURL {
-		return updateCheckNow(ctx, c, u.repo, true, u.checkForUnkownFirmware)
+	if srcUpdatePackage.Path() == defaultUpdatePackagePath {
+		return updateCheckNow(
+			ctx,
+			c,
+			srcUpdatePackage.Repository(),
+			true,
+			u.checkForUnkownFirmware,
+		)
 	}
 
 	// Otherwise, copy the repository into a temporary directory, and publish
@@ -127,15 +132,9 @@ func (u *SystemUpdateChecker) Update(ctx context.Context, c client) error {
 	logger.Infof(
 		ctx,
 		"update package %s isn't default, cloning the repository so it can be made %s",
-		u.updatePackageUrl,
-		defaultUpdatePackageURL,
+		srcUpdatePackage,
+		defaultUpdatePackagePath,
 	)
-
-	url, err := url.Parse(u.updatePackageUrl)
-	if err != nil {
-		return fmt.Errorf("invalid update package URL %q: %w", u.updatePackageUrl, err)
-	}
-	srcUpdatePath := url.Path[1:]
 
 	tempDir, err := os.MkdirTemp("", "")
 	if err != nil {
@@ -143,23 +142,27 @@ func (u *SystemUpdateChecker) Update(ctx context.Context, c client) error {
 	}
 	defer os.RemoveAll(tempDir)
 
-	repo, err := u.repo.CloneIntoDir(ctx, tempDir)
+	tempRepo, err := srcUpdatePackage.Repository().CloneIntoDir(ctx, tempDir)
 	if err != nil {
-		return fmt.Errorf("failed to copy %s into %s: %w", u.repo, tempDir, err)
+		return fmt.Errorf(
+			"failed to copy %s into %s: %w",
+			srcUpdatePackage.Repository(),
+			tempDir,
+			err,
+		)
 	}
 
-	srcUpdate, err := repo.OpenUpdatePackage(ctx, srcUpdatePath)
+	tempSrcUpdate, err := tempRepo.OpenUpdatePackage(ctx, srcUpdatePackage.Path())
 	if err != nil {
-		return fmt.Errorf("failed to open %s: %w", srcUpdatePath, err)
+		return fmt.Errorf("failed to open %s: %w", srcUpdatePackage, err)
 	}
 
-	dstUpdatePath := "update/0"
-	_, err = srcUpdate.EditContents(ctx, dstUpdatePath, func(tempDir string) error { return nil })
+	_, err = tempSrcUpdate.EditContents(ctx, defaultUpdatePackagePath, func(tempDir string) error { return nil })
 	if err != nil {
-		return fmt.Errorf("failed to publish %s: %w", dstUpdatePath, err)
+		return fmt.Errorf("failed to publish %s: %w", defaultUpdatePackagePath, err)
 	}
 
-	return updateCheckNow(ctx, c, repo, true, u.checkForUnkownFirmware)
+	return updateCheckNow(ctx, c, tempRepo, true, u.checkForUnkownFirmware)
 }
 
 func updateCheckNow(
@@ -266,47 +269,43 @@ func updateCheckNow(
 
 // SystemUpdater uses the `system-updater` to install a package.
 type SystemUpdater struct {
-	repo                   *packages.Repository
-	updatePackageUrl       string
 	checkForUnkownFirmware bool
 }
 
-func NewSystemUpdater(repo *packages.Repository, updatePackageUrl string, checkForUnkownFirmware bool) *SystemUpdater {
-	return &SystemUpdater{repo: repo, updatePackageUrl: updatePackageUrl, checkForUnkownFirmware: checkForUnkownFirmware}
+func NewSystemUpdater(checkForUnkownFirmware bool) *SystemUpdater {
+	return &SystemUpdater{
+		checkForUnkownFirmware: checkForUnkownFirmware,
+	}
 }
 
-func (u *SystemUpdater) Update(ctx context.Context, c client) error {
+func (u *SystemUpdater) Update(
+	ctx context.Context,
+	c client,
+	srcUpdate *packages.UpdatePackage,
+) error {
 	startTime := time.Now()
 
-	url, err := url.Parse(u.updatePackageUrl)
-	if err != nil {
-		return fmt.Errorf("invalid update package URL %q: %w", u.updatePackageUrl, err)
-	}
-	pkgPath := url.Path[1:]
-
-	srcUpdate, err := u.repo.OpenUpdatePackage(ctx, pkgPath)
-	if err != nil {
-		return err
-	}
-
 	repoName := "download-ota"
-	dstUpdate, err := srcUpdate.RehostUpdatePackage(ctx, repoName, pkgPath)
+	dstUpdate, err := srcUpdate.RehostUpdatePackage(
+		ctx,
+		repoName,
+		util.AddSuffixToPackageName(srcUpdate.Path(), "system-updater"),
+	)
 
-	logger.Infof(ctx, "published %q as %q to %q", pkgPath, dstUpdate.Merkle(), u.repo)
-
-	server, err := c.ServePackageRepository(ctx, u.repo, repoName, true, nil)
+	server, err := c.ServePackageRepository(ctx, dstUpdate.Repository(), repoName, true, nil)
 	if err != nil {
 		return fmt.Errorf("error setting up server: %w", err)
 	}
 	defer server.Shutdown(ctx)
 
-	logger.Infof(ctx, "Downloading OTA %q", u.updatePackageUrl)
+	updatePackageUrl := fmt.Sprintf("fuchsia-pkg://%s/%s", repoName, dstUpdate.Path())
+	logger.Infof(ctx, "Downloading OTA %q", updatePackageUrl)
 
 	cmd := []string{
 		"update",
 		"force-install",
 		"--reboot", "false",
-		fmt.Sprintf("%q", u.updatePackageUrl),
+		fmt.Sprintf("%q", updatePackageUrl),
 	}
 	if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err != nil {
 		return fmt.Errorf("failed to run system updater: %w", err)
@@ -336,8 +335,6 @@ func (u *SystemUpdater) Update(ctx context.Context, c client) error {
 }
 
 type OmahaUpdater struct {
-	repo                        *packages.Repository
-	updatePackageURL            *url.URL
 	omahaTool                   *omaha_tool.OmahaTool
 	avbTool                     *avb.AVBTool
 	zbiTool                     *zbi.ZBITool
@@ -346,47 +343,27 @@ type OmahaUpdater struct {
 }
 
 func NewOmahaUpdater(
-	repo *packages.Repository,
-	updatePackageURL string,
 	omahaTool *omaha_tool.OmahaTool,
 	avbTool *avb.AVBTool,
 	zbiTool *zbi.ZBITool,
 	workaroundOtaNoRewriteRules bool,
 	checkForUnkownFirmware bool,
-) (*OmahaUpdater, error) {
-	u, err := url.Parse(updatePackageURL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid update package URL %q: %w", updatePackageURL, err)
-	}
-
-	if u.Scheme != "fuchsia-pkg" {
-		return nil, fmt.Errorf("scheme must be 'fuchsia-pkg', not %q", u.Scheme)
-	}
-
-	if u.Host == "" {
-		return nil, fmt.Errorf("update package URL's host must not be empty")
-	}
-
+) *OmahaUpdater {
 	return &OmahaUpdater{
-		repo:                        repo,
-		updatePackageURL:            u,
 		omahaTool:                   omahaTool,
 		avbTool:                     avbTool,
 		zbiTool:                     zbiTool,
 		workaroundOtaNoRewriteRules: workaroundOtaNoRewriteRules,
 		checkForUnkownFirmware:      checkForUnkownFirmware,
-	}, nil
+	}
 }
 
-func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
-	logger.Infof(ctx, "injecting omaha_url into %q", u.updatePackageURL)
-
-	srcUpdate, err := u.repo.OpenUpdatePackage(ctx, u.updatePackageURL.Path[1:])
-	if err != nil {
-		return err
-	}
-
-	logger.Infof(ctx, "source update package merkle for %q is %q", u.updatePackageURL, srcUpdate.Merkle())
+func (u *OmahaUpdater) Update(
+	ctx context.Context,
+	c client,
+	srcUpdate *packages.UpdatePackage,
+) error {
+	logger.Infof(ctx, "injecting omaha_url into %q", srcUpdate)
 
 	// Create a ZBI with the omaha_url argument.
 	destZbi, err := os.CreateTemp("", "omaha_argument.zbi")
@@ -417,14 +394,12 @@ func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 		ctx,
 		u.avbTool,
 		repoName,
-		"update_omaha/0",
+		util.AddSuffixToPackageName(srcUpdate.Path(), "omaha-client"),
 		propFiles,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to inject vbmeta properties into update package: %w", err)
 	}
-
-	logger.Infof(ctx, "Published %q as %q to %q", dstUpdate.Path(), dstUpdate.Merkle(), u.repo)
 
 	omahaPackageURL := fmt.Sprintf(
 		"fuchsia-pkg://%s/%s?hash=%s",
@@ -433,11 +408,13 @@ func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 		dstUpdate.Merkle(),
 	)
 
+	logger.Infof(ctx, "Update Package URL: %q", omahaPackageURL)
+
 	// Configure the Omaha server with the new omaha package URL.
 	if err := u.omahaTool.SetPkgURL(ctx, omahaPackageURL); err != nil {
 		return fmt.Errorf("Failed to set Omaha update package: %w", err)
 	}
 
 	// Trigger an update
-	return updateCheckNow(ctx, c, u.repo, !u.workaroundOtaNoRewriteRules, u.checkForUnkownFirmware)
+	return updateCheckNow(ctx, c, dstUpdate.Repository(), !u.workaroundOtaNoRewriteRules, u.checkForUnkownFirmware)
 }

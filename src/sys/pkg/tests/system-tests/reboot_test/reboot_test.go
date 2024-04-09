@@ -172,7 +172,6 @@ func doTestReboot(
 	if err := check.ValidateDevice(
 		ctx,
 		device,
-		repo,
 		expectedSystemImage,
 		expectedConfig,
 		c.checkABR,
@@ -187,7 +186,6 @@ func doTestReboot(
 	if err := check.ValidateDevice(
 		ctx,
 		device,
-		repo,
 		expectedSystemImage,
 		expectedConfig,
 		c.checkABR,
@@ -245,7 +243,7 @@ func initializeDevice(
 	// Install version N on the device if it is not already on that version.
 	expectedSystemImage, err := updatePackage.OpenSystemImagePackage(ctx)
 	if err != nil {
-		return fmt.Errorf("error extracting expected system image merkle: %w", err)
+		return fmt.Errorf("error extracting expected system image: %w", err)
 	}
 
 	// Only provision if the device is not running the expected version.
@@ -289,7 +287,6 @@ func initializeDevice(
 	if err := check.ValidateDevice(
 		ctx,
 		device,
-		repo,
 		expectedSystemImage,
 		expectedConfig,
 		c.checkABR,

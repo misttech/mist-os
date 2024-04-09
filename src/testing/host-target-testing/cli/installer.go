@@ -16,7 +16,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/avb"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/omaha_tool"
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/updater"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/zbi"
@@ -33,9 +32,6 @@ const (
 
 	// Install OTAs directly with the system-updater.
 	SystemUpdater = "system-updater"
-
-	// The default fuchsia update package URL.
-	defaultUpdatePackageURL = "fuchsia-pkg://fuchsia.com/update/0"
 )
 
 type InstallerConfig struct {
@@ -188,11 +184,7 @@ func (c *InstallerConfig) ConfigureBuild(ctx context.Context, device *device.Cli
 }
 
 // Updater returns the configured updater.
-func (c *InstallerConfig) Updater(
-	repo *packages.Repository,
-	updatePackageURL string,
-	checkForUnkownFirmware bool,
-) (updater.Updater, error) {
+func (c *InstallerConfig) Updater(checkForUnkownFirmware bool) (updater.Updater, error) {
 	switch c.installerMode {
 	case Omaha:
 		avbTool, err := c.AVBTool()
@@ -206,24 +198,20 @@ func (c *InstallerConfig) Updater(
 		}
 
 		return updater.NewOmahaUpdater(
-			repo,
-			updatePackageURL,
 			c.omahaTool,
 			avbTool,
 			zbiTool,
 			c.workaroundOtaNoRewriteRules,
 			checkForUnkownFirmware,
-		)
+		), nil
 
 	case SystemUpdateChecker:
 		return updater.NewSystemUpdateChecker(
-			repo,
-			updatePackageURL,
 			checkForUnkownFirmware,
 		), nil
 
 	case SystemUpdater:
-		return updater.NewSystemUpdater(repo, updatePackageURL, checkForUnkownFirmware), nil
+		return updater.NewSystemUpdater(checkForUnkownFirmware), nil
 
 	default:
 		return nil, fmt.Errorf("Invalid installer mode: %v", c.installerMode)

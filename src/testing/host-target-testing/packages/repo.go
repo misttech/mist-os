@@ -198,7 +198,7 @@ func (r *Repository) OpenUpdatePackage(ctx context.Context, path string) (*Updat
 		return nil, err
 	}
 
-	return newUpdatePackage(ctx, r, p)
+	return newUpdatePackage(ctx, p)
 }
 
 func (r *Repository) OpenBlob(ctx context.Context, merkle build.MerkleRoot) (*os.File, error) {

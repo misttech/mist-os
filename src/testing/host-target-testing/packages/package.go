@@ -92,6 +92,15 @@ func newPackage(
 	}, nil
 }
 
+// Repository returns the repository that contains this package.
+func (p *Package) Repository() *Repository {
+	return p.repo
+}
+
+func (p *Package) String() string {
+	return fmt.Sprintf("%s @ %s", p.Path(), p.Merkle())
+}
+
 // Path returns the package path.
 func (p *Package) Path() string {
 	return p.path

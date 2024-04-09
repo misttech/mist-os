@@ -497,3 +497,12 @@ func ValidatePath(path string) error {
 
 	return nil
 }
+
+func AddSuffixToPackageName(packagePath string, suffix string) string {
+	before, after, ok := strings.Cut(packagePath, "/")
+	if ok {
+		return fmt.Sprintf("%s_%s/%s", before, suffix, after)
+	} else {
+		return fmt.Sprintf("%s_%s", before, suffix)
+	}
+}

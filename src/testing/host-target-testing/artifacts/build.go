@@ -41,6 +41,9 @@ const (
 )
 
 type Build interface {
+	// String returns a string identifier for this build.
+	String() string
+
 	// GetBootserver returns the path to the bootserver used for paving.
 	GetBootserver(ctx context.Context) (string, error)
 
@@ -632,6 +635,10 @@ type OmahaBuild struct {
 
 func NewOmahaBuild(build Build, omahatool *omaha_tool.OmahaTool, avbtool *avb.AVBTool, zbitool *zbi.ZBITool) *OmahaBuild {
 	return &OmahaBuild{build: build, omahatool: omahatool, avbtool: avbtool, zbitool: zbitool}
+}
+
+func (b *OmahaBuild) String() string {
+	return b.build.String()
 }
 
 func (b *OmahaBuild) GetBootserver(ctx context.Context) (string, error) {

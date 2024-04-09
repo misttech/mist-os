@@ -155,7 +155,7 @@ func doTestRecovery(
 	// Install version N on the device if it is not already on that version.
 	expectedSystemImage, err := updatePackage.OpenSystemImagePackage(ctx)
 	if err != nil {
-		return fmt.Errorf("error extracting expected system image merkle: %w", err)
+		return fmt.Errorf("error extracting expected system image: %w", err)
 	}
 
 	expectedConfig, err := check.DetermineCurrentABRConfig(ctx, device, repo)
@@ -166,7 +166,6 @@ func doTestRecovery(
 	if err := check.ValidateDevice(
 		ctx,
 		device,
-		repo,
 		expectedSystemImage,
 		expectedConfig,
 		c.checkABR,
@@ -269,7 +268,6 @@ func initializeDevice(
 	if err := check.ValidateDevice(
 		ctx,
 		device,
-		repo,
 		expectedSystemImage,
 		expectedConfig,
 		c.checkABR,

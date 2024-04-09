@@ -64,6 +64,14 @@ func newSystemImagePackage(ctx context.Context, p Package) (*SystemImagePackage,
 	}, nil
 }
 
+func (u *SystemImagePackage) Repository() *Repository {
+	return u.p.Repository()
+}
+
+func (u *SystemImagePackage) String() string {
+	return u.p.String()
+}
+
 func (u *SystemImagePackage) Path() string {
 	return u.p.Path()
 }
