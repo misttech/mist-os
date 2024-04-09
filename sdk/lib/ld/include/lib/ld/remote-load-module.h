@@ -223,12 +223,6 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
     return loader_.Load(diag, load_info_, this->decoded().vmo().borrow());
   }
 
-  template <class Diagnostics>
-  static bool LoadModules(Diagnostics& diag, List& modules) {
-    auto load = [&diag](auto& module) { return !module.HasModule() || module.Load(diag); };
-    return OnModules(modules, load);
-  }
-
   // This must be the last method called with the loader. Direct the loader to
   // preserve the load image before it is garbage collected.
   void Commit() {
@@ -237,14 +231,6 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
     // This returns the Loader::Relro object that holds the VMAR handle.  But
     // we don't need it because the RELRO segment was mapped read-only anyway.
     std::ignore = std::move(loader_).Commit(typename LoadInfo::Region{});
-  }
-
-  static void CommitModules(List& modules) {
-    std::for_each(modules.begin(), modules.end(), [](auto& module) {
-      if (module.HasModule()) [[likely]] {
-        module.Commit();
-      }
-    });
   }
 
   void set_decoded(DecodedPtr decoded, uint32_t modid, bool symbols_visible,
@@ -276,11 +262,6 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
 
  private:
   void SetAbiName() { module_.link_map.name = this->name().c_str(); }
-
-  template <typename T>
-  static bool OnModules(List& modules, T&& callback) {
-    return std::all_of(modules.begin(), modules.end(), std::forward<T>(callback));
-  }
 
   Module module_;
   LoadInfo load_info_;

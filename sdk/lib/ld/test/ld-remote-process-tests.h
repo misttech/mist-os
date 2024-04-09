@@ -262,9 +262,11 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
 
     // Finally, all the VMO contents are in place to be mapped into the
     // process.
-    EXPECT_TRUE(RemoteModule::LoadModules(diag, modules));
+    ASSERT_TRUE(linker.Load(diag));
 
-    RemoteModule::CommitModules(modules);
+    // Any failure before here would destroy all the VMARs when linker goes out
+    // of scope.  From here the mappings will stick in the process.
+    linker.Commit();
   }
 
   uintptr_t entry_ = 0;

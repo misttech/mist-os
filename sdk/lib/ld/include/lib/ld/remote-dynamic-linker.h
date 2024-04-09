@@ -53,7 +53,22 @@ namespace ld {
 //   That is, it performs relocation on all modules.
 //   TODO(https://fxbug.dev/326524302): complete passive ABI in this step
 //
-// TODO(https://fxbug.dev/326524302): More steps
+// * `Load()` loads all the segments finalized by `Relocate()` into the VMARs
+//   created by `Allocate()`.
+//
+// * `Commit()` finally ensures that the VMARs created and mappings made can't
+//   be changed or destroyed.  If Commit() is not called, then all the VMARs
+//   will be destroyed when the ld::RuntimeDynamicLinker object is destroyed.
+//
+// After Commit() the object is only available for examining what was done.
+// The VMAR handles are no longer available and the VmarLoader objects would
+// need to be reinitialized to be used again.  The segment VMO handles are
+// still available, but when not in zygote mode they are in use by process
+// mappings and must not be touched.  TODO(https://fxbug.dev/326524302): In
+// Zygote mode, it can also be distilled into a zygote.
+//
+// Various other methods are provided for interrogating the list of modules and
+// accessing the dynamic linker stub module and the ld::RemoteAbi object.
 
 template <class Elf = elfldltl::Elf<>, RemoteLoadZygote Zygote = RemoteLoadZygote::kNo>
 class RemoteDynamicLinker {
@@ -415,6 +430,45 @@ class RemoteDynamicLinker {
       return module.Relocate(diag, valid_modules, tls_desc_resolver);
     };
     return OnModules(valid_modules, relocate);
+  }
+
+  // Load each module into the VMARs created by Allocate.  This should only be
+  // attempted after Relocate has succeeded with no errors reported to the
+  // Diagnostics object.  Loading the object will likely work if relocation was
+  // incomplete, but using the code and data thus loaded would almost certainly
+  // be very unsafe.  There's no benefit to loading code and then not starting
+  // the process, so loading of incomplete state should not be attempted.
+  //
+  // After this, all the mappings are in place with their proper and final
+  // protections.  The VMAR handles still exist to allow mapping changes, but
+  // those VMARs will be destroyed when this object is destroyed unless Commit
+  // is called first.
+  template <class Diagnostics>
+  bool Load(Diagnostics& diag) {
+    auto load = [&diag](Module& module) { return module.Load(diag); };
+    return OnValidModules(load);
+  }
+
+  // This should only be called after Load (and everything before) has
+  // succeeded.  This commits all the mappings to their VMARs permanently.  The
+  // sole handle to each VMAR is dropped here, so no more changes to those
+  // VMARs can be made--only unmapping a whole module's vaddr range en masse to
+  // destroy the VMAR.
+  //
+  // This should be the last use of the object when not in Zygote mode.  The
+  // list of modules and each module's segments can still be examined, but the
+  // VMOs for relocated segments are now being read and written through process
+  // mappings and must not be disturbed.  The VmarLoader object for each module
+  // will be in moved-from state, and cannot be used without reinitialization.
+  //
+  // TODO(https://fxbug.dev/326524302): Describe Zygote options.
+  void Commit() {
+    for (Module& module : ValidModules()) {
+      // After this, destroying the module won't destroy its VMAR any more.  No
+      // more changes can be made to mappings in that VMAR, except by unmapping
+      // the whole thing.
+      module.Commit();
+    }
   }
 
  private:
