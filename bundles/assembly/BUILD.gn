@@ -126,6 +126,17 @@ assembly_input_bundle("bootstrap") {
         },
       ]
     },
+    {
+      name = "bootstrap"
+      component_shards = [
+        {
+          component_name = "bootstrap"
+          shards = rebase_path(
+                  [ "//src/bringup/bin/sysinfo/meta/sysinfo.shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
   ]
 
   boot_driver_packages = [

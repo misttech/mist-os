@@ -1,0 +1,37 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "sysinfo",
+            url: "fuchsia-boot:///sysinfo#meta/sysinfo.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.boot.WriteOnlyLog" ],
+            from: "parent",
+            to: "#sysinfo",
+        },
+        {
+            directory: "dev-topological",
+            from: "#devfs-with-pkg",
+            to: "#sysinfo",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: "#sysinfo",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.sysinfo.SysInfo",
+            from: "#sysinfo",
+        },
+    ],
+}

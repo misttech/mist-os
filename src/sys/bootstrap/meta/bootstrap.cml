@@ -45,10 +45,6 @@
             name: "role_manager",
             url: "fuchsia-boot:///role_manager#meta/role_manager.cm",
         },
-        {
-            name: "sysinfo",
-            url: "fuchsia-boot:///sysinfo#meta/sysinfo.cm",
-        },
     ],
     offer: [
         {
@@ -164,7 +160,6 @@
                 "#fshost",
                 "#pwrbtn-monitor",
                 "#shutdown_shim",
-                "#sysinfo",
             ],
         },
         {
@@ -195,10 +190,7 @@
         {
             directory: "dev-topological",
             from: "#devfs-with-pkg",
-            to: [
-                "#miscsvc",
-                "#sysinfo",
-            ],
+            to: "#miscsvc",
         },
         {
             directory: "dev-class",
@@ -252,7 +244,6 @@
                 "#role_manager",
                 "#shutdown_shim",
                 "#svchost",
-                "#sysinfo",
             ],
         },
         {
@@ -372,10 +363,6 @@
         {
             protocol: "fuchsia.power.button.Monitor",
             from: "#pwrbtn-monitor",
-        },
-        {
-            protocol: "fuchsia.sysinfo.SysInfo",
-            from: "#sysinfo",
         },
         {
             protocol: "fuchsia.tpm.cr50.Cr50",
