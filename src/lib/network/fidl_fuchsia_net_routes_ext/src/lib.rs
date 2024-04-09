@@ -906,8 +906,9 @@ pub enum WaitForRoutesError<I: FidlRouteIpExt> {
 /// from the predicate.
 ///
 /// With the given `initial_state`, take events from `event_stream` and update
-/// the state, calling `predicate` whenever the state changes. When predicate
-/// returns `Some(T)` yield `Ok(T)`.
+/// the state, calling `predicate` whenever the state changes. When `predicate`
+/// returns `Some(T)` yield `Ok(T)`. Note, this function will hang if no events
+/// arrive on `event_stream`.
 pub async fn wait_for_routes_map<
     I: FidlRouteIpExt,
     S: futures::Stream<Item = Result<Event<I>, WatchError>> + Unpin,

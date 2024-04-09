@@ -1821,6 +1821,25 @@ async fn dhcpv4_client_restarts_after_delay() {
                 )
                 .await;
 
+                let routes_state: fnet_routes::StateV4Proxy = client_realm
+                    .connect_to_protocol::<fnet_routes::StateV4Marker>()
+                    .expect("connect to routes state");
+
+                let routes_event_stream =
+                    fnet_routes_ext::event_stream_from_state::<Ipv4>(&routes_state)
+                        .expect("routes event stream");
+                futures::pin_mut!(routes_event_stream);
+
+                // Collect the current route table state prior to starting
+                // the DHCP server so that we ensure the default route the
+                // DHCP client acquires is not already present when we wait
+                // for the default route.
+                let mut routes = fnet_routes_ext::collect_routes_until_idle::<Ipv4, HashSet<_>>(
+                    routes_event_stream.by_ref(),
+                )
+                .await
+                .expect("collect routes until idle");
+
                 server_proxy
                     .start_serving()
                     .await
@@ -1861,21 +1880,6 @@ async fn dhcpv4_client_restarts_after_delay() {
                         prefix_len: 24
                     }
                 );
-
-                let routes_state: fnet_routes::StateV4Proxy = client_realm
-                    .connect_to_protocol::<fnet_routes::StateV4Marker>()
-                    .expect("connect to routes state");
-
-                let routes_event_stream =
-                    fnet_routes_ext::event_stream_from_state::<Ipv4>(&routes_state)
-                        .expect("routes event stream");
-                futures::pin_mut!(routes_event_stream);
-
-                let mut routes = fnet_routes_ext::collect_routes_until_idle::<Ipv4, HashSet<_>>(
-                    routes_event_stream.by_ref(),
-                )
-                .await
-                .expect("collect routes until idle");
 
                 let find_default_route =
                     |routes: &HashSet<fnet_routes_ext::InstalledRoute<Ipv4>>| {
