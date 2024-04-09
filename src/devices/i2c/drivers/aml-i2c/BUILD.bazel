@@ -92,6 +92,7 @@ fuchsia_cc_test(
     ],
     deps = [
         "//src/devices/lib/amlogic",
+        "@com_google_googletest//:gtest_main",
         "@fuchsia_sdk//pkg/async-loop-default",
         "@fuchsia_sdk//pkg/async_patterns_testing_cpp",
         "@fuchsia_sdk//pkg/ddk",
@@ -110,7 +111,6 @@ fuchsia_cc_test(
         "@internal_sdk//pkg/driver_compat_logging",
         "@internal_sdk//pkg/driver_runtime",
         "@internal_sdk//pkg/fake-mmio-reg",
-        "@internal_sdk//pkg/zxtest",
     ],
 )
 
