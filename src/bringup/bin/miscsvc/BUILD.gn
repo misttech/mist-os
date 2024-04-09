@@ -19,7 +19,6 @@ executable("miscsvc") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/kcounter",
     "//zircon/system/ulib/svc",
     "//zircon/system/ulib/sysmem-connector",
   ]

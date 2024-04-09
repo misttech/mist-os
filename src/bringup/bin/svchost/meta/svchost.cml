@@ -10,6 +10,7 @@
     capabilities: [
         {
             protocol: [
+                "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
@@ -21,6 +22,11 @@
             directory: "config-profiles",
             rights: [ "r*" ],
             path: "/config/profiles",
+        },
+        {
+            directory: "boot-kernel",
+            rights: [ "r*" ],
+            path: "/boot/kernel",
         },
         {
             protocol: [
@@ -40,6 +46,7 @@
     expose: [
         {
             protocol: [
+                "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",

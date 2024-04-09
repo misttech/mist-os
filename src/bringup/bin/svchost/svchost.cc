@@ -10,6 +10,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
+#include <lib/kcounter/provider.h>
 #include <lib/kernel-debug/kernel-debug.h>
 #include <lib/ktrace/ktrace.h>
 #include <lib/svc/outgoing.h>
@@ -180,6 +181,10 @@ int main(int argc, char** argv) {
       {
           .provider = ktrace_get_service_provider(),
           .ctx = reinterpret_cast<void*>(static_cast<uintptr_t>(debug_resource.release())),
+      },
+      {
+          .provider = kcounter_get_service_provider(),
+          .ctx = nullptr,
       },
   };
 

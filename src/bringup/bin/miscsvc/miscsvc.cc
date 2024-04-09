@@ -4,7 +4,6 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/kcounter/provider.h>
 #include <lib/paver/provider.h>
 #include <lib/svc/outgoing.h>
 #include <zircon/status.h>
@@ -108,7 +107,6 @@ int main(int argc, char** argv) {
   zx_service_provider_instance_t service_providers[] = {
       {.provider = sysmem2_get_service_provider(), .ctx = nullptr},
       {.provider = paver_get_service_provider(), .ctx = nullptr},
-      {.provider = kcounter_get_service_provider(), .ctx = nullptr},
   };
 
   for (size_t i = 0; i < std::size(service_providers); ++i) {

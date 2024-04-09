@@ -13,7 +13,6 @@
     capabilities: [
         {
             protocol: [
-                "fuchsia.kernel.Counter",
                 "fuchsia.paver.Paver",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
@@ -55,7 +54,6 @@
     expose: [
         {
             protocol: [
-                "fuchsia.kernel.Counter",
                 "fuchsia.paver.Paver",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
