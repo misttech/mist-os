@@ -43,10 +43,7 @@
             to: [ "#devices-tests" ],
         },
         {
-            event_stream: [
-                "capability_requested",
-                "directory_ready",
-            ],
+            event_stream: [ "capability_requested" ],
             from: "parent",
             to: "#devices-tests",
             scope: "#devices-tests",
