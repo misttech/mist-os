@@ -100,26 +100,6 @@ if (is_host) {
   }
 }
 
-action("json_for_test") {
-  deps = [
-    ":fidl($fidl_toolchain)",
-    ":fidl-composed($fidl_toolchain)",
-    ":fidl-sys($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.io",
-    "//sdk/lib/fidl/cpp/test:frobinator",
-  ]
-  outputs = [ "$target_gen_dir/library_loader_test_data.h" ]
-  script = "generate_test_includes.sh"
-  args = [
-    rebase_path(outputs[0], root_build_dir),
-    "fidling/gen/sdk/lib/fidl/cpp/test/frobinator.fidl.json",
-    "fidling/gen/zircon/system/fidl/fuchsia-io/fuchsia-io.fidl.json",
-    "fidling/gen/tools/fidlcat/lib/fidl.fidl.json",
-    "fidling/gen/tools/fidlcat/lib/fidl-composed.fidl.json",
-    "fidling/gen/tools/fidlcat/lib/fidl-sys.fidl.json",
-  ]
-}
-
 fidl("fidl") {
   testonly = true
   name = "test.fidlcat.examples"
