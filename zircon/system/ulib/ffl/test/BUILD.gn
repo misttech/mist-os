@@ -21,7 +21,10 @@ test("ffl") {
       configs -= fdio_config
     }
   }
-  sources = [ "ffl_tests.cc" ]
+  sources = [
+    "exponential_average_tests.cc",
+    "ffl_tests.cc",
+  ]
   deps = [
     "//zircon/system/ulib/ffl",
     "//zircon/system/ulib/zxtest",

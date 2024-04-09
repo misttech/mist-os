@@ -6,6 +6,7 @@ import("//build/cpp/library_headers.gni")
 
 library_headers("headers") {
   headers = [
+    "ffl/exponential_average.h",
     "ffl/expression.h",
     "ffl/fixed_format.h",
     "ffl/fixed.h",
