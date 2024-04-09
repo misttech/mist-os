@@ -6,19 +6,36 @@ DFv1-to-DFv2 driver migration.
 This guide provides instructions on how to set up and use the compat device
 server in a DFv2 driver for communicating with DFv1 drivers.
 
-The compat device server offers the `fuchsia_driver_compat::Device` interface
-(see [`compat.fidl`][compat-fidl]), which helps DFv2 drivers maintain
-compatibility with DFv1 drivers. This interface allows DFv2 drivers to provide
-their resources to descendant DFv1 drivers.
+The compat device server helps DFv2 drivers maintain compatibility with
+DFv1 drivers during the migration process. The compat device server offers the
+`fuchsia_driver_compat::Device` interface (see [`compat.fidl`][compat-fidl]).
+This interface allows DFv2 drivers to provide their resources to descendant
+DFv1 drivers.
 
-To initialize the compat device server in a DFv2 driver, see
-[Set up the compat device server](#set-up-the-compat-device-server).
+The key features of the compat device server are:
 
-And if your DFv2 driver needs to provide Banjo or metadata resources to its
-descendant DFv1 drivers, see the additional steps below:
+- **Resource sharing:** Provide resources from your DFv2 driver to
+  descendant DFv1 drivers seamlessly.
 
-- [Provide Banjo services to descendant DFv1 drivers](#provide-banjo-services-to-descendant-dfv1-drivers)
-- [Forward, add, and parse DFv1 metadata](#forward-add-and-parse-dfv1-metadata)
+- **Banjo services:** Offer Banjo protocols implemented in your DFv2 driver
+  to DFv1 drivers.
+
+- **Metadata handling:** Forward, add, and parse DFv1 metadata for
+  communication between DFv2 and DFv1 drivers.
+
+This guide provides step-by-step instructions and examples to help you with the
+following tasks:
+
+- [Set up the compat device server](#set-up-the-compat-device-server): Set up
+  the compat device server in a DFv2 driver, including initialization
+  (synchronous or asynchronous) and offering it to the child nodes.
+
+- [Provide Banjo services to descendant DFv1 drivers](#provide-banjo-services-to-descendant-dfv1-drivers):
+  Configure and share Banjo protocols with descendant DFv1 drivers.
+
+- [Forward, add, and parse DFv1 metadata](#forward-add-and-parse-dfv1-metadata):
+  Add, forward, and retrieve metadata, ensuring seamless information exchange
+  between DFv2 and DFv1 drivers.
 
 ## Set up the compat device server {:#set-up-the-compat-device-server}
 
@@ -334,7 +351,9 @@ To add the `Misc` Banjo protocol to the compat device server, do the following:
    ```
 
 For the remaining steps on providing this Banjo protocol to descendant
-DFv1drivers, see the [Banjo transport example][banjo-transport-example].
+DFv1 drivers, see the
+[Serve Banjo protocols in a DFv2 driver][serve-banjo-protocols-in-a-dfv2-driver]
+guide.
 
 ## Forward, add, and parse DFv1 metadata {:#forward-add-and-parse-dfv1-metadata}
 
@@ -510,3 +529,4 @@ zx::result<std::vector<gpio_pin_t>> gpio_pins =
 [banjo-server-h]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/compat/cpp/banjo_server.h
 [metadata-h]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/compat/cpp/metadata.h
 [ddk-metadata-h]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/ddk/include/lib/ddk/metadata.h
+[serve-banjo-protocols-in-a-dfv2-driver]: serve-banjo-protocols.md

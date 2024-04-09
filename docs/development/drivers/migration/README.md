@@ -48,12 +48,13 @@ Driver migration from DFv1 to DFv2 can be divided into two phases:
 1. [Migrate from DFv1 to DFv2][migrate-from-dfv1-to-dfv2].
 2. [Migrate from Banjo to FIDL][migrate-from-banjo-to-fidl].
 
-### Extension
+### Extensions
 
-The following guide is added to support tasks that were previously
+The following guides are added to support tasks that were previously
 identified as missing in the migration playbook above:
 
 - [Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
+- [Serve Banjo protocols in a DFv2 driver][serve-banjo-protocols]
 
 <!-- Reference links -->
 
@@ -67,3 +68,4 @@ identified as missing in the migration playbook above:
 [migrate-from-banjo-to-fidl]: /docs/development/drivers/migration/migrate-from-banjo-to-fidl/overview.md
 [migrate-from-dfv1-to-dfv2]: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2/overview.md
 [set-up-compat-device-server]: /docs/development/drivers/migration/set-up-compat-device-server.md
+[serve-banjo-protocols]: /docs/development/drivers/migration/serve-banjo-protocols.md

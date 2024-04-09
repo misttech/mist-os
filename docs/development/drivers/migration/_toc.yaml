@@ -5,6 +5,7 @@
 # Please, read https://fuchsia.dev/fuchsia-src/contribute/docs/documentation-navigation-toc
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
+
 toc:
 - title: "Overview"
   path: /docs/development/drivers/migration/README.md
@@ -30,7 +31,9 @@ toc:
   - title: "Convert Banjo protocols to FIDL protocols"
     path: /docs/development/drivers/migration/migrate-from-banjo-to-fidl/convert-banjo-protocols-to-fidl-protocols.md
     step_group: driver_migration-banjo-to-fidl
-- title: "Extension"
+- title: "Extensions"
   section:
   - title: "Set up the compat device server in a DFv2 driver"
     path: /docs/development/drivers/migration/set-up-compat-device-server.md
+  - title: "Serve Banjo protocols in a DFv2 driver"
+    path: /docs/development/drivers/migration/serve-banjo-protocols.md

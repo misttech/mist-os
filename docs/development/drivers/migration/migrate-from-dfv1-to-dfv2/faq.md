@@ -18,8 +18,8 @@ you need to use this compatibility shim (by manually creating
 `compat::DeviceServer`) for enabling the drivers in different framework
 versions to talk to each other.
 
-For more details on using the compatibility shim in a DFv2 driver
-to talk to its descendant DFv1 drivers, see the
+For more details on using the compatibility shim in a DFv2 driver,
+see the
 [Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
 guide.
 
@@ -35,6 +35,10 @@ following features:
   (see [`banjo_server.h`][banjo-server-h]).
 - `compat::ConnectBanjo` makes it easier to connect to Banjo
   (see [`banjo_client.h`][banjo-client-h]).
+
+For more details on these features, see the
+[Serve Banjo protocols in a DFv2 driver][serve-banjo-protocols-in-a-dfv2-driver]
+guide.
 
 ## Can DFv2 drivers use the compatibility shim for composite nodes?
 
@@ -251,4 +255,4 @@ contains most of the new APIs).
 [use-node-properties]: update-driver-interfaces-to-dfv2.md#use-the-node-properties-generated-from-fidl-service-offers
 [update-unit-tests]: update-driver-interfaces-to-dfv2.md#update-unit-tests-to-dfv2
 [additional-resources]: update-driver-interfaces-to-dfv2.md#additional-resources
-
+[serve-banjo-protocols-in-a-dfv2-driver]: /docs/development/drivers/migration/serve-banjo-protocols.md

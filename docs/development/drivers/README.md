@@ -38,9 +38,10 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 - [Overview][dfv1-to-dfv2-driver-migration-overview]
 - [1. Migrate from DFv1 to DFv2][migrate-from-dfv1-to-dfv2]
 - [2. Migrate from Banjo to FIDL][migrate-from-banjo-to-fidl]
-- Extension
+- Extensions
 
   - [Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
+  - [Serve Banjo protocols in a DFv2 driver][serve-banjo-protocols]
 
 ### DFv2 driver development
 
@@ -197,3 +198,4 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 [gpio-init]: concepts/driver_development/gpio-initialization.md
 [set-up-compat-device-server]: migration/set-up-compat-device-server.md
 [write-a-minimal-driver]: developer_guide/write-a-minimal-dfv2-driver.md
+[serve-banjo-protocols]: migration/serve-banjo-protocols.md
