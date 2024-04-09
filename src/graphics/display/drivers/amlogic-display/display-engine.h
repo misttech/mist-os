@@ -32,6 +32,7 @@
 #include "src/graphics/display/drivers/amlogic-display/vsync-receiver.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -40,12 +41,16 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   // Factory method for production use.
   //
   // `bus_device` must be valid.
-  static zx::result<std::unique_ptr<DisplayEngine>> Create(zx_device_t* bus_device);
+  // `incoming` must be non-null and outlive `DisplayEngine`.
+  static zx::result<std::unique_ptr<DisplayEngine>> Create(zx_device_t* bus_device,
+                                                           display::Namespace* incoming);
 
   // Creates an uninitialized `DisplayEngine` instance.
   //
+  // `incoming` must be non-null and outlive `DisplayEngine`.
+  //
   // Production code should use `DisplayEngine::Create()` instead.
-  explicit DisplayEngine(zx_device_t* bus_device);
+  explicit DisplayEngine(zx_device_t* bus_device, display::Namespace* incoming);
 
   DisplayEngine(const DisplayEngine&) = delete;
   DisplayEngine(DisplayEngine&&) = delete;
@@ -217,6 +222,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   bool IsNewDisplayTiming(const display::DisplayTiming& timing) __TA_REQUIRES(display_mutex_);
 
   zx_device_t* const bus_device_;
+  display::Namespace& incoming_;
 
   // Zircon handles
   zx::bti bti_;

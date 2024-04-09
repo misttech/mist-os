@@ -109,6 +109,8 @@ source_set("common_srcs") {
     "//src/graphics/display/lib/designware-dsi:dsi-host-controller",
     "//src/graphics/display/lib/designware-hdmi:hdmi-transmitter-controller-impl",
     "//src/graphics/display/lib/device-protocol-display",
+    "//src/graphics/display/lib/driver-framework-migration-utils/namespace",
+    "//src/graphics/display/lib/driver-framework-migration-utils/namespace:namespace-dfv1",
     "//src/graphics/display/lib/mipi-dsi",
     "//src/lib/ddk",
     "//src/lib/ddktl",

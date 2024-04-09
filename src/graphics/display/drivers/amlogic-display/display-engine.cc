@@ -30,7 +30,6 @@
 #include <cstddef>
 #include <memory>
 
-#include <ddktl/device.h>
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 
@@ -43,6 +42,7 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace amlogic_display {
@@ -596,13 +596,13 @@ void DisplayEngine::Deinitialize() {
 }
 
 zx_status_t DisplayEngine::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
-  // We can't use DdkConnectFragmentFidlProtocol here because it wants to create the endpoints but
-  // we only have the server_end here.
-  using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV1;
-  zx_status_t status = device_connect_fragment_fidl_protocol(
-      bus_device_, "sysmem", ServiceMember::ServiceName, ServiceMember::Name, connection.release());
-  if (status != ZX_OK) {
-    return status;
+  fidl::ServerEnd<fuchsia_sysmem::Allocator> allocator_server(std::move(connection));
+  zx::result<> connect_result = incoming_.Connect<fuchsia_hardware_sysmem::Service::AllocatorV1>(
+      std::move(allocator_server), "sysmem");
+  if (connect_result.is_error()) {
+    zxlogf(ERROR, "Failed to connect to sysmem Allocator service: %s",
+           connect_result.status_string());
+    return connect_result.status_value();
   }
   return ZX_OK;
 }
@@ -1098,8 +1098,7 @@ zx_status_t DisplayEngine::GetCommonProtocolsAndResources() {
 
   static constexpr char kPdevFragmentName[] = "pdev";
   zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-          fuchsia_hardware_platform_device::Service::Device>(bus_device_, kPdevFragmentName);
+      incoming_.Connect<fuchsia_hardware_platform_device::Service::Device>(kPdevFragmentName);
   if (pdev_result.is_error()) {
     zxlogf(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
     return pdev_result.status_value();
@@ -1112,8 +1111,7 @@ zx_status_t DisplayEngine::GetCommonProtocolsAndResources() {
   }
 
   zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> sysmem_client_result =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-          fuchsia_hardware_sysmem::Service::AllocatorV1>(bus_device_, "sysmem");
+      incoming_.Connect<fuchsia_hardware_sysmem::Service::AllocatorV1>("sysmem");
   if (sysmem_client_result.is_error()) {
     zxlogf(ERROR, "Failed to get sysmem protocol: %s", sysmem_client_result.status_string());
     return sysmem_client_result.status_value();
@@ -1121,8 +1119,7 @@ zx_status_t DisplayEngine::GetCommonProtocolsAndResources() {
   sysmem_.Bind(std::move(sysmem_client_result.value()));
 
   zx::result<fidl::ClientEnd<fuchsia_hardware_amlogiccanvas::Device>> canvas_client_result =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-          fuchsia_hardware_amlogiccanvas::Service::Device>(bus_device_, "canvas");
+      incoming_.Connect<fuchsia_hardware_amlogiccanvas::Service::Device>("canvas");
   if (canvas_client_result.is_error()) {
     zxlogf(ERROR, "Failed to get Amlogic canvas protocol: %s",
            canvas_client_result.status_string());
@@ -1259,13 +1256,17 @@ zx_status_t DisplayEngine::Initialize() {
   return ZX_OK;
 }
 
-DisplayEngine::DisplayEngine(zx_device_t* bus_device) : bus_device_(bus_device) {}
+DisplayEngine::DisplayEngine(zx_device_t* bus_device, display::Namespace* incoming)
+    : bus_device_(bus_device), incoming_(*incoming) {
+  ZX_DEBUG_ASSERT(incoming != nullptr);
+}
 DisplayEngine::~DisplayEngine() {}
 
 // static
-zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(zx_device_t* parent) {
+zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(zx_device_t* parent,
+                                                                 display::Namespace* incoming) {
   fbl::AllocChecker alloc_checker;
-  auto display_engine = fbl::make_unique_checked<DisplayEngine>(&alloc_checker, parent);
+  auto display_engine = fbl::make_unique_checked<DisplayEngine>(&alloc_checker, parent, incoming);
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);

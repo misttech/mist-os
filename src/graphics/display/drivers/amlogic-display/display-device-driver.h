@@ -13,6 +13,7 @@
 #include <ddktl/device.h>
 
 #include "src/graphics/display/drivers/amlogic-display/display-engine.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -29,7 +30,10 @@ class DisplayDeviceDriver final : public DeviceType {
 
   // Exposed for testing. Production code should use the `Create()` factory
   // method instead.
-  explicit DisplayDeviceDriver(zx_device_t* parent, std::unique_ptr<DisplayEngine> display_engine);
+  //
+  // `incoming` must outlive `display_engine`.
+  explicit DisplayDeviceDriver(zx_device_t* parent, std::unique_ptr<display::Namespace> incoming,
+                               std::unique_ptr<DisplayEngine> display_engine);
 
   DisplayDeviceDriver(const DisplayDeviceDriver&) = delete;
   DisplayDeviceDriver(DisplayDeviceDriver&&) = delete;
@@ -48,6 +52,8 @@ class DisplayDeviceDriver final : public DeviceType {
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
 
  private:
+  // `incoming_` must outlive `display_engine_`.
+  std::unique_ptr<display::Namespace> incoming_;
   std::unique_ptr<DisplayEngine> display_engine_;
 };
 
