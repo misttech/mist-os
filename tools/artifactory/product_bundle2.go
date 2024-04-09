@@ -90,6 +90,7 @@ func uploadsFromProductBundle(mods productBundlesModules, transferManifestPath s
 				uploads = append(uploads, Upload{
 					Source:      path.Join(mods.BuildDir(), transferManifestParentPath, entry.Local, artifact.Name),
 					Destination: path.Join(remote, artifact.Name),
+					Signed:      true,
 				})
 			}
 		} else if entry.Type == "blobs" {
@@ -98,6 +99,7 @@ func uploadsFromProductBundle(mods productBundlesModules, transferManifestPath s
 				Source:      path.Join(mods.BuildDir(), transferManifestParentPath, entry.Local),
 				Destination: remote,
 				Deduplicate: true,
+				Signed:      true,
 			})
 		} else {
 			return nil, fmt.Errorf("unrecognized transfer entry type: %s", entry.Type)
@@ -121,6 +123,7 @@ func uploadsFromProductBundle(mods productBundlesModules, transferManifestPath s
 		Contents: updatedTransferManifest,
 		// Consumers rely on the manifest being named transfer.json.
 		Destination: path.Join(productBundleRemote, "transfer.json"),
+		Signed:      true,
 	})
 
 	return uploads, nil

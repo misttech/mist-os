@@ -123,24 +123,29 @@ func TestProductBundle2Uploads(t *testing.T) {
 		{
 			Source:      filepath.Join(dir, "123"),
 			Destination: filepath.Join("PRODUCT_BUNDLES", "my-product-bundle", "123"),
+			Signed:      true,
 		},
 		{
 			Source:      filepath.Join(dir, "sub", "456"),
 			Destination: filepath.Join("PRODUCT_BUNDLES", "my-product-bundle", "sub", "456"),
+			Signed:      true,
 		},
 		{
 			Source:      filepath.Join(dir, "sub", "sub", "789"),
 			Destination: filepath.Join("PRODUCT_BUNDLES", "my-product-bundle", "sub", "sub", "789"),
+			Signed:      true,
 		},
 		{
 			Source:      filepath.Join(dir, "blobs"),
 			Destination: filepath.Join("BLOBS"),
 			Deduplicate: true,
+			Signed:      true,
 		},
 		{
 			Compress:    true,
 			Contents:    []byte(expectedTransferManifest),
 			Destination: filepath.Join("PRODUCT_BUNDLES", "my-product-bundle", "transfer.json"),
+			Signed:      true,
 		},
 	}
 
