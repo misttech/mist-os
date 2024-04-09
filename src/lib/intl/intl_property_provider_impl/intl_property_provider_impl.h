@@ -11,6 +11,7 @@
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fpromise/result.h>
+#include <lib/inspect/component/cpp/component.h>
 
 #include <queue>
 
@@ -28,7 +29,7 @@ namespace intl {
 // async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 // auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 // // Connects to required backend services through context->svc().
-// auto intl = IntlPropertyProviderImpl::Create(context->svc());
+// auto intl = IntlPropertyProviderImpl::Create(context->svc(), /*health=*/nullptr);
 // // Starts serving `fuchsia.intl.PropertyProvider`.
 // context->outgoing()->AddPublicService(intl->GetHandler());
 // // Waits for events in the async loop.
@@ -37,12 +38,15 @@ namespace intl {
 //
 class IntlPropertyProviderImpl final : fuchsia::intl::PropertyProvider {
  public:
-  explicit IntlPropertyProviderImpl(fuchsia::settings::IntlPtr settings_client_);
+  // settings_client_ is an optional connection to the intl settings client, which may not always
+  // be available. `health` is an inspect node used to report the intl provider health - it will
+  // be dropped to `unhealthy` if the provider starts serving lots of errors.
+  IntlPropertyProviderImpl(fuchsia::settings::IntlPtr settings_client_, inspect::NodeHealth health);
 
   // Create an instance of `IntlPropertyProviderImpl`, after using the given `ServiceDirectory` to
   // connect to all of the provider's service dependencies.
   static std::unique_ptr<IntlPropertyProviderImpl> Create(
-      const std::shared_ptr<sys::ServiceDirectory>& incoming_services);
+      const std::shared_ptr<sys::ServiceDirectory>& incoming_services, inspect::NodeHealth health);
 
   // Returns the client-side handler for `fuchsia.intl.PropertyProvider`, based on either the
   // dispatcher that is passed in (e.g. for testing), or the default thread-local dispatcher.
@@ -81,6 +85,10 @@ class IntlPropertyProviderImpl final : fuchsia::intl::PropertyProvider {
   // Send the Profile to any queued callers of `GetProfile`.
   void ProcessProfileRequests();
 
+  // Corrects the error budget.  Set to less than zero to remove error budget.
+  // Set to more than zero to add to error budget.
+  void ErrorBudgetInc(int increment);
+
   // A snapshot of the assembled intl `Profile`.
   std::optional<fuchsia::intl::Profile> intl_profile_;
 
@@ -95,6 +103,12 @@ class IntlPropertyProviderImpl final : fuchsia::intl::PropertyProvider {
 
   // Queue of pending requests
   std::queue<fuchsia::intl::PropertyProvider::GetProfileCallback> get_profile_queue_;
+
+  // A node to report health into.
+  inspect::NodeHealth health_;
+
+  // The error budget: less than 0, is an error state. Otherwise, is OK.
+  int error_budget_{};
 };
 
 }  // namespace intl

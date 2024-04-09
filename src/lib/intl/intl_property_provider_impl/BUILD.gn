@@ -52,9 +52,10 @@ icu_source_set("intl_property_provider_impl") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.intl:fuchsia.intl_hlcpp",
-    "//sdk/fidl/fuchsia.settings:fuchsia.settings_hlcpp",
+    "//sdk/fidl/fuchsia.intl:fuchsia.intl_cpp",
+    "//sdk/fidl/fuchsia.settings:fuchsia.settings_cpp",
     "//sdk/lib/fidl/cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/service/cpp",
     "//sdk/lib/syslog/cpp",
@@ -68,6 +69,7 @@ icu_source_set("intl_property_provider_impl") {
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_hlcpp",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_hlcpp",
     "//sdk/lib/fit-promise",
+    "//sdk/lib/inspect/component/cpp",
   ]
 }
 
@@ -79,6 +81,7 @@ executable("intl_property_provider_impl_test_bin") {
 
   deps = [
     ":intl_property_provider_impl",
+    "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fidl_fuchsia_intl_ext/cpp",
@@ -87,6 +90,8 @@ executable("intl_property_provider_impl_test_bin") {
     "//src/lib/fxl/test:test_settings",
     "//src/lib/testing/loop_fixture",
     "//src/performance/trace/tests:component_context",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
   ]
 }
 

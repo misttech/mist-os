@@ -12,7 +12,7 @@ namespace intl {
 // Runs the server for the `fuchsia.intl.ProfileProvider` service.  The function
 // blocks by running the async loop, and returns the status reported by the async
 // loop when it exits.
-zx_status_t serve_intl_profile_provider(int argc, const char **argv);
+zx_status_t serve_intl_profile_provider(int argc, const char** argv);
 
 // Runs the server for the `fuchsia.intl.*` services.  The function
 // blocks by running the async loop, and returns the status reported by the async
@@ -20,7 +20,7 @@ zx_status_t serve_intl_profile_provider(int argc, const char **argv);
 //
 // For use in "small" configurations, where we must by necessity serve multiple
 // protocols by the same component.
-zx_status_t serve_fuchsia_intl_services(int argc, const char **argv);
+zx_status_t serve_fuchsia_intl_services(int argc, const char** argv);
 
 }  // namespace intl
 

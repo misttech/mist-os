@@ -9,10 +9,15 @@
 #include <fuchsia/settings/cpp/fidl_test_base.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/binding_set.h>
+#include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <gtest/gtest.h>
+
+#include "lib/inspect/cpp/health.h"
 #include "src/lib/fidl_fuchsia_intl_ext/cpp/fidl_ext.h"
 #include "src/lib/fostr/fidl/fuchsia/intl/formatting.h"
 #include "src/lib/fostr/fidl/fuchsia/settings/formatting.h"
@@ -20,8 +25,7 @@
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/performance/trace/tests/component_context.h"
 
-namespace intl {
-namespace testing {
+namespace intl::testing {
 namespace {
 
 using fuchsia::intl::CalendarId;
@@ -32,6 +36,7 @@ using fuchsia::intl::TemperatureUnit;
 using fuchsia::intl::TimeZoneId;
 using fuchsia::settings::HourCycle;
 using sys::testing::ComponentContextProvider;
+using namespace inspect::testing;
 
 template <typename T>
 T CloneStruct(const T& value) {
@@ -40,12 +45,13 @@ T CloneStruct(const T& value) {
   return new_value;
 }
 
-fuchsia::settings::IntlSettings NewSettings(std::vector<std::string> locale_ids,
+fuchsia::settings::IntlSettings NewSettings(const std::vector<std::string>& locale_ids,
                                             HourCycle hour_cycle,
                                             TemperatureUnit temperature_unit) {
   EXPECT_FALSE(locale_ids.empty()) << "by settings protocol locale ids must be nonempty";
   fuchsia::settings::IntlSettings settings;
   std::vector<LocaleId> locales;
+  locales.reserve(locale_ids.size());
   for (const auto& locale_id : locale_ids) {
     locales.emplace_back(LocaleId{
         .id = locale_id,
@@ -123,13 +129,23 @@ class FakeSettingsService : public fuchsia::settings::testing::Intl_TestBase {
   fuchsia::settings::IntlSettings intl_settings_;
 
   // If set, it means that any incoming watch should return immediately.
-  bool state_changed_;
+  bool state_changed_{};
+};
+
+struct Inspect {
+  static constexpr char kNodeName[] = "inspect";
+  explicit Inspect(inspect::ComponentInspector inspector)
+      : comp_inspector(std::move(inspector)), node(comp_inspector.root().CreateChild(kNodeName)) {}
+
+  inspect::ComponentInspector comp_inspector;
+  inspect::Node node;
 };
 
 // Tests for `IntlPropertyProviderImpl`.
 class IntlPropertyProviderImplTest : public gtest::RealLoopFixture {
  protected:
   void SetUp() override {
+    inspect_ = std::make_unique<Inspect>(inspect::ComponentInspector(dispatcher(), {}));
     SetUpInstanceWithIncomingServices();
     PublishOutgoingService();
   }
@@ -142,7 +158,8 @@ class IntlPropertyProviderImplTest : public gtest::RealLoopFixture {
                          setui_service_->GetHandler(dispatcher())));
     fuchsia::settings::IntlPtr client =
         provider_.context()->svc()->Connect<fuchsia::settings::Intl>();
-    instance_ = std::make_unique<IntlPropertyProviderImpl>(std::move(client));
+    auto health = inspect::NodeHealth(&inspect_->node);
+    instance_ = std::make_unique<IntlPropertyProviderImpl>(std::move(client), std::move(health));
   }
 
   // Makes the service of the unit under test available in the outgoing testing
@@ -160,6 +177,9 @@ class IntlPropertyProviderImplTest : public gtest::RealLoopFixture {
 
   // The default component context provider.
   ComponentContextProvider provider_;
+
+  // Component inspector is initialized on each SetUp.
+  std::unique_ptr<Inspect> inspect_;
 
   // The fake setui service instance.
   std::unique_ptr<FakeSettingsService> setui_service_;
@@ -190,6 +210,19 @@ TEST_F(IntlPropertyProviderImplTest, GeneratesValidProfileFromDefaults) {
   client->GetProfile([&](Profile profile) { actual = std::move(profile); });
   RunLoopUntilIdle();
   EXPECT_EQ(expected, actual);
+
+  // Check that inspect is healthy after this.
+  // root:
+  //   inspect:
+  //     fuchsia.inspect.Health:
+  //       ...
+  //       status = OK
+  auto hierarchy_result = inspect::ReadFromVmo(inspect_->comp_inspector.inspector().DuplicateVmo());
+  auto health_matcher = NodeMatches(AllOf(NameMatches("fuchsia.inspect.Health"),
+                                          PropertyList(Contains(StringIs("status", "OK")))));
+  auto inspect_matcher = AllOf(ChildrenMatch(Contains(health_matcher)));
+  EXPECT_THAT(hierarchy_result.take_value(),
+              AllOf(NodeMatches(NameMatches("root")), ChildrenMatch(Contains(inspect_matcher))));
 }
 
 TEST_F(IntlPropertyProviderImplTest, NotifiesOnTimeZoneChange) {
@@ -388,8 +421,7 @@ TEST_F(IntlPropertyProviderImplTest, UnsetDefault) {
 }
 
 }  // namespace
-}  // namespace testing
-}  // namespace intl
+}  // namespace intl::testing
 
 // This test has its own main because we want the logger to be turned on.
 int main(int argc, char** argv) {

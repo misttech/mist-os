@@ -10,6 +10,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
+#include "lib/inspect/cpp/health.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
 #include "src/lib/intl/intl_property_provider_impl/intl_property_provider_impl.h"
@@ -21,6 +22,9 @@ using intl::TimeZoneInfoService;
 namespace intl {
 
 namespace {
+
+// Use this as the name of the health node monitoring this set of services.
+constexpr char kHealthNodeName[] = "fuchsia.intl.PropertyProvider";
 
 void init(int argc, const char** argv) {
   auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
@@ -38,7 +42,13 @@ zx_status_t serve_intl_profile_provider(int argc, const char** argv) {
   std::unique_ptr<sys::ComponentContext> context =
       sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
-  std::unique_ptr<IntlPropertyProviderImpl> intl = IntlPropertyProviderImpl::Create(context->svc());
+  auto inspector = inspect::ComponentInspector(loop.dispatcher(), {});
+  inspect::Node node = inspector.root().CreateChild(kHealthNodeName);
+  inspect::NodeHealth health = inspect::NodeHealth(&node);
+  health.Ok();
+
+  std::unique_ptr<IntlPropertyProviderImpl> intl =
+      IntlPropertyProviderImpl::Create(context->svc(), std::move(health));
   const auto intl_status = context->outgoing()->AddPublicService(intl->GetHandler());
   if (intl_status != ZX_OK) {
     FX_LOGS(FATAL) << "could not start intl_property_provider_impl";
@@ -57,6 +67,11 @@ zx_status_t serve_fuchsia_intl_services(int argc, const char** argv) {
   std::unique_ptr<sys::ComponentContext> context =
       sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
+  auto inspector = inspect::ComponentInspector(loop.dispatcher(), {});
+  inspect::Node node = inspector.root().CreateChild(kHealthNodeName);
+  inspect::NodeHealth health = inspect::NodeHealth(&node);
+  health.Ok();
+
   std::unique_ptr<TimeZoneInfoService> info = TimeZoneInfoService::Create();
   // Required by the startup protocol of TimeZoneInfoService.
   info->Start();
@@ -65,7 +80,8 @@ zx_status_t serve_fuchsia_intl_services(int argc, const char** argv) {
     FX_LOGS(FATAL) << "could not start time_zone_info_service";
   }
 
-  std::unique_ptr<IntlPropertyProviderImpl> intl = IntlPropertyProviderImpl::Create(context->svc());
+  std::unique_ptr<IntlPropertyProviderImpl> intl =
+      IntlPropertyProviderImpl::Create(context->svc(), std::move(health));
   const auto intl_status = context->outgoing()->AddPublicService(intl->GetHandler());
   if (intl_status != ZX_OK) {
     FX_LOGS(FATAL) << "could not start intl_property_provider_impl";

@@ -220,18 +220,20 @@ zx_status_t InitializeIcuIfNeeded() {
 
 }  // namespace
 
-IntlPropertyProviderImpl::IntlPropertyProviderImpl(fuchsia::settings::IntlPtr settings_client_)
+IntlPropertyProviderImpl::IntlPropertyProviderImpl(fuchsia::settings::IntlPtr settings_client_,
+                                                   inspect::NodeHealth health)
     : intl_profile_(std::nullopt),
       raw_profile_data_(std::nullopt),
-      settings_client_(std::move(settings_client_)) {
+      settings_client_(std::move(settings_client_)),
+      health_(std::move(health)) {
   Start();
 }
 
 // static
 std::unique_ptr<IntlPropertyProviderImpl> IntlPropertyProviderImpl::Create(
-    const std::shared_ptr<sys::ServiceDirectory>& incoming_services) {
+    const std::shared_ptr<sys::ServiceDirectory>& incoming_services, inspect::NodeHealth health) {
   fuchsia::settings::IntlPtr client = incoming_services->Connect<fuchsia::settings::Intl>();
-  return std::make_unique<IntlPropertyProviderImpl>(std::move(client));
+  return std::make_unique<IntlPropertyProviderImpl>(std::move(client), std::move(health));
 }
 
 fidl::InterfaceRequestHandler<fuchsia::intl::PropertyProvider> IntlPropertyProviderImpl::GetHandler(
@@ -239,9 +241,25 @@ fidl::InterfaceRequestHandler<fuchsia::intl::PropertyProvider> IntlPropertyProvi
   return property_provider_bindings_.GetHandler(this, dispatcher);
 }
 
+void IntlPropertyProviderImpl::ErrorBudgetInc(int increment) {
+  // Set unhealthy if too many errors happen and keep happening, but have
+  // a little bit of hysteresis so that we don't flap the error indicator
+  // too frequently.
+  constexpr int kMaxErrorBudget = 5;
+  constexpr int kMinErrorBudget = -5;
+  error_budget_ = std::min(kMaxErrorBudget, std::max(kMinErrorBudget, error_budget_ + increment));
+
+  if (error_budget_ < 0) {
+    health_.Unhealthy("error budget exhausted.");
+  } else {
+    health_.Ok();
+  }
+}
+
 void IntlPropertyProviderImpl::Start() {
   if (InitializeIcuIfNeeded() != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to initialize ICU data";
+    ErrorBudgetInc(-1);
     return;
   }
   settings_client_.set_error_handler([](zx_status_t status) {
@@ -270,14 +288,16 @@ void IntlPropertyProviderImpl::StartSettingsWatcher() {
 fpromise::result<Profile, zx_status_t> IntlPropertyProviderImpl::GetProfileInternal() {
   if (!intl_profile_) {
     Profile profile;
-    if (!IsRawDataInitialized()) {
+    if (!IsRawDataInitialized() || !raw_profile_data_.has_value()) {
       return fpromise::error(ZX_ERR_SHOULD_WAIT);
     }
     auto result = GenerateProfile(*raw_profile_data_);
     if (result.is_error()) {
       FX_LOGS(WARNING) << "Couldn't generate profile: " << result.error();
+      ErrorBudgetInc(-1);
       return result;
     }
+    ErrorBudgetInc(1);
     intl_profile_ = result.take_value();
   }
   return fpromise::ok(fidl::Clone(*intl_profile_));
@@ -286,7 +306,8 @@ fpromise::result<Profile, zx_status_t> IntlPropertyProviderImpl::GetProfileInter
 bool IntlPropertyProviderImpl::IsRawDataInitialized() { return raw_profile_data_.has_value(); }
 
 bool IntlPropertyProviderImpl::UpdateRawData(fuchsia::intl::merge::Data new_raw_data) {
-  if (IsRawDataInitialized() && fidl::Equals(*raw_profile_data_, new_raw_data)) {
+  if (IsRawDataInitialized() && raw_profile_data_.has_value() &&
+      fidl::Equals(*raw_profile_data_, new_raw_data)) {
     return false;
   }
   raw_profile_data_ = std::move(new_raw_data);
@@ -297,6 +318,7 @@ bool IntlPropertyProviderImpl::UpdateRawData(fuchsia::intl::merge::Data new_raw_
     binding->events().OnChange();
   }
   ProcessProfileRequests();
+  ErrorBudgetInc(1);
   return true;
 }
 
@@ -309,6 +331,7 @@ void IntlPropertyProviderImpl::ProcessProfileRequests() {
   auto profile_result = GetProfileInternal();
   if (profile_result.is_error()) {
     FX_LOGS(DEBUG) << "Profile not updated: error was: " << profile_result.error();
+    ErrorBudgetInc(-1);
     return;
   }
 
@@ -318,6 +341,7 @@ void IntlPropertyProviderImpl::ProcessProfileRequests() {
     auto var = fidl::Clone(profile_result.value());
     callback(std::move(var));
     get_profile_queue_.pop();
+    ErrorBudgetInc(1);
   }
 }
 

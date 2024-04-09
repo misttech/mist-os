@@ -46,13 +46,16 @@ icu_source_set("lib") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.settings:fuchsia.settings_hlcpp",
+    "//sdk/fidl/fuchsia.settings:fuchsia.settings_cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl:fxl_cli",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
+
+  public_deps = [ "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_cpp" ]
 }
 
 icu_executable("intl_services_bin") {
@@ -60,7 +63,10 @@ icu_executable("intl_services_bin") {
   sources = [ "main.cc" ]
 
   icu_deps = [ ":lib" ]
-  deps = [ "//sdk/lib/syslog/cpp" ]
+  deps = [
+    "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_cpp",
+    "//sdk/lib/syslog/cpp",
+  ]
 }
 
 icu_fuchsia_component("component") {
