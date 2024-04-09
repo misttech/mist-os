@@ -12,15 +12,11 @@ use {
     thiserror::Error,
 };
 const CAPABILITY_REQUESTED_EVENT: &str = "capability_requested";
-const DIR_READY_EVENT: &str = "directory_ready";
 
 #[derive(Debug, Error)]
 pub enum RealmValidationError {
     #[error("Realm should expose {}", fcomponent::RealmMarker::PROTOCOL_NAME)]
     RealmProtocol,
-
-    #[error("Realm should offer {} event stream to the test collection", DIR_READY_EVENT)]
-    DirectoryReady,
 
     #[error(
         "Realm should offer {} event stream to the test collection",
@@ -113,7 +109,6 @@ fn validate_and_get_offers(
         return Err(RealmValidationError::RealmProtocol);
     }
 
-    let mut directory_ready = false;
     let mut capability_requested = false;
     let mut offers = vec![];
     for offer in manifest.offers {
@@ -129,7 +124,7 @@ fn validate_and_get_offers(
                 ..
             }) = &offer
             {
-                if (*target_name == CAPABILITY_REQUESTED_EVENT || *target_name == DIR_READY_EVENT)
+                if *target_name == CAPABILITY_REQUESTED_EVENT
                     && source == &cm_rust::OfferSource::Parent
                     && scope
                         .as_ref()
@@ -141,16 +136,12 @@ fn validate_and_get_offers(
                         })
                         .unwrap_or(false)
                 {
-                    directory_ready = directory_ready || *target_name == DIR_READY_EVENT;
                     capability_requested =
                         capability_requested || *target_name == CAPABILITY_REQUESTED_EVENT;
                 }
             }
             offers.push(offer.native_into_fidl());
         }
-    }
-    if !directory_ready {
-        return Err(RealmValidationError::DirectoryReady);
     }
     if !capability_requested {
         return Err(RealmValidationError::CapabilityRequested);
@@ -233,7 +224,6 @@ mod test {
             )
         });
         assert!(offers.iter().any(|o| *o.target_name() == CAPABILITY_REQUESTED_EVENT));
-        assert!(offers.iter().any(|o| *o.target_name() == DIR_READY_EVENT));
         assert!(offers.iter().any(|o| *o.target_name() == "fidl.examples.routing.echo.Echo"));
 
         let realm = parse_provided_realm(
@@ -257,7 +247,6 @@ mod test {
             )
         });
         assert!(offers.iter().any(|o| *o.target_name() == CAPABILITY_REQUESTED_EVENT));
-        assert!(offers.iter().any(|o| *o.target_name() == DIR_READY_EVENT));
     }
 
     #[fuchsia::test]
@@ -286,16 +275,6 @@ mod test {
             parse_provided_realm(&lifecycle_controller, &realm_query, "/test_realm:invalid_col")
                 .await,
             Err(RealmError::Validation(RealmValidationError::TestCollectionNotFound(_)))
-        );
-
-        assert_matches!(
-            parse_provided_realm(
-                &lifecycle_controller,
-                &realm_query,
-                "/test_realm:no_directory_ready_event"
-            )
-            .await,
-            Err(RealmError::Validation(RealmValidationError::DirectoryReady))
         );
 
         assert_matches!(
