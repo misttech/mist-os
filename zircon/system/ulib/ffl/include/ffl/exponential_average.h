@@ -22,7 +22,16 @@ namespace ffl {
 //        { Sn-1 + b * D      if D >= 0
 //
 // In either case, the smoothing factors (a and b) are always required to be between 0 and 1.
-template <typename Value, typename Alpha, typename Beta, typename = void>
+//
+// This object also keeps track of the variance of the exponential moving average, which is
+// calculated as follows:
+//
+//        { (1 - a) * (Vn-1 + a * D^2)    if D < 0
+//   Vn = {
+//        { (1 - b) * (Vn-1 + b * D^2)    if D >= 0
+//
+// Because 0 <= a <= 1 and 0 <= b <= 1, this quantity must be non-negative.
+template <typename Value, typename Alpha, typename Beta>
 class ExponentialAverage;
 
 template <typename V, size_t VFractionalBits,        //
@@ -57,13 +66,22 @@ class ExponentialAverage<Fixed<V, VFractionalBits>,  //
 
   constexpr void AddSample(Value sample) {
     const Value delta = sample - average_;
-    average_ += delta >= 0 ? Value{beta_ * delta} : Value{alpha_ * delta};
+    if (delta >= 0) {
+      average_ += Value{beta_ * delta};
+      variance_ = (Beta(1) - beta_) * (variance_ + (beta_ * delta) * delta);
+    } else {
+      average_ += Value{alpha_ * delta};
+      variance_ = (Alpha(1) - alpha_) * (variance_ + (alpha_ * delta) * delta);
+    }
   }
 
   constexpr Value value() { return average_; }
 
+  constexpr Value variance() { return variance_; }
+
  private:
   Value average_;
+  Value variance_ = Value{0};
   const Alpha alpha_;
   const Beta beta_;
 };
