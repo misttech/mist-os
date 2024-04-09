@@ -157,7 +157,7 @@ function unmount_repo() {
     echo "Trying to unmount $MOUNTPOINT" >&2
     if ! sudo umount "$MOUNTPOINT" ; then
       echo "Stopping goma" >&2
-      (cd ~/src/fuchsia && ./scripts/fx goma_ctl ensure_stop)
+      (cd "$MOUNTPOINT" && ./scripts/fx goma_ctl ensure_stop)
       echo "Stopping ffx daemon" >&2
       (cd "$MOUNTPOINT" && ./scripts/fx ffx emu stop --all)
       (cd "$MOUNTPOINT" && ./scripts/fx ffx daemon stop)
