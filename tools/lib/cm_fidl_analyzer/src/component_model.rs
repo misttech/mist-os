@@ -1284,9 +1284,47 @@ impl ComponentModelForAnalyzer {
     pub fn collect_config_by_url(&self) -> anyhow::Result<BTreeMap<String, ConfigFields>> {
         let mut configs = BTreeMap::new();
         for instance in self.instances.values() {
-            if let Some(fields) = instance.config_fields() {
-                configs.insert(instance.url().to_string(), fields.clone());
+            let mut fields = match instance.config_fields() {
+                Some(f) => f.clone(),
+                None => {
+                    let Some(ref config_decl) = instance.decl.config else {
+                        continue;
+                    };
+                    ConfigFields { fields: Vec::new(), checksum: config_decl.checksum.clone() }
+                }
+            };
+
+            for use_ in instance.decl.uses.iter() {
+                let cm_rust::UseDecl::Config(config) = use_ else {
+                    continue;
+                };
+                let value = routing::config::route_config_value(config, instance)
+                    .now_or_never()
+                    .expect("future was not ready immediately")?;
+                let Some(value) = value else {
+                    continue;
+                };
+
+                let new_field = config_encoder::ConfigField {
+                    key: config.target_name.clone().into(),
+                    value,
+                    mutability: Default::default(),
+                };
+
+                let mut needs_key = true;
+                for field in &mut fields.fields {
+                    if field.key != new_field.key {
+                        continue;
+                    }
+                    field.value = new_field.value.clone();
+                    needs_key = false;
+                }
+                if needs_key {
+                    fields.fields.push(new_field);
+                }
             }
+
+            configs.insert(instance.url().to_string(), fields.clone());
         }
         Ok(configs)
     }
@@ -1305,13 +1343,16 @@ mod tests {
         super::ModelBuilderForAnalyzer,
         crate::{environment::BOOT_SCHEME, ComponentModelForAnalyzer},
         anyhow::Result,
+        assert_matches::assert_matches,
         cm_config::RuntimeConfig,
         cm_moniker::InstancedMoniker,
         cm_rust::{
             Availability, ComponentDecl, DependencyType, RegistrationSource, ResolverRegistration,
             RunnerRegistration, UseProtocolDecl, UseSource, UseStorageDecl,
         },
-        cm_rust_testing::{ChildBuilder, ComponentDeclBuilder, EnvironmentBuilder},
+        cm_rust_testing::{
+            CapabilityBuilder, ChildBuilder, ComponentDeclBuilder, EnvironmentBuilder, UseBuilder,
+        },
         cm_types::Name,
         config_encoder::ConfigFields,
         fidl_fuchsia_component_internal as component_internal,
@@ -1543,6 +1584,230 @@ mod tests {
             },
             &root_instance,
         );
+    }
+
+    #[fuchsia::test]
+    fn config_capability_overrides() {
+        let package_value: cm_rust::ConfigValue = cm_rust::ConfigSingleValue::Uint8(1).into();
+        let config_value: cm_rust::ConfigValue = cm_rust::ConfigSingleValue::Uint8(2).into();
+
+        let config = Arc::new(RuntimeConfig::default());
+        let cm_url = cm_types::Url::new(make_test_url("root").to_string())
+            .expect("failed to parse root component url");
+
+        let decl = ComponentDeclBuilder::new()
+            .capability(
+                CapabilityBuilder::config().name("my_config").value(config_value.clone().into()),
+            )
+            .use_(
+                UseBuilder::config()
+                    .name("my_config")
+                    .target_name("config")
+                    .source(cm_rust::UseSource::Self_)
+                    .config_type(cm_rust::ConfigValueType::Uint8),
+            )
+            .build();
+
+        let mut decl_map = HashMap::<Url, (ComponentDecl, Option<ConfigFields>)>::new();
+        decl_map.insert(
+            make_test_url("root"),
+            (
+                decl,
+                Some(ConfigFields {
+                    fields: vec![config_encoder::ConfigField {
+                        key: "config".into(),
+                        value: package_value,
+                        mutability: Default::default(),
+                    }],
+                    checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
+                }),
+            ),
+        );
+
+        let url = Url::parse(cm_url.as_str()).expect("failed to parse root component url");
+        let build_model_result = ModelBuilderForAnalyzer::new(url).build(
+            decl_map,
+            config,
+            Arc::new(component_id_index::Index::default()),
+            RunnerRegistry::default(),
+        );
+        assert_eq!(build_model_result.errors.len(), 0);
+        assert!(build_model_result.model.is_some());
+        let model = build_model_result.model.unwrap();
+        assert_eq!(model.len(), 1);
+
+        let config = model.collect_config_by_url().unwrap();
+        let config = config.get(cm_url.as_str()).unwrap();
+        assert_eq!(config.fields.len(), 1);
+        assert_eq!(config.fields[0].key.as_str(), "config");
+        assert_eq!(config.fields[0].value, config_value);
+    }
+
+    // This checks that a component works successfully with just config capabilities
+    // and no Config Value File.
+    #[fuchsia::test]
+    fn config_capability_only() {
+        let config_value: cm_rust::ConfigValue = cm_rust::ConfigSingleValue::Uint8(2).into();
+
+        let config = Arc::new(RuntimeConfig::default());
+        let cm_url = cm_types::Url::new(make_test_url("root").to_string())
+            .expect("failed to parse root component url");
+
+        let decl = ComponentDeclBuilder::new()
+            .capability(
+                CapabilityBuilder::config().name("my_config").value(config_value.clone().into()),
+            )
+            .use_(
+                UseBuilder::config()
+                    .name("my_config")
+                    .target_name("config")
+                    .source(cm_rust::UseSource::Self_)
+                    .config_type(cm_rust::ConfigValueType::Uint8),
+            )
+            .config(cm_rust::ConfigDecl {
+                fields: Vec::new(),
+                checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
+                value_source: cm_rust::ConfigValueSource::Capabilities(Default::default()),
+            })
+            .build();
+
+        let mut decl_map = HashMap::<Url, (ComponentDecl, Option<ConfigFields>)>::new();
+        decl_map.insert(make_test_url("root"), (decl, None));
+
+        let url = Url::parse(cm_url.as_str()).expect("failed to parse root component url");
+        let build_model_result = ModelBuilderForAnalyzer::new(url).build(
+            decl_map,
+            config,
+            Arc::new(component_id_index::Index::default()),
+            RunnerRegistry::default(),
+        );
+        assert_eq!(build_model_result.errors.len(), 0);
+        assert!(build_model_result.model.is_some());
+        let model = build_model_result.model.unwrap();
+        assert_eq!(model.len(), 1);
+
+        let config = model.collect_config_by_url().unwrap();
+        let config = config.get(cm_url.as_str()).unwrap();
+        assert_eq!(config.fields.len(), 1);
+        assert_eq!(config.fields[0].key.as_str(), "config");
+        assert_eq!(config.fields[0].value, config_value);
+    }
+
+    #[fuchsia::test]
+    fn config_capability_optional_from_void() {
+        let package_value: cm_rust::ConfigValue = cm_rust::ConfigSingleValue::Uint8(1).into();
+
+        let config = Arc::new(RuntimeConfig::default());
+        let cm_url = cm_types::Url::new(make_test_url("root").to_string())
+            .expect("failed to parse root component url");
+
+        // Create and  add the root cml.
+        let decl = ComponentDeclBuilder::new()
+            .child(
+                cm_rust_testing::ChildBuilder::new()
+                    .name("child")
+                    .url(&make_test_url("child").to_string()),
+            )
+            .offer(
+                cm_rust_testing::OfferBuilder::config()
+                    .source(cm_rust::OfferSource::Void)
+                    .name("my_config")
+                    .target(cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                        name: "child".into(),
+                        collection: None,
+                    }))
+                    .availability(cm_rust::Availability::Optional),
+            )
+            .build();
+
+        let mut decl_map = HashMap::<Url, (ComponentDecl, Option<ConfigFields>)>::new();
+        decl_map.insert(make_test_url("root"), (decl, None));
+
+        // Create and add the child CML.
+        let child_url = cm_types::Url::new(make_test_url("child").to_string())
+            .expect("failed to parse root component url");
+        let decl = ComponentDeclBuilder::new()
+            .use_(
+                UseBuilder::config()
+                    .name("my_config")
+                    .target_name("config")
+                    .source(cm_rust::UseSource::Parent)
+                    .availability(cm_rust::Availability::Optional)
+                    .config_type(cm_rust::ConfigValueType::Uint8),
+            )
+            .build();
+
+        decl_map.insert(
+            make_test_url("child"),
+            (
+                decl,
+                Some(ConfigFields {
+                    fields: vec![config_encoder::ConfigField {
+                        key: "config".into(),
+                        value: package_value.clone(),
+                        mutability: Default::default(),
+                    }],
+                    checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
+                }),
+            ),
+        );
+
+        let url = Url::parse(cm_url.as_str()).expect("failed to parse root component url");
+        let build_model_result = ModelBuilderForAnalyzer::new(url).build(
+            decl_map,
+            config,
+            Arc::new(component_id_index::Index::default()),
+            RunnerRegistry::default(),
+        );
+        assert_eq!(build_model_result.errors.len(), 0);
+        assert!(build_model_result.model.is_some());
+        let model = build_model_result.model.unwrap();
+        assert_eq!(model.len(), 2);
+
+        let config = model.collect_config_by_url().unwrap();
+        let config = config.get(child_url.as_str()).unwrap();
+        assert_eq!(config.fields.len(), 1);
+        assert_eq!(config.fields[0].key.as_str(), "config");
+        assert_eq!(config.fields[0].value, package_value);
+    }
+
+    #[fuchsia::test]
+    fn config_capability_routing_error() {
+        let config = Arc::new(RuntimeConfig::default());
+        let cm_url = cm_types::Url::new(make_test_url("root").to_string())
+            .expect("failed to parse root component url");
+
+        let decl = ComponentDeclBuilder::new()
+            .use_(
+                UseBuilder::config()
+                    .name("my_config")
+                    .target_name("config")
+                    .source(cm_rust::UseSource::Parent)
+                    .config_type(cm_rust::ConfigValueType::Uint8),
+            )
+            .config(cm_rust::ConfigDecl {
+                fields: Vec::new(),
+                checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
+                value_source: cm_rust::ConfigValueSource::Capabilities(Default::default()),
+            })
+            .build();
+
+        let mut decl_map = HashMap::<Url, (ComponentDecl, Option<ConfigFields>)>::new();
+        decl_map.insert(make_test_url("root"), (decl, None));
+
+        let url = Url::parse(cm_url.as_str()).expect("failed to parse root component url");
+        let build_model_result = ModelBuilderForAnalyzer::new(url).build(
+            decl_map,
+            config,
+            Arc::new(component_id_index::Index::default()),
+            RunnerRegistry::default(),
+        );
+        assert_eq!(build_model_result.errors.len(), 0);
+        assert!(build_model_result.model.is_some());
+        let model = build_model_result.model.unwrap();
+        assert_eq!(model.len(), 1);
+
+        assert_matches!(model.collect_config_by_url(), Err(_));
     }
 
     // Builds a model with structure `root -- child` in which the child environment extends the root's.
