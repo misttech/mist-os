@@ -8,8 +8,8 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
-#include <lib/scsi/controller.h>
-#include <lib/scsi/disk.h>
+#include <lib/scsi/controller-dfv1.h>
+#include <lib/scsi/disk-dfv1.h>
 #include <stdio.h>
 #include <string.h>
 #include <zircon/assert.h>

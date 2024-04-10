@@ -9,7 +9,7 @@
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/scsi/controller.h>
+#include <lib/scsi/controller-dfv1.h>
 #include <stdint.h>
 
 #include <ddktl/device.h>

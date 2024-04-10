@@ -12,8 +12,8 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/scsi/controller.h>
-#include <lib/scsi/disk.h>
+#include <lib/scsi/controller-dfv1.h>
+#include <lib/scsi/disk-dfv1.h>
 #include <lib/sync/completion.h>
 #include <threads.h>
 #include <zircon/assert.h>

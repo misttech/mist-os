@@ -11,7 +11,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/scsi/controller.h>
+#include <lib/scsi/controller-dfv1.h>
 #include <lib/zx/vmar.h>
 #include <stdint.h>
 #include <stdio.h>

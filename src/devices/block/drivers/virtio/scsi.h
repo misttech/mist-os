@@ -6,8 +6,8 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_SCSI_H_
 
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/scsi/controller.h>
-#include <lib/scsi/disk.h>
+#include <lib/scsi/controller-dfv1.h>
+#include <lib/scsi/disk-dfv1.h>
 #include <lib/sync/completion.h>
 #include <lib/virtio/backends/backend.h>
 #include <lib/virtio/device.h>

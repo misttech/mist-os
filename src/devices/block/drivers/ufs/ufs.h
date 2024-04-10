@@ -9,7 +9,7 @@
 #include <lib/device-protocol/pci.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/scsi/disk.h>
+#include <lib/scsi/disk-dfv1.h>
 
 #include <unordered_set>
 

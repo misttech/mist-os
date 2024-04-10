@@ -4,8 +4,8 @@
 
 #include <endian.h>
 #include <lib/fit/function.h>
-#include <lib/scsi/controller.h>
-#include <lib/scsi/disk.h>
+#include <lib/scsi/controller-dfv1.h>
+#include <lib/scsi/disk-dfv1.h>
 #include <sys/types.h>
 #include <zircon/listnode.h>
 

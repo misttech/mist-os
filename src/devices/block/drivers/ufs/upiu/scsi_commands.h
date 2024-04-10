@@ -6,7 +6,7 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_UFS_UPIU_SCSI_COMMANDS_H_
 
 #include <endian.h>
-#include <lib/scsi/controller.h>
+#include <lib/scsi/controller-dfv1.h>
 #include <lib/sync/completion.h>
 
 #include <vector>

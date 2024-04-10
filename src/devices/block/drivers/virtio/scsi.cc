@@ -7,8 +7,8 @@
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
-#include <lib/scsi/controller.h>
-#include <lib/scsi/disk.h>
+#include <lib/scsi/controller-dfv1.h>
+#include <lib/scsi/disk-dfv1.h>
 #include <netinet/in.h>
 #include <stdint.h>
 #include <stdlib.h>

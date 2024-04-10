@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 #include <endian.h>
-#include <lib/scsi/controller.h>
-#include <lib/scsi/disk.h>
+#include <lib/scsi/controller-dfv1.h>
+#include <lib/scsi/disk-dfv1.h>
 #include <zircon/status.h>
 
 #include <tuple>

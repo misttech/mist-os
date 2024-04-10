@@ -6,7 +6,7 @@
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/ddk/debug.h>
-#include <lib/scsi/disk.h>
+#include <lib/scsi/disk-dfv1.h>
 #include <netinet/in.h>
 #include <zircon/process.h>
 

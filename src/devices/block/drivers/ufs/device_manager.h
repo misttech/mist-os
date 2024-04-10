@@ -6,7 +6,7 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_UFS_DEVICE_MANAGER_H_
 
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/scsi/controller.h>
+#include <lib/scsi/controller-dfv1.h>
 #include <lib/trace/event.h>
 #include <lib/zx/result.h>
 
