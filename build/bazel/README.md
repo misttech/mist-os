@@ -179,8 +179,7 @@ in the following way:
 ```
 
   Note that the `bar` path segment has disappeared due to the way
-  `{{source_file_part}}` works in GN, use `bazel_input_resource_tree()`
-  if you want to preserve it instead.
+  `{{source_file_part}}` works in GN.
 
 - All `bazel_input_xxx()` GN targets *MUST* be reachable from the special GN
   target `//build/bazel:legacy_ninja_build_outputs`. More specifically
