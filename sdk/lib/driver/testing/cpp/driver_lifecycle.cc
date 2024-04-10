@@ -12,11 +12,9 @@ DriverUnderTestBase::DriverUnderTestBase(DriverRegistration driver_registration_
     : driver_dispatcher_(fdf::Dispatcher::GetCurrent()->get()),
       checker_(fdf_dispatcher_get_async_dispatcher(driver_dispatcher_)),
       driver_registration_symbol_(driver_registration_symbol) {
-  zx::result endpoints = fdf::CreateEndpoints<fuchsia_driver_framework::Driver>();
-  ZX_ASSERT_MSG(endpoints.is_ok(), "Failed to create fdf::Driver endpoints: %s",
-                endpoints.status_string());
-  void* token = driver_registration_symbol_.v1.initialize(endpoints->server.TakeHandle().release());
-  driver_client_.Bind(std::move(endpoints->client), driver_dispatcher_, this);
+  auto [client_end, server_end] = fdf::Endpoints<fuchsia_driver_framework::Driver>::Create();
+  void* token = driver_registration_symbol_.v1.initialize(server_end.TakeHandle().release());
+  driver_client_.Bind(std::move(client_end), driver_dispatcher_, this);
   token_.emplace(token);
 }
 

@@ -28,19 +28,18 @@ class Server : public fidl::Server<fidl_examples_routing_echo::Echo> {
 };
 
 TEST(AsyncHelpersTest, AddedToTaskGroup) {
-  zx::result controller_endpoints = fidl::CreateEndpoints<fidl_examples_routing_echo::Echo>();
-  ASSERT_EQ(ZX_OK, controller_endpoints.status_value());
+  auto [client_end, server_end] = fidl::Endpoints<fidl_examples_routing_echo::Echo>::Create();
 
   fdf_testing::DriverRuntime runtime;
   fdf::UnownedSynchronizedDispatcher bg_dispatcher = runtime.StartBackgroundDispatcher();
-  async_patterns::TestDispatcherBound<Server> server(
-      bg_dispatcher->async_dispatcher(), std::in_place, std::move(controller_endpoints->server));
+  async_patterns::TestDispatcherBound<Server> server(bg_dispatcher->async_dispatcher(),
+                                                     std::in_place, std::move(server_end));
   server.SyncCall(&Server::Sync);
 
   fdf::async_helpers::TaskGroup tasks;
   {
     fidl::Client<fidl_examples_routing_echo::Echo> client(
-        std::move(controller_endpoints->client), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+        std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
     fdf::async_helpers::AsyncTask async_task;
     client->EchoString({"string"})
@@ -55,18 +54,17 @@ TEST(AsyncHelpersTest, AddedToTaskGroup) {
 }
 
 TEST(AsyncHelpersTest, DropAsyncTask) {
-  zx::result controller_endpoints = fidl::CreateEndpoints<fidl_examples_routing_echo::Echo>();
-  ASSERT_EQ(ZX_OK, controller_endpoints.status_value());
+  auto [client_end, server_end] = fidl::Endpoints<fidl_examples_routing_echo::Echo>::Create();
 
   fdf_testing::DriverRuntime runtime;
   fdf::UnownedSynchronizedDispatcher bg_dispatcher = runtime.StartBackgroundDispatcher();
-  async_patterns::TestDispatcherBound<Server> server(
-      bg_dispatcher->async_dispatcher(), std::in_place, std::move(controller_endpoints->server));
+  async_patterns::TestDispatcherBound<Server> server(bg_dispatcher->async_dispatcher(),
+                                                     std::in_place, std::move(server_end));
   server.SyncCall(&Server::Sync);
 
   {
     fidl::Client<fidl_examples_routing_echo::Echo> client(
-        std::move(controller_endpoints->client), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+        std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
     fdf::async_helpers::AsyncTask async_task;
     client->EchoString({"string"})

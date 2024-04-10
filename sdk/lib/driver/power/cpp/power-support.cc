@@ -92,20 +92,19 @@ fit::result<Error, bool> GetTokensFromParents(ElementDependencyMap& dependencies
 
   // Enumerate the list os service instances.
   {
-    fidl::Endpoints<fuchsia_io::Node> svc_instance_endpoints =
-        fidl::CreateEndpoints<fuchsia_io::Node>().value();
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Node>::Create();
 
     // Open the directory containing the services instances
     fidl::OneWayStatus status = svcs_dir_client->Open(
         ::fuchsia_io::wire::OpenFlags::kDirectory, ::fuchsia_io::wire::ModeType::kDoNotUse,
-        fuchsia_hardware_power::PowerTokenService::Name, std::move(svc_instance_endpoints.server));
+        fuchsia_hardware_power::PowerTokenService::Name, std::move(server_end));
 
     if (!status.ok()) {
       return fit::error(Error::IO);
     }
 
     fidl::WireSyncClient<fuchsia_io::Directory> svcs(
-        fidl::ClientEnd<fuchsia_io::Directory>(svc_instance_endpoints.client.TakeChannel()));
+        fidl::ClientEnd<fuchsia_io::Directory>(client_end.TakeChannel()));
 
     // TODO(https://fxbug.dev/328630967) Check if there are more granular errors we should return
     fidl::WireResult<fuchsia_io::Directory::ReadDirents> read_result =
@@ -269,15 +268,14 @@ std::vector<fuchsia_power_broker::PowerLevel> PowerLevelsFromConfig(
 fit::result<Error, TokenMap> GetDependencyTokens(
     const fdf::Namespace& ns,
     fuchsia_hardware_power::wire::PowerElementConfiguration element_config) {
-  fidl::Endpoints<fuchsia_io::Directory> svc_instance_endpoints =
-      fidl::CreateEndpoints<fuchsia_io::Directory>().value();
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   zx_status_t result = fdio_open_at(ns.svc_dir().channel()->get(), ".",
                                     static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory),
-                                    svc_instance_endpoints.server.channel().release());
+                                    server_end.channel().release());
   if (result != ZX_OK) {
     return fit::error(Error::IO);
   }
-  return GetDependencyTokens(element_config, std::move(svc_instance_endpoints.client));
+  return GetDependencyTokens(element_config, std::move(client_end));
 }
 
 fit::result<Error, TokenMap> GetDependencyTokens(

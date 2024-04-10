@@ -16,24 +16,22 @@ namespace frunner = fuchsia_component_runner;
 TEST(NamespaceTest, CreateAndConnect) {
   async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
 
-  auto pkg = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  EXPECT_EQ(ZX_OK, pkg.status_value());
-  auto svc = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  EXPECT_EQ(ZX_OK, svc.status_value());
+  auto pkg = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  auto svc = fidl::Endpoints<fuchsia_io::Directory>::Create();
   fidl::Arena arena;
   fidl::VectorView<frunner::wire::ComponentNamespaceEntry> ns_entries(arena, 2);
   ns_entries[0].Allocate(arena);
-  ns_entries[0].set_path(arena, "/pkg").set_directory(std::move(pkg->client));
+  ns_entries[0].set_path(arena, "/pkg").set_directory(std::move(pkg.client));
   ns_entries[1].Allocate(arena);
-  ns_entries[1].set_path(arena, "/svc").set_directory(std::move(svc->client));
+  ns_entries[1].set_path(arena, "/svc").set_directory(std::move(svc.client));
   auto ns = fdf::Namespace::Create(ns_entries);
   ASSERT_TRUE(ns.is_ok());
 
-  svc->server.TakeChannel().reset();
+  svc.server.TakeChannel().reset();
 
   fdf::testing::Directory pkg_directory;
   fidl::Binding<fio::Directory> pkg_binding(&pkg_directory);
-  pkg_binding.Bind(pkg->server.TakeChannel(), loop.dispatcher());
+  pkg_binding.Bind(pkg.server.TakeChannel(), loop.dispatcher());
 
   zx::channel server_end;
   pkg_directory.SetOpenHandler([&server_end](std::string path, auto object) {

@@ -25,9 +25,8 @@ TEST(ConnectorTest, Connect) {
   ASSERT_EQ(ZX_OK, connector_client.status_value());
 
   fidl::WireClient client{std::move(connector_client.value()), loop.dispatcher()};
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_logger::LogSink>();
-  ASSERT_EQ(ZX_OK, endpoints.status_value());
-  ASSERT_EQ(ZX_OK, client->Connect(endpoints->server.TakeChannel()).status());
+  auto [_, server_end] = fidl::Endpoints<fuchsia_logger::LogSink>::Create();
+  ASSERT_EQ(ZX_OK, client->Connect(server_end.TakeChannel()).status());
 
   loop.RunUntilIdle();
   ASSERT_TRUE(connection.is_valid());

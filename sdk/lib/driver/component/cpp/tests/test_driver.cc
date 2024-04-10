@@ -47,23 +47,20 @@ zx::result<> TestDriver::ExportDevfsNodeSync() {
                   .Build();
 
   // Create endpoints of the `NodeController` for the node.
-  zx::result controller_endpoints =
-      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed: %s", controller_endpoints.status_string());
+  auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
-  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
-  ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed: %s", node_endpoints.status_string());
+  auto node_endpoints = fidl::Endpoints<fuchsia_driver_framework::Node>::Create();
 
   fidl::WireResult result = node_client_.sync()->AddChild(
-      args, std::move(controller_endpoints->server), std::move(node_endpoints->server));
+      args, std::move(controller_endpoints.server), std::move(node_endpoints.server));
 
   if (!result.ok()) {
     FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
     return zx::error(result.status());
   }
 
-  devfs_node_controller_.Bind(std::move(controller_endpoints->client));
-  devfs_node_.Bind(std::move(node_endpoints->client));
+  devfs_node_controller_.Bind(std::move(controller_endpoints.client));
+  devfs_node_.Bind(std::move(node_endpoints.client));
   return zx::ok();
 }
 
@@ -187,32 +184,32 @@ void TestDriver::BeginInitAsyncCompat(fit::callback<void(zx::result<>)> complete
 }
 
 void TestDriver::CreateChildNodeSync() {
-  auto node_controller = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ZX_ASSERT(node_controller.is_ok());
+  auto [client_end, server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
   fidl::Arena arena;
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(arena, "child")
                   .offers2(sync_device_server_.CreateOffers2(arena))
                   .Build();
-  auto result = node_client_.sync()->AddChild(args, std::move(node_controller->server), {});
+  auto result = node_client_.sync()->AddChild(args, std::move(server_end), {});
   ZX_ASSERT(result.ok());
   ZX_ASSERT(result->is_ok());
   sync_added_child_ = true;
-  child_controller_.Bind(std::move(node_controller->client), dispatcher(), this);
+  child_controller_.Bind(std::move(client_end), dispatcher(), this);
 }
 
 void TestDriver::CreateChildNodeAsync() {
-  auto node_controller = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ZX_ASSERT(node_controller.is_ok());
+  auto [client_end, server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
   fidl::Arena arena;
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(arena, "child")
                   .offers2(async_device_server_.CreateOffers2(arena))
                   .Build();
 
-  node_client_->AddChild(args, std::move(node_controller->server), {})
-      .Then([this, client = std::move(node_controller->client)](
+  node_client_->AddChild(args, std::move(server_end), {})
+      .Then([this, client = std::move(client_end)](
                 fidl::WireUnownedResult<fuchsia_driver_framework::Node::AddChild>& result) mutable {
         ZX_ASSERT_MSG(result.ok(), "%s", result.FormatDescription().c_str());
         ZX_ASSERT_MSG(result->is_ok(), "%s", result.FormatDescription().c_str());

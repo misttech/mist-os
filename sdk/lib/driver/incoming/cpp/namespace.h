@@ -42,17 +42,14 @@ zx::result<fdf::ClientEnd<typename ServiceMember::ProtocolType>> DriverTransport
     return zx::error(status);
   }
 
-  zx::result endpoints = fdf::CreateEndpoints<typename ServiceMember::ProtocolType>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
+  auto [client_end, server_end] = fdf::Endpoints<typename ServiceMember::ProtocolType>::Create();
 
   if (zx_status_t status =
-          fdf::ProtocolConnect(std::move(client_token), std::move(endpoints->server.TakeHandle()));
+          fdf::ProtocolConnect(std::move(client_token), std::move(server_end.TakeHandle()));
       status != ZX_OK) {
     return zx::error(status);
   }
-  return zx::ok(std::move(endpoints->client));
+  return zx::ok(std::move(client_end));
 }
 
 // Uses the passed in server_end to make the connection.
@@ -138,15 +135,12 @@ class Namespace {
     static_assert(!fidl::IsServiceMemberV<Protocol>, "Protocol must not be a ServiceMember.");
     static_assert((std::is_same_v<typename Protocol::Transport, fidl::internal::ChannelTransport>),
                   "Protocol must use ChannelTransport. Use a ServiceMember for DriverTransport.");
-    auto endpoints = fidl::CreateEndpoints<Protocol>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-    zx::result result = Open(path, flags, endpoints->server.TakeChannel());
+    auto [client_end, server_end] = fidl::Endpoints<Protocol>::Create();
+    zx::result result = Open(path, flags, server_end.TakeChannel());
     if (result.is_error()) {
       return result.take_error();
     }
-    return zx::ok(std::move(endpoints->client));
+    return zx::ok(std::move(client_end));
   }
 
   // Opens the |path| in the driver's namespace.

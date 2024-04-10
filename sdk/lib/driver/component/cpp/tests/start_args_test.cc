@@ -144,13 +144,12 @@ TEST(StartArgsTest, ProgramValueAsVector) {
 }
 
 TEST(StartArgsTest, NsValueWire) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_EQ(ZX_OK, endpoints.status_value());
-  zx_handle_t client_handle = endpoints->client.handle()->get();
+  auto [client_end, _] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  zx_handle_t client_handle = client_end.handle()->get();
   fidl::Arena arena;
   fidl::VectorView<frunner::wire::ComponentNamespaceEntry> ns_entries(arena, 1);
   ns_entries[0].Allocate(arena);
-  ns_entries[0].set_path(arena, "/svc").set_directory(std::move(endpoints->client));
+  ns_entries[0].set_path(arena, "/svc").set_directory(std::move(client_end));
 
   auto svc = fdf_internal::NsValue(ns_entries, "/svc");
   ASSERT_EQ(svc->handle()->get(), client_handle);
@@ -160,13 +159,12 @@ TEST(StartArgsTest, NsValueWire) {
 }
 
 TEST(StartArgsTest, NsValue) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_EQ(ZX_OK, endpoints.status_value());
-  zx_handle_t client_handle = endpoints->client.handle()->get();
+  auto [client_end, _] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  zx_handle_t client_handle = client_end.handle()->get();
   std::vector<frunner::ComponentNamespaceEntry> ns_entries(1);
   ns_entries[0] = frunner::ComponentNamespaceEntry({
       .path = "/svc",
-      .directory = std::move(endpoints->client),
+      .directory = std::move(client_end),
   });
 
   auto svc = fdf_internal::NsValue(ns_entries, "/svc");

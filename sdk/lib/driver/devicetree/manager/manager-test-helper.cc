@@ -181,19 +181,16 @@ void ManagerTestHelper::ConnectLogger(std::string_view tag) {
 }
 
 zx::result<> ManagerTestHelper::DoPublish(Manager& manager) {
-  auto pbus_endpoints = fdf::CreateEndpoints<fuchsia_hardware_platform_bus::PlatformBus>();
-  ZX_ASSERT(pbus_endpoints.is_ok());
-  auto mgr_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::CompositeNodeManager>();
-  ZX_ASSERT(mgr_endpoints.is_ok());
-  auto node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
-  ZX_ASSERT(node_endpoints.is_ok());
-  node_.Bind(std::move(node_endpoints->client));
+  auto pbus_endpoints = fdf::Endpoints<fuchsia_hardware_platform_bus::PlatformBus>::Create();
+  auto mgr_endpoints = fidl::Endpoints<fuchsia_driver_framework::CompositeNodeManager>::Create();
+  auto node_endpoints = fidl::Endpoints<fuchsia_driver_framework::Node>::Create();
+  node_.Bind(std::move(node_endpoints.client));
 
-  env_.SyncCall(&FakeEnvWrapper::Bind, std::move(pbus_endpoints->server),
-                std::move(mgr_endpoints->server), std::move(node_endpoints->server));
-  pbus_.Bind(std::move(pbus_endpoints->client));
+  env_.SyncCall(&FakeEnvWrapper::Bind, std::move(pbus_endpoints.server),
+                std::move(mgr_endpoints.server), std::move(node_endpoints.server));
+  pbus_.Bind(std::move(pbus_endpoints.client));
 
-  return manager.PublishDevices(pbus_, std::move(mgr_endpoints->client), node_);
+  return manager.PublishDevices(pbus_, std::move(mgr_endpoints.client), node_);
 }
 
 }  // namespace fdf_devicetree::testing

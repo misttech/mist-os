@@ -46,23 +46,20 @@ zx::result<zx::vmo> LoadVisitorVmo(fdf::Namespace& incoming, std::string_view vi
                                               fio::wire::VmoFlags::kExecute |
                                               fio::wire::VmoFlags::kPrivateClone;
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::File>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::File>::Create();
 
   std::string full_path = std::string(kVisitorsPath) + "/" + visitor_file.data();
   zx::result status =
       incoming.Open(full_path.c_str(),
                     fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightExecutable,
-                    endpoints->server.TakeChannel());
+                    server_end.TakeChannel());
   if (status.is_error()) {
     FDF_LOG(ERROR, "Failed to open visitor '%.*s': %s", static_cast<int>(visitor_file.length()),
             visitor_file.data(), status.status_string());
     return status.take_error();
   }
 
-  fidl::WireSyncClient file_client{std::move(endpoints->client)};
+  fidl::WireSyncClient file_client{std::move(client_end)};
   fidl::WireResult file_res = file_client->GetBackingMemory(KVisitorVmoFlag);
   if (!file_res.ok()) {
     FDF_LOG(ERROR, "Failed to get visitor '%.*s' vmo: %s", static_cast<int>(visitor_file.length()),
@@ -82,18 +79,18 @@ zx::result<zx::vmo> LoadVisitorVmo(fdf::Namespace& incoming, std::string_view vi
 zx::result<std::vector<std::string>> GetVisitorFiles(fdf::Namespace& incoming) {
   std::vector<std::string> visitor_files;
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   zx::result status =
       incoming.Open(kVisitorsPath,
                     fio::wire::OpenFlags::kDirectory | fio::wire::OpenFlags::kRightReadable |
                         fio::wire::OpenFlags::kRightExecutable,
-                    endpoints->server.TakeChannel());
+                    server_end.TakeChannel());
   if (status.is_error()) {
     FDF_LOG(ERROR, "Failed to open visitors directory");
     return status.take_error();
   }
 
-  fidl::WireSyncClient directory{std::move(endpoints->client)};
+  fidl::WireSyncClient directory{std::move(client_end)};
   while (true) {
     auto result = directory->ReadDirents(fio::kMaxBuf);
     if (!result.ok()) {

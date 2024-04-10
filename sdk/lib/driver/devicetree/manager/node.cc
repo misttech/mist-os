@@ -172,20 +172,15 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
 
     node_add_args.properties() = node_properties_;
 
-    auto controller_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-    if (controller_endpoints.is_error()) {
-      FDF_LOG(ERROR, "Create node controller end points failed: %s",
-              zx_status_get_string(controller_endpoints.error_value()));
-      return zx::error(controller_endpoints.error_value());
-    }
-    auto result =
-        fdf_node->AddChild({std::move(node_add_args), std::move(controller_endpoints->server), {}});
+    auto [client_end, server_end] =
+        fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
+    auto result = fdf_node->AddChild({std::move(node_add_args), std::move(server_end), {}});
     if (result.is_error()) {
       FDF_LOG(ERROR, "AddChild request failed: %s",
               result.error_value().FormatDescription().c_str());
       return zx::error(ZX_ERR_INTERNAL);
     }
-    node_controller_.Bind(std::move(controller_endpoints->client));
+    node_controller_.Bind(std::move(client_end));
   }
 
   // Add composite node spec if composite.

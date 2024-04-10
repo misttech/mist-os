@@ -13,12 +13,9 @@ zx::result<Namespace> Namespace::Create(
     return zx::error(status);
   }
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-  Namespace self(incoming, std::move(endpoints->client));
+  Namespace self(incoming, std::move(client_end));
   for (auto& entry : entries) {
     std::string path(entry.path().data(), entry.path().size());
     if (zx_status_t status =
@@ -27,8 +24,8 @@ zx::result<Namespace> Namespace::Create(
       return zx::error(status);
     }
   }
-  if (zx_status_t status = fdio_ns_service_connect(self.incoming_, "/svc",
-                                                   endpoints->server.TakeChannel().release());
+  if (zx_status_t status =
+          fdio_ns_service_connect(self.incoming_, "/svc", server_end.TakeChannel().release());
       status != ZX_OK) {
     return zx::error(status);
   }
@@ -42,12 +39,9 @@ zx::result<Namespace> Namespace::Create(
     return zx::error(status);
   }
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-  Namespace self(ns, std::move(endpoints->client));
+  Namespace self(ns, std::move(client_end));
   for (auto& entry : entries) {
     auto path = entry.path();
     auto directory = std::move(entry.directory());
@@ -59,8 +53,8 @@ zx::result<Namespace> Namespace::Create(
       return zx::error(status);
     }
   }
-  if (zx_status_t status = fdio_ns_service_connect(self.incoming_, "/svc",
-                                                   endpoints->server.TakeChannel().release());
+  if (zx_status_t status =
+          fdio_ns_service_connect(self.incoming_, "/svc", server_end.TakeChannel().release());
       status != ZX_OK) {
     return zx::error(status);
   }

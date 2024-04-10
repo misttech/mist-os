@@ -330,15 +330,13 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
 
  private:
   fidl::ClientEnd<fuchsia_io::Directory> ConnectToDriverSvcDir() {
-    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT_MSG(svc_endpoints.is_ok(), "Failed to CreateEndpoints: %s.",
-                  svc_endpoints.status_string());
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     zx_status_t status = fdio_open_at(outgoing_directory_client_.handle()->get(), "/svc",
                                       static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                      svc_endpoints->server.TakeChannel().release());
+                                      server_end.TakeChannel().release());
     ZX_ASSERT_MSG(ZX_OK == status, "Failed to fdio_open_at '/svc' on the driver's outgoing: %s.",
                   zx_status_get_string(status));
-    return std::move(svc_endpoints->client);
+    return std::move(client_end);
   }
 
   zx::result<> StartDriverImpl(fit::callback<void(fdf::DriverStartArgs&)> args_modifier) {

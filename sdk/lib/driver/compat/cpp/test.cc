@@ -27,19 +27,18 @@ TEST(CompatConnectTest, Connection) {
   directory->AddEntry("one", file);
   directory->AddEntry("two", file);
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_EQ(ZX_OK, endpoints.status_value());
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   auto dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 
   fs::ManagedVfs vfs(dispatcher);
 
-  vfs.ServeDirectory(directory, std::move(endpoints->server));
+  vfs.ServeDirectory(directory, std::move(server_end));
 
   bool callback_complete = false;
 
   fdf::async_helpers::AsyncTask task = compat::FindDirectoryEntries(
-      std::move(endpoints->client), dispatcher,
+      std::move(client_end), dispatcher,
       [&callback_complete](zx::result<std::vector<std::string>> entries) mutable {
         callback_complete = true;
         ASSERT_EQ(ZX_OK, entries.status_value());

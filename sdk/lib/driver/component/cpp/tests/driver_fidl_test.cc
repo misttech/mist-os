@@ -122,16 +122,15 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
 
   fidl::ClientEnd<fuchsia_io::Directory> CreateDriverSvcClient() {
     // Open the svc directory in the driver's outgoing, and store a client to it.
-    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_EQ(ZX_OK, svc_endpoints.status_value());
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
     // [START set_up_outgoing_directory_channel]
     zx_status_t status = fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
                                       static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                      svc_endpoints->server.TakeChannel().release());
+                                      server_end.TakeChannel().release());
     // [END set_up_outgoing_directory_channel]
     EXPECT_EQ(ZX_OK, status);
-    return std::move(svc_endpoints->client);
+    return std::move(client_end);
   }
 
   async_dispatcher_t* env_dispatcher() { return env_dispatcher_->async_dispatcher(); }

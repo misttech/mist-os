@@ -30,14 +30,11 @@ class Connector final : public fidl::WireServer<fuchsia_device_fs::Connector> {
   }
 
   zx::result<fidl::ClientEnd<fuchsia_device_fs::Connector>> Bind(async_dispatcher_t* dispatcher) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_device_fs::Connector>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-    if (zx::result result = Bind(dispatcher, std::move(endpoints->server)); result.is_error()) {
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_device_fs::Connector>::Create();
+    if (zx::result result = Bind(dispatcher, std::move(server_end)); result.is_error()) {
       return result.take_error();
     }
-    return zx::ok(std::move(endpoints->client));
+    return zx::ok(std::move(client_end));
   }
 
   std::optional<fidl::ServerBinding<fuchsia_device_fs::Connector>>& binding() { return binding_; }

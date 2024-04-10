@@ -31,16 +31,13 @@ TestNode::TestNode(std::string name, async_dispatcher_t* dispatcher)
 TestNode::~TestNode() { std::lock_guard guard(checker_); }
 
 zx::result<fidl::ClientEnd<fuchsia_driver_framework::Node>> TestNode::CreateNodeChannel() {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_driver_framework::Node>::Create();
 
-  if (zx::result result = Serve(std::move(endpoints->server)); result.is_error()) {
+  if (zx::result result = Serve(std::move(server_end)); result.is_error()) {
     return result.take_error();
   }
 
-  return zx::ok(std::move(endpoints->client));
+  return zx::ok(std::move(client_end));
 }
 
 zx::result<> TestNode::Serve(fidl::ServerEnd<fuchsia_driver_framework::Node> server_end) {
@@ -56,22 +53,11 @@ zx::result<> TestNode::Serve(fidl::ServerEnd<fuchsia_driver_framework::Node> ser
 
 zx::result<TestNode::CreateStartArgsResult> TestNode::CreateStartArgsAndServe() {
   std::lock_guard guard(checker_);
-  zx::result incoming_directory_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (incoming_directory_endpoints.is_error()) {
-    return incoming_directory_endpoints.take_error();
-  }
+  auto incoming_directory_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  auto outgoing_directory_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  auto incoming_node_endpoints = fidl::Endpoints<fuchsia_driver_framework::Node>::Create();
 
-  zx::result outgoing_directory_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (outgoing_directory_endpoints.is_error()) {
-    return outgoing_directory_endpoints.take_error();
-  }
-
-  zx::result incoming_node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
-  if (incoming_node_endpoints.is_error()) {
-    return incoming_node_endpoints.take_error();
-  }
-
-  zx::result serve_result = Serve(std::move(incoming_node_endpoints->server));
+  zx::result serve_result = Serve(std::move(incoming_node_endpoints.server));
   if (serve_result.is_error()) {
     return serve_result.take_error();
   }
@@ -79,19 +65,19 @@ zx::result<TestNode::CreateStartArgsResult> TestNode::CreateStartArgsAndServe() 
   auto incoming_entries = std::vector<fuchsia_component_runner::ComponentNamespaceEntry>(1);
   incoming_entries[0] = fuchsia_component_runner::ComponentNamespaceEntry({
       .path = "/",
-      .directory = std::move(incoming_directory_endpoints->client),
+      .directory = std::move(incoming_directory_endpoints.client),
   });
 
   auto start_args = fuchsia_driver_framework::DriverStartArgs({
-      .node = std::move(incoming_node_endpoints->client),
+      .node = std::move(incoming_node_endpoints.client),
       .incoming = std::move(incoming_entries),
-      .outgoing_dir = std::move(outgoing_directory_endpoints->server),
+      .outgoing_dir = std::move(outgoing_directory_endpoints.server),
   });
 
   return zx::ok(CreateStartArgsResult{
       .start_args = std::move(start_args),
-      .incoming_directory_server = std::move(incoming_directory_endpoints->server),
-      .outgoing_directory_client = std::move(outgoing_directory_endpoints->client),
+      .incoming_directory_server = std::move(incoming_directory_endpoints.server),
+      .outgoing_directory_client = std::move(outgoing_directory_endpoints.client),
   });
 }
 
