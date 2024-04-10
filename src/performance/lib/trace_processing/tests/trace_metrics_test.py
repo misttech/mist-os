@@ -14,6 +14,7 @@ import unittest
 import trace_processing.metrics.app_render as app_render_metrics
 import trace_processing.metrics.cpu as cpu_metrics
 import trace_processing.metrics.fps as fps_metrics
+import trace_processing.metrics.input_latency as input_latency_metrics
 import trace_processing.metrics.scenic as scenic_metrics
 import trace_processing.trace_importing as trace_importing
 import trace_processing.trace_metrics as trace_metrics
@@ -464,6 +465,69 @@ class MetricProcessorsTest(unittest.TestCase):
                         label="AppFpsAverage",
                         unit=U.framesPerSecond,
                         values=[96527.77777777778],
+                    ),
+                ],
+            ),
+            param(
+                "input",
+                processor=input_latency_metrics.InputLatencyMetricsProcessor(
+                    aggregates_only=False,
+                ),
+                model_file="input_latency_metric.json",
+                expected_results=[
+                    TCR(
+                        label="InputLatency",
+                        unit=U.milliseconds,
+                        values=[0.005, 0.003, 0.002, 0.007, 0.009],
+                    ),
+                ],
+            ),
+            param(
+                "input_aggregates",
+                processor=input_latency_metrics.InputLatencyMetricsProcessor(
+                    aggregates_only=True,
+                ),
+                model_file="input_latency_metric.json",
+                expected_results=[
+                    TCR(
+                        label="InputLatencyP5",
+                        unit=U.milliseconds,
+                        values=[0.0022],
+                    ),
+                    TCR(
+                        label="InputLatencyP25",
+                        unit=U.milliseconds,
+                        values=[0.003],
+                    ),
+                    TCR(
+                        label="InputLatencyP50",
+                        unit=U.milliseconds,
+                        values=[0.005],
+                    ),
+                    TCR(
+                        label="InputLatencyP75",
+                        unit=U.milliseconds,
+                        values=[0.007],
+                    ),
+                    TCR(
+                        label="InputLatencyP95",
+                        unit=U.milliseconds,
+                        values=[0.0086],
+                    ),
+                    TCR(
+                        label="InputLatencyMin",
+                        unit=U.milliseconds,
+                        values=[0.002],
+                    ),
+                    TCR(
+                        label="InputLatencyMax",
+                        unit=U.milliseconds,
+                        values=[0.009],
+                    ),
+                    TCR(
+                        label="InputLatencyAverage",
+                        unit=U.milliseconds,
+                        values=[0.0052],
                     ),
                 ],
             ),
