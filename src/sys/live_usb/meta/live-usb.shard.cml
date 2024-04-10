@@ -27,7 +27,7 @@
         },
         {
             protocol: [ "fuchsia.paver.Paver" ],
-            from: "#miscsvc",
+            from: "#paver",
             to: "#live_usb",
         },
         {

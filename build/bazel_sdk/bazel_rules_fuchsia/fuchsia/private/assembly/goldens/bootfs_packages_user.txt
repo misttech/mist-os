@@ -33,9 +33,9 @@ i2c
 ?live-usb
 ?memfs
 ?minfs
-miscsvc
 netdevice-migration
 network-device
+paver
 pkg-cache
 platform-bus
 power

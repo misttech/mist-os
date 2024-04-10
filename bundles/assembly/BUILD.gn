@@ -105,7 +105,7 @@ assembly_input_bundle("bootstrap") {
   bootfs_packages = [
     "//src/bringup/bin/svchost:pkg",
     "//src/bringup/bin/device-name-provider:package",
-    "//src/bringup/bin/miscsvc:package",
+    "//src/bringup/bin/paver:package",
     "//src/bringup/bin/pwrbtn-monitor:package",
     "//src/bringup/bin/sysinfo:package",
     "//src/devices/sysmem/bin/sysmem_connector:pkg",

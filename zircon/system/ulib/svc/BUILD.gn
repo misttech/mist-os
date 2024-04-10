@@ -44,7 +44,7 @@ zx_library("svc") {
     "//sdk/lib/driver_test_realm/*",
     "//src/bringup/bin/console/*",
     "//src/bringup/bin/device-name-provider/*",
-    "//src/bringup/bin/miscsvc/*",
+    "//src/bringup/bin/paver/*",
     "//src/bringup/bin/pwrbtn-monitor/*",
     "//src/bringup/bin/svchost/*",
     "//src/bringup/bin/sysinfo/*",

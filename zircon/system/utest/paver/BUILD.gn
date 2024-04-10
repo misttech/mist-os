@@ -5,8 +5,8 @@
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
 
-test("miscsvc") {
-  output_name = "miscsvc-test"
+test("paver") {
+  output_name = "paversvc-test"
   sources = [ "main.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
@@ -15,7 +15,7 @@ test("miscsvc") {
   ]
 }
 
-bootfs_test("miscsvc-bootfs-test") {
-  name = "miscsvc-test"
-  deps = [ ":miscsvc" ]
+bootfs_test("paver-bootfs-test") {
+  name = "paversvc-test"
+  deps = [ ":paver" ]
 }

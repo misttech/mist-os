@@ -33,11 +33,11 @@ i2c
 ?live-usb
 ?memfs
 ?minfs
-miscsvc
 nand-broker
 netdevice-migration
 ?netsvc
 network-device
+paver
 pkg-cache
 platform-bus
 power

@@ -9,7 +9,7 @@
 
 namespace {
 
-TEST(MiscSvcTest, PaverSvccEnumeratesSuccessfully) {
+TEST(PaverSvcTest, PaverSvccEnumeratesSuccessfully) {
   zx::result client_end = component::Connect<fuchsia_paver::Paver>();
   ASSERT_OK(client_end);
   fidl::WireSyncClient paver(std::move(client_end.value()));

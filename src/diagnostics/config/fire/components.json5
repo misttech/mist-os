@@ -619,4 +619,9 @@
         label: "System Memory",
         moniker: "bootstrap/sysmem",
     },
+    {
+        id: 258,
+        label: "Paver Service",
+        moniker: "bootstrap/paver",
+    },
 ]

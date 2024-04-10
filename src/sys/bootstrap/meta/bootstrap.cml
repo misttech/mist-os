@@ -8,8 +8,8 @@
             url: "fuchsia-boot:///archivist#meta/archivist.cm",
         },
         {
-            name: "miscsvc",
-            url: "fuchsia-boot:///miscsvc#meta/miscsvc.cm",
+            name: "paver",
+            url: "fuchsia-boot:///paver#meta/paver.cm",
         },
         {
             name: "pwrbtn-monitor",
@@ -77,7 +77,7 @@
             directory: "boot",
             from: "parent",
             as: "boot-config",
-            to: "#miscsvc",
+            to: "#paver",
             rights: [ "r*" ],
             subdir: "config",
         },
@@ -112,7 +112,7 @@
                 "fuchsia.process.Launcher",
             ],
             from: "parent",
-            to: "#miscsvc",
+            to: "#paver",
         },
         {
             protocol: [
@@ -141,7 +141,7 @@
         {
             directory: "dev-topological",
             from: "#devfs-with-pkg",
-            to: "#miscsvc",
+            to: "#paver",
         },
         {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
@@ -161,7 +161,7 @@
         {
             protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
             from: "#shutdown_shim",
-            to: [ "#miscsvc" ],
+            to: [ "#paver" ],
         },
         {
             protocol: [ "fuchsia.hardware.power.statecontrol.Admin" ],
@@ -176,7 +176,7 @@
             ],
             from: "#archivist",
             to: [
-                "#miscsvc",
+                "#paver",
                 "#pwrbtn-monitor",
                 "#role_manager",
                 "#shutdown_shim",
@@ -198,7 +198,7 @@
         {
             protocol: [ "fuchsia.fshost.BlockWatcher" ],
             from: "#fshost",
-            to: "#miscsvc",
+            to: "#paver",
         },
 
         // -- Archivist offers below here --
@@ -262,7 +262,7 @@
         },
         {
             protocol: "fuchsia.paver.Paver",
-            from: "#miscsvc",
+            from: "#paver",
         },
         {
             protocol: "fuchsia.power.button.Monitor",

@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
 
   status = outgoing.ServeFromStartupInfo();
   if (status != ZX_OK) {
-    fprintf(stderr, "miscsvc: error: Failed to serve outgoing directory: %d (%s).\n", status,
+    fprintf(stderr, "paver: error: Failed to serve outgoing directory: %d (%s).\n", status,
             zx_status_get_string(status));
     return 1;
   }
@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
   for (size_t i = 0; i < std::size(service_providers); ++i) {
     status = provider_load(&service_providers[i], dispatcher, outgoing.svc_dir());
     if (status != ZX_OK) {
-      fprintf(stderr, "miscsvc: error: Failed to load service provider %zu: %d (%s).\n", i, status,
+      fprintf(stderr, "paver: error: Failed to load service provider %zu: %d (%s).\n", i, status,
               zx_status_get_string(status));
       return 1;
     }

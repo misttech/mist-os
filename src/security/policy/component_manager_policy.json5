@@ -610,7 +610,7 @@
                     "/bootstrap",
                     "/bootstrap/cr50_agent",
                     "/bootstrap/console-launcher",
-                    "/bootstrap/miscsvc",
+                    "/bootstrap/paver",
 
                     // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
                     // no longer run in the sshd realm.
@@ -681,7 +681,7 @@
                     "/bootstrap/cpu_manager",
                     "/bootstrap/devfs-with-pkg",
                     "/bootstrap/flashmap",
-                    "/bootstrap/miscsvc",
+                    "/bootstrap/paver",
                     "/bootstrap/power_manager",
                     "/bootstrap/sysinfo",
                     "/bootstrap/vboot-fwparam",

@@ -4,8 +4,8 @@
 
 import("//build/components.gni")
 
-executable("miscsvc") {
-  sources = [ "miscsvc.cc" ]
+executable("paver") {
+  sources = [ "paver.cc" ]
   deps = [
     "//sdk/lib/fdio",
     "//src/storage/lib/paver",
@@ -19,12 +19,12 @@ executable("miscsvc") {
 }
 
 fuchsia_component("component") {
-  component_name = "miscsvc"
-  manifest = "meta/miscsvc.cml"
-  deps = [ ":miscsvc" ]
+  component_name = "paver"
+  manifest = "meta/paver.cml"
+  deps = [ ":paver" ]
 }
 
 fuchsia_package("package") {
-  package_name = "miscsvc"
+  package_name = "paver"
   deps = [ ":component" ]
 }
