@@ -197,6 +197,9 @@ pub trait ValueExt: Sized {
 
     /// Whether this value represents a client endpoint for the given service.
     fn is_client(&self, service: &str) -> bool;
+
+    /// Get whether this value can be invoked as a command
+    fn is_invocable(&self) -> bool;
 }
 
 impl ValueExt for Value {
@@ -513,6 +516,15 @@ impl ValueExt for Value {
             Value::OutOfLine(PlaygroundValue::InUseHandle(s)) => {
                 s.get_client_protocol().ok().map(|x| &x == service).unwrap_or(false)
             }
+            _ => false,
+        }
+    }
+
+    fn is_invocable(&self) -> bool {
+        match self {
+            Value::OutOfLine(PlaygroundValue::Invocable(_)) => true,
+            Value::OutOfLine(PlaygroundValue::InUseHandle(h)) => h.is_client_end(),
+            Value::OutOfLine(PlaygroundValue::TypeHinted(_, v)) => v.is_invocable(),
             _ => false,
         }
     }

@@ -80,6 +80,22 @@ pub struct GlobalVariables {
 }
 
 impl GlobalVariables {
+    /// Get the names of the variables in this namespace. Filters out variables
+    /// whose values are not ready yet, and variables with values for which the
+    /// given function returns `false`.
+    pub fn names<'a>(
+        &'a self,
+        filter: impl Fn(&Value) -> bool + 'a,
+    ) -> impl std::iter::Iterator<Item = &String> {
+        self.entries
+            .iter()
+            .filter(move |(_, x)| match &*x.0.lock().unwrap().lock().unwrap() {
+                FrameValue::Ready(Ok(x)) => filter(x),
+                _ => false,
+            })
+            .map(|x| x.0)
+    }
+
     /// Create a [`Frame`] that contains the values of some of the global
     /// variables in this structure. The `mapping` function can dictate what IDs
     /// the values receive, and can return `None` to skip certain values. The

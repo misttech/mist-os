@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 use crate::compiler::Visitor;
 use crate::error::{Error, Result};
 use crate::frame::GlobalVariables;
-use crate::parser::{Mutability, ParseResult};
+use crate::parser::{Mutability, Node, ParseResult};
 use crate::value::{InUseHandle, Invocable, PlaygroundValue, ReplayableIterator, Value, ValueExt};
 
 macro_rules! error {
@@ -563,17 +563,33 @@ impl Interpreter {
     /// before the completion text is inserted in their place, and the cursor
     /// should end up at the end of the completion text.
     pub async fn complete(&self, cmd: String, cursor_pos: usize) -> Vec<(String, usize)> {
+        let cmd: ParseResult<'_> = cmd.as_str().into();
+        let cmd = cmd.tree;
         let mut ret = Vec::new();
-        if cursor_pos != cmd.len() {
-            return ret;
-        }
 
-        if "open".starts_with(&cmd) {
-            ret.push(("open ".into(), 0));
-        }
+        let mut cmd_node_and_parents = cmd.find_node_containing_cursor(cursor_pos);
+        match cmd_node_and_parents.pop() {
+            Some(Node::Invocation(identifier, _)) => {
+                let start = identifier.get_utf8_column() - 1;
+                let end = start + identifier.fragment().chars().count();
 
-        if "req".starts_with(&cmd) {
-            ret.push(("req ".into(), 0));
+                if end >= cursor_pos {
+                    let char_offset = cursor_pos - start;
+                    let byte_offset = identifier
+                        .fragment()
+                        .char_indices()
+                        .skip(char_offset)
+                        .next()
+                        .map(|x| x.0)
+                        .unwrap_or(identifier.fragment().len());
+                    for name in self.global_variables.lock().unwrap().names(|x| x.is_invocable()) {
+                        if name.starts_with(&identifier.fragment()[..byte_offset]) {
+                            ret.push((format!("{name} "), start))
+                        }
+                    }
+                }
+            }
+            _ => (),
         }
 
         ret

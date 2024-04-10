@@ -148,6 +148,117 @@ pub enum Node<'a> {
     Error,
 }
 
+impl<'a> Node<'a> {
+    pub(crate) fn find_node_containing_cursor(&self, character_offset: usize) -> Vec<&Self> {
+        let mut ret = Vec::new();
+        let _ = self.find_node_containing_cursor_inner(character_offset, &mut ret);
+        ret
+    }
+
+    fn find_node_containing_cursor_inner<'q>(
+        &'q self,
+        character_offset: usize,
+        path: &mut Vec<&'q Self>,
+    ) -> bool {
+        // TODO: This won't work right for multiline commands.
+        fn offset_in_span(span: &Span<'_>, character_offset: usize) -> bool {
+            let start = span.get_utf8_column() - 1;
+            let end = span.fragment().chars().count() + start;
+            character_offset >= start && character_offset <= end
+        }
+
+        path.push(self);
+
+        let ret = match self {
+            Node::Add(a, b)
+            | Node::Assignment(a, b)
+            | Node::Divide(a, b)
+            | Node::EQ(a, b)
+            | Node::GE(a, b)
+            | Node::GT(a, b)
+            | Node::Iterate(a, b)
+            | Node::LE(a, b)
+            | Node::LT(a, b)
+            | Node::LogicalAnd(a, b)
+            | Node::LogicalOr(a, b)
+            | Node::Lookup(a, b)
+            | Node::Multiply(a, b)
+            | Node::NE(a, b)
+            | Node::Pipe(a, b)
+            | Node::Subtract(a, b) => {
+                a.find_node_containing_cursor_inner(character_offset, path)
+                    || b.find_node_containing_cursor_inner(character_offset, path)
+            }
+            Node::Async(a) | Node::LogicalNot(a) | Node::Negate(a) => {
+                a.find_node_containing_cursor_inner(character_offset, path)
+            }
+            Node::Label(s)
+            | Node::Identifier(s)
+            | Node::Integer(s)
+            | Node::Real(s)
+            | Node::String(s)
+            | Node::BareString(s) => offset_in_span(&s, character_offset),
+            Node::Block(a) | Node::List(a) | Node::Program(a) => {
+                a.iter().any(|x| x.find_node_containing_cursor_inner(character_offset, path))
+            }
+            Node::FunctionDecl { identifier, parameters, body } => {
+                offset_in_span(&identifier, character_offset)
+                    || parameters.parameters.iter().any(|x| offset_in_span(x, character_offset))
+                    || parameters
+                        .optional_parameters
+                        .iter()
+                        .any(|x| offset_in_span(x, character_offset))
+                    || parameters.variadic.iter().any(|x| offset_in_span(x, character_offset))
+                    || body.find_node_containing_cursor_inner(character_offset, path)
+            }
+            Node::If { condition, body, else_ } => {
+                condition.find_node_containing_cursor_inner(character_offset, path)
+                    || body.find_node_containing_cursor_inner(character_offset, path)
+                    || else_
+                        .iter()
+                        .any(|x| x.find_node_containing_cursor_inner(character_offset, path))
+            }
+            Node::Invocation(name, args) => {
+                offset_in_span(name, character_offset)
+                    || args
+                        .iter()
+                        .any(|x| x.find_node_containing_cursor_inner(character_offset, path))
+            }
+            Node::Lambda { parameters, body } => {
+                parameters.parameters.iter().any(|x| offset_in_span(x, character_offset))
+                    || parameters
+                        .optional_parameters
+                        .iter()
+                        .any(|x| offset_in_span(x, character_offset))
+                    || parameters.variadic.iter().any(|x| offset_in_span(x, character_offset))
+                    || body.find_node_containing_cursor_inner(character_offset, path)
+            }
+            Node::Object(label, members) => {
+                label.iter().any(|x| offset_in_span(x, character_offset))
+                    || members.iter().any(|(x, y)| {
+                        x.find_node_containing_cursor_inner(character_offset, path)
+                            || y.find_node_containing_cursor_inner(character_offset, path)
+                    })
+            }
+            Node::Range(a, b, _) => {
+                a.iter().any(|x| x.find_node_containing_cursor_inner(character_offset, path))
+                    || b.iter().any(|x| x.find_node_containing_cursor_inner(character_offset, path))
+            }
+            Node::VariableDecl { identifier, value, mutability: _ } => {
+                offset_in_span(&identifier, character_offset)
+                    || value.find_node_containing_cursor_inner(character_offset, path)
+            }
+            Node::True | Node::False | Node::Null | Node::Error => false,
+        };
+
+        if !ret {
+            let _ = path.pop();
+        }
+
+        ret
+    }
+}
+
 #[cfg(test)]
 impl<'a> Node<'a> {
     /// Checks whether two nodes refer to equivalent content. This is a rough
