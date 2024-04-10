@@ -2,6 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+"""Rule definition for creating a component manifest suitable for the driver
+runner."""
+
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageResourcesInfo")
 load(":fuchsia_component_manifest.bzl", "fuchsia_component_manifest")
 
