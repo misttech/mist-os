@@ -12,7 +12,7 @@
 
 namespace fake_display {
 
-DisplayImageInfo::DisplayImageInfo(IdType id, ImageMetadata metadata, zx::vmo vmo)
+DisplayImageInfo::DisplayImageInfo(IdType id, const ImageMetadata& metadata, zx::vmo vmo)
     : id_(id), metadata_(std::move(metadata)), vmo_(std::move(vmo)) {}
 
 DisplayImageInfo::HashTable::KeyType DisplayImageInfo::GetKey() const { return id_; }

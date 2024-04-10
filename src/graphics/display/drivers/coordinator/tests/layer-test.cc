@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fit/defer.h>
+#include <lib/zx/result.h>
 
 #include <fbl/auto_lock.h>
 #include <fbl/intrusive_single_list.h>
@@ -17,6 +18,7 @@
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/tests/base.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/lib/testing/predicates/status.h"
@@ -33,14 +35,16 @@ class LayerTest : public TestBase {
   }
 
   fbl::RefPtr<Image> CreateReadyImage() {
+    zx::result<DriverImageId> import_result = display()->ImportVmoImageForTesting(zx::vmo(0), 0);
+    EXPECT_OK(import_result.status_value());
+    EXPECT_NE(import_result.value(), kInvalidDriverImageId);
+
     image_t dc_image = {
         .width = kDisplayWidth,
         .height = kDisplayHeight,
         .tiling_type = fhdt::wire::kImageTilingTypeLinear,
-        .handle = 0,
+        .handle = ToBanjoDriverImageId(import_result.value()),
     };
-    EXPECT_OK(display()->ImportVmoImageForTesting(&dc_image, zx::vmo(0), 0));
-    EXPECT_NE(dc_image.handle, 0u);
     fbl::RefPtr<Image> image =
         fbl::AdoptRef(new Image(controller(), dc_image, zx::vmo(0), nullptr, ClientId(1)));
     image->id = next_image_id_++;

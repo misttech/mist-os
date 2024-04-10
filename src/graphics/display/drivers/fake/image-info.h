@@ -29,7 +29,7 @@ class DisplayImageInfo : public fbl::SinglyLinkedListable<std::unique_ptr<Displa
   using IdType = display::DriverImageId;
   using HashTable = fbl::HashTable<IdType, std::unique_ptr<DisplayImageInfo>>;
 
-  DisplayImageInfo(IdType id, ImageMetadata metadata, zx::vmo vmo);
+  DisplayImageInfo(IdType id, const ImageMetadata& metadata, zx::vmo vmo);
   ~DisplayImageInfo() = default;
 
   // Disallow copy and move.

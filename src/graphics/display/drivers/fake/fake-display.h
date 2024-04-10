@@ -123,7 +123,7 @@ class FakeDisplay : public DeviceType,
   void SendVsync();
 
   // Just for display core unittests.
-  zx_status_t ImportVmoImageForTesting(image_t* image, zx::vmo vmo, size_t offset);
+  zx::result<display::DriverImageId> ImportVmoImageForTesting(zx::vmo vmo, size_t offset);
 
   size_t TEST_imported_images_count() const {
     fbl::AutoLock lock(&image_mutex_);

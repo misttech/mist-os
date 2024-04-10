@@ -161,9 +161,8 @@ void FakeDisplay::DisplayControllerImplResetDisplayControllerInterface() {
   controller_interface_client_ = ddk::DisplayControllerInterfaceProtocolClient();
 }
 
-zx_status_t FakeDisplay::ImportVmoImageForTesting(image_t* image, zx::vmo vmo, size_t offset) {
-  zx_status_t status = ZX_OK;
-
+zx::result<display::DriverImageId> FakeDisplay::ImportVmoImageForTesting(zx::vmo vmo,
+                                                                         size_t offset) {
   fbl::AllocChecker alloc_checker;
   fbl::AutoLock lock(&image_mutex_);
 
@@ -176,15 +175,13 @@ zx_status_t FakeDisplay::ImportVmoImageForTesting(image_t* image, zx::vmo vmo, s
   };
 
   auto import_info = fbl::make_unique_checked<DisplayImageInfo>(
-      &alloc_checker, driver_image_id, std::move(display_image_metadata), std::move(vmo));
+      &alloc_checker, driver_image_id, display_image_metadata, std::move(vmo));
   if (!alloc_checker.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  image->handle = display::ToBanjoDriverImageId(driver_image_id);
   imported_images_.insert(std::move(import_info));
-
-  return status;
+  return zx::ok(driver_image_id);
 }
 
 namespace {

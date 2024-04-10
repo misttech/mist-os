@@ -18,6 +18,7 @@
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/tests/base.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace display {
@@ -31,9 +32,13 @@ class ImageTest : public TestBase, public FenceCallback {
     zx::vmo dup_vmo;
     EXPECT_OK(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_vmo));
     // TODO: Factor this out of display::Client or make images easier to test without a client.
-    if (display()->ImportVmoImageForTesting(&dc_image, std::move(vmo), /*offset=*/0) != ZX_OK) {
+    zx::result<DriverImageId> import_result =
+        display()->ImportVmoImageForTesting(std::move(vmo), /*offset=*/0);
+    if (!import_result.is_ok()) {
       return nullptr;
     }
+    dc_image.handle = ToBanjoDriverImageId(import_result.value());
+
     fbl::RefPtr<Image> image =
         fbl::AdoptRef(new Image(controller(), dc_image, std::move(dup_vmo), nullptr, ClientId(1)));
     image->id = next_image_id_++;
