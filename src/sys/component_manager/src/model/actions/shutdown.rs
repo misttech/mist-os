@@ -5,7 +5,8 @@
 use {
     crate::model::{
         actions::{Action, ActionKey, ActionSet},
-        component::{ComponentInstance, InstanceState, ResolvedInstanceState},
+        component::instance::{InstanceState, ResolvedInstanceState},
+        component::ComponentInstance,
         error::ActionError,
     },
     async_trait::async_trait,

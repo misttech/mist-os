@@ -472,7 +472,8 @@ pub mod tests {
 #[cfg(test)]
 pub(crate) mod test_utils {
     use {
-        crate::model::component::{ComponentInstance, InstanceState},
+        crate::model::component::instance::InstanceState,
+        crate::model::component::ComponentInstance,
         moniker::{ChildName, MonikerBase},
         routing::component_instance::ComponentInstanceInterface,
     };

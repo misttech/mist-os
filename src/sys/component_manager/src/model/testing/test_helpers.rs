@@ -7,7 +7,8 @@ use {
         builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder},
         framework::realm::RealmCapabilityHost,
         model::{
-            component::{ComponentInstance, InstanceState, StartReason, WeakComponentInstance},
+            component::instance::InstanceState,
+            component::{ComponentInstance, StartReason, WeakComponentInstance},
             events::{registry::EventSubscription, source::EventSource, stream::EventStream},
             hooks::HooksRegistration,
             model::Model,

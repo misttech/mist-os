@@ -208,6 +208,7 @@ rustc_binary("bin") {
     "src/model/actions/stop.rs",
     "src/model/actions/unresolve.rs",
     "src/model/component.rs",
+    "src/model/component_instance_state.rs",
     "src/model/context.rs",
     "src/model/environment.rs",
     "src/model/error.rs",

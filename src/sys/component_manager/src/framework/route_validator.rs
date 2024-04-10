@@ -8,7 +8,8 @@ use {
             CapabilityProvider, CapabilitySource, FrameworkCapability, InternalCapabilityProvider,
         },
         model::{
-            component::{ComponentInstance, ResolvedInstanceState, WeakComponentInstance},
+            component::instance::ResolvedInstanceState,
+            component::{ComponentInstance, WeakComponentInstance},
             model::Model,
             routing::{self, service::AnonymizedServiceRoute, Route, RouteRequest, RoutingError},
         },

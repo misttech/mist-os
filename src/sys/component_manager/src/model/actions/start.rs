@@ -7,10 +7,8 @@ use {
     crate::framework::controller,
     crate::model::{
         actions::{Action, ActionKey},
-        component::{
-            ComponentInstance, IncomingCapabilities, InstanceState, StartReason,
-            StartedInstanceState,
-        },
+        component::instance::{InstanceState, StartedInstanceState},
+        component::{ComponentInstance, IncomingCapabilities, StartReason},
         error::{ActionError, CreateNamespaceError, StartActionError, StructuredConfigError},
         hooks::{Event, EventPayload, RuntimeInfo},
         namespace::create_namespace,
@@ -581,7 +579,8 @@ mod tests {
     use {
         crate::model::{
             actions::{ActionSet, ShutdownAction, ShutdownType, StopAction},
-            component::{Component, ResolvedInstanceState, UnresolvedInstanceState},
+            component::instance::{ResolvedInstanceState, UnresolvedInstanceState},
+            component::Component,
             error::ModelError,
             hooks::{EventType, Hook, HooksRegistration},
             structured_dict::ComponentInput,

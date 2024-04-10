@@ -5,7 +5,8 @@
 use {
     crate::model::{
         actions::{Action, ActionKey, ActionSet, ShutdownAction, ShutdownType},
-        component::{ComponentInstance, InstanceState},
+        component::instance::InstanceState,
+        component::ComponentInstance,
         error::{ActionError, UnresolveActionError},
         hooks::{Event, EventPayload},
     },

@@ -7,10 +7,9 @@ pub mod sandbox_construction;
 use {
     crate::model::{
         actions::{Action, ActionKey},
-        component::{
-            Component, ComponentInstance, InstanceState, ResolvedInstanceState,
-            WeakComponentInstance,
-        },
+        component::instance::{InstanceState, ResolvedInstanceState},
+        component::ComponentInstance,
+        component::{Component, WeakComponentInstance},
         error::{ActionError, ResolveActionError},
         hooks::{Event, EventPayload},
         resolver::Resolver,

@@ -7,7 +7,8 @@ use {
         builtin_environment::BuiltinEnvironment,
         model::{
             actions::{ActionSet, ShutdownAction, ShutdownType, StartAction, StopAction},
-            component::{ComponentInstance, IncomingCapabilities, InstanceState, StartReason},
+            component::instance::InstanceState,
+            component::{ComponentInstance, IncomingCapabilities, StartReason},
             error::{ActionError, ModelError, StartActionError},
             events::registry::EventSubscription,
             hooks::{Event, EventType, Hook, HooksRegistration},

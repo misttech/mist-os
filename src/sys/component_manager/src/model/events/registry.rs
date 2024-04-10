@@ -6,7 +6,8 @@ use {
     crate::{
         capability::CapabilitySource,
         model::{
-            component::{ComponentInstance, ExtendedInstance, InstanceState, WeakExtendedInstance},
+            component::instance::InstanceState,
+            component::{ComponentInstance, ExtendedInstance, WeakExtendedInstance},
             error::ModelError,
             events::{
                 dispatcher::{EventDispatcher, EventDispatcherScope},

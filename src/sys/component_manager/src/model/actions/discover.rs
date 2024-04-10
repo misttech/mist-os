@@ -5,7 +5,8 @@
 use {
     crate::model::{
         actions::{Action, ActionKey},
-        component::{ComponentInstance, InstanceState, UnresolvedInstanceState},
+        component::instance::{InstanceState, UnresolvedInstanceState},
+        component::ComponentInstance,
         error::{ActionError, DiscoverActionError},
         hooks::{Event, EventPayload},
         structured_dict::ComponentInput,

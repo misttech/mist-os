@@ -6,7 +6,8 @@ use {
     crate::{
         capability::CapabilitySource,
         model::{
-            component::{ComponentInstance, ResolvedInstanceState, WeakComponentInstance},
+            component::instance::ResolvedInstanceState,
+            component::{ComponentInstance, WeakComponentInstance},
             routing::router::{Request, Router},
             structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
         },
