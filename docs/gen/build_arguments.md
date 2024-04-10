@@ -451,7 +451,7 @@ tree users don't set this anymore.
 
 **Current value (from the default):** `true`
 
-From //src/storage/blobfs/BUILD.gn:12
+From //src/storage/blobfs/BUILD.gn:11
 
 ### blobfs_num_pager_threads
 
@@ -459,7 +459,7 @@ The number of pager threads to spawn for blobfs.
 
 **Current value (from the default):** `2`
 
-From //src/storage/blobfs/bin/BUILD.gn:22
+From //src/storage/blobfs/bin/BUILD.gn:20
 
 ### blobfs_page_in_metrics_recording
 
@@ -469,7 +469,7 @@ metrics entries.
 
 **Current value (from the default):** `false`
 
-From //src/storage/blobfs/BUILD.gn:17
+From //src/storage/blobfs/BUILD.gn:16
 
 ### blobfs_size_creep_limit
 
