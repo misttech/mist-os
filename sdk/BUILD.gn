@@ -740,7 +740,6 @@ sdk_molecule("platform_libs") {
     "//src/devices/testing/mock-mmio-reg:mock-mmio-reg_sdk",
     "//zircon/system/ulib/ddk-platform-defs:ddk-platform-defs_sdk",
     "//zircon/system/ulib/fzl:fzl_sdk",
-    "//zircon/system/ulib/zxtest:zxtest_sdk",
   ]
 }
 
