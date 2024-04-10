@@ -212,3 +212,18 @@ type SensorEvent = struct {
     /// The sample data (see documentation for EventPayload).
     payload EventPayload;
 };
+
+/// Rate configuration given to Driver::ConfigureSensorRate and
+/// Manager::ConfigureSensorRate.
+type SensorRateConfig = table {
+    /// The desired time period between samples arriving from the hardware.
+    ///
+    /// Required.
+    1: sampling_period_ns zx.Duration;
+
+    /// How long a sensor value may be buffered before it is emitted. A value of
+    /// zero will result in no buffering.
+    ///
+    /// Required.
+    2: max_reporting_latency_ns zx.Duration;
+};

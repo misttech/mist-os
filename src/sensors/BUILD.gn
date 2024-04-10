@@ -29,6 +29,7 @@ rustc_library("lib") {
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures-util",
+    "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:tracing",
   ]
 

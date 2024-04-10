@@ -5,9 +5,62 @@ library fuchsia.sensors;
 
 using fuchsia.sensors.types as types;
 
+/// Errors that may be returned by Manager::Activate.
+type ActivateSensorError = flexible enum : uint32 {
+    /// The SensorManager failed to get a response from the backing driver.
+    DRIVER_UNAVAILABLE = 1;
+
+    /// The provided SensorId does not correspond to an actual sensor.
+    INVALID_SENSOR_ID = 2;
+};
+
+/// Errors that may be returned by Manager::Deactivate.
+type DeactivateSensorError = flexible enum : uint32 {
+    /// The SensorManager failed to get a response from the backing driver.
+    DRIVER_UNAVAILABLE = 1;
+
+    /// The provided SensorId does not correspond to an actual sensor.
+    INVALID_SENSOR_ID = 2;
+};
+
+/// Errors that may be returned by Manager::ConfigureSensorRate.
+type ConfigureSensorRateError = flexible enum : uint32 {
+    /// The SensorManager failed to get a response from the backing driver.
+    DRIVER_UNAVAILABLE = 1;
+
+    /// The provided sensor SensorId does not correspond to an actual sensor.
+    INVALID_SENSOR_ID = 2;
+
+    /// The rate configuration was missing fields or contained an unsupported
+    /// sample rate and/or maximum reporting latency.
+    INVALID_CONFIG = 3;
+};
+
 @discoverable
 open protocol Manager {
+    /// Returns the list of sensors managed by the SensorManager.
     flexible GetSensorsList() -> (struct {
         sensors vector<types.SensorInfo>:MAX;
+    });
+
+    /// Configures the sampling period and reporting latency for a particular sensor.
+    flexible ConfigureSensorRates(resource struct {
+        id types.SensorId;
+        sensor_rate_config types.SensorRateConfig;
+    }) -> () error ConfigureSensorRateError;
+
+    /// Activates a sensor. Events will begin to appear in the stream of sensor events.
+    flexible Activate(struct {
+        id types.SensorId;
+    }) -> () error ActivateSensorError;
+
+    /// Deactivates a sensor. Events will no longer appear in the stream of sensor events.
+    flexible Deactivate(struct {
+        id types.SensorId;
+    }) -> () error DeactivateSensorError;
+
+    /// The stream of sensor events from all sensors that have been activated.
+    -> OnSensorEvent(struct {
+        event types.SensorEvent;
     });
 };

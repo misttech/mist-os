@@ -19,10 +19,10 @@ using fuchsia_hardware_sensors::ConfigureSensorRateError;
 using fuchsia_hardware_sensors::DeactivateSensorError;
 using fuchsia_hardware_sensors::FixedValuesPlaybackConfig;
 using fuchsia_hardware_sensors::PlaybackSourceConfig;
-using fuchsia_hardware_sensors::SensorRateConfig;
 using fuchsia_sensors_types::SensorEvent;
 using fuchsia_sensors_types::SensorId;
 using fuchsia_sensors_types::SensorInfo;
+using fuchsia_sensors_types::SensorRateConfig;
 }  // namespace
 
 PlaybackController::PlaybackController(async_dispatcher_t* dispatcher)

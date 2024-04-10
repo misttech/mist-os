@@ -4,7 +4,6 @@
 library fuchsia.hardware.sensors;
 
 using fuchsia.sensors.types as types;
-using zx;
 
 /// Errors that may be returned by Driver::ActivateSensor.
 type ActivateSensorError = flexible enum : uint32 {
@@ -16,20 +15,6 @@ type ActivateSensorError = flexible enum : uint32 {
 type DeactivateSensorError = flexible enum : uint32 {
     /// The provided SensorId does not correspond to an actual sensor.
     INVALID_SENSOR_ID = 1;
-};
-
-/// Rate configuration given to Driver::ConfigureSensorRate.
-type SensorRateConfig = table {
-    /// The desired time period between samples arriving from the hardware.
-    ///
-    /// Required.
-    1: sampling_period_ns zx.Duration;
-
-    /// How long a sensor value may be buffered before it is emitted. A value of
-    /// zero will result in no buffering.
-    ///
-    /// Required.
-    2: max_reporting_latency_ns zx.Duration;
 };
 
 /// Errors that may be returned by Driver::ConfigureSensorRate.
@@ -63,7 +48,7 @@ protocol Driver {
     /// Set the output rate for the specified sensor.
     ConfigureSensorRate(struct {
         sensor_id types.SensorId;
-        sensor_rate_config SensorRateConfig;
+        sensor_rate_config types.SensorRateConfig;
     }) -> () error ConfigureSensorRateError;
 
     /// The stream of sensor samples from all activated sensors.

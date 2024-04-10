@@ -3,28 +3,13 @@
 // found in the LICENSE file.
 use {
     anyhow::{Context as _, Error},
-    fidl_fuchsia_sensors as sensors_fidl, fidl_fuchsia_sensors_types as sensors_types_fidl,
+    fidl_fuchsia_sensors::*,
+    fidl_fuchsia_sensors_types::*,
     fuchsia_component::server::ServiceFs,
     futures_util::{StreamExt, TryStreamExt},
-    sensors_fidl::ManagerRequest,
+    itertools::Itertools,
     std::collections::HashMap,
 };
-
-#[derive(Clone, Debug)]
-pub struct SensorInfo {
-    id: i32,
-    name: String,
-}
-
-impl SensorInfo {
-    pub fn to_fidl(&mut self) -> sensors_types_fidl::SensorInfo {
-        sensors_types_fidl::SensorInfo {
-            sensor_id: Some(self.id.clone()),
-            name: Some(self.name.clone()),
-            ..Default::default()
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct SensorManager {
@@ -32,7 +17,7 @@ pub struct SensorManager {
 }
 
 enum IncomingRequest {
-    SensorManager(sensors_fidl::ManagerRequestStream),
+    SensorManager(ManagerRequestStream),
 }
 
 async fn handle_sensors_request(
@@ -41,9 +26,29 @@ async fn handle_sensors_request(
 ) -> anyhow::Result<()> {
     match request {
         ManagerRequest::GetSensorsList { responder } => {
-            let fidl_sensors =
-                sensors.values().map(|sensor| sensor.clone().to_fidl()).collect::<Vec<_>>();
+            let fidl_sensors = sensors.values().map(|sensor| sensor.clone()).collect::<Vec<_>>();
             let _ = responder.send(fidl_sensors.as_slice());
+        }
+        ManagerRequest::ConfigureSensorRates { id, sensor_rate_config: _, responder } => {
+            if !sensors.keys().contains(&id) {
+                tracing::warn!(
+                    "Received ConfigureSensorRates request for unknown sensor id: {}",
+                    id
+                );
+                let _ = responder.send(Err(ConfigureSensorRateError::InvalidSensorId));
+            }
+        }
+        ManagerRequest::Activate { id, responder } => {
+            if !sensors.keys().contains(&id) {
+                tracing::warn!("Received request to activate unknown sensor id: {}", id);
+                let _ = responder.send(Err(ActivateSensorError::InvalidSensorId));
+            }
+        }
+        ManagerRequest::Deactivate { id, responder } => {
+            if !sensors.keys().contains(&id) {
+                tracing::warn!("Received request to deactivate unknown sensor id: {}", id);
+                let _ = responder.send(Err(DeactivateSensorError::InvalidSensorId));
+            }
         }
         ManagerRequest::_UnknownMethod { ordinal, .. } => {
             tracing::warn!("ManagerRequest::_UnknownMethod with ordinal {}", ordinal);
@@ -53,7 +58,7 @@ async fn handle_sensors_request(
 }
 
 async fn handle_sensor_manager_request_stream(
-    mut stream: sensors_fidl::ManagerRequestStream,
+    mut stream: ManagerRequestStream,
     sensors: HashMap<i32, SensorInfo>,
 ) -> Result<(), Error> {
     while let Some(request) =
@@ -68,7 +73,11 @@ async fn handle_sensor_manager_request_stream(
 
 impl SensorManager {
     pub fn new() -> Self {
-        Self { sensors: HashMap::new() }
+        let mut sensors = HashMap::new();
+        let sensor = SensorInfo { sensor_id: Some(1), ..Default::default() };
+        sensors.insert(sensor.sensor_id.unwrap(), sensor);
+
+        Self { sensors }
     }
 
     pub async fn run(&mut self) -> Result<(), Error> {
@@ -95,13 +104,12 @@ impl SensorManager {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fidl_fuchsia_sensors as sensors_fidl};
+    use super::*;
 
     #[fuchsia::test]
     async fn test_handle_get_sensors_list() {
         let manager = SensorManager::new();
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<sensors_fidl::ManagerMarker>().unwrap();
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ManagerMarker>().unwrap();
         let sensors = manager.sensors.clone();
         fuchsia_async::Task::spawn(async move {
             handle_sensor_manager_request_stream(stream, sensors)
@@ -111,6 +119,7 @@ mod tests {
         .detach();
 
         let fidl_sensors = proxy.get_sensors_list().await.unwrap();
-        assert!(fidl_sensors.is_empty());
+        let sensor = SensorInfo { sensor_id: Some(1), ..Default::default() };
+        assert!(fidl_sensors.contains(&sensor));
     }
 }

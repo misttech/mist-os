@@ -33,7 +33,7 @@ class PlaybackController : public camera::actor::ActorBase {
   using SensorEvent = fuchsia_sensors_types::SensorEvent;
   using SensorId = fuchsia_sensors_types::SensorId;
   using SensorInfo = fuchsia_sensors_types::SensorInfo;
-  using SensorRateConfig = fuchsia_hardware_sensors::SensorRateConfig;
+  using SensorRateConfig = fuchsia_sensors_types::SensorRateConfig;
 
   static constexpr auto kLowerTimestamp = [](const SensorEvent& l, const SensorEvent& r) {
     return l.timestamp() > r.timestamp();
