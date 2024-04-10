@@ -243,7 +243,7 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
         let wait_for_netmgr =
             wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None)
                 .fuse();
-        futures::pin_mut!(wait_for_netmgr);
+        let mut wait_for_netmgr = pin!(wait_for_netmgr);
         let (if_id, _if_name): (u64, String) = interfaces::wait_for_non_loopback_interface_up(
             &interface_state,
             &mut wait_for_netmgr,
