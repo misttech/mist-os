@@ -168,8 +168,10 @@ impl GenerateBuildArchive {
                     Image::ZBI { path, signed: _ } => Some((path, "zircon-a.zbi")),
                     Image::VBMeta(path) => Some((path, "zircon-a.vbmeta")),
                     Image::FVM(path) => Some((path, "storage-full.blk")),
+                    Image::Fxfs { path, .. } => Some((path, "fxfs.blk")),
                     Image::QemuKernel(path) => Some((path, "qemu-kernel.kernel")),
                     Image::FVMFastboot(path) => Some((path, "fvm.fastboot.blk")),
+                    Image::FxfsSparse { path, .. } => Some((path, "fxfs.sparse.blk")),
                     _ => None,
                 };
                 if let Some((path, name)) = entry {
