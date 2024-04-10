@@ -20,6 +20,10 @@ namespace display {
 // Instances are guaranteed to represent images whose dimensions are supported
 // by the display stack.
 class ImageMetadata {
+ private:
+  // Enables creating instances using the designated initializer syntax.
+  struct ConstructorArgs;
+
  public:
   // The maximum image width supported by the display stack.
   static constexpr int kMaxWidth = 65535;
@@ -31,6 +35,11 @@ class ImageMetadata {
   [[nodiscard]] static constexpr bool IsValid(
       const fuchsia_hardware_display_types::wire::ImageMetadata& fidl_image_metadata);
   [[nodiscard]] static constexpr bool IsValid(const image_metadata_t& banjo_image_metadata);
+
+  // Constructor that enables the designated initializer syntax.
+  //
+  // NOLINTNEXTLINE(google-explicit-constructor)
+  constexpr ImageMetadata(const ImageMetadata::ConstructorArgs& args);
 
   // `fidl_image_metadata` must be convertible to a valid ImageMetadata.
   explicit constexpr ImageMetadata(
@@ -58,9 +67,16 @@ class ImageMetadata {
   constexpr ImageTilingType tiling_type() const { return tiling_type_; }
 
  private:
+  struct ConstructorArgs {
+    int32_t width;
+    int32_t height;
+    ImageTilingType tiling_type;
+  };
+
   // In debug mode, asserts that IsValid() would return true.
   //
   // IsValid() variant with developer-friendly debug assertions.
+  static constexpr void DebugAssertIsValid(const ImageMetadata::ConstructorArgs& args);
   static constexpr void DebugAssertIsValid(
       const fuchsia_hardware_display_types::wire::ImageMetadata& fidl_image_metadata);
   static constexpr void DebugAssertIsValid(const image_metadata_t& banjo_image_metadata);
@@ -107,6 +123,11 @@ constexpr bool ImageMetadata::IsValid(const image_metadata_t& banjo_image_metada
   return true;
 }
 
+constexpr ImageMetadata::ImageMetadata(const ImageMetadata::ConstructorArgs& args)
+    : width_(args.width), height_(args.height), tiling_type_(args.tiling_type) {
+  DebugAssertIsValid(args);
+}
+
 constexpr ImageMetadata::ImageMetadata(
     const fuchsia_hardware_display_types::wire::ImageMetadata& fidl_image_metadata)
     : width_(static_cast<int32_t>(fidl_image_metadata.width)),
@@ -149,6 +170,14 @@ constexpr image_metadata_t ImageMetadata::ToBanjo() const {
       .height = static_cast<uint32_t>(height_),
       .tiling_type = tiling_type_.ToBanjo(),
   };
+}
+
+// static
+constexpr void ImageMetadata::DebugAssertIsValid(const ImageMetadata::ConstructorArgs& args) {
+  ZX_DEBUG_ASSERT(args.width >= 0);
+  ZX_DEBUG_ASSERT(args.width <= ImageMetadata::kMaxWidth);
+  ZX_DEBUG_ASSERT(args.height >= 0);
+  ZX_DEBUG_ASSERT(args.height <= ImageMetadata::kMaxHeight);
 }
 
 // static

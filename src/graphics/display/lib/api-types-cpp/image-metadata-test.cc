@@ -15,26 +15,23 @@ namespace display {
 
 namespace {
 
-constexpr ImageMetadata kSmallDisplay =
-    ImageMetadata(fuchsia_hardware_display_types::wire::ImageMetadata{
-        .width = 800,
-        .height = 600,
-        .tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeLinear,
-    });
+constexpr ImageMetadata kSmallDisplay({
+    .width = 800,
+    .height = 600,
+    .tiling_type = kImageTilingTypeLinear,
+});
 
-constexpr ImageMetadata kSmallDisplay2 =
-    ImageMetadata(fuchsia_hardware_display_types::wire::ImageMetadata{
-        .width = 800,
-        .height = 600,
-        .tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeLinear,
-    });
+constexpr ImageMetadata kSmallDisplay2({
+    .width = 800,
+    .height = 600,
+    .tiling_type = kImageTilingTypeLinear,
+});
 
-constexpr ImageMetadata kSmallCaptured =
-    ImageMetadata(fuchsia_hardware_display_types::wire::ImageMetadata{
-        .width = 800,
-        .height = 600,
-        .tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeCapture,
-    });
+constexpr ImageMetadata kSmallCaptured({
+    .width = 800,
+    .height = 600,
+    .tiling_type = kImageTilingTypeCapture,
+});
 
 TEST(ImageMetadataTest, EqualityIsReflexive) {
   EXPECT_EQ(kSmallDisplay, kSmallDisplay);
@@ -48,23 +45,21 @@ TEST(ImageMetadataTest, EqualityIsSymmetric) {
 }
 
 TEST(ImageMetadataTest, EqualityForDifferentWidths) {
-  static constexpr ImageMetadata kSmallSquareDisplay =
-      ImageMetadata(fuchsia_hardware_display_types::wire::ImageMetadata{
-          .width = 600,
-          .height = 600,
-          .tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeLinear,
-      });
+  static constexpr ImageMetadata kSmallSquareDisplay({
+      .width = 600,
+      .height = 600,
+      .tiling_type = kImageTilingTypeLinear,
+  });
   EXPECT_NE(kSmallDisplay, kSmallSquareDisplay);
   EXPECT_NE(kSmallSquareDisplay, kSmallDisplay);
 }
 
 TEST(ImageMetadataTest, EqualityForDifferentHeights) {
-  static constexpr ImageMetadata kLargeSquareDisplay =
-      ImageMetadata(fuchsia_hardware_display_types::wire::ImageMetadata{
-          .width = 800,
-          .height = 800,
-          .tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeLinear,
-      });
+  static constexpr ImageMetadata kLargeSquareDisplay({
+      .width = 800,
+      .height = 800,
+      .tiling_type = kImageTilingTypeLinear,
+  });
   EXPECT_NE(kSmallDisplay, kLargeSquareDisplay);
   EXPECT_NE(kLargeSquareDisplay, kSmallDisplay);
 }
@@ -72,6 +67,17 @@ TEST(ImageMetadataTest, EqualityForDifferentHeights) {
 TEST(ImageMetadataTest, EqualityForDifferentTilingTypes) {
   EXPECT_NE(kSmallDisplay, kSmallCaptured);
   EXPECT_NE(kSmallCaptured, kSmallDisplay);
+}
+
+TEST(ImageMetadataTest, FromDesignatedInitializer) {
+  static constexpr ImageMetadata image_metadata({
+      .width = 640,
+      .height = 480,
+      .tiling_type = kImageTilingTypeCapture,
+  });
+  EXPECT_EQ(640, image_metadata.width());
+  EXPECT_EQ(480, image_metadata.height());
+  EXPECT_EQ(kImageTilingTypeCapture, image_metadata.tiling_type());
 }
 
 TEST(ImageMetadataTest, FromFidlImageMetadata) {
@@ -101,10 +107,10 @@ TEST(ImageMetadataTest, FromBanjoImageMetadata) {
 }
 
 TEST(ImageMetadataTest, ToFidlImageMetadata) {
-  static constexpr ImageMetadata image_metadata(fuchsia_hardware_display_types::wire::ImageMetadata{
+  static constexpr ImageMetadata image_metadata({
       .width = 640,
       .height = 480,
-      .tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeCapture,
+      .tiling_type = kImageTilingTypeCapture,
   });
 
   static constexpr fuchsia_hardware_display_types::wire::ImageMetadata fidl_image_metadata =
@@ -116,10 +122,10 @@ TEST(ImageMetadataTest, ToFidlImageMetadata) {
 }
 
 TEST(ImageMetadataTest, ToBanjoImageMetadata) {
-  static constexpr ImageMetadata image_metadata(fuchsia_hardware_display_types::wire::ImageMetadata{
+  static constexpr ImageMetadata image_metadata({
       .width = 640,
       .height = 480,
-      .tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeCapture,
+      .tiling_type = kImageTilingTypeCapture,
   });
 
   static constexpr image_metadata_t banjo_image_metadata = image_metadata.ToBanjo();
