@@ -17,7 +17,7 @@ pub(super) async fn update_servers(
 ) {
     trace!("updating DNS servers obtained from {:?} to {:?}", source, servers);
 
-    let () = dns_servers.set_servers_from_source(source, servers);
+    dns_servers.set_servers_from_source(source, servers);
     let servers = dns_servers.consolidated();
     trace!("updating LookupAdmin with DNS servers = {:?}", servers);
 

@@ -142,7 +142,7 @@ pub(super) fn start_client(
 
     // Not all environments may have a DHCPv6 client service so we consider this a
     // non-fatal error.
-    let () = dhcpv6_client_provider
+    dhcpv6_client_provider
         .new_client(&params.into(), server)
         .context("error creating new DHCPv6 client")
         .map_err(errors::Error::NonFatal)?;

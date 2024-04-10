@@ -1161,8 +1161,7 @@ impl<'a> NetCfg<'a> {
                             with source = {:?}: {:?}",
                             source, e
                         );
-                        let () = self
-                            .handle_dns_server_watcher_done(source, dns_watchers)
+                        self.handle_dns_server_watcher_done(source, dns_watchers)
                             .await
                             .with_context(|| {
                                 format!(
@@ -1778,7 +1777,7 @@ impl<'a> NetCfg<'a> {
                                     sockaddr.display_ext(),
                                 );
 
-                                let () = dhcpv6::stop_client(
+                                dhcpv6::stop_client(
                                     &lookup_admin,
                                     dns_servers,
                                     *id,
@@ -2253,7 +2252,7 @@ impl<'a> NetCfg<'a> {
 
             if let Some(dhcp_server) = &self.dhcp_server {
                 info!("configuring DHCP server for WLAN AP (interface ID={})", interface_id);
-                let () = Self::configure_wlan_ap_and_dhcp_server(
+                Self::configure_wlan_ap_and_dhcp_server(
                     &mut self.filter_enabled_state,
                     &mut self.filter_control,
                     interface_id,
@@ -2321,7 +2320,7 @@ impl<'a> NetCfg<'a> {
 
             info!("discovered host interface with id={}, configuring interface", interface_id);
 
-            let () = Self::configure_host(
+            Self::configure_host(
                 &mut self.filter_enabled_state,
                 &mut self.filter_control,
                 &self.stack,
@@ -2370,7 +2369,7 @@ impl<'a> NetCfg<'a> {
 
         // Enable DHCP.
         if start_in_stack_dhcpv4 {
-            let () = stack
+            stack
                 .set_dhcp_client_enabled(interface_id.get(), true)
                 .await
                 .unwrap_or_else(|err| exit_with_fidl_error(err))
@@ -2421,7 +2420,7 @@ impl<'a> NetCfg<'a> {
             prefix_len: WLAN_AP_PREFIX_LEN.get(),
         };
 
-        let () = control
+        control
             .add_address(
                 &addr,
                 &fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
@@ -2434,7 +2433,7 @@ impl<'a> NetCfg<'a> {
         // wish to retain the handle in the future to allow external address removal (e.g. by a
         // user) to be observed so that an error can be emitted (as such removal would break a
         // critical user journey).
-        let () = address_state_provider
+        address_state_provider
             .detach()
             .map_err(Into::into)
             .map_err(map_address_state_provider_error("error sending detach request"))?;
@@ -2455,7 +2454,7 @@ impl<'a> NetCfg<'a> {
         let state_stream =
             fidl_fuchsia_net_interfaces_ext::admin::assignment_state_stream(address_state_provider);
         let mut state_stream = pin!(state_stream);
-        let () = fidl_fuchsia_net_interfaces_ext::admin::wait_assignment_state(
+        fidl_fuchsia_net_interfaces_ext::admin::wait_assignment_state(
             &mut state_stream,
             fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
         )
@@ -2463,7 +2462,7 @@ impl<'a> NetCfg<'a> {
         .map_err(map_address_state_provider_error("failed to add interface address for WLAN AP"))?;
 
         let subnet = fidl_fuchsia_net_ext::apply_subnet_mask(addr);
-        let () = stack
+        stack
             .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
                 subnet,
                 device_id: interface_id.get(),
@@ -2497,7 +2496,7 @@ impl<'a> NetCfg<'a> {
         // will be used on a new interface. If leases exist, configuring the DHCP
         // server parameters may fail (AddressPool).
         debug!("clearing DHCP leases");
-        let () = dhcp_server
+        dhcp_server
             .clear_leases()
             .await
             .context("error sending clear DHCP leases request")
@@ -2509,7 +2508,7 @@ impl<'a> NetCfg<'a> {
         // Configure the DHCP server.
         let v = vec![ipv4];
         debug!("setting DHCP IpAddrs parameter to {:?}", v);
-        let () = dhcp_server
+        dhcp_server
             .set_parameter(&fnet_dhcp::Parameter::IpAddrs(v))
             .await
             .context("error sending set DHCP IpAddrs parameter request")
@@ -2520,7 +2519,7 @@ impl<'a> NetCfg<'a> {
 
         let v = vec![name];
         debug!("setting DHCP BoundDeviceNames parameter to {:?}", v);
-        let () = dhcp_server
+        dhcp_server
             .set_parameter(&fnet_dhcp::Parameter::BoundDeviceNames(v))
             .await
             .context("error sending set DHCP BoundDeviceName parameter request")
@@ -2535,7 +2534,7 @@ impl<'a> NetCfg<'a> {
             ..Default::default()
         };
         debug!("setting DHCP LeaseLength parameter to {:?}", v);
-        let () = dhcp_server
+        dhcp_server
             .set_parameter(&fnet_dhcp::Parameter::Lease(v))
             .await
             .context("error sending set DHCP LeaseLength parameter request")
@@ -3081,7 +3080,7 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
     // setting default DNS servers when interfaces are in Delegated provisioning mode.
     let servers = servers.into_iter().map(static_source_from_ip).collect();
     debug!("updating default servers to {:?}", servers);
-    let () = netcfg.update_dns_servers(DnsServersUpdateSource::Default, servers).await;
+    netcfg.update_dns_servers(DnsServersUpdateSource::Default, servers).await;
 
     M::run(netcfg, allowed_bridge_upstream_device_classes)
         .map_err(|e| {
@@ -3540,7 +3539,7 @@ mod tests {
 
         // Should start the DHCPv6 client when we get an interface changed event that shows the
         // interface as up with an link-local address.
-        let () = netcfg
+        netcfg
             .handle_interface_watcher_event(
                 fnet_interfaces::Event::Added(fnet_interfaces::Properties {
                     id: Some(INTERFACE_ID.get()),
@@ -3568,27 +3567,21 @@ mod tests {
         .expect("error checking for new client with sockaddr1");
 
         // Drop the server-end of the lookup admin to simulate a down lookup admin service.
-        let () = std::mem::drop(lookup_admin);
+        std::mem::drop(lookup_admin);
 
         // Not having any more link local IPv6 addresses should terminate the client.
-        let () = handle_interface_changed_event(
-            &mut netcfg,
-            &mut dns_watchers,
-            None,
-            Some(ipv6addrs(None)),
-        )
-        .await
-        .expect("error handling interface changed event with sockaddr1 removed");
+        handle_interface_changed_event(&mut netcfg, &mut dns_watchers, None, Some(ipv6addrs(None)))
+            .await
+            .expect("error handling interface changed event with sockaddr1 removed");
 
         // Another update without any link-local IPv6 addresses should do nothing
         // since the DHCPv6 client was already stopped.
-        let () =
-            handle_interface_changed_event(&mut netcfg, &mut dns_watchers, None, Some(Vec::new()))
-                .await
-                .expect("error handling interface changed event with sockaddr1 removed");
+        handle_interface_changed_event(&mut netcfg, &mut dns_watchers, None, Some(Vec::new()))
+            .await
+            .expect("error handling interface changed event with sockaddr1 removed");
 
         // Update interface with a link-local address to create a new DHCPv6 client.
-        let () = handle_interface_changed_event(
+        handle_interface_changed_event(
             &mut netcfg,
             &mut dns_watchers,
             None,
@@ -3607,7 +3600,7 @@ mod tests {
         .expect("error checking for new client with sockaddr1");
 
         // Update offline status to down to stop DHCPv6 client.
-        let () = handle_interface_changed_event(&mut netcfg, &mut dns_watchers, Some(false), None)
+        handle_interface_changed_event(&mut netcfg, &mut dns_watchers, Some(false), None)
             .await
             .expect("error handling interface changed event with sockaddr1 removed");
 
@@ -4374,7 +4367,7 @@ mod tests {
 
         // Should start the DHCPv6 client when we get an interface changed event that shows the
         // interface as up with an link-local address.
-        let () = netcfg
+        netcfg
             .handle_interface_watcher_event(
                 fnet_interfaces::Event::Added(fnet_interfaces::Properties {
                     id: Some(INTERFACE_ID.get()),
@@ -4437,7 +4430,7 @@ mod tests {
 
         // Should start a new DHCPv6 client when we get an interface changed event that shows the
         // interface as up with an link-local address.
-        let () = handle_interface_changed_event(
+        handle_interface_changed_event(
             &mut netcfg,
             &mut dns_watchers,
             None,
@@ -4472,7 +4465,7 @@ mod tests {
 
         // Should start a new DHCPv6 client when we get an interface changed event that shows the
         // interface as up with an link-local address.
-        let () = handle_interface_changed_event(
+        handle_interface_changed_event(
             &mut netcfg,
             &mut dns_watchers,
             Some(true), /* up */
@@ -4525,7 +4518,7 @@ mod tests {
         )
         .await;
         assert!(!dns_watchers.contains_key(&DHCPV6_DNS_SOURCE), "should not have a watcher");
-        let () = handle_interface_changed_event(
+        handle_interface_changed_event(
             &mut netcfg,
             &mut dns_watchers,
             None,
@@ -4725,7 +4718,7 @@ mod tests {
             let sockaddr = dhcpv6_sockaddr(id);
 
             // Fake an interface added event.
-            let () = netcfg
+            netcfg
                 .handle_interface_watcher_event(
                     fnet_interfaces::Event::Added(fnet_interfaces::Properties {
                         id: Some(id.get()),
@@ -5130,7 +5123,7 @@ mod tests {
             let sockaddr = dhcpv6_sockaddr(id);
 
             // Fake an interface added event.
-            let () = netcfg
+            netcfg
                 .handle_interface_watcher_event(
                     fnet_interfaces::Event::Added(fnet_interfaces::Properties {
                         id: Some(id.get()),

@@ -93,7 +93,7 @@ impl NetworkDeviceInstance {
         let get_device = || {
             let (device, device_server_end) =
                 fidl::endpoints::create_endpoints::<fhwnet::DeviceMarker>();
-            let () = device_instance
+            device_instance
                 .get_device(device_server_end)
                 .context("calling DeviceInstance get_device")
                 .map_err(errors::Error::NonFatal)?;
@@ -109,7 +109,7 @@ impl NetworkDeviceInstance {
             fidl::endpoints::create_proxy::<fhwnet::PortWatcherMarker>()
                 .context("create port watcher endpoints")
                 .map_err(errors::Error::NonFatal)?;
-        let () = device
+        device
             .get_port_watcher(port_watcher_server_end)
             .context("calling Device get_port_watcher")
             .map_err(errors::Error::NonFatal)?;
@@ -121,7 +121,7 @@ impl NetworkDeviceInstance {
         .map_err(errors::Error::NonFatal)?;
 
         let device_for_netstack = get_device()?;
-        let () = installer
+        installer
             .install_device(device_for_netstack, device_control_server_end)
             // NB: Failing to communicate with installer is a fatal error, that
             // means the Netstack is gone, which we don't tolerate.
@@ -153,7 +153,7 @@ impl NetworkDeviceInstance {
                                 fidl::endpoints::create_proxy::<fhwnet::PortMarker>()
                                     .context("create port endpoints")
                                     .map_err(errors::Error::NonFatal)?;
-                            let () = device
+                            device
                                 .get_port(&port_id, port_server_end)
                                 .context("calling Device get_port")
                                 .map_err(errors::Error::NonFatal)?;
@@ -191,8 +191,7 @@ impl NetworkDeviceInstance {
             fidl::endpoints::create_proxy::<fhwnet::MacAddressingMarker>()
                 .context("create MacAddressing proxy")
                 .map_err(errors::Error::NonFatal)?;
-        let () = port
-            .get_mac(mac_addressing_server_end)
+        port.get_mac(mac_addressing_server_end)
             .context("calling Port get_mac")
             .map_err(errors::Error::NonFatal)?;
 
@@ -228,7 +227,7 @@ impl NetworkDeviceInstance {
                 .context("create Control proxy")
                 .map_err(errors::Error::NonFatal)?;
 
-        let () = device_control
+        device_control
             .create_interface(
                 &port_id,
                 control_server_end,

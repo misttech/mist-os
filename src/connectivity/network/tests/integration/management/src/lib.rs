@@ -113,10 +113,10 @@ async fn with_netcfg_owned_device<
     // Add a device to the realm.
     let network = sandbox.create_network(name).await.expect("create network");
     let endpoint = network.create_endpoint(name).await.expect("create endpoint");
-    let () = endpoint.set_link_up(true).await.expect("set link up");
+    endpoint.set_link_up(true).await.expect("set link up");
     let endpoint_mount_path = netemul::devfs_device_path("ep");
     let endpoint_mount_path = endpoint_mount_path.as_path();
-    let () = realm.add_virtual_device(&endpoint, endpoint_mount_path).await.unwrap_or_else(|e| {
+    realm.add_virtual_device(&endpoint, endpoint_mount_path).await.unwrap_or_else(|e| {
         panic!("add virtual device {}: {:?}", endpoint_mount_path.display(), e)
     });
 
@@ -136,7 +136,7 @@ async fn with_netcfg_owned_device<
     .await
     .expect("wait for non loopback interface");
 
-    let () = after_interface_up(if_id, &network, &interface_state, &realm, &sandbox).await;
+    after_interface_up(if_id, &network, &interface_state, &realm, &sandbox).await;
 
     // Wait for orderly shutdown of the test realm to complete before allowing
     // test interfaces to be cleaned up.
@@ -586,7 +586,7 @@ async fn test_oir_interface_name_conflict_uninstall_existing<M: Manager, N: Nets
         .expect("create ethx7");
     let endpoint_mount_path = netemul::devfs_device_path("ep1");
     let endpoint_mount_path = endpoint_mount_path.as_path();
-    let () = realm.add_virtual_device(&if1, endpoint_mount_path).await.unwrap_or_else(|e| {
+    realm.add_virtual_device(&if1, endpoint_mount_path).await.unwrap_or_else(|e| {
         panic!("add virtual device1 {}: {:?}", endpoint_mount_path.display(), e)
     });
 
@@ -609,7 +609,7 @@ async fn test_oir_interface_name_conflict_uninstall_existing<M: Manager, N: Nets
         .expect("create ethx7");
     let endpoint_mount_path = netemul::devfs_device_path("ep2");
     let endpoint_mount_path = endpoint_mount_path.as_path();
-    let () = realm.add_virtual_device(&if2, endpoint_mount_path).await.unwrap_or_else(|e| {
+    realm.add_virtual_device(&if2, endpoint_mount_path).await.unwrap_or_else(|e| {
         panic!("add virtual device2 {}: {:?}", endpoint_mount_path.display(), e)
     });
 
@@ -637,7 +637,7 @@ async fn test_oir_interface_name_conflict_uninstall_existing<M: Manager, N: Nets
     // This is necessary to prevent test interfaces from being removed while
     // NetCfg is still in the process of configuring them after adding them to
     // the Netstack, which causes spurious errors.
-    let () = realm.shutdown().await.expect("failed to shutdown realm");
+    realm.shutdown().await.expect("failed to shutdown realm");
 }
 
 /// Tests that when a conflicting interface already exists with the same name,
@@ -726,7 +726,7 @@ async fn test_oir_interface_name_conflict_reject<M: Manager, N: Netstack>(
             .expect("create x");
         let endpoint_mount_path = netemul::devfs_device_path("ep1");
         let endpoint_mount_path = endpoint_mount_path.as_path();
-        let () = realm.add_virtual_device(&if1, endpoint_mount_path).await.unwrap_or_else(|e| {
+        realm.add_virtual_device(&if1, endpoint_mount_path).await.unwrap_or_else(|e| {
             panic!("add virtual device1 {}: {:?}", endpoint_mount_path.display(), e)
         });
         either::Either::Left(if1)
@@ -762,7 +762,7 @@ async fn test_oir_interface_name_conflict_reject<M: Manager, N: Netstack>(
         .expect("create x");
     let endpoint_mount_path = netemul::devfs_device_path("ep2");
     let endpoint_mount_path = endpoint_mount_path.as_path();
-    let () = realm.add_virtual_device(&if2, endpoint_mount_path).await.unwrap_or_else(|e| {
+    realm.add_virtual_device(&if2, endpoint_mount_path).await.unwrap_or_else(|e| {
         panic!("add virtual device2 {}: {:?}", endpoint_mount_path.display(), e)
     });
 
@@ -782,7 +782,7 @@ async fn test_oir_interface_name_conflict_reject<M: Manager, N: Netstack>(
     // This is necessary to prevent test interfaces from being removed while
     // NetCfg is still in the process of configuring them after adding them to
     // the Netstack, which causes spurious errors.
-    let () = realm.shutdown().await.expect("failed to shutdown realm");
+    realm.shutdown().await.expect("failed to shutdown realm");
 }
 
 /// Make sure the DHCP server is configured to start serving requests when NetCfg discovers
@@ -804,7 +804,7 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
     /// Check if the DHCP server is started.
     async fn check_dhcp_status(dhcp_server: &fnet_dhcp::Server_Proxy, started: bool) {
         for _ in 0..RETRY_COUNT {
-            let () = fuchsia_async::Timer::new(POLL_WAIT.after_now()).await;
+            fuchsia_async::Timer::new(POLL_WAIT.after_now()).await;
 
             if started == dhcp_server.is_serving().await.expect("query server status request") {
                 return;
@@ -852,11 +852,11 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
             .await
             .expect("create wlan ap");
         let path = netemul::devfs_device_path(&format!("dhcp-server-ep-{}", offset));
-        let () = realm
+        realm
             .add_virtual_device(&wlan_ap, path.as_path())
             .await
             .unwrap_or_else(|e| panic!("add WLAN AP virtual device {}: {:?}", path.display(), e));
-        let () = wlan_ap.set_link_up(true).await.expect("set wlan ap link up");
+        wlan_ap.set_link_up(true).await.expect("set wlan ap link up");
 
         // Make sure the WLAN AP interface is added to the Netstack and is brought up with
         // the right IP address.
@@ -950,7 +950,7 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
         let dhcp_server_ref = &dhcp_server;
         let checks_ref = &checks;
         if !try_any(stream::iter(0..RETRY_COUNT).then(|i| async move {
-            let () = fuchsia_async::Timer::new(POLL_WAIT.after_now()).await;
+            fuchsia_async::Timer::new(POLL_WAIT.after_now()).await;
             try_all(stream::iter(checks_ref.iter()).then(|(param_name, param_value)| async move {
                 Ok(dhcp_server_ref
                     .get_parameter(*param_name)
@@ -976,7 +976,7 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
         }
 
         // The DHCP server should be started.
-        let () = check_dhcp_status(&dhcp_server, true).await;
+        check_dhcp_status(&dhcp_server, true).await;
 
         // Add a host endpoint to the network. It should be configured by the DHCP server.
         let host = network
@@ -984,11 +984,11 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
             .await
             .expect("create host");
         let path = netemul::devfs_device_path(&format!("dhcp-client-ep-{}", offset));
-        let () = realm
+        realm
             .add_virtual_device(&host, path.as_path())
             .await
             .unwrap_or_else(|e| panic!("add host virtual device {}: {:?}", path.display(), e));
-        let () = host.set_link_up(true).await.expect("set host link up");
+        host.set_link_up(true).await.expect("set host link up");
         let host_id = fidl_fuchsia_net_interfaces_ext::wait_interface(
             event_stream.by_ref(),
             &mut if_map,
@@ -1040,15 +1040,15 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
         .expect("wait for host interface to be configured");
 
         // Take the interface down, the DHCP server should be stopped.
-        let () = wlan_ap.set_link_up(false).await.expect("set wlan ap link down");
-        let () = check_dhcp_status(&dhcp_server, false).await;
+        wlan_ap.set_link_up(false).await.expect("set wlan ap link down");
+        check_dhcp_status(&dhcp_server, false).await;
 
         // Bring the interface back up, the DHCP server should be started.
-        let () = wlan_ap.set_link_up(true).await.expect("set wlan ap link up");
-        let () = check_dhcp_status(&dhcp_server, true).await;
+        wlan_ap.set_link_up(true).await.expect("set wlan ap link up");
+        check_dhcp_status(&dhcp_server, true).await;
         // Remove the interface, the DHCP server should be stopped.
         drop(wlan_ap);
-        let () = check_dhcp_status(&dhcp_server, false).await;
+        check_dhcp_status(&dhcp_server, false).await;
 
         // Remove the host endpoint from the network and wait for the interface
         // to be removed from the netstack.
@@ -1057,7 +1057,7 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
         // times and observe DHCP address acquisition on a new interface each
         // time.
         drop(host);
-        let () = fidl_fuchsia_net_interfaces_ext::wait_interface(
+        fidl_fuchsia_net_interfaces_ext::wait_interface(
             event_stream.by_ref(),
             &mut if_map,
             |if_map| (!if_map.contains_key(&host_id)).then_some(()),
@@ -1094,7 +1094,7 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
     for i in 0..=1 {
         let test_fut = wlan_ap_dhcp_server_inner(&sandbox, &realm, i).fuse();
         let mut test_fut = pin!(test_fut);
-        let () = futures::select! {
+        futures::select! {
             () = test_fut => {},
             stopped_event = wait_for_netmgr => {
                 panic!(
@@ -1147,7 +1147,7 @@ async fn observes_stop_events<M: Manager, N: Netstack>(name: &str) {
         .result()
         .expect("error event on started");
 
-    let () = realm.shutdown().await.expect("shutdown");
+    realm.shutdown().await.expect("shutdown");
 
     let event =
         event_matcher.wait::<events::Stopped>(&mut event_stream).await.expect("got stopped event");

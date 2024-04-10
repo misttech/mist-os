@@ -131,19 +131,19 @@ impl<'a> Guest<'a> {
             .create_endpoint(format!("host{}", interface))
             .await
             .expect("failed to create endpoint on host realm connected to guest");
-        let () = ep.set_link_up(true).await.expect("failed to enable endpoint");
+        ep.set_link_up(true).await.expect("failed to enable endpoint");
 
         let (device, port_id) = ep.get_netdevice().await.expect("failed to get netdevice");
         let device =
             device.into_proxy().expect("fuchsia.hardware.network/Device into_proxy failed");
         let (port, server_end) =
             fidl::endpoints::create_endpoints::<fhardware_network::PortMarker>();
-        let () = device.get_port(&port_id, server_end).expect("get_port");
+        device.get_port(&port_id, server_end).expect("get_port");
 
         let (interface_proxy, server_end) =
             fidl::endpoints::create_proxy::<fnet_virtualization::InterfaceMarker>()
                 .expect("failed to create fuchsia.net.virtualization/Interface proxy");
-        let () = network_proxy.add_port(port, server_end).expect("add_port");
+        network_proxy.add_port(port, server_end).expect("add_port");
         Self { interface_proxy, realm, _net: net, _ep: ep, guest_if }
     }
 }
@@ -515,7 +515,7 @@ async fn virtualization<N: Netstack>(name: &str, sub_name: &str, steps: &[Step])
                 .await;
 
                 // Verify that the bridge is working
-                let () = bridge
+                bridge
                     .as_ref()
                     .expect("bridge must be present")
                     .ping_pairwise(nodes.as_slice())

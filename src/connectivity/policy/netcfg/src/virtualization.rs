@@ -256,7 +256,7 @@ impl<'a, B: BridgeHandler> Virtualization<'a, B> {
                         // The virtual network has been shut down and is notifying us to
                         // remove the interface.
                         result = network_close_rx => {
-                            let () = result.expect("sender should not be dropped");
+                            result.expect("sender should not be dropped");
                             "network has been shut down".to_string()
                         },
                         // A terminal event was sent on the interface control channel,
