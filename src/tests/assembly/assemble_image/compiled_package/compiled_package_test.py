@@ -56,9 +56,12 @@ class CompiledPackageTest(unittest.TestCase):
         )
 
         self.assertIn(
-            "meta/qux.cm",
-            [blob["destination"] for blob in manifest["bootfs_files"]],
-            "The image assembly config should have meta/qux.cm in the bootfs files",
+            "for-test2",
+            [
+                os.path.basename(os.path.dirname(file))
+                for file in manifest["bootfs_packages"]
+            ],
+            "The image assembly config should have for-test2 in the bootfs packages",
         )
 
         # Make sure the components were compiled

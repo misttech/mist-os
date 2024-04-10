@@ -23,6 +23,11 @@ fuchsia_component("f2fs-component") {
   deps = [ ":f2fs" ]
 }
 
+fuchsia_package("package") {
+  package_name = "f2fs"
+  deps = [ ":f2fs-component" ]
+}
+
 test("f2fs_component_test") {
   sources = [ "f2fs_test.cc" ]
   deps = [

@@ -33,36 +33,36 @@ template("fshost_cml") {
     if (!defined(options.bootfs_only) || !options.bootfs_only) {
       if (defined(options.use_disk_migration) && options.use_disk_migration) {
         sources += [
-          "//src/storage/fshost/meta/blobfs_fshost.cml",
-          "//src/storage/fshost/meta/f2fs_fshost.cml",
-          "//src/storage/fshost/meta/fxfs_fshost.cml",
-          "//src/storage/fshost/meta/minfs_fshost.cml",
+          "//src/storage/fshost/meta/blobfs_fshost_test.cml",
+          "//src/storage/fshost/meta/f2fs_fshost_test.cml",
+          "//src/storage/fshost/meta/fxfs_fshost_test.cml",
+          "//src/storage/fshost/meta/minfs_fshost_test.cml",
         ]
       } else if (options.data_filesystem_format == "minfs") {
         sources += [
-          "//src/storage/fshost/meta/blobfs_fshost.cml",
-          "//src/storage/fshost/meta/minfs_fshost.cml",
+          "//src/storage/fshost/meta/blobfs_fshost_test.cml",
+          "//src/storage/fshost/meta/minfs_fshost_test.cml",
           "//src/storage/fshost/meta/non_fxfs_fshost.cml",
         ]
       } else if (options.data_filesystem_format == "fxfs") {
         if (defined(options.fxfs_blob) && !options.fxfs_blob) {
           sources += [
-            "//src/storage/fshost/meta/blobfs_fshost.cml",
-            "//src/storage/fshost/meta/fxfs_fshost.cml",
+            "//src/storage/fshost/meta/blobfs_fshost_test.cml",
+            "//src/storage/fshost/meta/fxfs_fshost_test.cml",
           ]
         } else {
-          sources += [ "//src/storage/fshost/meta/fxfs_blob_fshost.cml" ]
+          sources += [ "//src/storage/fshost/meta/fxfs_blob_fshost_test.cml" ]
         }
       } else if (options.data_filesystem_format == "f2fs") {
         sources += [
-          "//src/storage/fshost/meta/blobfs_fshost.cml",
-          "//src/storage/fshost/meta/f2fs_fshost.cml",
+          "//src/storage/fshost/meta/blobfs_fshost_test.cml",
+          "//src/storage/fshost/meta/f2fs_fshost_test.cml",
           "//src/storage/fshost/meta/non_fxfs_fshost.cml",
         ]
       }
       sources += [ "//src/storage/fshost/meta/core_fshost.cml" ]
       if (defined(options.use_disk_migration) && options.use_disk_migration) {
-        sources += [ "//src/storage/fshost/meta/minfs_fshost.cml" ]
+        sources += [ "//src/storage/fshost/meta/minfs_fshost_test.cml" ]
       }
 
       # These are components that must be included in the package depending on the data filesystem

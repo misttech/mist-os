@@ -105,9 +105,10 @@ pub async fn unlock_data_volume<'a>(
 
     let (data_unwrapped, metadata_unwrapped) = unwrap_or_create_keys(keybag, false).await?;
 
-    let crypt_service = CryptService::new(data_unwrapped, metadata_unwrapped)
-        .await
-        .context("init_crypt_service")?;
+    let crypt_service =
+        CryptService::new(data_unwrapped, metadata_unwrapped, &config.fxfs_crypt_url)
+            .await
+            .context("init_crypt_service")?;
     if config.check_filesystems {
         fs.check_volume("data", Some(crypt_service.connect()))
             .await
@@ -127,6 +128,7 @@ pub async fn unlock_data_volume<'a>(
 /// Returns the name of the data volume as well as a reference to it.
 pub async fn init_data_volume<'a>(
     fs: &'a mut ServingMultiVolumeFilesystem,
+    config: &'a fshost_config::Config,
 ) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
     // Open up the unencrypted volume so that we can access the key-bag for data.
     let root_vol = fs
@@ -147,9 +149,10 @@ pub async fn init_data_volume<'a>(
 
     let (data_unwrapped, metadata_unwrapped) = unwrap_or_create_keys(keybag, true).await?;
 
-    let crypt_service = CryptService::new(data_unwrapped, metadata_unwrapped)
-        .await
-        .context("init_crypt_service")?;
+    let crypt_service =
+        CryptService::new(data_unwrapped, metadata_unwrapped, &config.fxfs_crypt_url)
+            .await
+            .context("init_crypt_service")?;
     let crypt = Some(crypt_service.connect());
 
     let volume = fs
@@ -168,7 +171,11 @@ pub struct CryptService {
 }
 
 impl CryptService {
-    async fn new(data_key: Aes256Key, metadata_key: Aes256Key) -> Result<Self, Error> {
+    async fn new(
+        data_key: Aes256Key,
+        metadata_key: Aes256Key,
+        fxfs_crypt_url: &str,
+    ) -> Result<Self, Error> {
         static INSTANCE: AtomicU64 = AtomicU64::new(1);
 
         let collection_ref = fdecl::CollectionRef { name: FXFS_CRYPT_COLLECTION_NAME.to_string() };
@@ -177,7 +184,7 @@ impl CryptService {
 
         let child_decl = fdecl::Child {
             name: Some(component_name.clone()),
-            url: Some("#meta/fxfs-crypt.cm".to_string()),
+            url: Some(fxfs_crypt_url.to_string()),
             startup: Some(fdecl::StartupMode::Lazy),
             ..Default::default()
         };

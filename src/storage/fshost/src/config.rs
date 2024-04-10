@@ -23,6 +23,7 @@ pub fn default_config() -> fshost_config::Config {
         ramdisk_image: false,
         fvm_slice_size: 1024 * 1024, // Default to 1 MiB slice size for tests.
         fxfs_blob: false,
+        fxfs_crypt_url: String::from("#meta/fxfs-crypt.cm"),
         gpt: true,
         gpt_all: false,
         mbr: false,

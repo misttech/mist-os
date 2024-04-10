@@ -245,7 +245,7 @@ raw_assembly_input_bundle_json = """{
           "destination": "c/d"
         }
       ],
-      "bootfs_unpackaged": false
+      "bootfs_package": false
     },
     {
       "name": "foo",

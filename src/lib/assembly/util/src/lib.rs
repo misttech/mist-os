@@ -13,10 +13,9 @@ mod paths;
 
 pub use fast_copy::fast_copy;
 pub use files::{
-    BlobfsCompiledPackageDestination, BootfsCompiledPackageDestination,
-    BootfsComponentForRepackage, BootfsDestination, BootfsPackageDestination,
-    CompiledPackageDestination, Destination, FileEntry, PackageDestination, PackageSetDestination,
-    TestCompiledPackageDestination,
+    BlobfsCompiledPackageDestination, BootfsCompiledPackageDestination, BootfsDestination,
+    BootfsPackageDestination, CompiledPackageDestination, Destination, FileEntry,
+    PackageDestination, PackageSetDestination, TestCompiledPackageDestination,
 };
 pub use insert_unique::{
     BTreeMapDuplicateKeyError, DuplicateKeyError, InsertAllUniqueExt, InsertUniqueExt, MapEntry,

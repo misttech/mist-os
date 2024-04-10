@@ -39,18 +39,12 @@ pub enum BootfsDestination {
     AdditionalBootArgs,
     /// The list of bootfs packages.
     BootfsPackageIndex,
-    /// The component manifest for the bootstrap realm.
-    BootstrapManifest,
     /// The component id index config for the Storage subsystem.
     ComponentIdIndex,
     /// The component manager policy for the Component subsystem.
     ComponentManagerConfig,
     /// The cpu manager node config.
     CpuManagerNodeConfig,
-    /// The fshost structured config file for the Storage subsystem.
-    FshostConfig,
-    /// The fshost component manifest for the Storage subsystem.
-    FshostManifest,
     /// The power manager node config.
     PowerManagerNodeConfig,
     /// The power manager thermal config.
@@ -75,9 +69,6 @@ impl std::fmt::Display for BootfsDestination {
                 Self::ComponentIdIndex => "config/component_id_index",
                 Self::ComponentManagerConfig => "config/component_manager",
                 Self::CpuManagerNodeConfig => "config/cpu_manager/node_config.json",
-                Self::BootstrapManifest => "meta/bootstrap.cm",
-                Self::FshostConfig => "meta/fshost.cvf",
-                Self::FshostManifest => "meta/fshost.cm",
                 Self::PowerManagerNodeConfig => "config/power_manager/node_config.json",
                 Self::PowerManagerThermalConfig => "config/power_manager/thermal_config.json",
                 Self::Zxcrypt => "config/zxcrypt",
@@ -233,34 +224,6 @@ pub enum TestCompiledPackageDestination {
     ForTest2,
 }
 
-/// The bootfs components that can be repackaged.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum BootfsComponentForRepackage {
-    /// The fshost component.
-    Fshost,
-    /// Variant specifically for making tests easier.
-    ForTest,
-}
-
-impl BootfsComponentForRepackage {
-    /// Fetch the manifest for the bootfs component.
-    pub fn manifest(self) -> BootfsDestination {
-        match self {
-            Self::Fshost => BootfsDestination::FshostManifest,
-            Self::ForTest => BootfsDestination::ForTest,
-        }
-    }
-
-    /// Fetch the structured config file for the bootfs component.
-    pub fn config(self) -> BootfsDestination {
-        match self {
-            Self::Fshost => BootfsDestination::FshostConfig,
-            Self::ForTest => BootfsDestination::ForTest,
-        }
-    }
-}
-
 // Compare using the string representation to ensure that we do not add a
 // package from an AIB that was already added by assembly.
 impl Eq for BootfsDestination {}
@@ -355,20 +318,12 @@ impl std::fmt::Display for BootfsCompiledPackageDestination {
     }
 }
 
-impl std::fmt::Display for BootfsComponentForRepackage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let value = serde_json::to_value(self).expect("serialize enum");
-        write!(f, "{}", value.as_str().expect("enum is str"))
-    }
-}
-
 impl Key for BootfsDestination {}
 impl Key for PackageDestination {}
 impl Key for BootfsPackageDestination {}
 impl Key for PackageSetDestination {}
 impl Key for BlobfsCompiledPackageDestination {}
 impl Key for BootfsCompiledPackageDestination {}
-impl Key for BootfsComponentForRepackage {}
 impl Destination for String {}
 impl Destination for BootfsDestination {}
 impl Destination for PackageDestination {}
@@ -393,14 +348,5 @@ mod tests {
         let dest = BootfsDestination::AdditionalBootArgs;
         assert_eq!("\"config/additional_boot_args\"", &serde_json::to_string(&dest).unwrap());
         assert_eq!("\"for-test\"", &serde_json::to_string(&BootfsDestination::ForTest).unwrap());
-    }
-
-    #[test]
-    fn test_bootfs_component() {
-        assert_eq!(
-            BootfsDestination::FshostManifest,
-            BootfsComponentForRepackage::Fshost.manifest()
-        );
-        assert_eq!(BootfsDestination::FshostConfig, BootfsComponentForRepackage::Fshost.config());
     }
 }

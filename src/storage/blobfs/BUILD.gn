@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 
@@ -276,13 +275,6 @@ fuchsia_component("decompressor-sandbox") {
   ]
   manifest = "meta/decompressor_sandbox.cml"
   deps = [ ":decompressor" ]
-}
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [
-    ":decompressor",
-    ":decompressor-sandbox",
-  ]
 }
 
 group("tests") {

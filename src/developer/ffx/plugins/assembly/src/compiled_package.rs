@@ -4,10 +4,12 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_components::ComponentBuilder;
-use assembly_config_schema::assembly_config::{CompiledPackageDefinition, MainPackageDefinition};
-use assembly_named_file_map::NamedFileMap;
+use assembly_config_schema::{
+    assembly_config::{CompiledPackageDefinition, MainPackageDefinition},
+    PackageSet,
+};
 use assembly_tool::Tool;
-use assembly_util::{BootfsDestination, DuplicateKeyError, FileEntry, InsertUniqueExt, MapEntry};
+use assembly_util::{DuplicateKeyError, InsertUniqueExt, MapEntry};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::{PackageBuilder, RelativeTo};
 use serde::Serialize;
@@ -56,10 +58,6 @@ impl CompiledPackageBuilder {
             CompiledPackageDefinition::MainDefinition(def) => {
                 if self.main_definition.is_some() {
                     bail!("Duplicate main definition for package {name}");
-                }
-
-                if def.bootfs_unpackaged && !def.contents.is_empty() {
-                    bail!("Failure adding {}. Bootfs compiled packages should only define components, not contents", def.name);
                 }
 
                 self.main_definition = Some(def.clone());
@@ -151,36 +149,6 @@ impl CompiledPackageBuilder {
         )
     }
 
-    /// Build the compiled package as files in bootfs
-    fn build_bootfs(
-        &self,
-        cmc_tool: &dyn Tool,
-        bootfs_files: &mut NamedFileMap<BootfsDestination>,
-        main_definition: &MainPackageDefinition,
-        outdir: impl AsRef<Utf8Path>,
-    ) -> Result<()> {
-        let outdir = outdir.as_ref().join(&self.name);
-
-        if !main_definition.contents.is_empty() {
-            bail!("Failure adding {}. Bootfs compiled packages should only define components, not contents", &main_definition.name);
-        }
-
-        for (component_name, cml) in &main_definition.components {
-            let component_manifest_path = &self
-                .build_component(cmc_tool, component_name, cml, &outdir)
-                .with_context(|| format!("building component {component_name}"))?;
-            let component_manifest_file_name =
-                component_manifest_path.file_name().context("component file name")?;
-            let component_path = format!("meta/{component_manifest_file_name}");
-            bootfs_files.add_entry(FileEntry {
-                source: component_manifest_path.to_owned(),
-                destination: BootfsDestination::FromAIB(component_path),
-            })?;
-        }
-
-        Ok(())
-    }
-
     /// Build the compiled package as a package
     fn build_package(
         &self,
@@ -224,25 +192,19 @@ impl CompiledPackageBuilder {
         Ok(package_manifest_path)
     }
 
-    /// Build the components for the package and either build the package
-    /// or extract the contents to bootfs
+    /// Build the components for the package and build the package
     ///
-    /// Returns a path to the package manifest, if we actually build a package
+    /// Returns a path to the package manifest, and whether the package should be placed in bootfs
+    /// or the base package set.
     pub fn build(
         self,
         cmc_tool: &dyn Tool,
-        bootfs_files: &mut NamedFileMap<BootfsDestination>,
         outdir: impl AsRef<Utf8Path>,
-    ) -> Result<Option<Utf8PathBuf>> {
+    ) -> Result<(Utf8PathBuf, PackageSet)> {
         let main_definition = &self.main_definition.as_ref().context("no main definition")?;
-        if main_definition.bootfs_unpackaged {
-            match self.build_bootfs(cmc_tool, bootfs_files, main_definition, outdir) {
-                Ok(()) => Ok(Option::None),
-                Err(e) => Err(e),
-            }
-        } else {
-            Ok(Option::Some(self.build_package(cmc_tool, main_definition, outdir)?))
-        }
+        let package_set =
+            if main_definition.bootfs_package { PackageSet::Bootfs } else { PackageSet::Base };
+        Ok((self.build_package(cmc_tool, main_definition, outdir)?, package_set))
     }
 }
 
@@ -252,7 +214,9 @@ mod tests {
     use assembly_config_schema::assembly_config::AdditionalPackageContents;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::ToolProvider;
-    use assembly_util::{CompiledPackageDestination, TestCompiledPackageDestination::ForTest};
+    use assembly_util::{
+        CompiledPackageDestination, FileEntry, TestCompiledPackageDestination::ForTest,
+    };
     use fuchsia_archive::Utf8Reader;
     use fuchsia_pkg::PackageManifest;
     use std::fs::File;
@@ -278,7 +242,7 @@ mod tests {
                         destination: "file1".into(),
                     }],
                     includes: Vec::default(),
-                    bootfs_unpackaged: false,
+                    bootfs_package: false,
                 }),
                 outdir,
             )
@@ -316,7 +280,7 @@ mod tests {
                         destination: "file1".into()
                     }],
                     includes: Vec::default(),
-                    bootfs_unpackaged: false,
+                    bootfs_package: false,
                 })
             }
         );
@@ -328,7 +292,6 @@ mod tests {
         let tools = FakeToolProvider::default();
         let outdir_tmp = TempDir::new().unwrap();
         let outdir = Utf8Path::from_path(outdir_tmp.path()).unwrap();
-        let mut bootfs_files = NamedFileMap::new("test");
         make_test_package_and_components(outdir);
 
         compiled_package_builder
@@ -344,7 +307,7 @@ mod tests {
                         destination: "file1".into(),
                     }],
                     includes: Vec::default(),
-                    bootfs_unpackaged: false,
+                    bootfs_package: false,
                 }),
                 outdir,
             )
@@ -361,9 +324,7 @@ mod tests {
             )
             .unwrap();
 
-        compiled_package_builder
-            .build(tools.get_tool("cmc").unwrap().as_ref(), &mut bootfs_files, outdir)
-            .unwrap();
+        compiled_package_builder.build(tools.get_tool("cmc").unwrap().as_ref(), outdir).unwrap();
 
         let compiled_package_file = File::open(outdir.join("for-test/for-test.far")).unwrap();
         let mut far_reader = Utf8Reader::new(&compiled_package_file).unwrap();
@@ -388,7 +349,7 @@ mod tests {
                 components: BTreeMap::new(),
                 contents: Vec::default(),
                 includes: Vec::default(),
-                bootfs_unpackaged: false,
+                bootfs_package: false,
             }),
             "assembly/input/bundle/path/compiled_packages/include",
         );
@@ -406,7 +367,7 @@ mod tests {
                 components: BTreeMap::new(),
                 contents: vec![FileEntry { source: "file1".into(), destination: "file1".into() }],
                 includes: Vec::default(),
-                bootfs_unpackaged: true,
+                bootfs_package: true,
             }),
             "assembly/input/bundle/path/compiled_packages/include",
         );
@@ -445,7 +406,7 @@ mod tests {
                     components: BTreeMap::default(),
                     contents: Vec::default(),
                     includes: Vec::default(),
-                    bootfs_unpackaged: false,
+                    bootfs_package: false,
                 }),
                 "assembly/input/bundle/path/compiled_packages/include",
             )
@@ -457,7 +418,7 @@ mod tests {
                 components: BTreeMap::default(),
                 contents: Vec::default(),
                 includes: Vec::default(),
-                bootfs_unpackaged: false,
+                bootfs_package: false,
             }),
             "assembly/input/bundle/path/compiled_packages/include",
         );

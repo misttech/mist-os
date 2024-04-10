@@ -1206,9 +1206,10 @@ impl FilesystemLauncher {
             }
         }
 
-        let (crypt_service, volume_name, _) = fxfs::init_data_volume(serving_multi_vol_fs)
-            .await
-            .context("initializing data volume encryption")?;
+        let (crypt_service, volume_name, _) =
+            fxfs::init_data_volume(serving_multi_vol_fs, &self.config)
+                .await
+                .context("initializing data volume encryption")?;
         let filesystem = Filesystem::ServingVolumeInFxblob(Some(crypt_service), volume_name);
 
         Ok(filesystem)
@@ -1274,9 +1275,10 @@ impl FilesystemLauncher {
         let filesystem = if let DiskFormat::Fxfs = format {
             let mut serving_multi_vol_fs =
                 fs.serve_multi_volume().await.context("serving multi volume data partition")?;
-            let (crypt_service, volume_name, _) = fxfs::init_data_volume(&mut serving_multi_vol_fs)
-                .await
-                .context("initializing data volume encryption")?;
+            let (crypt_service, volume_name, _) =
+                fxfs::init_data_volume(&mut serving_multi_vol_fs, &self.config)
+                    .await
+                    .context("initializing data volume encryption")?;
             Filesystem::ServingMultiVolume(crypt_service, serving_multi_vol_fs, volume_name)
         } else {
             Filesystem::Serving(fs.serve().await.context("serving single volume data partition")?)

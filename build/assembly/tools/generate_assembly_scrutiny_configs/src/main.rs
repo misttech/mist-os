@@ -5,8 +5,8 @@
 use argh::FromArgs;
 use assembly_config_schema::BuildType;
 use assembly_util::{
-    BlobfsCompiledPackageDestination, BootfsDestination, BootfsPackageDestination,
-    PackageDestination,
+    BlobfsCompiledPackageDestination, BootfsCompiledPackageDestination, BootfsDestination,
+    BootfsPackageDestination, PackageDestination,
 };
 use camino::Utf8PathBuf;
 use strum::IntoEnumIterator;
@@ -85,6 +85,7 @@ fn get_static_packages_allowlist(build_type: &BuildType) -> Vec<String> {
         })
         .collect();
     static_packages.append(&mut compiled_packages);
+
     static_packages.sort();
     static_packages
 }
@@ -115,6 +116,9 @@ fn get_bootfs_packages_allowlist() -> Vec<String> {
         }
     )
     .collect();
+    let mut compiled_packages: Vec<String> =
+        BootfsCompiledPackageDestination::iter().map(|a| a.to_string()).collect();
+    bootfs_packages.append(&mut compiled_packages);
     bootfs_packages.sort();
     bootfs_packages
 }

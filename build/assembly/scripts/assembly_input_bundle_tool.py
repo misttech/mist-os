@@ -260,7 +260,7 @@ def add_compiled_packages_from_file(aib_creator: AIBCreator, compiled_packages):
                 ]
 
             if (
-                main_def.bootfs_unpackaged
+                main_def.bootfs_package
                 and main_def.name not in BOOTFS_COMPILED_PACKAGE_ALLOWLIST
             ):
                 raise ValueError(

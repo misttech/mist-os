@@ -119,36 +119,51 @@ impl Filesystem {
                 );
 
                 let collection_ref = fdecl::CollectionRef { name: collection_name };
-                let child_decl = fdecl::Child {
-                    name: Some(name.clone()),
-                    url: Some(format!("#meta/{}.cm", component_name)),
-                    startup: Some(fdecl::StartupMode::Lazy),
-                    ..Default::default()
-                };
-                // Launch a new component in our collection.
-                realm_proxy
-                    .create_child(
-                        &collection_ref,
-                        &child_decl,
-                        fcomponent::CreateChildArgs::default(),
+                let child_decls = vec![
+                    fdecl::Child {
+                        name: Some(name.clone()),
+                        url: Some(format!("#meta/{}.cm", component_name)),
+                        startup: Some(fdecl::StartupMode::Lazy),
+                        ..Default::default()
+                    },
+                    fdecl::Child {
+                        name: Some(format!("{}-relative", name)),
+                        url: Some(format!(
+                            "fuchsia-boot:///{}#meta/{}.cm",
+                            component_name, component_name
+                        )),
+                        startup: Some(fdecl::StartupMode::Lazy),
+                        ..Default::default()
+                    },
+                ];
+                for child_decl in child_decls {
+                    // Launch a new component in our collection.
+                    realm_proxy
+                        .create_child(
+                            &collection_ref,
+                            &child_decl,
+                            fcomponent::CreateChildArgs::default(),
+                        )
+                        .await?
+                        .map_err(|e| anyhow!("create_child failed: {:?}", e))?;
+
+                    let component = Arc::new(DynamicComponentInstance {
+                        name: child_decl.name.unwrap(),
+                        collection: collection_ref.name.clone(),
+                        should_not_drop: AtomicBool::new(false),
+                    });
+
+                    if let Ok(proxy) = open_childs_exposed_directory(
+                        component.name.clone(),
+                        Some(component.collection.clone()),
                     )
-                    .await?
-                    .map_err(|e| anyhow!("create_child failed: {:?}", e))?;
-
-                let component = Arc::new(DynamicComponentInstance {
-                    name,
-                    collection: collection_ref.name,
-                    should_not_drop: AtomicBool::new(false),
-                });
-
-                let proxy = open_childs_exposed_directory(
-                    component.name.clone(),
-                    Some(component.collection.clone()),
-                )
-                .await?;
-
-                self.component = Some(component);
-                Ok(proxy)
+                    .await
+                    {
+                        self.component = Some(component);
+                        return Ok(proxy);
+                    }
+                }
+                Err(anyhow!("Failed to open exposed directory"))
             }
         }
     }

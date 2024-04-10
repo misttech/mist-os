@@ -2,16 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/test.gni")
 
-# Include the binary, .cm, and the .cvf in the bundle.
-bootfs_files_for_assembly("bootfs") {
+fuchsia_package("package") {
+  package_name = "blobfs"
   deps = [
-    ":blobfs",
-    ":blobfs-component-config-values",
-    ":blobfs.cml",
+    ":component",
+    "//src/storage/blobfs:decompressor-sandbox",
   ]
 }
 
@@ -34,7 +32,6 @@ executable("blobfs") {
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
     "//src/storage/blobfs",
-    "//src/storage/blobfs:decompressor-sandbox",
     "//src/storage/lib/block_client/cpp",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -53,6 +50,7 @@ fuchsia_component("component") {
   deps = [
     ":blobfs",
     ":blobfs-component-config-values",
+    "//src/storage/blobfs:decompressor-sandbox",
   ]
 }
 

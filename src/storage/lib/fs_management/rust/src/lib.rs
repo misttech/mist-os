@@ -58,8 +58,10 @@ impl Default for ComponentType {
 
 pub struct Options<'a> {
     /// For static children, the name specifies the name of the child.  For dynamic children, the
-    /// component URL is "#meta/{component-name}.cm".  The library will attempt to connect to a
-    /// static child first, and if that fails, it will launch the filesystem within a collection.
+    /// component URL is "fuchsia-boot:///{component-name}#meta/{component-name}.cm" or
+    /// "#meta/{component-name}.cm".  The library will attempt to connect to a static child first,
+    /// and if that fails, it will launch the filesystem within a collection. It will try to
+    /// create a child component via the absolute URL and then fallback to the relative URL.
     component_name: &'a str,
 
     /// It should be possible to reuse components after serving them, but it's not universally

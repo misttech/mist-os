@@ -86,6 +86,10 @@ impl FshostBuilder {
         for (key, value) in self.config_values {
             realm_builder.set_config_value(&fshost, key, value.value).await.unwrap()
         }
+        realm_builder
+            .set_config_value(&fshost, "fxfs_crypt_url", "#meta/fxfs-crypt.cm".into())
+            .await
+            .unwrap();
 
         realm_builder
             .add_route(

@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
+    include: [ "//src/storage/fshost/meta/minfs_fshost_base.shard.cml" ],
     children: [
         {
-            name: "f2fs",
-            url: "fuchsia-boot:///f2fs#meta/f2fs.cm",
+            name: "minfs",
+            url: "#meta/minfs.cm",
         },
     ],
 }

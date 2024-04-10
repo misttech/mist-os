@@ -120,7 +120,7 @@ pub struct MainPackageDefinition {
     /// Whether the contents of this package should go into bootfs.
     /// Gated by allowlist -- please use this as a base package if possible.
     #[serde(default)]
-    pub bootfs_unpackaged: bool,
+    pub bootfs_package: bool,
 }
 
 /// Additional contents of the package to be defined in

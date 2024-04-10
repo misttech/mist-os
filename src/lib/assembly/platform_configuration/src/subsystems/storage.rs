@@ -9,7 +9,7 @@ use assembly_config_schema::platform_config::storage_config::StorageConfig;
 use assembly_images_config::{
     BlobfsLayout, DataFilesystemFormat, DataFvmVolumeConfig, FvmVolumeConfig, VolumeConfig,
 };
-use assembly_util::{BootfsComponentForRepackage, BootfsDestination, FileEntry};
+use assembly_util::{BootfsDestination, FileEntry};
 
 pub(crate) struct StorageSubsystemConfig;
 impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
@@ -147,7 +147,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 .field("use_system_image", true)?;
 
             let mut fshost_config_builder =
-                builder.bootfs().component(BootfsComponentForRepackage::Fshost)?;
+                builder.package("fshost").component("meta/fshost.cm")?;
             fshost_config_builder
                 .field("blobfs", true)?
                 .field("blobfs_max_bytes", blobfs_max_bytes)?
@@ -170,6 +170,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 .field("use_disk_migration", use_disk_migration)?
                 .field("nand", nand)?
                 .field("fxfs_blob", fxfs_blob)?
+                .field("fxfs_crypt_url", "fuchsia-boot:///fxfs-crypt#meta/fxfs-crypt.cm")?
                 .field("fvm_slice_size", fvm_slice_size)?;
 
             fshost_config_builder.field("data_filesystem_format", data_filesystem_format_str)?;

@@ -4,64 +4,12 @@
 
 //! Utilities for working with structured configuration during the product assembly process.
 
-use anyhow::{format_err, Context};
-use assembly_named_file_map::NamedFileMap;
-use assembly_util::{BootfsComponentForRepackage, BootfsDestination, FileEntry};
 use assembly_validate_util::PkgNamespace;
 use camino::Utf8PathBuf;
 use cm_rust::{FidlIntoNative, NativeIntoFidl};
 use fidl::{unpersist, Persistable};
 use fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo};
 use std::{collections::BTreeMap, fmt::Debug};
-
-pub struct BootfsRepackager<'f> {
-    files: &'f mut NamedFileMap<BootfsDestination>,
-    outdir: Utf8PathBuf,
-}
-
-impl<'f> BootfsRepackager<'f> {
-    pub fn new(
-        files: &'f mut NamedFileMap<BootfsDestination>,
-        outdir: impl Into<Utf8PathBuf>,
-    ) -> Self {
-        Self { files, outdir: outdir.into() }
-    }
-
-    /// Check if the package we're building has a particular component manifest.
-    pub fn has_component(&self, manifest_path: BootfsComponentForRepackage) -> bool {
-        self.read_contents(manifest_path).is_ok()
-    }
-
-    /// Apply structured configuration values to this package, failing if the package already has
-    /// a configuration value file for the component.
-    pub fn set_component_config(
-        &mut self,
-        component: BootfsComponentForRepackage,
-        values: BTreeMap<String, serde_json::Value>,
-    ) -> Result<(), RepackageError> {
-        let manifest_bytes =
-            self.read_contents(component.clone()).map_err(RepackageError::ReadManifest)?;
-        let (config_bytes, _) = config_for_manifest(manifest_bytes, values)?;
-
-        let path: BootfsDestination = component.config();
-        let out_path = self.outdir.join("bootfs/repackaging/components").join(path.to_string());
-        std::fs::create_dir_all(out_path.parent().unwrap())
-            .context("creating outdir")
-            .map_err(RepackageError::WriteValueFile)?;
-        std::fs::write(&out_path, config_bytes)
-            .with_context(|| format!("writing {}", out_path))
-            .map_err(RepackageError::WriteValueFile)?;
-        self.files
-            .add_entry(FileEntry { source: out_path, destination: path })
-            .map_err(RepackageError::WriteValueFile)
-    }
-
-    fn read_contents(&self, component: BootfsComponentForRepackage) -> anyhow::Result<Vec<u8>> {
-        let path = component.manifest();
-        let src_path = &self.files.get(&path).ok_or_else(|| format_err!("missing {path}"))?.source;
-        Ok(std::fs::read(src_path).with_context(|| format!("reading {}", src_path))?)
-    }
-}
 
 pub struct Repackager {
     builder: PackageBuilder,

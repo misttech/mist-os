@@ -353,6 +353,15 @@ group("libc") {
   deps = [ ":verify_abi" ]
 }
 
+group("libc_fshost") {
+  visibility = [ "//bundles/assembly/*" ]
+
+  # This has to be public_deps so that the shared_library() target's output
+  # files can be input files of the setup and packaging targets that depend on
+  # this "libc" wrapper target.
+  public_deps = [ libc_impl_label ]
+}
+
 bootfs_files_for_assembly("bootfs") {
   deps = [ libc_impl_label ]
 }

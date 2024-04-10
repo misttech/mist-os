@@ -216,6 +216,11 @@ fuchsia_component("fxfs_component") {
   manifest = "meta/fxfs.cml"
 }
 
+fuchsia_package("package") {
+  package_name = "fxfs"
+  deps = [ ":fxfs_component" ]
+}
+
 fuchsia_shell_package("fxfs-bin") {
   deps = [ ":fxfs" ]
 }

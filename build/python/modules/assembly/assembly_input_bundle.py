@@ -118,7 +118,7 @@ class CompiledPackageMainDefinition:
     # CML files included by the component cml
     includes: Set[FilePath] = field(default_factory=set)
     # Whether to extract the contents of this package into bootfs
-    bootfs_unpackaged: bool = field(default=False)
+    bootfs_package: bool = field(default=False)
 
 
 @dataclass
@@ -672,7 +672,7 @@ class AIBCreator:
                 components=copied_component_cmls,
                 includes=copied_includes,
                 contents=set(copied_package_files),
-                bootfs_unpackaged=package.bootfs_unpackaged,
+                bootfs_package=package.bootfs_package,
             )
             result.packages_to_compile.append(copied_definition)
 

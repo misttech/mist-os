@@ -1,0 +1,61 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "inspect/offer.shard.cml" ],
+    use: [
+        {
+            protocol: "fuchsia.fs.startup.Startup",
+            from: "#blobfs",
+            path: "/blobfs/svc/fuchsia.fs.startup.Startup",
+        },
+        {
+            directory: "blob-exec",
+            from: "#blobfs",
+            rights: [
+                "execute",
+                "rw*",
+            ],
+            path: "/blob",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.device.manager.Administrator",
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.logger.LogSink",
+                "fuchsia.scheduler.RoleManager",
+            ],
+            from: "parent",
+            to: "#blobfs",
+        },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: "#blobfs",
+            availability: "optional",
+        },
+        {
+            directory: "dev-topological",
+            from: "parent",
+            to: "#blobfs",
+        },
+    ],
+    expose: [
+        {
+            directory: "root",
+            from: "#blobfs",
+            as: "blob",
+        },
+        {
+            directory: "blob-exec",
+            from: "#blobfs",
+        },
+        {
+            protocol: "fuchsia.update.verify.BlobfsVerifier",
+            from: "#blobfs",
+        },
+    ],
+}

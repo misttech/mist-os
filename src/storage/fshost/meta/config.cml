@@ -84,5 +84,11 @@
 
         // If true, blobfs is stored on fxfs.
         fxfs_blob: { type: "bool" },
+
+        // Path to the fxfs_crypt component.
+        fxfs_crypt_url: {
+            type: "string",
+            max_size: 64,
+        },
     },
 }

@@ -20,10 +20,10 @@ use assembly_driver_manifest::{DriverManifestBuilder, DriverPackageType};
 use assembly_named_file_map::NamedFileMap;
 use assembly_package_utils::PackageInternalPathBuf;
 use assembly_platform_configuration::{
-    BootfsComponentConfigs, DomainConfig, DomainConfigs, PackageConfigs, PackageConfiguration,
+    DomainConfig, DomainConfigs, PackageConfigs, PackageConfiguration,
 };
 use assembly_shell_commands::ShellCommandsBuilder;
-use assembly_structured_config::{BootfsRepackager, Repackager};
+use assembly_structured_config::Repackager;
 use assembly_tool::ToolProvider;
 use assembly_util as util;
 use assembly_util::{
@@ -56,9 +56,6 @@ pub struct ImageAssemblyConfigBuilder {
 
     /// The bootfs_files from the AssemblyInputBundles
     bootfs_files: NamedFileMap<BootfsDestination>,
-
-    /// Modifications that must be made to structured config within bootfs.
-    bootfs_structured_config: BootfsComponentConfigs,
 
     /// Modifications that must be made to configuration for packages.
     package_configs: PackageConfigs,
@@ -98,7 +95,6 @@ impl ImageAssemblyConfigBuilder {
             boot_args: BTreeSet::default(),
             shell_commands: ShellCommands::default(),
             bootfs_files: NamedFileMap::new("bootfs files"),
-            bootfs_structured_config: BootfsComponentConfigs::new("bootfs component configs"),
             package_configs: PackageConfigs::new("package configs"),
             domain_configs: DomainConfigs::new("domain configs"),
             kernel_path: None,
@@ -543,10 +539,6 @@ impl ImageAssemblyConfigBuilder {
             })
     }
 
-    pub fn set_bootfs_structured_config(&mut self, config: BootfsComponentConfigs) {
-        self.bootfs_structured_config = config;
-    }
-
     /// Set the configuration updates for a package. Can only be called once per
     /// package.
     pub fn set_package_config(
@@ -635,8 +627,7 @@ impl ImageAssemblyConfigBuilder {
             base_drivers,
             boot_drivers,
             boot_args,
-            mut bootfs_files,
-            bootfs_structured_config,
+            bootfs_files,
             kernel_path,
             kernel_args,
             qemu_kernel,
@@ -655,31 +646,32 @@ impl ImageAssemblyConfigBuilder {
         for (_, package_builder) in packages_to_compile {
             let package_name = package_builder.name.to_owned();
             let package_manifest_path = package_builder
-                .build(cmc_tool.as_ref(), &mut bootfs_files, outdir)
+                .build(cmc_tool.as_ref(), outdir)
                 .with_context(|| format!("building compiled package {}", &package_name))?;
 
-            if let Some(p) = package_manifest_path {
-                let d = PackageSetDestination::Blob(PackageDestination::FromProduct(
-                    package_name.clone(),
-                ));
-                let (_d, package_entry) =
-                    PackageEntry::parse_from(PackageOrigin::AIB, PackageSet::Base, p)?;
-                packages
-                    .try_insert_unique(d, package_entry)
-                    .with_context(|| format!("Adding compiled package {package_name}"))?;
+            match package_manifest_path {
+                (p, PackageSet::Base) => {
+                    let d = PackageSetDestination::Blob(PackageDestination::FromProduct(
+                        package_name.clone(),
+                    ));
+                    let (_d, package_entry) =
+                        PackageEntry::parse_from(PackageOrigin::AIB, PackageSet::Base, p)?;
+                    packages
+                        .try_insert_unique(d, package_entry)
+                        .with_context(|| format!("Adding compiled package {package_name}"))?;
+                }
+                (p, PackageSet::Bootfs) => {
+                    let d = PackageSetDestination::Boot(BootfsPackageDestination::FromAIB(
+                        package_name.clone(),
+                    ));
+                    let (_d, package_entry) =
+                        PackageEntry::parse_from(PackageOrigin::AIB, PackageSet::Bootfs, p)?;
+                    packages
+                        .try_insert_unique(d, package_entry)
+                        .with_context(|| format!("Adding compiled package {package_name}"))?;
+                }
+                (_, package_set) => panic!("Unexpected package set {package_set}"),
             };
-        }
-
-        // Add structured config value files to bootfs
-        let mut bootfs_repackager = BootfsRepackager::new(&mut bootfs_files, outdir);
-        for (component, values) in bootfs_structured_config {
-            // check if we should try to configure the component before attempting so we can still
-            // return errors for other conditions like a missing config field or a wrong type
-            if bootfs_repackager.has_component(component.clone()) {
-                bootfs_repackager.set_component_config(component, values.fields.into())?;
-            } else {
-                // TODO(https://fxbug.dev/42052394) return an error here
-            }
         }
 
         // Repackage any matching packages
@@ -1610,7 +1602,7 @@ mod tests {
                 ]),
                 contents: Vec::default(),
                 includes: Vec::default(),
-                bootfs_unpackaged: false,
+                bootfs_package: false,
             },
         ));
         let bundle2 = AssemblyInputBundle {

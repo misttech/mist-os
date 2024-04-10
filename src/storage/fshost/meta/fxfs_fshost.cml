@@ -2,72 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "fxfs",
-            url: "#meta/fxfs.cm",
-        },
-    ],
-    collections: [
-        {
-            name: "fxfs-crypt",
-            durability: "transient",
-        },
-    ],
-    use: [
-        {
-            protocol: "fuchsia.fs.startup.Startup",
-            from: "#fxfs",
-            path: "/fxfs/svc/fuchsia.fs.startup.Startup",
-        },
-        {
-            protocol: "fuchsia.component.Realm",
-            from: "framework",
-        },
-    ],
-    offer: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#fxfs",
-                "#fxfs-crypt",
-            ],
-        },
-        {
-            protocol: [
-                "fuchsia.memorypressure.Provider",
-                "fuchsia.tracing.provider.Registry",
-            ],
-            from: "parent",
-            to: "#fxfs",
-            availability: "optional",
-        },
-        {
-            service: "fuchsia.fxfs.CryptService",
-            from: "#fxfs-crypt",
-            to: "#fxfs",
-        },
-    ],
-    expose: [
-        {
-            directory: "volumes",
-            from: "#fxfs",
-        },
-        {
-            protocol: "fuchsia.fxfs.Volumes",
-            from: "#fxfs",
-        },
-        {
-            protocol: "fuchsia.fxfs.BlobCreator",
-            from: "void",
-            availability: "optional",
-        },
-        {
-            protocol: "fuchsia.fxfs.BlobReader",
-            from: "void",
-            availability: "optional",
+            url: "fuchsia-boot:///fxfs#meta/fxfs.cm",
         },
     ],
 }

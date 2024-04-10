@@ -6,11 +6,13 @@ import("//build/assembly/assembly_input_bundle.gni")
 import("//build/assembly/assembly_resources_directory.gni")
 import("//build/assembly/kernel_aib.gni")
 import("//build/bazel/bazel_inputs.gni")
+import("//build/config/clang/clang.gni")
 import("//build/icu/icu_assembly_input_bundle.gni")
 import("//bundles/assembly/platform_aibs.gni")
 import("//src/lib/icu/tzdata/icu_tzres_source.gni")
 import("//third_party/sbase/binaries.gni")
 import("//zircon/kernel/phys/qemu.gni")
+import("//zircon/system/ulib/c/libc_toolchain.gni")
 
 ########
 # Guaranteed Invariants
@@ -116,7 +118,7 @@ assembly_input_bundle("bootstrap") {
 
   compiled_packages = [
     {
-      bootfs_unpackaged = true
+      bootfs_package = true
       name = "bootstrap"
       components = [
         {
@@ -2297,13 +2299,71 @@ assembly_input_bundle("fshost_common") {
       ]
     },
     {
-      bootfs_unpackaged = true
+      bootfs_package = true
       name = "fshost"
       components = [
         {
           component_name = "fshost"
           shards = rebase_path("//src/storage/fshost/meta/base_fshost.cml",
                                root_build_dir)
+        },
+      ]
+      contents = [
+        {
+          label = "//src/storage/fshost"
+          source = "${root_out_dir}/fshost"
+          destination = "bin/fshost"
+        },
+        {
+          label = "//src/storage/lib/fs_management/cpp:fs-management($shlib_toolchain)"
+          source = "${root_out_dir}/${target_cpu}-shared/libfs-management.so"
+          destination = "lib/libfs-management.so"
+        },
+        {
+          label = "//sdk/lib/fdio($shlib_toolchain)"
+          source = "${root_out_dir}/${target_cpu}-shared/libfdio.so"
+          destination = "lib/libfdio.so"
+        },
+        {
+          label = "//third_party/boringssl:crypto-shared($shlib_toolchain)"
+          source = "${root_out_dir}/${target_cpu}-shared/libcrypto.so"
+          destination = "lib/libcrypto.so"
+        },
+        {
+          label = "//third_party/boringssl:ssl-shared($shlib_toolchain)"
+          source = "${root_out_dir}/${target_cpu}-shared/libssl.so"
+          destination = "lib/libssl.so"
+        },
+        {
+          label = "//zircon/system/ulib/trace-engine($shlib_toolchain)"
+          source = "${root_out_dir}/${target_cpu}-shared/libtrace-engine.so"
+          destination = "lib/libtrace-engine.so"
+        },
+        {
+          label = "//src/security/lib/tee/tee-client-api($shlib_toolchain)"
+          source = "${root_out_dir}/${target_cpu}-shared/libtee-client-api.so"
+          destination = "lib/libtee-client-api.so"
+        },
+        {
+          label = "//zircon/system/ulib/c:libc_fshost"
+          source = system_libc_stripped
+          destination = "lib/ld.so.1"
+        },
+        {
+          label = "//build/toolchain/runtime:shared-libc++-deps"
+          source =
+              "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libc++.so.2"
+          destination = "lib/libc++.so.2"
+        },
+        {
+          label = "//build/toolchain/runtime:shared-libc++-deps"
+          source = "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libc++abi.so.1"
+          destination = "lib/libc++abi.so.1"
+        },
+        {
+          label = "//build/toolchain/runtime:shared-libc++-deps"
+          source = "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libunwind.so.1"
+          destination = "lib/libunwind.so.1"
         },
       ]
       component_includes = [
@@ -2353,7 +2413,6 @@ assembly_input_bundle("fshost_common") {
       ]
     },
   ]
-  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost_common" ]
 }
 
 # AIB adding support for storage, needed by all fshost variants that use anything more than bootfs
@@ -2375,8 +2434,7 @@ assembly_input_bundle("fshost_storage") {
       ]
     },
   ]
-  bootfs_files_labels =
-      [ "//src/storage/fshost:assembly_bundle_fshost_storage_common" ]
+  bootfs_packages = [ "//src/storage/memfs:package" ]
 }
 
 # AIB containing the fshost with fxfs.
@@ -2392,14 +2450,20 @@ assembly_input_bundle("fshost_fxfs") {
       component_shards = [
         {
           component_name = "fshost"
-          shards =
-              rebase_path([ "//src/storage/fshost/meta/fxfs_blob_fshost.cml" ],
-                          root_build_dir)
+          shards = rebase_path(
+                  [
+                    "//src/storage/fshost/meta/fxfs_blob_fshost.cml",
+                    "//src/storage/fshost/meta/fxfs_blob_fshost_base.shard.cml",
+                  ],
+                  root_build_dir)
         },
       ]
     },
   ]
-  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost" ]
+  bootfs_packages = [
+    "//src/storage/fxfs:package",
+    "//src/storage/fxfs-crypt:package",
+  ]
 }
 
 # AIB containing fshost with an fvm and blobfs only.
@@ -2415,14 +2479,17 @@ assembly_input_bundle("fshost_fvm") {
       component_shards = [
         {
           component_name = "fshost"
-          shards =
-              rebase_path([ "//src/storage/fshost/meta/blobfs_fshost.cml" ],
-                          root_build_dir)
+          shards = rebase_path(
+                  [
+                    "//src/storage/fshost/meta/blobfs_fshost.cml",
+                    "//src/storage/fshost/meta/blobfs_fshost_base.shard.cml",
+                  ],
+                  root_build_dir)
         },
       ]
     },
   ]
-  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost_fvm" ]
+  bootfs_packages = [ "//src/storage/blobfs/bin:package" ]
 }
 
 # AIB containing fshost with an fvm and fxfs to hold the data.
@@ -2438,14 +2505,20 @@ assembly_input_bundle("fshost_fvm_fxfs") {
       component_shards = [
         {
           component_name = "fshost"
-          shards = rebase_path([ "//src/storage/fshost/meta/fxfs_fshost.cml" ],
-                               root_build_dir)
+          shards = rebase_path(
+                  [
+                    "//src/storage/fshost/meta/fxfs_fshost.cml",
+                    "//src/storage/fshost/meta/fxfs_fshost_base.shard.cml",
+                  ],
+                  root_build_dir)
         },
       ]
     },
   ]
-  bootfs_files_labels =
-      [ "//src/storage/fshost:assembly_bundle_fshost_fvm_fxfs" ]
+  bootfs_packages = [
+    "//src/storage/fxfs:package",
+    "//src/storage/fxfs-crypt:package",
+  ]
 }
 
 # AIB containing fshost support for minfs. Not compatible with fxfs.
@@ -2461,17 +2534,18 @@ assembly_input_bundle("fshost_fvm_minfs") {
       component_shards = [
         {
           component_name = "fshost"
-          shards =
-              rebase_path([
-                            "//src/storage/fshost/meta/minfs_fshost.cml",
-                            "//src/storage/fshost/meta/non_fxfs_fshost.cml",
-                          ],
-                          root_build_dir)
+          shards = rebase_path(
+                  [
+                    "//src/storage/fshost/meta/minfs_fshost.cml",
+                    "//src/storage/fshost/meta/minfs_fshost_base.shard.cml",
+                    "//src/storage/fshost/meta/non_fxfs_fshost.cml",
+                  ],
+                  root_build_dir)
         },
       ]
     },
   ]
-  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost_minfs" ]
+  bootfs_packages = [ "//src/storage/minfs/bin:package" ]
 }
 
 # AIB containing fshost support for minfs-to-fxfs migration.
@@ -2490,18 +2564,22 @@ assembly_input_bundle("fshost_fvm_minfs_migration") {
       component_shards = [
         {
           component_name = "fshost"
-          shards = rebase_path([
-                                 "//src/storage/fshost/meta/minfs_fshost.cml",
-                                 "//src/storage/fshost/meta/fxfs_fshost.cml",
-                               ],
-                               root_build_dir)
+          shards = rebase_path(
+                  [
+                    "//src/storage/fshost/meta/minfs_fshost.cml",
+                    "//src/storage/fshost/meta/minfs_fshost_base.shard.cml",
+                    "//src/storage/fshost/meta/fxfs_fshost.cml",
+                    "//src/storage/fshost/meta/fxfs_fshost_base.shard.cml",
+                  ],
+                  root_build_dir)
         },
       ]
     },
   ]
-  bootfs_files_labels = [
-    "//src/storage/fshost:assembly_bundle_fshost",
-    "//src/storage/fshost:assembly_bundle_fshost_minfs",
+  bootfs_packages = [
+    "//src/storage/fxfs:package",
+    "//src/storage/fxfs-crypt:package",
+    "//src/storage/minfs/bin:package",
   ]
 }
 
@@ -2518,17 +2596,18 @@ assembly_input_bundle("fshost_fvm_f2fs") {
       component_shards = [
         {
           component_name = "fshost"
-          shards =
-              rebase_path([
-                            "//src/storage/fshost/meta/f2fs_fshost.cml",
-                            "//src/storage/fshost/meta/non_fxfs_fshost.cml",
-                          ],
-                          root_build_dir)
+          shards = rebase_path(
+                  [
+                    "//src/storage/fshost/meta/f2fs_fshost.cml",
+                    "//src/storage/fshost/meta/f2fs_fshost_base.shard.cml",
+                    "//src/storage/fshost/meta/non_fxfs_fshost.cml",
+                  ],
+                  root_build_dir)
         },
       ]
     },
   ]
-  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost_f2fs" ]
+  bootfs_packages = [ "//src/storage/f2fs/bin:package" ]
 }
 
 assembly_input_bundle("system_update_checker") {
@@ -3564,7 +3643,7 @@ assembly_input_bundle("example_assembly_bundle") {
       ]
 
       # Test that bootfs packages work
-      bootfs_unpackaged = true
+      bootfs_package = true
     },
 
     # Add a shard to the `core` package which should have a main definition

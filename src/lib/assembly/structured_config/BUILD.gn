@@ -11,8 +11,6 @@ rustc_library("structured_config") {
   name = "assembly_structured_config"
   sources = [ "src/lib.rs" ]
   deps = [
-    "//src/lib/assembly/named_file_map",
-    "//src/lib/assembly/util",
     "//src/lib/assembly/validate_util",
     "//src/lib/fidl/rust/fidl",
     "//src/sys/lib/cm_fidl_validator",

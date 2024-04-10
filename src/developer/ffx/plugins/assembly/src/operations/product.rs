@@ -190,9 +190,6 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         .add_bundle(&legacy_bundle_path)
         .context(format!("Adding legacy bundle: {legacy_bundle_path}"))?;
 
-    // Set the Structured Configuration for the components in Bootfs
-    builder.set_bootfs_structured_config(configuration.bootfs.components);
-
     // Add the bootfs files.
     builder.add_bootfs_files(&configuration.bootfs.files).context("Adding bootfs files")?;
 

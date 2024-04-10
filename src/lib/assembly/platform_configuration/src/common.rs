@@ -12,9 +12,7 @@ use tempfile::TempDir;
 use assembly_config_schema::platform_config::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};
 use assembly_config_schema::{BoardInformation, BuildType, ICUConfig};
 use assembly_named_file_map::NamedFileMap;
-use assembly_util::{
-    BootfsComponentForRepackage, BootfsDestination, FileEntry, NamedMap, PackageSetDestination,
-};
+use assembly_util::{BootfsDestination, FileEntry, NamedMap, PackageSetDestination};
 
 /// The platform's base service level.
 ///
@@ -174,12 +172,6 @@ pub(crate) trait ConfigurationBuilder {
 
 /// The interface for specifying the configuration to provide for bootfs.
 pub(crate) trait BootfsConfigBuilder {
-    /// Add configuration to the builder for a component within a package.
-    fn component(
-        &mut self,
-        component: BootfsComponentForRepackage,
-    ) -> Result<&mut dyn ComponentConfigBuilder>;
-
     /// Add a file to bootfs.
     fn file(
         &mut self,
@@ -369,9 +361,6 @@ pub type PackageConfigs = NamedMap<String, PackageConfiguration>;
 
 /// A map from component manifest path with a namespace to the values for the component.
 pub type ComponentConfigs = NamedMap<String, ComponentConfiguration>;
-
-/// A map from bootfs component manifest to the values for the component.
-pub type BootfsComponentConfigs = NamedMap<BootfsComponentForRepackage, ComponentConfiguration>;
 
 /// A map from package name to domain config.
 pub type DomainConfigs = NamedMap<PackageSetDestination, DomainConfig>;
@@ -611,44 +600,17 @@ impl ComponentConfigBuilder for ComponentConfiguration {
 /// in bootfs.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BootfsConfig {
-    /// A map from manifest paths within bootfs to the configuration values for
-    /// the component.
-    pub components: BootfsComponentConfigs,
-
     /// A map from bootfs destination to bootfs file entry.
     pub files: NamedFileMap<BootfsDestination>,
 }
 
 impl Default for BootfsConfig {
     fn default() -> Self {
-        Self {
-            components: BootfsComponentConfigs::new("bootfs component configs"),
-            files: NamedFileMap::new("bootfs files"),
-        }
+        Self { files: NamedFileMap::new("bootfs files") }
     }
 }
 
 impl BootfsConfigBuilder for BootfsConfig {
-    /// Add configuration to the builder for a component within bootfs.
-    fn component(
-        &mut self,
-        component: BootfsComponentForRepackage,
-    ) -> Result<&mut dyn ComponentConfigBuilder> {
-        match self.components.entry(component.clone()) {
-            entry @ Entry::Vacant(_) => {
-                Ok(entry.or_insert_with_key(|component| ComponentConfiguration {
-                    fields: NamedMap::new("structured config fields"),
-                    manifest_path: component.to_string(),
-                }))
-            }
-            Entry::Occupied(_) => {
-                Err(anyhow!("Each component's configuration can only be set once"))
-                    .with_context(|| format!("Setting configuration for component: {component}"))
-                    .context("Setting configuration in bootfs")
-            }
-        }
-    }
-
     /// Add a file to bootfs.
     fn file(
         &mut self,
@@ -838,11 +800,6 @@ mod tests {
         // using an inner
         let make_config = |builder: &mut dyn ConfigurationBuilder| -> Result<()> {
             builder
-                .bootfs()
-                .component(BootfsComponentForRepackage::ForTest)?
-                .field("key", "value")?;
-
-            builder
                 .package("package_a")
                 .component("meta/component_a1")?
                 .field("key_a1", "value_a1")?;
@@ -871,15 +828,6 @@ mod tests {
         assert!(make_config(&mut builder).is_ok());
         let config = builder.build();
 
-        assert_eq!(config.bootfs.components.len(), 1);
-
-        assert_eq!(
-            config.bootfs.components.get(&BootfsComponentForRepackage::ForTest).unwrap().fields,
-            NamedMap {
-                name: "structured config fields".into(),
-                entries: [("key".into(), "value".into())].into(),
-            },
-        );
         assert_eq!(config.package_configs.len(), 2);
         assert_eq!(
             config.package_configs.get("package_a").unwrap(),
@@ -970,9 +918,6 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let mut builder = ConfigurationBuilderImpl::default();
 
-        assert!(builder.bootfs().component(BootfsComponentForRepackage::ForTest).is_ok());
-        assert!(builder.bootfs().component(BootfsComponentForRepackage::ForTest).is_err());
-
         assert!(builder.package("foo").component("bar").is_ok());
         assert!(builder.package("foo").component("bar").is_err());
 
@@ -1030,20 +975,6 @@ mod tests {
         }
 
         let mut builder = ConfigurationBuilderImpl::default();
-
-        builder.bootfs().component(BootfsComponentForRepackage::ForTest).unwrap();
-        let result = builder
-            .bootfs()
-            .component(BootfsComponentForRepackage::ForTest)
-            .context("Configuring Subsystem");
-
-        assert_eq!(
-            format_result(result),
-            r"Configuring Subsystem Failed
-    1.  Setting configuration in bootfs
-    2.  Setting configuration for component: for-test
-    3.  Each component's configuration can only be set once"
-        );
 
         builder.package("foo").component("bar").unwrap();
         let result = builder.package("foo").component("bar").context("Configuring Subsystem");

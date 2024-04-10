@@ -14,7 +14,7 @@
     children: [
         {
             name: "tmpfs",
-            url: "#meta/memfs.cm",
+            url: "fuchsia-boot:///memfs#meta/memfs.cm",
         },
     ],
     capabilities: [

@@ -618,11 +618,48 @@ template("assembly_input_bundle") {
   }
 
   if (defined(invoker.compiled_packages)) {
+    _compiled_packages = []
+    foreach(package, invoker.compiled_packages) {
+      _package = {
+      }
+      _package = {
+        forward_variables_from(package, "*", [ "contents" ])
+      }
+      _contents = []
+      if (defined(package.contents)) {
+        _inputs = []
+        _deps = []
+        foreach(entry, package.contents) {
+          _entry = {
+          }
+          _entry = {
+            forward_variables_from(entry,
+                                   [
+                                     "label",
+                                     "destination",
+                                   ])
+          }
+          _entry.source = rebase_path("${entry.source}", root_build_dir)
+          _contents += [ _entry ]
+
+          _inputs += [ entry.source ]
+          _deps += [ entry.label ]
+        }
+        group_name = "${target_name}.compiled_package.${package.name}.inputs"
+        group_with_inputs(group_name) {
+          deps = _deps
+          inputs = _inputs
+        }
+        creation_deps += [ ":${group_name}" ]
+      }
+      _package.contents = _contents
+      _compiled_packages += [ _package ]
+    }
     generated_file(labels.compiled_packages) {
       forward_variables_from(invoker, [ "testonly" ])
       outputs = [ "${files.compiled_packages}" ]
       output_conversion = "json"
-      contents = invoker.compiled_packages
+      contents = _compiled_packages
     }
 
     creation_args += [

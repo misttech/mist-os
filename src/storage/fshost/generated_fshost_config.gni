@@ -60,6 +60,7 @@ template("generated_fshost_config") {
       fvm = true
       ramdisk_image = false
       fxfs_blob = true
+      fxfs_crypt_url = "fuchsia-boot:///fxfs-crypt#meta/fxfs-crypt.cm"
       gpt = true
       gpt_all = false
       mbr = false

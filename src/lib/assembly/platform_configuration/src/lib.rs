@@ -6,7 +6,6 @@ pub(crate) mod common;
 pub(crate) mod subsystems;
 pub(crate) mod util;
 
-pub use common::BootfsComponentConfigs;
 pub use common::CompletedConfiguration;
 pub use common::ComponentConfigs;
 pub use common::DomainConfig;

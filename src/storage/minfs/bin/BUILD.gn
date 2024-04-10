@@ -27,6 +27,12 @@ fuchsia_component("minfs-component") {
   deps = [ ":minfs" ]
 }
 
+fuchsia_package("package") {
+  visibility += [ "*" ]
+  package_name = "minfs"
+  deps = [ ":minfs-component" ]
+}
+
 group("minfs-test-component") {
   visibility += [ "*" ]
   deps = [
