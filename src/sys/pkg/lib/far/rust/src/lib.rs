@@ -268,12 +268,13 @@ fn validate_content_chunk(
 ) -> Result<(), Error> {
     // Chunks must be non-overlapping and tightly packed
     let expected_offset = if let Some(previous_entry) = previous_entry {
-        next_multiple_of(
-            previous_entry.data_offset.get() + previous_entry.data_length.get(),
-            CONTENT_ALIGNMENT,
-        )
+        // Both the addition and rounding were checked when the previous entry was validated.
+        (previous_entry.data_offset.get() + previous_entry.data_length.get())
+            .next_multiple_of(CONTENT_ALIGNMENT)
     } else {
-        next_multiple_of(end_of_last_non_content_chunk, CONTENT_ALIGNMENT)
+        end_of_last_non_content_chunk
+            .checked_next_multiple_of(CONTENT_ALIGNMENT)
+            .ok_or(Error::ContentChunkOffsetOverflow)?
     };
     if entry.data_offset.get() != expected_offset {
         return Err(Error::InvalidContentChunkOffset {
@@ -284,16 +285,16 @@ fn validate_content_chunk(
     }
 
     // Chunks must be contained in the archive
-    let stream_len_lower_bound = next_multiple_of(
-        entry.data_offset.get().checked_add(entry.data_length.get()).ok_or_else(|| {
-            Error::ContentChunkEndOverflow {
-                name: name.into(),
-                offset: entry.data_offset.get(),
-                length: entry.data_length.get(),
-            }
-        })?,
-        CONTENT_ALIGNMENT,
-    );
+    let stream_len_lower_bound = entry
+        .data_offset
+        .get()
+        .checked_add(entry.data_length.get())
+        .and_then(|end| end.checked_next_multiple_of(CONTENT_ALIGNMENT))
+        .ok_or_else(|| Error::ContentChunkEndOverflow {
+            name: name.into(),
+            offset: entry.data_offset.get(),
+            length: entry.data_length.get(),
+        })?;
     if stream_len_lower_bound > stream_len {
         return Err(Error::ContentChunkBeyondArchive {
             name: name.into(),
@@ -344,18 +345,6 @@ impl SafeIntegerConversion for u32 {
             std::mem::size_of::<u32>() <= std::mem::size_of::<usize>()
         );
         self as usize
-    }
-}
-
-// Returns the least multiple of `multiple` that is greater than or equal to `unrounded_value`.
-// Panics if `multiple` is zero.
-// TODO(https://fxbug.dev/42055087) Replace next_multiple_of with std methods once available.
-fn next_multiple_of(unrounded_value: u64, multiple: u64) -> u64 {
-    let rem = unrounded_value.checked_rem(multiple).expect("never called with multiple = 0");
-    if rem > 0 {
-        unrounded_value - rem + multiple
-    } else {
-        unrounded_value
     }
 }
 
@@ -480,18 +469,5 @@ pub(crate) mod tests {
     #[test]
     fn into_usize_no_panic() {
         assert_eq!(u32::MAX.into_usize(), u32::MAX.try_into().unwrap());
-    }
-
-    #[test]
-    fn test_next_multiple_of() {
-        assert_eq!(next_multiple_of(3, 8), 8);
-        assert_eq!(next_multiple_of(13, 8), 16);
-        assert_eq!(next_multiple_of(16, 8), 16);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_next_multiple_of_zero() {
-        next_multiple_of(3, 0);
     }
 }

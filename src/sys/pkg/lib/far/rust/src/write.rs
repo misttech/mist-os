@@ -4,9 +4,9 @@
 
 use {
     crate::{
-        name::validate_name, next_multiple_of, DirectoryEntry, Error, Index, IndexEntry,
-        CONTENT_ALIGNMENT, DIRECTORY_ENTRY_LEN, DIR_CHUNK_TYPE, DIR_NAMES_CHUNK_TYPE,
-        INDEX_ENTRY_LEN, INDEX_LEN, MAGIC_INDEX_VALUE,
+        name::validate_name, DirectoryEntry, Error, Index, IndexEntry, CONTENT_ALIGNMENT,
+        DIRECTORY_ENTRY_LEN, DIR_CHUNK_TYPE, DIR_NAMES_CHUNK_TYPE, INDEX_ENTRY_LEN, INDEX_LEN,
+        MAGIC_INDEX_VALUE,
     },
     std::{
         collections::BTreeMap,
@@ -67,7 +67,8 @@ pub fn write(
     let name_index = IndexEntry {
         chunk_type: DIR_NAMES_CHUNK_TYPE,
         offset: (dir_index.offset.get() + dir_index.length.get()).into(),
-        length: next_multiple_of(path_data.len() as u64, 8).into(),
+        // path_data.len() is at most u32::MAX + u16::MAX, so the aligning will not overflow a u64.
+        length: (path_data.len() as u64).next_multiple_of(8).into(),
     };
 
     target.write_all(index.as_bytes()).map_err(Error::SerializeIndex)?;
@@ -78,13 +79,21 @@ pub fn write(
         .write_all(name_index.as_bytes())
         .map_err(Error::SerializeDirectoryNamesChunkIndexEntry)?;
 
-    let mut content_offset =
-        next_multiple_of(name_index.offset.get() + name_index.length.get(), CONTENT_ALIGNMENT);
+    let mut content_offset = name_index
+        .offset
+        .get()
+        .checked_add(name_index.length.get())
+        .ok_or(Error::ContentChunkOffsetOverflow)?
+        .checked_next_multiple_of(CONTENT_ALIGNMENT)
+        .ok_or(Error::ContentChunkOffsetOverflow)?;
 
     for entry in &mut directory_entries {
         entry.data_offset = content_offset.into();
-        content_offset =
-            next_multiple_of(content_offset + entry.data_length.get(), CONTENT_ALIGNMENT);
+        content_offset = content_offset
+            .checked_add(entry.data_length.get())
+            .ok_or(Error::ContentChunkOffsetOverflow)?
+            .checked_next_multiple_of(CONTENT_ALIGNMENT)
+            .ok_or(Error::ContentChunkOffsetOverflow)?;
         target.write_all(entry.as_bytes()).map_err(Error::SerializeDirectoryEntry)?;
     }
 
@@ -93,7 +102,8 @@ pub fn write(
     write_zeros(&mut target, name_index.length.get() as usize - path_data.len())?;
 
     let pos = name_index.offset.get() + name_index.length.get();
-    let padding_count = next_multiple_of(pos, CONTENT_ALIGNMENT) - pos;
+    // This alignment won't overflow, it was checked for the first content_offset.
+    let padding_count = pos.next_multiple_of(CONTENT_ALIGNMENT) - pos;
     write_zeros(&mut target, padding_count as usize)?;
 
     for (entry_index, (archive_path, (_, mut contents))) in path_content_map.into_iter().enumerate()
@@ -108,7 +118,10 @@ pub fn write(
         }
         let pos = directory_entries[entry_index].data_offset.get()
             + directory_entries[entry_index].data_length.get();
-        let padding_count = next_multiple_of(pos, CONTENT_ALIGNMENT) - pos;
+        let padding_count = pos
+            .checked_next_multiple_of(CONTENT_ALIGNMENT)
+            .ok_or(Error::ContentChunkOffsetOverflow)?
+            - pos;
         write_zeros(&mut target, padding_count as usize)?;
     }
 

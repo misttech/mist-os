@@ -144,6 +144,9 @@ pub enum Error {
     #[error("Attempted to read past the end of a content chunk")]
     ReadPastEnd,
 
+    #[error("Content chunk offset larger than u64::MAX")]
+    ContentChunkOffsetOverflow,
+
     #[error(
         "Directory entry for {} has a bad content chunk offset, expected {expected} actual \
          {actual}",
