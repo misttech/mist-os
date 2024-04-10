@@ -11,7 +11,7 @@ use std::{collections::HashSet, sync::Arc};
 
 use anyhow::{anyhow, Context};
 use async_utils::hanging_get::client::HangingGetStream;
-use fidl::endpoints::create_sync_proxy;
+use fidl::endpoints::{create_request_stream, create_sync_proxy};
 use fidl_fuchsia_power_broker as fbroker;
 use fidl_fuchsia_power_suspend as fsuspend;
 use fidl_fuchsia_power_system as fsystem;
@@ -21,33 +21,38 @@ use futures::StreamExt;
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_error, log_info};
 use starnix_sync::{Mutex, MutexGuard};
-use starnix_uapi::{error, errors::Errno};
+use starnix_uapi::{errno, error, errors::Errno};
+
+/// Power Mode power element is owned and registered by Starnix kernel. This power element is
+/// added in the power topology as a dependent on Application Activity element that is owned by
+/// the SAG.
+///
+/// After Starnix boots, a power-on lease will be created and retained.
+///
+/// When it need to suspend, Starnix should create another lease for the suspend state and release
+/// the power-on lease.
+///
+/// The power level will only be changed to the requested level when all elements in the
+/// topology can maintain the minimum power equilibrium in the lease.
+///
+/// | Power Mode        | Level |
+/// | ----------------- | ----- |
+/// | On                | 4     |
+/// | Suspend-to-Idle   | 3     |
+/// | Standby           | 2     |
+/// | Suspend-to-RAM    | 1     |
+/// | Suspend-to-Disk   | 0     |
+#[derive(Debug)]
+struct PowerMode {
+    element_proxy: fbroker::ElementControlSynchronousProxy,
+    lessor_proxy: fbroker::LessorSynchronousProxy,
+    level_proxy: fbroker::CurrentLevelSynchronousProxy,
+}
 
 /// Manager for suspend and resume.
 #[derive(Default)]
 pub struct SuspendResumeManager {
-    /// Synch FIDL Proxy to create leases on the power topology.
-    ///
-    /// Power Mode power element is owned and registered by Starnix kernel. This power element is
-    /// added in the power topology as a dependent on Application Activity element that is owned by
-    /// the SAG.
-    ///
-    /// After Starnix boots, a power-on lease will be created and retained.
-    ///
-    /// When needs to suspend, Starnix should create another lease for the suspend state and release
-    /// the power-on lease.
-    ///
-    /// The power level will only be changed to the requested level when all elements in the
-    /// topology can maintain the minimum power equilibrium in the lease.
-    ///
-    /// | Power Mode        | Level |
-    /// | ----------------- | ----- |
-    /// | On                | 4     |
-    /// | Suspend-to-Idle   | 3     |
-    /// | Standby           | 2     |
-    /// | Suspend-to-RAM    | 1     |
-    /// | Suspend-to-Disk   | 0     |
-    power_mode_lessor: OnceCell<fbroker::LessorSynchronousProxy>,
+    power_mode: OnceCell<PowerMode>,
     inner: Mutex<SuspendResumeManagerInner>,
 }
 static POWER_ON_LEVEL: fbroker::PowerLevel = 4;
@@ -98,7 +103,15 @@ impl SuspendResumeManager {
             // TODO(b/316023943): also depends on execution_resume_latency after implemented.
             let power_levels: Vec<u8> = (0..=POWER_ON_LEVEL).collect();
             let (lessor, lessor_server_end) = create_sync_proxy::<fbroker::LessorMarker>();
-            let _element = topology
+            let (current_level, current_level_server_end) =
+                create_sync_proxy::<fbroker::CurrentLevelMarker>();
+            let (_, required_level_server_end) =
+                create_sync_proxy::<fbroker::RequiredLevelMarker>();
+            let level_control_channels = fbroker::LevelControlChannels {
+                current: current_level_server_end,
+                required: required_level_server_end,
+            };
+            let element = topology
                 .add_element(
                     fbroker::ElementSchema {
                         element_name: Some("starnix_power_mode".into()),
@@ -112,6 +125,7 @@ impl SuspendResumeManager {
                                 .into_primitive(),
                         }]),
                         lessor_channel: Some(lessor_server_end),
+                        level_control_channels: Some(level_control_channels),
                         ..Default::default()
                     },
                     zx::Time::INFINITE,
@@ -123,9 +137,15 @@ impl SuspendResumeManager {
                 .lease(POWER_ON_LEVEL, zx::Time::INFINITE)?
                 .map_err(|e| anyhow!("PowerBroker::LeaseError({e:?})"))?
                 .into_channel();
-
-            self.power_mode_lessor.set(lessor).expect("Power Mode should be uninitialized");
             self.lock().lease_control_channel = Some(power_on_control);
+
+            self.power_mode
+                .set(PowerMode {
+                    element_proxy: element.into_sync_proxy(),
+                    lessor_proxy: lessor,
+                    level_proxy: current_level,
+                })
+                .expect("Power Mode should be uninitialized");
         };
 
         Ok(())
@@ -137,8 +157,7 @@ impl SuspendResumeManager {
         system_task: &CurrentTask,
     ) {
         let (listener_client_end, mut listener_stream) =
-            fidl::endpoints::create_request_stream::<fsystem::ActivityGovernorListenerMarker>()
-                .unwrap();
+            create_request_stream::<fsystem::ActivityGovernorListenerMarker>().unwrap();
         let self_ref = self.clone();
         system_task.kernel().kthreads.spawn_future(async move {
             while let Some(stream) = listener_stream.next().await {
@@ -146,7 +165,7 @@ impl SuspendResumeManager {
                     Ok(req) => match req {
                         fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
                             log_info!("Resuming from suspend");
-                            match self_ref.update_power_lease(POWER_ON_LEVEL) {
+                            match self_ref.update_power_level(POWER_ON_LEVEL) {
                                 Ok(_) => {
                                     // The server is expected to respond once it has performed the
                                     // operations required to keep the system awake.
@@ -218,6 +237,13 @@ impl SuspendResumeManager {
         });
     }
 
+    fn power_mode(&self) -> Result<&PowerMode, Errno> {
+        match self.power_mode.get() {
+            Some(p) => Ok(p),
+            None => error!(EAGAIN, "power-mode element is not initialized"),
+        }
+    }
+
     pub fn suspend_stats(&self) -> SuspendStats {
         self.lock().suspend_stats.clone()
     }
@@ -235,32 +261,58 @@ impl SuspendResumeManager {
         HashSet::from([SuspendState::Ram, SuspendState::Idle])
     }
 
-    fn update_power_lease(&self, level: fbroker::PowerLevel) -> Result<(), Errno> {
-        if let Some(lessor) = self.power_mode_lessor.get() {
-            // Before the old lease is dropped, a new lease must be created to transit to the
-            // new level. This ensures a smooth transition without going back to the initial
-            // power level.
-            match lessor.lease(level, zx::Time::INFINITE) {
-                Ok(Ok(res)) => {
-                    self.lock().lease_control_channel = Some(res.into_channel());
-                    Ok(())
+    fn update_power_level(&self, level: fbroker::PowerLevel) -> Result<(), Errno> {
+        let power_mode = self.power_mode()?;
+        // Before the old lease is dropped, a new lease must be created to transit to the
+        // new level. This ensures a smooth transition without going back to the initial
+        // power level.
+        match power_mode.lessor_proxy.lease(level, zx::Time::INFINITE) {
+            Ok(Ok(lease_client)) => {
+                // Wait until the lease is satisfied.
+                let lease_control = lease_client.into_sync_proxy();
+                let mut lease_status = fbroker::LeaseStatus::Unknown;
+                while lease_status != fbroker::LeaseStatus::Satisfied {
+                    lease_status = lease_control
+                        .watch_status(lease_status, zx::Time::INFINITE)
+                        .map_err(|_| errno!(EINVAL))?;
                 }
-                Ok(Err(err)) => {
-                    log_error!("power broker lease error {:?}", err);
-                    error!(EINVAL)
-                }
-                Err(err) => {
-                    log_error!("power broker fidl error {:?}", err);
-                    error!(EINVAL)
-                }
+                self.lock().lease_control_channel = Some(lease_control.into_channel());
             }
-        } else {
-            log_error!("power-mode element is not initialized");
-            error!(EAGAIN)
+            Ok(Err(err)) => {
+                return error!(EINVAL, format!("power broker lease error {:?}", err));
+            }
+            Err(err) => {
+                return error!(EINVAL, format!("power broker lease fidl error {err}"));
+            }
+        }
+
+        match power_mode.level_proxy.update(level, zx::Time::INFINITE) {
+            Ok(Ok(_)) => Ok(()),
+            Ok(Err(err)) => error!(EINVAL, format!("power level update error {:?}", err)),
+            Err(err) => error!(EINVAL, format!("power level update fidl error {err}")),
         }
     }
 
+    fn wait_for_power_level(&self, level: fbroker::PowerLevel) -> Result<(), Errno> {
+        // Create power element status stream
+        let (element_status, element_status_server) = create_sync_proxy::<fbroker::StatusMarker>();
+        self.power_mode()?
+            .element_proxy
+            .open_status_channel(element_status_server)
+            .map_err(|e| errno!(EINVAL, format!("Status channel failed to open: {e}")))?;
+        while element_status
+            .watch_power_level(zx::Time::INFINITE)
+            .map_err(|err| errno!(EINVAL, format!("power element status watch error {err}")))?
+            .map_err(|err| {
+                errno!(EINVAL, format!("power element status watch fidl error {:?}", err))
+            })?
+            != level
+        {}
+        Ok(())
+    }
+
     pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
-        self.update_power_lease(state.into())
+        self.update_power_level(state.into())?;
+        self.wait_for_power_level(POWER_ON_LEVEL)
     }
 }
