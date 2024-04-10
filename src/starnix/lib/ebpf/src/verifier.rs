@@ -379,8 +379,9 @@ impl Type {
 
 #[derive(Clone, Debug)]
 pub struct FunctionSignature {
-    pub args: &'static [Type],
+    pub args: Vec<Type>,
     pub return_value: Type,
+    pub invalidate_array_bounds: bool,
 }
 
 #[derive(Debug, Default)]
@@ -1882,6 +1883,9 @@ impl BpfVisitor for ComputationContext {
         }
         // Parameters have been validated, specify the return value on return.
         let mut next = self.next()?;
+        if signature.invalidate_array_bounds {
+            next.array_bounds.clear();
+        }
         let value = self.resolve_return_value(context, &signature.return_value)?;
         next.set_reg(0, value)?;
         for i in 1..=5 {

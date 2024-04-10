@@ -761,7 +761,7 @@ pub mod test {
                 name: "gather_bytes",
                 function_pointer: Arc::new(gather_bytes),
                 signature: FunctionSignature {
-                    args: &[
+                    args: vec![
                         Type::ScalarValueParameter,
                         Type::ScalarValueParameter,
                         Type::ScalarValueParameter,
@@ -769,6 +769,7 @@ pub mod test {
                         Type::ScalarValueParameter,
                     ],
                     return_value: Type::unknown_written_scalar_value(),
+                    invalidate_array_bounds: false,
                 },
             })
             .expect("register");
@@ -778,11 +779,12 @@ pub mod test {
                 name: "memfrob",
                 function_pointer: Arc::new(memfrob),
                 signature: FunctionSignature {
-                    args: &[
+                    args: vec![
                         Type::MemoryParameter { memory_length_index: 1 },
                         Type::ScalarValueParameter,
                     ],
                     return_value: Type::AliasParameter { parameter_index: 0 },
+                    invalidate_array_bounds: false,
                 },
             })
             .expect("register");
@@ -792,8 +794,9 @@ pub mod test {
                 name: "trash_registers",
                 function_pointer: Arc::new(trash_registers),
                 signature: FunctionSignature {
-                    args: &[],
+                    args: vec![],
                     return_value: Type::unknown_written_scalar_value(),
+                    invalidate_array_bounds: false,
                 },
             })
             .expect("register");
@@ -803,8 +806,9 @@ pub mod test {
                 name: "sqrti",
                 function_pointer: Arc::new(sqrti),
                 signature: FunctionSignature {
-                    args: &[Type::ScalarValueParameter],
+                    args: vec![Type::ScalarValueParameter],
                     return_value: Type::unknown_written_scalar_value(),
+                    invalidate_array_bounds: false,
                 },
             })
             .expect("register");
@@ -816,8 +820,9 @@ pub mod test {
                 signature: FunctionSignature {
                     // Args cannot be correctly verified as the verifier cannot check the string
                     // are correctly 0 terminated.
-                    args: &[],
+                    args: vec![],
                     return_value: Type::unknown_written_scalar_value(),
+                    invalidate_array_bounds: false,
                 },
             })
             .expect("register");
@@ -827,10 +832,11 @@ pub mod test {
                 name: "null_or",
                 function_pointer: Arc::new(null_or),
                 signature: FunctionSignature {
-                    args: &[Type::ScalarValueParameter],
+                    args: vec![Type::ScalarValueParameter],
                     return_value: Type::NullOrParameter(Box::new(
                         Type::unknown_written_scalar_value(),
                     )),
+                    invalidate_array_bounds: false,
                 },
             })
             .expect("register");

@@ -91,10 +91,14 @@ pub static BPF_HELPERS: Lazy<Vec<EbpfHelper<HelperFunctionContextMarker>>> = Laz
             name: MAP_LOOKUP_ELEM_NAME,
             function_pointer: Arc::new(bpf_map_lookup_elem),
             signature: FunctionSignature {
-                args: &[Type::ConstPtrToMapParameter, Type::MapKeyParameter { map_ptr_index: 0 }],
+                args: vec![
+                    Type::ConstPtrToMapParameter,
+                    Type::MapKeyParameter { map_ptr_index: 0 },
+                ],
                 return_value: Type::NullOrParameter(Box::new(Type::MapValueParameter {
                     map_ptr_index: 0,
                 })),
+                invalidate_array_bounds: false,
             },
         },
         EbpfHelper {
@@ -102,13 +106,14 @@ pub static BPF_HELPERS: Lazy<Vec<EbpfHelper<HelperFunctionContextMarker>>> = Laz
             name: MAP_UPDATE_ELEM_NAME,
             function_pointer: Arc::new(bpf_map_update_elem),
             signature: FunctionSignature {
-                args: &[
+                args: vec![
                     Type::ConstPtrToMapParameter,
                     Type::MapKeyParameter { map_ptr_index: 0 },
                     Type::MapValueParameter { map_ptr_index: 0 },
                     Type::ScalarValueParameter,
                 ],
                 return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
             },
         },
         EbpfHelper {
@@ -116,8 +121,12 @@ pub static BPF_HELPERS: Lazy<Vec<EbpfHelper<HelperFunctionContextMarker>>> = Laz
             name: MAP_DELETE_ELEM_NAME,
             function_pointer: Arc::new(bpf_map_delete_elem),
             signature: FunctionSignature {
-                args: &[Type::ConstPtrToMapParameter, Type::MapKeyParameter { map_ptr_index: 0 }],
+                args: vec![
+                    Type::ConstPtrToMapParameter,
+                    Type::MapKeyParameter { map_ptr_index: 0 },
+                ],
                 return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
             },
         },
     ]
