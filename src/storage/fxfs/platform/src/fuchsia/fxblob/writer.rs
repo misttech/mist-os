@@ -10,7 +10,7 @@ use {
         directory::FxDirectory, errors::map_to_status, fxblob::directory::BlobDirectory,
         node::FxNode, volume::FxVolume,
     },
-    anyhow::{anyhow, Context, Error},
+    anyhow::{Context as _, Error},
     delivery_blob::{
         compression::{decode_archive, ChunkInfo, ChunkedDecompressor},
         Type1Blob,
@@ -23,7 +23,6 @@ use {
     futures::{lock::Mutex as AsyncMutex, try_join, TryStreamExt},
     fxfs::{
         errors::FxfsError,
-        log::*,
         object_handle::{ObjectHandle, WriteObjectHandle},
         object_store::{
             directory::{replace_child_with_object, ReplacedChild},
@@ -250,8 +249,7 @@ impl FxDeliveryBlob {
             .directory()
             .directory()
             .acquire_context_for_replace(None, &name, false)
-            .await
-            .map_err(map_to_status)?
+            .await?
             .transaction;
 
         let object_id = self.handle.object_id();
@@ -322,39 +320,38 @@ impl FxNode for FxDeliveryBlob {
 }
 
 impl FxDeliveryBlob {
-    async fn truncate(&self, length: u64) -> Result<(), Status> {
+    async fn truncate(&self, length: u64) -> Result<(), Error> {
         let mut inner = self.inner.lock().await;
-        if let Some(previous_size) = inner.delivery_size {
-            error!(previous_size, "truncate already called on blob");
-            return Err(Status::BAD_STATE);
+        if inner.delivery_size.is_some() {
+            return Err(Status::BAD_STATE).context("Blob was already truncated.");
         }
         if length < Type1Blob::HEADER.header_length as u64 {
-            error!("specified size is too small for delivery blob");
-            return Err(Status::INVALID_ARGS);
+            return Err(Status::INVALID_ARGS).context("Invalid size (too small).");
         }
         inner.delivery_size = Some(length);
         Ok(())
     }
 
-    async fn append(&self, content: &[u8], inner: &mut Inner) -> Result<u64, Status> {
-        if let None = inner.delivery_size {
-            error!("truncate must be called before writing blobs");
-            return Err(Status::BAD_STATE);
-        }
+    /// Appends |content| to this delivery blob.
+    ///
+    /// *WARNING*: If this function fails, the blob will remain in an invalid state. Errors should
+    /// be latched by the caller instead of calling this function again. The blob can be closed and
+    /// re-opened to attempt writing again.
+    async fn append(&self, content: &[u8], inner: &mut Inner) -> Result<u64, Error> {
+        let delivery_size = inner
+            .delivery_size
+            .ok_or(Status::BAD_STATE)
+            .context("Must truncate blob before writing.")?;
         let content_len = content.len() as u64;
-        if (inner.delivery_bytes_written + content_len) > inner.delivery_size.unwrap() {
-            error!("write exceeds truncated blob length");
-            return Err(Status::BUFFER_TOO_SMALL);
+        if (inner.delivery_bytes_written + content_len) > delivery_size {
+            return Err(Status::BUFFER_TOO_SMALL).with_context(|| {
+                format!(
+                    "Wrote more bytes than truncated size (truncated = {}, written = {}).",
+                    delivery_size,
+                    inner.delivery_bytes_written + content_len
+                )
+            });
         }
-        if let Some(ref header) = inner.header {
-            if (inner.payload_persisted + content_len) > header.payload_length as u64 {
-                error!("write exceeds delivery header payload length");
-                return Err(Status::BUFFER_TOO_SMALL);
-            }
-        }
-
-        // Any errors occurring below will be latched as the blob will be in an unrecoverable state.
-        // Writers will need to close and try to rewrite the blob.
         async {
             inner.buffer.extend_from_slice(content);
             inner.delivery_bytes_written += content_len;
@@ -362,10 +359,19 @@ impl FxDeliveryBlob {
             // Decode delivery blob header.
             if inner.header.is_none() {
                 let Some((header, payload)) = Type1Blob::parse(&inner.buffer)
-                    .context("Failed to decode delivery blob header")?
+                    .context("Failed to decode delivery blob header.")?
                 else {
                     return Ok(()); // Not enough data to decode header yet.
                 };
+                let expected_size = header.header.header_length as usize + header.payload_length;
+                if expected_size != delivery_size as usize {
+                    return Err(FxfsError::IntegrityError).with_context(|| {
+                        format!(
+                            "Truncated size ({}) does not match size from blob header ({})!",
+                            delivery_size, expected_size
+                        )
+                    });
+                }
                 inner.buffer = Vec::from(payload);
                 inner.header = Some(header);
             }
@@ -375,7 +381,7 @@ impl FxDeliveryBlob {
                 let prev_buff_len = inner.buffer.len();
                 let archive_length = inner.header().payload_length;
                 let Some((seek_table, chunk_data)) = decode_archive(&inner.buffer, archive_length)
-                    .context("Failed to decode chunked archive")?
+                    .context("Failed to decode archive header")?
                 else {
                     return Ok(()); // Not enough data to decode archive header/seek table.
                 };
@@ -424,8 +430,7 @@ impl FxDeliveryBlob {
             }
             Ok(())
         }
-        .await
-        .map_err(|e| Err(map_to_status(e)))?;
+        .await?;
         Ok(content_len)
     }
 
@@ -463,7 +468,8 @@ impl FxDeliveryBlob {
         let write_offset = inner.delivery_bytes_written;
         {
             let Some(ref vmo) = inner.vmo else {
-                return Err(anyhow!("get_vmo was not called before attempting to write bytes"));
+                return Err(Status::BAD_STATE)
+                    .context("BlobWriter.GetVmo must be called before BlobWriter.BytesReady.");
             };
             let vmo_offset = write_offset % *RING_BUFFER_SIZE;
             if vmo_offset + bytes_written > *RING_BUFFER_SIZE {
@@ -476,9 +482,12 @@ impl FxDeliveryBlob {
         }
         self.append(&buf, &mut inner).await.with_context(|| {
             format!(
-            "failed to to write to blob {} (bytes_written = {}, write_offset = {}, buf.len() = {})",
-            self.hash, bytes_written, write_offset, buf.len()
-        )
+                "failed to write blob {} (bytes_written = {}, offset = {}, delivery_size = {})",
+                self.hash,
+                bytes_written,
+                write_offset,
+                inner.delivery_size.unwrap_or_default()
+            )
         })?;
         Ok(())
     }
@@ -495,12 +504,12 @@ impl FxDeliveryBlob {
                     let res = match self.get_vmo(size).await {
                         Ok(vmo) => Ok(vmo),
                         Err(e) => {
-                            tracing::error!("blob service: get_vmo failed: {:?}", e);
+                            tracing::error!("BlobWriter.GetVmo error: {:?}", e);
                             Err(map_to_status(e).into_raw())
                         }
                     };
                     responder.send(res).unwrap_or_else(|e| {
-                        tracing::error!("failed to send GetVmo response. error: {:?}", e);
+                        tracing::error!("Error sending BlobWriter.GetVmo response: {:?}", e);
                     });
                 }
                 BlobWriterRequest::BytesReady { bytes_written, responder } => {
@@ -510,7 +519,7 @@ impl FxDeliveryBlob {
                         match self.bytes_ready(bytes_written).await {
                             Ok(()) => Ok(()),
                             Err(e) => {
-                                tracing::error!("blob service: bytes_ready failed: {:?}", e);
+                                tracing::error!("BlobWriter.BytesReady error: {:?}", e);
                                 let status = map_to_status(e).into_raw();
                                 latched_error = Some(status);
                                 Err(status)
@@ -518,7 +527,7 @@ impl FxDeliveryBlob {
                         }
                     };
                     responder.send(res).unwrap_or_else(|e| {
-                        tracing::error!("failed to send BytesReady response. error: {:?}", e);
+                        tracing::error!("Error sending BlobWriter.BytesReady response: {:?}", e);
                     });
                 }
             }
@@ -1017,6 +1026,44 @@ mod tests {
             assert_eq!(fixture.read_blob(hash).await, data);
         }
 
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn bytes_ready_should_fail_if_size_invalid() {
+        let fixture = new_blob_fixture().await;
+        // Generate a delivery blob (size doesn't matter).
+        let mut data = vec![1; 196608];
+        thread_rng().fill(&mut data[..]);
+        let mut builder = MerkleTreeBuilder::new();
+        builder.write(&data);
+        let hash = builder.finish().root();
+        let blob_data = Type1Blob::generate(&data, CompressionMode::Always);
+        // To simplify the test, we make sure to write enough bytes on the first call to bytes_ready
+        // so that the header can be decoded (and thus the length mismatch is detected).
+        let bytes_to_write = std::cmp::min((*RING_BUFFER_SIZE / 2) as usize, blob_data.len());
+        Type1Blob::parse(&blob_data[..bytes_to_write])
+            .unwrap()
+            .expect("bytes_to_write must be long enough to cover delivery blob header!");
+        // We can call get_vmo with the wrong size, because we don't know what size the blob should
+        // be. Once we call bytes_ready with enough data for the header to be decoded, we should
+        // detect the failure.
+        for incorrect_size in [blob_data.len() - 1, blob_data.len() + 1] {
+            let writer =
+                fixture.create_blob(&hash.into(), false).await.expect("failed to create blob");
+            let vmo = writer
+                .get_vmo(incorrect_size as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+            assert!(vmo.get_size().unwrap() > bytes_to_write as u64);
+            vmo.write(&blob_data[..bytes_to_write], 0).unwrap();
+            writer
+                .bytes_ready(bytes_to_write as u64)
+                .await
+                .expect("transport error on bytes_ready")
+                .expect_err("should fail writing blob if size passed to get_vmo is incorrect");
+        }
         fixture.close().await;
     }
 }
