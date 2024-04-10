@@ -211,7 +211,7 @@ pub async fn repo_package_manifest_list(
 async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
     let mut repo_builder = PmRepository::builder(cmd.repo_path.clone())
         .copy_mode(cmd.copy_mode)
-        .delivery_blob_type(Some(cmd.delivery_blob_type.try_into()?));
+        .delivery_blob_type(cmd.delivery_blob_type.try_into()?);
 
     if let Some(path) = &cmd.blob_repo_dir {
         repo_builder = repo_builder.blob_repo_path(path.clone());

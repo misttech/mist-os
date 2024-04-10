@@ -65,7 +65,7 @@ impl PmRepositoryBuilder {
     }
 
     /// Set the type of delivery blob to generate when copying blobs into the repository.
-    pub fn delivery_blob_type(mut self, delivery_blob_type: Option<DeliveryBlobType>) -> Self {
+    pub fn delivery_blob_type(mut self, delivery_blob_type: DeliveryBlobType) -> Self {
         self.builder = self.builder.delivery_blob_type(delivery_blob_type);
         self
     }

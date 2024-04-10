@@ -286,12 +286,12 @@ async fn delivery_blob_not_available() {
     let pkg = make_pkg_with_extra_blobs("delivery_blob", 1).await;
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
-            .delivery_blob_type(None)
             .add_package(&pkg)
             .build()
             .await
             .unwrap(),
     );
+    repo.purge_blobs(pkg.list_blobs().into_iter());
     let served_repository = Arc::clone(&repo).server().start().unwrap();
 
     let repo_url = "fuchsia-pkg://test".parse().unwrap();

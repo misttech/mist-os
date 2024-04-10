@@ -7,6 +7,7 @@
 use {
     crate::{package::Package, serve::ServedRepositoryBuilder},
     anyhow::{format_err, Context as _, Error},
+    delivery_blob::DeliveryBlobType,
     fidl_fuchsia_pkg_ext::{
         MirrorConfig, RepositoryConfig, RepositoryConfigBuilder, RepositoryKey,
     },
@@ -31,12 +32,12 @@ use {
 pub struct RepositoryBuilder<'a> {
     packages: Vec<MaybeOwned<'a, Package>>,
     repodir: Option<PathBuf>,
-    delivery_blob_type: Option<u32>,
+    delivery_blob_type: DeliveryBlobType,
 }
 
 impl<'a> Default for RepositoryBuilder<'a> {
     fn default() -> Self {
-        Self { packages: vec![], repodir: None, delivery_blob_type: Some(1) }
+        Self { packages: vec![], repodir: None, delivery_blob_type: DeliveryBlobType::Type1 }
     }
 }
 
@@ -57,10 +58,8 @@ impl<'a> RepositoryBuilder<'a> {
         self
     }
 
-    /// Set the type of delivery blob to generate, if set, in addition to exposing the blobs at
-    /// "/blobs/", the repo will also expose an appropriately modified copy of each blob at
-    /// "/blobs/{type}/".
-    pub fn delivery_blob_type(mut self, delivery_blob_type: Option<u32>) -> Self {
+    /// Set the type of delivery blob, the blobs will be exposed at "/blobs/{type}/".
+    pub fn delivery_blob_type(mut self, delivery_blob_type: DeliveryBlobType) -> Self {
         self.delivery_blob_type = delivery_blob_type;
         self
     }
@@ -92,7 +91,7 @@ impl<'a> RepositoryBuilder<'a> {
 
             RepoBuilder::create(
                 PmRepository::builder(repodir.path().to_owned().try_into()?)
-                    .delivery_blob_type(self.delivery_blob_type.map(|t| t.try_into().unwrap()))
+                    .delivery_blob_type(self.delivery_blob_type)
                     .build(),
                 &keys,
             )
@@ -105,7 +104,7 @@ impl<'a> RepositoryBuilder<'a> {
 
         // Open the repo for an update.
         let pm_repo = PmRepository::builder(repodir.path().to_owned().try_into()?)
-            .delivery_blob_type(self.delivery_blob_type.map(|t| t.try_into().unwrap()))
+            .delivery_blob_type(self.delivery_blob_type)
             .build();
         let client = {
             let local = tuf::repository::EphemeralRepository::<tuf::pouf::Pouf1>::new();
@@ -351,7 +350,7 @@ mod tests {
     async fn test_repo_builder() {
         let same_contents = b"same contents";
         let repo = RepositoryBuilder::new()
-            .delivery_blob_type(Some(1))
+            .delivery_blob_type(DeliveryBlobType::Type1)
             .add_package(
                 PackageBuilder::new("rolldice")
                     .add_resource_at("bin/rolldice", "#!/boot/bin/sh\necho 4\n".as_bytes())

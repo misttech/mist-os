@@ -72,7 +72,7 @@ pub struct FileSystemRepositoryBuilder {
     blob_repo_path: Utf8PathBuf,
     copy_mode: CopyMode,
     aliases: BTreeSet<String>,
-    delivery_blob_type: Option<DeliveryBlobType>,
+    delivery_blob_type: DeliveryBlobType,
 }
 
 impl FileSystemRepositoryBuilder {
@@ -84,7 +84,7 @@ impl FileSystemRepositoryBuilder {
             blob_repo_path,
             copy_mode: CopyMode::Copy,
             aliases: BTreeSet::new(),
-            delivery_blob_type: None,
+            delivery_blob_type: DeliveryBlobType::Type1,
         }
     }
 
@@ -109,7 +109,7 @@ impl FileSystemRepositoryBuilder {
     }
 
     /// Set the type of delivery blob to generate when copying blobs into the repository.
-    pub fn delivery_blob_type(mut self, delivery_blob_type: Option<DeliveryBlobType>) -> Self {
+    pub fn delivery_blob_type(mut self, delivery_blob_type: DeliveryBlobType) -> Self {
         self.delivery_blob_type = delivery_blob_type;
         self
     }
@@ -142,7 +142,7 @@ pub struct FileSystemRepository {
     blob_repo_path: Utf8PathBuf,
     copy_mode: CopyMode,
     aliases: BTreeSet<String>,
-    delivery_blob_type: Option<DeliveryBlobType>,
+    delivery_blob_type: DeliveryBlobType,
     tuf_repo: TufFileSystemRepository<Pouf1>,
 }
 
@@ -451,15 +451,13 @@ impl RepoStorage for FileSystemRepository {
                 }
             }
 
-            if let Some(blob_type) = self.delivery_blob_type {
                 let dst = sanitize_path(
                     &self.blob_repo_path,
-                    &format!("{}/{hash_str}", blob_type as u32),
+                    &format!("{}/{hash_str}", u32::from(self.delivery_blob_type)),
                 )?;
                 if self.copy_mode == CopyMode::CopyOverwrite || !path_exists(&dst).await? {
-                    generate_delivery_blob(&src, &dst, blob_type).await?;
+                    generate_delivery_blob(&src, &dst, self.delivery_blob_type).await?;
                 }
-            }
 
             Ok(())
         }
@@ -1009,7 +1007,7 @@ mod tests {
         std::fs::create_dir(&blob_repo_path).unwrap();
 
         let repo = FileSystemRepository::builder(metadata_repo_path, blob_repo_path.clone())
-            .delivery_blob_type(Some(DeliveryBlobType::Type1))
+            .delivery_blob_type(DeliveryBlobType::Type1)
             .build();
 
         // Store the blob.

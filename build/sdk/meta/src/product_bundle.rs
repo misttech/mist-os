@@ -265,7 +265,7 @@ pub fn get_repositories(product_bundle_dir: Utf8PathBuf) -> Result<Vec<FileSyste
         )
         .alias(repo.name);
         if let Some(blob_type) = repo.delivery_blob_type {
-            repo_builder = repo_builder.delivery_blob_type(Some(blob_type.try_into()?));
+            repo_builder = repo_builder.delivery_blob_type(blob_type.try_into()?);
         }
         repos.push(repo_builder.build());
     }

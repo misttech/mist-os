@@ -888,11 +888,20 @@ mod tests {
         // Make sure we wrote all the blobs from package1.
         assert_eq!(
             read_dir(&blob_repo_path),
-            BTreeMap::from([
+            [
                 (test_utils::PKG1_HASH.into(), pkg1_meta_far_contents.clone()),
                 (test_utils::PKG1_BIN_HASH.into(), b"binary package1".to_vec()),
                 (test_utils::PKG1_LIB_HASH.into(), b"lib package1".to_vec()),
+            ]
+            .into_iter()
+            .flat_map(|(hash, content)| [
+                (
+                    format!("1/{hash}"),
+                    delivery_blob::generate(delivery_blob::DeliveryBlobType::Type1, &content)
+                ),
+                (hash, content)
             ])
+            .collect()
         );
 
         // Make sure we can update a client from this metadata.
@@ -930,14 +939,23 @@ mod tests {
         // Make sure we wrote all the blobs from package1 and package2.
         assert_eq!(
             read_dir(&blob_repo_path),
-            BTreeMap::from([
+            [
                 (test_utils::PKG1_HASH.into(), pkg1_meta_far_contents.clone()),
                 (test_utils::PKG1_BIN_HASH.into(), b"binary package1".to_vec()),
                 (test_utils::PKG1_LIB_HASH.into(), b"lib package1".to_vec()),
                 (test_utils::PKG2_HASH.into(), pkg2_meta_far_contents.clone()),
                 (test_utils::PKG2_BIN_HASH.into(), b"binary package2".to_vec()),
                 (test_utils::PKG2_LIB_HASH.into(), b"lib package2".to_vec()),
+            ]
+            .into_iter()
+            .flat_map(|(hash, content)| [
+                (
+                    format!("1/{hash}"),
+                    delivery_blob::generate(delivery_blob::DeliveryBlobType::Type1, &content)
+                ),
+                (hash, content)
             ])
+            .collect()
         );
 
         // Make sure we can resolve the new metadata.
@@ -1100,7 +1118,7 @@ mod tests {
 
         assert_eq!(
             repo_blobs.keys().map(|k| k.to_owned()).collect::<BTreeSet<String>>(),
-            BTreeSet::from([
+            [
                 test_utils::ANONSUBPKG_HASH.into(),
                 test_utils::ANONSUBPKG_BIN_HASH.into(),
                 test_utils::ANONSUBPKG_LIB_HASH.into(),
@@ -1110,13 +1128,16 @@ mod tests {
                 test_utils::SUPERPKG_HASH.into(),
                 test_utils::SUPERPKG_BIN_HASH.into(),
                 test_utils::SUPERPKG_LIB_HASH.into(),
-            ])
+            ]
+            .into_iter()
+            .flat_map(|hash| [format!("1/{hash}"), hash])
+            .collect()
         );
 
         // Make sure we wrote all the blobs from package1.
         assert_eq!(
             read_dir(&blob_repo_path),
-            BTreeMap::from([
+            [
                 (test_utils::ANONSUBPKG_HASH.into(), anonsubpkg_meta_far_contents.clone()),
                 (test_utils::ANONSUBPKG_BIN_HASH.into(), b"binary anonymous_subpackage".to_vec()),
                 (test_utils::ANONSUBPKG_LIB_HASH.into(), b"lib anonymous_subpackage".to_vec()),
@@ -1126,7 +1147,16 @@ mod tests {
                 (test_utils::SUPERPKG_HASH.into(), superpkg_meta_far_contents.clone()),
                 (test_utils::SUPERPKG_BIN_HASH.into(), b"binary superpackage".to_vec()),
                 (test_utils::SUPERPKG_LIB_HASH.into(), b"lib superpackage".to_vec()),
+            ]
+            .into_iter()
+            .flat_map(|(hash, content)| [
+                (
+                    format!("1/{hash}"),
+                    delivery_blob::generate(delivery_blob::DeliveryBlobType::Type1, &content)
+                ),
+                (hash, content)
             ])
+            .collect()
         );
 
         // Make sure we can update a client from this metadata.
