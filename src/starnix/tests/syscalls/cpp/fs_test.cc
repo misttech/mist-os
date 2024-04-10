@@ -250,42 +250,14 @@ class UtimensatTest : public ::testing::Test {
   std::string test_file_;
 };
 
-void unset_capability(int cap) {
-  __user_cap_header_struct header;
-  memset(&header, 0, sizeof(header));
-  header.version = _LINUX_CAPABILITY_VERSION_3;
-  __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3];
-  SAFE_SYSCALL(syscall(SYS_capget, &header, &caps));
-  caps[CAP_TO_INDEX(cap)].effective &= ~CAP_TO_MASK(cap);
-  SAFE_SYSCALL(syscall(SYS_capset, &header, &caps));
-}
-
-// Drops all capabilities from the effective, permitted and inheritable sets.
-void drop_all_capabilities(void) {
-  __user_cap_header_struct header;
-  memset(&header, 0, sizeof(header));
-  header.version = _LINUX_CAPABILITY_VERSION_3;
-  __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3] = {{0}};
-  SAFE_SYSCALL(syscall(SYS_capset, &header, &caps));
-}
-
-bool has_capability(int cap) {
-  __user_cap_header_struct header;
-  memset(&header, 0, sizeof(header));
-  header.version = _LINUX_CAPABILITY_VERSION_3;
-  __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3];
-  SAFE_SYSCALL(syscall(SYS_capget, &header, &caps));
-  return caps[CAP_TO_INDEX(cap)].effective & CAP_TO_MASK(cap);
-}
-
 bool change_ids(uid_t user, gid_t group) {
   // TODO(https://fxbug.dev/42076425): changing the filesystem user ID from 0 to
   // nonzero should drop capabilities, dropping them manually as a workaround.
   uid_t current_ruid, current_euid, current_suid;
   SAFE_SYSCALL(getresuid(&current_ruid, &current_euid, &current_suid));
   if (current_euid == 0 && user != 0) {
-    unset_capability(CAP_DAC_OVERRIDE);
-    unset_capability(CAP_FOWNER);
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+    test_helper::UnsetCapability(CAP_FOWNER);
   }
 
   return (setresgid(group, group, group) == 0) && (setresuid(user, user, user) == 0);
@@ -353,36 +325,36 @@ TEST_F(UtimensatTest, NonOwnerWithCapabilitiesCanSetTime) {
   // either CAP_DAC_OVERRIDE or CAP_FOWNER capability.
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([this] {
-    ASSERT_TRUE(has_capability(CAP_DAC_OVERRIDE));
-    ASSERT_TRUE(has_capability(CAP_FOWNER));
+    ASSERT_TRUE(test_helper::HasCapability(CAP_DAC_OVERRIDE));
+    ASSERT_TRUE(test_helper::HasCapability(CAP_FOWNER));
     EXPECT_EQ(0, utimensat(-1, test_file_.c_str(), NULL, 0))
         << "utimensat failed: " << std::strerror(errno);
   });
   EXPECT_TRUE(helper.WaitForChildren());
 
   helper.RunInForkedProcess([this] {
-    unset_capability(CAP_DAC_OVERRIDE);
-    ASSERT_FALSE(has_capability(CAP_DAC_OVERRIDE));
-    ASSERT_TRUE(has_capability(CAP_FOWNER));
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+    ASSERT_FALSE(test_helper::HasCapability(CAP_DAC_OVERRIDE));
+    ASSERT_TRUE(test_helper::HasCapability(CAP_FOWNER));
     EXPECT_EQ(0, utimensat(-1, test_file_.c_str(), NULL, 0))
         << "utimensat failed: " << std::strerror(errno);
   });
   EXPECT_TRUE(helper.WaitForChildren());
 
   helper.RunInForkedProcess([this] {
-    unset_capability(CAP_FOWNER);
-    ASSERT_TRUE(has_capability(CAP_DAC_OVERRIDE));
-    ASSERT_FALSE(has_capability(CAP_FOWNER));
+    test_helper::UnsetCapability(CAP_FOWNER);
+    ASSERT_TRUE(test_helper::HasCapability(CAP_DAC_OVERRIDE));
+    ASSERT_FALSE(test_helper::HasCapability(CAP_FOWNER));
     EXPECT_EQ(0, utimensat(-1, test_file_.c_str(), NULL, 0))
         << "utimensat failed: " << std::strerror(errno);
   });
   EXPECT_TRUE(helper.WaitForChildren());
 
   helper.RunInForkedProcess([this] {
-    unset_capability(CAP_DAC_OVERRIDE);
-    unset_capability(CAP_FOWNER);
-    ASSERT_FALSE(has_capability(CAP_DAC_OVERRIDE));
-    ASSERT_FALSE(has_capability(CAP_FOWNER));
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+    test_helper::UnsetCapability(CAP_FOWNER);
+    ASSERT_FALSE(test_helper::HasCapability(CAP_DAC_OVERRIDE));
+    ASSERT_FALSE(test_helper::HasCapability(CAP_FOWNER));
     EXPECT_NE(0, utimensat(-1, test_file_.c_str(), NULL, 0));
   });
   EXPECT_TRUE(helper.WaitForChildren());
@@ -390,9 +362,9 @@ TEST_F(UtimensatTest, NonOwnerWithCapabilitiesCanSetTime) {
   // Non file owner without write permissions can set the time to some other
   // value with the CAP_FOWNER capability.
   helper.RunInForkedProcess([this] {
-    unset_capability(CAP_DAC_OVERRIDE);
-    ASSERT_FALSE(has_capability(CAP_DAC_OVERRIDE));
-    ASSERT_TRUE(has_capability(CAP_FOWNER));
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+    ASSERT_FALSE(test_helper::HasCapability(CAP_DAC_OVERRIDE));
+    ASSERT_TRUE(test_helper::HasCapability(CAP_FOWNER));
     struct timespec times[2] = {{0, 0}};
     EXPECT_EQ(0, utimensat(-1, test_file_.c_str(), times, 0))
         << "utimensat failed: " << std::strerror(errno);
@@ -400,10 +372,10 @@ TEST_F(UtimensatTest, NonOwnerWithCapabilitiesCanSetTime) {
   EXPECT_TRUE(helper.WaitForChildren());
 
   helper.RunInForkedProcess([this] {
-    unset_capability(CAP_DAC_OVERRIDE);
-    unset_capability(CAP_FOWNER);
-    ASSERT_FALSE(has_capability(CAP_DAC_OVERRIDE));
-    ASSERT_FALSE(has_capability(CAP_FOWNER));
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+    test_helper::UnsetCapability(CAP_FOWNER);
+    ASSERT_FALSE(test_helper::HasCapability(CAP_DAC_OVERRIDE));
+    ASSERT_FALSE(test_helper::HasCapability(CAP_FOWNER));
     struct timespec times[2] = {{0, 0}};
     EXPECT_NE(0, utimensat(-1, test_file_.c_str(), times, 0));
   });
@@ -416,10 +388,10 @@ TEST_F(UtimensatTest, CanSetOmitTimestampsWithoutPermissions) {
   ASSERT_EQ(chmod(test_file_.c_str(), 0), 0);
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([this] {
-    unset_capability(CAP_DAC_OVERRIDE);
-    unset_capability(CAP_FOWNER);
-    ASSERT_FALSE(has_capability(CAP_DAC_OVERRIDE));
-    ASSERT_FALSE(has_capability(CAP_FOWNER));
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+    test_helper::UnsetCapability(CAP_FOWNER);
+    ASSERT_FALSE(test_helper::HasCapability(CAP_DAC_OVERRIDE));
+    ASSERT_FALSE(test_helper::HasCapability(CAP_FOWNER));
     struct timespec times[2] = {{0, UTIME_OMIT}, {0, UTIME_OMIT}};
     EXPECT_EQ(0, utimensat(-1, test_file_.c_str(), times, 0))
         << "utimensat failed: " << std::strerror(errno);
@@ -526,7 +498,7 @@ TEST_P(FsMountTest, CantBypassDirectoryPermissions) {
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&] {
     ASSERT_TRUE(change_ids(kUser2Uid, kUser2Gid));
-    drop_all_capabilities();
+    test_helper::DropAllCapabilities();
 
     // We should be able to create files in user2's directory.
     std::string file_path = user2_folder + "/test_file";
@@ -557,7 +529,7 @@ TEST_P(FsMountTest, CreateWithDifferentModes) {
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([user1_folder] {
     ASSERT_TRUE(change_ids(kUser1Uid, kUser1Gid));
-    drop_all_capabilities();
+    test_helper::DropAllCapabilities();
 
     const mode_t old_umask = umask(0);
     constexpr mode_t kModeMask = 0777;
@@ -591,7 +563,7 @@ TEST_P(FsMountTest, ChmodWithDifferentModes) {
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([user1_folder] {
     ASSERT_TRUE(change_ids(kUser1Uid, kUser1Gid));
-    drop_all_capabilities();
+    test_helper::DropAllCapabilities();
     const mode_t old_umask = umask(0);
     constexpr mode_t kModeMask = 0777;
     auto clean_umask = fit::defer([old_umask]() { umask(old_umask); });
@@ -635,7 +607,7 @@ TEST_P(FsMountTest, OpenWithTruncAndCreatOnReadOnlyFsReturnsEROFS) {
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([lock_file] {
     ASSERT_TRUE(change_ids(kUser1Uid, kUser1Gid));
-    drop_all_capabilities();
+    test_helper::DropAllCapabilities();
 
     int fd = open(lock_file.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
     int saved_errno = errno;
@@ -659,7 +631,7 @@ TEST_P(FsMountTest, OpenWithTruncAndCreatWithExistingFileSucceeds) {
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([lock_file] {
     ASSERT_TRUE(change_ids(kUser1Uid, kUser1Gid));
-    drop_all_capabilities();
+    test_helper::DropAllCapabilities();
 
     int fd = SAFE_SYSCALL(open(lock_file.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600));
     SAFE_SYSCALL(close(fd));
@@ -677,7 +649,7 @@ TEST_P(FsMountTest, OpenWithTruncAndCreatWithNoPermsReturnsEACCES) {
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([lock_file] {
     ASSERT_TRUE(change_ids(kUser2Uid, kUser2Gid));
-    drop_all_capabilities();
+    test_helper::DropAllCapabilities();
 
     int fd = open(lock_file.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
     int saved_errno = errno;

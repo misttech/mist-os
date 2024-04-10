@@ -236,6 +236,15 @@ int MemFdCreate(const char *name, unsigned int flags);
 
 void WaitUntilBlocked(pid_t target, bool ignore_tracer);
 
+// Unsets a capability from the effective set.
+void UnsetCapability(int cap);
+
+// Drops all capabilities from the effective, permitted and inheritable sets.
+void DropAllCapabilities();
+
+// Checks if a capability is in the effective set.
+bool HasCapability(int cap);
+
 }  // namespace test_helper
 
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_CPP_TEST_HELPER_H_

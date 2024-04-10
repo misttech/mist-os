@@ -20,6 +20,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+
 #include <fstream>
 
 #include <gtest/gtest.h>
@@ -351,6 +352,33 @@ void WaitUntilBlocked(pid_t target, bool ignore_tracer) {
       FAIL() << "Failed to wait for pid " << target
              << " to block. resulting status: " << buffer.str();
   }
+}
+
+void UnsetCapability(int cap) {
+  __user_cap_header_struct header;
+  memset(&header, 0, sizeof(header));
+  header.version = _LINUX_CAPABILITY_VERSION_3;
+  __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3];
+  SAFE_SYSCALL(syscall(SYS_capget, &header, &caps));
+  caps[CAP_TO_INDEX(cap)].effective &= ~CAP_TO_MASK(cap);
+  SAFE_SYSCALL(syscall(SYS_capset, &header, &caps));
+}
+
+void DropAllCapabilities(void) {
+  __user_cap_header_struct header;
+  memset(&header, 0, sizeof(header));
+  header.version = _LINUX_CAPABILITY_VERSION_3;
+  __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3] = {{0}};
+  SAFE_SYSCALL(syscall(SYS_capset, &header, &caps));
+}
+
+bool HasCapability(int cap) {
+  __user_cap_header_struct header;
+  memset(&header, 0, sizeof(header));
+  header.version = _LINUX_CAPABILITY_VERSION_3;
+  __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3];
+  SAFE_SYSCALL(syscall(SYS_capget, &header, &caps));
+  return caps[CAP_TO_INDEX(cap)].effective & CAP_TO_MASK(cap);
 }
 
 }  // namespace test_helper
