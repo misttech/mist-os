@@ -4,9 +4,9 @@
 
 """Implement fuchsia_prebuilt_package() rule."""
 
-load("@bazel_skylib//rules:select_file.bzl", "select_file")
 load("//fuchsia/private/workflows:fuchsia_task_publish.bzl", "fuchsia_task_publish")
 load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo", "FuchsiaPackagedComponentInfo")
+load("@bazel_skylib//rules:select_file.bzl", "select_file")
 
 def _relative_file_name(ctx, filename):
     return ctx.label.name + "_expanded/" + filename

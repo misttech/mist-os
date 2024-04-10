@@ -112,12 +112,12 @@ load(
     _fuchsia_prebuilt_package = "fuchsia_prebuilt_package",
 )
 load(
-    "//fuchsia/private:fuchsia_remote_product_bundle.bzl",
-    _fuchsia_remote_product_bundle = "fuchsia_remote_product_bundle",
-)
-load(
     "//fuchsia/private:fuchsia_rust.bzl",
     _fuchsia_wrap_rust_binary = "fuchsia_wrap_rust_binary",
+)
+load(
+    "//fuchsia/private:fuchsia_remote_product_bundle.bzl",
+    _fuchsia_remote_product_bundle = "fuchsia_remote_product_bundle",
 )
 load(
     "//fuchsia/private:fuchsia_select.bzl",

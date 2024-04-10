@@ -4,8 +4,8 @@
 
 """A cc_library generated from a bind library."""
 
-load("@bazel_skylib//lib:paths.bzl", "paths")
 load(":providers.bzl", "FuchsiaBindLibraryInfo")
+load("@bazel_skylib//lib:paths.bzl", "paths")
 
 def _codegen_impl(ctx):
     sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
