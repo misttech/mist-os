@@ -32,17 +32,15 @@ use std::sync::Mutex;
 pub(super) const DEFAULT_MANUAL_BRIGHTNESS_VALUE: f32 = 0.5;
 pub(super) const DEFAULT_AUTO_BRIGHTNESS_VALUE: f32 = 0.5;
 
-lazy_static! {
-    /// Default display used if no configuration is available.
-    pub(crate) static ref DEFAULT_DISPLAY_INFO: DisplayInfo = DisplayInfo::new(
-        false,                           /*auto_brightness_enabled*/
-        DEFAULT_MANUAL_BRIGHTNESS_VALUE, /*manual_brightness_value*/
-        DEFAULT_AUTO_BRIGHTNESS_VALUE,   /*auto_brightness_value*/
-        true,                            /*screen_enabled*/
-        LowLightMode::Disable,           /*low_light_mode*/
-        None,                            /*theme*/
-    );
-}
+/// Default display used if no configuration is available.
+pub(crate) const DEFAULT_DISPLAY_INFO: DisplayInfo = DisplayInfo::new(
+    false,                           /*auto_brightness_enabled*/
+    DEFAULT_MANUAL_BRIGHTNESS_VALUE, /*manual_brightness_value*/
+    DEFAULT_AUTO_BRIGHTNESS_VALUE,   /*auto_brightness_value*/
+    true,                            /*screen_enabled*/
+    LowLightMode::Disable,           /*low_light_mode*/
+    None,                            /*theme*/
+);
 
 lazy_static! {
     /// Reference to a display configuration.
@@ -59,7 +57,7 @@ lazy_static! {
 ///
 /// [`DEFAULT_DISPLAY_INFO`]: static@DEFAULT_DISPLAY_INFO
 pub(crate) fn default_display_info() -> DisplayInfo {
-    let mut default_display_info = *DEFAULT_DISPLAY_INFO;
+    let mut default_display_info = DEFAULT_DISPLAY_INFO;
 
     if let Ok(Some(display_configuration)) =
         DISPLAY_CONFIGURATION.lock().unwrap().get_cached_value()

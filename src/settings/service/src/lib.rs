@@ -252,7 +252,10 @@ fn init_storage_dir() -> DirectoryProxy {
 
 /// The [EnvironmentBuilder] aggregates the parameters surrounding an [environment](Environment) and
 /// ultimately spawns an environment based on them.
-pub struct EnvironmentBuilder<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> {
+pub struct EnvironmentBuilder<
+    'a,
+    T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static,
+> {
     configuration: Option<ServiceConfiguration>,
     agent_blueprints: Vec<AgentCreator>,
     event_subscriber_blueprints: Vec<event::subscriber::BlueprintHandle>,
@@ -261,17 +264,19 @@ pub struct EnvironmentBuilder<T: StorageFactory<Storage = DeviceStorage> + Send 
     registrants: Vec<Registrant>,
     settings: Vec<SettingType>,
     handlers: HashMap<SettingType, GenerateHandler>,
-    setting_proxy_inspect_info: Option<&'static fuchsia_inspect::Node>,
+    setting_proxy_inspect_info: Option<&'a fuchsia_inspect::Node>,
     active_listener_inspect_logger: Option<Arc<Mutex<ListenerInspectLogger>>>,
     storage_dir: Option<DirectoryProxy>,
     store_proxy: Option<StoreProxy>,
     fidl_storage_factory: Option<Arc<FidlStorageFactory>>,
 }
 
-impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> EnvironmentBuilder<T> {
+impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
+    EnvironmentBuilder<'a, T>
+{
     /// Construct a new [EnvironmentBuilder] using `storage_factory` to construct the storage for
     /// the future [Environment].
-    pub fn new(storage_factory: Arc<T>) -> EnvironmentBuilder<T> {
+    pub fn new(storage_factory: Arc<T>) -> Self {
         EnvironmentBuilder {
             configuration: None,
             agent_blueprints: vec![],
@@ -290,18 +295,14 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
     }
 
     /// Overrides the default [GenerateHandler] for a specific [SettingType].
-    pub fn handler(
-        mut self,
-        setting_type: SettingType,
-        generate_handler: GenerateHandler,
-    ) -> EnvironmentBuilder<T> {
+    pub fn handler(mut self, setting_type: SettingType, generate_handler: GenerateHandler) -> Self {
         // Ignore the old handler result.
         let _ = self.handlers.insert(setting_type, generate_handler);
         self
     }
 
     /// A service generator to be used as an overlay on the ServiceContext.
-    pub fn service(mut self, generate_service: GenerateService) -> EnvironmentBuilder<T> {
+    pub fn service(mut self, generate_service: GenerateService) -> Self {
         self.generate_service = Some(generate_service);
         self
     }
@@ -309,13 +310,13 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
     /// A preset configuration to load preset parameters as a base. Note that this will override
     /// any configuration modifications made by [EnvironmentBuilder::fidl_interface],
     /// [EnvironmentBuilder::policies], and [EnvironmentBuilder::flags].
-    pub fn configuration(mut self, configuration: ServiceConfiguration) -> EnvironmentBuilder<T> {
+    pub fn configuration(mut self, configuration: ServiceConfiguration) -> Self {
         self.configuration = Some(configuration);
         self
     }
 
     /// Will override all fidl interfaces in the [ServiceConfiguration].
-    pub fn fidl_interfaces(mut self, interfaces: &[fidl::Interface]) -> EnvironmentBuilder<T> {
+    pub fn fidl_interfaces(mut self, interfaces: &[fidl::Interface]) -> Self {
         if self.configuration.is_none() {
             self.configuration = Some(ServiceConfiguration::default());
         }
@@ -328,21 +329,21 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
     }
 
     /// Appends the [Registrant]s to the list of registrants already configured.
-    pub fn registrants(mut self, mut registrants: Vec<Registrant>) -> EnvironmentBuilder<T> {
+    pub fn registrants(mut self, mut registrants: Vec<Registrant>) -> Self {
         self.registrants.append(&mut registrants);
 
         self
     }
 
     /// Setting types to participate.
-    pub fn settings(mut self, settings: &[SettingType]) -> EnvironmentBuilder<T> {
+    pub fn settings(mut self, settings: &[SettingType]) -> Self {
         self.settings.extend(settings);
 
         self
     }
 
     /// Setting types to participate with customized controllers.
-    pub fn flags(mut self, controller_flags: &[ControllerFlag]) -> EnvironmentBuilder<T> {
+    pub fn flags(mut self, controller_flags: &[ControllerFlag]) -> Self {
         if self.configuration.is_none() {
             self.configuration = Some(ServiceConfiguration::default());
         }
@@ -355,16 +356,13 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
     }
 
     /// Appends the supplied [AgentRegistrar]s to the list of agent registrars.
-    pub fn agents(mut self, mut registrars: Vec<AgentCreator>) -> EnvironmentBuilder<T> {
+    pub fn agents(mut self, mut registrars: Vec<AgentCreator>) -> Self {
         self.agent_blueprints.append(&mut registrars);
         self
     }
 
     /// Event subscribers to participate
-    pub fn event_subscribers(
-        mut self,
-        subscribers: &[event::subscriber::BlueprintHandle],
-    ) -> EnvironmentBuilder<T> {
+    pub fn event_subscribers(mut self, subscribers: &[event::subscriber::BlueprintHandle]) -> Self {
         self.event_subscriber_blueprints.append(&mut subscribers.to_vec());
         self
     }
@@ -373,9 +371,9 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
     /// inspect loggers.
     pub fn setting_proxy_inspect_info(
         mut self,
-        setting_proxy_inspect_info: &'static fuchsia_inspect::Node,
+        setting_proxy_inspect_info: &'a fuchsia_inspect::Node,
         active_listener_inspect_logger: Arc<Mutex<ListenerInspectLogger>>,
-    ) -> EnvironmentBuilder<T> {
+    ) -> Self {
         self.setting_proxy_inspect_info = Some(setting_proxy_inspect_info);
         self.active_listener_inspect_logger = Some(active_listener_inspect_logger);
         self
@@ -742,7 +740,7 @@ async fn create_environment<'a, T, F>(
     handler_factory: Arc<Mutex<SettingHandlerFactoryImpl>>,
     device_storage_factory: Arc<T>,
     fidl_storage_factory: Arc<F>,
-    setting_proxies_node: &'static fuchsia_inspect::Node,
+    setting_proxies_node: &fuchsia_inspect::Node,
     listener_logger: Arc<Mutex<ListenerInspectLogger>>,
 ) -> Result<HashSet<Entity>, Error>
 where
@@ -765,7 +763,7 @@ where
             Some(DEFAULT_SETTING_PROXY_RESPONSE_TIMEOUT_MS.millis()),
             true,
             setting_proxies_node.create_child(format!("{setting_type:?}")),
-            listener_logger.clone(),
+            Arc::clone(&listener_logger),
         )
         .await?;
 

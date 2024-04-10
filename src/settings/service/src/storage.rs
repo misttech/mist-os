@@ -72,12 +72,13 @@ pub(crate) mod testing {
         StoreAccessorMarker, StoreAccessorProxy, StoreAccessorRequest, Value,
     };
     use fuchsia_async as fasync;
+    use fuchsia_inspect::component;
     use fuchsia_zircon as zx;
     use futures::lock::Mutex;
     use futures::prelude::*;
     use serde::{Deserialize, Serialize};
     use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
-    use settings_storage::stash_logger::{StashInspectLogger, StashInspectLoggerHandle};
+    use settings_storage::stash_logger::StashInspectLogger;
     use settings_storage::storage_factory::{InitializationState, StorageAccess, StorageFactory};
     use std::collections::HashMap;
     use std::sync::Arc;
@@ -129,7 +130,9 @@ pub(crate) mod testing {
             InMemoryStorageFactory {
                 initial_data: HashMap::new(),
                 device_storage_cache: Mutex::new(InitializationState::new()),
-                inspect_handle: StashInspectLoggerHandle::new().logger,
+                inspect_handle: Arc::new(Mutex::new(StashInspectLogger::new(
+                    component::inspector().root(),
+                ))),
             }
         }
 
@@ -144,7 +147,9 @@ pub(crate) mod testing {
             InMemoryStorageFactory {
                 initial_data: map,
                 device_storage_cache: Mutex::new(InitializationState::new()),
-                inspect_handle: StashInspectLoggerHandle::new().logger,
+                inspect_handle: Arc::new(Mutex::new(StashInspectLogger::new(
+                    component::inspector().root(),
+                ))),
             }
         }
 

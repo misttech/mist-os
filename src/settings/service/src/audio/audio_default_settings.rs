@@ -20,15 +20,13 @@ const DEFAULT_STREAMS: [AudioStream; 5] = [
     create_default_audio_stream(AudioStreamType::Communication),
 ];
 
+const DEFAULT_AUDIO_INFO: AudioInfo =
+    AudioInfo { streams: DEFAULT_STREAMS, modified_counters: None };
+
 /// A mapping from stream type to an arbitrary numerical value. This number will
 /// change from the number sent in the previous update if the stream type's
 /// volume has changed.
 pub type ModifiedCounters = HashMap<AudioStreamType, usize>;
-
-lazy_static! {
-    pub(crate) static ref DEFAULT_AUDIO_INFO: AudioInfo =
-        AudioInfo { streams: DEFAULT_STREAMS, modified_counters: None };
-}
 
 lazy_static! {
     pub(crate) static ref AUDIO_DEFAULT_SETTINGS: Mutex<DefaultSetting<AudioInfo, &'static str>> =

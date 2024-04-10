@@ -10,7 +10,6 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::component;
 use futures::lock::Mutex;
-use lazy_static::lazy_static;
 use settings::base::get_default_interfaces;
 use settings::config::base::get_default_agent_types;
 use settings::config::default_settings::DefaultSetting;
@@ -21,34 +20,28 @@ use settings::EnabledInterfacesConfiguration;
 use settings::EnvironmentBuilder;
 use settings::ServiceConfiguration;
 use settings::ServiceFlags;
-use settings_storage::stash_logger::StashInspectLoggerHandle;
+use settings_storage::stash_logger::StashInspectLogger;
 use settings_storage::storage_factory::StashDeviceStorageFactory;
 use std::path::Path;
 use std::sync::Arc;
 
 const STASH_IDENTITY: &str = "settings_service";
 
-lazy_static! {
-    // TODO(https://fxbug.dev/42175672): replace with a dependency injected value instead of a static.
-    static ref SETTING_PROXY_INSPECT_INFO: SettingProxyInspectInfo =
-        SettingProxyInspectInfo::new(component::inspector().root());
-
-    static ref LISTENER_INSPECT_LOGGER: Arc<Mutex<ListenerInspectLogger>> =
-        Arc::new(Mutex::new(ListenerInspectLogger::new()));
-}
-
 #[fuchsia::main(logging_tags = ["setui-service"])]
 fn main() -> Result<(), Error> {
     let executor = fasync::LocalExecutor::new();
     tracing::info!("Starting setui-service...");
 
-    let _inspect_server_task = inspect_runtime::publish(
-        component::inspector(),
-        inspect_runtime::PublishOptions::default(),
-    );
+    let inspector = component::inspector();
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
 
     // Serve stats about inspect in a lazy node.
     component::serve_inspect_stats();
+
+    let setting_proxy_inspect_info = SettingProxyInspectInfo::new(inspector.root());
+    let stash_inspect_logger = StashInspectLogger::new(inspector.root());
+    let listener_inspect_logger = ListenerInspectLogger::new();
 
     let default_enabled_interfaces_configuration =
         EnabledInterfacesConfiguration::with_interfaces(get_default_interfaces());
@@ -86,8 +79,10 @@ fn main() -> Result<(), Error> {
 
     let store_proxy = connect_to_protocol::<StoreMarker>().expect("failed to connect to stash");
     store_proxy.identify(STASH_IDENTITY).expect("should identify");
-    let storage_factory =
-        StashDeviceStorageFactory::new(store_proxy.clone(), StashInspectLoggerHandle::new().logger);
+    let storage_factory = StashDeviceStorageFactory::new(
+        store_proxy.clone(),
+        Arc::new(Mutex::new(stash_inspect_logger)),
+    );
 
     let storage_dir = fuchsia_fs::directory::open_in_namespace(
         "/data/storage",
@@ -103,8 +98,8 @@ fn main() -> Result<(), Error> {
     EnvironmentBuilder::new(Arc::new(storage_factory))
         .configuration(configuration)
         .setting_proxy_inspect_info(
-            SETTING_PROXY_INSPECT_INFO.node(),
-            LISTENER_INSPECT_LOGGER.clone(),
+            setting_proxy_inspect_info.node(),
+            Arc::new(Mutex::new(listener_inspect_logger)),
         )
         .storage_dir(storage_dir)
         .store_proxy(store_proxy)
