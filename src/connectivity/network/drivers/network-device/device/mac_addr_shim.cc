@@ -9,11 +9,8 @@ namespace network {
 void MacAddrShim::Bind(fdf_dispatcher_t* dispatcher, ddk::MacAddrProtocolClient client_impl,
                        fdf::ServerEnd<netdriver::MacAddr> server_end) {
   std::unique_ptr impl = std::make_unique<MacAddrShim>(client_impl);
-  MacAddrShim* impl_ptr = impl.get();
 
-  fdf::ServerBindingRef binding_ref =
-      fdf::BindServer(dispatcher, std::move(server_end), std::move(impl));
-  impl_ptr->binding_.emplace(std::move(binding_ref));
+  fdf::BindServer(dispatcher, std::move(server_end), std::move(impl));
 }
 
 MacAddrShim::MacAddrShim(ddk::MacAddrProtocolClient impl) : impl_(impl) {}

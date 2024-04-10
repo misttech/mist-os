@@ -33,7 +33,6 @@ class NetworkPortShim : public fdf::WireServer<netdriver::NetworkPort> {
  private:
   NetworkPortShim(ddk::NetworkPortProtocolClient impl, fdf_dispatcher_t* dispatcher);
 
-  std::optional<fdf::ServerBindingRef<netdriver::NetworkPort>> binding_;
   ddk::NetworkPortProtocolClient impl_;
   fdf_dispatcher_t* dispatcher_;
 };

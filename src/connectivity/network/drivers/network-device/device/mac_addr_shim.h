@@ -33,7 +33,6 @@ class MacAddrShim : public fdf::WireServer<netdriver::MacAddr> {
   void GetAddress(fdf::Arena& arena, GetAddressCompleter::Sync& completer) override;
 
  private:
-  std::optional<fdf::ServerBindingRef<netdriver::MacAddr>> binding_;
   ddk::MacAddrProtocolClient impl_;
 };
 

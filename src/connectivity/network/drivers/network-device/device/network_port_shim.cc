@@ -14,11 +14,7 @@ void NetworkPortShim::Bind(ddk::NetworkPortProtocolClient client_impl, fdf_dispa
                            fdf::ServerEnd<netdriver::NetworkPort> server_end) {
   std::unique_ptr<NetworkPortShim> impl(new NetworkPortShim(client_impl, dispatcher));
 
-  NetworkPortShim* impl_ptr = impl.get();
-
-  fdf::ServerBindingRef binding_ref =
-      fdf::BindServer(impl->dispatcher_, std::move(server_end), std::move(impl));
-  impl_ptr->binding_.emplace(std::move(binding_ref));
+  fdf::BindServer(impl->dispatcher_, std::move(server_end), std::move(impl));
 }
 
 NetworkPortShim::NetworkPortShim(ddk::NetworkPortProtocolClient impl, fdf_dispatcher_t* dispatcher)

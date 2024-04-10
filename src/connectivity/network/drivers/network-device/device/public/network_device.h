@@ -55,15 +55,15 @@ struct DeviceInterfaceDispatchers {
 
 struct ShimDispatchers {
   ShimDispatchers() = default;
-  ShimDispatchers(fdf::UnsynchronizedDispatcher& shim, fdf::UnsynchronizedDispatcher& port)
+  ShimDispatchers(fdf::UnsynchronizedDispatcher& shim, fdf::SynchronizedDispatcher& port)
       : shim_(shim), port_(port) {}
   ShimDispatchers(const ShimDispatchers&) = default;
   ShimDispatchers& operator=(const ShimDispatchers&) = default;
 
   // This is used by NetworkDeviceShim to serve the NetworkDeviceImpl protocol.
   fdf::UnownedUnsynchronizedDispatcher shim_;
-  // This is used by NetworkDeviceShim to serve the NetworkPort protocol.
-  fdf::UnownedUnsynchronizedDispatcher port_;
+  // This is used by NetworkPortShim to serve the NetworkPort protocol.
+  fdf::UnownedSynchronizedDispatcher port_;
 };
 
 // A class that represents a set of owned dispatchers suitable for use with a
@@ -106,7 +106,7 @@ class OwnedShimDispatchers {
 
   fdf::UnsynchronizedDispatcher shim_;
   libsync::Completion shim_shutdown_;
-  fdf::UnsynchronizedDispatcher port_;
+  fdf::SynchronizedDispatcher port_;
   libsync::Completion port_shutdown_;
 };
 

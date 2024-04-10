@@ -217,7 +217,7 @@ zx::result<std::unique_ptr<OwnedShimDispatchers>> OwnedShimDispatchers::Create()
   }
   dispatchers->shim_ = std::move(shim_dispatcher.value());
 
-  zx::result port_dispatcher = fdf::UnsynchronizedDispatcher::Create(
+  zx::result port_dispatcher = fdf::SynchronizedDispatcher::Create(
       {}, "netdev-shim-port", [dispatchers = dispatchers.get()](fdf_dispatcher_t*) {
         dispatchers->port_shutdown_.Signal();
       });
