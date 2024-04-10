@@ -21,8 +21,8 @@ use bstr::B;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::{
-    DeviceOpen, FileOpsCore, Locked, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
-    Unlocked, WriteOps,
+    DeviceOpen, FileOpsCore, FsNodeAllocate, Locked, Mutex, MutexGuard, RwLock, RwLockReadGuard,
+    RwLockWriteGuard, Unlocked, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
@@ -1019,6 +1019,7 @@ impl FsNodeOps for Arc<FuseNode> {
 
     fn allocate(
         &self,
+        _locked: &mut Locked<'_, FsNodeAllocate>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _mode: FallocMode,

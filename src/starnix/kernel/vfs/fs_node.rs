@@ -27,7 +27,8 @@ use once_cell::sync::OnceCell;
 use selinux::SecurityId;
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
-    DeviceOpen, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, RwLock, RwLockReadGuard,
+    DeviceOpen, FileOpsCore, FsNodeAllocate, LockBefore, LockEqualOrBefore, Locked, Mutex, RwLock,
+    RwLockReadGuard,
 };
 use starnix_uapi::{
     as_any::AsAny,
@@ -636,6 +637,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Manipulate allocated disk space for the file.
     fn allocate(
         &self,
+        _locked: &mut Locked<'_, FsNodeAllocate>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _mode: FallocMode,
@@ -1466,13 +1468,17 @@ impl FsNode {
 
     /// Avoid calling this method directly. You probably want to call `FileObject::fallocate()`
     /// which will also perform additional verifications.
-    pub fn fallocate(
+    pub fn fallocate<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mode: FallocMode,
         offset: u64,
         length: u64,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FsNodeAllocate>,
+    {
         let allocate_size = checked_add_offset_and_length(offset as usize, length as usize)
             .map_err(|_| errno!(EFBIG))? as u64;
         if allocate_size > current_task.thread_group.get_rlimit(Resource::FSIZE) {
@@ -1482,7 +1488,8 @@ impl FsNode {
 
         self.clear_suid_and_sgid_bits(current_task)?;
         let _guard = self.append_lock.read(current_task);
-        self.ops().allocate(self, current_task, mode, offset, length)?;
+        let mut locked = locked.cast_locked::<FsNodeAllocate>();
+        self.ops().allocate(&mut locked, self, current_task, mode, offset, length)?;
         self.update_ctime_mtime();
         Ok(())
     }

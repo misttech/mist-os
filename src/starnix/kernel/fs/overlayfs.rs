@@ -17,8 +17,8 @@ use once_cell::sync::OnceCell;
 use rand::Rng;
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{
-    DeviceOpen, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, RwLock, RwLockReadGuard,
-    RwLockWriteGuard, Unlocked, WriteOps,
+    DeviceOpen, FileOpsCore, FsNodeAllocate, LockBefore, LockEqualOrBefore, Locked, RwLock,
+    RwLockReadGuard, RwLockWriteGuard, Unlocked, WriteOps,
 };
 use starnix_uapi::{
     auth::FsCred,
@@ -716,14 +716,15 @@ impl FsNodeOps for Arc<OverlayNode> {
 
     fn allocate(
         &self,
+        locked: &mut Locked<'_, FsNodeAllocate>,
         _node: &FsNode,
         current_task: &CurrentTask,
         mode: FallocMode,
         offset: u64,
         length: u64,
     ) -> Result<(), Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
-        self.ensure_upper(&mut locked, current_task)?.entry().node.fallocate(
+        self.ensure_upper(locked, current_task)?.entry().node.fallocate(
+            locked,
             current_task,
             mode,
             offset,

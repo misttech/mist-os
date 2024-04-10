@@ -23,7 +23,9 @@ use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, trace_duration, track_stub, CATEGORY_STARNIX_MM};
-use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked, WriteOps};
+use starnix_sync::{
+    FileOpsCore, FsNodeAllocate, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked, WriteOps,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
@@ -1354,13 +1356,17 @@ impl FileObject {
         self.node().ftruncate(locked, current_task, length)
     }
 
-    pub fn fallocate(
+    pub fn fallocate<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mode: FallocMode,
         offset: u64,
         length: u64,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<FsNodeAllocate>,
+    {
         // If the file is a pipe or FIFO, ESPIPE is returned.
         // See https://man7.org/linux/man-pages/man2/fallocate.2.html#ERRORS
         if self.node().is_fifo() {
@@ -1379,7 +1385,7 @@ impl FileObject {
             return error!(EBADF);
         }
 
-        self.node().fallocate(current_task, mode, offset, length)
+        self.node().fallocate(locked, current_task, mode, offset, length)
     }
 
     pub fn to_handle(&self, current_task: &CurrentTask) -> Result<Option<zx::Handle>, Errno> {

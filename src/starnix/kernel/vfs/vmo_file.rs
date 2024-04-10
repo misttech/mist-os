@@ -17,7 +17,7 @@ use crate::{
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{DeviceOpen, FileOpsCore, FsNodeAllocate, LockBefore, Locked};
 use starnix_uapi::{
     errno, error, errors::Errno, file_mode::mode, open_flags::OpenFlags, resource_limits::Resource,
     seal_flags::SealFlags, signals::SIGXFSZ,
@@ -127,6 +127,7 @@ impl FsNodeOps for VmoFileNode {
 
     fn allocate(
         &self,
+        _locked: &mut Locked<'_, FsNodeAllocate>,
         node: &FsNode,
         _current_task: &CurrentTask,
         mode: FallocMode,

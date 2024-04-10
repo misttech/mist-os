@@ -24,6 +24,7 @@ lock_level!(WriteOps);
 
 // Lock level for DeviceOps.open. Must be before FileOpsCore because of get_or_create_loop_device
 lock_level!(DeviceOpen);
+lock_level!(FsNodeAllocate);
 
 // This file defines a hierarchy of locks, that is, the order in which
 // the locks must be acquired. Unlocked is a highest level and represents
@@ -36,7 +37,8 @@ impl_lock_after!(Unlocked => MmDumpable);
 
 impl_lock_after!(Unlocked => TaskRelease);
 impl_lock_after!(TaskRelease => DeviceOpen);
-impl_lock_after!(DeviceOpen => FileOpsCore);
+impl_lock_after!(DeviceOpen => FsNodeAllocate);
+impl_lock_after!(FsNodeAllocate => FileOpsCore);
 impl_lock_after!(FileOpsCore => WriteOps);
 impl_lock_after!(WriteOps =>  ProcessGroupState);
 impl_lock_after!(WriteOps => BpfHelperOps);

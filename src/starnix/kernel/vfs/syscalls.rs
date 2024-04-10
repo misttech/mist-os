@@ -2589,7 +2589,7 @@ pub fn sys_fadvise64(
 }
 
 pub fn sys_fallocate(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     mode: u32,
@@ -2606,7 +2606,7 @@ pub fn sys_fallocate(
     }
 
     let mode = FallocMode::from_bits(mode).ok_or_else(|| errno!(EINVAL))?;
-    file.fallocate(current_task, mode, offset as u64, len as u64)?;
+    file.fallocate(locked, current_task, mode, offset as u64, len as u64)?;
 
     Ok(())
 }

@@ -26,7 +26,8 @@ use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_logging::{impossible_error, log_warn, trace_duration, CATEGORY_STARNIX_MM};
 use starnix_sync::{
-    FileOpsCore, Locked, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked, WriteOps,
+    FileOpsCore, FsNodeAllocate, Locked, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
+    Unlocked, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
@@ -708,13 +709,13 @@ impl FsNodeOps for RemoteNode {
 
     fn allocate(
         &self,
+        locked: &mut Locked<'_, FsNodeAllocate>,
         node: &FsNode,
         current_task: &CurrentTask,
         mode: FallocMode,
         offset: u64,
         length: u64,
     ) -> Result<(), Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): FsNodeOps.allocate before FileOpsCore
         match mode {
             FallocMode::Allocate { keep_size: false } => {
                 let allocate_size = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
@@ -2534,7 +2535,13 @@ mod test {
                     reg_node
                         .entry
                         .node
-                        .fallocate(&current_task, FallocMode::Allocate { keep_size: false }, 0, 20)
+                        .fallocate(
+                            locked,
+                            &current_task,
+                            FallocMode::Allocate { keep_size: false },
+                            0,
+                            20,
+                        )
                         .expect("truncate failed");
                 }
             })
@@ -2590,6 +2597,7 @@ mod test {
                         .entry
                         .node
                         .fallocate(
+                            locked,
                             &current_task,
                             FallocMode::Allocate { keep_size: false },
                             1,
