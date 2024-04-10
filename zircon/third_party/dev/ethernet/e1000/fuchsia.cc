@@ -1222,6 +1222,11 @@ void Device<RxDescriptor>::Stop(fdf::Arena& arena, StopCompleter::Sync& complete
     em_release_hw_control(adapter_.get());
   }
 
+  e1000_reset_hw(&adapter_->hw);
+  if (adapter_->hw.mac.type >= e1000_82544) {
+    E1000_WRITE_REG(&adapter_->hw, E1000_WUFC, 0);
+  }
+
   completer.buffer(arena).Reply();
 }
 
