@@ -51,7 +51,8 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             .field("utc_start_at_startup", utc_start_at_startup)?
             .field("early_exit", early_exit)?
             // TODO: b/295537795 - provide this setting somehow.
-            .field("power_topology_integration_enabled", false)?;
+            .field("power_topology_integration_enabled", false)?
+            .field("rtc_is_read_only", false)?;
 
         Ok(())
     }

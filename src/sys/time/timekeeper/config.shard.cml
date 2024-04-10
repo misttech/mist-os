@@ -65,5 +65,8 @@
         // Governor, and/or Power Broker to take part in the system's power
         // topology.
         power_topology_integration_enabled: { type: "bool" },
+
+        // If set, Timekeeper will only read the RTC, never update it.
+        rtc_is_read_only: { type: "bool" },
     },
 }

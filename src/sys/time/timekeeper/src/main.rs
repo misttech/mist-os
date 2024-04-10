@@ -30,7 +30,7 @@ use {
             CobaltDiagnostics, CompositeDiagnostics, Diagnostics, Event, InspectDiagnostics,
         },
         enums::{InitialClockState, InitializeRtcOutcome, Role, StartClockSource, Track},
-        rtc::{Rtc, RtcCreationError, RtcImpl},
+        rtc::{Rtc, RtcCreationError, RtcImpl, RtcReadOnlyImpl},
         time_source::{TimeSource, TimeSourceLauncher},
         time_source_manager::TimeSourceManager,
     },
@@ -108,6 +108,11 @@ impl Config {
 
     fn get_early_exit(&self) -> bool {
         self.source_config.early_exit
+    }
+
+    // Returns true if RTC is read only.  Most of the time this will be `false`.
+    fn rtc_read_only(&self) -> bool {
+        self.source_config.rtc_is_read_only
     }
 
     // TODO: b/295537795 - remove annotation once used.
@@ -220,10 +225,19 @@ async fn main() -> Result<()> {
         }
     };
 
-    fasync::Task::spawn(async move {
-        maintain_utc(primary_track, monitor_track, optional_rtc, diagnostics, config).await;
-    })
-    .detach();
+    if config.rtc_read_only() {
+        info!("using a read-only RTC implementation");
+        let optional_rtc: Option<RtcReadOnlyImpl> = optional_rtc.map(Into::into);
+        fasync::Task::spawn(async move {
+            maintain_utc(primary_track, monitor_track, optional_rtc, diagnostics, config).await;
+        })
+        .detach();
+    } else {
+        fasync::Task::spawn(async move {
+            maintain_utc(primary_track, monitor_track, optional_rtc, diagnostics, config).await;
+        })
+        .detach();
+    }
 
     let _inspect_server_task = inspect_runtime::publish(
         &diagnostics::INSPECTOR,
@@ -501,6 +515,7 @@ mod tests {
             utc_start_at_startup: false,
             early_exit: false,
             power_topology_integration_enabled: false,
+            rtc_is_read_only: false,
         }))
     }
 

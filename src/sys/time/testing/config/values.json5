@@ -1,3 +1,8 @@
+// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// Refer to //src/sys/time/timekeeper/config.shard.cml for the data schema.
 {
     disable_delays: true,
     oscillator_error_std_dev_ppm: 15,
@@ -12,4 +17,5 @@
     utc_start_at_startup: true,
     early_exit: false,
     power_topology_integration_enabled: false,
+    rtc_is_read_only: false,
 }
