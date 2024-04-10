@@ -8,6 +8,7 @@
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
+#include <array>
 #include <cstdint>
 
 namespace software_compositor {
