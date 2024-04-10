@@ -203,6 +203,7 @@ async fn inspect_tcp_sockets<I: net_types::ip::Ip>(name: &str, socket_state: Tcp
                         RemoteAddress: format!("192.0.2.2:{REMOTE_PORT}"),
                         TransportProtocol: "TCP",
                         NetworkProtocol: "IPv4",
+                        State: "SynSent",
                     },
                 }
             })
@@ -257,6 +258,7 @@ async fn inspect_tcp_sockets<I: net_types::ip::Ip>(name: &str, socket_state: Tcp
                         RemoteAddress: format!("[2001:db8::2]:{REMOTE_PORT}"),
                         TransportProtocol: "TCP",
                         NetworkProtocol: "IPv6",
+                        State: "SynSent",
                     }
                 }
             })

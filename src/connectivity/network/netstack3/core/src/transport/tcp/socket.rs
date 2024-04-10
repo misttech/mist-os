@@ -140,6 +140,9 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
     fn get_defunct<D: device::WeakId, BT: TcpBindingsTypes>(
         conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
     ) -> bool;
+    fn get_state<D: device::WeakId, BT: TcpBindingsTypes>(
+        conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
+    ) -> &State<BT::Instant, BT::ReceiveBuffer, BT::SendBuffer, BT::ListenerNotifierOrProvidedBuffers>;
     fn get_bound_info<D: device::WeakId>(
         listener_addr: &ListenerAddr<Self::ListenerIpAddr, D>,
     ) -> BoundInfo<Self::Addr, D>;
@@ -201,6 +204,12 @@ impl DualStackIpExt for Ipv4 {
         (conn, _addr): &Self::ConnectionAndAddr<D, BT>,
     ) -> bool {
         conn.defunct
+    }
+    fn get_state<D: device::WeakId, BT: TcpBindingsTypes>(
+        (conn, _addr): &Self::ConnectionAndAddr<D, BT>,
+    ) -> &State<BT::Instant, BT::ReceiveBuffer, BT::SendBuffer, BT::ListenerNotifierOrProvidedBuffers>
+    {
+        &conn.state
     }
     fn get_bound_info<D: device::WeakId>(
         listener_addr: &ListenerAddr<Self::ListenerIpAddr, D>,
@@ -302,6 +311,15 @@ impl DualStackIpExt for Ipv6 {
         match conn_and_addr {
             EitherStack::ThisStack((conn, _addr)) => conn.defunct,
             EitherStack::OtherStack((conn, _addr)) => conn.defunct,
+        }
+    }
+    fn get_state<D: device::WeakId, BT: TcpBindingsTypes>(
+        conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
+    ) -> &State<BT::Instant, BT::ReceiveBuffer, BT::SendBuffer, BT::ListenerNotifierOrProvidedBuffers>
+    {
+        match conn_and_addr {
+            EitherStack::ThisStack((conn, _addr)) => &conn.state,
+            EitherStack::OtherStack((conn, _addr)) => &conn.state,
         }
     }
     fn get_bound_info<D: device::WeakId>(
@@ -4132,6 +4150,7 @@ where
                         if I::get_defunct(conn_and_addr) {
                             return;
                         }
+                        let state = I::get_state(conn_and_addr);
                         let ConnectionInfo {
                             local_addr: SocketAddr { ip: local_ip, port: local_port },
                             remote_addr: SocketAddr { ip: remote_ip, port: remote_port },
@@ -4145,6 +4164,7 @@ where
                             remote_ip.into(),
                             remote_port,
                         )));
+                        node.record_display("State", state);
                     }
                 }
             });

@@ -91,7 +91,7 @@ impl NonZeroDurationOptionExt for Option<NonZeroDuration> {
 ///   - accept
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct Closed<Error> {
+pub struct Closed<Error> {
     /// Describes a reason why the connection was closed.
     pub(crate) reason: Error,
 }
@@ -209,7 +209,7 @@ impl<Error> Closed<Error> {
 ///   - listen
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct Listen {
+pub struct Listen {
     iss: SeqNum,
     buffer_sizes: BufferSizes,
     device_mss: Mss,
@@ -321,7 +321,7 @@ impl Listen {
 ///   - connect
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct SynSent<I, ActiveOpen> {
+pub struct SynSent<I, ActiveOpen> {
     iss: SeqNum,
     // The timestamp when the SYN segment was sent. A `None` here means that
     // the SYN segment was retransmitted so that it can't be used to estimate
@@ -548,7 +548,7 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
 ///   - connect
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct SynRcvd<I, ActiveOpen> {
+pub struct SynRcvd<I, ActiveOpen> {
     iss: SeqNum,
     irs: SeqNum,
     /// The timestamp when the SYN segment was received, and consequently, our
@@ -907,7 +907,7 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
 ///   - connect
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct Established<I, R, S> {
+pub struct Established<I, R, S> {
     snd: Send<I, S, { FinQueued::NO }>,
     rcv: Recv<I, R>,
 }
@@ -1423,7 +1423,7 @@ impl<I: Instant, S: SendBuffer> Send<I, S, { FinQueued::NO }> {
 ///   - connect
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct CloseWait<I, S> {
+pub struct CloseWait<I, S> {
     snd: Send<I, S, { FinQueued::NO }>,
     last_ack: SeqNum,
     last_wnd: WindowSize,
@@ -1446,7 +1446,7 @@ pub(crate) struct CloseWait<I, S> {
 ///   - connect
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct LastAck<I, S> {
+pub struct LastAck<I, S> {
     snd: Send<I, S, { FinQueued::YES }>,
     last_ack: SeqNum,
     last_wnd: WindowSize,
@@ -1468,7 +1468,7 @@ pub(crate) struct LastAck<I, S> {
 ///   - connect
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct FinWait1<I, R, S> {
+pub struct FinWait1<I, R, S> {
     snd: Send<I, S, { FinQueued::YES }>,
     rcv: Recv<I, R>,
 }
@@ -1488,7 +1488,7 @@ pub(crate) struct FinWait1<I, R, S> {
 ///   - accept
 ///   - listen
 ///   - connect
-pub(crate) struct FinWait2<I, R> {
+pub struct FinWait2<I, R> {
     last_seq: SeqNum,
     rcv: Recv<I, R>,
     timeout_at: Option<I>,
@@ -1509,7 +1509,7 @@ pub(crate) struct FinWait2<I, R> {
 ///   - accept
 ///   - listen
 ///   - connect
-pub(crate) struct Closing<I, S> {
+pub struct Closing<I, S> {
     snd: Send<I, S, { FinQueued::YES }>,
     last_ack: SeqNum,
     last_wnd: WindowSize,
@@ -1532,7 +1532,7 @@ pub(crate) struct Closing<I, S> {
 ///   - connect
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct TimeWait<I> {
+pub struct TimeWait<I> {
     pub(super) last_seq: SeqNum,
     pub(super) last_ack: SeqNum,
     pub(super) last_wnd: WindowSize,
@@ -1546,7 +1546,7 @@ fn new_time_wait_expiry<I: Instant>(now: I) -> I {
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) enum State<I, R, S, ActiveOpen> {
+pub enum State<I, R, S, ActiveOpen> {
     Closed(Closed<Option<ConnectionError>>),
     Listen(Listen),
     SynRcvd(SynRcvd<I, ActiveOpen>),
@@ -1558,6 +1558,25 @@ pub(crate) enum State<I, R, S, ActiveOpen> {
     FinWait2(FinWait2<I, R>),
     Closing(Closing<I, S>),
     TimeWait(TimeWait<I>),
+}
+
+impl<I, R, S, ActiveOpen> core::fmt::Display for State<I, R, S, ActiveOpen> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+        let name = match self {
+            State::Closed(_) => "Closed",
+            State::Listen(_) => "Listen",
+            State::SynRcvd(_) => "SynRcvd",
+            State::SynSent(_) => "SynSent",
+            State::Established(_) => "Established",
+            State::CloseWait(_) => "CloseWait",
+            State::LastAck(_) => "LastAck",
+            State::FinWait1(_) => "FinWait1",
+            State::FinWait2(_) => "FinWait2",
+            State::Closing(_) => "Closing",
+            State::TimeWait(_) => "TimeWait",
+        };
+        write!(f, "{name}")
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
