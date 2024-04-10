@@ -619,3 +619,23 @@ TEST_F(Dfv2NodeTest, UnbindChildrenFailAddChild) {
 
   ASSERT_TRUE(parent->children().empty());
 }
+
+// Verify `Node::ScheduleUnbind` will unbind a node that is bound to a driver.
+TEST_F(Dfv2NodeTest, ScheduleUnbind) {
+  const std::string kNodeName = "test";
+
+  auto node = CreateNode(kNodeName);
+  StartTestDriver(node);
+  ASSERT_TRUE(node->HasDriverComponent());
+
+  // Get the driver so that the test can properly close the driver's connection when the driver
+  // receives a Stop fidl request.
+  auto [driver_server, node_client] = node_manager->driver_host().TakeDriver(kNodeName);
+  FakeDriver driver{dispatcher(), std::move(driver_server), std::move(node_client)};
+
+  auto device_controller = ConnectToDeviceController(node);
+  device_controller->ScheduleUnbind().ThenExactlyOnce(
+      [](auto& result) { ASSERT_EQ(result.status(), ZX_OK); });
+  RunLoopUntilIdle();
+  ASSERT_FALSE(node->HasDriverComponent());
+}

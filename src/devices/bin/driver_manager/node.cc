@@ -1437,7 +1437,8 @@ void Node::UnbindChildren(UnbindChildrenCompleter::Sync& completer) {
 }
 
 void Node::ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
+  Remove(RemovalSet::kAll, nullptr);
+  completer.ReplySuccess();
 }
 void Node::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
   completer.ReplySuccess(fidl::StringView::FromExternal(MakeTopologicalPath()));
