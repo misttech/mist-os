@@ -330,6 +330,28 @@ fn extract_mld_version(
     Ok(mld_version)
 }
 
+fn extract_nud_config(
+    finterfaces_admin::Configuration { ipv4, ipv6, .. }: finterfaces_admin::Configuration,
+    ip_version: fnet::IpVersion,
+) -> Result<finterfaces_admin::NudConfiguration, Error> {
+    match ip_version {
+        fnet::IpVersion::V4 => {
+            let finterfaces_admin::Ipv4Configuration { arp, .. } =
+                ipv4.context("get IPv4 configuration")?;
+            let finterfaces_admin::ArpConfiguration { nud, .. } =
+                arp.context("get ARP configuration")?;
+            nud.context("get NUD configuration")
+        }
+        fnet::IpVersion::V6 => {
+            let finterfaces_admin::Ipv6Configuration { ndp, .. } =
+                ipv6.context("get IPv6 configuration")?;
+            let finterfaces_admin::NdpConfiguration { nud, .. } =
+                ndp.context("get NDP configuration")?;
+            nud.context("get NUD configuration")
+        }
+    }
+}
+
 async fn do_if<C: NetCliDepsConnector>(
     out: &mut ffx_writer::Writer,
     cmd: opts::IfEnum,
@@ -1128,25 +1150,65 @@ async fn do_neigh<C: NetCliDepsConnector>(
         opts::NeighEnum::Config(opts::NeighConfig { neigh_config_cmd }) => match neigh_config_cmd {
             opts::NeighConfigEnum::Get(opts::NeighGetConfig { interface, ip_version }) => {
                 let interface = interface.find_nicid(connector).await?;
-                let view = connect_with_context::<fneighbor::ViewMarker, _>(connector).await?;
-                let () = print_neigh_config(interface, ip_version, view)
+                let control = get_control(connector, interface).await.context("get control")?;
+                let configuration = control
+                    .get_configuration()
                     .await
-                    .context("failed during neigh config get command")?;
+                    .map_err(anyhow::Error::new)
+                    .and_then(|res| {
+                        res.map_err(|e: finterfaces_admin::ControlGetConfigurationError| {
+                            anyhow::anyhow!("{:?}", e)
+                        })
+                    })
+                    .context("get configuration")?;
+                let nud = extract_nud_config(configuration, ip_version)?;
+                println!("{:#?}", nud);
             }
             opts::NeighConfigEnum::Update(opts::NeighUpdateConfig {
                 interface,
                 ip_version,
                 base_reachable_time,
             }) => {
-                let updates =
-                    fneighbor::UnreachabilityConfig { base_reachable_time, ..Default::default() };
                 let interface = interface.find_nicid(connector).await?;
-                let controller =
-                    connect_with_context::<fneighbor::ControllerMarker, _>(connector).await?;
-                let () = update_neigh_config(interface, ip_version, updates, controller)
+                let control = get_control(connector, interface).await.context("get control")?;
+                let nud_config = finterfaces_admin::NudConfiguration {
+                    base_reachable_time,
+                    ..Default::default()
+                };
+                let config = match ip_version {
+                    fnet::IpVersion::V4 => finterfaces_admin::Configuration {
+                        ipv4: Some(finterfaces_admin::Ipv4Configuration {
+                            arp: Some(finterfaces_admin::ArpConfiguration {
+                                nud: Some(nud_config),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                    fnet::IpVersion::V6 => finterfaces_admin::Configuration {
+                        ipv6: Some(finterfaces_admin::Ipv6Configuration {
+                            ndp: Some(finterfaces_admin::NdpConfiguration {
+                                nud: Some(nud_config),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                };
+                let prev_config = control
+                    .set_configuration(&config)
                     .await
-                    .context("failed during neigh config update command")?;
-                info!("Updated config for interface {}", interface);
+                    .map_err(anyhow::Error::new)
+                    .and_then(|res| {
+                        res.map_err(|e: finterfaces_admin::ControlSetConfigurationError| {
+                            anyhow::anyhow!("{:?}", e)
+                        })
+                    })
+                    .context("set configuration")?;
+                let prev_nud = extract_nud_config(prev_config, ip_version)?;
+                info!("Updated config for interface {}; previously was: {:?}", interface, prev_nud);
             }
         },
     }
@@ -1285,36 +1347,6 @@ async fn print_neigh_entries(
     }
 
     Ok(())
-}
-
-async fn print_neigh_config(
-    interface: u64,
-    version: fnet::IpVersion,
-    view: fneighbor::ViewProxy,
-) -> Result<(), Error> {
-    let config = view
-        .get_unreachability_config(interface, version)
-        .await
-        .context("get_unreachability_config FIDL error")?
-        .map_err(zx::Status::from_raw)
-        .context("get_unreachability_config failed")?;
-
-    println!("{:#?}", config);
-    Ok(())
-}
-
-async fn update_neigh_config(
-    interface: u64,
-    version: fnet::IpVersion,
-    updates: fneighbor::UnreachabilityConfig,
-    controller: fneighbor::ControllerProxy,
-) -> Result<(), Error> {
-    controller
-        .update_unreachability_config(interface, version, &updates)
-        .await
-        .context("update_unreachability_config FIDL error")?
-        .map_err(zx::Status::from_raw)
-        .context("update_unreachability_config failed")
 }
 
 fn neigh_entry_stream(
@@ -3479,63 +3511,6 @@ mac               -
         let ((), ()) = futures::future::try_join(neigh, neigh_succeeds)
             .await
             .expect("neigh remove should succeed");
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn neigh_config_get() {
-        let (view, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fneighbor::ViewMarker>()
-                .expect("creating a request stream and proxy for testing should succeed");
-        let neigh = print_neigh_config(INTERFACE_ID, IP_VERSION, view);
-        let neigh_succeeds = async {
-            let (got_interface_id, got_ip_version, responder) = requests
-                .try_next()
-                .await
-                .expect("neigh FIDL error")
-                .expect("request stream should not have ended")
-                .into_get_unreachability_config()
-                .expect("request should be of type GetUnreachabilityConfig");
-            assert_eq!(got_interface_id, INTERFACE_ID);
-            assert_eq!(got_ip_version, IP_VERSION);
-            let () =
-                responder.send(Ok(&Default::default())).expect("responder.send should succeed");
-            Ok(())
-        };
-        let ((), ()) = futures::future::try_join(neigh, neigh_succeeds)
-            .await
-            .expect("neigh config get should succeed");
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn neigh_config_update() {
-        let config = fneighbor::UnreachabilityConfig::default();
-
-        let (controller, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fneighbor::ControllerMarker>()
-                .expect("creating a request stream and proxy for testing should succeed");
-        let neigh = update_neigh_config(
-            INTERFACE_ID,
-            IP_VERSION,
-            fneighbor::UnreachabilityConfig::default(),
-            controller,
-        );
-        let neigh_succeeds = async {
-            let (got_interface_id, got_ip_version, got_config, responder) = requests
-                .try_next()
-                .await
-                .expect("neigh FIDL error")
-                .expect("request stream should not have ended")
-                .into_update_unreachability_config()
-                .expect("request should be of type UpdateUnreachabilityConfig");
-            assert_eq!(got_interface_id, INTERFACE_ID);
-            assert_eq!(got_ip_version, IP_VERSION);
-            assert_eq!(got_config, config);
-            let () = responder.send(Ok(())).expect("responder.send should succeed");
-            Ok(())
-        };
-        let ((), ()) = futures::future::try_join(neigh, neigh_succeeds)
-            .await
-            .expect("neigh config update should succeed");
     }
 
     #[test_case(opts::dhcpd::DhcpdEnum::Get(opts::dhcpd::Get {
