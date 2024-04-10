@@ -229,10 +229,7 @@ fn run_task(
 
     // We need to check for exit once, before the task starts executing, in case
     // the task has already been sent a signal that will cause it to exit.
-    let state = zx::sys::zx_restricted_state_t::from(&*current_task.thread_state.registers);
-    if let Some(exit_status) =
-        process_completed_restricted_exit(current_task, &error_context, &state)?
-    {
+    if let Some(exit_status) = process_completed_restricted_exit(current_task, &error_context)? {
         return Ok(exit_status);
     }
     loop {
@@ -271,6 +268,14 @@ fn run_task(
         // Copy the register state out of the VMO.
         restricted_state.read_state(&mut state);
 
+        // Generate CFI directives so the unwinder will be redirected to unwind the restricted
+        // stack.
+        generate_cfi_directives!(state);
+
+        scopeguard::defer! {
+                // Restore the CFI directives before continuing.
+                restore_cfi_directives!();
+        }
         match reason_code {
             zx::sys::ZX_RESTRICTED_REASON_SYSCALL => {
                 profile_duration!("ExecuteSyscall");
@@ -284,17 +289,10 @@ fn run_task(
                     current_task.thread_state.registers.syscall_register(),
                 );
 
-                // Generate CFI directives so the unwinder will be redirected to unwind the restricted
-                // stack.
-                generate_cfi_directives!(state);
-
                 if let Some(new_error_context) = execute_syscall(locked, current_task, syscall_decl)
                 {
                     error_context = Some(new_error_context);
                 }
-
-                // Restore the CFI directives before continuing.
-                restore_cfi_directives!();
 
                 firehose_trace_duration_end!(
                     CATEGORY_STARNIX,
@@ -336,8 +334,7 @@ fn run_task(
                 ));
             }
         }
-        if let Some(exit_status) =
-            process_completed_restricted_exit(current_task, &error_context, &state)?
+        if let Some(exit_status) = process_completed_restricted_exit(current_task, &error_context)?
         {
             return Ok(exit_status);
         }

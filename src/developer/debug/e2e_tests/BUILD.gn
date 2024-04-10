@@ -92,9 +92,15 @@ if (is_host && has_board) {
     # TODO(https://fxbug.dev/42109154): Enable software breakpoint tests on ARM64
     # once they are stable.
     if (target_cpu == "arm64") {
-      sources += [ "scripts/hello_starnix_hardware_breakpoint.script" ]
+      sources += [
+        "scripts/hello_starnix_exception.script",
+        "scripts/hello_starnix_hardware_breakpoint.script",
+      ]
     } else {
-      sources += [ "scripts" ]
+      sources += [
+        # TODO(jruthe): List test scripts invididually here once they are deflaked.
+        "scripts",
+      ]
     }
   }
 
