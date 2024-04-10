@@ -220,6 +220,8 @@ pub enum Type {
     },
     /// A function return value that is either null, or the given type.
     NullOrParameter(Box<Type>),
+    /// A function parameter that must be a pointer to memory with the given id.
+    StructParameter { id: MemoryId },
 }
 
 const NOT_INIT: Type = Type::ScalarValue {
@@ -1869,6 +1871,11 @@ impl BpfVisitor for ComputationContext {
                         _ => Err(format!("cannot known expected buffer size at pc {}", self.pc)),
                     }
                 }
+
+                (
+                    Type::StructParameter { id: id1 },
+                    Type::PtrToMemory { id: id2, offset: 0, .. },
+                ) if *id1 == id2 => Ok(()),
 
                 _ => Err(format!("incorrect parameter at pc {}", self.pc)),
             }?;
