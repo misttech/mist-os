@@ -29,7 +29,7 @@
         },
         {
             protocol: "fuchsia.sysmem.Allocator",
-            from: "#sysmem_connector",
+            from: "parent",
             to: "#bt-hfp-audio-gateway",
         },
         {

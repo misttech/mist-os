@@ -11,13 +11,7 @@
         lifecycle: { stop_event: "notify" },
     },
     capabilities: [
-        {
-            protocol: [
-                "fuchsia.paver.Paver",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.sysmem2.Allocator",
-            ],
-        },
+        { protocol: "fuchsia.paver.Paver" },
     ],
     use: [
         // For /boot/config/zxcrypt
@@ -52,11 +46,7 @@
     ],
     expose: [
         {
-            protocol: [
-                "fuchsia.paver.Paver",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.sysmem2.Allocator",
-            ],
+            protocol: "fuchsia.paver.Paver",
             from: "self",
         },
     ],

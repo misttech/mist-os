@@ -281,10 +281,10 @@
         },
         {
             protocol: [ "fuchsia.sysmem.Allocator" ],
-            from: "#miscsvc",
+            from: "#sysmem",
             to: "#boot-drivers",
 
-            // This must be weak because miscsvc needs sysmem from devfs, which creates
+            // This must be weak because sysmem needs sysmem from devfs, which creates
             // a cycle. sysmem can be made into a non-driver to fix this.
             dependency: "weak",
             source_availability: "unknown",

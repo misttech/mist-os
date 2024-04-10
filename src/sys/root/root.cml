@@ -266,6 +266,7 @@
                 "fuchsia.space.Manager",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
                 "fuchsia.thermal.ClientStateConnector",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",

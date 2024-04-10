@@ -76,7 +76,6 @@ pkg-resolver
 ?starnix
 ?starnix_kernel
 ?stash
-sysmem_connector
 system-update-committer
 ?system-update-configurator
 ?system-update-realm

@@ -124,7 +124,7 @@ fuchsia_driver_component("sysmem") {
 }
 
 fuchsia_driver_package("package") {
-  package_name = "sysmem"
+  package_name = "sysmem-driver"
   driver_components = [ ":sysmem" ]
 }
 

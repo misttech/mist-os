@@ -151,7 +151,7 @@
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
             ],
-            from: "#sysmem_connector",
+            from: "parent",
             to: "#testing",
             source_availability: "unknown",
         },

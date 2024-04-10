@@ -30,7 +30,7 @@
         },
         {
             protocol: [ "fuchsia.sysmem.Allocator" ],
-            from: "#sysmem_connector",
+            from: "parent",
             to: "#zircon-guest-manager",
         },
         {

@@ -48,6 +48,7 @@ zx_library("svc") {
     "//src/bringup/bin/pwrbtn-monitor/*",
     "//src/bringup/bin/svchost/*",
     "//src/bringup/bin/sysinfo/*",
+    "//src/bringup/bin/sysmem/*",
     "//src/connectivity/network/tun/network-tun/*",
     "//src/connectivity/openthread/ot-stack/*",
     "//src/connectivity/openthread/third_party/openthread/platform/*",

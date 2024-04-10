@@ -55,7 +55,8 @@ spi
 startup
 svchost
 sysinfo
-sysmem
+sysmem-driver
+sysmem_connector
 ums-function
 usb-audio
 usb-bus

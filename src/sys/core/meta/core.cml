@@ -36,19 +36,6 @@
             startup: "eager",
         },
         {
-            name: "sysmem_connector",
-            url: "fuchsia-pkg://fuchsia.com/sysmem_connector#meta/sysmem_connector.cm",
-
-            // Until there is something analogous to on_terminate: "reboot" for drivers, we need
-            // sysmem_connector to terminate and trigger a reboot on behalf of sysmem if the sysmem
-            // driver terminates.
-            //
-            // TODO(https://fxbug.dev/42178137): Once we have something like on_terminate: "reboot" for drivers
-            // we can remove both "eager" and "reboot" here.
-            startup: "eager",
-            on_terminate: "reboot",
-        },
-        {
             name: "cobalt_system_metrics",
             url: "fuchsia-pkg://fuchsia.com/cobalt_system_metrics#meta/cobalt_system_metrics.cm",
             startup: "eager",
@@ -297,7 +284,7 @@
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
             ],
-            from: "#sysmem_connector",
+            from: "parent",
             to: [ "#agis" ],
         },
         {
@@ -356,13 +343,6 @@
             as: "dev-input-report",
             to: "#brightness_manager",
             subdir: "input-report",
-        },
-        {
-            directory: "dev-class",
-            from: "parent",
-            as: "dev-sysmem",
-            to: "#sysmem_connector",
-            subdir: "sysmem",
         },
         {
             directory: "dev-class",
@@ -501,7 +481,6 @@
             to: [
                 "#cobalt_system_metrics",
                 "#pkg-resolver",
-                "#sysmem_connector",
                 "#timekeeper",
             ],
         },

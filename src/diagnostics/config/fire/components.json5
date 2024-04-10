@@ -614,4 +614,9 @@
         label: "Virtual Keyboard",
         moniker: "core/ui/virtual_keyboard_manager",
     },
+    {
+        id: 257,
+        label: "System Memory",
+        moniker: "bootstrap/sysmem",
+    },
 ]

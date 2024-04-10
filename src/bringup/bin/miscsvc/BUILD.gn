@@ -5,14 +5,8 @@
 import("//build/components.gni")
 
 executable("miscsvc") {
-  sources = [
-    "miscsvc.cc",
-    "sysmem.cc",
-  ]
+  sources = [ "miscsvc.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
-    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/lib/fdio",
     "//src/storage/lib/paver",
     "//src/sys/lib/stdout-to-debuglog/cpp",
@@ -20,7 +14,6 @@ executable("miscsvc") {
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/svc",
-    "//zircon/system/ulib/sysmem-connector",
   ]
   output_dir = "$root_out_dir/zircon-migrated"
 }

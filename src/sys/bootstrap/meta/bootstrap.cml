@@ -261,11 +261,7 @@
             from: "#shutdown_shim",
         },
         {
-            protocol: [
-                "fuchsia.paver.Paver",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.sysmem2.Allocator",
-            ],
+            protocol: "fuchsia.paver.Paver",
             from: "#miscsvc",
         },
         {

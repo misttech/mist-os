@@ -34,7 +34,7 @@
         },
         {
             protocol: [ "fuchsia.sysmem.Allocator" ],
-            from: "#miscsvc",
+            from: "#sysmem",
             to: "#virtual_console",
         },
         {

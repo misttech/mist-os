@@ -226,12 +226,16 @@
             to: "#console-launcher",
         },
         {
+            protocol: "fuchsia.paver.Paver",
+            from: "#miscsvc",
+            to: "#console-launcher",
+        },
+        {
             protocol: [
-                "fuchsia.paver.Paver",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
             ],
-            from: "#miscsvc",
+            from: "#sysmem",
             to: "#console-launcher",
         },
         {
