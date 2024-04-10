@@ -60,9 +60,18 @@ class ThreadBase {
   // period.
   constexpr Duration time_slice_used() const { return time_slice_used_; }
 
-  // Reactivates the thread in a new activation period beginning `now`.
+  // Whether the thread is active at the provided time (i.e., whether that time
+  // falls within the current activation period).
+  constexpr bool IsActive(Time now) const { return start() <= now && now < finish(); }
+
+  // Reactivates the thread in a new activation period. If the provided time is
+  // before the current period ends, then the new period will naturally begin at
+  // the current's finish time; otherwise, the thread missed out on being
+  // reactivated along the current period boundary (e.g., due to having been
+  // blocked for an extended period of time) and the activation period will be
+  // reset starting at `now`.
   constexpr void Reactivate(Time now) {
-    start_ = now;
+    start_ = std::max(now, finish());
     time_slice_used_ = Duration{0};
   }
 

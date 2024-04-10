@@ -98,16 +98,16 @@ TEST(RunQueueTests, QueueExpired) {
   // The threads should have been reactivated.
   //
   EXPECT_FALSE(queue.IsExpired(thread1, Start(5)));
-  EXPECT_EQ(Start(5), thread1.start());
-  EXPECT_EQ(Finish(15), thread1.finish());
+  EXPECT_EQ(Start(10), thread1.start());
+  EXPECT_EQ(Finish(20), thread1.finish());
 
   EXPECT_FALSE(queue.IsExpired(thread2, Start(5)));
-  EXPECT_EQ(Start(5), thread2.start());
-  EXPECT_EQ(Finish(15), thread2.finish());
+  EXPECT_EQ(Start(11), thread2.start());
+  EXPECT_EQ(Finish(21), thread2.finish());
 
   EXPECT_FALSE(queue.IsExpired(thread3, Start(5)));
-  EXPECT_EQ(Start(5), thread3.start());
-  EXPECT_EQ(Finish(20), thread3.finish());
+  EXPECT_EQ(Start(17), thread3.start());
+  EXPECT_EQ(Finish(32), thread3.finish());
 }
 
 TEST(RunQueueTests, Dequeue) {

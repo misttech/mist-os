@@ -56,14 +56,17 @@ TEST(ThreadBaseTests, Reactivate) {
   EXPECT_EQ(Time{0}, thread.start());
   EXPECT_EQ(Time{10}, thread.finish());
 
-  // Already activated at t=0, so call should have no effect.
+  // Reactivation in the current period ([0, 10)) will result in the period
+  // being reset as the next one ([10, 20)).
   thread.Reactivate(Start(0));
-  EXPECT_EQ(Time{0}, thread.start());
-  EXPECT_EQ(Time{10}, thread.finish());
+  EXPECT_EQ(Time{10}, thread.start());
+  EXPECT_EQ(Time{20}, thread.finish());
 
-  thread.Reactivate(Start(15));
-  EXPECT_EQ(Time{15}, thread.start());
-  EXPECT_EQ(Time{25}, thread.finish());
+  // Reactivation past the current period ([10, 20)) will result in a new period
+  // beginning at that time ([25, 35)).
+  thread.Reactivate(Start(25));
+  EXPECT_EQ(Time{25}, thread.start());
+  EXPECT_EQ(Time{35}, thread.finish());
 }
 
 }  // namespace

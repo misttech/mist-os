@@ -131,10 +131,13 @@ class RunQueue {
 
     // Try to avoid rebalancing (from tree insertion and deletion) in the case
     // where the next thread is the current one.
-    if (!next || (current_ && SchedulesBeforeIfActive(*current_, *next))) {
+    if (current_ && current_->IsActive(now) &&
+        (!next || SchedulesBeforeIfActive(*current_, *next))) {
       next = current_;
     } else {
-      Dequeue(*next);
+      if (next) {
+        Dequeue(*next);
+      }
       if (current_) {
         Queue(*current_, now);
       }
