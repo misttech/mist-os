@@ -20,4 +20,7 @@ pub mod nodes;
 #[macro_use]
 mod self_profile;
 
+#[cfg(test)]
+pub mod test_utils;
+
 pub use self_profile::{start_self_profiling, stop_self_profiling, ProfileDuration};

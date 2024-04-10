@@ -141,7 +141,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn vertex_add() {
+    fn vertex_add() {
         let inspector = inspect::Inspector::default();
         let tracker = GraphEventsTracker::new(inspector.root().create_child("events"), 1);
         let vertex_tracker = tracker.for_vertex::<u64>();
@@ -175,7 +175,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn vertex_remove() {
+    fn vertex_remove() {
         let inspector = inspect::Inspector::default();
         let tracker = GraphEventsTracker::new(inspector.root().create_child("events"), 1);
         let vertex_tracker = tracker.for_vertex::<u64>();
@@ -192,7 +192,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn vertex_metadata_update() {
+    fn vertex_metadata_update() {
         let inspector = inspect::Inspector::default();
         let tracker = GraphEventsTracker::new(inspector.root().create_child("events"), 1);
         let vertex_tracker = tracker.for_vertex::<u64>();
@@ -211,7 +211,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn edge_add() {
+    fn edge_add() {
         let inspector = inspect::Inspector::default();
         let tracker = GraphEventsTracker::new(inspector.root().create_child("events"), 1);
         let vertex_tracker = tracker.for_vertex::<u64>();
@@ -250,7 +250,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn edge_remove() {
+    fn edge_remove() {
         let inspector = inspect::Inspector::default();
         let tracker = GraphEventsTracker::new(inspector.root().create_child("events"), 1);
         let vertex_tracker = tracker.for_vertex::<u64>();
@@ -268,7 +268,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn edge_metadata_update() {
+    fn edge_metadata_update() {
         let inspector = inspect::Inspector::default();
         let tracker = GraphEventsTracker::new(inspector.root().create_child("events"), 1);
         let vertex_tracker = tracker.for_vertex::<u64>();
@@ -288,7 +288,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn circular_buffer_semantics() {
+    fn circular_buffer_semantics() {
         let inspector = inspect::Inspector::default();
         let tracker = GraphEventsTracker::new(inspector.root().create_child("events"), 2);
         let vertex_tracker = tracker.for_vertex::<u64>();

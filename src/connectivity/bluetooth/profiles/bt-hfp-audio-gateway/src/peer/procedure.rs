@@ -501,7 +501,9 @@ impl Inspect for &mut IProcedure {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use diagnostics_assertions::assert_data_tree;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use fuchsia_inspect::DiagnosticsHierarchyGetter;
+    use test_util::assert_lt;
 
     /// A vec of responses converts to the expected request
     #[fuchsia::test]
@@ -528,20 +530,20 @@ mod tests {
 
     #[test]
     fn answer_procedure_default_inspect_tree() {
-        let exec = fuchsia_async::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fuchsia_async::Time::from_nanos(1000));
-
         let inspect = inspect::Inspector::default();
         let mut proc = ProcedureMarker::Answer.initialize();
         let mut state = SlcState::default();
         proc.iattach(&inspect.root(), "procedure_0").expect("can initialize inspect");
         // Default inspect tree.
-        assert_data_tree!(inspect, root: {
+        let hierarchy = inspect.get_diagnostics_hierarchy();
+        assert_data_tree!(hierarchy, root: {
             procedure_0: {
                 name: "Answer",
-                started_at: 1000i64,
+                started_at: AnyProperty,
             }
         });
+        let started_time =
+            hierarchy.get_property_by_path(&["procedure_0", "started_at"]).unwrap().int().unwrap();
 
         // Procedure just started so it is not terminated. Can't grab inspect data.
         assert!(!proc.is_terminated());
@@ -553,19 +555,25 @@ mod tests {
             x => panic!("Unexpected message: {:?}", x),
         };
 
-        exec.set_fake_time(fuchsia_async::Time::from_nanos(5000));
-
         let _req = proc.ag_update(update, &mut state);
         assert!(proc.is_terminated());
 
         let node = proc.take_inspect_node();
         assert_matches!(node, Some(_));
-        assert_data_tree!(inspect, root: {
+        let hierarchy = inspect.get_diagnostics_hierarchy();
+        assert_data_tree!(hierarchy, root: {
             procedure_0: {
                 name: "Answer",
-                started_at: 1000i64,
-                completed_at: 5000i64
+                started_at: AnyProperty,
+                completed_at: AnyProperty,
             }
         });
+        let completed_time = hierarchy
+            .get_property_by_path(&["procedure_0", "completed_at"])
+            .unwrap()
+            .int()
+            .unwrap();
+
+        assert_lt!(started_time, completed_time);
     }
 }

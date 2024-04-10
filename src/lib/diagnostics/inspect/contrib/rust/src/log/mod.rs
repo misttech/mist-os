@@ -56,11 +56,6 @@ pub trait WriteInspect {
 ///     }
 /// });
 /// ```
-///
-///# Panics
-///
-/// inspect_log! uses [`NodeExt::record_time`] which panics if the caller did not set up a
-/// fuchsia_async executor
 #[macro_export]
 macro_rules! inspect_log {
     ($bounded_list_node:expr, $($args:tt)+) => {{
@@ -210,51 +205,49 @@ macro_rules! make_inspect_loggable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nodes::BoundedListNode;
-
-    use diagnostics_assertions::assert_data_tree;
-    use fuchsia_async as fasync;
+    use crate::{nodes::BoundedListNode, test_utils::FakeClock};
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_inspect::Inspector;
     use fuchsia_sync::Mutex;
+    use fuchsia_zircon as zx;
 
     #[fuchsia::test]
     fn test_inspect_log_basic() {
-        let executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fasync::Time::from_nanos(0));
+        let fake_clock = FakeClock::new();
+        let current = fake_clock.get().into_nanos();
+
         let (inspector, mut node) = inspector_and_list_node();
 
         // Logging string and full-size numeric type
         inspect_log!(node, k1: "1".to_string(), meaning_of_life: 42u64, k3: 3i64, k4: 4f64);
 
         // Logging smaller numeric types (which should be converted to bigger types)
-        executor.set_fake_time(fasync::Time::from_nanos(5));
+        fake_clock.advance(zx::Duration::from_nanos(5));
         inspect_log!(node, small_uint: 1u8, small_int: 2i8, float: 3f32);
 
         // Logging reference types + using bracket format
-        executor.set_fake_time(fasync::Time::from_nanos(10));
+        fake_clock.advance(zx::Duration::from_nanos(5));
         inspect_log!(node, {
             s: "str",
             uint: &13u8,
         });
 
         // Logging empty event
-        executor.set_fake_time(fasync::Time::from_nanos(15));
+        fake_clock.advance(zx::Duration::from_nanos(5));
         inspect_log!(node, {});
 
         assert_data_tree!(inspector, root: {
             list_node: {
-                "0": { "@time": 0i64, k1: "1", meaning_of_life: 42u64, k3: 3i64, k4: 4f64 },
-                "1": { "@time": 5i64, small_uint: 1u64, small_int: 2i64, float: 3f64 },
-                "2": { "@time": 10i64, s: "str", uint: 13u64 },
-                "3": { "@time": 15i64 },
+                "0": { "@time": current, k1: "1", meaning_of_life: 42u64, k3: 3i64, k4: 4f64 },
+                "1": { "@time": current + 5, small_uint: 1u64, small_int: 2i64, float: 3f64 },
+                "2": { "@time": current + 10, s: "str", uint: 13u64 },
+                "3": { "@time": current + 15 },
             }
         });
     }
 
     #[fuchsia::test]
     fn test_inspect_log_nested() {
-        let executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
         inspect_log!(node, {
             k1: {
@@ -270,7 +263,7 @@ mod tests {
         assert_data_tree!(inspector, root: {
             list_node: {
                 "0": {
-                    "@time": 12345i64,
+                    "@time": AnyProperty,
                     k1: {
                         sub1: "subval1",
                         sub2: {
@@ -286,8 +279,6 @@ mod tests {
 
     #[fuchsia::test]
     fn test_inspect_log_var_key_syntax() {
-        let executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
         let key = "@@@";
         inspect_log!(node, var key: "!!!");
@@ -295,7 +286,7 @@ mod tests {
         assert_data_tree!(inspector, root: {
             list_node: {
                 "0": {
-                    "@time": 12345i64,
+                    "@time": AnyProperty,
                     "@@@": "!!!"
                 }
             }
@@ -304,7 +295,6 @@ mod tests {
 
     #[fuchsia::test]
     fn test_inspect_log_parsing() {
-        let _executor = fasync::TestExecutor::new();
         // if this test compiles, it's considered as succeeded
         let (_inspector, mut node) = inspector_and_list_node();
 
@@ -330,7 +320,6 @@ mod tests {
     #[fuchsia::test]
     fn test_inspect_log_allows_mutex_guard_temporary() {
         // if this test compiles, it's considered as succeeded
-        let _executor = fasync::TestExecutor::new();
         let (_inspector, node) = inspector_and_list_node();
         let node = Mutex::new(node);
         inspect_log!(node.lock(), k1: "v1");
@@ -339,7 +328,6 @@ mod tests {
     #[fuchsia::test]
     fn test_inspect_log_macro_does_not_move_value() {
         // if this test compiles, it's considered as succeeded
-        let _executor = fasync::TestExecutor::new();
         let (_inspector, mut node) = inspector_and_list_node();
         let s = String::from("s");
         inspect_log!(node, s: s);
@@ -350,26 +338,25 @@ mod tests {
 
     #[fuchsia::test]
     fn test_log_option() {
-        let executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fasync::Time::from_nanos(12345));
+        let fake_clock = FakeClock::new();
+        let current = fake_clock.get().into_nanos();
         let (inspector, mut node) = inspector_and_list_node();
 
         inspect_log!(node, some?: Some("a"));
-        executor.set_fake_time(fasync::Time::from_nanos(24680));
+
+        fake_clock.advance(zx::Duration::from_nanos(12345));
         inspect_log!(node, none?: None as Option<String>);
 
         assert_data_tree!(inspector, root: {
             list_node: {
-                "0": { "@time": 12345i64, some: "a" },
-                "1": { "@time": 24680i64 },
+                "0": { "@time": current, some: "a" },
+                "1": { "@time": current + 12345 },
             }
         });
     }
 
     #[fuchsia::test]
     fn test_log_inspect_bytes() {
-        let executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
         let bytes = [11u8, 22, 33];
 
@@ -379,17 +366,15 @@ mod tests {
 
         assert_data_tree!(inspector, root: {
             list_node: {
-                "0": { "@time": 12345i64, bytes: vec![11u8, 22, 33] },
-                "1": { "@time": 12345i64, bytes: vec![11u8, 22, 33] },
-                "2": { "@time": 12345i64, bytes: vec![11u8, 22, 33] },
+                "0": { "@time": AnyProperty, bytes: vec![11u8, 22, 33] },
+                "1": { "@time": AnyProperty, bytes: vec![11u8, 22, 33] },
+                "2": { "@time": AnyProperty, bytes: vec![11u8, 22, 33] },
             }
         });
     }
 
     #[fuchsia::test]
     fn test_log_inspect_list() {
-        let executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
         let list = [11u8, 22, 33];
 
@@ -398,7 +383,7 @@ mod tests {
         assert_data_tree!(inspector, root: {
             list_node: {
                 "0": {
-                    "@time": 12345i64,
+                    "@time": AnyProperty,
                     list: {
                         "0": 11u64,
                         "1": 22u64,
@@ -411,8 +396,6 @@ mod tests {
 
     #[fuchsia::test]
     fn test_log_inspect_list_closure() {
-        let executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
         let list = [13u32, 17, 29];
         let list_mapped = InspectListClosure(&list, |node_writer, key, item| {
@@ -424,7 +407,7 @@ mod tests {
         assert_data_tree!(inspector, root: {
             list_node: {
                 "0": {
-                    "@time": 12345i64,
+                    "@time": AnyProperty,
                     list: {
                         "0": 26u64,
                         "1": 34u64,
@@ -437,8 +420,6 @@ mod tests {
 
     #[fuchsia::test]
     fn test_log_inspect_uint_array() {
-        let executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
         let list = [1u32, 2, 3, 4, 5, 6];
 
@@ -447,7 +428,7 @@ mod tests {
         assert_data_tree!(inspector, root: {
             list_node: {
                 "0": {
-                    "@time": 12345i64,
+                    "@time": AnyProperty,
                     list: vec![1u64, 2, 3, 4, 5, 6],
                 }
             }
@@ -457,7 +438,6 @@ mod tests {
     #[fuchsia::test]
     fn test_inspect_insert_parsing() {
         // if this test compiles, it's considered as succeeded
-        let _executor = fasync::TestExecutor::new();
         let (_inspector, mut node) = inspector_and_list_node();
         let node_writer = node.add_entry(|node_writer| {
             // Non-block version, no trailing comma
@@ -482,8 +462,6 @@ mod tests {
 
     #[fuchsia::test]
     fn test_make_inspect_loggable() {
-        let executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
 
         let obj = make_inspect_loggable!(k1: "1", k2: 2i64, k3: "3");
@@ -498,11 +476,11 @@ mod tests {
         assert_data_tree!(inspector, root: {
             list_node: {
                 "0": {
-                    "@time": 12345i64,
+                    "@time": AnyProperty,
                     some_key: { k1: "1", k2: 2i64, k3: "3" },
                 },
                 "1": {
-                    "@time": 12345i64,
+                    "@time": AnyProperty,
                     point: { x: 10i64, y: 50i64 },
                 },
             }
@@ -511,8 +489,6 @@ mod tests {
 
     #[fuchsia::test]
     fn test_log_inspect_string_reference() {
-        let executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
 
         inspect_log!(node, "foo" => "foo_1");
@@ -522,10 +498,10 @@ mod tests {
 
         assert_data_tree!(inspector, root: {
             list_node: {
-                "0": { "@time": 12345i64, foo: "foo_1" },
-                "1": { "@time": 12345i64, foo: "foo_2" },
-                "2": { "@time": 12345i64, foo: "foo_3" },
-                "3": { "@time": 12345i64, foo: "foo_4" },
+                "0": { "@time": AnyProperty, foo: "foo_1" },
+                "1": { "@time": AnyProperty, foo: "foo_2" },
+                "2": { "@time": AnyProperty, foo: "foo_3" },
+                "3": { "@time": AnyProperty, foo: "foo_4" },
             }
         });
     }

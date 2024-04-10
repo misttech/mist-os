@@ -453,7 +453,7 @@ mod tests {
     use assert_matches::assert_matches;
     use async_test_helpers::run_while;
     use async_utils::PollExt;
-    use diagnostics_assertions::assert_data_tree;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_power_battery as fpower;
     use fuchsia_inspect_derive::WithInspect;
@@ -1255,8 +1255,8 @@ mod tests {
         assert_data_tree!(inspector, root: {
             avrcp_relay: contains {
                 recent_player_requests: {
-                    "0": { "@time": 7000i64, request: "pause" },
-                    "1": { "@time": 7000i64, request: "play" },
+                    "0": { "@time": AnyProperty, request: "pause" },
+                    "1": { "@time": AnyProperty, request: "play" },
                 },
             }
         });

@@ -727,7 +727,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn track_events() {
+    fn track_events() {
         let inspector = inspect::Inspector::default();
         let graph = Digraph::new(inspector.root(), DigraphOpts::default().track_events(5));
         let mut vertex_one = graph.add_vertex(
