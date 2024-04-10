@@ -67,12 +67,6 @@ int main(int argc, char** argv) {
     LOGF(INFO, "Failed to redirect stdout to debuglog, assuming test environment and continuing");
   }
 
-  auto args_result = component::Connect<fuchsia_boot::Arguments>();
-  if (args_result.is_error()) {
-    LOGF(ERROR, "Failed to get boot arguments service handle: %s", args_result.status_string());
-    return args_result.error_value();
-  }
-
   auto config = driver_manager_config::Config::TakeFromStartupHandle();
 
   if (config.verbose()) {
