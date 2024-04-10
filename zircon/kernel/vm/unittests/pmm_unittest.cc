@@ -593,12 +593,6 @@ static bool pmm_checker_test_with_fill_size(size_t fill_size) {
   p[fill_size - 1] = 1;
   EXPECT_FALSE(checker.ValidatePattern(page));
 
-  // Disarm the checker and see that it now passes.
-  checker.Disarm();
-  EXPECT_FALSE(checker.IsArmed());
-  EXPECT_TRUE(checker.ValidatePattern(page));
-  checker.AssertPattern(page);
-
   page->set_state(vm_page_state::ALLOC);
   pmm_free_page(page);
 

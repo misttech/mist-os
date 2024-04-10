@@ -86,8 +86,6 @@ void PmmChecker::SetFillSize(size_t fill_size) {
 
 void PmmChecker::Arm() { armed_ = true; }
 
-void PmmChecker::Disarm() { armed_ = false; }
-
 void PmmChecker::FillPattern(vm_page_t* page) const {
   DEBUG_ASSERT(page->is_free());
   void* kvaddr = paddr_to_physmap(page->paddr());

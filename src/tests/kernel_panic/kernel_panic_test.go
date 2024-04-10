@@ -18,6 +18,10 @@ var cmdline = []string{
 	"kernel.halt-on-panic=true",
 	"kernel.bypass-debuglog=true",
 	"zircon.autorun.boot=/boot/bin/sh+-c+k",
+	// The parent build configuration may have the pmm-checker already enabled in its command line,
+	// which conflicts with our desire to turn it on with specific settings, so re-set it to be
+	// disabled at startup.
+	"kernel.pmm-checker.enable=false",
 }
 
 // See that `k crash` crashes the kernel.
@@ -107,10 +111,8 @@ func TestExecuteUserMemoryViolation(t *testing.T) {
 	i.WaitForLogMessage("{{{bt:0:")
 }
 
-// See that the pmm checker can detect pmm free list corruption.
-//
-// Verify both oops and panic actions.
-func TestPmmCheckerOopsAndPanic(t *testing.T) {
+// Common helper for verifying that the pmm checker can detect pmm free list corruption.
+func pmmCheckerTestCommon(t *testing.T, ctx context.Context, check_action string) *emulatortest.Instance {
 	exDir := execDir(t)
 	distro := emulatortest.UnpackFrom(t, filepath.Join(exDir, "test_data"), emulator.DistributionParams{
 		Emulator: emulator.Qemu,
@@ -122,8 +124,6 @@ func TestPmmCheckerOopsAndPanic(t *testing.T) {
 
 	device := emulator.DefaultVirtualDevice(string(arch))
 	device.KernelArgs = append(device.KernelArgs, cmdline...)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	i := distro.CreateContext(ctx, device)
 	i.Start()
 
@@ -137,8 +137,8 @@ func TestPmmCheckerOopsAndPanic(t *testing.T) {
 		t.Skipf("Skipping test. This test is incompatible with Address Sanitizer")
 	}
 
-	// Enable the pmm checker with action oops.
-	i.RunCommand("k pmm checker enable 4096 oops")
+	// Enable the pmm checker with requested action.
+	i.RunCommand("k pmm checker enable 4096 " + check_action)
 	i.WaitForLogMessage("pmm checker enabled")
 
 	// Corrupt the free list.
@@ -148,24 +148,27 @@ func TestPmmCheckerOopsAndPanic(t *testing.T) {
 	// Force a check.
 	i.RunCommand("k pmm checker check")
 
+	return i
+}
+
+// Verify the oops action.
+func TestPmmCheckerOops(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	i := pmmCheckerTestCommon(t, ctx, "oops")
 	// See that the corruption is detected and triggered an oops.
 	i.WaitForLogMessage("ZIRCON KERNEL OOPS")
 	i.WaitForLogMessage("pmm checker found unexpected pattern in page at")
 	i.WaitForLogMessage("dump of page follows")
 	i.WaitForLogMessage("done")
+}
 
-	// Re-enable with action panic.
-	i.RunCommand("k pmm checker enable 4096 panic")
-	i.WaitForLogMessage("pmm checker enabled")
-
-	// Corrupt the free list a second time.
-	i.RunCommand("k crash_pmm_use_after_free")
-	i.WaitForLogMessage("crash_pmm_use_after_free done")
-
-	// Force a check.
-	i.RunCommand("k pmm checker check")
-
-	// See that the corruption is detected, but this time results in a panic.
+// Verify the panic action.
+func TestPmmCheckerPanic(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	i := pmmCheckerTestCommon(t, ctx, "panic")
+	// See that the corruption is detected and triggers a panic.
 	i.WaitForLogMessage("ZIRCON KERNEL PANIC")
 	i.WaitForLogMessage("pmm checker found unexpected pattern in page at")
 	i.WaitForLogMessage("dump of page follows")

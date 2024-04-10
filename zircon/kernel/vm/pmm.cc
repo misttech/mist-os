@@ -204,12 +204,10 @@ int64_t pmm_get_alloc_failed_count() { return PmmNode::get_alloc_failed_count();
 bool pmm_has_alloc_failed_no_mem() { return PmmNode::has_alloc_failed_no_mem(); }
 
 static void pmm_checker_enable(size_t fill_size, PmmChecker::Action action) {
-  // We might be changing the fill size.  If we increase the fill size while the checker is active,
-  // we might spuriously assert so disable the checker.
-  pmm_node.DisableChecker();
-
   // Enable filling of pages going forward.
-  pmm_node.EnableFreePageFilling(fill_size, action);
+  if (!pmm_node.EnableFreePageFilling(fill_size, action)) {
+    printf("Checker already configured, requested fill size and action ignored.\n");
+  }
 
   // From this point on, pages will be filled when they are freed.  However, the free list may still
   // have a lot of unfilled pages so make a pass over them and fill them all.
@@ -217,8 +215,6 @@ static void pmm_checker_enable(size_t fill_size, PmmChecker::Action action) {
 
   // All free pages have now been filled with |fill_size| and the checker is armed.
 }
-
-static void pmm_checker_disable() { pmm_node.DisableChecker(); }
 
 static bool pmm_checker_is_enabled() { return pmm_node.Checker()->IsArmed(); }
 
@@ -388,7 +384,6 @@ static int cmd_usage(const char* cmd_name, bool is_panic) {
         "%s checker enable [<size>] [oops|panic]     : enables the pmm checker with optional "
         "fill size and optional action\n",
         cmd_name);
-    printf("%s checker disable                          : disables the pmm checker\n", cmd_name);
     printf(
         "%s checker check                            : forces a check of all free pages in the "
         "pmm\n",
@@ -529,9 +524,6 @@ static int cmd_pmm(int argc, const cmd_args* argv, uint32_t flags) {
       }
       pmm_checker_enable(fill_size, action);
       // No need to print status as enabling automatically prints status.
-    } else if (!strcmp(argv[2].str, "disable")) {
-      pmm_checker_disable();
-      pmm_checker_print_status();
     } else if (!strcmp(argv[2].str, "check")) {
       if (!pmm_checker_is_enabled()) {
         printf("error: pmm checker is not enabled\n");

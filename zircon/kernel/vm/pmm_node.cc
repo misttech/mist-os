@@ -217,17 +217,16 @@ void PmmNode::PoisonAllFreePages() {
 }
 #endif  // __has_feature(address_sanitizer)
 
-void PmmNode::EnableFreePageFilling(size_t fill_size, PmmChecker::Action action) {
+bool PmmNode::EnableFreePageFilling(size_t fill_size, PmmChecker::Action action) {
   Guard<Mutex> guard{&lock_};
+  if (free_fill_enabled_) {
+    // Checker is already enabled.
+    return false;
+  }
   checker_.SetFillSize(fill_size);
   checker_.SetAction(action);
   free_fill_enabled_ = true;
-}
-
-void PmmNode::DisableChecker() {
-  Guard<Mutex> guard{&lock_};
-  checker_.Disarm();
-  free_fill_enabled_ = false;
+  return true;
 }
 
 void PmmNode::AllocPageHelperLocked(vm_page_t* page) {

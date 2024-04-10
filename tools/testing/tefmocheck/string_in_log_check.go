@@ -394,7 +394,7 @@ func fuchsiaLogChecks() []FailureModeCheck {
 		{startString: "RUN   TestKillCriticalProcess", endString: ": TestKillCriticalProcess"},
 		{startString: "RUN   TestKernelLockupDetectorCriticalSection", endString: ": TestKernelLockupDetectorCriticalSection"},
 		{startString: "RUN   TestKernelLockupDetectorHeartbeat", endString: ": TestKernelLockupDetectorHeartbeat"},
-		{startString: "RUN   TestPmmCheckerOopsAndPanic", endString: ": TestPmmCheckerOopsAndPanic"},
+		{startString: "RUN   TestPmmCheckerOops", endString: ": TestPmmCheckerOops"},
 		{startString: "RUN   TestKernelLockupDetectorFatalCriticalSection", endString: ": TestKernelLockupDetectorFatalCriticalSection"},
 		{startString: "RUN   TestKernelLockupDetectorFatalHeartbeat", endString: ": TestKernelLockupDetectorFatalHeartbeat"},
 		// Kernel out-of-memory test "OOMHard" may report valid OOPS that should not reflect a test failure.
@@ -430,7 +430,7 @@ func fuchsiaLogChecks() []FailureModeCheck {
 				{startString: "RUN   TestBasicCrash", endString: "PASS: TestBasicCrash"},
 				{startString: "RUN   TestReadUserMemoryViolation", endString: "PASS: TestReadUserMemoryViolation"},
 				{startString: "RUN   TestExecuteUserMemoryViolation", endString: "PASS: TestExecuteUserMemoryViolation"},
-				{startString: "RUN   TestPmmCheckerOopsAndPanic", endString: "PASS: TestPmmCheckerOopsAndPanic"},
+				{startString: "RUN   TestPmmCheckerPanic", endString: "PASS: TestPmmCheckerPanic"},
 				{startString: "RUN   TestCrashAssert", endString: "PASS: TestCrashAssert"},
 				{startString: "RUN   TestKernelLockupDetectorFatalCriticalSection", endString: ": TestKernelLockupDetectorFatalCriticalSection"},
 				{startString: "RUN   TestKernelLockupDetectorFatalHeartbeat", endString: ": TestKernelLockupDetectorFatalHeartbeat"},

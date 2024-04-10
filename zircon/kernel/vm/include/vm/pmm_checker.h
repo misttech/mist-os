@@ -68,7 +68,6 @@ class PmmChecker {
   bool IsArmed() const { return armed_; }
 
   void Arm();
-  void Disarm();
 
   void PrintStatus(FILE* f) const;
 
