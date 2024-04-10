@@ -18,6 +18,7 @@ use fuchsia_zircon::{self as zx, HandleBased};
 use futures::{channel::mpsc, StreamExt};
 use power_broker_client::PowerElementContext;
 use realm_proxy_client::RealmProxyClient;
+use std::time::Instant;
 
 const REALM_FACTORY_CHILD_NAME: &str = "test_realm_factory";
 
@@ -1122,4 +1123,88 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
     Ok(())
 }
 
-// TODO(b/306171083): Add more test cases when passive dependencies are supported.
+#[fuchsia::test]
+async fn test_activity_governor_blocks_lease_while_suspend_in_progress() -> Result<()> {
+    let (realm, _, suspend_device) = create_realm().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+
+    // First watch should return immediately with default values.
+    let current_stats = stats.watch().await?;
+    assert_eq!(Some(0), current_stats.success_count);
+    assert_eq!(Some(0), current_stats.fail_count);
+    assert_eq!(None, current_stats.last_failed_error);
+    assert_eq!(None, current_stats.last_time_in_suspend);
+
+    let suspend_controller = create_suspend_topology(&realm).await?;
+    lease(&suspend_controller, 1).await.unwrap();
+
+    let (listener_client_end, mut listener_stream) =
+        fidl::endpoints::create_request_stream().unwrap();
+    activity_governor
+        .register_listener(fsystem::ActivityGovernorRegisterListenerRequest {
+            listener: Some(listener_client_end),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+
+    let now = Instant::now();
+
+    let (mut on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
+    let (mut on_lease_tx, mut on_lease_rx) = mpsc::channel(1);
+    fasync::Task::local(async move {
+        {
+            // Try to take a lease before handling listener requests.
+            lease(&suspend_controller, 1).await.unwrap();
+            on_lease_tx.try_send(now.elapsed()).unwrap();
+        }
+
+        while let Some(Ok(req)) = listener_stream.next().await {
+            match req {
+                fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
+                    on_resume_tx.start_send(lease(&suspend_controller, 1).await.unwrap()).unwrap();
+                    responder.send().unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {}
+                fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
+                    panic!("Unexpected method: {}", ordinal);
+                }
+            }
+        }
+    })
+    .detach();
+
+    fasync::Task::local(async move {
+        // Wait some time before resuming.
+        fasync::Timer::new(fasync::Duration::from_millis(100)).await;
+        let resume_time = now.elapsed();
+        suspend_device
+            .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+                suspend_duration: Some(49i64),
+                suspend_overhead: Some(51i64),
+                ..Default::default()
+            }))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(resume_time < on_lease_rx.next().await.unwrap(), "Lease was granted too early");
+    })
+    .detach();
+
+    // Wait for OnResume to be called.
+    on_resume_rx.next().await.unwrap();
+
+    let current_stats = stats.watch().await?;
+    assert_eq!(Some(1), current_stats.success_count);
+    assert_eq!(Some(0), current_stats.fail_count);
+    assert_eq!(None, current_stats.last_failed_error);
+    assert_eq!(Some(49), current_stats.last_time_in_suspend);
+    assert_eq!(Some(51), current_stats.last_time_in_suspend_operations);
+
+    Ok(())
+}

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
+use async_trait::async_trait;
 use async_utils::hanging_get::server::{HangingGet, Publisher};
 use fidl_fuchsia_hardware_suspend as fhsuspend;
 use fidl_fuchsia_power_broker as fbroker;
@@ -14,15 +15,16 @@ use fidl_fuchsia_power_system::{
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{ArrayProperty, Property};
-use fuchsia_zircon as zx;
+use fuchsia_zircon::{self as zx, HandleBased};
 use futures::{
     channel::mpsc::{self, Receiver, Sender},
     future::LocalBoxFuture,
+    lock::Mutex,
     prelude::*,
 };
 use power_broker_client::PowerElementContext;
 use std::{
-    cell::{Cell, RefCell},
+    cell::{OnceCell, RefCell},
     rc::Rc,
 };
 
@@ -33,6 +35,160 @@ type StatsPublisher = Publisher<fsuspend::SuspendStats, fsuspend::StatsWatchResp
 enum IncomingRequest {
     ActivityGovernor(fsystem::ActivityGovernorRequestStream),
     Stats(fsuspend::StatsRequestStream),
+}
+
+#[async_trait(?Send)]
+trait SuspendResumeListener {
+    /// Gets the manager of suspend stats.
+    fn suspend_stats(&self) -> &SuspendStatsManager;
+    /// Called when system suspension is about to begin.
+    fn on_suspend(&self);
+    /// Called after system suspension ends.
+    async fn on_resume(&self);
+}
+
+/// Controls access to execution_state and suspend management.
+struct ExecutionStateManagerInner {
+    /// The context used to manage the execution state power element.
+    execution_state: PowerElementContext,
+    /// The FIDL proxy to the device used to trigger system suspend.
+    suspender: fhsuspend::SuspenderProxy,
+    /// The suspend state index that will be passed to the suspender when system suspend is
+    /// triggered.
+    suspend_state_index: u64,
+    /// The flag used to track whether suspension is allowed based on execution_state's power level.
+    /// If true, execution_state has transitioned from a higher power state to
+    /// ExecutionStateLevel::Inactive and is still at the ExecutionStateLevel::Inactive power level.
+    suspend_allowed: bool,
+}
+
+/// Manager of the execution_state power element and suspend logic.
+struct ExecutionStateManager {
+    /// The passive dependency token of the execution_state power element.
+    passive_dependency_token: fbroker::DependencyToken,
+    /// State of the execution_state power element and suspend controls.
+    inner: Mutex<ExecutionStateManagerInner>,
+    /// SuspendResumeListener object to notify of suspend/resume.
+    suspend_resume_listener: OnceCell<Rc<dyn SuspendResumeListener>>,
+}
+
+impl ExecutionStateManager {
+    fn new(execution_state: PowerElementContext, suspender: fhsuspend::SuspenderProxy) -> Self {
+        Self {
+            passive_dependency_token: execution_state.passive_dependency_token(),
+            inner: Mutex::new(ExecutionStateManagerInner {
+                execution_state,
+                suspender,
+                suspend_state_index: 0,
+                suspend_allowed: false,
+            }),
+            suspend_resume_listener: OnceCell::new(),
+        }
+    }
+
+    fn set_suspend_resume_listener(&self, suspend_resume_listener: Rc<dyn SuspendResumeListener>) {
+        let _ = self.suspend_resume_listener.set(suspend_resume_listener);
+    }
+
+    fn passive_dependency_token(&self) -> fbroker::DependencyToken {
+        self.passive_dependency_token
+            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+            .expect("failed to duplicate token")
+    }
+
+    async fn set_suspend_state_index(&self, suspend_state_index: u64) {
+        tracing::debug!(?suspend_state_index, "set_suspend_state_index: acquiring inner lock");
+        self.inner.lock().await.suspend_state_index = suspend_state_index;
+    }
+
+    async fn update_current_level(&self, required_level: fbroker::PowerLevel) -> Result<bool> {
+        tracing::debug!(?required_level, "update_current_level: acquiring inner lock");
+        let mut inner = self.inner.lock().await;
+        tracing::debug!(?required_level, "update_current_level: updating current level");
+
+        let res = inner.execution_state.current_level.update(required_level).await;
+        if let Err(error) = res {
+            tracing::warn!(?error, "run_power_element: update_current_power_level failed");
+            return Err(error.into());
+        }
+
+        // After other elements have been informed of required_level for
+        // execution_state, check whether the system can be suspended.
+        if required_level == ExecutionStateLevel::Inactive.into_primitive() {
+            tracing::debug!("beginning suspend process for execution_state");
+            inner.suspend_allowed = true;
+            return Ok(true);
+        } else {
+            inner.suspend_allowed = false;
+            return Ok(false);
+        }
+    }
+
+    async fn name(&self) -> String {
+        self.inner.lock().await.execution_state.name().to_string()
+    }
+
+    async fn required_level_proxy(&self) -> fbroker::RequiredLevelProxy {
+        self.inner.lock().await.execution_state.required_level.clone()
+    }
+
+    async fn trigger_suspend(&self) {
+        let listener = self.suspend_resume_listener.get().unwrap();
+        {
+            tracing::debug!("trigger_suspend: acquiring inner lock");
+            let inner = self.inner.lock().await;
+            if !inner.suspend_allowed {
+                tracing::info!("Suspend not allowed");
+                return;
+            }
+
+            tracing::info!("Suspending");
+            listener.on_suspend();
+
+            let response = inner
+                .suspender
+                .suspend(&fhsuspend::SuspenderSuspendRequest {
+                    state_index: Some(inner.suspend_state_index),
+                    ..Default::default()
+                })
+                .await;
+            tracing::info!(?response, "Resuming");
+
+            listener.suspend_stats().update(|stats_opt: &mut Option<fsuspend::SuspendStats>| {
+                let stats = stats_opt.as_mut().expect("stats is uninitialized");
+
+                match response {
+                    Ok(Ok(res)) => {
+                        stats.last_time_in_suspend = res.suspend_duration;
+                        stats.last_time_in_suspend_operations = res.suspend_overhead;
+
+                        if stats.last_time_in_suspend.is_some() {
+                            stats.success_count = stats.success_count.map(|c| c + 1);
+                        } else {
+                            tracing::warn!("Failed to suspend in Suspender");
+                            stats.fail_count = stats.fail_count.map(|c| c + 1);
+                        }
+                    }
+                    error => {
+                        tracing::warn!(?error, "Failed to suspend");
+                        stats.fail_count = stats.fail_count.map(|c| c + 1);
+
+                        if let Ok(Err(error)) = error {
+                            stats.last_failed_error = Some(error);
+                        }
+                    }
+                }
+                true
+            });
+        }
+        // At this point, the suspend request is no longer in flight and has
+        // been handled. With `inner` going out of scope, other tasks can modify
+        // flags and update the power level of execution_state. This is needed
+        // in order to allow listeners to request power level changes when they
+        // get the `ActivityGovernorListener::OnResume` call.
+
+        listener.on_resume().await;
+    }
 }
 
 struct SuspendStatsManager {
@@ -132,13 +288,86 @@ impl SuspendStatsManager {
     }
 }
 
+fn default_update_fn<'a>(
+    power_element: &'a PowerElementContext,
+) -> Box<dyn Fn(fbroker::PowerLevel) -> LocalBoxFuture<'a, ()> + 'a> {
+    Box::new(move |new_power_level: fbroker::PowerLevel| {
+        async move {
+            let element_name = power_element.name();
+
+            tracing::debug!(
+                ?element_name,
+                ?new_power_level,
+                "default_update_fn: updating current level"
+            );
+
+            let res = power_element.current_level.update(new_power_level).await;
+            if let Err(error) = res {
+                tracing::warn!(
+                    ?element_name,
+                    ?error,
+                    "default_update_fn: updating current level failed"
+                );
+            }
+        }
+        .boxed_local()
+    })
+}
+
+async fn run_power_element<'a>(
+    element_name: &'a str,
+    required_level: &'a fbroker::RequiredLevelProxy,
+    initial_level: fbroker::PowerLevel,
+    inspect_node: fuchsia_inspect::Node,
+    update_fn: Box<dyn Fn(fbroker::PowerLevel) -> LocalBoxFuture<'a, ()> + 'a>,
+) {
+    let mut last_required_level = initial_level;
+    let power_level_node = inspect_node.create_uint("power_level", last_required_level.into());
+
+    loop {
+        tracing::debug!(
+            ?element_name,
+            ?last_required_level,
+            "run_power_element: waiting for new level"
+        );
+        match required_level.watch().await {
+            Ok(Ok(required_level)) => {
+                tracing::debug!(
+                    ?element_name,
+                    ?required_level,
+                    ?last_required_level,
+                    "run_power_element: new level requested"
+                );
+                if required_level == last_required_level {
+                    tracing::debug!(
+                        ?element_name,
+                        ?required_level,
+                        ?last_required_level,
+                        "run_power_element: required level has not changed, skipping."
+                    );
+                    continue;
+                }
+
+                update_fn(required_level).await;
+                power_level_node.set(required_level.into());
+                last_required_level = required_level;
+            }
+            error => {
+                tracing::warn!(
+                    ?element_name,
+                    ?error,
+                    "run_power_element: watch_required_level failed"
+                )
+            }
+        }
+    }
+}
+
 /// SystemActivityGovernor runs the server for fuchsia.power.suspend and fuchsia.power.system FIDL
 /// APIs.
 pub struct SystemActivityGovernor {
     /// The root inspect node for system-activity-governor.
     inspect_root: fuchsia_inspect::Node,
-    /// The context used to manage the execution state power element.
-    execution_state: PowerElementContext,
     /// The context used to manage the application activity power element.
     application_activity: PowerElementContext,
     /// The context used to manage the full wake handling power element.
@@ -150,24 +379,13 @@ pub struct SystemActivityGovernor {
     /// The manager used to report suspend stats to inspect and clients of
     /// fuchsia.power.suspend.Stats.
     suspend_stats: SuspendStatsManager,
-    /// The FIDL proxy to the device used to trigger system suspend.
-    suspender: fhsuspend::SuspenderProxy,
     /// The collection of resume latencies supported by the suspender.
     resume_latencies: Vec<zx::sys::zx_duration_t>,
-    /// The suspend state index that will be passed to the suspender when system suspend is
-    /// triggered.
-    selected_suspend_state_index: Cell<Option<u64>>,
     /// The collection of ActivityGovernorListener that have registered through
     /// fuchsia.power.system.ActivityGovernor/RegisterListener.
     listeners: RefCell<Vec<fsystem::ActivityGovernorListenerProxy>>,
-    /// The flag used to track whether ActivityGovernorListener/OnResume notifications are still in
-    /// progress. If true, SystemActivityGovernor is currently processing on_resume notifications
-    /// and awaiting responses from listeners.
-    notify_resume_pending: Cell<bool>,
-    /// The flag used to track whether suspension is allowed based on execution_state's power level.
-    /// If true, execution_state has transitioned from a higher power state to
-    /// EXECUTION_STATE_INACTIVE and is still at the EXECUTION_STATE_INACTIVE power level.
-    suspend_allowed: Cell<bool>,
+    /// The manager used to modify execution_state and trigger suspend.
+    execution_state_manager: ExecutionStateManager,
 }
 
 impl SystemActivityGovernor {
@@ -271,34 +489,26 @@ impl SystemActivityGovernor {
 
         Ok(Rc::new(Self {
             inspect_root,
-            execution_state,
             application_activity,
             full_wake_handling,
             wake_handling,
             execution_resume_latency,
             resume_latencies,
             suspend_stats,
-            suspender,
-            selected_suspend_state_index: Cell::new(None),
             listeners: RefCell::new(Vec::new()),
-            notify_resume_pending: Cell::new(false),
-            suspend_allowed: Cell::new(false),
+            execution_state_manager: ExecutionStateManager::new(execution_state, suspender),
         }))
     }
 
     /// Runs a FIDL server to handle fuchsia.power.suspend and fuchsia.power.system API requests.
     pub async fn run(self: Rc<Self>) -> Result<()> {
         tracing::info!("Handling power elements");
+        self.execution_state_manager.set_suspend_resume_listener(self.clone());
         self.inspect_root.atomic_update(|node| {
             node.record_child("power_elements", |elements_node| {
                 let (es_suspend_tx, es_suspend_rx) = mpsc::channel(1);
-                let (listeners_suspend_tx, listeners_suspend_rx) = mpsc::channel(1);
-                self.run_suspend_task(
-                    es_suspend_rx,
-                    listeners_suspend_tx.clone(),
-                    listeners_suspend_rx,
-                );
-                self.run_execution_state(&elements_node, es_suspend_tx, listeners_suspend_tx);
+                self.run_suspend_task(es_suspend_rx);
+                self.run_execution_state(&elements_node, es_suspend_tx);
                 self.run_application_activity(&elements_node);
                 self.run_full_wake_handling(&elements_node);
                 self.run_wake_handling(&elements_node);
@@ -310,27 +520,17 @@ impl SystemActivityGovernor {
         self.run_fidl_server().await
     }
 
-    fn run_suspend_task(
-        self: &Rc<Self>,
-        mut execution_state_suspend_signal: Receiver<()>,
-        listeners_done_signaller: Sender<()>,
-        mut listeners_done_signal: Receiver<()>,
-    ) {
+    fn run_suspend_task(self: &Rc<Self>, mut execution_state_suspend_signal: Receiver<()>) {
         let this = self.clone();
+
         fasync::Task::local(async move {
             loop {
-                let suspend_signal = futures::future::join(
-                    execution_state_suspend_signal.next(),
-                    listeners_done_signal.next(),
-                );
                 tracing::debug!("awaiting suspend signals");
-                suspend_signal.await;
+                let _ = execution_state_suspend_signal.next().await;
 
                 // Check that the conditions to suspend are still satisfied.
-                if this.suspend_allowed.get() && !this.notify_resume_pending.get() {
-                    tracing::debug!("suspend signals received, triggering suspend");
-                    this.trigger_suspend(listeners_done_signaller.clone()).await;
-                }
+                tracing::debug!("attempting to suspend");
+                this.execution_state_manager.trigger_suspend().await;
             }
         })
         .detach();
@@ -340,47 +540,34 @@ impl SystemActivityGovernor {
         self: &Rc<Self>,
         inspect_node: &fuchsia_inspect::Node,
         execution_state_suspend_signaller: Sender<()>,
-        listeners_done_signaller: Sender<()>,
     ) {
         let execution_state_node = inspect_node.create_child("execution_state");
-        let this = self.clone();
+        let sag = self.clone();
 
         fasync::Task::local(async move {
-            let sag = this.clone();
-            Self::run_power_element(
-                &this.execution_state,
+            let sag = sag.clone();
+            let element_name = sag.execution_state_manager.name().await;
+            let required_level = sag.execution_state_manager.required_level_proxy().await;
+
+            run_power_element(
+                &element_name,
+                &required_level,
                 ExecutionStateLevel::Inactive.into_primitive(),
                 execution_state_node,
-                None,
-                Some(Box::new(move |new_power_level: fbroker::PowerLevel| {
-                    // After other elements have been informed of new_power_level for
-                    // execution_state, check whether the system should be suspended.
+                Box::new(move |new_power_level: fbroker::PowerLevel| {
                     let sag = sag.clone();
                     let mut execution_state_suspend_signaller =
                         execution_state_suspend_signaller.clone();
-                    let listeners_done_signaller = listeners_done_signaller.clone();
 
                     async move {
-                        if new_power_level == ExecutionStateLevel::Inactive.into_primitive() {
-                            tracing::debug!("beginning suspend process for execution_state");
-                            sag.suspend_allowed.set(true);
-                            if sag.notify_resume_pending.get() {
-                                tracing::debug!(
-                                    "notification in progress, sending suspend request"
-                                );
-                                let _ = execution_state_suspend_signaller.start_send(());
-                            } else {
-                                tracing::debug!(
-                                    "triggering suspend due to execution_state falling to 0",
-                                );
-                                sag.trigger_suspend(listeners_done_signaller.clone()).await;
-                            }
-                        } else {
-                            sag.suspend_allowed.set(false);
+                        let update_res =
+                            sag.execution_state_manager.update_current_level(new_power_level).await;
+                        if let Ok(true) = update_res {
+                            let _ = execution_state_suspend_signaller.start_send(());
                         }
                     }
                     .boxed_local()
-                })),
+                }),
             )
             .await;
         })
@@ -392,12 +579,12 @@ impl SystemActivityGovernor {
         let this = self.clone();
 
         fasync::Task::local(async move {
-            Self::run_power_element(
-                &this.application_activity,
+            run_power_element(
+                this.application_activity.name(),
+                &this.application_activity.required_level,
                 ApplicationActivityLevel::Inactive.into_primitive(),
                 application_activity_node,
-                None,
-                None,
+                default_update_fn(&this.application_activity),
             )
             .await;
         })
@@ -409,12 +596,12 @@ impl SystemActivityGovernor {
         let this = self.clone();
 
         fasync::Task::local(async move {
-            Self::run_power_element(
-                &this.full_wake_handling,
+            run_power_element(
+                &this.full_wake_handling.name(),
+                &this.full_wake_handling.required_level,
                 FullWakeHandlingLevel::Inactive.into_primitive(),
                 full_wake_handling_node,
-                None,
-                None,
+                default_update_fn(&this.full_wake_handling),
             )
             .await;
         })
@@ -426,12 +613,12 @@ impl SystemActivityGovernor {
         let this = self.clone();
 
         fasync::Task::local(async move {
-            Self::run_power_element(
-                &this.wake_handling,
+            run_power_element(
+                this.wake_handling.name(),
+                &this.wake_handling.required_level,
                 WakeHandlingLevel::Inactive.into_primitive(),
                 wake_handling_node,
-                None,
-                None,
+                default_update_fn(&this.wake_handling),
             )
             .await;
         })
@@ -448,173 +635,52 @@ impl SystemActivityGovernor {
         for (i, val) in self.resume_latencies.iter().enumerate() {
             resume_latencies_node.set(i, *val);
         }
+
         execution_resume_latency_node.record(resume_latencies_node);
-        let resume_latency_node =
-            execution_resume_latency_node.create_int("resume_latency", self.resume_latencies[0]);
-        self.selected_suspend_state_index.set(Some(0));
+        let resume_latency_node = Rc::new(
+            execution_resume_latency_node.create_int("resume_latency", self.resume_latencies[0]),
+        );
 
         fasync::Task::local(async move {
             let sag = this.clone();
-            let sag2 = this.clone();
+            let update_fn = Rc::new(default_update_fn(&this.execution_resume_latency));
 
-            Self::run_power_element(
-                &this.execution_resume_latency,
+            run_power_element(
+                this.execution_resume_latency.name(),
+                &this.execution_resume_latency.required_level,
                 initial_level,
                 execution_resume_latency_node,
-                Some(Box::new(move |new_power_level: fbroker::PowerLevel| {
-                    // new_power_level for execution_resume_latency is an index into
-                    // the list of resume latencies returned by the suspend HAL.
-                    // Before other power elements are informed of the new power level,
-                    // update the value that will be sent to the suspend HAL when suspension
-                    // is triggered to avoid data races.
-                    if (new_power_level as usize) < sag.resume_latencies.len() {
-                        sag.selected_suspend_state_index.set(Some(new_power_level.into()));
+                Box::new(move |new_power_level: fbroker::PowerLevel| {
+                    let sag = sag.clone();
+                    let update_fn = update_fn.clone();
+                    let resume_latency_node = resume_latency_node.clone();
+
+                    async move {
+                        // new_power_level for execution_resume_latency is an index into
+                        // the list of resume latencies returned by the suspend HAL.
+
+                        // Before other power elements are informed of the new power level,
+                        // update the value that will be sent to the suspend HAL when suspension
+                        // is triggered to avoid data races.
+                        if (new_power_level as usize) < sag.resume_latencies.len() {
+                            sag.execution_state_manager
+                                .set_suspend_state_index(new_power_level.into())
+                                .await;
+                        }
+
+                        update_fn(new_power_level).await;
+
+                        // After other power elements are informed of the new power level,
+                        // update Inspect to account for the new resume latency value.
+                        let power_level = new_power_level as usize;
+                        if power_level < sag.resume_latencies.len() {
+                            resume_latency_node.set(sag.resume_latencies[power_level]);
+                        }
                     }
-                    future::ready(()).boxed_local()
-                })),
-                Some(Box::new(move |new_power_level: fbroker::PowerLevel| {
-                    // new_power_level for execution_resume_latency is an index into
-                    // the list of resume latencies returned by the suspend HAL.
-                    // After other power elements are informed of the new power level,
-                    // update Inspect to account for the new resume latency value.
-                    let power_level = new_power_level as usize;
-                    if power_level < sag2.resume_latencies.len() {
-                        resume_latency_node.set(sag2.resume_latencies[power_level]);
-                    }
-                    future::ready(()).boxed_local()
-                })),
+                    .boxed_local()
+                }),
             )
             .await;
-        })
-        .detach();
-    }
-
-    async fn run_power_element<'a>(
-        power_element: &'a PowerElementContext,
-        initial_level: fbroker::PowerLevel,
-        inspect_node: fuchsia_inspect::Node,
-        pre_update_fn: Option<Box<dyn Fn(fbroker::PowerLevel) -> LocalBoxFuture<'a, ()>>>,
-        post_update_fn: Option<Box<dyn Fn(fbroker::PowerLevel) -> LocalBoxFuture<'a, ()>>>,
-    ) {
-        let element_name = power_element.name();
-        let mut last_required_level = initial_level;
-        let power_level_node = inspect_node.create_uint("power_level", last_required_level.into());
-
-        loop {
-            tracing::debug!(
-                ?element_name,
-                ?last_required_level,
-                "run_power_element: waiting for new level"
-            );
-            match power_element.required_level.watch().await {
-                Ok(Ok(required_level)) => {
-                    tracing::debug!(
-                        ?element_name,
-                        ?required_level,
-                        ?last_required_level,
-                        "run_power_element: new level requested"
-                    );
-                    if required_level == last_required_level {
-                        // Required level has not changed.
-                        continue;
-                    }
-
-                    if let Some(pre_update_fn) = &pre_update_fn {
-                        pre_update_fn(required_level).await;
-                    }
-
-                    let res = power_element.current_level.update(required_level).await;
-                    if let Err(error) = res {
-                        tracing::warn!(
-                            ?element_name,
-                            ?error,
-                            "run_power_element: update_current_power_level failed"
-                        );
-                    }
-
-                    power_level_node.set(required_level.into());
-                    if let Some(post_update_fn) = &post_update_fn {
-                        post_update_fn(required_level).await;
-                    }
-                    last_required_level = required_level;
-                }
-                error => {
-                    tracing::warn!(
-                        ?element_name,
-                        ?error,
-                        "run_power_element: watch_required_level failed"
-                    )
-                }
-            }
-        }
-    }
-
-    async fn trigger_suspend(self: &Rc<Self>, listeners_done_signaller: Sender<()>) {
-        tracing::info!("Suspending");
-        self.notify_suspend();
-
-        let resp = self
-            .suspender
-            .suspend(&fhsuspend::SuspenderSuspendRequest {
-                state_index: self.selected_suspend_state_index.get(),
-                ..Default::default()
-            })
-            .await;
-
-        tracing::info!(?resp, "Resuming");
-
-        self.suspend_stats.update(|stats_opt: &mut Option<fsuspend::SuspendStats>| {
-            let stats = stats_opt.as_mut().expect("stats is uninitialized");
-
-            match resp {
-                Ok(Ok(res)) => {
-                    stats.last_time_in_suspend = res.suspend_duration;
-                    stats.last_time_in_suspend_operations = res.suspend_overhead;
-
-                    if stats.last_time_in_suspend.is_some() {
-                        stats.success_count = stats.success_count.map(|c| c + 1);
-                    } else {
-                        tracing::warn!("Failed to suspend in Suspender");
-                        stats.fail_count = stats.fail_count.map(|c| c + 1);
-                    }
-                }
-                error => {
-                    tracing::warn!(?error, "Failed to suspend");
-                    stats.fail_count = stats.fail_count.map(|c| c + 1);
-
-                    if let Ok(Err(error)) = error {
-                        stats.last_failed_error = Some(error);
-                    }
-                }
-            }
-            true
-        });
-
-        self.notify_resume(listeners_done_signaller);
-    }
-
-    fn notify_suspend(&self) {
-        // A client may call RegisterListener while handling on_suspend which may cause another
-        // mutable borrow of listeners. Clone the listeners to prevent this.
-        let listeners: Vec<_> = self.listeners.borrow_mut().clone();
-        for l in listeners {
-            let _ = l.on_suspend();
-        }
-    }
-
-    fn notify_resume(self: &Rc<Self>, mut listeners_done_signaller: Sender<()>) {
-        let this = self.clone();
-        self.notify_resume_pending.set(true);
-
-        fasync::Task::local(async move {
-            // A client may call RegisterListener while handling on_resume which may cause another
-            // mutable borrow of listeners. Clone the listeners to prevent this.
-            let listeners: Vec<_> = this.listeners.borrow_mut().clone();
-            for l in listeners {
-                let _ = l.on_resume().await;
-            }
-            this.notify_resume_pending.set(false);
-            let _ = listeners_done_signaller.start_send(());
         })
         .detach();
     }
@@ -659,7 +725,7 @@ impl SystemActivityGovernor {
                     let result = responder.send(fsystem::PowerElements {
                         execution_state: Some(fsystem::ExecutionState {
                             passive_dependency_token: Some(
-                                self.execution_state.passive_dependency_token(),
+                                self.execution_state_manager.passive_dependency_token(),
                             ),
                             ..Default::default()
                         }),
@@ -731,6 +797,31 @@ impl SystemActivityGovernor {
                     tracing::warn!(?ordinal, "Unknown StatsRequest method");
                 }
             }
+        }
+    }
+}
+
+#[async_trait(?Send)]
+impl SuspendResumeListener for SystemActivityGovernor {
+    fn suspend_stats(&self) -> &SuspendStatsManager {
+        &self.suspend_stats
+    }
+
+    fn on_suspend(&self) {
+        // A client may call RegisterListener while handling on_suspend which may cause another
+        // mutable borrow of listeners. Clone the listeners to prevent this.
+        let listeners: Vec<_> = self.listeners.borrow_mut().clone();
+        for l in listeners {
+            let _ = l.on_suspend();
+        }
+    }
+
+    async fn on_resume(&self) {
+        // A client may call RegisterListener while handling on_resume which may cause another
+        // mutable borrow of listeners. Clone the listeners to prevent this.
+        let listeners: Vec<_> = self.listeners.borrow_mut().clone();
+        for l in listeners {
+            let _ = l.on_resume().await;
         }
     }
 }
