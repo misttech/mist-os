@@ -31,9 +31,6 @@ lazy_static! {
 /// table, except that the opaque binary ComponentDecl has been deserialized and validated.
 #[derive(Debug)]
 pub struct ResolvedComponent {
-    /// A string indicating which resolver resolved this component (for log
-    /// messages and debugging only).
-    pub resolved_by: String,
     /// The url used to resolve this component.
     pub resolved_url: String,
     /// The package context, from the component resolution context returned by

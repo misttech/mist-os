@@ -49,7 +49,6 @@ impl Resolver for BuiltinResolver {
         let abi_revision = version_history::HISTORY.get_abi_revision_for_platform_components();
 
         Ok(ResolvedComponent {
-            resolved_by: SCHEME.to_string(),
             resolved_url: url.to_string(),
             context_to_resolve_children: None,
             decl,

@@ -180,7 +180,6 @@ pub struct Component {
 impl Component {
     pub fn resolve_with_config(
         ResolvedComponent {
-            resolved_by: _,
             resolved_url,
             context_to_resolve_children,
             decl,

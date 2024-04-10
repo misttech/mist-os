@@ -12,7 +12,7 @@ use {
         resolving::{ComponentAddress, ResolvedComponent, ResolverError},
     },
     async_trait::async_trait,
-    cm_rust::{ConfigValueSource, FidlIntoNative, RegistrationSource, ResolverRegistration},
+    cm_rust::{ConfigValueSource, FidlIntoNative, ResolverRegistration},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_mem as fmem,
     std::{collections::HashMap, sync::Arc},
@@ -133,20 +133,10 @@ impl Resolver for RemoteResolver {
             },
             None => None,
         };
-        let resolved_by = format!(
-            "RemoteResolver::{}{}",
-            if let RegistrationSource::Child(ref name) = self.registration.source {
-                name.to_string() + "/"
-            } else {
-                "".into()
-            },
-            self.registration.resolver.as_str()
-        );
         let resolved_url = component.url.ok_or(ResolverError::RemoteInvalidData)?;
         let context_to_resolve_children = component.resolution_context.map(Into::into);
         let abi_revision = component.abi_revision.map(Into::into);
         Ok(ResolvedComponent {
-            resolved_by,
             resolved_url,
             context_to_resolve_children,
             decl,
@@ -245,7 +235,6 @@ mod tests {
         ) -> Result<ResolvedComponent, ResolverError> {
             assert_eq!(self.expected_url.as_str(), component_address.url());
             Ok(ResolvedComponent {
-                resolved_by: "resolver::MockOkResolver".into(),
                 resolved_url: self.resolved_url.clone(),
                 // MockOkResolver only resolves one component, so it does not
                 // need to provide a context for resolving children.
@@ -332,7 +321,6 @@ mod tests {
             assert_eq!(expected_url, component_url);
             assert_eq!(expected_context.as_ref(), some_context, "resolving {}", component_url);
             Ok(ResolvedComponent {
-                resolved_by: "resolver::MockMultipleOkResolver".into(),
                 resolved_url,
                 context_to_resolve_children,
 

@@ -88,7 +88,6 @@ impl Resolver for RealmBuilderResolver {
         } = self
             .resolve_async(component_url, some_context.map(|context| context.into()).as_ref())
             .await?;
-        let resolved_by = "RealmBuilderResolver".to_string();
         let resolved_url = url.unwrap();
         let context_to_resolve_children = resolution_context.map(Into::into);
         let decl = resolver::read_and_validate_manifest(&decl.unwrap())?;
@@ -98,7 +97,6 @@ impl Resolver for RealmBuilderResolver {
             None
         };
         Ok(ResolvedComponent {
-            resolved_by,
             resolved_url,
             context_to_resolve_children,
             decl,

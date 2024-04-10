@@ -114,7 +114,6 @@ impl MockResolver {
         }
 
         Ok(ResolvedComponent {
-            resolved_by: "mocks::MockResolver".into(),
             resolved_url: format!("test:///{}_resolved", name),
             context_to_resolve_children: None,
             decl: decl.clone(),

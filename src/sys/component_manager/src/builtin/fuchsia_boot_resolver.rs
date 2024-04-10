@@ -411,7 +411,6 @@ impl Resolver for FuchsiaBootResolver {
             None
         };
         Ok(ResolvedComponent {
-            resolved_by: "FuchsiaBootResolver".into(),
             resolved_url,
             context_to_resolve_children: None,
             decl,
