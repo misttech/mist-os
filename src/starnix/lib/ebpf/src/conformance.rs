@@ -732,6 +732,7 @@ pub mod test {
     #[test_case(ubpf_test_data!("subnet.data"))]
     #[test_case(local_test_data!("err-write-r10.data"))]
     #[test_case(local_test_data!("null-checks-propagated.data"))]
+    #[test_case(local_test_data!("stack-access.data"))]
     fn test_ebpf_conformance(content: &str) {
         let Some(mut test_case) = TestCase::parse(content) else {
             // Special case that only test the test framework.

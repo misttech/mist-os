@@ -594,7 +594,7 @@ impl Stack {
         let original_buf = original.as_bytes_mut();
         let value_buf = value.as_bytes();
         for i in 0..byte_count {
-            original_buf[i + offset] = value_buf[i + offset];
+            original_buf[i + offset] = value_buf[i];
         }
         original
     }
