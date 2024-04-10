@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/python/python_binary.gni")
 import("//build/python/python_library.gni")
 
 python_library("trace_processing") {
@@ -13,6 +14,7 @@ python_library("trace_processing") {
     "metrics/__init__.py",
     "metrics/app_render.py",
     "metrics/cpu.py",
+    "metrics/cpu_breakdown.py",
     "metrics/fps.py",
     "metrics/input_latency.py",
     "metrics/scenic.py",
@@ -28,4 +30,11 @@ python_library("trace_processing") {
 group("tests") {
   testonly = true
   public_deps = [ "tests" ]
+}
+
+python_binary("run_cpu_breakdown") {
+  testonly = true
+  main_source = "run_cpu_breakdown.py"
+  deps = [ ":trace_processing" ]
+  enable_mypy = true
 }
