@@ -38,7 +38,7 @@ def extract_labels(json_dict):
     _walk_json(json_dict, [_remove_none_values_visitor, _extract_labels_visitor])
     return extracted_raw_config_labels
 
-def replace_labels_with_files(json_dict, target_to_string_map):
+def replace_labels_with_files(json_dict, target_to_string_map, relative = None):
     """Replace all labels in json_dict with file paths.
 
     Uses target_to_string_map to find the labels to replace.
@@ -51,6 +51,8 @@ def replace_labels_with_files(json_dict, target_to_string_map):
       json_dict: starlark dictionary with label strings
       target_to_string_map: starlark dictionary mapping the Target to the
         LABEL(label) strings
+      relative: if provided, remove the given directory prefix in order to refer
+        to files under the given directory by relative paths
     """
 
     # Invert the map so that it is LABEL(label) to label.
@@ -64,7 +66,10 @@ def replace_labels_with_files(json_dict, target_to_string_map):
         if type(value) == "string" and value in string_to_target_map:
             label = string_to_target_map.get(value)
             label_files = label.files.to_list()
-            dictionary[key] = label_files[0].path
+            if relative:
+                dictionary[key] = label_files[0].path.removeprefix(relative + "/")
+            else:
+                dictionary[key] = label_files[0].path
 
     _walk_json(json_dict, [_replace_labels_visitor])
 

@@ -55,7 +55,15 @@ def _collect_file_deps(dep):
 
 def _fuchsia_product_configuration_impl(ctx):
     product_config = json.decode(ctx.attr.product_config)
-    replace_labels_with_files(product_config, ctx.attr.product_config_labels)
+    product_config_file = ctx.actions.declare_file(ctx.label.name + "_product_config.json")
+
+    if (ctx.attr.relative_paths):
+        # Relativize paths in the product config relative to the directory
+        # containing the product config
+        replace_labels_with_files(product_config, ctx.attr.product_config_labels, relative = product_config_file.dirname)
+    else:
+        # Use absolute paths
+        replace_labels_with_files(product_config, ctx.attr.product_config_labels)
     platform = product_config.get("platform", {})
     build_type = platform.get("build_type")
     product = product_config.get("product", {})
@@ -109,7 +117,6 @@ def _fuchsia_product_configuration_impl(ctx):
             output_files.append(repo_config_file)
         swd_config["tuf_config_paths"] = tuf_config_paths
 
-    product_config_file = ctx.actions.declare_file(ctx.label.name + "_product_config.json")
     content = json.encode_indent(product_config, indent = "  ")
     ctx.actions.write(product_config_file, content)
     output_files.append(product_config_file)
@@ -161,6 +168,10 @@ _fuchsia_product_configuration = rule(
             doc = "OTA configuration to include in the product. Only for use with products that use Omaha.",
             providers = [FuchsiaOmahaOtaConfigInfo],
         ),
+        "relative_paths": attr.bool(
+            doc = "Whether to generate an Assembly product configuration with relative path, so it can be relocated.",
+            default = False,
+        ),
         "deps": attr.label_list(
             doc = "Additional dependencies that must be built before this target is built.",
             default = [],
@@ -175,6 +186,7 @@ def fuchsia_product_configuration(
         cache_packages = None,
         base_driver_packages = None,
         ota_configuration = None,
+        relative_paths = False,
         **kwarg):
     """A new implementation of fuchsia_product_configuration that takes raw a json config.
 
@@ -220,5 +232,6 @@ def fuchsia_product_configuration(
         cache_packages = cache_packages,
         base_driver_packages = base_driver_packages,
         ota_configuration = ota_configuration,
+        relative_paths = False,
         **kwarg
     )
