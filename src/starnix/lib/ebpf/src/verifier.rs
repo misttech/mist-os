@@ -991,6 +991,21 @@ impl ComputationContext {
                     mappings: Default::default(),
                 })
             }
+            Type::MemoryParameter { memory_length_index } => {
+                let buffer_size = self.reg(memory_length_index + 1)?;
+                if let Type::ScalarValue { value, unknown_mask: 0, .. } = buffer_size {
+                    let id = verification_context.next_id();
+                    Ok(Type::PtrToMemory {
+                        id: id.into(),
+                        offset: 0,
+                        buffer_size: value,
+                        fields: Default::default(),
+                        mappings: Default::default(),
+                    })
+                } else {
+                    Err(format!("unable to compute returned buffer size at pc {}", self.pc))
+                }
+            }
             t => Ok(t.clone()),
         }
     }
