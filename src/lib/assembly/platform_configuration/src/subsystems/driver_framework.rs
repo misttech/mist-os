@@ -15,6 +15,13 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
         driver_framework_config: &DriverFrameworkConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
+        // This is a temporary change to include register driver through
+        // register platform AIB. It will be removed after we move the driver
+        // into bootstrap AIB.
+        if context.board_info.provides_feature("fuchsia::platform_driver_migration") {
+            builder.platform_bundle("register_driver");
+        }
+
         // This is always set to false, but should be configurable once drivers actually support
         // using a hardware iommu.
         builder.set_config_capability(

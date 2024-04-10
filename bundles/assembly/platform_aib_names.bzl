@@ -31,6 +31,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "legacy_power_framework",
     "live_usb",
     "resources",
+    "register_driver",
     "virtcon",
     "virtcon_disable",
 ]

@@ -18,6 +18,7 @@ _base = {
     "fuchsia::pmm_checker",
     "fuchsia::usb_peripheral_support",
     "fuchsia::wlan_fullmac",
+    "fuchsia::platform_driver_migration",
   ]
 
   input_bundles = [
@@ -191,11 +192,6 @@ board_input_bundle("main_bundle") {
       package_target = "//src/devices/pwm/drivers/aml-pwm-init:package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-pwm-init.cm" ]
-    },
-    {
-      package_target = "//src/devices/registers/drivers/registers:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/registers.cm" ]
     },
     {
       package_target = "//src/devices/serial/drivers/aml-uart:package-dfv2"

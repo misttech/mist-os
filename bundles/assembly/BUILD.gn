@@ -358,6 +358,17 @@ assembly_input_bundle("bootstrap_userdebug") {
   ]
 }
 
+# This is a temporary AIB hold register driver. This driver will eventually
+# be moved to bootstrap AIB and this AIB will be removed.
+assembly_input_bundle("register_driver") {
+  boot_driver_packages = [
+    {
+      package_target = "//src/devices/registers/drivers/registers:package"
+      driver_components = [ "meta/registers.cm" ]
+    },
+  ]
+}
+
 # The most-common, most-basic, AIB that is included in all eng systems.
 #
 assembly_input_bundle("bootstrap_eng") {
