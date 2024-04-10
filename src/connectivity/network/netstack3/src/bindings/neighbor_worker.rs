@@ -415,10 +415,6 @@ pub(super) async fn serve_view(
                     .send(NewWatcher { stream: it.into_stream()?, options })
                     .await
                     .map_err(|_: mpsc::SendError| Error::Send(WorkerClosedError))?,
-                ViewRequest::GetUnreachabilityConfig { interface, ip_version, responder } => {
-                    warn!("not responding to GetUnreachabilityConfig");
-                    let _ = (interface, ip_version, responder);
-                }
             }
             Ok(sink)
         })
@@ -507,18 +503,6 @@ pub(super) async fn serve_controller(
                         fnet::IpVersion::V6 => clear_entries::<Ipv6>(&mut ctx, interface),
                     };
                     responder.send(result.map_err(|e| e.into_raw()))
-                }
-                ControllerRequest::UpdateUnreachabilityConfig {
-                    interface: _,
-                    ip_version: _,
-                    config: _,
-                    responder,
-                } => {
-                    warn!(
-                        "TODO(https://fxbug.dev/42075782): \
-                            Implement fuchsia.net.neighbor/Controller.UpdateUnreachabilityConfig"
-                    );
-                    responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
                 }
             }
         })

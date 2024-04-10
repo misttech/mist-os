@@ -9,21 +9,14 @@
 /// addresses, respectively.
 ///
 /// This library enables inspection and manipulation of the neighbor table.
-///  * See [`fuchsia.net.neighbor/View`] for viewing neighbor table entries and
-///    interface configuration.
+///  * See [`fuchsia.net.neighbor/View`] for viewing neighbor table entries.
 ///  * See [`fuchsia.net.neighbor/Controller`] for adding static neighbor table
-///    entries, removing entries, and updating interface configuration.
+///    entries, and removing entries.
 ///
 /// # Important Concepts
 ///
-///
 /// [`Entry`] represents a neighboring device and is stored in the neighbor
 /// table, which is also managed by the networking stack.
-///
-/// [`UnreachabilityConfig`] holds the various parameters used for tweaking the
-/// behavior of Neighbor Unreachability Detection (NUD). This allows
-/// implementations to operate over links with widely varying performance
-/// characteristics.
 ///
 /// # Privacy Considerations
 ///
@@ -111,7 +104,7 @@ closed protocol EntryIterator {
 // This value will need to be recomputed if any of the above numbers change.
 const MAX_ITEM_BATCH_SIZE uint64 = 256;
 
-/// Inspect the neighbor table and related interface configuration.
+/// Inspect the neighbor table.
 @discoverable
 closed protocol View {
     /// Open a connection to an [`EntryIterator`] for listing existing entries
@@ -124,26 +117,11 @@ closed protocol View {
         /// Options for modifying the behavior of an [`EntryIterator`].
         options @generated_name("EntryIteratorOptions") table {};
     });
-
-    /// View the current configurations of an interface.
-    ///
-    /// + request `interface` interface to read configurations from.
-    /// + request `ip_version` the IP version to read configurations from.
-    /// - response `config` a snapshot of the interface's configuration.
-    /// * error `ZX_ERR_NOT_FOUND` if `interface` does not exist.
-    // TODO(https://fxbug.dev/42137084): Reading configuration should be moved to
-    // interface-scoped protocols in fuchsia.net.interfaces.
-    strict GetUnreachabilityConfig(struct {
-        interface fuchsia.net.InterfaceId;
-        ip_version fuchsia.net.IpVersion;
-    }) -> (struct {
-        config UnreachabilityConfig;
-    }) error zx.Status;
 };
 
 // TODO(https://fxbug.dev/42085349): Define and use domain-specific error enum
 // instead of zx.Status.
-/// Modify the neighbor table and related interface configuration.
+/// Modify the neighbor table.
 @discoverable
 closed protocol Controller {
     /// Create a static entry. If a conflict is found, overwrite the existing
@@ -192,28 +170,5 @@ closed protocol Controller {
     strict ClearEntries(struct {
         interface fuchsia.net.InterfaceId;
         ip_version fuchsia.net.IpVersion;
-    }) -> () error zx.Status;
-
-    /// Change the configuration of the neighbor discovery algorithm for an
-    /// interface.
-    ///
-    /// + request `interface` the interface to be configured.
-    /// + request `ip_version` the IP version to be configured.
-    /// + request `config` used for updating the configuration for an interface.
-    ///     Only the specified fields will be changed. All other fields will
-    ///     remain the same as the original configuration.
-    /// * error `ZX_ERR_NOT_FOUND` if `interface` references an interface that
-    ///     does not exist.
-    /// * error `ZX_ERR_NOT_SUPPORTED` if `interface` references an interface
-    ///     that does not keep a neighbor table (e.g. point-to-point links).
-    /// * error `ZX_ERR_INVALID_ARGS` if `config` contains an invalid value,
-    ///     see [`fuchsia.net.neighbor/UnreachabilityConfig`] for the list of
-    ///     constraints.
-    // TODO(https://fxbug.dev/42137084): Updating configuration should be moved to
-    // interface-scoped protocols in fuchsia.net.interfaces.
-    strict UpdateUnreachabilityConfig(struct {
-        interface fuchsia.net.InterfaceId;
-        ip_version fuchsia.net.IpVersion;
-        config UnreachabilityConfig;
     }) -> () error zx.Status;
 };

@@ -14,7 +14,6 @@ import (
 	"strings"
 	"syscall/zx"
 	"syscall/zx/fidl"
-	"time"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
@@ -309,25 +308,6 @@ func (n *neighborImpl) OpenEntryIterator(_ fidl.Context, req neighbor.EntryItera
 	return nil
 }
 
-func (n *neighborImpl) GetUnreachabilityConfig(_ fidl.Context, interfaceID uint64, ipVersion net.IpVersion) (neighbor.ViewGetUnreachabilityConfigResult, error) {
-	netProto, ok := fidlconv.ToTCPIPNetProto(ipVersion)
-	if !ok {
-		return neighbor.ViewGetUnreachabilityConfigResultWithErr(int32(zx.ErrInvalidArgs)), nil
-	}
-
-	config, err := n.stack.NUDConfigurations(tcpip.NICID(interfaceID), netProto)
-	if err != nil {
-		return neighbor.ViewGetUnreachabilityConfigResultWithErr(int32(WrapTcpIpError(err).ToZxStatus())), nil
-	}
-
-	var resp neighbor.UnreachabilityConfig
-	resp.SetBaseReachableTime(config.BaseReachableTime.Nanoseconds())
-
-	return neighbor.ViewGetUnreachabilityConfigResultWithResponse(neighbor.ViewGetUnreachabilityConfigResponse{
-		Config: resp,
-	}), nil
-}
-
 func isValidNeighborAddr(addr netip.Addr) bool {
 	limitedBroadcastAddr := netip.AddrFrom4([4]byte{255, 255, 255, 255})
 	return !(addr.IsLoopback() || addr.IsMulticast() || addr.IsUnspecified() || addr == limitedBroadcastAddr || addr.Is4In6())
@@ -375,38 +355,6 @@ func (n *neighborImpl) ClearEntries(_ fidl.Context, interfaceID uint64, ipVersio
 		return neighbor.ControllerClearEntriesResultWithErr(int32(WrapTcpIpError(err).ToZxStatus())), nil
 	}
 	return neighbor.ControllerClearEntriesResultWithResponse(neighbor.ControllerClearEntriesResponse{}), nil
-}
-
-func (n *neighborImpl) UpdateUnreachabilityConfig(_ fidl.Context, interfaceID uint64, ipVersion net.IpVersion, config neighbor.UnreachabilityConfig) (neighbor.ControllerUpdateUnreachabilityConfigResult, error) {
-	if !n.stack.HasNIC(tcpip.NICID(interfaceID)) {
-		return neighbor.ControllerUpdateUnreachabilityConfigResultWithErr(int32(zx.ErrNotFound)), nil
-	}
-
-	netProto, ok := fidlconv.ToTCPIPNetProto(ipVersion)
-	if !ok {
-		return neighbor.ControllerUpdateUnreachabilityConfigResultWithErr(int32(zx.ErrInvalidArgs)), nil
-	}
-
-	currentConfig, err := n.stack.NUDConfigurations(tcpip.NICID(interfaceID), netProto)
-	if err != nil {
-		return neighbor.ControllerUpdateUnreachabilityConfigResultWithErr(int32(WrapTcpIpError(err).ToZxStatus())), nil
-	}
-
-	invalidArgsResult := neighbor.ControllerUpdateUnreachabilityConfigResultWithErr(int32(zx.ErrInvalidArgs))
-
-	// See fuchsia.net.neighbor/UnreachabilityConfig for the list of constraints.
-	if config.HasBaseReachableTime() {
-		if v := config.GetBaseReachableTime(); v <= 0 {
-			_ = syslog.WarnTf(neighbor.ControllerName, "UpdateUnreachabilityConfig: invalid `base_reachable_time` %d: must be > 0", v)
-			return invalidArgsResult, nil
-		}
-		currentConfig.BaseReachableTime = time.Duration(config.GetBaseReachableTime())
-	}
-
-	if err := n.stack.SetNUDConfigurations(tcpip.NICID(interfaceID), netProto, currentConfig); err != nil {
-		return neighbor.ControllerUpdateUnreachabilityConfigResultWithErr(int32(WrapTcpIpError(err).ToZxStatus())), nil
-	}
-	return neighbor.ControllerUpdateUnreachabilityConfigResultWithResponse(neighbor.ControllerUpdateUnreachabilityConfigResponse{}), nil
 }
 
 // neighborEntryIterator queues events received from the neighbor table for

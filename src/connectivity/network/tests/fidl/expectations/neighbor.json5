@@ -9,13 +9,5 @@
                 "*",
             ],
         },
-        {
-            type: "expect_failure",
-            matchers: [
-                // TODO(https://fxbug.dev/42075782): Support fuchsia.net.neighbor in NS3.
-                "neigh_unreachability_config_errors_ns3",
-                "neigh_unreachability_config_ns3",
-            ],
-        },
     ],
 }
