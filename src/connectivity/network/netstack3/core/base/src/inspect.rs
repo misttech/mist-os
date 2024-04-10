@@ -11,7 +11,7 @@
 use alloc::{format, string::String};
 use core::fmt::{Debug, Display};
 
-use net_types::ip::IpAddress;
+use net_types::{ip::IpAddress, AddrAndPortFormatter, ZonedAddr};
 
 use crate::counters::Counter;
 
@@ -96,6 +96,49 @@ pub trait Inspector: Sized {
     /// Records an IP address.
     fn record_ip_addr<A: IpAddress>(&mut self, name: &str, value: A) {
         self.record_display(name, value)
+    }
+
+    /// Records a `ZonedAddr` and it's port, mapping the zone into an
+    /// inspectable device identifier.
+    fn record_zoned_addr_with_port<I: InspectorDeviceExt<D>, A: IpAddress, D, P: Display>(
+        &mut self,
+        name: &str,
+        addr: ZonedAddr<A, D>,
+        port: P,
+    ) {
+        self.record_display(
+            name,
+            AddrAndPortFormatter::<_, _, A::Version>::new(
+                addr.map_zone(|device| I::device_identifier_as_address_zone(device)),
+                port,
+            ),
+        )
+    }
+
+    /// Records the local address of a socket.
+    fn record_local_socket_addr<I: InspectorDeviceExt<D>, A: IpAddress, D, P: Display>(
+        &mut self,
+        addr_with_port: Option<(ZonedAddr<A, D>, P)>,
+    ) {
+        const NAME: &str = "LocalAddress";
+        if let Some((addr, port)) = addr_with_port {
+            self.record_zoned_addr_with_port::<I, _, _, _>(NAME, addr, port);
+        } else {
+            self.record_str(NAME, "[NOT BOUND]")
+        }
+    }
+
+    /// Records the remote address of a socket.
+    fn record_remote_socket_addr<I: InspectorDeviceExt<D>, A: IpAddress, D, P: Display>(
+        &mut self,
+        addr_with_port: Option<(ZonedAddr<A, D>, P)>,
+    ) {
+        const NAME: &str = "RemoteAddress";
+        if let Some((addr, port)) = addr_with_port {
+            self.record_zoned_addr_with_port::<I, _, _, _>(NAME, addr, port);
+        } else {
+            self.record_str(NAME, "[NOT CONNECTED]")
+        }
     }
 
     /// Records an implementor of [`InspectableValue`].

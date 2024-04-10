@@ -22,7 +22,7 @@ use derivative::Derivative;
 use either::Either;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker, Ipv4, Ipv6},
-    AddrAndPortFormatter, MulticastAddr, MulticastAddress as _, SpecifiedAddr, ZonedAddr,
+    MulticastAddr, MulticastAddress as _, SpecifiedAddr, ZonedAddr,
 };
 use packet::BufferMut;
 use packet_formats::ip::IpProtoExt;
@@ -144,11 +144,10 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> SocketState<I, D, S> {
     }
 
     /// Record inspect information generic to each datagram protocol.
-    pub(crate) fn record_common_info<N: Inspector + InspectorDeviceExt<D>>(
-        &self,
-        inspector: &mut N,
-        socket_id: &S::SocketId<I, D>,
-    ) {
+    pub(crate) fn record_common_info<N>(&self, inspector: &mut N, socket_id: &S::SocketId<I, D>)
+    where
+        N: Inspector + InspectorDeviceExt<D>,
+    {
         inspector.record_debug_child(socket_id, |node| {
             node.record_str("TransportProtocol", S::NAME);
             node.record_str("NetworkProtocol", I::NAME);
@@ -176,26 +175,8 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> SocketState<I, D, S> {
                     Some((remote_ip.into_inner_without_witness(), remote_identifier)),
                 ),
             };
-            match local {
-                None => node.record_str("LocalAddress", "[NOT BOUND]"),
-                Some((addr, port)) => node.record_display(
-                    "LocalAddress",
-                    AddrAndPortFormatter::<_, _, I>::new(
-                        addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
-                        port,
-                    ),
-                ),
-            };
-            match remote {
-                None => node.record_str("RemoteAddress", "[NOT CONNECTED]"),
-                Some((addr, port)) => node.record_display(
-                    "RemoteAddress",
-                    AddrAndPortFormatter::<_, _, I>::new(
-                        addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
-                        port,
-                    ),
-                ),
-            };
+            node.record_local_socket_addr::<N, _, _, _>(local);
+            node.record_remote_socket_addr::<N, _, _, _>(remote);
         });
     }
 }
