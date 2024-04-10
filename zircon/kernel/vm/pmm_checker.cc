@@ -87,7 +87,6 @@ void PmmChecker::SetFillSize(size_t fill_size) {
 void PmmChecker::Arm() { armed_ = true; }
 
 void PmmChecker::FillPattern(vm_page_t* page) const {
-  DEBUG_ASSERT(page->is_free());
   void* kvaddr = paddr_to_physmap(page->paddr());
   DEBUG_ASSERT(is_kernel_address(reinterpret_cast<vaddr_t>(kvaddr)));
   __unsanitized_memset(kvaddr, kPatternOneByte, fill_size_);

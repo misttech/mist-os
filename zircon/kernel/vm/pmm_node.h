@@ -154,8 +154,8 @@ class PmmNode {
   void ReportAllocFailure() TA_EXCL(lock_);
 
  private:
-  void FreePageHelperLocked(vm_page* page) TA_REQ(lock_);
-  void FreeListLocked(list_node* list) TA_REQ(lock_);
+  void FreePageHelperLocked(vm_page* page, bool already_filled) TA_REQ(lock_);
+  void FreeListLocked(list_node* list, bool already_filled) TA_REQ(lock_);
 
   void UpdateMemAvailStateLocked() TA_REQ(lock_);
   void SetMemAvailStateLocked(uint8_t mem_avail_state) TA_REQ(lock_);
@@ -258,8 +258,31 @@ class PmmNode {
   DECLARE_MUTEX(PmmNode) compression_lock_;
   fbl::RefPtr<VmCompression> page_compression_ TA_GUARDED(compression_lock_);
 
-  bool free_fill_enabled_ TA_GUARDED(lock_) = false;
-  PmmChecker checker_ TA_GUARDED(lock_);
+  // Indicates whether pages should have a pattern filled into them when they are freed. This value
+  // can only transition from false->true, and never back to false again. Once this value is set,
+  // the fill size in checker_ may no longer be changed, and it becomes safe to call FillPattern
+  // even without the lock held.
+  // This is an atomic to allow for reading this outside of the lock, but modifications only happen
+  // with the lock held.
+  ktl::atomic<bool> free_fill_enabled_ TA_GUARDED(lock_) = false;
+  // Indicates whether it is known that all pages in the free list have had a pattern filled into
+  // them. This value can only transition from false->true, and never back to false again. Once this
+  // value is set the action and armed state in checker_ may no longer be changed, and it becomes
+  // safe to call AssertPattern even without the lock held.
+  bool all_free_pages_filled_ TA_GUARDED(lock_) = false;
+  PmmChecker checker_;
+
+  // This method is racy as it allows us to read free_fill_enabled_ without holding the lock. If we
+  // receive a value of 'true', then as there is no mechanism to re-set it to false, we know it is
+  // still true. If we receive the value of 'false', then it could still become 'true' later.
+  // The intent of this method is to allow for filling the free pattern outside of the lock in most
+  // cases, and in the unlikely event of a race during the checker being armed, the pattern can
+  // resort to being filled inside the lock.
+  bool IsFreeFillEnabledRacy() const TA_NO_THREAD_SAFETY_ANALYSIS {
+    // Read with acquire semantics to ensure that any modifications to checker_ are visible before
+    // changes to free_fill_enabled_. See EnableFreePageFilling for where the release is performed.
+    return free_fill_enabled_.load(ktl::memory_order_acquire);
+  }
 
   // The rng state for random waiting on allocations. This allows us to use rand_r, which requires
   // no further thread synchronization, unlike rand().

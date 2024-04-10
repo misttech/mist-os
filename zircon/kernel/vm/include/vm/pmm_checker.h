@@ -72,9 +72,6 @@ class PmmChecker {
   void PrintStatus(FILE* f) const;
 
   // Fills |page| with a pattern.
-  //
-  // It is an error to call this method with a page that is not free.  In other words,
-  // page->is_page() must be true.
   void FillPattern(vm_page_t* page) const;
 
   // Returns true if |page| contains the expected fill pattern or |IsArmed| is false.
