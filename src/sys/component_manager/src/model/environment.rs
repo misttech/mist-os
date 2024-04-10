@@ -9,9 +9,7 @@ use {
         },
         resolver::{Resolver, ResolverRegistry},
     },
-    ::routing::environment::{
-        DebugRegistry, EnvironmentExtends, EnvironmentInterface, RunnerRegistry,
-    },
+    ::routing::environment::{DebugRegistry, EnvironmentExtends, RunnerRegistry},
     ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError},
     async_trait::async_trait,
     cm_rust::EnvironmentDecl,
@@ -30,19 +28,9 @@ use std::sync::Weak;
 /// [`EnvironmentDecl`]: fidl_fuchsia_sys2::EnvironmentDecl
 #[derive(Debug)]
 pub struct Environment {
-    /// Name of this environment as defined by its creator.
-    /// Would be `None` for root environment.
-    name: Option<String>,
-    /// The parent that created or inherited the environment.
-    parent: WeakExtendedInstance,
-    /// The extension mode of this environment.
-    extends: EnvironmentExtends,
-    /// The runners available in this environment.
-    runner_registry: RunnerRegistry,
+    env: routing::environment::Environment<ComponentInstance>,
     /// The resolvers in this environment, mapped to URL schemes.
     resolver_registry: ResolverRegistry,
-    /// Protocols available in this environment as debug capabilities.
-    debug_registry: DebugRegistry,
     /// The deadline for runners to respond to `ComponentController.Stop` calls.
     stop_timeout: Duration,
 }
@@ -54,12 +42,14 @@ impl Environment {
     #[cfg(test)]
     pub fn empty() -> Environment {
         Environment {
-            name: None,
-            parent: WeakExtendedInstance::AboveRoot(Weak::new()),
-            extends: EnvironmentExtends::None,
-            runner_registry: RunnerRegistry::default(),
+            env: routing::environment::Environment::new(
+                None,
+                WeakExtendedInstance::AboveRoot(Weak::new()),
+                EnvironmentExtends::None,
+                RunnerRegistry::default(),
+                DebugRegistry::default(),
+            ),
             resolver_registry: ResolverRegistry::new(),
-            debug_registry: DebugRegistry::default(),
             stop_timeout: DEFAULT_STOP_TIMEOUT,
         }
     }
@@ -72,12 +62,14 @@ impl Environment {
         debug_registry: DebugRegistry,
     ) -> Environment {
         Environment {
-            name: None,
-            parent: WeakExtendedInstance::AboveRoot(Arc::downgrade(top_instance)),
-            extends: EnvironmentExtends::None,
-            runner_registry,
+            env: routing::environment::Environment::new(
+                None,
+                WeakExtendedInstance::AboveRoot(Arc::downgrade(top_instance)),
+                EnvironmentExtends::None,
+                runner_registry,
+                debug_registry,
+            ),
             resolver_registry,
-            debug_registry,
             stop_timeout: DEFAULT_STOP_TIMEOUT,
         }
     }
@@ -85,12 +77,14 @@ impl Environment {
     /// Creates an environment from `env_decl`, using `parent` as the parent realm.
     pub fn from_decl(parent: &Arc<ComponentInstance>, env_decl: &EnvironmentDecl) -> Environment {
         Environment {
-            name: Some(env_decl.name.clone()),
-            parent: WeakExtendedInstance::Component(parent.into()),
-            extends: env_decl.extends.into(),
-            runner_registry: RunnerRegistry::from_decl(&env_decl.runners),
+            env: routing::environment::Environment::new(
+                Some(env_decl.name.clone()),
+                WeakExtendedInstance::Component(parent.into()),
+                env_decl.extends.into(),
+                RunnerRegistry::from_decl(&env_decl.runners),
+                env_decl.debug_capabilities.clone().into(),
+            ),
             resolver_registry: ResolverRegistry::from_decl(&env_decl.resolvers, parent),
-            debug_registry: env_decl.debug_capabilities.clone().into(),
             stop_timeout: match env_decl.stop_timeout_ms {
                 Some(timeout) => Duration::from_millis(timeout.into()),
                 None => match env_decl.extends {
@@ -106,12 +100,14 @@ impl Environment {
     /// Creates a new environment with `parent` as the parent.
     pub fn new_inheriting(parent: &Arc<ComponentInstance>) -> Environment {
         Environment {
-            name: None,
-            parent: WeakExtendedInstance::Component(parent.into()),
-            extends: EnvironmentExtends::Realm,
-            runner_registry: RunnerRegistry::default(),
+            env: routing::environment::Environment::new(
+                None,
+                WeakExtendedInstance::Component(parent.into()),
+                EnvironmentExtends::Realm,
+                RunnerRegistry::default(),
+                DebugRegistry::default(),
+            ),
             resolver_registry: ResolverRegistry::new(),
-            debug_registry: DebugRegistry::default(),
             stop_timeout: parent.environment.stop_timeout(),
         }
     }
@@ -119,27 +115,9 @@ impl Environment {
     pub fn stop_timeout(&self) -> Duration {
         self.stop_timeout
     }
-}
 
-impl EnvironmentInterface<ComponentInstance> for Environment {
-    fn name(&self) -> Option<&str> {
-        self.name.as_deref()
-    }
-
-    fn parent(&self) -> &WeakExtendedInstance {
-        &self.parent
-    }
-
-    fn extends(&self) -> &EnvironmentExtends {
-        &self.extends
-    }
-
-    fn runner_registry(&self) -> &RunnerRegistry {
-        &self.runner_registry
-    }
-
-    fn debug_registry(&self) -> &DebugRegistry {
-        &self.debug_registry
+    pub fn environment(&self) -> &routing::environment::Environment<ComponentInstance> {
+        &self.env
     }
 }
 
@@ -149,12 +127,12 @@ impl Resolver for Environment {
         &self,
         component_address: &ComponentAddress,
     ) -> Result<ResolvedComponent, ResolverError> {
-        let parent = self.parent.upgrade().map_err(|_| {
+        let parent = self.env.parent().upgrade().map_err(|_| {
             error!("error getting the component that created the environment");
             ResolverError::SchemeNotRegistered
         })?;
         match self.resolver_registry.resolve(component_address).await {
-            Err(ResolverError::SchemeNotRegistered) => match &self.extends {
+            Err(ResolverError::SchemeNotRegistered) => match self.env.extends() {
                 EnvironmentExtends::Realm => match parent {
                     ExtendedInstance::Component(parent) => {
                         parent.environment.resolve(component_address).await
@@ -216,7 +194,7 @@ mod tests {
                 .stop_timeout(1234)
                 .build(),
         );
-        assert_matches!(environment.parent, WeakExtendedInstance::Component(_));
+        assert_matches!(environment.env.parent(), WeakExtendedInstance::Component(_));
 
         let environment = Environment::from_decl(
             &component,
@@ -225,7 +203,7 @@ mod tests {
                 .extends(fdecl::EnvironmentExtends::Realm)
                 .build(),
         );
-        assert_matches!(environment.parent, WeakExtendedInstance::Component(_));
+        assert_matches!(environment.env.parent(), WeakExtendedInstance::Component(_));
 
         let environment = Environment::from_decl(
             &component,
@@ -247,7 +225,7 @@ mod tests {
                 source: RegistrationSource::Parent,
             }
         };
-        assert_eq!(environment.debug_registry.debug_capabilities, expected_debug_capability);
+        assert_eq!(environment.env.debug_registry().debug_capabilities, expected_debug_capability);
     }
 
     #[fuchsia::test]
@@ -390,18 +368,21 @@ mod tests {
         assert_eq!(component.component_url, "test:///b");
 
         let registered_runner =
-            component.environment.get_registered_runner(&"test".parse().unwrap()).unwrap();
+            component.environment.env.get_registered_runner(&"test".parse().unwrap()).unwrap();
         assert_matches!(registered_runner, Some((ExtendedInstance::AboveRoot(_), r)) if r == runner_reg);
         assert_matches!(
-            component.environment.get_registered_runner(&"foo".parse().unwrap()),
+            component.environment.env.get_registered_runner(&"foo".parse().unwrap()),
             Ok(None)
         );
 
-        let debug_capability =
-            component.environment.get_debug_capability(&"target_name".parse().unwrap()).unwrap();
+        let debug_capability = component
+            .environment
+            .env
+            .get_debug_capability(&"target_name".parse().unwrap())
+            .unwrap();
         assert_matches!(debug_capability, Some((ExtendedInstance::AboveRoot(_), None, d)) if d == debug_reg);
         assert_matches!(
-            component.environment.get_debug_capability(&"foo".parse().unwrap()),
+            component.environment.env.get_debug_capability(&"foo".parse().unwrap()),
             Ok(None)
         );
 
@@ -494,20 +475,23 @@ mod tests {
         assert_eq!(component.component_url, "test:///b");
 
         let registered_runner =
-            component.environment.get_registered_runner(&"test".parse().unwrap()).unwrap();
+            component.environment.env.get_registered_runner(&"test".parse().unwrap()).unwrap();
         assert_matches!(registered_runner, Some((ExtendedInstance::Component(c), r))
             if r == runner_reg && c.moniker == Moniker::root());
         assert_matches!(
-            component.environment.get_registered_runner(&"foo".parse().unwrap()),
+            component.environment.env.get_registered_runner(&"foo".parse().unwrap()),
             Ok(None)
         );
 
-        let debug_capability =
-            component.environment.get_debug_capability(&"target_name".parse().unwrap()).unwrap();
+        let debug_capability = component
+            .environment
+            .env
+            .get_debug_capability(&"target_name".parse().unwrap())
+            .unwrap();
         assert_matches!(debug_capability, Some((ExtendedInstance::Component(c), Some(_), d))
             if d == debug_reg && c.moniker == Moniker::root());
         assert_matches!(
-            component.environment.get_debug_capability(&"foo".parse().unwrap()),
+            component.environment.env.get_debug_capability(&"foo".parse().unwrap()),
             Ok(None)
         );
 
@@ -641,20 +625,23 @@ mod tests {
         assert_eq!(component.component_url, "test:///b");
 
         let registered_runner =
-            component.environment.get_registered_runner(&"test".parse().unwrap()).unwrap();
+            component.environment.env.get_registered_runner(&"test".parse().unwrap()).unwrap();
         assert_matches!(registered_runner, Some((ExtendedInstance::Component(c), r))
             if r == runner_reg && c.moniker == Moniker::root());
         assert_matches!(
-            component.environment.get_registered_runner(&"foo".parse().unwrap()),
+            component.environment.env.get_registered_runner(&"foo".parse().unwrap()),
             Ok(None)
         );
 
-        let debug_capability =
-            component.environment.get_debug_capability(&"target_name".parse().unwrap()).unwrap();
+        let debug_capability = component
+            .environment
+            .env
+            .get_debug_capability(&"target_name".parse().unwrap())
+            .unwrap();
         assert_matches!(debug_capability, Some((ExtendedInstance::Component(c), Some(n), d))
             if d == debug_reg && n == "env_a" && c.moniker == Moniker::root());
         assert_matches!(
-            component.environment.get_debug_capability(&"foo".parse().unwrap()),
+            component.environment.env.get_debug_capability(&"foo".parse().unwrap()),
             Ok(None)
         );
 
@@ -736,18 +723,21 @@ mod tests {
         assert_eq!(component.component_url, "test:///b");
 
         let registered_runner =
-            component.environment.get_registered_runner(&"test".parse().unwrap()).unwrap();
+            component.environment.env.get_registered_runner(&"test".parse().unwrap()).unwrap();
         assert_matches!(registered_runner, Some((ExtendedInstance::AboveRoot(_), r)) if r == runner_reg);
         assert_matches!(
-            component.environment.get_registered_runner(&"foo".parse().unwrap()),
+            component.environment.env.get_registered_runner(&"foo".parse().unwrap()),
             Ok(None)
         );
 
-        let debug_capability =
-            component.environment.get_debug_capability(&"target_name".parse().unwrap()).unwrap();
+        let debug_capability = component
+            .environment
+            .env
+            .get_debug_capability(&"target_name".parse().unwrap())
+            .unwrap();
         assert_matches!(debug_capability, Some((ExtendedInstance::AboveRoot(_), None, d)) if d == debug_reg);
         assert_matches!(
-            component.environment.get_debug_capability(&"foo".parse().unwrap()),
+            component.environment.env.get_debug_capability(&"foo".parse().unwrap()),
             Ok(None)
         );
 

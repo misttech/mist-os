@@ -15,7 +15,7 @@ use {
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, WeakExtendedInstanceInterface,
         },
-        environment::{DebugRegistry, EnvironmentExtends, EnvironmentInterface, RunnerRegistry},
+        environment::{DebugRegistry, EnvironmentExtends, RunnerRegistry},
         error::ComponentInstanceError,
     },
     std::{collections::HashMap, sync::Arc},
@@ -65,22 +65,15 @@ impl ResolverRegistry {
 /// parent realm's environment.
 #[derive(Debug)]
 pub struct EnvironmentForAnalyzer {
-    /// The name of this environment as defined by its creator. Should be `None` for the root
-    /// environment.
-    name: Option<String>,
-    /// The relationship of this environment to that of the component instance's parent.
-    extends: EnvironmentExtends,
-    /// The parent of this instance.
-    parent: WeakExtendedInstanceInterface<ComponentInstanceForAnalyzer>,
-    /// The runners available in this environment.
-    runner_registry: RunnerRegistry,
+    env: routing::environment::Environment<ComponentInstanceForAnalyzer>,
     /// The resolvers available in this environment.
     resolver_registry: ResolverRegistry,
-    /// Protocols available in this environment as debug capabilities.
-    debug_registry: DebugRegistry,
 }
 
 impl EnvironmentForAnalyzer {
+    pub fn env(&self) -> &routing::environment::Environment<ComponentInstanceForAnalyzer> {
+        &self.env
+    }
     // TODO(https://fxbug.dev/42140194): This parallel implementation of component manager's builtin environment
     // setup will do for now, but is fragile and should be replaced soon. In particular, it doesn't provide a
     // way to register builtin runners or resolvers that appear in the `builtin_capabilities` field of the
@@ -127,14 +120,16 @@ impl EnvironmentForAnalyzer {
         };
 
         Arc::new(Self {
-            name: None,
-            extends: EnvironmentExtends::None,
-            parent: WeakExtendedInstanceInterface::from(&ExtendedInstanceInterface::AboveRoot(
-                Arc::clone(top_instance),
-            )),
-            runner_registry,
+            env: routing::environment::Environment::new(
+                None,
+                WeakExtendedInstanceInterface::from(&ExtendedInstanceInterface::AboveRoot(
+                    Arc::clone(top_instance),
+                )),
+                EnvironmentExtends::None,
+                runner_registry,
+                DebugRegistry::default(),
+            ),
             resolver_registry,
-            debug_registry: DebugRegistry::default(),
         })
     }
 
@@ -162,14 +157,16 @@ impl EnvironmentForAnalyzer {
 
     fn new_inheriting(parent: &Arc<ComponentInstanceForAnalyzer>) -> Arc<Self> {
         Arc::new(Self {
-            name: None,
-            extends: EnvironmentExtends::Realm,
-            parent: WeakExtendedInstanceInterface::from(&ExtendedInstanceInterface::Component(
-                Arc::clone(parent),
-            )),
-            runner_registry: RunnerRegistry::default(),
+            env: routing::environment::Environment::new(
+                None,
+                WeakExtendedInstanceInterface::from(&ExtendedInstanceInterface::Component(
+                    Arc::clone(parent),
+                )),
+                EnvironmentExtends::Realm,
+                RunnerRegistry::default(),
+                DebugRegistry::default(),
+            ),
             resolver_registry: ResolverRegistry::default(),
-            debug_registry: DebugRegistry::default(),
         })
     }
 
@@ -178,14 +175,16 @@ impl EnvironmentForAnalyzer {
         env_decl: &EnvironmentDecl,
     ) -> Result<Arc<Self>, BuildAnalyzerModelError> {
         Ok(Arc::new(Self {
-            name: Some(env_decl.name.clone()),
-            extends: env_decl.extends.into(),
-            parent: WeakExtendedInstanceInterface::from(&ExtendedInstanceInterface::Component(
-                Arc::clone(parent),
-            )),
-            runner_registry: RunnerRegistry::from_decl(&env_decl.runners),
+            env: routing::environment::Environment::new(
+                Some(env_decl.name.clone()),
+                WeakExtendedInstanceInterface::from(&ExtendedInstanceInterface::Component(
+                    Arc::clone(parent),
+                )),
+                env_decl.extends.into(),
+                RunnerRegistry::from_decl(&env_decl.runners),
+                env_decl.debug_capabilities.clone().into(),
+            ),
             resolver_registry: ResolverRegistry::from_decl(&env_decl.resolvers)?,
-            debug_registry: env_decl.debug_capabilities.clone().into(),
         }))
     }
 
@@ -198,10 +197,10 @@ impl EnvironmentForAnalyzer {
         Option<(ExtendedInstanceInterface<ComponentInstanceForAnalyzer>, ResolverRegistration)>,
         ComponentInstanceError,
     > {
-        let parent = self.parent().upgrade()?;
+        let parent = self.env.parent().upgrade()?;
         match self.resolver_registry().get_resolver(scheme) {
             Some(reg) => Ok(Some((parent, reg.clone()))),
-            None => match self.extends() {
+            None => match self.env.extends() {
                 EnvironmentExtends::Realm => match parent {
                     ExtendedInstanceInterface::Component(parent) => {
                         parent.environment.get_registered_resolver(scheme)
@@ -219,27 +218,5 @@ impl EnvironmentForAnalyzer {
 
     fn resolver_registry(&self) -> &ResolverRegistry {
         &self.resolver_registry
-    }
-}
-
-impl EnvironmentInterface<ComponentInstanceForAnalyzer> for EnvironmentForAnalyzer {
-    fn name(&self) -> Option<&str> {
-        self.name.as_deref()
-    }
-
-    fn parent(&self) -> &WeakExtendedInstanceInterface<ComponentInstanceForAnalyzer> {
-        &self.parent
-    }
-
-    fn extends(&self) -> &EnvironmentExtends {
-        &self.extends
-    }
-
-    fn runner_registry(&self) -> &RunnerRegistry {
-        &self.runner_registry
-    }
-
-    fn debug_registry(&self) -> &DebugRegistry {
-        &self.debug_registry
     }
 }

@@ -20,7 +20,7 @@ use {
             ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
             TopInstanceInterface, WeakExtendedInstanceInterface,
         },
-        environment::{EnvironmentInterface, RunnerRegistry},
+        environment::RunnerRegistry,
         error::ComponentInstanceError,
         policy::GlobalPolicyChecker,
         resolving::{ComponentAddress, ComponentResolutionContext},
@@ -172,8 +172,8 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
         &self.url
     }
 
-    fn environment(&self) -> &dyn EnvironmentInterface<Self> {
-        self.environment.as_ref()
+    fn environment(&self) -> &routing::environment::Environment<Self> {
+        &self.environment.env()
     }
 
     fn try_get_parent(&self) -> Result<ExtendedInstanceInterface<Self>, ComponentInstanceError> {

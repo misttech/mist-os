@@ -32,7 +32,6 @@ use {
     moniker::{Moniker, MonikerBase},
     routing::{
         component_instance::{ComponentInstanceInterface, ResolvedInstanceInterface},
-        environment::EnvironmentInterface,
         resolving::ComponentAddress,
     },
     std::sync::{Arc, Weak},
@@ -353,7 +352,7 @@ async fn resolve_declaration(
 
     trace!(
         parent=%parent_moniker,
-        env=%environment.name().as_ref().unwrap_or(&"<unnamed>"),
+        env=%environment.environment().name().as_ref().unwrap_or(&"<unnamed>"),
         ?address,
         "resolving manifest without creating component",
     );

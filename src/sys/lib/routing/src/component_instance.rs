@@ -5,7 +5,7 @@
 use {
     crate::{
         capability_source::{BuiltinCapabilities, NamespaceCapabilities},
-        environment::EnvironmentInterface,
+        environment,
         error::ComponentInstanceError,
         policy::GlobalPolicyChecker,
         resolving::{ComponentAddress, ComponentResolutionContext},
@@ -46,7 +46,7 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
     fn url(&self) -> &str;
 
     /// Returns a representation of this `ComponentInstanceInterface`'s environment.
-    fn environment(&self) -> &dyn EnvironmentInterface<Self>;
+    fn environment(&self) -> &environment::Environment<Self>;
 
     /// Returns configuration overrides applied to this component by its parent.
     fn config_parent_overrides(&self) -> Option<&Vec<cm_rust::ConfigOverride>>;
@@ -330,7 +330,7 @@ pub mod tests {
             todo!()
         }
 
-        fn environment(&self) -> &dyn EnvironmentInterface<Self> {
+        fn environment(&self) -> &crate::environment::Environment<Self> {
             todo!()
         }
 

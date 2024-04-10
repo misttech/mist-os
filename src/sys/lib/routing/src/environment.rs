@@ -19,14 +19,61 @@ use {
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// A trait providing data from a component instance's environment.
-pub trait EnvironmentInterface<C>: Send + Sync
-where
-    C: ComponentInstanceInterface,
-{
+#[derive(Debug)]
+pub struct Environment<Component: ComponentInstanceInterface> {
+    /// Name of this environment as defined by its creator.
+    /// Would be `None` for root environment.
+    name: Option<String>,
+    /// The parent that created or inherited the environment.
+    parent: WeakExtendedInstanceInterface<Component>,
+    /// The extension mode of this environment.
+    extends: EnvironmentExtends,
+    /// The runners available in this environment.
+    runner_registry: RunnerRegistry,
+    /// Protocols available in this environment as debug capabilities.
+    debug_registry: DebugRegistry,
+}
+
+impl<C: ComponentInstanceInterface> Environment<C> {
+    pub fn new(
+        name: Option<String>,
+        parent: WeakExtendedInstanceInterface<C>,
+        extends: EnvironmentExtends,
+        runner_registry: RunnerRegistry,
+        debug_registry: DebugRegistry,
+    ) -> Self {
+        Self { name, parent, extends, runner_registry, debug_registry }
+    }
+
+    /// The name of this environment as defined by its creator.
+    /// Should be `None` for the root environment.
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// The parent component instance or top instance that created or inherited the environment.
+    pub fn parent(&self) -> &WeakExtendedInstanceInterface<C> {
+        &self.parent
+    }
+
+    /// The relationship of this environment to that of the component instance's parent.
+    pub fn extends(&self) -> &EnvironmentExtends {
+        &self.extends
+    }
+
+    /// The runners available in this environment.
+    pub fn runner_registry(&self) -> &RunnerRegistry {
+        &self.runner_registry
+    }
+
+    /// Protocols avaliable in this environment as debug capabilities.
+    pub fn debug_registry(&self) -> &DebugRegistry {
+        &self.debug_registry
+    }
+
     /// Returns the runner registered to `name` and the component that created the environment the
     /// runner was registered to. Returns `None` if there was no match.
-    fn get_registered_runner(
+    pub fn get_registered_runner(
         &self,
         name: &Name,
     ) -> Result<Option<(ExtendedInstanceInterface<C>, RunnerRegistration)>, ComponentInstanceError>
@@ -53,7 +100,7 @@ where
     /// Returns the debug capability registered to `name`, the realm that created the environment
     /// and the capability was registered to (`None` for component manager's realm) and name of the
     /// environment that registered the capability. Returns `None` if there was no match.
-    fn get_debug_capability(
+    pub fn get_debug_capability(
         &self,
         name: &Name,
     ) -> Result<
@@ -78,22 +125,6 @@ where
             },
         }
     }
-
-    /// The name of this environment as defined by its creator.
-    /// Should be `None` for the root environment.
-    fn name(&self) -> Option<&str>;
-
-    /// The parent component instance or top instance that created or inherited the environment.
-    fn parent(&self) -> &WeakExtendedInstanceInterface<C>;
-
-    /// The relationship of this environment to that of the component instance's parent.
-    fn extends(&self) -> &EnvironmentExtends;
-
-    /// The runners available in this environment.
-    fn runner_registry(&self) -> &RunnerRegistry;
-
-    /// Protocols avaliable in this environment as debug capabilities.
-    fn debug_registry(&self) -> &DebugRegistry;
 }
 
 /// How this environment extends its parent's.

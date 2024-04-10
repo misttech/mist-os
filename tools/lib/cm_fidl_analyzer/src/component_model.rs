@@ -1363,7 +1363,7 @@ mod tests {
                 ComponentInstanceInterface, ExtendedInstanceInterface,
                 WeakExtendedInstanceInterface,
             },
-            environment::{EnvironmentInterface, RunnerRegistry},
+            environment::RunnerRegistry,
             error::ComponentInstanceError,
             RouteRequest,
         },
@@ -1454,14 +1454,14 @@ mod tests {
         let root_environment = root_instance.environment();
         let child_environment = child_instance.environment();
 
-        assert_eq!(root_environment.name(), None);
-        match root_environment.parent() {
+        assert_eq!(root_environment.env().name(), None);
+        match root_environment.env().parent() {
             WeakExtendedInstanceInterface::AboveRoot(_) => {}
             _ => panic!("root environment's parent should be `AboveRoot`"),
         }
 
-        assert_eq!(child_environment.name(), None);
-        match child_environment.parent() {
+        assert_eq!(child_environment.env().name(), None);
+        match child_environment.env().parent() {
             WeakExtendedInstanceInterface::Component(component) => {
                 assert_eq!(component.upgrade()?.moniker(), root_instance.moniker());
                 assert_eq!(
@@ -1874,6 +1874,7 @@ mod tests {
 
         let get_child_runner_result = child_instance
             .environment()
+            .env()
             .get_registered_runner(&child_runner_registration.target_name)?;
         assert!(get_child_runner_result.is_some());
         let (child_runner_registrar, child_runner) = get_child_runner_result.unwrap();
@@ -1903,7 +1904,7 @@ mod tests {
         assert_eq!(child_resolver_registration, child_resolver);
 
         let get_builtin_runner_result =
-            child_instance.environment().get_registered_runner(&builtin_runner_name)?;
+            child_instance.environment().env().get_registered_runner(&builtin_runner_name)?;
         assert!(get_builtin_runner_result.is_some());
         let (builtin_runner_registrar, _builtin_runner) = get_builtin_runner_result.unwrap();
         match builtin_runner_registrar {

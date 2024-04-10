@@ -47,7 +47,6 @@ use {
             ResolvedInstanceInterfaceExt, TopInstanceInterface, WeakComponentInstanceInterface,
             WeakExtendedInstanceInterface,
         },
-        environment::EnvironmentInterface,
         error::ComponentInstanceError,
         policy::GlobalPolicyChecker,
         resolving::{
@@ -1482,8 +1481,8 @@ impl ComponentInstanceInterface for ComponentInstance {
         &self.component_url
     }
 
-    fn environment(&self) -> &dyn EnvironmentInterface<Self> {
-        self.environment.as_ref()
+    fn environment(&self) -> &::routing::environment::Environment<Self> {
+        self.environment.environment()
     }
 
     fn policy_checker(&self) -> &GlobalPolicyChecker {
@@ -1851,8 +1850,8 @@ impl ResolvedInstanceState {
         // need to perform this check is already available to us. This way, we don't have to propagate this
         // info to sandbox capabilities just so they can enforce the policy.
         for (env_name, env) in &environments {
-            for capability_name in env.debug_registry().debug_capabilities.keys() {
-                let parent = match env.parent() {
+            for capability_name in env.environment().debug_registry().debug_capabilities.keys() {
+                let parent = match env.environment().parent() {
                     WeakExtendedInstance::Component(p) => p,
                     WeakExtendedInstance::AboveRoot(_) => unreachable!(
                         "this environment was defined by the component, can't be \
