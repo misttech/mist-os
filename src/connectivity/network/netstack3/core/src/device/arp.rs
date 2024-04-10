@@ -648,7 +648,10 @@ mod tests {
 
     use net_types::ethernet::Mac;
     use packet::{Buf, ParseBuffer};
-    use packet_formats::arp::{peek_arp_types, ArpHardwareType, ArpNetworkType};
+    use packet_formats::{
+        arp::{peek_arp_types, ArpHardwareType, ArpNetworkType},
+        ipv4::Ipv4FragmentType,
+    };
     use test_case::test_case;
 
     use super::*;
@@ -867,7 +870,7 @@ mod tests {
             _device_id: Option<&Self::DeviceId>,
             _original_src: SocketIpAddr<Ipv4Addr>,
             _original_dst: SocketIpAddr<Ipv4Addr>,
-            _header_len: usize,
+            _metadata: (usize, Ipv4FragmentType),
         ) {
             panic!("send_icmp_dest_unreachable should not be called");
         }

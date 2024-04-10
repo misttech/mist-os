@@ -29,6 +29,7 @@ use packet_formats::{
         ndp::{options::NdpOptionBuilder, NeighborSolicitation, OptionSequenceBuilder},
         IcmpUnusedCode,
     },
+    ipv4::Ipv4FragmentType,
     utils::NonZeroDuration,
 };
 use tracing::trace;
@@ -1326,7 +1327,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         device_id: Option<&Self::DeviceId>,
         original_src_ip: SocketIpAddr<Ipv4Addr>,
         original_dst_ip: SocketIpAddr<Ipv4Addr>,
-        header_len: usize,
+        (header_len, fragment_type): (usize, Ipv4FragmentType),
     ) {
         crate::ip::icmp::send_icmpv4_host_unreachable(
             self,
@@ -1341,6 +1342,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
             original_dst_ip,
             frame,
             header_len,
+            fragment_type,
         );
     }
 }

@@ -2087,6 +2087,7 @@ pub(crate) fn send_icmpv4_host_unreachable<
     dst_ip: SocketIpAddr<Ipv4Addr>,
     original_packet: B,
     header_len: usize,
+    fragment_type: Ipv4FragmentType,
 ) {
     core_ctx.with_counters(|counters| {
         counters.address_unreachable.increment();
@@ -2102,7 +2103,7 @@ pub(crate) fn send_icmpv4_host_unreachable<
         Icmpv4DestUnreachableCode::DestHostUnreachable,
         original_packet,
         header_len,
-        Ipv4FragmentType::InitialFragment,
+        fragment_type,
     );
 }
 

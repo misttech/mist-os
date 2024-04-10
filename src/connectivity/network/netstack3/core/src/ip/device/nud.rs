@@ -28,7 +28,10 @@ use packet::{
     Buf, BufferMut, GrowBuffer as _, ParsablePacket as _, ParseBufferMut as _, Serializer,
 };
 use packet_formats::{
-    ip::IpPacket as _, ipv4::Ipv4Packet, ipv6::Ipv6Packet, utils::NonZeroDuration,
+    ip::IpPacket as _,
+    ipv4::{Ipv4FragmentType, Ipv4Header as _, Ipv4Packet},
+    ipv6::Ipv6Packet,
+    utils::NonZeroDuration,
 };
 use zerocopy::ByteSlice;
 
@@ -1673,10 +1676,10 @@ pub(crate) trait NudIcmpIpExt: packet_formats::ip::IpExt {
 }
 
 impl NudIcmpIpExt for Ipv4 {
-    type Metadata = usize;
+    type Metadata = (usize, Ipv4FragmentType);
 
-    fn extract_metadata<B: ByteSlice>(packet: &Ipv4Packet<B>) -> usize {
-        packet.header_len()
+    fn extract_metadata<B: ByteSlice>(packet: &Ipv4Packet<B>) -> Self::Metadata {
+        (packet.header_len(), packet.fragment_type())
     }
 }
 
@@ -1704,7 +1707,7 @@ pub(crate) trait NudIcmpContext<I: Ip + NudIcmpIpExt, D: LinkDevice, BC>:
         device_id: Option<&Self::DeviceId>,
         original_src_ip: SocketIpAddr<I::Addr>,
         original_dst_ip: SocketIpAddr<I::Addr>,
-        header_len: I::Metadata,
+        metadata: I::Metadata,
     );
 }
 
@@ -2597,11 +2600,13 @@ mod tests {
                 options::NdpOptionBuilder, NeighborAdvertisement, NeighborSolicitation,
                 OptionSequenceBuilder, RouterAdvertisement,
             },
-            IcmpPacketBuilder, IcmpUnusedCode,
+            IcmpDestUnreachable, IcmpPacketBuilder, IcmpUnusedCode,
         },
-        ip::Ipv6Proto,
+        ip::{IpProto, Ipv4Proto, Ipv6Proto},
+        ipv4::Ipv4PacketBuilder,
         ipv6::Ipv6PacketBuilder,
         testutil::{parse_ethernet_frame, parse_icmp_packet_in_ip_packet_in_ethernet_frame},
+        udp::UdpPacketBuilder,
     };
     use test_case::test_case;
 
@@ -2611,7 +2616,7 @@ mod tests {
             testutil::{
                 FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, FakeInstant, FakeNetwork,
                 FakeNetworkContext as _, FakeNetworkLinks, FakeTimerCtxExt as _,
-                WrappedFakeCoreCtx,
+                WithFakeFrameContext, WrappedFakeCoreCtx,
             },
             CtxPair, InstantContext, SendFrameContext as _,
         },
@@ -5711,5 +5716,81 @@ mod tests {
                 Some(crate::transport::tcp::ConnectionError::HostUnreachable),
             );
         });
+    }
+
+    #[test_case(1; "non_initial_fragment")]
+    #[test_case(0; "initial_fragment")]
+    fn icmp_error_fragment_offset(fragment_offset: u16) {
+        let mut builder = testutil::FakeEventDispatcherBuilder::default();
+        let _device_id = builder.add_device_with_ip(
+            Ipv4::FAKE_CONFIG.local_mac,
+            Ipv4::FAKE_CONFIG.local_ip.get(),
+            Ipv4::FAKE_CONFIG.subnet,
+        );
+        let (mut ctx, mut device_ids) = builder.build();
+        let device_id = device_ids.pop().unwrap();
+
+        // Add a static neighbor entry for `FROM_ADDR` so that NUD trivially
+        // succeeds if an ICMP dest unreachable message destined for the address
+        // is generated.
+        const FROM_ADDR: SpecifiedAddr<Ipv4Addr> = Ipv4::FAKE_CONFIG.remote_ip;
+        ctx.core_api()
+            .neighbor::<Ipv4, _>()
+            .insert_static_entry(&device_id, FROM_ADDR.get(), Ipv4::FAKE_CONFIG.remote_mac.get())
+            .expect("add static NUD entry for FROM_ADDR");
+
+        crate::device::testutil::set_forwarding_enabled::<_, Ipv4>(
+            &mut ctx,
+            &device_id.clone().into(),
+            true,
+        );
+
+        // Receive an IPv4 packet with the per test-case fragment offset value.
+        let to = Ipv4::get_other_ip_address(254);
+        let mut ipv4_packet_builder = Ipv4PacketBuilder::new(
+            FROM_ADDR,
+            to,
+            255, /* ttl */
+            Ipv4Proto::Proto(IpProto::Udp),
+        );
+        ipv4_packet_builder.fragment_offset(fragment_offset);
+        let non_initial_fragment_packet_buf = packet::Buf::new(&mut [], ..)
+            .encapsulate(UdpPacketBuilder::new(
+                FROM_ADDR.get(),
+                to.get(),
+                None,
+                NonZeroU16::new(12345).unwrap(),
+            ))
+            .encapsulate(ipv4_packet_builder)
+            .serialize_vec_outer()
+            .unwrap()
+            .unwrap_b();
+        ctx.test_api().receive_ip_packet::<Ipv4, _>(
+            &device_id.into(),
+            Some(FrameDestination::Individual { local: false }),
+            non_initial_fragment_packet_buf,
+        );
+
+        // Should only see ICMP dest unreachable for initial fragments, i.e.
+        // fragment offset equal to 0.
+        while ctx.process_queues() || ctx.trigger_next_timer().is_some() {}
+        ctx.with_fake_frame_ctx_mut(|ctx| {
+            let found = ctx.take_frames().drain(..).find_map(|(_meta, buf)| {
+                packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
+                    Ipv4,
+                    _,
+                    IcmpDestUnreachable,
+                    _,
+                >(
+                    &buf, packet_formats::ethernet::EthernetFrameLengthCheck::NoCheck, |_| ()
+                )
+                .ok()
+            });
+            if fragment_offset == 0 {
+                assert!(found.is_some());
+            } else {
+                assert_eq!(found, None);
+            }
+        })
     }
 }
