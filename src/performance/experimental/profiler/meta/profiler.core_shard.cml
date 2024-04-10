@@ -17,6 +17,7 @@
     offer: [
         {
             protocol: [
+                "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.RootJob",
                 "fuchsia.logger.Log",
                 "fuchsia.logger.LogSink",

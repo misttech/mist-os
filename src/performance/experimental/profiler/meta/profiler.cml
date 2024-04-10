@@ -6,6 +6,7 @@
     program: {
         runner: "elf",
         binary: "bin/profiler",
+        use_next_vdso: "true",
     },
     capabilities: [
         {
@@ -15,6 +16,7 @@
     use: [
         {
             protocol: [
+                "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.RootJob",
                 "fuchsia.logger.Log",
             ],

@@ -1,27 +1,51 @@
 # CPU Profiler
 
-This is an experimental cpu profiler aimed at sampling stack traces and presenting them as pprof
-graphs. It does not have kernel assisted sample yet, though that is an eventual goal after which it
-will move out of experimental.
+This is an experimental cpu profiler aimed at sampling stack traces and outputting them to pprof
+format.
 
-In the mean time, it uses the root resource to suspend the target threads periodically,
-`zx_process_read_memory` and the fuchsia unwinder to read stack traces from the target, then
-exfiltrates them.
+## Kernel assistance
 
-Due to this, there is some overhead when sampling stacks. About 300us per sample when using frame
-pointers, 3000us for reading Dwarf CFI frames[^1]. This can make the current implementation
-impractical for use cases require demand less perturbation.
+Experimental kernel assisted sampling via `zx_sampler_create` can be enabled via the GN flag
+'experimental_thread_sampler_enabled=true' which improves sampling times to single digit us per
+sample.
+
+If not enabled, the sampler will fall back to userspace based sampling which uses the root resource
+to suspend the target threads periodically, uses `zx_process_read_memory` and the fuchsia unwinder to
+read stack traces from the target, then exfiltrates the stack data. In this mode taking a sample
+using frame pointers takes roughly 300us[^1] per sample. In this fallback mode, it's recommended to
+set a relatively low sample rate to not overly perturb the profiled program. For reference, 50
+samples per second would be a 1.5% sampling overhead.
+
+Note: As experimental_thread_sampler_enabled=true isn't enabled in CI/CQ yet, integration tests
+need to be run locally with the build flag enabled -- CI/CQ results will reflect the state of the
+zx_process_read_memory based implementation.
 
 [^1]: Numbers measured on core.x64-qemu
 
 ## Usage:
 
-You'll need to add the profiler component and its core shard to the build as well as the host tool.
+You'll need to add the host tool to interpret the output file to your build. In addition, we
+recommend several additional arguments to improve the quality of the profiles you get:
 
 ```
-fx set <product>.<board> --with-base //src/performance/experimental/profiler --with-host //src/performance/experimental/profiler/samples_to_pprof:install --args='core_realm_shards += [ "//src/performance/experimental/profiler:profiler_core_shard" ]'
+fx set <product>.<board> \
+--with-host //src/performance/experimental/profiler/samples_to_pprof:install \
+--args='debuginfo="backtrace"' \
+--args='enable_frame_pointers=true' \
+--args='experimental_thread_sampler_enabled=true'
 ```
 
+'debuginfo="backtrace"' and 'enabled_frame_pointers=true' will give enough information to retrieve
+and symbolize stacks in a release build.
+
+
+### Release Mode
+`--release` may result in more difficult to follow stacks due to inlining and optimization passes, but
+will give overall more representative samples. Especially for Rust and C++ based targets, the zero
+cost abstractions in their standard libraries are not zero cost unless some level of optimization is
+applied.
+
+# Profiling
 The easiest way to interact with the profiler is through the ffx plugin:
 
 ```

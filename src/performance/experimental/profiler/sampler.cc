@@ -131,17 +131,9 @@ zx::result<> profiler::Sampler::WatchTarget(const JobTarget& target) {
         auto process_watcher = std::make_unique<ProcessWatcher>(
             process_target.handle.borrow(),
             [job_path, this](zx_koid_t pid, zx_koid_t tid, zx::thread t) {
-              zx::result res = targets_.AddThread(job_path, pid, ThreadTarget{std::move(t), tid});
-              if (res.is_error()) {
-                FX_PLOGS(ERROR, res.status_value()) << "Failed to add thread to session: " << tid;
-              }
+              AddThread(job_path, pid, tid, std::move(t));
             },
-            [job_path, this](zx_koid_t pid, zx_koid_t tid) {
-              zx::result res = targets_.RemoveThread(job_path, pid, tid);
-              if (res.is_error()) {
-                FX_PLOGS(ERROR, res.status_value()) << "Failed to remove exited thread: " << tid;
-              }
-            }
+            [job_path, this](zx_koid_t pid, zx_koid_t tid) { RemoveThread(job_path, pid, tid); }
 
         );
         auto [it, emplaced] = process_watchers_.emplace(pid, std::move(process_watcher));
@@ -170,7 +162,7 @@ zx::result<> profiler::Sampler::WatchTarget(const JobTarget& target) {
   return zx::ok();
 }
 
-zx::result<> profiler::Sampler::Start() {
+zx::result<> profiler::Sampler::Start(size_t buffer_size_mb /* unused, we buffer in memory */) {
   // If a watched process launches a new thread, we want to add it to the set of monitored threads.
   zx::result<> res = targets_.ForEachProcess(
       [this](cpp20::span<const zx_koid_t> job_path, const ProcessTarget& p) -> zx::result<> {
@@ -274,4 +266,20 @@ zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
     return res.take_error();
   }
   return zx::ok(profiler::SymbolizationContext{contexts});
+}
+
+void profiler::Sampler::AddThread(std::vector<const zx_koid_t> job_path, zx_koid_t pid,
+                                  zx_koid_t tid, zx::thread t) {
+  zx::result res = targets_.AddThread(job_path, pid, ThreadTarget{std::move(t), tid});
+  if (res.is_error()) {
+    FX_PLOGS(ERROR, res.status_value()) << "Failed to add thread to session: " << tid;
+  }
+}
+
+void profiler::Sampler::RemoveThread(std::vector<const zx_koid_t> job_path, zx_koid_t pid,
+                                     zx_koid_t tid) {
+  zx::result res = targets_.RemoveThread(job_path, pid, tid);
+  if (res.is_error()) {
+    FX_PLOGS(ERROR, res.status_value()) << "Failed to remove exited thread: " << tid;
+  }
 }

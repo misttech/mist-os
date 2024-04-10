@@ -86,7 +86,7 @@ struct JobTarget {
 
   // The list of ancestor jobs encountered while traversing starting at root job to this job.
   // Contains the root job, but does not contain this job.
-  std::vector<zx_koid_t> ancestry;
+  std::vector<const zx_koid_t> ancestry;
 
   // Do a depth first search to call f on each process in the modeled job tree.
   zx::result<> ForEachProcess(

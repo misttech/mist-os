@@ -42,20 +42,22 @@ class Sampler {
   explicit Sampler(async_dispatcher_t* dispatcher, TargetTree&& targets)
       : dispatcher_(dispatcher), targets_(std::move(targets)) {}
 
-  zx::result<> Start();
-  zx::result<> Stop();
+  virtual zx::result<> Start(size_t buffer_size_mb);
+  virtual zx::result<> Stop();
 
   // Return the information needed to symbolize the samples
   zx::result<profiler::SymbolizationContext> GetContexts();
 
   std::unordered_map<zx_koid_t, std::vector<Sample>> GetSamples() { return samples_; }
   std::vector<zx::ticks> SamplingDurations() { return inspecting_durations_; }
-  zx::result<> AddTarget(JobTarget&& target);
+  virtual zx::result<> AddTarget(JobTarget&& target);
+  virtual ~Sampler() = default;
 
- private:
+ protected:
   zx::result<> WatchTarget(const JobTarget& target);
-  void AddThread(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
-                 const zx_packet_signal_t* signal) {}
+  virtual void AddThread(std::vector<const zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid,
+                         zx::thread t);
+  virtual void RemoveThread(std::vector<const zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid);
 
   void CollectSamples(async_dispatcher_t* dispatcher, async::TaskBase* task, zx_status_t status);
 

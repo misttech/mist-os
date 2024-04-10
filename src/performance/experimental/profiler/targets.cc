@@ -207,7 +207,7 @@ zx::result<profiler::JobTarget> profiler::MakeJobTarget(zx::job job,
 
   // Provide each of this job's children their ancestry, which is this job's ancestry, prepended to
   // this job's job id.
-  std::vector<zx_koid_t> child_job_ancestry{ancestry.begin(), ancestry.end()};
+  std::vector<const zx_koid_t> child_job_ancestry{ancestry.begin(), ancestry.end()};
   child_job_ancestry.push_back(job_id);
 
   std::unordered_map<zx_koid_t, profiler::JobTarget> child_job_targets;
@@ -233,7 +233,7 @@ zx::result<profiler::JobTarget> profiler::MakeJobTarget(zx::job job,
         FX_PLOGS(ERROR, child_job_target.status_value()) << "failed to make job_target";
         return child_job_target.take_error();
       }
-      child_job_target->ancestry = child_job_ancestry;
+      child_job_target->ancestry = std::move(child_job_ancestry);
       child_job_targets.try_emplace(child_koid, std::move(*child_job_target));
     }
   }
