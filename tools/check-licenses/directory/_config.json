@@ -19,7 +19,7 @@
                     "Investigation in https://fxbug.dev/333576929"
                 ],
                 "paths": [
-                    "prebuilt/bt-host"
+                    "prebuilt/connectivity/bluetooth/bt-host"
                 ]
             },
             {
