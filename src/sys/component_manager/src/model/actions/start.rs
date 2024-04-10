@@ -18,10 +18,7 @@ use {
     },
     crate::runner::RemoteRunner,
     ::namespace::Entry as NamespaceEntry,
-    ::routing::{
-        component_instance::ComponentInstanceInterface, error::RoutingError,
-        policy::GlobalPolicyChecker,
-    },
+    ::routing::{component_instance::ComponentInstanceInterface, policy::GlobalPolicyChecker},
     async_trait::async_trait,
     cm_logger::scoped::ScopedLogger,
     cm_rust::ComponentDecl,
@@ -413,16 +410,6 @@ async fn open_runner(
     Ok(Some(RemoteRunner::new(proxy)))
 }
 
-fn get_config_field<'a>(
-    name: &str,
-    decl: &'a cm_rust::ComponentDecl,
-) -> Option<&'a cm_rust::UseConfigurationDecl> {
-    decl.uses.iter().find_map(|use_| match use_ {
-        cm_rust::UseDecl::Config(c) => (c.target_name == name).then_some(c),
-        _ => None,
-    })
-}
-
 /// Returns true if the decl uses configuration capabilities.
 fn has_config_capabilities(decl: &cm_rust::ComponentDecl) -> bool {
     decl.uses.iter().find(|u| matches!(u, cm_rust::UseDecl::Config(_))).is_some()
@@ -438,57 +425,6 @@ async fn update_component_config(
     Ok(())
 }
 
-async fn resolve_config_capability(
-    key: &str,
-    decl: &cm_rust::ComponentDecl,
-    component: &Arc<ComponentInstance>,
-) -> Result<Option<cm_rust::ConfigValue>, StartActionError> {
-    let Some(use_config) = get_config_field(key, decl) else {
-        return Ok(None);
-    };
-
-    let source = routing::route_capability(
-        RouteRequest::UseConfig(use_config.clone()),
-        component,
-        &mut routing::mapper::NoopRouteMapper,
-    )
-    .await
-    .map_err(|err| StartActionError::StructuredConfigError {
-        moniker: component.moniker.clone(),
-        err: err.into(),
-    })?;
-
-    let cap = match source.source {
-        routing::capability_source::CapabilitySource::Void { .. } => return Ok(None),
-
-        routing::capability_source::CapabilitySource::Capability { source_capability, .. } => {
-            source_capability
-        }
-        routing::capability_source::CapabilitySource::Component { capability, .. } => capability,
-        o => {
-            return Err(StartActionError::StructuredConfigError {
-                moniker: component.moniker.clone(),
-                err: RoutingError::UnsupportedRouteSource {
-                    source_type: o.type_name().to_string(),
-                }
-                .into(),
-            })
-        }
-    };
-
-    let cap = match cap {
-        routing::capability_source::ComponentCapability::Config(c) => c,
-        c => {
-            return Err(StartActionError::StructuredConfigError {
-                moniker: component.moniker.clone(),
-                err: RoutingError::UnsupportedCapabilityType { type_name: c.type_name().into() }
-                    .into(),
-            })
-        }
-    };
-    Ok(Some(cap.value))
-}
-
 async fn create_config_with_capabilities(
     decl: &cm_rust::ComponentDecl,
     component: &Arc<ComponentInstance>,
@@ -498,9 +434,27 @@ async fn create_config_with_capabilities(
     };
     let mut fields = ConfigFields { fields: Vec::new(), checksum: config_decl.checksum.clone() };
     for field in &config_decl.fields {
-        let value = resolve_config_capability(&field.key, decl, component).await?;
-        let value =
-            value.expect("ConfigValueSource::Capabilities requires no optional config capabilties");
+        let Some(use_config) = routing::config::get_use_config_from_key(&field.key, decl) else {
+            return Err(StartActionError::StructuredConfigError {
+                moniker: component.moniker.clone(),
+                err: StructuredConfigError::KeyNotFound { key: field.key.clone() },
+            });
+        };
+        let value = match routing::config::route_config_value(use_config, component).await {
+            Ok(Some(v)) => v,
+            Ok(None) => {
+                return Err(StartActionError::StructuredConfigError {
+                    moniker: component.moniker.clone(),
+                    err: StructuredConfigError::KeyNotFound { key: field.key.clone() },
+                })
+            }
+            Err(err) => {
+                return Err(StartActionError::StructuredConfigError {
+                    moniker: component.moniker.clone(),
+                    err: err.into(),
+                })
+            }
+        };
         fields.fields.push(config_encoder::ConfigField {
             key: field.key.clone(),
             value: value,
@@ -520,10 +474,20 @@ async fn update_config_with_capabilities(
     component: &Arc<ComponentInstance>,
 ) -> Result<(), StartActionError> {
     for field in config.fields.iter_mut() {
-        let Some(value) = resolve_config_capability(&field.key, decl, component).await? else {
+        let Some(use_config) = routing::config::get_use_config_from_key(&field.key, decl) else {
             continue;
         };
+        let value =
+            routing::config::route_config_value(use_config, component).await.map_err(|e| {
+                StartActionError::StructuredConfigError {
+                    moniker: component.moniker.clone(),
+                    err: e.into(),
+                }
+            })?;
 
+        let Some(value) = value else {
+            continue;
+        };
         if !field.value.matches_type(&value) {
             return Err(StartActionError::StructuredConfigError {
                 moniker: component.moniker.clone(),

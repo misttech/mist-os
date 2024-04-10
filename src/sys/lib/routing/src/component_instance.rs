@@ -290,3 +290,73 @@ pub trait TopInstanceInterface: Sized + std::fmt::Debug {
 
     fn builtin_capabilities(&self) -> &BuiltinCapabilities;
 }
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    #[derive(Debug)]
+    pub struct TestTopInstance {}
+
+    impl TopInstanceInterface for TestTopInstance {
+        fn namespace_capabilities(&self) -> &NamespaceCapabilities {
+            todo!()
+        }
+
+        fn builtin_capabilities(&self) -> &BuiltinCapabilities {
+            todo!()
+        }
+    }
+
+    pub struct TestComponent {}
+
+    #[async_trait]
+    impl ComponentInstanceInterface for TestComponent {
+        type TopInstance = TestTopInstance;
+
+        fn child_moniker(&self) -> Option<&ChildName> {
+            todo!()
+        }
+
+        fn instanced_moniker(&self) -> &InstancedMoniker {
+            todo!()
+        }
+
+        fn moniker(&self) -> &Moniker {
+            todo!()
+        }
+
+        fn url(&self) -> &str {
+            todo!()
+        }
+
+        fn environment(&self) -> &dyn EnvironmentInterface<Self> {
+            todo!()
+        }
+
+        fn config_parent_overrides(&self) -> Option<&Vec<cm_rust::ConfigOverride>> {
+            todo!()
+        }
+
+        fn policy_checker(&self) -> &GlobalPolicyChecker {
+            todo!()
+        }
+
+        fn component_id_index(&self) -> &component_id_index::Index {
+            todo!()
+        }
+
+        fn try_get_parent(
+            &self,
+        ) -> Result<ExtendedInstanceInterface<Self>, ComponentInstanceError> {
+            todo!()
+        }
+
+        async fn lock_resolved_state<'a>(
+            self: &'a Arc<Self>,
+        ) -> Result<Box<dyn ResolvedInstanceInterface<Component = Self> + 'a>, ComponentInstanceError>
+        {
+            todo!()
+        }
+    }
+}
