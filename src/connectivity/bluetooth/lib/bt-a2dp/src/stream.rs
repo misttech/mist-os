@@ -327,7 +327,7 @@ pub(crate) mod tests {
 
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::types::Channel;
-    use futures::pin_mut;
+    use std::pin::pin;
     use std::task::Poll;
 
     use crate::media_task::tests::TestMediaTaskBuilder;
@@ -596,7 +596,7 @@ pub(crate) mod tests {
 
         // Task should be created here.
         let task = {
-            pin_mut!(next_task_fut);
+            let mut next_task_fut = pin!(next_task_fut);
             match exec.run_until_stalled(&mut next_task_fut) {
                 Poll::Ready(Some(task)) => task,
                 x => panic!("Expected next task to be sent after start, got {:?}", x),
@@ -614,7 +614,7 @@ pub(crate) mod tests {
         let next_task_fut = task_builder.next_task();
         // Task should be created here.
         let task = {
-            pin_mut!(next_task_fut);
+            let mut next_task_fut = pin!(next_task_fut);
             match exec.run_until_stalled(&mut next_task_fut) {
                 Poll::Ready(Some(task)) => task,
                 x => panic!("Expected next task to be sent after start, got {:?}", x),
@@ -649,10 +649,10 @@ pub(crate) mod tests {
         let _ = stream.endpoint_mut().receive_channel(transport).expect("ready for a channel");
 
         let stream_finish_fut = stream.start().expect("start to succeed with a future");
-        pin_mut!(stream_finish_fut);
+        let mut stream_finish_fut = pin!(stream_finish_fut);
 
         let task = {
-            pin_mut!(next_task_fut);
+            let mut next_task_fut = pin!(next_task_fut);
             match exec.run_until_stalled(&mut next_task_fut) {
                 Poll::Ready(Some(task)) => task,
                 x => panic!("Expected next task to be sent after start, got {:?}", x),
@@ -683,7 +683,7 @@ pub(crate) mod tests {
         let result_fut = stream.start().expect("start to succeed with a future");
 
         let next_task_fut = task_builder.next_task();
-        pin_mut!(next_task_fut);
+        let mut next_task_fut = pin!(next_task_fut);
         let task = match exec.run_until_stalled(&mut next_task_fut) {
             Poll::Ready(Some(task)) => task,
             x => panic!("Expected next task to be sent after restart, got {x:?}"),

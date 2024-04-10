@@ -427,7 +427,7 @@ mod tests {
     use async_test_helpers::expect_stream_pending;
     use async_utils::PollExt;
     use fuchsia_async as fasync;
-    use futures::pin_mut;
+    use std::pin::pin;
 
     use crate::header::header_set::{expect_body, expect_end_of_body};
     use crate::server::handler::test_utils::TestApplicationProfile;
@@ -449,7 +449,7 @@ mod tests {
         let (obex_server, _test_app, remote) = new_obex_server(/*srm=*/ false);
 
         let server_fut = obex_server.run();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server still active");
 
         drop(remote);
@@ -462,7 +462,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (obex_server, test_app, mut remote) = new_obex_server(/*srm=*/ false);
         let server_fut = obex_server.run();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         let connect_request = RequestPacket::new_connect(500, HeaderSet::new());
@@ -490,7 +490,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (obex_server, test_app, mut remote) = new_obex_server(/*srm=*/ false);
         let server_fut = obex_server.run();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         let request_headers = HeaderSet::from_header(Header::Target(vec![5, 6]));
@@ -519,7 +519,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (obex_server, test_app, mut remote) = new_obex_server(/*srm=*/ false);
         let server_fut = obex_server.run();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         let connect_request = RequestPacket::new_connect(255, HeaderSet::new());
@@ -545,7 +545,7 @@ mod tests {
         let (obex_server, _test_app, remote) = new_obex_server(/*srm=*/ false);
 
         let server_fut = obex_server.run();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server still active");
 
         // Invalid CONNECT request. Missing the 2 byte max packet size field.
@@ -560,7 +560,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (obex_server, test_app, mut remote) = new_obex_server(/*srm=*/ false);
         let server_fut = obex_server.run();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         let headers = HeaderSet::from_header(Header::Description("done".into()));
@@ -592,7 +592,7 @@ mod tests {
         // Set to the Connected state to bypass CONNECT operation.
         obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         let server_fut = obex_server.run();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         let headers = HeaderSet::from_header(Header::name("folder1"));
@@ -620,7 +620,7 @@ mod tests {
         // Set to the Connected state to bypass CONNECT operation.
         obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         let server_fut = obex_server.run();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         let setpath_request = RequestPacket::new_set_path(SetPathFlags::BACKUP, HeaderSet::new())
@@ -645,7 +645,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (obex_server, _test_app, mut remote) = new_obex_server(/*srm=*/ false);
         let server_fut = obex_server.run();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         let setpath_request = RequestPacket::new_set_path(SetPathFlags::BACKUP, HeaderSet::new())
@@ -664,7 +664,7 @@ mod tests {
         // Set to the Connected state to bypass CONNECT operation.
         obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         let server_fut = obex_server.run();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         // Remote asks for information about the payload. The ObexServer should receive the request
@@ -710,7 +710,7 @@ mod tests {
         let (mut obex_server, _test_app, mut remote) = new_obex_server(/*srm=*/ false);
         obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         let server_fut = obex_server.run();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         // Send an example GET_FINAL request with a header describing the name of the object.
@@ -736,7 +736,7 @@ mod tests {
         obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         obex_server.set_max_packet_size(20); // Set max to something small.
         let server_fut = obex_server.run();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         // First request asks for information & SRM. Server should receive the request, ask the
@@ -803,7 +803,7 @@ mod tests {
         // Set to the Connected state to bypass CONNECT operation.
         obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         let server_fut = obex_server.run();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         let headers = HeaderSet::from_headers(vec![
@@ -835,7 +835,7 @@ mod tests {
         let (mut obex_server, test_app, mut remote) = new_obex_server(/*srm=*/ true);
         obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         let server_fut = obex_server.run();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         // First request asks to enable SRM and provides some info.
@@ -893,7 +893,7 @@ mod tests {
         let (mut obex_server, test_app, mut remote) = new_obex_server(/*srm=*/ false);
         obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         let server_fut = obex_server.run();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         let headers = HeaderSet::from_header(Header::name("foo.txt"));

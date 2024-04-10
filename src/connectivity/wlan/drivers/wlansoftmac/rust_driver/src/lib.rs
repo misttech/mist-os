@@ -586,7 +586,7 @@ mod tests {
         fuchsia_async::TestExecutor,
         fuchsia_inspect::InspectorConfig,
         futures::{stream::FuturesUnordered, task::Poll},
-        pin_utils::pin_mut,
+        std::pin::pin,
         test_case::test_case,
         wlan_common::assert_variant,
         wlan_mlme::device::test_utils::{FakeDevice, FakeDeviceConfig},
@@ -709,7 +709,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>().unwrap();
         let inspect_vmo_fut =
             usme_bootstrap_proxy.start(generic_sme_server, &sent_legacy_privacy_support);
-        pin_mut!(inspect_vmo_fut);
+        let mut inspect_vmo_fut = pin!(inspect_vmo_fut);
         assert!(matches!(
             TestExecutor::poll_until_stalled(&mut inspect_vmo_fut).await,
             Poll::Pending
@@ -731,10 +731,10 @@ mod tests {
         // Send a GenericSme.Query() to check the generic_sme_proxy
         // and generic_sme_stream are connected.
         let query_fut = generic_sme_proxy.query();
-        pin_mut!(query_fut);
+        let mut query_fut = pin!(query_fut);
         assert!(matches!(TestExecutor::poll_until_stalled(&mut query_fut).await, Poll::Pending));
         let next_generic_sme_request_fut = generic_sme_request_stream.next();
-        pin_mut!(next_generic_sme_request_fut);
+        let mut next_generic_sme_request_fut = pin!(next_generic_sme_request_fut);
         assert!(matches!(
             TestExecutor::poll_until_stalled(&mut next_generic_sme_request_fut).await,
             Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::Query { .. })))
@@ -896,11 +896,11 @@ mod tests {
         ));
 
         let resp_fut = generic_sme_proxy.query();
-        pin_mut!(resp_fut);
+        let mut resp_fut = pin!(resp_fut);
         assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
 
         let sme_and_mlme = [sme, mlme].into_iter().collect::<FuturesUnordered<_>>();
-        pin_mut!(sme_and_mlme);
+        let mut sme_and_mlme = pin!(sme_and_mlme);
         assert!(matches!(
             TestExecutor::poll_until_stalled(&mut sme_and_mlme.next()).await,
             Poll::Pending
@@ -925,7 +925,7 @@ mod tests {
 
         let server_fut =
             serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         assert_variant!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
 
         softmac_ifc_bridge_channel.write(&[], &mut []).unwrap();
@@ -944,7 +944,7 @@ mod tests {
 
         let server_fut =
             serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         assert_variant!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
 
         drop(softmac_ifc_bridge_client);
@@ -975,10 +975,10 @@ mod tests {
 
         let server_fut =
             serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
 
         let resp_fut = softmac_ifc_bridge_proxy.notify_scan_complete(&request);
-        pin_mut!(resp_fut);
+        let mut resp_fut = pin!(resp_fut);
         assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
         assert_variant!(
             TestExecutor::poll_until_stalled(&mut server_fut).await,
@@ -997,7 +997,7 @@ mod tests {
 
         let server_fut =
             serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
 
         let resp_fut = softmac_ifc_bridge_proxy.notify_scan_complete(
             &fidl_softmac::WlanSoftmacIfcBaseNotifyScanCompleteRequest {
@@ -1006,7 +1006,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        pin_mut!(resp_fut);
+        let mut resp_fut = pin!(resp_fut);
         assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
         assert_variant!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
         assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Ready(Ok(())));
@@ -1076,7 +1076,7 @@ mod tests {
 
         let server_fut =
             serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
 
         let resp_fut = softmac_ifc_bridge_proxy.report_tx_result(&fidl_common::WlanTxResult {
             tx_result_entry: [fidl_common::WlanTxResultEntry {
@@ -1086,7 +1086,7 @@ mod tests {
             peer_addr: [3; 6],
             result_code: fidl_common::WlanTxResultCode::Failed,
         });
-        pin_mut!(resp_fut);
+        let mut resp_fut = pin!(resp_fut);
         assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
         assert_variant!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
         assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Ready(Ok(())));
@@ -1435,7 +1435,7 @@ mod tests {
             fidl::endpoints::create_proxy().expect("Failed to create_proxy");
 
         let resp_fut = generic_sme_proxy.get_sme_telemetry(sme_telemetry_server);
-        pin_mut!(resp_fut);
+        let mut resp_fut = pin!(resp_fut);
 
         // First poll `get_sme_telemetry` to send a `GetSmeTelemetry` request to the SME server, and then
         // poll the SME server process it. Finally, expect `get_sme_telemetry` to complete with `Ok(())`.
@@ -1447,7 +1447,7 @@ mod tests {
         );
 
         let resp_fut = generic_sme_proxy.get_client_sme(client_sme_server);
-        pin_mut!(resp_fut);
+        let mut resp_fut = pin!(resp_fut);
 
         // First poll `get_client_sme` to send a `GetClientSme` request to the SME server, and then poll the
         // SME server process it. Finally, expect `get_client_sme` to complete with `Ok(())`.
@@ -1487,7 +1487,7 @@ mod tests {
             fidl::endpoints::create_proxy().expect("Failed to create_proxy");
 
         let resp_fut = generic_sme_proxy.get_client_sme(client_sme_server);
-        pin_mut!(resp_fut);
+        let mut resp_fut = pin!(resp_fut);
         assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
         assert_eq!(TestExecutor::poll_until_stalled(&mut start_and_serve_fut).await, Poll::Pending);
         assert!(matches!(
@@ -1497,7 +1497,7 @@ mod tests {
 
         let scan_response_fut =
             client_sme_proxy.scan(&fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {}));
-        pin_mut!(scan_response_fut);
+        let mut scan_response_fut = pin!(scan_response_fut);
         assert!(matches!(
             TestExecutor::poll_until_stalled(&mut scan_response_fut).await,
             Poll::Pending

@@ -171,7 +171,7 @@ mod tests {
         super::*,
         fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::task::Poll,
-        pin_utils::pin_mut,
+        std::pin::pin,
         wlan_common::assert_variant,
         wlan_common::{
             random_fidl_bss_description, scan::Compatibility, security::SecurityDescriptor,
@@ -413,7 +413,7 @@ mod tests {
         let (iter, iter_server) =
             fidl::endpoints::create_proxy().expect("failed to create iterator");
         let send_fut = send_scan_results_over_fidl(iter_server, &scan_results);
-        pin_mut!(send_fut);
+        let mut send_fut = pin!(send_fut);
 
         // Request a chunk of scan results.
         let mut output_iter_fut = iter.get_next();
@@ -448,7 +448,7 @@ mod tests {
         let (iter, iter_server) =
             fidl::endpoints::create_proxy().expect("failed to create iterator");
         let send_fut = send_scan_results_over_fidl(iter_server, &scan_results);
-        pin_mut!(send_fut);
+        let mut send_fut = pin!(send_fut);
 
         // Close the channel without getting results
         drop(iter);
@@ -471,7 +471,7 @@ mod tests {
         ]);
 
         let send_fut = send_scan_results_over_fidl(iter_server, &fidl_scan_results);
-        pin_mut!(send_fut);
+        let mut send_fut = pin!(send_fut);
 
         let mut output_iter_fut = iter.get_next();
 
@@ -498,7 +498,7 @@ mod tests {
         ]);
 
         let send_fut = send_scan_results_over_fidl(iter_server, &fidl_scan_results);
-        pin_mut!(send_fut);
+        let mut send_fut = pin!(send_fut);
 
         let mut output_iter_fut = iter.get_next();
 
@@ -522,7 +522,7 @@ mod tests {
             ]);
 
         let send_fut = send_scan_results_over_fidl(iter_server, &fidl_scan_results);
-        pin_mut!(send_fut);
+        let mut send_fut = pin!(send_fut);
 
         let mut output_iter_fut = iter.get_next();
 
@@ -549,7 +549,7 @@ mod tests {
             ]);
 
         let send_fut = send_scan_results_over_fidl(iter_server, &fidl_scan_results);
-        pin_mut!(send_fut);
+        let mut send_fut = pin!(send_fut);
 
         let mut output_iter_fut = iter.get_next();
 

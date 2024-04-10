@@ -286,8 +286,8 @@ mod tests {
         fidl::endpoints::create_proxy,
         fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync,
         futures::{future::BoxFuture, task::Poll, StreamExt},
-        pin_utils::pin_mut,
         rand::Rng,
+        std::pin::pin,
         test_case::test_case,
         wlan_common::{assert_variant, channel::Cbw, RadioConfig},
     };
@@ -427,13 +427,13 @@ mod tests {
         };
         let req_reason = client_types::DisconnectReason::NetworkUnsaved;
         let disconnect_fut = test_values.iface_manager.disconnect(req.clone(), req_reason);
-        pin_mut!(disconnect_fut);
+        let mut disconnect_fut = pin!(disconnect_fut);
 
         assert_variant!(test_values.exec.run_until_stalled(&mut disconnect_fut), Poll::Pending);
 
         // Verify that the receiver sees the command and send back a response.
         let next_message = test_values.receiver.next();
-        pin_mut!(next_message);
+        let mut next_message = pin!(next_message);
 
         assert_variant!(
             test_values.exec.run_until_stalled(&mut next_message),
@@ -468,11 +468,11 @@ mod tests {
         let disconnect_fut = test_values
             .iface_manager
             .disconnect(req.clone(), client_types::DisconnectReason::NetworkUnsaved);
-        pin_mut!(disconnect_fut);
+        let mut disconnect_fut = pin!(disconnect_fut);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         match failure_mode {
             NegativeTestFailureMode::RequestFailure => {}
@@ -510,13 +510,13 @@ mod tests {
             client_types::ConnectReason::FidlConnectRequest,
         );
         let connect_fut = test_values.iface_manager.connect(req.clone());
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
 
         assert_variant!(test_values.exec.run_until_stalled(&mut connect_fut), Poll::Pending);
 
         // Verify that the receiver sees the command and send back a response.
         let next_message = test_values.receiver.next();
-        pin_mut!(next_message);
+        let mut next_message = pin!(next_message);
 
         assert_variant!(
             test_values.exec.run_until_stalled(&mut next_message),
@@ -549,11 +549,11 @@ mod tests {
             client_types::ConnectReason::FidlConnectRequest,
         );
         let connect_fut = test_values.iface_manager.connect(req.clone());
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         match failure_mode {
             NegativeTestFailureMode::RequestFailure => {}
@@ -581,13 +581,13 @@ mod tests {
         // Request that an idle client be recorded.
         let iface_id = 123;
         let idle_client_fut = test_values.iface_manager.record_idle_client(iface_id);
-        pin_mut!(idle_client_fut);
+        let mut idle_client_fut = pin!(idle_client_fut);
 
         assert_variant!(test_values.exec.run_until_stalled(&mut idle_client_fut), Poll::Pending);
 
         // Verify that the receiver sees the request.
         let next_message = test_values.receiver.next();
-        pin_mut!(next_message);
+        let mut next_message = pin!(next_message);
 
         assert_variant!(
             test_values.exec.run_until_stalled(&mut next_message),
@@ -614,11 +614,11 @@ mod tests {
         // Request that an idle client be recorded.
         let iface_id = 123;
         let idle_client_fut = test_values.iface_manager.record_idle_client(iface_id);
-        pin_mut!(idle_client_fut);
+        let mut idle_client_fut = pin!(idle_client_fut);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         match failure_mode {
             NegativeTestFailureMode::RequestFailure => {}
@@ -648,12 +648,12 @@ mod tests {
 
         // Query whether there is an idle client
         let idle_client_fut = test_values.iface_manager.has_idle_client();
-        pin_mut!(idle_client_fut);
+        let mut idle_client_fut = pin!(idle_client_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut idle_client_fut), Poll::Pending);
 
         // Verify that the service sees the query
         let next_message = test_values.receiver.next();
-        pin_mut!(next_message);
+        let mut next_message = pin!(next_message);
 
         assert_variant!(
             test_values.exec.run_until_stalled(&mut next_message),
@@ -677,12 +677,12 @@ mod tests {
 
         // Query whether there is an idle client
         let idle_client_fut = test_values.iface_manager.has_idle_client();
-        pin_mut!(idle_client_fut);
+        let mut idle_client_fut = pin!(idle_client_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut idle_client_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         match failure_mode {
             NegativeTestFailureMode::RequestFailure => {}
@@ -712,12 +712,12 @@ mod tests {
 
         // Add an interface
         let added_iface_fut = test_values.iface_manager.handle_added_iface(123);
-        pin_mut!(added_iface_fut);
+        let mut added_iface_fut = pin!(added_iface_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut added_iface_fut), Poll::Pending);
 
         // Verify that the service sees the query
         let next_message = test_values.receiver.next();
-        pin_mut!(next_message);
+        let mut next_message = pin!(next_message);
 
         assert_variant!(
             test_values.exec.run_until_stalled(&mut next_message),
@@ -743,12 +743,12 @@ mod tests {
 
         // Add an interface
         let added_iface_fut = test_values.iface_manager.handle_added_iface(123);
-        pin_mut!(added_iface_fut);
+        let mut added_iface_fut = pin!(added_iface_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut added_iface_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         match failure_mode {
             NegativeTestFailureMode::RequestFailure => {}
@@ -778,12 +778,12 @@ mod tests {
 
         // Report the removal of an interface.
         let removed_iface_fut = test_values.iface_manager.handle_removed_iface(123);
-        pin_mut!(removed_iface_fut);
+        let mut removed_iface_fut = pin!(removed_iface_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut removed_iface_fut), Poll::Pending);
 
         // Verify that the service sees the query
         let next_message = test_values.receiver.next();
-        pin_mut!(next_message);
+        let mut next_message = pin!(next_message);
 
         assert_variant!(
             test_values.exec.run_until_stalled(&mut next_message),
@@ -809,12 +809,12 @@ mod tests {
 
         // Report the removal of an interface.
         let removed_iface_fut = test_values.iface_manager.handle_removed_iface(123);
-        pin_mut!(removed_iface_fut);
+        let mut removed_iface_fut = pin!(removed_iface_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut removed_iface_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         match failure_mode {
             NegativeTestFailureMode::RequestFailure => {}
@@ -844,12 +844,12 @@ mod tests {
 
         // Request a scan
         let scan_proxy_fut = test_values.iface_manager.get_sme_proxy_for_scan();
-        pin_mut!(scan_proxy_fut);
+        let mut scan_proxy_fut = pin!(scan_proxy_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut scan_proxy_fut), Poll::Pending);
 
         // Verify that the service sees the request.
         let next_message = test_values.receiver.next();
-        pin_mut!(next_message);
+        let mut next_message = pin!(next_message);
 
         assert_variant!(
             test_values.exec.run_until_stalled(&mut next_message),
@@ -879,11 +879,11 @@ mod tests {
 
         // Request a scan
         let scan_proxy_fut = test_values.iface_manager.get_sme_proxy_for_scan();
-        pin_mut!(scan_proxy_fut);
+        let mut scan_proxy_fut = pin!(scan_proxy_fut);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         match failure_mode {
             NegativeTestFailureMode::RequestFailure => {}
@@ -915,12 +915,12 @@ mod tests {
         let stop_fut = test_values.iface_manager.stop_client_connections(
             client_types::DisconnectReason::FidlStopClientConnectionsRequest,
         );
-        pin_mut!(stop_fut);
+        let mut stop_fut = pin!(stop_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
 
         // Verify that the service sees the request.
         let next_message = test_values.receiver.next();
-        pin_mut!(next_message);
+        let mut next_message = pin!(next_message);
 
         assert_variant!(
             test_values.exec.run_until_stalled(&mut next_message),
@@ -947,12 +947,12 @@ mod tests {
         let stop_fut = test_values.iface_manager.stop_client_connections(
             client_types::DisconnectReason::FidlStopClientConnectionsRequest,
         );
-        pin_mut!(stop_fut);
+        let mut stop_fut = pin!(stop_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         match failure_mode {
             NegativeTestFailureMode::RequestFailure => {}
@@ -976,12 +976,12 @@ mod tests {
 
         // Start client connections
         let start_fut = test_values.iface_manager.start_client_connections();
-        pin_mut!(start_fut);
+        let mut start_fut = pin!(start_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
 
         // Verify that the service sees the request.
         let next_message = test_values.receiver.next();
-        pin_mut!(next_message);
+        let mut next_message = pin!(next_message);
 
         assert_variant!(
             test_values.exec.run_until_stalled(&mut next_message),
@@ -1005,12 +1005,12 @@ mod tests {
 
         // Start client connections
         let start_fut = test_values.iface_manager.start_client_connections();
-        pin_mut!(start_fut);
+        let mut start_fut = pin!(start_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         match failure_mode {
             NegativeTestFailureMode::RequestFailure => {}
@@ -1047,12 +1047,12 @@ mod tests {
 
         // Start an AP
         let start_fut = test_values.iface_manager.start_ap(create_ap_config());
-        pin_mut!(start_fut);
+        let mut start_fut = pin!(start_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
 
         // Verify the service sees the request
         let next_message = test_values.receiver.next();
-        pin_mut!(next_message);
+        let mut next_message = pin!(next_message);
 
         assert_variant!(
             test_values.exec.run_until_stalled(&mut next_message),
@@ -1079,12 +1079,12 @@ mod tests {
 
         // Start an AP
         let start_fut = test_values.iface_manager.start_ap(create_ap_config());
-        pin_mut!(start_fut);
+        let mut start_fut = pin!(start_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut start_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         match failure_mode {
             NegativeTestFailureMode::RequestFailure => {}
@@ -1110,12 +1110,12 @@ mod tests {
         let stop_fut = test_values
             .iface_manager
             .stop_ap(Ssid::try_from("foo").unwrap(), "bar".as_bytes().to_vec());
-        pin_mut!(stop_fut);
+        let mut stop_fut = pin!(stop_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
 
         // Verify the service sees the request
         let next_message = test_values.receiver.next();
-        pin_mut!(next_message);
+        let mut next_message = pin!(next_message);
 
         assert_variant!(
             test_values.exec.run_until_stalled(&mut next_message),
@@ -1144,12 +1144,12 @@ mod tests {
         let stop_fut = test_values
             .iface_manager
             .stop_ap(Ssid::try_from("foo").unwrap(), "bar".as_bytes().to_vec());
-        pin_mut!(stop_fut);
+        let mut stop_fut = pin!(stop_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         match failure_mode {
             NegativeTestFailureMode::RequestFailure => {}
@@ -1173,12 +1173,12 @@ mod tests {
 
         // Stop an AP
         let stop_fut = test_values.iface_manager.stop_all_aps();
-        pin_mut!(stop_fut);
+        let mut stop_fut = pin!(stop_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
 
         // Verify the service sees the request
         let next_message = test_values.receiver.next();
-        pin_mut!(next_message);
+        let mut next_message = pin!(next_message);
         assert_variant!(
             test_values.exec.run_until_stalled(&mut next_message),
             Poll::Ready(Some(IfaceManagerRequest::AtomicOperation(AtomicOperation::StopAllAps(StopAllApsRequest{
@@ -1201,12 +1201,12 @@ mod tests {
 
         // Stop an AP
         let stop_fut = test_values.iface_manager.stop_all_aps();
-        pin_mut!(stop_fut);
+        let mut stop_fut = pin!(stop_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         match failure_mode {
             NegativeTestFailureMode::RequestFailure => {}
@@ -1230,12 +1230,12 @@ mod tests {
 
         // Query whether there is an iface that can do WPA3.
         let has_wpa3_fut = test_values.iface_manager.has_wpa3_capable_client();
-        pin_mut!(has_wpa3_fut);
+        let mut has_wpa3_fut = pin!(has_wpa3_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut has_wpa3_fut), Poll::Pending);
 
         // Verify that the service sees the query
         let next_message = test_values.receiver.next();
-        pin_mut!(next_message);
+        let mut next_message = pin!(next_message);
 
         assert_variant!(
             test_values.exec.run_until_stalled(&mut next_message),
@@ -1259,12 +1259,12 @@ mod tests {
 
         // Query whether there is an iface with WPA3 support
         let has_wpa3_fut = test_values.iface_manager.has_wpa3_capable_client();
-        pin_mut!(has_wpa3_fut);
+        let mut has_wpa3_fut = pin!(has_wpa3_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut has_wpa3_fut), Poll::Pending);
 
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         match failure_mode {
             NegativeTestFailureMode::RequestFailure => {}
@@ -1291,12 +1291,12 @@ mod tests {
 
         // Set country code
         let set_country_fut = test_values.iface_manager.set_country(None);
-        pin_mut!(set_country_fut);
+        let mut set_country_fut = pin!(set_country_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
 
         // Verify the service sees the request
         let next_message = test_values.receiver.next();
-        pin_mut!(next_message);
+        let mut next_message = pin!(next_message);
 
         assert_variant!(
             test_values.exec.run_until_stalled(&mut next_message),
@@ -1324,11 +1324,11 @@ mod tests {
 
         // Set country code
         let set_country_fut = test_values.iface_manager.set_country(None);
-        pin_mut!(set_country_fut);
+        let mut set_country_fut = pin!(set_country_fut);
         assert_variant!(test_values.exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
         let service_fut =
             iface_manager_api_negative_test(test_values.receiver, failure_mode.clone());
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         match failure_mode {
             NegativeTestFailureMode::RequestFailure => {}
@@ -1371,7 +1371,7 @@ mod tests {
 
         // Issue the scan request.
         let scan_result_fut = sme.scan(&scan_request);
-        pin_mut!(scan_result_fut);
+        let mut scan_result_fut = pin!(scan_result_fut);
         assert_variant!(exec.run_until_stalled(&mut scan_result_fut), Poll::Pending);
 
         // Poll the server end of the SME and expect that a scan request has been forwarded.

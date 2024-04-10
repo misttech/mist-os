@@ -20,7 +20,7 @@ use std::{
     fs, io,
     num::NonZeroU64,
     path,
-    pin::Pin,
+    pin::{pin, Pin},
     str::FromStr,
 };
 
@@ -877,7 +877,7 @@ impl<'a> NetCfg<'a> {
     ) -> Result<(), anyhow::Error> {
         let netdev_stream =
             self.create_device_stream().await.context("create netdevice stream")?.fuse();
-        futures::pin_mut!(netdev_stream);
+        let mut netdev_stream = pin!(netdev_stream);
 
         let if_watcher_event_stream = fnet_interfaces_ext::event_stream_from_state(
             &self.interface_state,
@@ -885,7 +885,7 @@ impl<'a> NetCfg<'a> {
         )
         .context("error creating interface watcher event stream")?
         .fuse();
-        futures::pin_mut!(if_watcher_event_stream);
+        let mut if_watcher_event_stream = pin!(if_watcher_event_stream);
 
         let dns_server_watcher =
             fuchsia_component::client::connect_to_protocol::<fnet_name::DnsServerWatcherMarker>()
@@ -2412,7 +2412,7 @@ impl<'a> NetCfg<'a> {
 
         let state_stream =
             fidl_fuchsia_net_interfaces_ext::admin::assignment_state_stream(address_state_provider);
-        futures::pin_mut!(state_stream);
+        let mut state_stream = pin!(state_stream);
         let () = fidl_fuchsia_net_interfaces_ext::admin::wait_assignment_state(
             &mut state_stream,
             fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
@@ -3676,7 +3676,7 @@ mod tests {
                 )
                 .map(|result| result.expect("handling interfaces watcher event"))
                 .fuse();
-            futures::pin_mut!(netcfg_fut);
+            let netcfg_fut = pin!(netcfg_fut);
             if added_online {
                 // Serving should be started. Expect both futures to terminate.
                 let ((), ()) = futures::join!(netcfg_fut, start_serving_fut);
@@ -3700,7 +3700,7 @@ mod tests {
                 &mut dns_watchers,
             )
             .fuse();
-            futures::pin_mut!(netcfg_fut);
+            let netcfg_fut = pin!(netcfg_fut);
             // Serving should be started. Expect both futures to terminate.
             let ((), ()) = futures::join!(netcfg_fut, start_serving_fut);
         }

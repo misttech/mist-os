@@ -88,7 +88,7 @@ mod tests {
     use futures::stream::{StreamExt, StreamFuture};
     use futures::task::Poll;
     use ieee80211::Ssid;
-    use pin_utils::pin_mut;
+    use std::pin::pin;
 
     use wlan_common::assert_variant;
 
@@ -155,7 +155,7 @@ mod tests {
         };
 
         let fut = start(&ap_sme, target_ssid, target_password, channel);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         send_start_ap_response(&mut exec, &mut ap_sme_req, config, result_code);
@@ -233,7 +233,7 @@ mod tests {
         let (mut exec, proxy, mut req_stream) =
             crate::tests::setup_fake_service::<DeviceMonitorMarker>();
         let fut = get_first_sme(&proxy);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         let ifaces = (0..iface_list.len() as u16).collect();
 

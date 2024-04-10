@@ -276,7 +276,7 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fuchsia_async as fasync;
     use futures::StreamExt;
-    use std::task::Poll;
+    use std::{pin::pin, task::Poll};
 
     // This also gets tested at a service level. Test that we get a TargetBound error on double set.
     // Test that we can set again after the target handler has closed.
@@ -312,12 +312,10 @@ mod tests {
             .expect("Error creating TargetHandler endpoint");
         assert_matches!(target_delegate.set_target_handler(target_proxy), Ok(()));
 
-        let get_media_attr_fut = target_delegate.send_get_media_attributes_command();
-        pin_utils::pin_mut!(get_media_attr_fut);
+        let mut get_media_attr_fut = pin!(target_delegate.send_get_media_attributes_command());
         assert!(exec.run_until_stalled(&mut get_media_attr_fut).is_pending());
 
-        let select_next_some_fut = target_stream.select_next_some();
-        pin_utils::pin_mut!(select_next_some_fut);
+        let mut select_next_some_fut = pin!(target_stream.select_next_some());
         match exec.run_until_stalled(&mut select_next_some_fut) {
             Poll::Ready(Ok(TargetHandlerRequest::GetMediaAttributes { responder })) => {
                 assert!(responder.send(Ok(&MediaAttributes::default())).is_ok());
@@ -343,13 +341,11 @@ mod tests {
             .expect("Error creating TargetHandler endpoint");
         assert_matches!(target_delegate.set_target_handler(target_proxy), Ok(()));
 
-        let list_pas_fut =
-            target_delegate.send_list_player_application_setting_attributes_command();
-        pin_utils::pin_mut!(list_pas_fut);
+        let mut list_pas_fut =
+            pin!(target_delegate.send_list_player_application_setting_attributes_command());
         assert!(exec.run_until_stalled(&mut list_pas_fut).is_pending());
 
-        let select_next_some_fut = target_stream.select_next_some();
-        pin_utils::pin_mut!(select_next_some_fut);
+        let mut select_next_some_fut = pin!(target_stream.select_next_some());
         match exec.run_until_stalled(&mut select_next_some_fut) {
             Poll::Ready(Ok(TargetHandlerRequest::ListPlayerApplicationSettingAttributes {
                 responder,
@@ -378,12 +374,11 @@ mod tests {
         assert_matches!(target_delegate.set_target_handler(target_proxy), Ok(()));
 
         let attributes = vec![PlayerApplicationSettingAttributeId::ShuffleMode];
-        let get_pas_fut = target_delegate.send_get_player_application_settings_command(attributes);
-        pin_utils::pin_mut!(get_pas_fut);
+        let mut get_pas_fut =
+            pin!(target_delegate.send_get_player_application_settings_command(attributes));
         assert!(exec.run_until_stalled(&mut get_pas_fut).is_pending());
 
-        let select_next_some_fut = target_stream.select_next_some();
-        pin_utils::pin_mut!(select_next_some_fut);
+        let mut select_next_some_fut = pin!(target_stream.select_next_some());
         match exec.run_until_stalled(&mut select_next_some_fut) {
             Poll::Ready(Ok(TargetHandlerRequest::GetPlayerApplicationSettings {
                 responder,
@@ -426,12 +421,11 @@ mod tests {
         // Current media doesn't support Equalizer.
         let attributes =
             PlayerApplicationSettings { equalizer: Some(Equalizer::Off), ..Default::default() };
-        let set_pas_fut = target_delegate.send_set_player_application_settings_command(attributes);
-        pin_utils::pin_mut!(set_pas_fut);
+        let mut set_pas_fut =
+            pin!(target_delegate.send_set_player_application_settings_command(attributes));
         assert!(exec.run_until_stalled(&mut set_pas_fut).is_pending());
 
-        let select_next_some_fut = target_stream.select_next_some();
-        pin_utils::pin_mut!(select_next_some_fut);
+        let mut select_next_some_fut = pin!(target_stream.select_next_some());
         match exec.run_until_stalled(&mut select_next_some_fut) {
             Poll::Ready(Ok(TargetHandlerRequest::SetPlayerApplicationSettings {
                 responder,
@@ -462,12 +456,10 @@ mod tests {
             .expect("Error creating TargetHandler endpoint");
         assert_matches!(target_delegate.set_target_handler(target_proxy), Ok(()));
 
-        let get_media_fut = target_delegate.send_get_media_player_items_command();
-        pin_utils::pin_mut!(get_media_fut);
+        let mut get_media_fut = pin!(target_delegate.send_get_media_player_items_command());
         assert!(exec.run_until_stalled(&mut get_media_fut).is_pending());
 
-        let select_next_some_fut = target_stream.select_next_some();
-        pin_utils::pin_mut!(select_next_some_fut);
+        let mut select_next_some_fut = pin!(target_stream.select_next_some());
         match exec.run_until_stalled(&mut select_next_some_fut) {
             Poll::Ready(Ok(TargetHandlerRequest::GetMediaPlayerItems { responder, .. })) => {
                 assert!(responder
@@ -497,8 +489,7 @@ mod tests {
         let target_delegate = TargetDelegate::new();
         {
             // try without a target handler
-            let get_supported_events_fut = target_delegate.get_supported_events();
-            pin_utils::pin_mut!(get_supported_events_fut);
+            let mut get_supported_events_fut = pin!(target_delegate.get_supported_events());
             match exec.run_until_stalled(&mut get_supported_events_fut) {
                 Poll::Ready(events) => {
                     assert_eq!(
@@ -520,12 +511,10 @@ mod tests {
                     .expect("Error creating TargetHandler endpoint");
             assert_matches!(target_delegate.set_target_handler(target_proxy), Ok(()));
 
-            let get_supported_events_fut = target_delegate.get_supported_events();
-            pin_utils::pin_mut!(get_supported_events_fut);
+            let mut get_supported_events_fut = pin!(target_delegate.get_supported_events());
             assert!(exec.run_until_stalled(&mut get_supported_events_fut).is_pending());
 
-            let select_next_some_fut = target_stream.select_next_some();
-            pin_utils::pin_mut!(select_next_some_fut);
+            let mut select_next_some_fut = pin!(target_stream.select_next_some());
             match exec.run_until_stalled(&mut select_next_some_fut) {
                 Poll::Ready(Ok(TargetHandlerRequest::GetEventsSupported { responder })) => {
                     assert!(responder

@@ -453,7 +453,7 @@ mod tests {
     use super::*;
     use {
         core::hash::Hash, fidl_fuchsia_bluetooth_sys::Key,
-        fuchsia_component::client::connect_to_protocol, futures::select, pin_utils::pin_mut,
+        fuchsia_component::client::connect_to_protocol, futures::select, std::pin::pin,
     };
 
     static TEST_INSPECT_ROOT: &'static str = "test";
@@ -1027,8 +1027,8 @@ mod tests {
         let (stash, run_stash) = build_stash(inner);
         let run_fn = f(stash);
 
-        pin_mut!(run_stash);
-        pin_mut!(run_fn);
+        let run_stash = pin!(run_stash);
+        let run_fn = pin!(run_fn);
         select! {
             result = run_fn.fuse() => result,
             run = run_stash.fuse() => match run {

@@ -13,6 +13,7 @@ use netstack_testing_common::{
     wait_for_component_stopped,
 };
 use netstack_testing_macros::netstack_test;
+use std::pin::pin;
 use test_case::test_case;
 
 const IPERF_URL: &str = "#meta/iperf.cm";
@@ -119,7 +120,7 @@ async fn version<N: Netstack>(name: &str) {
         .expect("subscribe to logs");
 
     let crash_monitor = watch_for_crash(&realm, IPERF_MONIKER).fuse();
-    futures::pin_mut!(crash_monitor);
+    let mut crash_monitor = pin!(crash_monitor);
     futures::select! {
         () = wait_for_log(stream, "iperf 3.7-FUCHSIA").fuse() => {},
         () = crash_monitor => {},
@@ -172,9 +173,8 @@ async fn loopback<N: Netstack, I: net_types::ip::Ip + TestIpExt>(name: &str, pro
         )
         .expect("create realm");
 
-    let client_crash_monitor = watch_for_crash(&realm, CLIENT_MONIKER).fuse();
-    let server_crash_monitor = watch_for_crash(&realm, SERVER_MONIKER).fuse();
-    futures::pin_mut!(client_crash_monitor, server_crash_monitor);
+    let mut client_crash_monitor = pin!(watch_for_crash(&realm, CLIENT_MONIKER).fuse());
+    let mut server_crash_monitor = pin!(watch_for_crash(&realm, SERVER_MONIKER).fuse());
 
     // Wait for the server to start up.
     let server_moniker =

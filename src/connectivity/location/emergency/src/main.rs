@@ -272,8 +272,8 @@ mod tests {
         super::*,
         fidl::endpoints::create_proxy_and_stream,
         futures::channel::mpsc,
-        futures::{future, pin_mut},
-        std::task::Poll,
+        futures::future,
+        std::{pin::pin, task::Poll},
         test_doubles::{FakeBssCache, StubBssResolver},
     };
 
@@ -385,7 +385,7 @@ mod tests {
                         .as_occurrence(1)]
                 );
             };
-            pin_mut!(test_fut);
+            let mut test_fut = pin!(test_fut);
             assert_matches::assert_matches!(
                 fasync::TestExecutor::new().run_until_stalled(&mut test_fut),
                 Poll::Ready(_)
@@ -673,7 +673,7 @@ mod tests {
                         .as_occurrence(1)]
                 );
             };
-            pin_mut!(test_fut);
+            let mut test_fut = pin!(test_fut);
             assert_matches::assert_matches!(
                 fasync::TestExecutor::new().run_until_stalled(&mut test_fut),
                 Poll::Ready(_)
@@ -721,7 +721,7 @@ mod tests {
                     vec![]
                 );
             };
-            pin_mut!(test_fut);
+            let mut test_fut = pin!(test_fut);
             assert_matches::assert_matches!(
                 fasync::TestExecutor::new().run_until_stalled(&mut test_fut),
                 Poll::Ready(_)

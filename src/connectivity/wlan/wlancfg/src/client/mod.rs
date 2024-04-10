@@ -522,7 +522,7 @@ mod tests {
             channel::{mpsc, oneshot},
             task::Poll,
         },
-        pin_utils::pin_mut,
+        std::pin::pin,
         test_case::test_case,
         wlan_common::assert_variant,
     };
@@ -778,7 +778,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -792,7 +792,7 @@ mod tests {
             ssid: ssid.to_vec(),
             type_: fidl_policy::SecurityType::None,
         });
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
 
         // Process connect request and verify connect response.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -823,7 +823,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -834,7 +834,7 @@ mod tests {
 
         // Issue connect request.
         let connect_fut = controller.connect(&test_values.net_id_open);
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
 
         // Process connect request and verify connect response.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -860,7 +860,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -871,7 +871,7 @@ mod tests {
 
         // Issue connect request.
         let connect_fut = controller.connect(&test_values.net_id_wpa2_w_password);
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
 
         // Process connect request and verify connect response.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -897,7 +897,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -908,7 +908,7 @@ mod tests {
 
         // Issue connect request.
         let connect_fut = controller.connect(&test_values.net_id_wpa2_w_psk);
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
 
         // Process connect request and verify connect response.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -942,7 +942,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -962,7 +962,7 @@ mod tests {
         };
         // Check that connect request fails because WPA3 is not supported.
         let connect_fut = controller.connect(&net_id);
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut connect_fut),
@@ -983,7 +983,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -999,12 +999,12 @@ mod tests {
         };
         let password = Credential::Password(b"password".to_vec());
         let save_fut = test_values.saved_networks.store(net_id.clone().into(), password);
-        pin_mut!(save_fut);
+        let mut save_fut = pin!(save_fut);
         assert!(exec.run_singlethreaded(&mut save_fut).expect("Failed to save network").is_none());
 
         // Issue connect request to a WPA3 network.
         let connect_fut = controller.connect(&net_id);
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut connect_fut),
@@ -1025,7 +1025,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should now be waiting for request.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1036,7 +1036,7 @@ mod tests {
 
         // Issue request to start client connections.
         let start_fut = controller.start_client_connections();
-        pin_mut!(start_fut);
+        let mut start_fut = pin!(start_fut);
 
         // Request should be acknowledged.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1052,7 +1052,7 @@ mod tests {
 
         // Perform a connect operation.
         let connect_fut = controller.connect(&test_values.net_id_wpa2_w_password);
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
 
         // Process connect request and verify connect response.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1068,7 +1068,7 @@ mod tests {
 
         // Issue request to stop client connections.
         let stop_fut = controller.stop_client_connections();
-        pin_mut!(stop_fut);
+        let mut stop_fut = pin!(stop_fut);
 
         // Run the serve future until it stalls and expect the client to disconnect
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1102,7 +1102,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1161,7 +1161,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1215,19 +1215,19 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // Setup the IfaceManager so that it has a disconnected iface.
         {
             let iface_manager = test_values.iface_manager.clone();
             let iface_manager_fut = iface_manager.lock();
-            pin_mut!(iface_manager_fut);
+            let mut iface_manager_fut = pin!(iface_manager_fut);
             let mut iface_manager = match exec.run_until_stalled(&mut iface_manager_fut) {
                 Poll::Ready(iface_manager) => iface_manager,
                 Poll::Pending => panic!("expected to acquire iface_manager lock"),
             };
             let record_idle_fut = iface_manager.record_idle_client(0);
-            pin_mut!(record_idle_fut);
+            let mut record_idle_fut = pin!(record_idle_fut);
             assert_variant!(exec.run_until_stalled(&mut record_idle_fut), Poll::Ready(Ok(())));
         }
 
@@ -1285,7 +1285,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1302,7 +1302,7 @@ mod tests {
         let network_id = NetworkIdentifier::try_from("foo", SecurityType::Wpa2).unwrap();
         let credential = Credential::Password(b"password".to_vec());
         let save_fut = saved_networks.store(network_id.clone(), credential.clone());
-        pin_mut!(save_fut);
+        let mut save_fut = pin!(save_fut);
         assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
 
         // Save a network with the same identifier but a different password
@@ -1343,7 +1343,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1399,7 +1399,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1497,7 +1497,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1557,7 +1557,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1580,7 +1580,7 @@ mod tests {
 
         let (update_sender, mut listener_updates) = mpsc::unbounded();
         let serve_fut = serve_listener_requests(update_sender, requests);
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1611,7 +1611,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1626,7 +1626,7 @@ mod tests {
 
         // Ensure first controller is operable. Issue connect request.
         let connect_fut = controller1.connect(&test_values.net_id_open);
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
 
         // Process connect request from first controller. Verify success.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1638,7 +1638,7 @@ mod tests {
 
         // Ensure second controller is not operable. Issue connect request.
         let connect_fut = controller2.connect(&test_values.net_id_open);
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
 
         // Process connect request from second controller. Verify failure.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1660,7 +1660,7 @@ mod tests {
 
         // Ensure third controller is operable. Issue connect request.
         let connect_fut = controller3.connect(&test_values.net_id_open);
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
 
         // Process connect request from third controller. Verify success.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1684,7 +1684,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1700,7 +1700,7 @@ mod tests {
         // Verify Epitaph was received.
         let mut controller2_event_stream = controller2.take_event_stream();
         let controller2_event_fut = controller2_event_stream.next();
-        pin_mut!(controller2_event_fut);
+        let mut controller2_event_fut = pin!(controller2_event_fut);
         assert_variant!(
             exec.run_until_stalled(&mut controller2_event_fut),
             Poll::Ready(Some(Err(fidl::Error::ClientChannelClosed {
@@ -1801,7 +1801,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1812,7 +1812,7 @@ mod tests {
 
         // Issue connect request.
         let connect_fut = controller.connect(&test_values.net_id_open);
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
 
         // Process connect request from first controller. Verify success.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1891,7 +1891,7 @@ mod tests {
             test_values.requests,
             test_values.telemetry_sender.clone(),
         );
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -1915,7 +1915,7 @@ mod tests {
             requests,
             test_values.telemetry_sender,
         );
-        pin_mut!(second_serve_fut);
+        let mut second_serve_fut = pin!(second_serve_fut);
 
         // Request a client controller from the second instance of the service.
         let (controller2, _) = request_controller(&provider);
@@ -1924,7 +1924,7 @@ mod tests {
         // Verify Epitaph was received.
         let mut controller2_event_stream = controller2.take_event_stream();
         let controller2_event_fut = controller2_event_stream.next();
-        pin_mut!(controller2_event_fut);
+        let mut controller2_event_fut = pin!(controller2_event_fut);
         assert_variant!(
             exec.run_until_stalled(&mut controller2_event_fut),
             Poll::Ready(Some(Err(fidl::Error::ClientChannelClosed {
@@ -1944,7 +1944,7 @@ mod tests {
 
         // Ensure the new controller works by issuing a connect request.
         let connect_fut = controller2.connect(&test_values.net_id_open);
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
 
         // Process connect request from first controller. Verify success.
         assert_variant!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
@@ -1974,7 +1974,7 @@ mod tests {
         // Regardless of what the IfaceManager is actually able to do, we expect the response to
         // simply ack the caller.
         let fut = handle_client_request_start_client_connections(iface_manager);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(
             exec.run_until_stalled(&mut fut),
             Poll::Ready(fidl_common::RequestStatus::Acknowledged)
@@ -2000,7 +2000,7 @@ mod tests {
         // Regardless of what the IfaceManager is actually able to do, we expect the response to
         // simply ack the caller.
         let fut = handle_client_request_stop_client_connections(iface_manager);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(
             exec.run_until_stalled(&mut fut),
             Poll::Ready(fidl_common::RequestStatus::Acknowledged)

@@ -120,11 +120,7 @@ pub fn channel<Req, Resp>(buffer: usize) -> (Sender<Req, Resp>, Receiver<Req, Re
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_async as fasync,
-        futures::{pin_mut, StreamExt},
-    };
+    use {super::*, fuchsia_async as fasync, futures::StreamExt, std::pin::pin};
 
     macro_rules! unwrap_ready {
         ($poll:expr) => {
@@ -141,11 +137,11 @@ mod tests {
         let (mut sender, mut receiver) = channel(0);
 
         let received = receiver.next();
-        pin_mut!(received);
+        let mut received = pin!(received);
         assert!(ex.run_until_stalled(&mut received).is_pending());
 
         let request = sender.request(());
-        pin_mut!(request);
+        let mut request = pin!(request);
         assert!(ex.run_until_stalled(&mut request).is_pending());
 
         let ((), responder) = unwrap_ready!(ex.run_until_stalled(&mut received)).unwrap();
@@ -164,11 +160,11 @@ mod tests {
         let mut sender2 = sender.clone();
 
         let received = receiver.next();
-        pin_mut!(received);
+        let mut received = pin!(received);
         assert!(ex.run_until_stalled(&mut received).is_pending());
 
         let request = sender.request(());
-        pin_mut!(request);
+        let mut request = pin!(request);
         assert!(ex.run_until_stalled(&mut request).is_pending());
 
         let ((), responder) = unwrap_ready!(ex.run_until_stalled(&mut received)).unwrap();
@@ -180,11 +176,11 @@ mod tests {
         unwrap_ready!(ex.run_until_stalled(&mut request)).unwrap();
 
         let received = receiver.next();
-        pin_mut!(received);
+        let mut received = pin!(received);
         assert!(ex.run_until_stalled(&mut received).is_pending());
 
         let request = sender2.request(());
-        pin_mut!(request);
+        let mut request = pin!(request);
         assert!(ex.run_until_stalled(&mut request).is_pending());
 
         let ((), responder) = unwrap_ready!(ex.run_until_stalled(&mut received)).unwrap();
@@ -202,7 +198,7 @@ mod tests {
         let (mut sender, receiver) = channel::<(), ()>(0);
 
         let request = sender.request(());
-        pin_mut!(request);
+        let mut request = pin!(request);
         assert!(ex.run_until_stalled(&mut request).is_pending());
 
         drop(receiver);
@@ -216,11 +212,11 @@ mod tests {
         let (mut sender, mut receiver) = channel::<(), ()>(0);
 
         let request = sender.request(());
-        pin_mut!(request);
+        let mut request = pin!(request);
         assert!(ex.run_until_stalled(&mut request).is_pending());
 
         let received = receiver.next();
-        pin_mut!(received);
+        let mut received = pin!(received);
         let ((), responder) = unwrap_ready!(ex.run_until_stalled(&mut received)).unwrap();
 
         assert!(ex.run_until_stalled(&mut request).is_pending());
@@ -235,7 +231,7 @@ mod tests {
         let (sender, mut receiver) = channel::<(), ()>(0);
 
         let received = receiver.next();
-        pin_mut!(received);
+        let mut received = pin!(received);
         assert!(ex.run_until_stalled(&mut received).is_pending());
 
         drop(sender);
@@ -250,12 +246,12 @@ mod tests {
 
         {
             let request = sender.request(());
-            pin_mut!(request);
+            let mut request = pin!(request);
             assert!(ex.run_until_stalled(&mut request).is_pending());
         } // request is dropped at the end of the block
 
         let received = receiver.next();
-        pin_mut!(received);
+        let mut received = pin!(received);
         let ((), responder) = unwrap_ready!(ex.run_until_stalled(&mut received)).unwrap();
 
         drop(sender);
@@ -289,7 +285,7 @@ mod tests {
         let (mut sender, mut receiver) = channel::<(), ()>(0);
 
         let request = sender.request(());
-        pin_mut!(request);
+        let mut request = pin!(request);
         assert!(ex.run_until_stalled(&mut request).is_pending());
 
         assert!(receiver.try_receive().unwrap().is_some());

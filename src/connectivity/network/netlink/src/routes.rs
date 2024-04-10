@@ -1100,6 +1100,7 @@ mod tests {
     };
     use netlink_packet_core::NetlinkPayload;
     use netlink_packet_route::RTNLGRP_LINK;
+    use std::pin::pin;
     use test_case::test_case;
 
     use crate::{
@@ -1686,13 +1687,12 @@ mod tests {
             request_sink: _,
             background_work,
         } = setup::<I>();
-        let event_loop_fut = event_loop.run();
-        let watcher_fut = respond_to_watcher_with_routes(watcher_stream, [route], None);
+        let event_loop_fut = pin!(event_loop.run());
+        let watcher_fut = pin!(respond_to_watcher_with_routes(watcher_stream, [route], None));
 
-        futures::pin_mut!(event_loop_fut, watcher_fut, background_work);
         let ((err, ()), _incomplete_background_work) = futures::future::select(
             futures::future::join(event_loop_fut, watcher_fut),
-            background_work.map(|_output| unreachable!()),
+            pin!(background_work.map(|_output| unreachable!())),
         )
         .await
         .factor_first();
@@ -1730,16 +1730,15 @@ mod tests {
             request_sink: _,
             background_work,
         } = setup::<I>();
-        let event_loop_fut = event_loop.run();
+        let event_loop_fut = pin!(event_loop.run());
         let routes_existing = [route.clone()];
         let new_event = fnet_routes_ext::Event::Existing(route.clone());
         let watcher_fut =
-            respond_to_watcher_with_routes(watcher_stream, routes_existing, Some(new_event));
+            pin!(respond_to_watcher_with_routes(watcher_stream, routes_existing, Some(new_event)));
 
-        futures::pin_mut!(event_loop_fut, watcher_fut, background_work);
         let ((err, ()), _incomplete_background_work) = futures::future::select(
             futures::future::join(event_loop_fut, watcher_fut),
-            background_work.map(|_output| unreachable!()),
+            pin!(background_work.map(|_output| unreachable!())),
         )
         .await
         .factor_first();
@@ -1767,16 +1766,15 @@ mod tests {
             request_sink: _,
             background_work,
         } = setup::<I>();
-        let event_loop_fut = event_loop.run();
+        let event_loop_fut = pin!(event_loop.run());
         let routes_existing = [route.clone()];
         let new_event = fnet_routes_ext::Event::Added(route.clone());
         let watcher_fut =
-            respond_to_watcher_with_routes(watcher_stream, routes_existing, Some(new_event));
+            pin!(respond_to_watcher_with_routes(watcher_stream, routes_existing, Some(new_event)));
 
-        futures::pin_mut!(event_loop_fut, watcher_fut, background_work);
         let ((err, ()), _incomplete_background_work) = futures::future::select(
             futures::future::join(event_loop_fut, watcher_fut),
-            background_work.map(|_output| unreachable!()),
+            pin!(background_work.map(|_output| unreachable!())),
         )
         .await
         .factor_first();
@@ -1903,7 +1901,7 @@ mod tests {
             route_clients.add_client(other_client);
             route_clients
         });
-        let event_loop_fut = event_loop
+        let mut event_loop_fut = pin!(event_loop
             .run()
             .map(|res| match res {
                 Ok(never) => match never {},
@@ -1912,9 +1910,8 @@ mod tests {
                     Err::<std::convert::Infallible, _>(e)
                 }
             })
-            .fuse();
-        let background_work = background_work.fuse();
-        futures::pin_mut!(event_loop_fut, background_work);
+            .fuse());
+        let mut background_work = pin!(background_work.fuse());
 
         let watcher_stream_fut = respond_to_watcher::<A::Version, _>(
             watcher_stream.by_ref(),

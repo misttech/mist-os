@@ -441,7 +441,8 @@ pub(crate) mod tests {
     use async_utils::PollExt;
     use fidl_fuchsia_bluetooth_gatt2::LocalServiceProxy;
     use fuchsia_async as fasync;
-    use futures::{future::Either, pin_mut};
+    use futures::future::Either;
+    use std::pin::pin;
 
     #[fuchsia::test]
     fn gatt_service_is_received_by_upstream_server() {
@@ -450,11 +451,11 @@ pub(crate) mod tests {
         let (gatt_client, mut gatt_server) =
             fidl::endpoints::create_proxy_and_stream::<Server_Marker>().unwrap();
         let gatt_server_fut = gatt_server.next();
-        pin_mut!(gatt_server_fut);
+        let mut gatt_server_fut = pin!(gatt_server_fut);
         let _ = exec.run_until_stalled(&mut gatt_server_fut).expect_pending("Upstream still ok");
 
         let publish_fut = GattService::from_proxy(gatt_client, Config::example_config());
-        pin_mut!(publish_fut);
+        let mut publish_fut = pin!(publish_fut);
         let _ =
             exec.run_until_stalled(&mut publish_fut).expect_pending("Waiting for publish response");
 
@@ -481,8 +482,8 @@ pub(crate) mod tests {
 
         let publish_fut = GattService::from_proxy(gatt_server_client, Config::example_config());
         let gatt_server_fut = gatt_server.select_next_some();
-        pin_mut!(publish_fut);
-        pin_mut!(gatt_server_fut);
+        let publish_fut = pin!(publish_fut);
+        let gatt_server_fut = pin!(gatt_server_fut);
 
         match futures::future::select(publish_fut, gatt_server_fut).await {
             Either::Left(_) => panic!("Publish future resolved before GATT server responded"),
@@ -505,7 +506,7 @@ pub(crate) mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (gatt_service, _upstream_service_client) =
             exec.run_singlethreaded(setup_gatt_service());
-        pin_mut!(gatt_service);
+        let mut gatt_service = pin!(gatt_service);
 
         assert!(!gatt_service.is_terminated());
         let _ =
@@ -533,7 +534,7 @@ pub(crate) mod tests {
             &MODEL_ID_CHARACTERISTIC_HANDLE,
             /* offset */ 0,
         );
-        pin_mut!(read_request_fut);
+        let mut read_request_fut = pin!(read_request_fut);
         let _ = exec
             .run_until_stalled(&mut read_request_fut)
             .expect_pending("waiting for FIDL response");
@@ -565,7 +566,7 @@ pub(crate) mod tests {
             &FIRMWARE_REVISION_CHARACTERISTIC_HANDLE,
             /* offset */ 0,
         );
-        pin_mut!(read_request_fut);
+        let mut read_request_fut = pin!(read_request_fut);
         let _ = exec
             .run_until_stalled(&mut read_request_fut)
             .expect_pending("waiting for FIDL response");
@@ -597,7 +598,7 @@ pub(crate) mod tests {
             &Handle { value: 999 },
             /* offset */ 0,
         );
-        pin_mut!(read_request_fut);
+        let mut read_request_fut = pin!(read_request_fut);
         let _ = exec
             .run_until_stalled(&mut read_request_fut)
             .expect_pending("waiting for FIDL response");
@@ -621,8 +622,7 @@ pub(crate) mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (mut gatt_service, upstream_service_client) =
             exec.run_singlethreaded(setup_gatt_service());
-        let gatt_service_fut = gatt_service.next();
-        pin_mut!(gatt_service_fut);
+        let gatt_service_fut = pin!(gatt_service.next());
 
         // Model ID is a valid characteristic, but writes are not supported.
         let params = WriteValueRequest {
@@ -632,8 +632,7 @@ pub(crate) mod tests {
             value: Some(vec![0x00, 0x01, 0x02]),
             ..Default::default()
         };
-        let write_request_fut = upstream_service_client.write_value(&params);
-        pin_mut!(write_request_fut);
+        let write_request_fut = pin!(upstream_service_client.write_value(&params));
         // We expect an Error to be returned to the FIDL client. Additionally, no `GattService`
         // stream items should be produced. This is verified indirectly via `run_while` which will
         // panic if the `BackgroundFut` (`gatt_service_fut`) finishes.
@@ -649,8 +648,7 @@ pub(crate) mod tests {
             value: Some(vec![0x00, 0x01, 0x02]),
             ..Default::default()
         };
-        let write_request_fut = upstream_service_client.write_value(&params);
-        pin_mut!(write_request_fut);
+        let write_request_fut = pin!(upstream_service_client.write_value(&params));
         let (write_result, _gatt_service_fut) =
             run_while(&mut exec, gatt_service_fut, write_request_fut);
         assert_matches!(write_result, Ok(Err(gatt::Error::InvalidHandle)));
@@ -673,7 +671,7 @@ pub(crate) mod tests {
             ..Default::default()
         };
         let write_request_fut = upstream_service_client.write_value(&params);
-        pin_mut!(write_request_fut);
+        let mut write_request_fut = pin!(write_request_fut);
         let _ = exec
             .run_until_stalled(&mut write_request_fut)
             .expect_pending("waiting for FIDL response");
@@ -742,7 +740,7 @@ pub(crate) mod tests {
             ..Default::default()
         };
         let write_request_fut = upstream_service_client.write_value(&params);
-        pin_mut!(write_request_fut);
+        let mut write_request_fut = pin!(write_request_fut);
         let _ = exec
             .run_until_stalled(&mut write_request_fut)
             .expect_pending("waiting for FIDL response");

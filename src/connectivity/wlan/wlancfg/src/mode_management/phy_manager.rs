@@ -969,7 +969,7 @@ mod tests {
         fuchsia_inspect as inspect,
         fuchsia_zircon::sys::{ZX_ERR_NOT_FOUND, ZX_OK},
         futures::{channel::mpsc, stream::StreamExt, task::Poll},
-        pin_utils::pin_mut,
+        std::pin::pin,
         test_case::test_case,
         wlan_common::assert_variant,
     };
@@ -1191,7 +1191,7 @@ mod tests {
         );
         {
             let add_phy_fut = phy_manager.add_phy(0);
-            pin_mut!(add_phy_fut);
+            let mut add_phy_fut = pin!(add_phy_fut);
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_pending());
 
             send_get_supported_mac_roles_response(
@@ -1228,7 +1228,7 @@ mod tests {
 
         {
             let add_phy_fut = phy_manager.add_phy(1);
-            pin_mut!(add_phy_fut);
+            let mut add_phy_fut = pin!(add_phy_fut);
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_pending());
 
             send_get_supported_mac_roles_response(
@@ -1263,7 +1263,7 @@ mod tests {
 
         {
             let add_phy_fut = phy_manager.add_phy(fake_phy_id);
-            pin_mut!(add_phy_fut);
+            let mut add_phy_fut = pin!(add_phy_fut);
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_pending());
 
             send_get_supported_mac_roles_response(
@@ -1286,7 +1286,7 @@ mod tests {
         // Send an update for the same PHY ID and ensure that the PHY info is updated.
         {
             let add_phy_fut = phy_manager.add_phy(fake_phy_id);
-            pin_mut!(add_phy_fut);
+            let mut add_phy_fut = pin!(add_phy_fut);
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_pending());
 
             send_get_supported_mac_roles_response(
@@ -1328,7 +1328,7 @@ mod tests {
         {
             let start_connections_fut = phy_manager
                 .create_all_client_ifaces(CreateClientIfacesReason::StartClientConnections);
-            pin_mut!(start_connections_fut);
+            let mut start_connections_fut = pin!(start_connections_fut);
             assert!(exec.run_until_stalled(&mut start_connections_fut).is_ready());
         }
 
@@ -1336,7 +1336,7 @@ mod tests {
         // client iface.
         {
             let add_phy_fut = phy_manager.add_phy(fake_phy_id);
-            pin_mut!(add_phy_fut);
+            let mut add_phy_fut = pin!(add_phy_fut);
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_pending());
 
             send_get_supported_mac_roles_response(
@@ -1399,7 +1399,7 @@ mod tests {
         {
             let start_connections_fut = phy_manager
                 .create_all_client_ifaces(CreateClientIfacesReason::StartClientConnections);
-            pin_mut!(start_connections_fut);
+            let mut start_connections_fut = pin!(start_connections_fut);
             assert!(exec.run_until_stalled(&mut start_connections_fut).is_ready());
         }
 
@@ -1407,7 +1407,7 @@ mod tests {
         // client iface.
         {
             let add_phy_fut = phy_manager.add_phy(fake_phy_id);
-            pin_mut!(add_phy_fut);
+            let mut add_phy_fut = pin!(add_phy_fut);
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_pending());
 
             send_get_supported_mac_roles_response(
@@ -1447,13 +1447,13 @@ mod tests {
 
         {
             let set_country_fut = phy_manager.set_country_code(Some([0, 1]));
-            pin_mut!(set_country_fut);
+            let mut set_country_fut = pin!(set_country_fut);
             assert_variant!(exec.run_until_stalled(&mut set_country_fut), Poll::Ready(Ok(())));
         }
 
         {
             let add_phy_fut = phy_manager.add_phy(fake_phy_id);
-            pin_mut!(add_phy_fut);
+            let mut add_phy_fut = pin!(add_phy_fut);
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_pending());
 
             send_get_supported_mac_roles_response(
@@ -1577,7 +1577,7 @@ mod tests {
 
             // Add the fake iface
             let on_iface_added_fut = phy_manager.on_iface_added(fake_iface_id);
-            pin_mut!(on_iface_added_fut);
+            let mut on_iface_added_fut = pin!(on_iface_added_fut);
             assert!(exec.run_until_stalled(&mut on_iface_added_fut).is_pending());
 
             send_query_iface_response(
@@ -1648,7 +1648,7 @@ mod tests {
 
             // Add the fake iface
             let on_iface_added_fut = phy_manager.on_iface_added(fake_iface_id);
-            pin_mut!(on_iface_added_fut);
+            let mut on_iface_added_fut = pin!(on_iface_added_fut);
             assert!(exec.run_until_stalled(&mut on_iface_added_fut).is_pending());
 
             send_query_iface_response(
@@ -1721,7 +1721,7 @@ mod tests {
         {
             // Add the fake iface
             let on_iface_added_fut = phy_manager.on_iface_added(fake_iface_id);
-            pin_mut!(on_iface_added_fut);
+            let mut on_iface_added_fut = pin!(on_iface_added_fut);
 
             // Since the PhyManager has not accounted for any PHYs, it will get the iface
             // information first and then query for the iface's PHY's information.
@@ -1811,7 +1811,7 @@ mod tests {
         for _ in 0..2 {
             // Add the fake iface
             let on_iface_added_fut = phy_manager.on_iface_added(fake_iface_id);
-            pin_mut!(on_iface_added_fut);
+            let mut on_iface_added_fut = pin!(on_iface_added_fut);
             assert!(exec.run_until_stalled(&mut on_iface_added_fut).is_pending());
 
             send_query_iface_response(
@@ -1863,7 +1863,7 @@ mod tests {
         {
             // Add the non-existent iface
             let on_iface_added_fut = phy_manager.on_iface_added(1);
-            pin_mut!(on_iface_added_fut);
+            let mut on_iface_added_fut = pin!(on_iface_added_fut);
             assert!(exec.run_until_stalled(&mut on_iface_added_fut).is_pending());
 
             send_query_iface_response(&mut exec, &mut test_values.monitor_stream, None);
@@ -2196,7 +2196,7 @@ mod tests {
 
             // Stop client connections
             let stop_clients_future = phy_manager.destroy_all_client_ifaces();
-            pin_mut!(stop_clients_future);
+            let mut stop_clients_future = pin!(stop_clients_future);
 
             assert!(exec.run_until_stalled(&mut stop_clients_future).is_pending());
 
@@ -2247,7 +2247,7 @@ mod tests {
 
             // Stop client connections
             let stop_clients_future = phy_manager.destroy_all_client_ifaces();
-            pin_mut!(stop_clients_future);
+            let mut stop_clients_future = pin!(stop_clients_future);
 
             assert!(exec.run_until_stalled(&mut stop_clients_future).is_ready());
         }
@@ -2296,7 +2296,7 @@ mod tests {
 
             // Stop client connections and expect the future to fail immediately.
             let stop_clients_future = phy_manager.destroy_all_client_ifaces();
-            pin_mut!(stop_clients_future);
+            let mut stop_clients_future = pin!(stop_clients_future);
             assert!(exec.run_until_stalled(&mut stop_clients_future).is_ready());
         }
 
@@ -2329,7 +2329,7 @@ mod tests {
 
         let get_ap_future = phy_manager.create_or_get_ap_iface();
 
-        pin_mut!(get_ap_future);
+        let mut get_ap_future = pin!(get_ap_future);
         assert_variant!(exec.run_until_stalled(&mut get_ap_future), Poll::Ready(Ok(None)));
     }
 
@@ -2362,7 +2362,7 @@ mod tests {
         {
             let get_ap_future = phy_manager.create_or_get_ap_iface();
 
-            pin_mut!(get_ap_future);
+            let mut get_ap_future = pin!(get_ap_future);
             assert!(exec.run_until_stalled(&mut get_ap_future).is_pending());
 
             send_create_iface_response(
@@ -2411,7 +2411,7 @@ mod tests {
         {
             let get_ap_future = phy_manager.create_or_get_ap_iface();
 
-            pin_mut!(get_ap_future);
+            let mut get_ap_future = pin!(get_ap_future);
             assert!(exec.run_until_stalled(&mut get_ap_future).is_ready());
         }
 
@@ -2454,7 +2454,7 @@ mod tests {
 
         // Retrieve the AP iface ID
         let get_ap_future = phy_manager.create_or_get_ap_iface();
-        pin_mut!(get_ap_future);
+        let mut get_ap_future = pin!(get_ap_future);
         assert_variant!(
             exec.run_until_stalled(&mut get_ap_future),
             Poll::Ready(Ok(Some(iface_id))) => assert_eq!(iface_id, fake_iface_id)
@@ -2486,7 +2486,7 @@ mod tests {
 
         // Retrieve the client ID
         let get_ap_future = phy_manager.create_or_get_ap_iface();
-        pin_mut!(get_ap_future);
+        let mut get_ap_future = pin!(get_ap_future);
         assert_variant!(exec.run_until_stalled(&mut get_ap_future), Poll::Ready(Ok(None)));
     }
 
@@ -2522,7 +2522,7 @@ mod tests {
 
             // Remove the AP iface ID
             let destroy_ap_iface_future = phy_manager.destroy_ap_iface(fake_iface_id);
-            pin_mut!(destroy_ap_iface_future);
+            let mut destroy_ap_iface_future = pin!(destroy_ap_iface_future);
             assert!(exec.run_until_stalled(&mut destroy_ap_iface_future).is_pending());
             send_destroy_iface_response(&mut exec, &mut test_values.monitor_stream, ZX_OK);
 
@@ -2568,7 +2568,7 @@ mod tests {
 
             // Remove a non-existent AP iface ID
             let destroy_ap_iface_future = phy_manager.destroy_ap_iface(2);
-            pin_mut!(destroy_ap_iface_future);
+            let mut destroy_ap_iface_future = pin!(destroy_ap_iface_future);
             assert_variant!(
                 exec.run_until_stalled(&mut destroy_ap_iface_future),
                 Poll::Ready(Ok(()))
@@ -2621,7 +2621,7 @@ mod tests {
 
             // Remove the AP iface ID
             let destroy_ap_iface_future = phy_manager.destroy_ap_iface(fake_iface_id);
-            pin_mut!(destroy_ap_iface_future);
+            let mut destroy_ap_iface_future = pin!(destroy_ap_iface_future);
             assert!(exec.run_until_stalled(&mut destroy_ap_iface_future).is_ready());
         }
 
@@ -2670,7 +2670,7 @@ mod tests {
 
             // Expect two interface destruction requests
             let destroy_ap_iface_future = phy_manager.destroy_all_ap_ifaces();
-            pin_mut!(destroy_ap_iface_future);
+            let mut destroy_ap_iface_future = pin!(destroy_ap_iface_future);
 
             assert!(exec.run_until_stalled(&mut destroy_ap_iface_future).is_pending());
             send_destroy_iface_response(&mut exec, &mut test_values.monitor_stream, ZX_OK);
@@ -2721,7 +2721,7 @@ mod tests {
 
             // Stop all AP ifaces
             let destroy_ap_iface_future = phy_manager.destroy_all_ap_ifaces();
-            pin_mut!(destroy_ap_iface_future);
+            let mut destroy_ap_iface_future = pin!(destroy_ap_iface_future);
             assert!(exec.run_until_stalled(&mut destroy_ap_iface_future).is_ready());
         }
 
@@ -2770,7 +2770,7 @@ mod tests {
 
             // Expect interface destruction to finish immediately.
             let destroy_ap_iface_future = phy_manager.destroy_all_ap_ifaces();
-            pin_mut!(destroy_ap_iface_future);
+            let mut destroy_ap_iface_future = pin!(destroy_ap_iface_future);
             assert!(exec.run_until_stalled(&mut destroy_ap_iface_future).is_ready());
         }
 
@@ -2823,7 +2823,7 @@ mod tests {
         phy_manager.suggest_ap_mac(mac);
 
         let get_ap_future = phy_manager.create_or_get_ap_iface();
-        pin_mut!(get_ap_future);
+        let mut get_ap_future = pin!(get_ap_future);
         assert_variant!(exec.run_until_stalled(&mut get_ap_future), Poll::Pending);
 
         // Verify that the suggested MAC is included in the request
@@ -2873,7 +2873,7 @@ mod tests {
         // Start client connections so that an IfaceRequest is issued for the client.
         let start_client_future =
             phy_manager.create_all_client_ifaces(CreateClientIfacesReason::StartClientConnections);
-        pin_mut!(start_client_future);
+        let mut start_client_future = pin!(start_client_future);
         assert_variant!(exec.run_until_stalled(&mut start_client_future), Poll::Pending);
 
         // Verify that the suggested MAC is NOT included in the request
@@ -2940,7 +2940,7 @@ mod tests {
             // Start client connections so that an IfaceRequest is issued for the client.
             let start_client_future = phy_manager
                 .create_all_client_ifaces(CreateClientIfacesReason::StartClientConnections);
-            pin_mut!(start_client_future);
+            let mut start_client_future = pin!(start_client_future);
             assert!(exec.run_until_stalled(&mut start_client_future).is_ready());
         }
 
@@ -2986,7 +2986,7 @@ mod tests {
 
         {
             let add_phy_fut = phy_manager.add_phy(1);
-            pin_mut!(add_phy_fut);
+            let mut add_phy_fut = pin!(add_phy_fut);
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_pending());
             send_get_supported_mac_roles_response(
                 &mut exec,
@@ -3016,7 +3016,7 @@ mod tests {
 
         {
             let add_phy_fut = phy_manager.add_phy(1);
-            pin_mut!(add_phy_fut);
+            let mut add_phy_fut = pin!(add_phy_fut);
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_pending());
             send_get_supported_mac_roles_response(
                 &mut exec,
@@ -3028,7 +3028,7 @@ mod tests {
 
         {
             let add_phy_fut = phy_manager.add_phy(2);
-            pin_mut!(add_phy_fut);
+            let mut add_phy_fut = pin!(add_phy_fut);
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_pending());
             send_get_supported_mac_roles_response(
                 &mut exec,
@@ -3113,7 +3113,7 @@ mod tests {
         // Apply a country code and ensure that it is propagated to the device service.
         {
             let set_country_fut = phy_manager.set_country_code(Some([0, 1]));
-            pin_mut!(set_country_fut);
+            let mut set_country_fut = pin!(set_country_fut);
 
             // Ensure that both PHYs have their country codes set.
             for _ in 0..2 {
@@ -3142,7 +3142,7 @@ mod tests {
         // device service.
         {
             let set_country_fut = phy_manager.set_country_code(None);
-            pin_mut!(set_country_fut);
+            let mut set_country_fut = pin!(set_country_fut);
 
             // Ensure that both PHYs have their country codes cleared.
             for _ in 0..2 {
@@ -3199,7 +3199,7 @@ mod tests {
         // Apply a country code and ensure that it is propagated to the device service.
         {
             let set_country_fut = phy_manager.set_country_code(Some([0, 1]));
-            pin_mut!(set_country_fut);
+            let mut set_country_fut = pin!(set_country_fut);
 
             assert_variant!(exec.run_until_stalled(&mut set_country_fut), Poll::Pending);
             assert_variant!(
@@ -3265,7 +3265,7 @@ mod tests {
         {
             let recovery_fut =
                 phy_manager.create_all_client_ifaces(CreateClientIfacesReason::RecoverClientIfaces);
-            pin_mut!(recovery_fut);
+            let mut recovery_fut = pin!(recovery_fut);
             assert_variant!(exec.run_until_stalled(&mut recovery_fut), Poll::Pending);
 
             loop {
@@ -3349,7 +3349,7 @@ mod tests {
         {
             let recovery_fut =
                 phy_manager.create_all_client_ifaces(CreateClientIfacesReason::RecoverClientIfaces);
-            pin_mut!(recovery_fut);
+            let mut recovery_fut = pin!(recovery_fut);
             assert_variant!(exec.run_until_stalled(&mut recovery_fut), Poll::Pending);
 
             loop {
@@ -3447,7 +3447,7 @@ mod tests {
         {
             let recovery_fut =
                 phy_manager.create_all_client_ifaces(CreateClientIfacesReason::RecoverClientIfaces);
-            pin_mut!(recovery_fut);
+            let mut recovery_fut = pin!(recovery_fut);
             assert_variant!(
                 exec.run_until_stalled(&mut recovery_fut),
                 Poll::Ready(Ok(recovered_ifaces)) => {
@@ -3494,7 +3494,7 @@ mod tests {
         {
             let start_client_future =
                 phy_manager.create_all_client_ifaces(CreateClientIfacesReason::RecoverClientIfaces);
-            pin_mut!(start_client_future);
+            let mut start_client_future = pin!(start_client_future);
             assert_variant!(
                 exec.run_until_stalled(&mut start_client_future),
                 Poll::Ready(Ok(vec)) => {
@@ -3507,7 +3507,7 @@ mod tests {
         {
             let start_client_future = phy_manager
                 .create_all_client_ifaces(CreateClientIfacesReason::StartClientConnections);
-            pin_mut!(start_client_future);
+            let mut start_client_future = pin!(start_client_future);
             assert_variant!(
                 exec.run_until_stalled(&mut start_client_future),
                 Poll::Ready(Ok(vec)) => {
@@ -3644,7 +3644,7 @@ mod tests {
 
             // The future should run until it stalls out requesting that one of the PHYs set its low
             // power mode.
-            pin_mut!(fut);
+            let mut fut = pin!(fut);
 
             for _ in 0..phy_ids.len() {
                 assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -3702,7 +3702,7 @@ mod tests {
 
             // The future should run until it stalls out requesting that one of the PHYs set its low
             // power mode.
-            pin_mut!(fut);
+            let mut fut = pin!(fut);
 
             for _ in 0..phy_ids.len() {
                 assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -3770,7 +3770,7 @@ mod tests {
 
         // The future should run until it stalls out requesting that one of the PHYs set its low
         // power mode.
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
@@ -3793,7 +3793,7 @@ mod tests {
         // Enable low power mode which should complete immediately.
         {
             let fut = phy_manager.set_power_state(fidl_common::PowerSaveType::PsModeBalanced);
-            pin_mut!(fut);
+            let mut fut = pin!(fut);
             assert_variant!(
                 exec.run_until_stalled(&mut fut),
                 Poll::Ready(Ok(fuchsia_zircon::Status::OK))
@@ -3805,7 +3805,7 @@ mod tests {
         // Add a new PHY and ensure that the low power mode is set
         {
             let add_phy_fut = phy_manager.add_phy(0);
-            pin_mut!(add_phy_fut);
+            let mut add_phy_fut = pin!(add_phy_fut);
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_pending());
 
             send_get_supported_mac_roles_response(
@@ -3854,7 +3854,7 @@ mod tests {
             NULL_ADDR,
             &test_values.telemetry_sender,
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Wait for the request to stall out waiting for DeviceMonitor.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -3885,7 +3885,7 @@ mod tests {
             NULL_ADDR,
             &test_values.telemetry_sender,
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Wait for the request to stall out waiting for DeviceMonitor.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -3921,7 +3921,7 @@ mod tests {
             NULL_ADDR,
             &test_values.telemetry_sender,
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The request should immediately fail.
         assert_variant!(
@@ -3943,7 +3943,7 @@ mod tests {
 
         // Issue a destroy iface request
         let fut = destroy_iface(&test_values.monitor_proxy, 0, &test_values.telemetry_sender);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Wait for the request to stall out waiting for DeviceMonitor.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -3968,7 +3968,7 @@ mod tests {
 
         // Issue a destroy iface request
         let fut = destroy_iface(&test_values.monitor_proxy, 0, &test_values.telemetry_sender);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Wait for the request to stall out waiting for DeviceMonitor.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -3993,7 +3993,7 @@ mod tests {
 
         // Issue a destroy iface request
         let fut = destroy_iface(&test_values.monitor_proxy, 0, &test_values.telemetry_sender);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Wait for the request to stall out waiting for DeviceMonitor.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -4027,7 +4027,7 @@ mod tests {
 
         // Issue a destroy iface request
         let fut = destroy_iface(&test_values.monitor_proxy, 0, &test_values.telemetry_sender);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The request should immediately fail.
         assert_variant!(

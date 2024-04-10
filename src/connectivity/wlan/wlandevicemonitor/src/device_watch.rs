@@ -86,8 +86,8 @@ mod tests {
         fidl_fuchsia_wlan_device::{ConnectorRequest, ConnectorRequestStream},
         fuchsia_async as fasync,
         fuchsia_zircon::DurationNum as _,
-        futures::{pin_mut, poll, stream::StreamExt as _, task::Poll},
-        std::sync::Arc,
+        futures::{poll, stream::StreamExt as _, task::Poll},
+        std::{pin::pin, sync::Arc},
         tracing::info,
         vfs::{
             directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path,
@@ -104,8 +104,8 @@ mod tests {
 
         serve_and_bind_vfs(fake_dir.clone(), "/test-dev");
 
-        let phy_watcher = watch_phy_devices("/test-dev").expect("Failed to create phy_watcher");
-        pin_mut!(phy_watcher);
+        let mut phy_watcher =
+            pin!(watch_phy_devices("/test-dev").expect("Failed to create phy_watcher"));
 
         phy_watcher
             .next()
@@ -128,8 +128,8 @@ mod tests {
 
         serve_and_bind_vfs(fake_dir.clone(), "/test-dev");
 
-        let phy_watcher = watch_phy_devices("/test-dev").expect("Failed to create phy_watcher");
-        pin_mut!(phy_watcher);
+        let mut phy_watcher =
+            pin!(watch_phy_devices("/test-dev").expect("Failed to create phy_watcher"));
 
         for _ in 0..2 {
             phy_watcher

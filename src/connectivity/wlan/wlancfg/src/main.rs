@@ -26,7 +26,7 @@ use {
         prelude::*,
         select, TryFutureExt,
     },
-    pin_utils::pin_mut,
+    std::pin::pin,
     std::{convert::Infallible, sync::Arc},
     tracing::{error, info, warn},
     wlan_trace as wtrace,
@@ -153,7 +153,7 @@ async fn serve_fidl(
             fasync::Task::spawn(fut).detach()
         });
     let service_fut = fs.take_and_serve_directory_handle()?.collect::<()>().fuse();
-    pin_mut!(service_fut);
+    let mut service_fut = pin!(service_fut);
 
     let serve_client_policy_listeners = util::listener::serve::<
         fidl_policy::ClientStateUpdatesProxy,
@@ -161,7 +161,7 @@ async fn serve_fidl(
         util::listener::ClientStateUpdate,
     >(client_listener_msgs)
     .fuse();
-    pin_mut!(serve_client_policy_listeners);
+    let mut serve_client_policy_listeners = pin!(serve_client_policy_listeners);
 
     let serve_ap_policy_listeners = util::listener::serve::<
         fidl_policy::AccessPointStateUpdatesProxy,
@@ -169,7 +169,7 @@ async fn serve_fidl(
         util::listener::ApStatesUpdate,
     >(ap_listener_msgs)
     .fuse();
-    pin_mut!(serve_ap_policy_listeners);
+    let mut serve_ap_policy_listeners = pin!(serve_ap_policy_listeners);
 
     loop {
         select! {

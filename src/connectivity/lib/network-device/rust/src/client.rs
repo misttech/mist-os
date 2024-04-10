@@ -10,6 +10,7 @@ use async_utils::hanging_get::client::HangingGetStream;
 use fidl_fuchsia_hardware_network as netdev;
 use fidl_table_validation::ValidFidlTable;
 use futures::{Stream, StreamExt as _, TryStreamExt as _};
+use std::pin::pin;
 
 use crate::error::{Error, Result};
 use crate::session::{Config, DeviceInfo, Port, Session, Task};
@@ -95,7 +96,7 @@ impl Client {
             .try_filter(|status| {
                 futures::future::ready(status.flags.contains(netdev::StatusFlags::ONLINE))
             });
-        futures::pin_mut!(stream);
+        let mut stream = pin!(stream);
         stream.next().await.expect("HangingGetStream should never terminate")
     }
 

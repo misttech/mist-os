@@ -10,6 +10,7 @@ use std::{
     collections::{HashMap, HashSet},
     net::SocketAddr,
     num::NonZeroU16,
+    pin::pin,
 };
 
 use fidl_fuchsia_net as fnet;
@@ -124,7 +125,7 @@ async fn with_netcfg_owned_device<
         .expect("connect to fuchsia.net.interfaces/State service");
     let wait_for_netmgr =
         wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None).fuse();
-    futures::pin_mut!(wait_for_netmgr);
+    let mut wait_for_netmgr = pin!(wait_for_netmgr);
     let (if_id, if_name): (u64, String) = interfaces::wait_for_non_loopback_interface_up(
         &interface_state,
         &mut wait_for_netmgr,
@@ -278,7 +279,7 @@ async fn test_install_only_no_provisioning<M: Manager, N: Netstack>(name: &str) 
                             }
                         }
                     });
-                futures::pin_mut!(stream);
+                let mut stream = pin!(stream);
                 assert!(stream
                     .next()
                     .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT.after_now(), || None)
@@ -357,7 +358,7 @@ async fn test_oir_interface_name_conflict_uninstall_existing<M: Manager, N: Nets
         futures::stream::once(wait_for_netmgr.map(|r| panic!("network manager exited {:?}", r))),
     )
     .fuse();
-    futures::pin_mut!(interfaces_stream);
+    let mut interfaces_stream = pin!(interfaces_stream);
     // Observe the initially existing loopback interface.
     assert_matches!(
         interfaces_stream.select_next_some().await,
@@ -496,7 +497,7 @@ async fn test_oir_interface_name_conflict_reject<M: Manager, N: Netstack>(
         futures::stream::once(wait_for_netmgr.map(|r| panic!("network manager exited {:?}", r))),
     )
     .fuse();
-    futures::pin_mut!(interfaces_stream);
+    let mut interfaces_stream = pin!(interfaces_stream);
     // Observe the initially existing loopback interface.
     assert_matches!(
         interfaces_stream.select_next_some().await,
@@ -658,7 +659,7 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
             fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("get interface event stream");
-        futures::pin_mut!(event_stream);
+        let mut event_stream = pin!(event_stream);
         let mut if_map =
             HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new();
         let (wlan_ap_id, wlan_ap_name) = fidl_fuchsia_net_interfaces_ext::wait_interface(
@@ -876,14 +877,14 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
         .expect("create netstack realm");
     let wait_for_netmgr =
         wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None).fuse();
-    futures::pin_mut!(wait_for_netmgr);
+    let mut wait_for_netmgr = pin!(wait_for_netmgr);
 
     // Add a WLAN AP, make sure the DHCP server gets configured and starts or
     // stops when the interface is added and brought up or brought down/removed.
     // A loop is used to emulate interface flaps.
     for i in 0..=1 {
         let test_fut = wlan_ap_dhcp_server_inner(&sandbox, &realm, i).fuse();
-        futures::pin_mut!(test_fut);
+        let mut test_fut = pin!(test_fut);
         let () = futures::select! {
             () = test_fut => {},
             stopped_event = wait_for_netmgr => {
@@ -1390,7 +1391,7 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                 }
             });
 
-        futures::pin_mut!(stream);
+        let mut stream = pin!(stream);
         stream.next().await.expect("expected DHCPv6 message")
     }
 
@@ -1825,10 +1826,9 @@ async fn dhcpv4_client_restarts_after_delay() {
                     .connect_to_protocol::<fnet_routes::StateV4Marker>()
                     .expect("connect to routes state");
 
-                let routes_event_stream =
-                    fnet_routes_ext::event_stream_from_state::<Ipv4>(&routes_state)
-                        .expect("routes event stream");
-                futures::pin_mut!(routes_event_stream);
+                let mut routes_event_stream =
+                    pin!(fnet_routes_ext::event_stream_from_state::<Ipv4>(&routes_state)
+                        .expect("routes event stream"));
 
                 // Collect the current route table state prior to starting
                 // the DHCP server so that we ensure the default route the
@@ -1851,7 +1851,7 @@ async fn dhcpv4_client_restarts_after_delay() {
                     fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
                 )
                 .expect("event stream from state");
-                futures::pin_mut!(if_event_stream);
+                let mut if_event_stream = pin!(if_event_stream);
 
                 let mut client_if_state =
                     fnet_interfaces_ext::InterfaceState::Unknown(client_interface_id);

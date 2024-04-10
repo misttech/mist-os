@@ -9,7 +9,7 @@ use {
     fuchsia_zircon::prelude::*,
     futures::{channel::oneshot, join},
     ieee80211::{Bssid, Ssid},
-    pin_utils::pin_mut,
+    std::pin::pin,
     wlan_common::{
         bss::Protection,
         channel::{Cbw, Channel},
@@ -113,7 +113,7 @@ async fn handle_tx_event_hooks() {
     let test_ns_prefix = helper.test_ns_prefix().to_string();
 
     // Run Policy and wait for the client to connect and EssSa to establish.
-    let run_policy_future = async {
+    let run_policy_future = pin!(async {
         join!(
             save_network_and_wait_until_connected(
                 &test_ns_prefix,
@@ -123,8 +123,7 @@ async fn handle_tx_event_hooks() {
             ),
             async { receiver.await.expect("failed to receive association signal") }
         )
-    };
-    pin_mut!(run_policy_future);
+    });
     helper
         .run_until_complete_or_timeout(
             30.seconds(),

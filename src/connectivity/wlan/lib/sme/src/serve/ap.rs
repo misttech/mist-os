@@ -10,7 +10,7 @@ use futures::channel::mpsc;
 use futures::prelude::*;
 use futures::select;
 use ieee80211::Ssid;
-use pin_utils::pin_mut;
+use std::pin::pin;
 use std::sync::{Arc, Mutex};
 use tracing::error;
 use wlan_common::RadioConfig;
@@ -29,8 +29,8 @@ pub fn serve(
         let sme = Arc::new(Mutex::new(sme));
         let mlme_sme = super::serve_mlme_sme(event_stream, Arc::clone(&sme), time_stream);
         let sme_fidl = super::serve_fidl(&*sme, new_fidl_clients, handle_fidl_request);
-        pin_mut!(mlme_sme);
-        pin_mut!(sme_fidl);
+        let mlme_sme = pin!(mlme_sme);
+        let sme_fidl = pin!(sme_fidl);
         select! {
             mlme_sme = mlme_sme.fuse() => mlme_sme?,
             sme_fidl = sme_fidl.fuse() => match sme_fidl? {},

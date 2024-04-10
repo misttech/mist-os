@@ -18,7 +18,7 @@ use fidl_fuchsia_netemul_network as fnetemul_network;
 use fnet_dhcp_ext::ClientExt;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::{future::ready, join, pin_mut, FutureExt, StreamExt, TryStreamExt};
+use futures::{future::ready, join, FutureExt, StreamExt, TryStreamExt};
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::{
     annotate, dhcpv4 as dhcpv4_helper,
@@ -26,6 +26,7 @@ use netstack_testing_common::{
     realms::{KnownServiceProvider, Netstack, TestSandboxExt as _},
 };
 use netstack_testing_macros::netstack_test;
+use std::pin::pin;
 use test_case::test_case;
 
 const MAC: net_types::ethernet::Mac = net_declare::net_mac!("00:00:00:00:00:01");
@@ -436,7 +437,7 @@ async fn assert_client_shutdown(
     let address_state_provider = address_state_provider.into();
     let asp_server_fut = async move {
         let request_stream = address_state_provider.into_stream();
-        pin_mut!(request_stream);
+        let mut request_stream = pin!(request_stream);
 
         let control_handle = assert_matches!(
             request_stream.try_next().await.expect("should succeed").expect("should not have ended"),
@@ -478,7 +479,7 @@ async fn client_provider_watch_configuration_acquires_lease<N: Netstack>(name: &
     );
 
     let config_stream = fnet_dhcp_ext::configuration_stream(client.clone()).fuse();
-    pin_mut!(config_stream);
+    let mut config_stream = pin!(config_stream);
 
     let fnet_dhcp_ext::Configuration { address, dns_servers, routers } = config_stream
         .try_next()
@@ -536,7 +537,7 @@ async fn client_explicitly_removes_address_when_lease_expires<N: Netstack>(name:
     );
 
     let config_stream = fnet_dhcp_ext::configuration_stream(client.clone()).fuse();
-    pin_mut!(config_stream);
+    let mut config_stream = pin!(config_stream);
 
     let fnet_dhcp_ext::Configuration { address, dns_servers, routers } = config_stream
         .try_next()
@@ -575,7 +576,7 @@ async fn client_explicitly_removes_address_when_lease_expires<N: Netstack>(name:
     // The client should fail to renew and have the lease expire, causing it to
     // remove the address.
     let request_stream = address_state_provider.into_stream().expect("should succeed");
-    pin_mut!(request_stream);
+    let mut request_stream = pin!(request_stream);
 
     let control_handle = assert_matches!(
         request_stream.try_next().await.expect("should succeed").expect("should not have ended"),
@@ -631,7 +632,7 @@ async fn client_rebinds_same_lease_to_other_server<N: Netstack>(name: &str) {
     );
 
     let config_stream = fnet_dhcp_ext::configuration_stream(client.clone()).fuse();
-    pin_mut!(config_stream);
+    let mut config_stream = pin!(config_stream);
 
     let fnet_dhcp_ext::Configuration { address, dns_servers, routers } = config_stream
         .try_next()
@@ -679,7 +680,7 @@ async fn client_rebinds_same_lease_to_other_server<N: Netstack>(name: &str) {
 
     {
         let request_stream = &mut request_stream;
-        pin_mut!(request_stream);
+        let mut request_stream = pin!(request_stream);
         let request = request_stream
             .try_next()
             .await
@@ -738,9 +739,9 @@ async fn watch_configuration_handles_interface_removal<N: Netstack>(name: &str) 
         fnet_dhcp_ext::default_new_client_params(),
     );
 
-    let client_fut = async {
+    let client_fut = pin!(async {
         let config_stream = fnet_dhcp_ext::configuration_stream(client.clone()).fuse();
-        pin_mut!(config_stream);
+        let mut config_stream = pin!(config_stream);
 
         let watch_config_result =
             annotate(config_stream.try_next(), DEBUG_PRINT_INTERVAL, "watch_configuration").await;
@@ -760,7 +761,7 @@ async fn watch_configuration_handles_interface_removal<N: Netstack>(name: &str) 
             .expect("event stream should not have ended");
         assert_eq!(reason, fnet_dhcp::ClientExitReason::InvalidInterface);
     }
-    .fuse();
+    .fuse());
 
     let sock = fasync::net::UdpSocket::bind_in_realm(
         &server_realm,
@@ -773,7 +774,7 @@ async fn watch_configuration_handles_interface_removal<N: Netstack>(name: &str) 
     .expect("bind_in_realm should succeed");
     sock.set_broadcast(true).expect("set_broadcast should succeed");
 
-    let interface_removal_fut = async move {
+    let interface_removal_fut = pin!(async move {
         // Wait until we see one message from the client before removing the interface.
         let mut buf = [0u8; 1500];
         let (_, client_addr): (usize, std::net::SocketAddr) =
@@ -792,9 +793,7 @@ async fn watch_configuration_handles_interface_removal<N: Netstack>(name: &str) 
 
         let _ = client_iface.remove_device();
     }
-    .fuse();
-
-    pin_mut!(client_fut, interface_removal_fut);
+    .fuse());
 
     let ((), ()) = join!(client_fut, interface_removal_fut);
 }
@@ -852,7 +851,7 @@ async fn client_handles_address_removal<N: Netstack>(
     );
 
     let config_stream = fnet_dhcp_ext::configuration_stream(client.clone()).fuse();
-    pin_mut!(config_stream);
+    let mut config_stream = pin!(config_stream);
 
     let fnet_dhcp_ext::Configuration { address, dns_servers, routers } = config_stream
         .try_next()

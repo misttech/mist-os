@@ -29,7 +29,10 @@ use netstack_testing_common::{
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    pin::pin,
+};
 use test_case::test_case;
 
 trait TestValue {
@@ -113,7 +116,7 @@ async fn watcher_existing(name: &str) {
     {
         let stream = fnet_filter_ext::event_stream_from_state(state.clone())
             .expect("get filter event stream");
-        futures::pin_mut!(stream);
+        let mut stream = pin!(stream);
         let observed: HashMap<_, _> =
             fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
         assert_eq!(observed, HashMap::new());
@@ -136,7 +139,7 @@ async fn watcher_existing(name: &str) {
     controller.commit().await.expect("commit pending changes");
 
     let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
     let observed: HashMap<_, _> =
         fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
     assert_eq!(
@@ -159,7 +162,7 @@ async fn watcher_observe_updates(name: &str) {
     let state =
         realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
     let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
     assert_eq!(stream.next().await.expect("wait for idle").expect("wait for idle"), Event::Idle);
 
     let control =
@@ -229,7 +232,7 @@ async fn resources_and_events_scoped_to_controllers(name: &str) {
     let state =
         realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
     let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
     assert_eq!(stream.next().await.expect("wait for idle").expect("wait for idle"), Event::Idle);
 
     let control =
@@ -337,7 +340,7 @@ async fn watcher_channel_closed_if_not_polled(name: &str) {
         }
     }
     .fuse();
-    futures::pin_mut!(perform_updates);
+    let mut perform_updates = pin!(perform_updates);
 
     // Wait for the watcher channel to be closed as a result.
     let mut event_stream = watcher.take_event_stream();
@@ -373,7 +376,7 @@ async fn on_id_assigned(name: &str) {
     let state =
         realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
     let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
     let mut observed: HashMap<_, _> =
         fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
     assert_eq!(
@@ -426,7 +429,7 @@ async fn drop_controller_removes_resources(name: &str) {
     let state =
         realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
     let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
 
     // Observe existing resources and ensure we see what was added.
     let observed: HashMap<_, _> =
@@ -807,7 +810,7 @@ async fn remove_resource_removes_contents(
     let state =
         realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
     let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
     let mut observed: HashMap<_, _> =
         fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
     assert_eq!(
@@ -928,7 +931,7 @@ async fn add_existing_resource_idempotent(
     let state =
         realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
     let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
     let observed: HashMap<_, _> =
         fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
     assert_eq!(
@@ -1007,7 +1010,7 @@ async fn remove_unknown_resource_idempotent(name: &str, resource: ResourceId) {
     let state =
         realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
     let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
     let observed: HashMap<_, _> =
         fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
     assert!(observed.is_empty());
@@ -1125,7 +1128,7 @@ async fn commit_failure_clears_pending_changes_and_does_not_change_state(name: &
     let state =
         realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
     let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
     let observed: HashMap<_, _> =
         fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
     assert_eq!(

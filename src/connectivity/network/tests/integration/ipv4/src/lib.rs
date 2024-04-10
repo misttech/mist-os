@@ -31,6 +31,7 @@ use packet_formats::{
     ip::Ipv4Proto,
     testutil::parse_ip_packet,
 };
+use std::pin::pin;
 use test_case::test_case;
 
 fn check_igmpv1v2_report<'a, M: MessageType<&'a [u8], FixedHeader = net_types_ip::Ipv4Addr>>(
@@ -291,7 +292,7 @@ async fn sends_igmp_reports<N: Netstack>(
             }
         },
     );
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
     let () = stream
         .next()
         .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {

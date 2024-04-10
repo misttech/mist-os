@@ -13,9 +13,9 @@ use {
     futures::{
         channel::oneshot::Sender,
         future::{Fuse, FusedFuture},
-        pin_mut, select, Future, FutureExt, StreamExt,
+        select, Future, FutureExt, StreamExt,
     },
-    std::fmt::Debug,
+    std::{fmt::Debug, pin::pin},
     tracing::{info, trace, warn},
 };
 
@@ -178,7 +178,7 @@ impl VolumeRelay {
         const AVRCP_VOLUME_STEP_SIZE: u8 = 1;
 
         let setvolume_timeout = Fuse::terminated();
-        pin_mut!(setvolume_timeout);
+        let mut setvolume_timeout = pin!(setvolume_timeout);
 
         loop {
             let mut sys_volume_watch_fut = audio_watch_stream.next();
@@ -362,7 +362,7 @@ mod tests {
         audio_request_stream: &mut settings::AudioRequestStream,
     ) -> settings::AudioWatchResponder {
         let watch_request_fut = audio_request_stream.select_next_some();
-        pin_mut!(watch_request_fut);
+        let mut watch_request_fut = pin!(watch_request_fut);
 
         match exec.run_until_stalled(&mut watch_request_fut).expect("should be ready") {
             Ok(settings::AudioRequest::Watch { responder }) => responder,
@@ -401,7 +401,7 @@ mod tests {
     {
         // Expect registration of a AbsoluteVolumeHandler
         let request_fut = avrcp_request_stream.select_next_some();
-        pin_mut!(request_fut);
+        let mut request_fut = pin!(request_fut);
 
         let handler = match exec.run_until_stalled(&mut request_fut).expect("should be ready") {
             Ok(avrcp::PeerManagerRequest::SetAbsoluteVolumeHandler { handler, responder }) => {
@@ -429,7 +429,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (mut settings_requests, avrcp_requests, stop_sender, relay_fut) = setup_volume_relay();
 
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
@@ -457,7 +457,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         let (mut settings_requests, avrcp_requests, _stop_sender, relay_fut) = setup_volume_relay();
 
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
@@ -466,12 +466,12 @@ mod tests {
 
         // Set volume request with the same volume value as the initial volume.
         let volume_set_fut = volume_client.set_volume(INITIAL_AVRCP_VOLUME);
-        pin_mut!(volume_set_fut);
+        let mut volume_set_fut = pin!(volume_set_fut);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         let request_fut = settings_requests.select_next_some();
-        pin_mut!(request_fut);
+        let mut request_fut = pin!(request_fut);
 
         // Response is returned immediately with the initial value.
         exec.run_until_stalled(&mut request_fut)
@@ -483,7 +483,7 @@ mod tests {
 
         // Volume decrease request to 90.
         let volume_set_fut = volume_client.set_volume(90);
-        pin_mut!(volume_set_fut);
+        let mut volume_set_fut = pin!(volume_set_fut);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
@@ -523,7 +523,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         let (mut settings_requests, avrcp_requests, _stop_sender, relay_fut) = setup_volume_relay();
 
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
@@ -532,12 +532,12 @@ mod tests {
 
         // Volume increase request to 103.
         let volume_set_fut = volume_client.set_volume(103);
-        pin_mut!(volume_set_fut);
+        let mut volume_set_fut = pin!(volume_set_fut);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         let request_fut = settings_requests.select_next_some();
-        pin_mut!(request_fut);
+        let mut request_fut = pin!(request_fut);
 
         exec.run_until_stalled(&mut volume_set_fut).expect_pending("should be pending");
 
@@ -572,14 +572,14 @@ mod tests {
 
         // Second set volume request to 103.
         let volume_set_fut = volume_client.set_volume(103);
-        pin_mut!(volume_set_fut);
+        let mut volume_set_fut = pin!(volume_set_fut);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         exec.run_until_stalled(&mut volume_set_fut).expect_pending("should be pending");
 
         let request_fut = settings_requests.select_next_some();
-        pin_mut!(request_fut);
+        let mut request_fut = pin!(request_fut);
 
         match exec.run_until_stalled(&mut request_fut).expect("should be ready") {
             Ok(settings::AudioRequest::Set { settings, responder }) => {
@@ -613,14 +613,14 @@ mod tests {
 
         // Third set volume request to 103.
         let volume_set_fut = volume_client.set_volume(103);
-        pin_mut!(volume_set_fut);
+        let mut volume_set_fut = pin!(volume_set_fut);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         exec.run_until_stalled(&mut volume_set_fut).expect_pending("should be pending");
 
         let request_fut = settings_requests.select_next_some();
-        pin_mut!(request_fut);
+        let mut request_fut = pin!(request_fut);
 
         match exec.run_until_stalled(&mut request_fut).expect("should be ready") {
             Ok(settings::AudioRequest::Set { settings, responder }) => {
@@ -657,7 +657,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (mut settings_requests, avrcp_requests, _stop_sender, relay_fut) = setup_volume_relay();
 
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
@@ -665,7 +665,7 @@ mod tests {
             finish_relay_setup(&mut relay_fut, &mut exec, avrcp_requests, &mut settings_requests);
 
         let volume_get_fut = volume_client.get_current_volume();
-        pin_mut!(volume_get_fut);
+        let mut volume_get_fut = pin!(volume_get_fut);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
@@ -676,7 +676,7 @@ mod tests {
         );
 
         let volume_hanging_fut = volume_client.on_volume_changed();
-        pin_mut!(volume_hanging_fut);
+        let mut volume_hanging_fut = pin!(volume_hanging_fut);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
@@ -687,7 +687,7 @@ mod tests {
         );
 
         let volume_hanging_fut = volume_client.on_volume_changed();
-        pin_mut!(volume_hanging_fut);
+        let mut volume_hanging_fut = pin!(volume_hanging_fut);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
@@ -720,7 +720,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (mut settings_requests, avrcp_requests, _stop_sender, relay_fut) = setup_volume_relay();
 
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
@@ -729,7 +729,7 @@ mod tests {
             finish_relay_setup(&mut relay_fut, &mut exec, avrcp_requests, &mut settings_requests);
 
         let volume_hanging_fut1 = volume_client.on_volume_changed();
-        pin_mut!(volume_hanging_fut1);
+        let mut volume_hanging_fut1 = pin!(volume_hanging_fut1);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
@@ -741,7 +741,7 @@ mod tests {
 
         // Make another OnVolumeChanged request.
         let volume_hanging_fut2 = volume_client.on_volume_changed();
-        pin_mut!(volume_hanging_fut2);
+        let mut volume_hanging_fut2 = pin!(volume_hanging_fut2);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
@@ -751,7 +751,7 @@ mod tests {
 
         // Another request for volume updates.
         let volume_hanging_fut3 = volume_client.on_volume_changed();
-        pin_mut!(volume_hanging_fut3);
+        let mut volume_hanging_fut3 = pin!(volume_hanging_fut3);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 

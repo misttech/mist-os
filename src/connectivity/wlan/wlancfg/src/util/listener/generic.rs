@@ -110,7 +110,7 @@ mod tests {
         fidl::endpoints::create_proxy,
         fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync,
         futures::{channel::mpsc, prelude::*, task::Poll},
-        pin_utils::pin_mut,
+        std::pin::pin,
         wlan_common::assert_variant,
     };
 
@@ -207,7 +207,7 @@ mod tests {
             fidl_policy::ClientStateSummary,
             ClientStateUpdate,
         >(listener_updates);
-        pin_mut!(serve_listeners);
+        let mut serve_listeners = pin!(serve_listeners);
         assert_variant!(exec.run_until_stalled(&mut serve_listeners), Poll::Pending);
 
         // Register listener.
@@ -239,7 +239,7 @@ mod tests {
             fidl_policy::ClientStateSummary,
             ClientStateUpdate,
         >(listener_updates);
-        pin_mut!(serve_listeners);
+        let mut serve_listeners = pin!(serve_listeners);
         assert_variant!(exec.run_until_stalled(&mut serve_listeners), Poll::Pending);
 
         // Register #1 listener & ack initial update.
@@ -291,7 +291,7 @@ mod tests {
             fidl_policy::ClientStateSummary,
             ClientStateUpdate,
         >(listener_updates);
-        pin_mut!(serve_listeners);
+        let mut serve_listeners = pin!(serve_listeners);
         assert_variant!(exec.run_until_stalled(&mut serve_listeners), Poll::Pending);
 
         // Register #1 listener & ack initial update.

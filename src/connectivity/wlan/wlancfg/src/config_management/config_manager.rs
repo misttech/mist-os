@@ -696,11 +696,11 @@ mod tests {
         },
         fidl_fuchsia_stash as fidl_stash,
         futures::{channel::mpsc, task::Poll, TryStreamExt},
-        pin_utils::pin_mut,
         rand::{
             distributions::{Alphanumeric, DistString as _},
             thread_rng,
         },
+        std::pin::pin,
         test_case::test_case,
         wlan_common::assert_variant,
     };
@@ -1664,7 +1664,7 @@ mod tests {
 
         let network_id = NetworkIdentifier::try_from("foo", SecurityType::None).unwrap();
         let save_fut = saved_networks.store(network_id, Credential::None);
-        pin_mut!(save_fut);
+        let mut save_fut = pin!(save_fut);
 
         // Verify that storing the network does not complete until stash responds.
         assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Pending);
@@ -1710,7 +1710,7 @@ mod tests {
 
         // Create WLAN stash with a mocked out channel to the stash API.
         let init_fut = SavedNetworksManager::new_with_stash(Some(stash), telemetry_sender);
-        pin_mut!(init_fut);
+        let mut init_fut = pin!(init_fut);
         assert_variant!(exec.run_until_stalled(&mut init_fut), Poll::Pending);
 
         // Send back an error through the channel that would cause loading stash to fail
@@ -1736,7 +1736,7 @@ mod tests {
         let credential = Credential::None;
         let network_id = NetworkIdentifier::try_from(ssid, SecurityType::None).unwrap();
         let save_fut = saved_networks.store(network_id.clone(), credential);
-        pin_mut!(save_fut);
+        let mut save_fut = pin!(save_fut);
 
         assert_variant!(
             exec.run_until_stalled(&mut save_fut),
@@ -1773,7 +1773,7 @@ mod tests {
 
         // Create WLAN stash with a mocked out channel to the stash API.
         let init_fut = SavedNetworksManager::new_with_stash(Some(stash), telemetry_sender);
-        pin_mut!(init_fut);
+        let mut init_fut = pin!(init_fut);
 
         // Create saved networks manager. This should complete without any stash interaction since
         // the channel is closed.
@@ -1786,7 +1786,7 @@ mod tests {
         let credential = Credential::None;
         let network_id = NetworkIdentifier::try_from(ssid, SecurityType::None).unwrap();
         let save_fut = saved_networks.store(network_id.clone(), credential);
-        pin_mut!(save_fut);
+        let mut save_fut = pin!(save_fut);
 
         assert_variant!(
             exec.run_until_stalled(&mut save_fut),

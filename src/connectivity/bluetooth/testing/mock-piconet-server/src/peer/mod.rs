@@ -239,7 +239,8 @@ mod tests {
         fidl::endpoints::create_proxy_and_stream,
         fuchsia_async as fasync,
         fuchsia_bluetooth::profile::ProtocolDescriptor,
-        futures::{pin_mut, task::Poll},
+        futures::task::Poll,
+        std::pin::pin,
     };
 
     use crate::{
@@ -299,7 +300,7 @@ mod tests {
         other_peer: PeerId,
     ) -> Option<Vec<ProtocolDescriptor>> {
         let service_found_fut = stream.select_next_some();
-        pin_mut!(service_found_fut);
+        let mut service_found_fut = pin!(service_found_fut);
 
         match exec.run_until_stalled(&mut service_found_fut) {
             Poll::Ready(Ok(bredr::SearchResultsRequest::ServiceFound {
@@ -324,7 +325,7 @@ mod tests {
         other_peer: PeerId,
     ) {
         let observer_fut = stream.select_next_some();
-        pin_mut!(observer_fut);
+        let mut observer_fut = pin!(observer_fut);
 
         match exec.run_until_stalled(&mut observer_fut) {
             Poll::Ready(Ok(bredr::PeerObserverRequest::ServiceFound {
@@ -349,7 +350,7 @@ mod tests {
         let (mut mock_peer, _observer_stream) = create_mock_peer(id)?;
 
         let (stream, adv_fut, svc_ids) = build_and_register_service(&mut mock_peer);
-        pin_mut!(adv_fut);
+        let mut adv_fut = pin!(adv_fut);
 
         // Services should be advertised.
         let advertised_service_records = mock_peer.get_advertised_services(&svc_ids);
@@ -434,7 +435,7 @@ mod tests {
             &mut mock_peer,
             bredr::ServiceClassProfileIdentifier::AudioSink,
         );
-        pin_mut!(search1);
+        let mut search1 = pin!(search1);
         let mut expected_searches: HashSet<_> =
             vec![bredr::ServiceClassProfileIdentifier::AudioSink].into_iter().collect();
         assert_eq!(expected_searches, mock_peer.get_active_searches());
@@ -444,7 +445,7 @@ mod tests {
             &mut mock_peer,
             bredr::ServiceClassProfileIdentifier::AudioSink,
         );
-        pin_mut!(search2);
+        let mut search2 = pin!(search2);
         assert_eq!(expected_searches, mock_peer.get_active_searches());
 
         // Adding different search is OK.
@@ -452,7 +453,7 @@ mod tests {
             &mut mock_peer,
             bredr::ServiceClassProfileIdentifier::AvRemoteControl,
         );
-        pin_mut!(search3);
+        let mut search3 = pin!(search3);
         let _ = expected_searches.insert(bredr::ServiceClassProfileIdentifier::AvRemoteControl);
         assert_eq!(expected_searches, mock_peer.get_active_searches());
 
@@ -498,7 +499,7 @@ mod tests {
             &mut mock_peer,
             bredr::ServiceClassProfileIdentifier::AvRemoteControlTarget,
         );
-        pin_mut!(search1);
+        let mut search1 = pin!(search1);
 
         let expected_searches: HashSet<_> =
             vec![bredr::ServiceClassProfileIdentifier::AvRemoteControlTarget].into_iter().collect();

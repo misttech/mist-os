@@ -41,7 +41,7 @@ pub fn utc_clock_transformation() -> Option<zx::ClockTransformation> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_zircon::HandleBased};
+    use {super::*, fuchsia_zircon::HandleBased, std::pin::pin};
 
     #[test]
     fn set_and_get_clock() {
@@ -53,8 +53,7 @@ mod tests {
         // Create a new clock and a manually polled future for setting the clock.
         let clock = zx::Clock::create(zx::ClockOpts::empty(), None).expect("create clock");
         let clock_ = clock.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("duplicate clock");
-        let set_fut = set_clock(clock_);
-        futures::pin_mut!(set_fut);
+        let mut set_fut = pin!(set_clock(clock_));
 
         // Clock has not yet been started so it is not set.
         assert!(exec.run_until_stalled(&mut set_fut).is_pending());

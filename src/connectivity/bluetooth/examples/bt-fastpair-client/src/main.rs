@@ -12,7 +12,7 @@ use fidl_fuchsia_bluetooth_sys::{
     PairingDelegateRequestStream, PairingMarker,
 };
 use fuchsia_component::client::connect_to_protocol;
-use futures::{pin_mut, select, stream::TryStreamExt, FutureExt};
+use futures::{select, stream::TryStreamExt, FutureExt};
 use tracing::{info, warn};
 
 async fn process_provider_events(mut stream: ProviderWatcherRequestStream) -> Result<(), Error> {
@@ -73,9 +73,8 @@ async fn main() -> Result<(), Error> {
     }
     info!("Enabled Pairing service");
 
-    let pairing_fut = process_pairing_events(pairing_server).fuse();
-    let fastpair_fut = process_provider_events(fastpair_server).fuse();
-    pin_mut!(pairing_fut, fastpair_fut);
+    let mut pairing_fut = pin!(process_pairing_events(pairing_server).fuse());
+    let mut fastpair_fut = pin!(process_provider_events(fastpair_server).fuse());
 
     select! {
         pairing_result = pairing_fut => info!("Pairing service unexpectedly finished: {:?}", pairing_result),

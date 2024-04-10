@@ -10,8 +10,8 @@ use fidl_fuchsia_bluetooth_snoop::{PacketType, SnoopMarker, SnoopProxy, SnoopReq
 use fuchsia_async::{self as fasync, Channel, TestExecutor};
 use fuchsia_inspect::Inspector;
 use fuchsia_zircon as zx;
-use futures::{pin_mut, StreamExt};
-use std::{task::Poll, time::Duration};
+use futures::StreamExt;
+use std::{pin::pin, task::Poll, time::Duration};
 
 use crate::{
     handle_client_request,
@@ -225,8 +225,8 @@ fn pump_handle_client_request(
     subscribers: &mut SubscriptionManager,
     packet_logs: &PacketLogs,
 ) {
-    let handler = handle_client_request(request, client_requests, subscribers, packet_logs);
-    pin_mut!(handler);
+    let mut handler =
+        pin!(handle_client_request(request, client_requests, subscribers, packet_logs));
     exec.run_until_stalled(&mut handler)
         .expect("Handler future to complete")
         .expect("Client channel to accept response");

@@ -484,8 +484,8 @@ pub mod tests {
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::profile::Psm;
     use fuchsia_bluetooth::types::{Channel, PeerId};
-    use futures::{pin_mut, TryStreamExt};
-    use std::sync::Arc;
+    use futures::TryStreamExt;
+    use std::{pin::pin, sync::Arc};
 
     const PLAYER_ID: u16 = 1004;
     const UID_COUNTER: u16 = 1;
@@ -496,7 +496,7 @@ pub mod tests {
         avctp_cmd_stream: &mut AvctpCommandStream,
     ) {
         let set_browsed_player_fut = controller.set_browsed_player(PLAYER_ID);
-        pin_mut!(set_browsed_player_fut);
+        let mut set_browsed_player_fut = pin!(set_browsed_player_fut);
 
         exec.run_until_stalled(&mut set_browsed_player_fut).expect_pending("should not be ready");
         let command = get_next_avctp_command(exec, avctp_cmd_stream);
@@ -570,7 +570,7 @@ pub mod tests {
         // Get media player items without updating the peer.
         {
             let get_media_players_fut = controller.get_media_player_items(0, 5, false);
-            pin_mut!(get_media_players_fut);
+            let mut get_media_players_fut = pin!(get_media_players_fut);
 
             exec.run_until_stalled(&mut get_media_players_fut).expect_pending("result not ready");
             let command = get_next_avctp_command(&mut exec, &mut avctp_cmd_stream);
@@ -598,7 +598,7 @@ pub mod tests {
         // Get media player items and update the peer afterwards.
         {
             let get_media_players_fut = controller.get_media_player_items(0, 5, true);
-            pin_mut!(get_media_players_fut);
+            let mut get_media_players_fut = pin!(get_media_players_fut);
 
             exec.run_until_stalled(&mut get_media_players_fut).expect_pending("result not ready");
             let command = get_next_avctp_command(&mut exec, &mut avctp_cmd_stream);
@@ -626,7 +626,7 @@ pub mod tests {
 
         let get_file_system_fut =
             controller.get_file_system_items(0, 5, AttributeRequestOption::GetAll(false));
-        pin_mut!(get_file_system_fut);
+        let mut get_file_system_fut = pin!(get_file_system_fut);
 
         exec.run_until_stalled(&mut get_file_system_fut).expect_pending("result not ready");
         let command = get_next_avctp_command(&mut exec, &mut avctp_cmd_stream);
@@ -658,7 +658,7 @@ pub mod tests {
 
         let get_now_playing_fut =
             controller.get_now_playing_items(0, 5, AttributeRequestOption::GetAll(true));
-        pin_mut!(get_now_playing_fut);
+        let mut get_now_playing_fut = pin!(get_now_playing_fut);
 
         // Should fail since browsed player isn't set.
         assert_matches!(
@@ -679,7 +679,7 @@ pub mod tests {
         set_browsed_player(&mut exec, &controller, &mut avctp_cmd_stream);
 
         let move_into_dir_fut = controller.change_directory(Some(2));
-        pin_mut!(move_into_dir_fut);
+        let mut move_into_dir_fut = pin!(move_into_dir_fut);
 
         exec.run_until_stalled(&mut move_into_dir_fut).expect_pending("result not ready");
         let command = get_next_avctp_command(&mut exec, &mut avctp_cmd_stream);
@@ -711,7 +711,7 @@ pub mod tests {
         set_browsed_player(&mut exec, &controller, &mut avctp_cmd_stream);
 
         let get_item_attributes_fut = controller.get_item_attributes(0xc0decafe);
-        pin_mut!(get_item_attributes_fut);
+        let mut get_item_attributes_fut = pin!(get_item_attributes_fut);
 
         let res = exec.run_until_stalled(&mut get_item_attributes_fut);
         let futures::task::Poll::Pending = res else {
@@ -754,7 +754,7 @@ pub mod tests {
 
         // Test PlayFileSystemItem.
         let play_fut = controller.play_item(1, Scope::MediaPlayerVirtualFilesystem);
-        pin_mut!(play_fut);
+        let mut play_fut = pin!(play_fut);
         exec.run_until_stalled(&mut play_fut).expect_pending("result not ready");
         let command = exec
             .run_until_stalled(&mut avc_cmd_stream.try_next())
@@ -778,7 +778,7 @@ pub mod tests {
 
         // Test PlayNowPlayingItem failure.
         let play_fut = controller.play_item(1, Scope::NowPlaying);
-        pin_mut!(play_fut);
+        let mut play_fut = pin!(play_fut);
         exec.run_until_stalled(&mut play_fut).expect_pending("result not ready");
         let command = exec
             .run_until_stalled(&mut avc_cmd_stream.try_next())

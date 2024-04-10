@@ -12,8 +12,8 @@ use {
     futures::{channel::mpsc, StreamExt},
     ieee80211::{Bssid, MacAddrBytes},
     lazy_static::lazy_static,
-    pin_utils::pin_mut,
     std::collections::{hash_map::Entry, HashMap},
+    std::pin::pin,
     tracing::info,
     wlan_common::{
         appendable::Appendable,
@@ -293,8 +293,7 @@ async fn rate_selection() {
     let (sender, mut receiver) = mpsc::channel(1);
 
     let (session, port) = helper.start_netdevice_session(*CLIENT_MAC_ADDR).await;
-    let send_eth_beacons = send_eth_beacons(&session, &port, &mut receiver, &phy);
-    pin_mut!(send_eth_beacons);
+    let send_eth_beacons = pin!(send_eth_beacons(&session, &port, &mut receiver, &phy));
 
     let mut tx_vec_counts = HashMap::new();
     let snapshot = helper

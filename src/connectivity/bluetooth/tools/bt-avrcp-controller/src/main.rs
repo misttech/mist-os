@@ -24,8 +24,8 @@ use {
         select, FutureExt, Sink, SinkExt, Stream, StreamExt, TryStreamExt,
     },
     hex::FromHex,
-    pin_utils::pin_mut,
     rustyline::{error::ReadlineError, CompletionType, Config, EditMode, Editor},
+    std::pin::pin,
     std::{str::FromStr as _, thread},
 };
 
@@ -639,8 +639,8 @@ async fn main() -> Result<(), Error> {
     let repl_fut =
         run_repl(&controller, &test_controller, &browse_controller, &test_browse_controller).fuse();
 
-    pin_mut!(event_fut);
-    pin_mut!(repl_fut);
+    let mut event_fut = pin!(event_fut);
+    let mut repl_fut = pin!(repl_fut);
 
     // These futures should only return when something fails.
     select! {

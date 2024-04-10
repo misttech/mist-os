@@ -42,6 +42,7 @@ use netstack_testing_macros::netstack_test;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto as _;
 use std::ops::Not as _;
+use std::pin::pin;
 use test_case::test_case;
 
 #[netstack_test]
@@ -161,7 +162,7 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
     )
     .expect("event stream from state")
     .fuse();
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
 
     let mut if_state =
         fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(interface.id());
@@ -214,7 +215,7 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
         })
     };
 
-    futures::pin_mut!(no_interest_event_stream);
+    let mut no_interest_event_stream = pin!(no_interest_event_stream);
 
     // We should observe two Existing events, one for loopback and one for the
     // test interface. (The order is not guaranteed).
@@ -322,7 +323,7 @@ async fn add_address_sets_correct_valid_until<N: Netstack>(name: &str) {
     )
     .expect("event stream from state")
     .fuse();
-    futures::pin_mut!(event_stream);
+    let event_stream = pin!(event_stream);
     let mut if_state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(interface.id());
 
     let valid_until = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
@@ -751,7 +752,7 @@ async fn add_address_offline<N: Netstack>(name: &str) {
     let state_stream = fidl_fuchsia_net_interfaces_ext::admin::assignment_state_stream(
         address_state_provider.clone(),
     );
-    futures::pin_mut!(state_stream);
+    let mut state_stream = pin!(state_stream);
     let () = fidl_fuchsia_net_interfaces_ext::admin::wait_assignment_state(
         &mut state_stream,
         fidl_fuchsia_net_interfaces::AddressAssignmentState::Unavailable,
@@ -873,7 +874,7 @@ async fn ipv4_routing_table(
         realm.connect_to_protocol::<fnet_routes::StateV4Marker>().expect("connect to protocol");
     let stream = fnet_routes_ext::event_stream_from_state::<Ipv4>(&state_v4)
         .expect("failed to connect to watcher");
-    futures::pin_mut!(stream);
+    let stream = pin!(stream);
     fnet_routes_ext::collect_routes_until_idle::<_, Vec<_>>(stream)
         .await
         .expect("failed to get routing table")
@@ -977,7 +978,7 @@ async fn add_address_and_remove<N: Netstack>(
         fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
     )
     .expect("event stream from state");
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
     let mut properties = fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(id);
     let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
         event_stream.by_ref(),
@@ -1115,7 +1116,7 @@ async fn add_address_and_remove<N: Netstack>(
         .expect("connect to routes state");
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<Ipv4>(&routes_state).expect("should succeed");
-    futures::pin_mut!(routes_stream);
+    let mut routes_stream = pin!(routes_stream);
 
     let mut routes =
         fnet_routes_ext::collect_routes_until_idle::<Ipv4, HashSet<_>>(&mut routes_stream)
@@ -1439,7 +1440,7 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
     .expect("create event stream")
     .map(|r| r.expect("watcher error"))
     .fuse();
-    futures::pin_mut!(watcher);
+    let mut watcher = pin!(watcher);
 
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
@@ -1832,7 +1833,7 @@ async fn device_control_closes_on_device_close<N: Netstack>(name: &str) {
         fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
     )
     .expect("create watcher");
-    futures::pin_mut!(watcher);
+    let mut watcher = pin!(watcher);
 
     let installer = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces_admin::InstallerMarker>()
@@ -2041,7 +2042,7 @@ async fn installer_creates_datapath<N: Netstack, I: net_types::ip::Ip>(test_name
                     }
                 }
             });
-    futures::pin_mut!(realms_stream);
+    let mut realms_stream = pin!(realms_stream);
 
     // Can't drop any of the fields of RealmInfo to maintain objects alive.
     let RealmInfo {
@@ -2176,7 +2177,7 @@ async fn control_enable_disable<N: Netstack>(name: &str) {
     .expect("create event stream")
     .map(|r| r.expect("watcher error"))
     .fuse();
-    futures::pin_mut!(watcher);
+    let mut watcher = pin!(watcher);
 
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
@@ -2268,7 +2269,7 @@ async fn link_state_interface_state_interaction<N: Netstack>(name: &str) {
     .expect("create event stream")
     .map(|r| r.expect("watcher error"))
     .fuse();
-    futures::pin_mut!(watcher);
+    let mut watcher = pin!(watcher);
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
         watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
@@ -2292,7 +2293,7 @@ async fn link_state_interface_state_interaction<N: Netstack>(name: &str) {
             ) if id == iface_id => futures::future::ready(online),
             event => panic!("unexpected event {:?}", event),
         });
-    futures::pin_mut!(watcher);
+    let watcher = pin!(watcher);
 
     // Helper function that polls the watcher and panics if `online` changes.
     async fn expect_online_not_changed<S: futures::Stream<Item = bool> + std::marker::Unpin>(
@@ -2670,7 +2671,7 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
     .expect("create event stream")
     .map(|r| r.expect("watcher error"))
     .fuse();
-    futures::pin_mut!(watcher);
+    let mut watcher = pin!(watcher);
 
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
@@ -3129,7 +3130,7 @@ async fn reinstall_same_port<N: Netstack>(name: &str) {
                     port.watch_state().await.expect("watch state");
                 Some((has_session.expect("missing session information"), port))
             });
-            futures::pin_mut!(attached_stream);
+            let mut attached_stream = pin!(attached_stream);
             attached_stream
                 .by_ref()
                 .filter_map(|attached| futures::future::ready(attached.then(|| ())))
@@ -3345,7 +3346,7 @@ async fn nud_max_multicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name
         }
     }
     .fuse();
-    futures::pin_mut!(ping_fut);
+    let mut ping_fut = pin!(ping_fut);
     let mut stream_fut = solicit_stream.take(WANT_SOLICITS.into()).collect::<()>().fuse();
     futures::select! {
         () = stream_fut => {},

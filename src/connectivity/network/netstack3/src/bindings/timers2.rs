@@ -546,6 +546,7 @@ mod tests {
     use futures::channel::mpsc;
 
     use crate::bindings::integration_tests::set_logger_for_test;
+    use std::pin::pin;
 
     use super::*;
 
@@ -583,7 +584,7 @@ mod tests {
         executor: &mut fasync::TestExecutor,
         f: Fut,
     ) -> R {
-        futures::pin_mut!(f);
+        let mut f = pin!(f);
         match executor.run_until_stalled(&mut f) {
             Poll::Ready(r) => r,
             Poll::Pending => panic!("Executor stalled"),

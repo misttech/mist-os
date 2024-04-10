@@ -209,9 +209,7 @@ mod tests {
     fn test_command_channel() {
         let mut exec = fasync::TestExecutor::new();
         let (remote, local) = Channel::create();
-        let command_channel = CommandChannel::from_channel(local).unwrap();
-
-        pin_utils::pin_mut!(command_channel);
+        let mut command_channel = CommandChannel::from_channel(local).unwrap();
 
         let _ = command_channel.send_command_packet(&[0x03, 0x0c, 0x00]).expect("unable to send");
 

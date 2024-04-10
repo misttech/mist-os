@@ -11,7 +11,7 @@ use {
     fuchsia_zircon::prelude::*,
     futures::channel::oneshot,
     ieee80211::{Bssid, Ssid},
-    pin_utils::pin_mut,
+    std::pin::pin,
     wlan_common::{
         bss::Protection,
         channel::{Cbw, Channel},
@@ -155,14 +155,13 @@ async fn reconnect_to_wpa2_network() {
     };
 
     let test_ns_prefix = helper.test_ns_prefix().to_string();
-    let run_policy_future = run_policy_and_assert_transparent_reconnect(
+    let run_policy_future = pin!(run_policy_and_assert_transparent_reconnect(
         &test_ns_prefix,
         &AP_SSID,
         &PROTECTION,
         Some(PASSWORD),
         receiver,
-    );
-    pin_mut!(run_policy_future);
+    ));
     helper
         .run_until_complete_or_timeout(
             30.seconds(),

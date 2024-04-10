@@ -590,14 +590,12 @@ async fn connected_state(
     let mut avg_rssi = SignalStrengthAverage::new();
 
     // Timer to log post-connection scores metrics.
-    let post_connect_metric_timer =
+    let mut post_connect_metric_timer =
         fasync::Timer::new(AVERAGE_SCORE_DELTA_MINIMUM_DURATION.after_now()).fuse();
-    fasync::pin_mut!(post_connect_metric_timer);
 
     // Timer when duration has lapsed from short duration to long duration, for metrics purposes.
-    let connect_duration_metric_timer =
+    let mut connect_duration_metric_timer =
         fasync::Timer::new(METRICS_SHORT_CONNECT_DURATION.after_now()).fuse();
-    fasync::pin_mut!(connect_duration_metric_timer);
 
     loop {
         select! {
@@ -863,7 +861,7 @@ mod tests {
         fuchsia_zircon::prelude::*,
         futures::{task::Poll, Future},
         lazy_static::lazy_static,
-        pin_utils::pin_mut,
+        std::pin::pin,
         wlan_common::assert_variant,
         wlan_metrics_registry::PolicyDisconnectionMigratedMetricDimensionReason,
     };
@@ -955,7 +953,7 @@ mod tests {
 
         let fut = wait_for_connect_result(response_stream);
 
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Send some unexpected response
@@ -985,7 +983,7 @@ mod tests {
 
         let fut = wait_for_connect_result(response_stream);
 
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Drop server end, and verify future completes with error
@@ -1012,7 +1010,7 @@ mod tests {
             connect_selection.target.network.clone(),
             connect_selection.target.credential.clone(),
         );
-        pin_mut!(save_fut);
+        let mut save_fut = pin!(save_fut);
         assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Pending);
         process_stash_write(&mut exec, &mut stash_server);
         assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
@@ -1028,9 +1026,9 @@ mod tests {
             ConnectingOptions { connect_selection: connect_selection.clone(), attempt_counter: 0 };
         let initial_state = connecting_state(test_values.common_options, connecting_options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -1123,7 +1121,7 @@ mod tests {
             connect_selection.target.network.clone(),
             connect_selection.target.credential.clone(),
         );
-        pin_mut!(save_fut);
+        let mut save_fut = pin!(save_fut);
         assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Pending);
         process_stash_write(&mut exec, &mut stash_server);
         assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
@@ -1133,9 +1131,9 @@ mod tests {
             ConnectingOptions { connect_selection: connect_selection.clone(), attempt_counter: 0 };
         let initial_state = connecting_state(test_values.common_options, connecting_options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -1212,14 +1210,14 @@ mod tests {
             ConnectingOptions { connect_selection: connect_selection.clone(), attempt_counter: 0 };
         let initial_state = connecting_state(test_values.common_options, connecting_options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Ensure a connect request is sent to the SME
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
         let time_to_connect = 30.seconds();
         let connect_txn_handle = assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
@@ -1350,9 +1348,9 @@ mod tests {
             ConnectingOptions { connect_selection: connect_selection.clone(), attempt_counter: 0 };
         let initial_state = connecting_state(test_values.common_options, connecting_options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -1534,9 +1532,9 @@ mod tests {
         };
         let initial_state = connecting_state(common_options, connecting_options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         let sme_fut = sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -1646,9 +1644,9 @@ mod tests {
         };
         let initial_state = connecting_state(common_options, connecting_options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         let sme_fut = sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -1721,9 +1719,9 @@ mod tests {
             ConnectingOptions { connect_selection: connect_selection.clone(), attempt_counter: 0 };
         let initial_state = connecting_state(test_values.common_options, connecting_options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -1815,7 +1813,7 @@ mod tests {
             ConnectingOptions { connect_selection: connect_selection.clone(), attempt_counter: 0 };
         let initial_state = connecting_state(test_values.common_options, connecting_options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Break the SME by dropping the server end of the SME stream, so it causes an error
         drop(test_values.sme_req_stream);
@@ -1854,9 +1852,9 @@ mod tests {
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         let disconnect_time = fasync::Time::after(12.hours());
 
@@ -1978,7 +1976,7 @@ mod tests {
             connect_selection.target.network.clone(),
             connect_selection.target.credential.clone(),
         );
-        pin_mut!(save_fut);
+        let mut save_fut = pin!(save_fut);
         assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
 
         let (connect_txn_proxy, connect_txn_stream) =
@@ -2001,7 +1999,7 @@ mod tests {
         // Start the state machine in the connected state.
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let disconnect_time = fasync::Time::after(12.hours());
@@ -2086,7 +2084,7 @@ mod tests {
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         let disconnect_time = fasync::Time::after(12.hours());
 
@@ -2181,9 +2179,9 @@ mod tests {
             ConnectingOptions { connect_selection: connect_selection.clone(), attempt_counter: 0 };
         let initial_state = connecting_state(test_values.common_options, connecting_options);
         let state_fut = run_state_machine(initial_state);
-        pin_mut!(state_fut);
+        let mut state_fut = pin!(state_fut);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
@@ -2268,9 +2266,9 @@ mod tests {
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Send another duplicate request
         let mut client = Client::new(test_values.client_req_sender);
@@ -2321,9 +2319,9 @@ mod tests {
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         let disconnect_time = fasync::Time::after(12.hours());
 
@@ -2510,9 +2508,9 @@ mod tests {
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2565,7 +2563,7 @@ mod tests {
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2623,9 +2621,9 @@ mod tests {
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2733,9 +2731,9 @@ mod tests {
 
         let connect_txn_handle = connect_txn_stream.control_handle();
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Send the first signal report from SME
         let rssi_1 = -50;
@@ -2819,7 +2817,7 @@ mod tests {
 
         let connect_txn_handle = connect_txn_stream.control_handle();
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2868,9 +2866,9 @@ mod tests {
         };
         let initial_state = disconnecting_state(test_values.common_options, disconnecting_options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2926,9 +2924,9 @@ mod tests {
         };
         let initial_state = disconnecting_state(test_values.common_options, disconnecting_options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2993,7 +2991,7 @@ mod tests {
         };
         let initial_state = disconnecting_state(test_values.common_options, disconnecting_options);
         let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Break the SME by dropping the server end of the SME stream, so it causes an error
         drop(test_values.sme_req_stream);
@@ -3013,7 +3011,7 @@ mod tests {
         let sme_event_stream = sme_proxy.take_event_stream();
         let (_client_req_sender, client_req_stream) = mpsc::channel(1);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Create a connect request so that the state machine does not immediately exit.
         let connect_selection = generate_connect_selection();
@@ -3030,7 +3028,7 @@ mod tests {
             test_values.common_options.defect_sender,
             test_values.common_options.roam_manager,
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Run the state machine so it sends the initial SME disconnect request.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -3059,7 +3057,7 @@ mod tests {
             .expect("could not create SME request stream");
 
         let sme_fut = sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         let sme_event_stream = sme_proxy.take_event_stream();
 
@@ -3078,7 +3076,7 @@ mod tests {
             test_values.common_options.defect_sender,
             test_values.common_options.roam_manager,
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Run the state machine so it sends the initial SME disconnect request.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -3106,7 +3104,7 @@ mod tests {
         let sme_event_stream = sme_proxy.take_event_stream();
         let (client_req_sender, client_req_stream) = mpsc::channel(1);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Create a connect request so that the state machine does not immediately exit.
         let connect_selection = generate_connect_selection();
@@ -3122,7 +3120,7 @@ mod tests {
             test_values.common_options.defect_sender,
             test_values.common_options.roam_manager,
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Run the state machine so it sends the initial SME disconnect request.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -3200,7 +3198,7 @@ mod tests {
             test_values.common_options.defect_sender,
             test_values.common_options.roam_manager,
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Drop the server end of the SME stream, so it causes an error
         drop(test_values.sme_req_stream);

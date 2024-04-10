@@ -42,7 +42,7 @@ use {
     },
     hex,
     lazy_static::lazy_static,
-    pin_utils::pin_mut,
+    std::pin::pin,
     std::{convert::Infallible, pin::Pin, sync::Arc},
     test_case::test_case,
     tracing::{debug, info, trace},
@@ -336,7 +336,7 @@ fn add_phy(exec: &mut TestExecutor, test_values: &mut TestValues) {
     );
     let add_phy_event = DeviceWatcherEvent::OnPhyAdded { phy_id: TEST_PHY_ID };
     let add_phy_fut = device_monitor::handle_event(&listener, add_phy_event);
-    pin_mut!(add_phy_fut);
+    let mut add_phy_fut = pin!(add_phy_fut);
 
     let device_monitor_req = run_while(
         exec,
@@ -379,7 +379,7 @@ fn prepare_client_interface(
     // Use the Policy API to start client connections
     let start_connections_fut =
         test_values.external_interfaces.client_controller.start_client_connections();
-    pin_mut!(start_connections_fut);
+    let mut start_connections_fut = pin!(start_connections_fut);
     assert_variant!(exec.run_until_stalled(&mut start_connections_fut), Poll::Pending);
 
     // Expect an interface creation request
@@ -692,7 +692,7 @@ fn save_and_connect(
 
     // Save the network
     let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
-    pin_mut!(save_fut);
+    let save_fut = pin!(save_fut);
 
     // Begin processing the save request and the stash write from the save
     process_stash_write(
@@ -990,7 +990,7 @@ fn test_save_and_fail_to_connect(
 
     // Save the network
     let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
-    pin_mut!(save_fut);
+    let mut save_fut = pin!(save_fut);
 
     // Begin processing the save request and the stash write from the save
     process_stash_write(
@@ -1103,7 +1103,7 @@ fn test_fail_to_save(
 
     // Save the network
     let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
-    pin_mut!(save_fut);
+    let mut save_fut = pin!(save_fut);
 
     // Progress the WLAN policy side of the future
     assert_variant!(
@@ -1145,7 +1145,7 @@ fn test_connect_to_new_network() {
 
     // Save the second network.
     let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
-    pin_mut!(save_fut);
+    let save_fut = pin!(save_fut);
 
     // Process the stash write from the save.
     process_stash_write(
@@ -1161,7 +1161,7 @@ fn test_connect_to_new_network() {
 
     // Send a request to connect to the second network.
     let connect_fut = test_values.external_interfaces.client_controller.connect(&network_id);
-    pin_mut!(connect_fut);
+    let connect_fut = pin!(connect_fut);
 
     // Check that connect request was acknowledged.
     let connect_fut_resp =
@@ -1353,7 +1353,7 @@ fn test_autoconnect_to_saved_network() {
 
     // Save the network.
     let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
-    pin_mut!(save_fut);
+    let save_fut = pin!(save_fut);
 
     // Process the stash write from the save.
     process_stash_write(
@@ -1601,7 +1601,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
 
     // Save the network.
     let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
-    pin_mut!(save_fut);
+    let save_fut = pin!(save_fut);
 
     // Process the stash write from the save.
     process_stash_write(
@@ -1815,7 +1815,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
         // Turn off client connections via Policy API
         let stop_connections_fut =
             test_values.external_interfaces.client_controller.stop_client_connections();
-        pin_mut!(stop_connections_fut);
+        let mut stop_connections_fut = pin!(stop_connections_fut);
         assert_variant!(exec.run_until_stalled(&mut stop_connections_fut), Poll::Pending);
 
         // State machine disconnects

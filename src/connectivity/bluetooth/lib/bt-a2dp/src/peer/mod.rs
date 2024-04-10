@@ -1078,7 +1078,8 @@ mod tests {
         ProfileMarker, ProfileRequest, ProfileRequestStream, ServiceClassProfileIdentifier,
     };
     use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
-    use futures::{future::Either, pin_mut};
+    use futures::future::Either;
+    use std::pin::pin;
 
     use crate::media_task::tests::{TestMediaTask, TestMediaTaskBuilder};
     use crate::media_types::*;
@@ -1248,7 +1249,7 @@ mod tests {
 
         let closed_fut = peer.closed();
 
-        pin_mut!(closed_fut);
+        let mut closed_fut = pin!(closed_fut);
 
         assert!(exec.run_until_stalled(&mut closed_fut).is_pending());
 
@@ -1272,7 +1273,7 @@ mod tests {
         let _ = peer.set_descriptor(p);
 
         let collect_future = peer.collect_capabilities();
-        pin_mut!(collect_future);
+        let mut collect_future = pin!(collect_future);
 
         assert!(exec.run_until_stalled(&mut collect_future).is_pending());
 
@@ -1379,7 +1380,7 @@ mod tests {
 
         // The second time, we don't expect to ask the peer again.
         let collect_future = peer.collect_capabilities();
-        pin_mut!(collect_future);
+        let mut collect_future = pin!(collect_future);
 
         match exec.run_until_stalled(&mut collect_future) {
             Poll::Ready(Ok(endpoints)) => assert_eq!(2, endpoints.len()),
@@ -1400,7 +1401,7 @@ mod tests {
         let _ = peer.set_descriptor(p);
 
         let collect_future = peer.collect_capabilities();
-        pin_mut!(collect_future);
+        let mut collect_future = pin!(collect_future);
 
         assert!(exec.run_until_stalled(&mut collect_future).is_pending());
 
@@ -1517,7 +1518,7 @@ mod tests {
 
         // The second time, we don't expect to ask the peer again.
         let collect_future = peer.collect_capabilities();
-        pin_mut!(collect_future);
+        let mut collect_future = pin!(collect_future);
 
         match exec.run_until_stalled(&mut collect_future) {
             Poll::Ready(Ok(endpoints)) => assert_eq!(2, endpoints.len()),
@@ -1532,7 +1533,7 @@ mod tests {
         let (remote, _, _, peer) = setup_test_peer(false, build_test_streams(), None);
 
         let collect_future = peer.collect_capabilities();
-        pin_mut!(collect_future);
+        let mut collect_future = pin!(collect_future);
 
         // Shouldn't finish yet.
         assert!(exec.run_until_stalled(&mut collect_future).is_pending());
@@ -1572,7 +1573,7 @@ mod tests {
         let (remote, _, _, peer) = setup_test_peer(true, build_test_streams(), None);
 
         let collect_future = peer.collect_capabilities();
-        pin_mut!(collect_future);
+        let mut collect_future = pin!(collect_future);
 
         // Shouldn't finish yet.
         assert!(exec.run_until_stalled(&mut collect_future).is_pending());
@@ -1673,7 +1674,7 @@ mod tests {
         };
 
         let start_future = peer.stream_start(remote_seid, vec![codec_params]);
-        pin_mut!(start_future);
+        let mut start_future = pin!(start_future);
 
         match exec.run_until_stalled(&mut start_future) {
             Poll::Pending => {}
@@ -1782,7 +1783,7 @@ mod tests {
 
         // Need to discover the remote streams first, or the stream start will not work.
         let collect_capabilities_fut = peer.collect_capabilities();
-        pin_mut!(collect_capabilities_fut);
+        let mut collect_capabilities_fut = pin!(collect_capabilities_fut);
 
         assert!(exec.run_until_stalled(&mut collect_capabilities_fut).is_pending());
 
@@ -1804,7 +1805,7 @@ mod tests {
             codec_extra: vec![0x11, 0x45, 51, 51],
         };
         let start_future = peer.stream_start(remote_seid, vec![codec_params]);
-        pin_mut!(start_future);
+        let mut start_future = pin!(start_future);
 
         assert!(exec.run_until_stalled(&mut start_future).is_pending());
         let request = exec.run_singlethreaded(&mut remote_events.next());
@@ -1876,7 +1877,7 @@ mod tests {
 
         // Need to discover the remote streams first, or the stream start will not work.
         let collect_capabilities_fut = peer.collect_capabilities();
-        pin_mut!(collect_capabilities_fut);
+        let mut collect_capabilities_fut = pin!(collect_capabilities_fut);
 
         assert!(exec.run_until_stalled(&mut collect_capabilities_fut).is_pending());
 
@@ -1899,7 +1900,7 @@ mod tests {
         };
         let start_future =
             peer.stream_start(remote_seid, vec![codec_params, ServiceCapability::DelayReporting]);
-        pin_mut!(start_future);
+        let mut start_future = pin!(start_future);
 
         assert!(exec.run_until_stalled(&mut start_future).is_pending());
         let request = exec.run_singlethreaded(&mut remote_events.next());
@@ -1971,7 +1972,7 @@ mod tests {
 
         // Need to discover the remote streams first, or the stream start will not work.
         let collect_capabilities_fut = peer.collect_capabilities();
-        pin_mut!(collect_capabilities_fut);
+        let mut collect_capabilities_fut = pin!(collect_capabilities_fut);
 
         assert!(exec.run_until_stalled(&mut collect_capabilities_fut).is_pending());
 
@@ -2000,7 +2001,7 @@ mod tests {
                 codec_params,
             ],
         );
-        pin_mut!(start_future);
+        let mut start_future = pin!(start_future);
 
         assert!(exec.run_until_stalled(&mut start_future).is_pending());
         let request = exec.run_singlethreaded(&mut remote_events.next());
@@ -2030,7 +2031,7 @@ mod tests {
         };
 
         let start_future = peer.stream_start(remote_seid, vec![codec_params]);
-        pin_mut!(start_future);
+        let mut start_future = pin!(start_future);
 
         let _ = exec
             .run_until_stalled(&mut start_future)
@@ -2131,7 +2132,7 @@ mod tests {
 
         // Need to discover the remote streams first, or the stream start will always work.
         let collect_capabilities_fut = peer.collect_capabilities();
-        pin_mut!(collect_capabilities_fut);
+        let mut collect_capabilities_fut = pin!(collect_capabilities_fut);
 
         assert!(exec.run_until_stalled(&mut collect_capabilities_fut).is_pending());
 
@@ -2153,7 +2154,7 @@ mod tests {
             codec_extra: vec![0x11, 0x45, 51, 51],
         };
         let start_future = peer.stream_start(remote_seid, vec![codec_params]);
-        pin_mut!(start_future);
+        let mut start_future = pin!(start_future);
 
         match exec.run_until_stalled(&mut start_future) {
             Poll::Ready(Err(avdtp::Error::OutOfRange)) => {}
@@ -2177,7 +2178,7 @@ mod tests {
         };
 
         let start_future = peer.stream_start(remote_seid, vec![codec_params]);
-        pin_mut!(start_future);
+        let mut start_future = pin!(start_future);
 
         match exec.run_until_stalled(&mut start_future) {
             Poll::Pending => {}
@@ -2273,8 +2274,7 @@ mod tests {
             };
         }
 
-        let collect_fut = peer.collect_capabilities();
-        pin_mut!(collect_fut);
+        let collect_fut = pin!(peer.collect_capabilities());
 
         // Discover then a GetCapabilities.
         let Either::Left((request, collect_fut)) =
@@ -2282,7 +2282,7 @@ mod tests {
         else {
             panic!("Collect future shouldn't finish first");
         };
-        pin_mut!(collect_fut);
+        let collect_fut = pin!(collect_fut);
         remote_handle_request(request.expect("a request").unwrap(), &remote_peer).await;
         let Either::Left((request, collect_fut)) =
             futures::future::select(remote_events.next(), collect_fut).await
@@ -2367,7 +2367,7 @@ mod tests {
         let remote_peer = avdtp::Peer::new(remote);
 
         let discover_fut = remote_peer.discover();
-        pin_mut!(discover_fut);
+        let mut discover_fut = pin!(discover_fut);
 
         let expected = vec![make_sbc_endpoint(1, avdtp::EndpointType::Source).information()];
         match exec.run_until_stalled(&mut discover_fut) {
@@ -2379,7 +2379,7 @@ mod tests {
         let unknown_endpoint_id = 2_u8.try_into().expect("should be able to get sbc endpointid");
 
         let get_caps_fut = remote_peer.get_capabilities(&sbc_endpoint_id);
-        pin_mut!(get_caps_fut);
+        let mut get_caps_fut = pin!(get_caps_fut);
 
         match exec.run_until_stalled(&mut get_caps_fut) {
             // There are two caps (mediatransport, mediacodec) in the sbc endpoint.
@@ -2388,7 +2388,7 @@ mod tests {
         };
 
         let get_caps_fut = remote_peer.get_capabilities(&unknown_endpoint_id);
-        pin_mut!(get_caps_fut);
+        let mut get_caps_fut = pin!(get_caps_fut);
 
         match exec.run_until_stalled(&mut get_caps_fut) {
             Poll::Ready(Err(avdtp::Error::RemoteRejected(e))) => {
@@ -2398,7 +2398,7 @@ mod tests {
         };
 
         let get_caps_fut = remote_peer.get_all_capabilities(&sbc_endpoint_id);
-        pin_mut!(get_caps_fut);
+        let mut get_caps_fut = pin!(get_caps_fut);
 
         match exec.run_until_stalled(&mut get_caps_fut) {
             // There are two caps (mediatransport, mediacodec) in the sbc endpoint.
@@ -2409,7 +2409,7 @@ mod tests {
         let sbc_caps = sbc_capabilities();
         let set_config_fut =
             remote_peer.set_configuration(&sbc_endpoint_id, &sbc_endpoint_id, &sbc_caps);
-        pin_mut!(set_config_fut);
+        let mut set_config_fut = pin!(set_config_fut);
 
         match exec.run_until_stalled(&mut set_config_fut) {
             Poll::Ready(Ok(())) => {}
@@ -2417,7 +2417,7 @@ mod tests {
         };
 
         let open_fut = remote_peer.open(&sbc_endpoint_id);
-        pin_mut!(open_fut);
+        let mut open_fut = pin!(open_fut);
         match exec.run_until_stalled(&mut open_fut) {
             Poll::Ready(Ok(())) => {}
             x => panic!("Open should be ready but got {:?}", x),
@@ -2430,7 +2430,7 @@ mod tests {
 
         let stream_ids = vec![sbc_endpoint_id.clone()];
         let start_fut = remote_peer.start(&stream_ids);
-        pin_mut!(start_fut);
+        let mut start_fut = pin!(start_fut);
         match exec.run_until_stalled(&mut start_fut) {
             Poll::Ready(Ok(())) => {}
             x => panic!("Start should be ready but got {:?}", x),
@@ -2441,7 +2441,7 @@ mod tests {
         assert!(media_task.is_started());
 
         let suspend_fut = remote_peer.suspend(&stream_ids);
-        pin_mut!(suspend_fut);
+        let mut suspend_fut = pin!(suspend_fut);
         match exec.run_until_stalled(&mut suspend_fut) {
             Poll::Ready(Ok(())) => {}
             x => panic!("Start should be ready but got {:?}", x),
@@ -2481,7 +2481,7 @@ mod tests {
 
         let set_config_fut =
             remote_peer.set_configuration(&sbc_endpoint_id, &sbc_endpoint_id, wrong_freq_sbc);
-        pin_mut!(set_config_fut);
+        let mut set_config_fut = pin!(set_config_fut);
 
         match exec.run_until_stalled(&mut set_config_fut) {
             Poll::Ready(Err(avdtp::Error::RemoteRejected(e))) => {
@@ -2493,7 +2493,7 @@ mod tests {
         let sbc_caps = sbc_capabilities();
         let set_config_fut =
             remote_peer.set_configuration(&sbc_endpoint_id, &sbc_endpoint_id, &sbc_caps);
-        pin_mut!(set_config_fut);
+        let mut set_config_fut = pin!(set_config_fut);
 
         match exec.run_until_stalled(&mut set_config_fut) {
             Poll::Ready(Ok(())) => {}
@@ -2521,7 +2521,7 @@ mod tests {
         let sbc_caps = sbc_capabilities();
         let set_config_fut =
             remote_peer.set_configuration(&sbc_endpoint_id, &sbc_endpoint_id, &sbc_caps);
-        pin_mut!(set_config_fut);
+        let mut set_config_fut = pin!(set_config_fut);
 
         match exec.run_until_stalled(&mut set_config_fut) {
             Poll::Ready(Ok(())) => {}
@@ -2529,7 +2529,7 @@ mod tests {
         };
 
         let open_fut = remote_peer.open(&sbc_endpoint_id);
-        pin_mut!(open_fut);
+        let mut open_fut = pin!(open_fut);
         match exec.run_until_stalled(&mut open_fut) {
             Poll::Ready(Ok(())) => {}
             x => panic!("Open should be ready but got {:?}", x),
@@ -2542,7 +2542,7 @@ mod tests {
         // The remote end should get a start request after the timeout.
         let mut remote_requests = remote_peer.take_request_stream();
         let next_remote_request_fut = remote_requests.next();
-        pin_mut!(next_remote_request_fut);
+        let mut next_remote_request_fut = pin!(next_remote_request_fut);
 
         // Nothing should happen immediately.
         assert!(exec.run_until_stalled(&mut next_remote_request_fut).is_pending());
@@ -2566,7 +2566,7 @@ mod tests {
 
         // Remote peer should still be able to suspend the stream.
         let suspend_fut = remote_peer.suspend(&stream_ids);
-        pin_mut!(suspend_fut);
+        let mut suspend_fut = pin!(suspend_fut);
         match exec.run_until_stalled(&mut suspend_fut) {
             Poll::Ready(Ok(())) => {}
             x => panic!("Suspend should be ready but got {:?}", x),
@@ -2753,7 +2753,7 @@ mod tests {
     ) -> TestMediaTask {
         let sbc_caps = sbc_capabilities();
         let set_config_fut = remote_peer.set_configuration(&local_id, &remote_id, &sbc_caps);
-        pin_mut!(set_config_fut);
+        let mut set_config_fut = pin!(set_config_fut);
 
         match exec.run_until_stalled(&mut set_config_fut) {
             Poll::Ready(Ok(())) => {}
@@ -2761,7 +2761,7 @@ mod tests {
         };
 
         let open_fut = remote_peer.open(&local_id);
-        pin_mut!(open_fut);
+        let mut open_fut = pin!(open_fut);
         match exec.run_until_stalled(&mut open_fut) {
             Poll::Ready(Ok(())) => {}
             x => panic!("Open should be ready but got {:?}", x),
@@ -2774,7 +2774,7 @@ mod tests {
         // Remote peer should still be able to try to start the stream, and we will say yes.
         let stream_ids = [local_id.clone()];
         let start_fut = remote_peer.start(&stream_ids);
-        pin_mut!(start_fut);
+        let mut start_fut = pin!(start_fut);
         match exec.run_until_stalled(&mut start_fut) {
             Poll::Ready(Ok(())) => {}
             x => panic!("Start should be ready but got {:?}", x),

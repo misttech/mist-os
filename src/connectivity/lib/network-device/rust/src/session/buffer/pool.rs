@@ -1028,6 +1028,7 @@ mod tests {
 
     use std::collections::HashSet;
     use std::num::{NonZeroU16, NonZeroU64, NonZeroUsize};
+    use std::pin::pin;
     use std::task::{Poll, Waker};
 
     const DEFAULT_MIN_TX_BUFFER_HEAD: u16 = 4;
@@ -1200,7 +1201,7 @@ mod tests {
         let pool = Pool::new_test_default();
         let mut allocated = pool.alloc_tx_all(1);
         let alloc_fut = pool.alloc_tx_checked(1);
-        futures::pin_mut!(alloc_fut);
+        let mut alloc_fut = pin!(alloc_fut);
         // The allocation should block.
         assert_matches!(executor.run_until_stalled(&mut alloc_fut), Poll::Pending);
         // And the allocation request should be queued.
@@ -1229,7 +1230,7 @@ mod tests {
         let mut allocated = pool.alloc_tx_all(1);
         {
             let alloc_fut = pool.alloc_tx_checked(1);
-            futures::pin_mut!(alloc_fut);
+            let mut alloc_fut = pin!(alloc_fut);
             assert_matches!(executor.run_until_stalled(&mut alloc_fut), Poll::Pending);
             assert_matches!(
                 pool.tx_alloc_state.lock().requests.as_slices(),
@@ -1253,7 +1254,7 @@ mod tests {
         let mut allocated = pool.alloc_tx_all(1);
         {
             let alloc_fut = pool.alloc_tx_checked(1);
-            futures::pin_mut!(alloc_fut);
+            let mut alloc_fut = pin!(alloc_fut);
             assert_matches!(executor.run_until_stalled(&mut alloc_fut), Poll::Pending);
             assert_matches!(
                 pool.tx_alloc_state.lock().requests.as_slices(),

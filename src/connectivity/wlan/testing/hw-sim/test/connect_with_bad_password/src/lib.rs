@@ -7,7 +7,7 @@ use {
     fuchsia_zircon::{self as zx, prelude::*},
     ieee80211::{Bssid, Ssid},
     lazy_static::lazy_static,
-    pin_utils::pin_mut,
+    std::pin::pin,
     tracing::info,
     wlan_common::{
         bss::Protection,
@@ -49,8 +49,7 @@ async fn fail_to_connect_or_timeout(
 ) {
     let authenticator =
         create_authenticator(bssid, ssid, password, cipher, *protection, *protection);
-    let connect = connect_and_wait_for_failure(ssid, supplicant, expected_failure);
-    pin_mut!(connect);
+    let connect = pin!(connect_and_wait_for_failure(ssid, supplicant, expected_failure));
     info!(
         "Attempting to connect to a network with {:?} protection **using an incorrect password**.",
         protection

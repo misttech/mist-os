@@ -277,6 +277,7 @@ mod tests {
     use super::*;
 
     use assert_matches::assert_matches;
+    use std::pin::pin;
 
     use crate::{
         messaging::testutil::SentMessage,
@@ -292,12 +293,12 @@ mod tests {
             FakeProtocolFamily,
         >(crate::client::testutil::CLIENT_ID_1, &[]);
 
-        let mut client_task = spawn_client_request_handler::<FakeProtocolFamily, _, _>(
+        let mut client_task = pin!(spawn_client_request_handler::<FakeProtocolFamily, _, _>(
             client,
             req_receiver,
             FakeNetlinkRequestHandler,
         )
-        .fuse();
+        .fuse());
 
         assert_matches!((&mut client_task).now_or_never(), None);
         assert_eq!(&client_sink.take_messages()[..], &[]);
@@ -306,8 +307,8 @@ mod tests {
         // NB: Use the sender's channel size as a synchronization method; If a
         // second message could be sent, the first *must* have been handled.
         req_sender.try_send(new_fake_netlink_message()).expect("should send without error");
-        let could_send_fut = futures::future::poll_fn(|ctx| req_sender.poll_ready(ctx)).fuse();
-        futures::pin_mut!(client_task, could_send_fut);
+        let mut could_send_fut =
+            pin!(futures::future::poll_fn(|ctx| req_sender.poll_ready(ctx)).fuse());
         futures::select!(
             res = could_send_fut => res.expect("should be able to send without error"),
             _client = client_task => panic!("client task unexpectedly finished"),
@@ -361,8 +362,8 @@ mod tests {
         // NB: Use the sender's channel size as a synchronization method; If a
         // second message could be sent, the first *must* have been handled.
         req_sender2.try_send(new_fake_netlink_message()).expect("should send without error");
-        let could_send_fut = futures::future::poll_fn(|ctx| req_sender2.poll_ready(ctx)).fuse();
-        futures::pin_mut!(client_acceptor_fut, could_send_fut);
+        let mut could_send_fut =
+            pin!(futures::future::poll_fn(|ctx| req_sender2.poll_ready(ctx)).fuse());
         futures::select!(
             res = could_send_fut => res.expect("should be able to send without error"),
             () = client_acceptor_fut => panic!("client acceptor unexpectedly finished"),

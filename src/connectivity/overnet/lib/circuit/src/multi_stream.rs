@@ -12,6 +12,7 @@ use futures::future::Either;
 use futures::prelude::*;
 use futures::StreamExt;
 use std::collections::HashMap;
+use std::pin::pin;
 use std::sync::{Arc, Mutex as SyncMutex};
 
 /// Status of an individual stream.
@@ -166,7 +167,7 @@ pub async fn multi_stream(
         let streams_in = streams_in.chain(futures::stream::pending()).map(Either::Right);
 
         let events = futures::stream::select(read_result_stream, streams_in);
-        futures::pin_mut!(events);
+        let mut events = pin!(events);
 
         let mut ret = Ok(());
         while let Some(event) = events.next().await {
@@ -215,8 +216,8 @@ pub async fn multi_stream(
         }
     });
 
-    futures::pin_mut!(handle_read);
-    futures::pin_mut!(handle_write);
+    let handle_read = pin!(handle_read);
+    let handle_write = pin!(handle_write);
 
     match futures::future::select(handle_read, handle_write).await {
         Either::Left((res, _)) => res,
@@ -443,8 +444,8 @@ pub fn multi_stream_node_connection(
     let node_fut = node.link_node(control_stream, new_stream_sender, new_stream_receiver, quality);
 
     async move {
-        futures::pin_mut!(node_fut);
-        futures::pin_mut!(stream_fut);
+        let node_fut = pin!(node_fut);
+        let stream_fut = pin!(stream_fut);
 
         // If either the node connection or the multi stream dies we assume the other will also die
         // shortly after, so we always await both futures to completion.
@@ -526,14 +527,14 @@ pub async fn multi_stream_node_connection_to_async(
 
     let read_write = futures::future::try_join(read_fut, write_fut);
 
-    futures::pin_mut!(conn_fut);
+    let conn_fut = pin!(conn_fut);
 
     let cleanup = {
         // We must pin read_write to this scope so the streams are dropped when
         // we leave this scope and conn_fut can run to completion. If it's
         // pinned to the stack alongside conn_fut then the streams aren't
         // dropped and conn_fut doesn't observe the closed status.
-        futures::pin_mut!(read_write);
+        let read_write = pin!(read_write);
 
         match futures::future::select(conn_fut, read_write).await {
             Either::Left((res, _)) => {

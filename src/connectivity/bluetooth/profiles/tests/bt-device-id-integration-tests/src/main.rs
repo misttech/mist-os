@@ -7,8 +7,9 @@ use fidl_fuchsia_bluetooth_deviceid::*;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_component_test::{Capability, RealmInstance};
 use fuchsia_zircon as zx;
-use futures::{future::Either, pin_mut, Future, FutureExt, StreamExt};
+use futures::{future::Either, Future, FutureExt, StreamExt};
 use mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember};
+use std::pin::pin;
 use tracing::info;
 
 const DEVICE_ID_URL: &str =
@@ -179,8 +180,8 @@ async fn second_primary_di_client_is_rejected() {
         connect_di_client(&test_topology, &di_component, true);
     let (di_client_fut2, _di_client_token2) =
         connect_di_client(&test_topology, &di_component, true);
-    pin_mut!(di_client_fut1);
-    pin_mut!(di_client_fut2);
+    let di_client_fut1 = pin!(di_client_fut1);
+    let di_client_fut2 = pin!(di_client_fut2);
 
     // The first client that registers will be successful - the failed client's request will resolve
     // with error.

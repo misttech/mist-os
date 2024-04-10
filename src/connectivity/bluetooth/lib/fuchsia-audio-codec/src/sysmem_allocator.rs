@@ -272,8 +272,9 @@ mod tests {
         BufferCollectionTokenRequest, BufferCollectionTokenRequestStream, CoherencyDomain,
         HeapType, SingleBufferSettings, VmoBuffer,
     };
-    use fuchsia_async::{self as fasync, pin_mut};
+    use fuchsia_async as fasync;
     use futures::StreamExt;
+    use std::pin::pin;
 
     use crate::buffer_collection_constraints::{
         BUFFER_COLLECTION_CONSTRAINTS_DEFAULT, IMAGE_FORMAT_CONSTRAINTS_DEFAULT,
@@ -483,8 +484,7 @@ mod tests {
             .set_constraints(true, &buffer_constraints)
             .expect("constraints should send okay");
 
-        let allocation_fut = buffer_collection_client.wait_for_buffers_allocated();
-        pin_mut!(allocation_fut);
+        let mut allocation_fut = pin!(buffer_collection_client.wait_for_buffers_allocated());
 
         let (status, buffers) =
             exec.run_singlethreaded(&mut allocation_fut).expect("allocation success");

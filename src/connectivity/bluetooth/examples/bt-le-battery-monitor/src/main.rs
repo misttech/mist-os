@@ -236,7 +236,7 @@ mod tests {
     use async_utils::PollExt;
     use fidl_fuchsia_bluetooth_le::CentralRequest;
     use fuchsia_async as fasync;
-    use futures::pin_mut;
+    use std::pin::pin;
 
     #[fuchsia::test]
     fn watch_scan_results_lifetime() {
@@ -246,9 +246,8 @@ mod tests {
         let (watch_client, mut watch_server) =
             fidl::endpoints::create_proxy_and_stream::<ScanResultWatcherMarker>().unwrap();
 
-        let watch_fut = watch_scan_results(central.clone(), watch_client);
-        let server_fut = watch_server.next();
-        pin_mut!(watch_fut, server_fut);
+        let watch_fut = pin!(watch_scan_results(central.clone(), watch_client));
+        let server_fut = pin!(watch_server.next());
         // Should receive initial request to watch.
         let (result, mut watch_fut) = run_while(&mut exec, watch_fut, server_fut);
         let responder = result.unwrap().expect("fidl request").into_watch().unwrap();
@@ -271,9 +270,8 @@ mod tests {
         let (watch_client, mut watch_server) =
             fidl::endpoints::create_proxy_and_stream::<ScanResultWatcherMarker>().unwrap();
 
-        let watch_fut = watch_scan_results(central.clone(), watch_client);
-        let server_fut = watch_server.next();
-        pin_mut!(watch_fut, server_fut);
+        let watch_fut = pin!(watch_scan_results(central.clone(), watch_client));
+        let server_fut = pin!(watch_server.next());
         // Should receive initial request to watch.
         let (result, mut watch_fut) = run_while(&mut exec, watch_fut, server_fut);
         let responder = result.unwrap().expect("fidl request").into_watch().unwrap();
@@ -359,7 +357,7 @@ mod tests {
         let (central_client, mut central_server) =
             fidl::endpoints::create_proxy_and_stream::<CentralMarker>().unwrap();
         let connect_fut = try_connect(id, &central_client);
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
 
         exec.run_until_stalled(&mut connect_fut).expect_pending("waiting for result");
 

@@ -7,6 +7,7 @@
 use std::{
     num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError},
     ops::ControlFlow,
+    pin::pin,
     sync::Arc,
     time::Duration,
 };
@@ -672,7 +673,7 @@ fn spawn_send_task<I: IpExt>(
         }
     };
     spawner.spawn(async move {
-        futures::pin_mut!(watch_fut);
+        let watch_fut = pin!(watch_fut);
         futures::future::select(watch_fut, abort)
             .map(|_: futures::future::Either<((), _), ((), _)>| ())
             .await;

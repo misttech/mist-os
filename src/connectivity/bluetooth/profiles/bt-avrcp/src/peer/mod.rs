@@ -923,7 +923,8 @@ pub(crate) mod tests {
     use assert_matches::assert_matches;
     use async_utils::PollExt;
     use bt_avctp::{AvcCommand, AvcCommandStream, AvctpCommand, AvctpCommandStream};
-    use futures::{pin_mut, task::Poll, TryStreamExt};
+    use futures::{task::Poll, TryStreamExt};
+    use std::pin::pin;
 
     use {
         diagnostics_assertions::assert_data_tree,
@@ -1003,7 +1004,7 @@ pub(crate) mod tests {
         assert!(!peer_handle.is_control_connected());
 
         let next_request_fut = profile_requests.next();
-        pin_mut!(next_request_fut);
+        let mut next_request_fut = pin!(next_request_fut);
         assert!(exec.run_until_stalled(&mut next_request_fut).is_pending());
 
         // Advance time by the maximum amount of time it would take to establish
@@ -1066,7 +1067,7 @@ pub(crate) mod tests {
         assert!(!peer_handle.is_control_connected());
 
         let next_request_fut = profile_requests.next();
-        pin_mut!(next_request_fut);
+        let mut next_request_fut = pin!(next_request_fut);
         assert!(exec.run_until_stalled(&mut next_request_fut).is_pending());
 
         // Advance time by the maximum amount of time it would take to establish
@@ -1146,7 +1147,7 @@ pub(crate) mod tests {
         assert!(!peer_handle.is_control_connected());
 
         let next_request_fut = profile_requests.next();
-        pin_mut!(next_request_fut);
+        let mut next_request_fut = pin!(next_request_fut);
         assert!(exec.run_until_stalled(&mut next_request_fut).is_pending());
 
         // Advance time by the maximum amount of time it would take to establish
@@ -1215,7 +1216,7 @@ pub(crate) mod tests {
         assert!(!peer_handle.is_control_connected());
 
         let next_request_fut = profile_requests.next();
-        pin_mut!(next_request_fut);
+        let mut next_request_fut = pin!(next_request_fut);
         assert!(exec.run_until_stalled(&mut next_request_fut).is_pending());
 
         // Advance time by the maximum amount of time it would take to establish a connection.
@@ -1297,7 +1298,7 @@ pub(crate) mod tests {
         assert!(!peer_handle.is_control_connected());
 
         let next_request_fut = profile_requests.next();
-        pin_mut!(next_request_fut);
+        let mut next_request_fut = pin!(next_request_fut);
         assert!(exec.run_until_stalled(&mut next_request_fut).is_pending());
 
         // Advance time by the maximum amount of time it would take to establish
@@ -1327,7 +1328,7 @@ pub(crate) mod tests {
 
         // We shouldn't have requested retry.
         let next_request_fut = profile_requests.next();
-        pin_mut!(next_request_fut);
+        let mut next_request_fut = pin!(next_request_fut);
         assert!(exec.run_until_stalled(&mut next_request_fut).is_pending());
 
         // Set control channel manually to test browse channel connection retry
@@ -1405,7 +1406,7 @@ pub(crate) mod tests {
         assert!(!peer_handle.is_control_connected());
 
         let next_request_fut = profile_requests.next();
-        pin_mut!(next_request_fut);
+        let mut next_request_fut = pin!(next_request_fut);
         assert!(exec.run_until_stalled(&mut next_request_fut).is_pending());
 
         // Advance time by the maximum amount of time it would take to establish
@@ -1513,7 +1514,7 @@ pub(crate) mod tests {
         assert!(!peer_handle.is_control_connected());
 
         let next_request_fut = profile_requests.next();
-        pin_mut!(next_request_fut);
+        let mut next_request_fut = pin!(next_request_fut);
         assert!(exec.run_until_stalled(&mut next_request_fut).is_pending());
 
         // Advance time by the maximum amount of time it would take to establish

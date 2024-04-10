@@ -3945,11 +3945,14 @@ mod tests {
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload},
         fidl_fuchsia_wlan_common as fidl_common,
-        futures::{pin_mut, stream::FusedStream, task::Poll, TryStreamExt},
+        futures::{stream::FusedStream, task::Poll, TryStreamExt},
         ieee80211_testutils::{BSSID_REGEX, SSID_REGEX},
         rand::Rng,
         regex::Regex,
-        std::{collections::VecDeque, pin::Pin},
+        std::{
+            collections::VecDeque,
+            pin::{pin, Pin},
+        },
         test_case::test_case,
         wlan_common::{
             assert_variant,
@@ -3974,7 +3977,7 @@ mod tests {
 
             let inspector = $test_helper.inspector.clone();
             let read_fut = reader::read(&inspector);
-            pin_mut!(read_fut);
+            let mut read_fut = pin!(read_fut);
             loop {
                 match $test_helper.exec.run_until_stalled(&mut read_fut) {
                     Poll::Pending => {
@@ -7339,7 +7342,7 @@ mod tests {
         .expect("failed to create proxy and stream.");
 
         let fut = create_metrics_logger(&factory_proxy, experiment_id.clone());
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // First, test the case where the factory service cannot be reached and expect an error.
         if failure_mode == CreateMetricsLoggerFailureMode::FactoryRequest {
@@ -7785,7 +7788,7 @@ mod tests {
 
         // Log the test telemetry event.
         let fut = stats_logger.log_post_recovery_result(reason, outcome);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify the metric that was emitted.
@@ -8966,7 +8969,7 @@ mod tests {
         >,
     ) {
         let telemetry_svc_req_fut = telemetry_svc_stream.try_next();
-        pin_mut!(telemetry_svc_req_fut);
+        let mut telemetry_svc_req_fut = pin!(telemetry_svc_req_fut);
         if let Poll::Ready(Ok(Some(request))) =
             executor.run_until_stalled(&mut telemetry_svc_req_fut)
         {
@@ -8995,7 +8998,7 @@ mod tests {
         telemetry_svc_stream: &mut fidl_fuchsia_wlan_sme::TelemetryRequestStream,
     ) {
         let telemetry_svc_req_fut = telemetry_svc_stream.try_next();
-        pin_mut!(telemetry_svc_req_fut);
+        let mut telemetry_svc_req_fut = pin!(telemetry_svc_req_fut);
         if let Poll::Ready(Ok(Some(request))) =
             executor.run_until_stalled(&mut telemetry_svc_req_fut)
         {

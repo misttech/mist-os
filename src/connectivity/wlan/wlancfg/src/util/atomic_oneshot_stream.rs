@@ -95,7 +95,7 @@ mod tests {
         super::*,
         fuchsia_async as fasync,
         futures::{channel::mpsc, future, select, stream::FuturesUnordered, task::Poll, FutureExt},
-        pin_utils::pin_mut,
+        std::pin::pin,
         wlan_common::assert_variant,
     };
 
@@ -156,7 +156,7 @@ mod tests {
             }
         };
 
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         exec.run_until_stalled(&mut fut)
     }
 

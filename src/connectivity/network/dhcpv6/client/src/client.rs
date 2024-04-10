@@ -732,7 +732,10 @@ pub(crate) async fn serve_client(
 
 #[cfg(test)]
 mod tests {
-    use std::{pin::Pin, task::Poll};
+    use std::{
+        pin::{pin, Pin},
+        task::Poll,
+    };
 
     use fidl::endpoints::{
         create_proxy, create_proxy_and_stream, create_request_stream, ClientEnd,
@@ -984,7 +987,7 @@ mod tests {
                             )
                         )
                     };
-                    futures::pin_mut!(test_fut);
+                    let mut test_fut = pin!(test_fut);
                     assert_matches!(
                         exec.run_until_stalled(&mut test_fut),
                         Poll::Pending,
@@ -1217,7 +1220,7 @@ mod tests {
                         }
                     }
                     .fuse();
-                    futures::pin_mut!(client_fut);
+                    let mut client_fut = pin!(client_fut);
                     let mut watcher_fut = watcher_fut.fuse();
                     select! {
                         () = client_fut => panic!("test client returned unexpectedly"),
@@ -1408,7 +1411,7 @@ mod tests {
             })
             .try_fold((), |(), ()| futures::future::ready(Ok(())))
             .fuse();
-        futures::pin_mut!(handle_client_events_fut);
+        let mut handle_client_events_fut = pin!(handle_client_events_fut);
 
         let want_servers = vec![
             create_test_dns_server(
@@ -1474,7 +1477,7 @@ mod tests {
             }
         }
         .fuse();
-        futures::pin_mut!(client_fut);
+        let mut client_fut = pin!(client_fut);
 
         let update_prefix = net_subnet_v6!("a::/64");
         let remove_prefix = net_subnet_v6!("b::/64");

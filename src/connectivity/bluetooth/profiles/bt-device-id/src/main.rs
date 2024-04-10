@@ -5,7 +5,8 @@
 use anyhow::Error;
 use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
 use fuchsia_component::server::ServiceFs;
-use futures::{channel::mpsc, future, pin_mut};
+use futures::{channel::mpsc, future};
+use std::pin::pin;
 use tracing::{error, info, warn};
 
 use crate::device_id::DeviceIdServer;
@@ -28,11 +29,10 @@ async fn main() -> Result<(), Error> {
         device_id_request_receiver,
     )
     .run();
-    pin_mut!(device_id_server);
+    let device_id_server = pin!(device_id_server);
 
     let fs = ServiceFs::new();
-    let services = run_services(fs, device_id_request_sender);
-    pin_mut!(services);
+    let services = pin!(run_services(fs, device_id_request_sender));
 
     info!("Device ID Component running.");
 

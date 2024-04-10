@@ -358,7 +358,7 @@ mod tests {
         fidl::endpoints::{create_proxy, create_request_stream, Proxy},
         fuchsia_async as fasync,
         futures::{channel::oneshot, task::Poll},
-        pin_utils::pin_mut,
+        std::pin::pin,
         std::unimplemented,
         wlan_common::assert_variant,
     };
@@ -512,7 +512,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.serve_provider_requests(test_values.requests);
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -535,7 +535,7 @@ mod tests {
         let operating_band = fidl_policy::OperatingBand::Any;
         let start_fut =
             controller.start_access_point(&network_config, connectivity_mode, operating_band);
-        pin_mut!(start_fut);
+        let mut start_fut = pin!(start_fut);
 
         // Process start request and verify start response.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -552,7 +552,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.serve_provider_requests(test_values.requests);
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -564,7 +564,7 @@ mod tests {
         // Set the StartAp response.
         {
             let iface_manager_fut = test_values.iface_manager.lock();
-            pin_mut!(iface_manager_fut);
+            let mut iface_manager_fut = pin!(iface_manager_fut);
             let mut iface_manager = assert_variant!(
                 exec.run_until_stalled(&mut iface_manager_fut),
                 Poll::Ready(iface_manager) => { iface_manager }
@@ -586,7 +586,7 @@ mod tests {
         let operating_band = fidl_policy::OperatingBand::Any;
         let start_fut =
             controller.start_access_point(&network_config, connectivity_mode, operating_band);
-        pin_mut!(start_fut);
+        let mut start_fut = pin!(start_fut);
 
         // Verify the start response is successful despite the AP's failure to start.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -606,7 +606,7 @@ mod tests {
         // Set the IfaceManager to fail when asked to start an AP.
         {
             let iface_manager_fut = test_values.iface_manager.lock();
-            pin_mut!(iface_manager_fut);
+            let mut iface_manager_fut = pin!(iface_manager_fut);
             let mut iface_manager = assert_variant!(
                 exec.run_until_stalled(&mut iface_manager_fut),
                 Poll::Ready(iface_manager) => { iface_manager }
@@ -615,7 +615,7 @@ mod tests {
         }
 
         let serve_fut = test_values.ap.serve_provider_requests(test_values.requests);
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -631,7 +631,7 @@ mod tests {
             fidl_policy::NetworkConfig { id: None, credential: None, ..Default::default() };
         let start_fut =
             controller.start_access_point(&network_config, connectivity_mode, operating_band);
-        pin_mut!(start_fut);
+        let mut start_fut = pin!(start_fut);
 
         // Process start request and verify start response.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -648,7 +648,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.serve_provider_requests(test_values.requests);
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -669,7 +669,7 @@ mod tests {
             ..Default::default()
         };
         let stop_fut = controller.stop_access_point(&network_config);
-        pin_mut!(stop_fut);
+        let mut stop_fut = pin!(stop_fut);
 
         // Process stop request and verify stop response.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -686,7 +686,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.serve_provider_requests(test_values.requests);
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -698,7 +698,7 @@ mod tests {
         // Set the StopAp response.
         {
             let iface_manager_fut = test_values.iface_manager.lock();
-            pin_mut!(iface_manager_fut);
+            let mut iface_manager_fut = pin!(iface_manager_fut);
             let mut iface_manager = assert_variant!(
                 exec.run_until_stalled(&mut iface_manager_fut),
                 Poll::Ready(iface_manager) => { iface_manager }
@@ -718,7 +718,7 @@ mod tests {
             ..Default::default()
         };
         let stop_fut = controller.stop_access_point(&network_config);
-        pin_mut!(stop_fut);
+        let mut stop_fut = pin!(stop_fut);
 
         // Process stop request and verify stop response.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -735,7 +735,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.serve_provider_requests(test_values.requests);
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -759,7 +759,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.serve_provider_requests(test_values.requests);
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -767,7 +767,7 @@ mod tests {
         // Set the StopAp response.
         {
             let iface_manager_fut = test_values.iface_manager.lock();
-            pin_mut!(iface_manager_fut);
+            let mut iface_manager_fut = pin!(iface_manager_fut);
             let mut iface_manager = assert_variant!(
                 exec.run_until_stalled(&mut iface_manager_fut),
                 Poll::Ready(iface_manager) => { iface_manager }
@@ -792,7 +792,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.serve_provider_requests(test_values.requests);
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -808,7 +808,7 @@ mod tests {
         // Verify Epitaph was received.
         let mut controller2_event_stream = controller2.take_event_stream();
         let controller2_event_fut = controller2_event_stream.next();
-        pin_mut!(controller2_event_fut);
+        let mut controller2_event_fut = pin!(controller2_event_fut);
         assert_variant!(
             exec.run_until_stalled(&mut controller2_event_fut),
             Poll::Ready(Some(Err(fidl::Error::ClientChannelClosed {
@@ -824,7 +824,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.clone().serve_provider_requests(test_values.requests);
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
 
         // No request has been sent yet. Future should be idle.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -839,7 +839,7 @@ mod tests {
             .expect("failed to create AccessPointProvider proxy");
         let requests = requests.into_stream().expect("failed to create stream");
         let second_serve_fut = test_values.ap.serve_provider_requests(requests);
-        pin_mut!(second_serve_fut);
+        let mut second_serve_fut = pin!(second_serve_fut);
 
         let (controller2, _) = request_controller(&provider);
         assert_variant!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
@@ -847,7 +847,7 @@ mod tests {
         // Verify Epitaph was received.
         let mut controller2_event_stream = controller2.take_event_stream();
         let controller2_event_fut = controller2_event_stream.next();
-        pin_mut!(controller2_event_fut);
+        let mut controller2_event_fut = pin!(controller2_event_fut);
         assert_variant!(
             exec.run_until_stalled(&mut controller2_event_fut),
             Poll::Ready(Some(Err(fidl::Error::ClientChannelClosed {
@@ -879,7 +879,7 @@ mod tests {
         let operating_band = fidl_policy::OperatingBand::Any;
         let start_fut =
             controller2.start_access_point(&network_config, connectivity_mode, operating_band);
-        pin_mut!(start_fut);
+        let mut start_fut = pin!(start_fut);
 
         // Process start request and verify start response.
         assert_variant!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);

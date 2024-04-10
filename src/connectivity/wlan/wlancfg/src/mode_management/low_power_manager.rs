@@ -88,7 +88,7 @@ mod tests {
         fuchsia_zircon as zx,
         futures::{channel::mpsc, task::Poll, StreamExt},
         ieee80211::MacAddr,
-        pin_utils::pin_mut,
+        std::pin::pin,
         std::unimplemented,
         test_case::test_case,
         wlan_common::assert_variant,
@@ -138,7 +138,7 @@ mod tests {
             test_vals.telemetry_sender,
         );
         let fut = lpm.run();
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The future should exit immediately with an error since the low power state could not
         // be queried.
@@ -157,7 +157,7 @@ mod tests {
             test_vals.telemetry_sender,
         );
         let fut = lpm.run();
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The future should stall waiting for an update.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -207,7 +207,7 @@ mod tests {
             test_vals.telemetry_sender,
         );
         let fut = lpm.run();
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The future should stall waiting for an update.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -248,7 +248,7 @@ mod tests {
             test_vals.telemetry_sender,
         );
         let fut = lpm.run();
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The future should stall waiting for an update.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -268,7 +268,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let phy_manager_fut = phy_manager.lock();
-        pin_mut!(phy_manager_fut);
+        let mut phy_manager_fut = pin!(phy_manager_fut);
         assert_variant!(
             exec.run_until_stalled(&mut phy_manager_fut),
             Poll::Ready(phy_manager) => {

@@ -10,6 +10,7 @@ use {
     std::{
         io,
         net::{Ipv4Addr, Ipv6Addr, SocketAddr},
+        pin::pin,
         task::{Context, Poll},
     },
     trust_dns_proto::udp,
@@ -54,7 +55,7 @@ impl udp::UdpSocket for DnsUdpSocket {
         buf: &mut [u8],
     ) -> Poll<io::Result<(usize, SocketAddr)>> {
         let fut = self.recv_from(buf);
-        futures::pin_mut!(fut);
+        let mut fut = pin!(fut);
         fut.poll_unpin(cx)
     }
 
@@ -70,7 +71,7 @@ impl udp::UdpSocket for DnsUdpSocket {
         target: SocketAddr,
     ) -> Poll<io::Result<usize>> {
         let fut = self.send_to(buf, target);
-        futures::pin_mut!(fut);
+        let mut fut = pin!(fut);
         fut.poll_unpin(cx)
     }
 

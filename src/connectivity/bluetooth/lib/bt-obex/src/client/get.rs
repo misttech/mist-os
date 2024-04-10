@@ -210,7 +210,7 @@ mod tests {
     use async_test_helpers::expect_stream_pending;
     use async_utils::PollExt;
     use fuchsia_async as fasync;
-    use futures::pin_mut;
+    use std::pin::pin;
 
     use crate::error::PacketError;
     use crate::header::{Header, HeaderIdentifier};
@@ -236,7 +236,7 @@ mod tests {
         {
             let info_headers = HeaderSet::from_header(Header::name("text"));
             let info_fut = operation.get_information(info_headers);
-            pin_mut!(info_fut);
+            let mut info_fut = pin!(info_fut);
             exec.run_until_stalled(&mut info_fut).expect_pending("waiting for peer response");
             let response_headers = HeaderSet::from_header(Header::name("bar"));
             let response = ResponsePacket::new_no_data(ResponseCode::Continue, response_headers);
@@ -259,7 +259,7 @@ mod tests {
         {
             let info_headers = HeaderSet::from_header(Header::Type("file".into()));
             let info_fut = operation.get_information(info_headers);
-            pin_mut!(info_fut);
+            let mut info_fut = pin!(info_fut);
             exec.run_until_stalled(&mut info_fut).expect_pending("waiting for peer response");
             let response_headers = HeaderSet::from_header(Header::Description("big file".into()));
             let response = ResponsePacket::new_no_data(ResponseCode::Continue, response_headers);
@@ -275,7 +275,7 @@ mod tests {
         // the operation is taken by value, it is considered complete after this step and resources
         // are freed.
         let data_fut = operation.get_data(HeaderSet::new());
-        pin_mut!(data_fut);
+        let mut data_fut = pin!(data_fut);
         exec.run_until_stalled(&mut data_fut).expect_pending("waiting for peer response");
         let response_headers1 = HeaderSet::from_header(Header::Body(vec![1, 2, 3]));
         let response1 = ResponsePacket::new_no_data(ResponseCode::Continue, response_headers1);
@@ -307,7 +307,7 @@ mod tests {
         // Terminating early is OK. It should consume the operation and be considered complete.
         let headers = HeaderSet::from_header(Header::name("terminated"));
         let terminate_fut = operation.terminate(headers);
-        pin_mut!(terminate_fut);
+        let mut terminate_fut = pin!(terminate_fut);
         let _ =
             exec.run_until_stalled(&mut terminate_fut).expect_pending("waiting for peer response");
         let response = ResponsePacket::new_no_data(ResponseCode::Ok, HeaderSet::new());
@@ -325,7 +325,7 @@ mod tests {
         {
             let info_headers = HeaderSet::from_header(Header::name("foo"));
             let info_fut = operation.get_information(info_headers);
-            pin_mut!(info_fut);
+            let mut info_fut = pin!(info_fut);
             exec.run_until_stalled(&mut info_fut).expect_pending("waiting for peer response");
             let response_headers = HeaderSet::from_headers(vec![
                 Header::name("bar"),
@@ -354,7 +354,7 @@ mod tests {
         {
             let info_headers = HeaderSet::from_header(Header::Type("file".into()));
             let info_fut = operation.get_information(info_headers);
-            pin_mut!(info_fut);
+            let mut info_fut = pin!(info_fut);
             let received_headers = exec
                 .run_until_stalled(&mut info_fut)
                 .expect("ready without peer response")
@@ -372,7 +372,7 @@ mod tests {
         // The 3-packet user payload should be returned at the end of the operation. Because
         // SRM is enabled, only one GetFinal request is issued.
         let data_fut = operation.get_data(HeaderSet::new());
-        pin_mut!(data_fut);
+        let mut data_fut = pin!(data_fut);
         exec.run_until_stalled(&mut data_fut).expect_pending("waiting for peer response");
         let response_headers1 = HeaderSet::from_header(Header::Body(vec![1, 2, 3]));
         let response1 = ResponsePacket::new_no_data(ResponseCode::Continue, response_headers1);
@@ -412,7 +412,7 @@ mod tests {
         {
             let info_headers = HeaderSet::from_header(SingleResponseMode::Disable.into());
             let info_fut = operation.get_information(info_headers);
-            pin_mut!(info_fut);
+            let mut info_fut = pin!(info_fut);
             let received_headers = exec
                 .run_until_stalled(&mut info_fut)
                 .expect("ready without peer response")
@@ -435,7 +435,7 @@ mod tests {
 
         // Trying to get additional information without providing any headers is an Error.
         let get_info_fut = operation.get_information(HeaderSet::new());
-        pin_mut!(get_info_fut);
+        let mut get_info_fut = pin!(get_info_fut);
         let get_info_result =
             exec.run_until_stalled(&mut get_info_fut).expect("resolves with error");
         assert_matches!(get_info_result, Err(Error::OperationError { .. }));
@@ -450,7 +450,7 @@ mod tests {
 
         // Trying to get the user data directly is OK.
         let get_data_fut = operation.get_data(HeaderSet::new());
-        pin_mut!(get_data_fut);
+        let mut get_data_fut = pin!(get_data_fut);
         exec.run_until_stalled(&mut get_data_fut).expect_pending("waiting for peer response");
         let response_headers = HeaderSet::from_header(Header::EndOfBody(vec![1, 2, 3]));
         let response = ResponsePacket::new_no_data(ResponseCode::Ok, response_headers);
@@ -475,7 +475,7 @@ mod tests {
 
         // Trying to get the user data directly is OK.
         let get_data_fut = operation.get_data(HeaderSet::new());
-        pin_mut!(get_data_fut);
+        let mut get_data_fut = pin!(get_data_fut);
         exec.run_until_stalled(&mut get_data_fut).expect_pending("waiting for peer response");
         let response_headers1 = HeaderSet::from_headers(vec![
             Header::Body(vec![1, 1]),
@@ -523,7 +523,7 @@ mod tests {
         // Before the client can get the user data, the peer disconnects.
         drop(remote);
         let get_data_fut = operation.get_data(HeaderSet::new());
-        pin_mut!(get_data_fut);
+        let mut get_data_fut = pin!(get_data_fut);
         let get_data_result =
             exec.run_until_stalled(&mut get_data_fut).expect("resolves with error");
         assert_matches!(get_data_result, Err(Error::IOError(_)));

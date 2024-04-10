@@ -427,8 +427,11 @@ mod subscriber_key {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, async_utils::hanging_get::test_util::TestObserver, fuchsia_async as fasync,
-        futures::channel::oneshot, std::task::Poll,
+        super::*,
+        async_utils::hanging_get::test_util::TestObserver,
+        fuchsia_async as fasync,
+        futures::channel::oneshot,
+        std::{pin::pin, task::Poll},
     };
 
     const TEST_CHANNEL_SIZE: usize = 128;
@@ -629,7 +632,7 @@ mod tests {
         let publisher = broker.new_publisher();
         let registrar = broker.new_registrar();
         let broker_future = broker.run();
-        futures::pin_mut!(broker_future);
+        let mut broker_future = pin!(broker_future);
 
         // Broker future is still pending when registrars are live.
         assert_eq!(ex.run_until_stalled(&mut broker_future), Poll::Pending);

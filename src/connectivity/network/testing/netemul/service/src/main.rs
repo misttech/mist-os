@@ -19,11 +19,11 @@ use {
         RealmBuilderParams, RealmInstance, Ref, Route,
     },
     fuchsia_zircon as zx,
-    futures::pin_mut,
     futures::{
         channel::mpsc, FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _,
         TryStreamExt as _,
     },
+    std::pin::pin,
     std::{
         borrow::Cow,
         collections::hash_map::{Entry, HashMap},
@@ -882,41 +882,46 @@ async fn handle_sandbox(
     let network_context =
         fuchsia_component::client::connect_to_protocol::<fnetemul_network::NetworkContextMarker>()
             .context("connect to network context")?;
-    let sandbox_fut = stream.err_into::<anyhow::Error>().try_for_each_concurrent(None, |request| {
-        let mut tx = tx.clone();
-        let sandbox_name = &sandbox_name;
-        let realm_index = &realm_index;
-        let network_context = &network_context;
-        async move {
-            match request {
-                SandboxRequest::CreateRealm { realm: server_end, options, control_handle: _ } => {
-                    let index = realm_index.fetch_add(1, Ordering::SeqCst);
-                    let prefix = format!("{}{}", sandbox_name, index);
-                    let (proxy, devfs) = make_devfs().context("creating devfs")?;
-                    match create_realm_instance(options, &prefix, devfs.clone(), proxy).await {
-                        Ok(realm) => tx
-                            .send(ManagedRealm { server_end, realm, devfs })
-                            .await
-                            .expect("receiver should not be closed"),
-                        Err(e) => {
-                            error!("error creating ManagedRealm: {}", e);
-                            server_end
-                                .close_with_epitaph(e.into())
-                                .unwrap_or_else(|e| error!("error sending epitaph: {:?}", e))
+    let mut sandbox_fut =
+        pin!(stream.err_into::<anyhow::Error>().try_for_each_concurrent(None, |request| {
+            let mut tx = tx.clone();
+            let sandbox_name = &sandbox_name;
+            let realm_index = &realm_index;
+            let network_context = &network_context;
+            async move {
+                match request {
+                    SandboxRequest::CreateRealm {
+                        realm: server_end,
+                        options,
+                        control_handle: _,
+                    } => {
+                        let index = realm_index.fetch_add(1, Ordering::SeqCst);
+                        let prefix = format!("{}{}", sandbox_name, index);
+                        let (proxy, devfs) = make_devfs().context("creating devfs")?;
+                        match create_realm_instance(options, &prefix, devfs.clone(), proxy).await {
+                            Ok(realm) => tx
+                                .send(ManagedRealm { server_end, realm, devfs })
+                                .await
+                                .expect("receiver should not be closed"),
+                            Err(e) => {
+                                error!("error creating ManagedRealm: {}", e);
+                                server_end
+                                    .close_with_epitaph(e.into())
+                                    .unwrap_or_else(|e| error!("error sending epitaph: {:?}", e))
+                            }
                         }
                     }
+                    SandboxRequest::GetNetworkContext {
+                        network_context: server_end,
+                        control_handle: _,
+                    } => network_context
+                        .clone(server_end)
+                        .unwrap_or_else(|e| error!("error cloning NetworkContext: {:?}", e)),
                 }
-                SandboxRequest::GetNetworkContext {
-                    network_context: server_end,
-                    control_handle: _,
-                } => network_context
-                    .clone(server_end)
-                    .unwrap_or_else(|e| error!("error cloning NetworkContext: {:?}", e)),
+                Ok(())
             }
-            Ok(())
-        }
-    });
-    let realms_fut = rx
+        }));
+    let mut realms_fut = pin!(rx
         .for_each_concurrent(None, |realm| async {
             let name = realm.realm.root.child_name().to_owned();
             realm
@@ -924,8 +929,7 @@ async fn handle_sandbox(
                 .await
                 .unwrap_or_else(|e| error!("error managing realm '{}': {:?}", name, e))
         })
-        .fuse();
-    pin_mut!(sandbox_fut, realms_fut);
+        .fuse());
     futures::select! {
         result = sandbox_fut => Ok(result?),
         () = realms_fut => unreachable!("realms_fut should never complete"),
@@ -1340,11 +1344,11 @@ mod tests {
         // Receive Signal if fuchsia.component.Binder channel is closed prematurely.
         // This channel is scoped to the runtime of the component, so it should
         // not be closed before the component stops.
-        let binder_fut = binder_proxy.on_closed().fuse();
+        let mut binder_fut = pin!(binder_proxy.on_closed().fuse());
 
         // Hold Future object of main assertion of the test so that we can join!
         // with the binder channel event stream below.
-        let assert_fut =
+        let mut assert_fut = pin!(
             // Without binding to the child by connecting to its exposed protocol, we should be able to
             // see its inspect data since it has been started eagerly.
             expect_single_inspect_node(&realm, COUNTER_COMPONENT_NAME, |data| {
@@ -1353,9 +1357,9 @@ mod tests {
                         count: 0u64,
                     }
                 });
-            }).fuse();
-
-        pin_mut!(binder_fut, assert_fut);
+            })
+            .fuse()
+        );
 
         futures::select! {
             () = assert_fut => {},

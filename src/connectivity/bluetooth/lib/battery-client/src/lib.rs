@@ -231,7 +231,7 @@ mod tests {
     use async_test_helpers::{expect_stream_item, expect_stream_pending};
     use async_utils::PollExt;
     use fuchsia_async as fasync;
-    use futures::pin_mut;
+    use std::pin::pin;
 
     fn setup_battery_client(
     ) -> (fasync::TestExecutor, BatteryClient, fpower::BatteryInfoWatcherProxy) {
@@ -244,7 +244,7 @@ mod tests {
 
         let upstream_battery_notifier = {
             let fut = stream.next();
-            pin_mut!(fut);
+            let mut fut = pin!(fut);
             match exec.run_until_stalled(&mut fut).expect("fut is ready").unwrap() {
                 Ok(fpower::BatteryManagerRequest::Watch { watcher, .. }) => {
                     watcher.into_proxy().unwrap()
@@ -266,7 +266,7 @@ mod tests {
         update: fpower::BatteryInfo,
     ) -> Result<BatteryInfo, BatteryClientError> {
         let update_fut = upstream_battery_notifier.on_change_battery_info(&update);
-        pin_mut!(update_fut);
+        let mut update_fut = pin!(update_fut);
         exec.run_until_stalled(&mut update_fut).expect_pending("waiting for fidl response");
 
         let item = expect_stream_item(exec, battery_client);
@@ -286,7 +286,7 @@ mod tests {
         // Expect the stream impl of the BatteryClient to finish.
         {
             let client_stream = client.next();
-            pin_mut!(client_stream);
+            let mut client_stream = pin!(client_stream);
             let res = exec
                 .run_until_stalled(&mut client_stream)
                 .expect("battery client should terminate");

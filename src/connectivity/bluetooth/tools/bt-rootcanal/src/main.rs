@@ -8,7 +8,7 @@ use {
         RootcanalClientControllerRequest, RootcanalClientControllerRequestStream, ServiceError,
     },
     fidl_fuchsia_hardware_bluetooth::VirtualControllerMarker,
-    fuchsia_async::{self as fasync, net::TcpStream, pin_mut},
+    fuchsia_async::{self as fasync, net::TcpStream},
     fuchsia_component::server::ServiceFs,
     fuchsia_fs::OpenFlags,
     fuchsia_sync::Mutex,
@@ -18,6 +18,7 @@ use {
         AsyncWriteExt, StreamExt, TryFutureExt,
     },
     std::net::{IpAddr, SocketAddr},
+    std::pin::pin,
     std::str::FromStr,
     std::sync::Arc,
 };
@@ -160,11 +161,9 @@ impl RootcanalClient {
     ) -> Result<(), Error> {
         let (read_stream, write_stream) = stream.split();
 
-        let chan_fut = channel_reader(write_stream, &channel);
-        pin_mut!(chan_fut);
+        let chan_fut = pin!(channel_reader(write_stream, &channel));
 
-        let stream_fut = stream_reader(read_stream, &channel);
-        pin_mut!(stream_fut);
+        let stream_fut = pin!(stream_reader(read_stream, &channel));
 
         match futures::future::select(chan_fut, stream_fut).await {
             Either::Left((res, _)) => res,
@@ -240,8 +239,7 @@ mod tests {
         let (txs, rxs) = zx::Socket::create_stream();
         let async_socket = fasync::Socket::from_socket(rxs);
 
-        let fut = Box::pin(RootcanalClient::run(async_socket, async_channel));
-        pin_mut!(fut);
+        let mut fut = Box::pin(RootcanalClient::run(async_socket, async_channel));
 
         // Run with nothing to read yet. Futures should be waiting on both streams.
         assert!(exec.run_until_stalled(&mut fut).is_pending());

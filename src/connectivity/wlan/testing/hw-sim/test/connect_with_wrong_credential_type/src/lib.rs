@@ -7,7 +7,7 @@ use {
     fuchsia_zircon::{self as zx, prelude::*},
     ieee80211::Bssid,
     lazy_static::lazy_static,
-    pin_utils::pin_mut,
+    std::pin::pin,
     tracing::info,
     wlan_common::{
         bss::Protection,
@@ -71,8 +71,7 @@ async fn connecting_to_aps_with_wrong_credential_types() {
             Protection::Wpa2Personal,
             Protection::Wpa2Personal,
         );
-        let connect = connect_and_wait_for_failure(supplicant.reborrow());
-        pin_mut!(connect);
+        let connect = pin!(connect_and_wait_for_failure(supplicant.reborrow()));
         info!("Attempting to connect to a WPA2 network **without a password**.");
         connect_or_timeout_with(
             &mut helper,
@@ -99,8 +98,7 @@ async fn connecting_to_aps_with_wrong_credential_types() {
             Protection::Wpa1,
             Protection::Wpa1,
         );
-        let connect = connect_and_wait_for_failure(supplicant.reborrow());
-        pin_mut!(connect);
+        let connect = pin!(connect_and_wait_for_failure(supplicant.reborrow()));
         info!("Attempting to connect to a WPA1 network **without a password**.");
         connect_or_timeout_with(
             &mut helper,
@@ -119,8 +117,7 @@ async fn connecting_to_aps_with_wrong_credential_types() {
     // password is provided. The DisconnectStatus::CredentialsFailed status should be
     // returned by policy.
     {
-        let connect = connect_and_wait_for_failure(supplicant.reborrow());
-        pin_mut!(connect);
+        let connect = pin!(connect_and_wait_for_failure(supplicant.reborrow()));
         info!("Attempting to connect to a WEP network **without a password**.");
         connect_or_timeout_with(
             &mut helper,
@@ -139,12 +136,11 @@ async fn connecting_to_aps_with_wrong_credential_types() {
     // password is provided. The DisconnectStatus::CredentialsFailed status should be
     // returned by policy.
     {
-        let connect = connect_and_wait_for_failure(Supplicant {
+        let connect = pin!(connect_and_wait_for_failure(Supplicant {
             security_type: fidl_policy::SecurityType::Wpa2,
             password: Some("password"),
             ..supplicant.reborrow()
-        });
-        pin_mut!(connect);
+        }));
         info!("Attempting to connect to an open network **with a password**.");
         connect_or_timeout_with(
             &mut helper,

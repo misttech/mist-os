@@ -9,7 +9,7 @@
 /// Methods for creating and interacting with virtualized guests in netemul tests.
 pub mod guest;
 
-use std::{borrow::Cow, num::NonZeroU64, ops::DerefMut as _, path::Path};
+use std::{borrow::Cow, num::NonZeroU64, ops::DerefMut as _, path::Path, pin::pin};
 
 use fidl_fuchsia_hardware_network as fnetwork;
 use fidl_fuchsia_io as fio;
@@ -1287,7 +1287,7 @@ impl<'a> TestInterface<'a> {
 
         let state_stream =
             fnet_interfaces_ext::admin::assignment_state_stream(address_state_provider);
-        futures::pin_mut!(state_stream);
+        let mut state_stream = pin!(state_stream);
         let ((), ()) = futures::future::try_join(
             fnet_interfaces_ext::admin::wait_assignment_state(
                 &mut state_stream,

@@ -221,14 +221,14 @@ mod tests {
     use fidl_fuchsia_wlan_device_service::DeviceWatcherEvent;
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
-    use futures::{pin_mut, task::Poll};
-    use std::mem;
+    use futures::task::Poll;
+    use std::{mem, pin::pin};
 
     #[fuchsia::test]
     fn reap_watchers() {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();
-        pin_mut!(future);
+        let mut future = pin!(future);
         assert_eq!(0, helper.service.inner.lock().watchers.len());
         let (client_end, server_end) = fidl::endpoints::create_endpoints();
 
@@ -254,7 +254,7 @@ mod tests {
     fn add_remove_phys() {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();
-        pin_mut!(future);
+        let mut future = pin!(future);
         let (proxy, server_end) =
             fidl::endpoints::create_proxy().expect("Failed to create endpoints");
         helper.service.add_watcher(server_end).expect("add_watcher failed");
@@ -289,7 +289,7 @@ mod tests {
     fn add_remove_ifaces() {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();
-        pin_mut!(future);
+        let mut future = pin!(future);
         let (proxy, server_end) =
             fidl::endpoints::create_proxy().expect("Failed to create endpoints");
         helper.service.add_watcher(server_end).expect("add_watcher failed");
@@ -318,7 +318,7 @@ mod tests {
     fn snapshot_phys() {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();
-        pin_mut!(future);
+        let mut future = pin!(future);
 
         // Add and remove phys before we the watcher is added
         helper.phys.insert(20, 2000);
@@ -346,7 +346,7 @@ mod tests {
     fn snapshot_ifaces() {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();
-        pin_mut!(future);
+        let mut future = pin!(future);
 
         // Add and remove ifaces before we the watcher is added
         helper.ifaces.insert(20, 2000);
@@ -374,7 +374,7 @@ mod tests {
     fn two_watchers() {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();
-        pin_mut!(future);
+        let mut future = pin!(future);
 
         helper.ifaces.insert(20, 2000);
 
@@ -405,7 +405,7 @@ mod tests {
     fn remove_watcher_on_send_error() {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();
-        pin_mut!(future);
+        let mut future = pin!(future);
 
         let (client_chan, server_chan) = zx::Channel::create();
         // Make a channel without a WRITE permission to make sure sending an event fails

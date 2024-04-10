@@ -656,8 +656,8 @@ mod tests {
         futures::{channel::mpsc, task::Poll},
         ieee80211_testutils::BSSID_REGEX,
         lazy_static::lazy_static,
-        pin_utils::pin_mut,
         rand::Rng,
+        std::pin::pin,
         test_case::test_case,
         wlan_common::{
             assert_variant, random_fidl_bss_description, scan::Compatibility,
@@ -915,7 +915,7 @@ mod tests {
         let fut = test_values
             .connection_selector
             .augment_bss_candidate_with_active_scan(candidate.clone());
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The connect_req comes out the other side with no change
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(res) => {
@@ -934,7 +934,7 @@ mod tests {
         let fut = test_values
             .connection_selector
             .augment_bss_candidate_with_active_scan(passively_scanned_candidate.clone());
-        pin_mut!(fut);
+        let fut = pin!(fut);
 
         // Set the scan results
         let new_bss_desc = random_fidl_bss_description!();
@@ -1021,7 +1021,7 @@ mod tests {
 
         // Run the scan, specifying the desired network
         let fut = connection_selector.find_available_bss_candidate_list(Some(test_id_1.clone()));
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         let results = exec.run_singlethreaded(&mut fut);
         assert_eq!(results.len(), 1);
 
@@ -1193,7 +1193,7 @@ mod tests {
 
         // Run the scan(s)
         let connection_selection_fut = connection_selector.find_available_bss_candidate_list(None);
-        pin_mut!(connection_selection_fut);
+        let mut connection_selection_fut = pin!(connection_selection_fut);
         let results = exec.run_singlethreaded(&mut connection_selection_fut);
         assert_eq!(results.len(), 3);
 
@@ -1241,7 +1241,7 @@ mod tests {
         // Kick off network selection
         let connection_selection_fut = connection_selector
             .find_and_select_scanned_candidate(None, generate_random_connect_reason());
-        pin_mut!(connection_selection_fut);
+        let mut connection_selection_fut = pin!(connection_selection_fut);
         // Check that nothing is returned
         assert_variant!(exec.run_until_stalled(&mut connection_selection_fut), Poll::Ready(None));
 
@@ -1407,7 +1407,7 @@ mod tests {
         // Check that we pick a network
         let connection_selection_fut = connection_selector
             .find_and_select_scanned_candidate(None, generate_random_connect_reason());
-        pin_mut!(connection_selection_fut);
+        let mut connection_selection_fut = pin!(connection_selection_fut);
         let results =
             exec.run_singlethreaded(&mut connection_selection_fut).expect("no selected candidate");
         assert_eq!(&results.network, &test_id_1.clone());
@@ -1539,7 +1539,7 @@ mod tests {
             Some(test_id_1.clone()),
             generate_random_connect_reason(),
         );
-        pin_mut!(connection_selection_fut);
+        let mut connection_selection_fut = pin!(connection_selection_fut);
         let results =
             exec.run_singlethreaded(&mut connection_selection_fut).expect("no selected candidate");
         assert_eq!(&results.network, &test_id_1);
@@ -1589,7 +1589,7 @@ mod tests {
             Some(test_id_1.clone()),
             generate_random_connect_reason(),
         );
-        pin_mut!(connection_selection_fut);
+        let mut connection_selection_fut = pin!(connection_selection_fut);
 
         // Check that nothing is returned
         let results = exec.run_singlethreaded(&mut connection_selection_fut);

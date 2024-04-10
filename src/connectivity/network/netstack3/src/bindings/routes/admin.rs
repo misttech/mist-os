@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{borrow::BorrowMut, collections::HashSet};
+use std::{borrow::BorrowMut, collections::HashSet, pin::pin};
 
 use fidl_fuchsia_net_interfaces_admin::ProofOfInterfaceAuthorization;
 use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
@@ -12,7 +12,7 @@ use fnet_routes_ext::{
     FidlRouteIpExt,
 };
 use fuchsia_zircon::AsHandleRef;
-use futures::{pin_mut, TryStream, TryStreamExt as _};
+use futures::{TryStream, TryStreamExt as _};
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv6};
 use netstack3_core::{device::DeviceId, routes::AddableEntry};
 
@@ -82,7 +82,7 @@ pub(crate) async fn serve_provider_v4(
     spawner: TaskWaitGroupSpawner,
     ctx: &crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
-    pin_mut!(stream);
+    let mut stream = pin!(stream);
 
     while let Some(req) = stream.try_next().await? {
         let () = match req {
@@ -104,7 +104,7 @@ pub(crate) async fn serve_provider_v6(
     spawner: TaskWaitGroupSpawner,
     ctx: &crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
-    pin_mut!(stream);
+    let mut stream = pin!(stream);
 
     while let Some(req) = stream.try_next().await? {
         let () = match req {

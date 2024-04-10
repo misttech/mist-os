@@ -5,7 +5,8 @@
 use anyhow::Error;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect_derive::Inspect;
-use futures::{channel::mpsc, future, pin_mut};
+use futures::{channel::mpsc, future};
+use std::pin::pin;
 use tracing::{debug, info, warn};
 
 mod advertisement;
@@ -40,10 +41,9 @@ async fn main() -> Result<(), Error> {
     if let Err(e) = server.iattach(&inspector.root(), "provider") {
         warn!("Couldn't attach inspect to the Provider server: {:?}", e);
     }
-    let fast_pair = server.run(fidl_service_receiver);
+    let fast_pair = pin!(server.run(fidl_service_receiver));
 
-    let services = run_services(fs, fidl_service_sender);
-    pin_mut!(fast_pair, services);
+    let services = pin!(run_services(fs, fidl_service_sender));
     info!("Fast Pair Provider component running.");
 
     match future::select(fast_pair, services).await {

@@ -10,7 +10,13 @@ use {
     fuchsia_sync::RwLock,
     futures::{future::join, stream::FuturesUnordered},
     proptest::prelude::*,
-    std::{collections::HashMap, fmt::Debug, iter, pin::Pin, sync::Arc},
+    std::{
+        collections::HashMap,
+        fmt::Debug,
+        iter,
+        pin::{pin, Pin},
+        sync::Arc,
+    },
 };
 
 // Maximum number of mock access.fidl clients we simulate.
@@ -87,7 +93,7 @@ proptest! {
 
         // Add mock host to dispatcher and make active
         let add_mock_host_fut = host_dispatcher::test::create_and_add_test_host_to_dispatcher(HostId(1), &hd);
-        futures::pin_mut!(add_mock_host_fut);
+        let mut add_mock_host_fut = pin!(add_mock_host_fut);
         let (host_stream, host_device, _gatt_server) = executor.run_singlethreaded(&mut add_mock_host_fut).unwrap();
         let host_info = Arc::new(RwLock::new(host_device.info()));
         hd.set_active_host(host_device.id())?;

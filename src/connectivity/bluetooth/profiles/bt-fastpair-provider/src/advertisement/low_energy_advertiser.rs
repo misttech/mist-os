@@ -348,7 +348,7 @@ mod tests {
         PeripheralRequestStream,
     };
     use fuchsia_async as fasync;
-    use futures::pin_mut;
+    use std::pin::pin;
 
     use crate::types::AccountKey;
 
@@ -358,7 +358,7 @@ mod tests {
     ) -> Result<(), Error> {
         let model_id = ModelId::try_from(3).unwrap();
         let adv_fut = advertiser.advertise_model_id(model_id);
-        pin_mut!(adv_fut);
+        let mut adv_fut = pin!(adv_fut);
         exec.run_until_stalled(&mut adv_fut).expect("should be able to advertise")
     }
 
@@ -415,7 +415,7 @@ mod tests {
         assert!(!advertiser.is_terminated());
         // Stopping advertising is a no-op since the advertisement was already terminated.
         let stop_fut = advertiser.stop_advertising();
-        pin_mut!(stop_fut);
+        let mut stop_fut = pin!(stop_fut);
         assert!(!exec.run_until_stalled(&mut stop_fut).expect("resolves immediately"));
     }
 
@@ -441,13 +441,12 @@ mod tests {
             let example_account_keys =
                 AccountKeyList::with_capacity_and_keys(1, vec![AccountKey::new([1; 16])]);
             let adv_fut = advertiser.advertise_account_keys(&example_account_keys);
-            pin_mut!(adv_fut);
+            let mut adv_fut = pin!(adv_fut);
             let _ =
                 exec.run_until_stalled(&mut adv_fut).expect_pending("waiting for stop advertise");
 
             // Upstream LE server should detect the stop request and respond to process termination.
-            let closed_fut = adv_peripheral_client.on_closed();
-            pin_mut!(closed_fut);
+            let closed_fut = pin!(adv_peripheral_client.on_closed());
             let (closed_result, mut adv_fut) = run_while(&mut exec, adv_fut, closed_fut);
             assert_matches!(closed_result, Ok(_));
             let _ = responder.send(Ok(())).unwrap();
@@ -485,7 +484,7 @@ mod tests {
         let (connect_client1, connect_server1) =
             fidl::endpoints::create_request_stream::<ConnectionMarker>().unwrap();
         let connected_fut1 = adv_peripheral_client.on_connected(&example_peer1, connect_client1);
-        pin_mut!(connected_fut1);
+        let mut connected_fut1 = pin!(connected_fut1);
         let _ = exec
             .run_until_stalled(&mut connected_fut1)
             .expect_pending("waiting for LEAdvertiser response");
@@ -498,7 +497,7 @@ mod tests {
         let (connect_client2, connect_server2) =
             fidl::endpoints::create_request_stream::<ConnectionMarker>().unwrap();
         let connected_fut2 = adv_peripheral_client.on_connected(&example_peer2, connect_client2);
-        pin_mut!(connected_fut2);
+        let mut connected_fut2 = pin!(connected_fut2);
         let _ = exec
             .run_until_stalled(&mut connected_fut2)
             .expect_pending("waiting for LEAdvertiser response");
@@ -538,7 +537,7 @@ mod tests {
             fidl::endpoints::create_request_stream::<ConnectionMarker>().unwrap();
         let connected_fut =
             adv_peripheral_client.on_connected(&le::Peer::default(), connect_client);
-        pin_mut!(connected_fut);
+        let mut connected_fut = pin!(connected_fut);
         let _ = exec
             .run_until_stalled(&mut connected_fut)
             .expect_pending("waiting for LEAdvertiser response");

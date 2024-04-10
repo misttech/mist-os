@@ -1651,7 +1651,7 @@ pub(crate) mod testutil {
 mod tests {
     use super::{testutil::*, *};
 
-    use std::pin::Pin;
+    use std::pin::{pin, Pin};
 
     use fidl::endpoints::{ControlHandle as _, RequestStream as _, Responder as _};
     use fidl_fuchsia_net as fnet;
@@ -2040,10 +2040,10 @@ mod tests {
             route_clients
         });
         let event_loop_fut = event_loop_fut.fuse();
-        futures::pin_mut!(event_loop_fut);
+        let mut event_loop_fut = pin!(event_loop_fut);
         let root_interfaces_fut =
             expect_only_get_mac_root_requests_fut(interfaces_request_stream).fuse();
-        futures::pin_mut!(root_interfaces_fut);
+        let mut root_interfaces_fut = pin!(root_interfaces_fut);
 
         // Existing events should never trigger messages to be sent.
         let watcher_stream_fut = respond_to_watcher(
@@ -2401,7 +2401,7 @@ mod tests {
             route_clients
         });
         let event_loop_fut = event_loop_fut.fuse();
-        futures::pin_mut!(event_loop_fut);
+        let mut event_loop_fut = pin!(event_loop_fut);
 
         let watcher_stream_fut = respond_to_watcher(
             watcher_stream.by_ref(),

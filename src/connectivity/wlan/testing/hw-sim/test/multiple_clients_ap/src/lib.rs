@@ -10,7 +10,7 @@ use {
     futures::{channel::oneshot, future, join, FutureExt, StreamExt, TryFutureExt},
     ieee80211::MacAddr,
     lazy_static::lazy_static,
-    pin_utils::pin_mut,
+    std::pin::pin,
     std::{fmt::Display, panic, sync::Arc},
     wlan_common::bss::Protection::Open,
     wlan_hw_sim::{
@@ -162,7 +162,7 @@ async fn multiple_clients_ap() {
         client1_confirm_sender.send(()).expect("sending confirmation");
     };
 
-    pin_mut!(client1_connect_fut);
+    let client1_connect_fut = pin!(client1_connect_fut);
     let client1_fut = client1_helper.run_until_complete_or_timeout(
         std::i64::MAX.nanos(),
         "connecting to AP",
@@ -183,7 +183,7 @@ async fn multiple_clients_ap() {
         client2_confirm_sender.send(()).expect("sending confirmation");
     };
 
-    pin_mut!(client2_connect_fut);
+    let client2_connect_fut = pin!(client2_connect_fut);
     let client2_fut = client2_helper.run_until_complete_or_timeout(
         std::i64::MAX.nanos(),
         "connecting to AP",

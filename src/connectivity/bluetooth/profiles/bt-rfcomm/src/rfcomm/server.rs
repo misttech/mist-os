@@ -295,7 +295,8 @@ mod tests {
     use fidl_fuchsia_bluetooth_bredr::ConnectionReceiverMarker;
     use fuchsia_async as fasync;
     use fuchsia_inspect_derive::WithInspect;
-    use futures::{pin_mut, task::Poll, AsyncWriteExt, StreamExt};
+    use futures::{task::Poll, AsyncWriteExt, StreamExt};
+    use std::pin::pin;
 
     use crate::rfcomm::test_util::{expect_frame_received_by_peer, send_peer_frame};
 
@@ -376,7 +377,7 @@ mod tests {
         let (c, mut s) = create_proxy_and_stream::<ConnectionReceiverMarker>().unwrap();
         let first_channel = {
             let fut = rfcomm.allocate_server_channel(c.clone());
-            pin_mut!(fut);
+            let mut fut = pin!(fut);
             match exec.run_until_stalled(&mut fut) {
                 Poll::Ready(Some(sc)) => sc,
                 x => panic!("Expected server channel but got {:?}", x),
@@ -384,7 +385,7 @@ mod tests {
         };
 
         let profile_client_fut = s.next();
-        pin_mut!(profile_client_fut);
+        let mut profile_client_fut = pin!(profile_client_fut);
         exec.run_until_stalled(&mut profile_client_fut)
             .expect_pending("waiting for connection request");
 
@@ -523,7 +524,7 @@ mod tests {
 
         // Simulate a client connect request.
         let (responder, connect_request_fut) = make_client_connect_request(&mut exec, id);
-        pin_mut!(connect_request_fut);
+        let mut connect_request_fut = pin!(connect_request_fut);
         exec.run_until_stalled(&mut connect_request_fut).expect_pending("waiting for channel");
         // We expect the open channel request to be OK - still awaiting the channel.
         let server_channel = ServerChannel::try_from(9).unwrap();
@@ -571,7 +572,7 @@ mod tests {
         // Simulate a client connect request.
         let random_id = PeerId(41);
         let (responder, connect_request_fut) = make_client_connect_request(&mut exec, random_id);
-        pin_mut!(connect_request_fut);
+        let mut connect_request_fut = pin!(connect_request_fut);
         exec.run_until_stalled(&mut connect_request_fut).expect_pending("waiting for channel");
 
         // We expect the open channel request to fail.

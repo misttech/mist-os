@@ -1350,6 +1350,7 @@ mod test {
     use std::{
         collections::VecDeque,
         num::{NonZeroU32, NonZeroU64},
+        pin::pin,
         sync::{Arc, Mutex},
     };
 
@@ -2862,15 +2863,15 @@ mod test {
         let (v4_routes_request_sink, mut v4_routes_request_stream) = mpsc::channel(0);
         let (v6_routes_request_sink, mut v6_routes_request_stream) = mpsc::channel(0);
 
-        let split_route_requests_background_work = split_route_requests(
+        let mut split_route_requests_background_work = pin!(split_route_requests(
             unified_request_stream,
             v4_routes_request_sink,
             v6_routes_request_sink,
         )
-        .fuse();
+        .fuse());
 
-        let handler_fut =
-            futures::future::join(handler.handle_request(request, &mut client), async {
+        let mut handler_fut =
+            pin!(futures::future::join(handler.handle_request(request, &mut client), async {
                 if family == AF_UNSPEC || family == AF_INET {
                     let next = v4_routes_request_stream.next();
                     match expected_request.map(|a| {
@@ -2900,9 +2901,7 @@ mod test {
                     };
                 }
             })
-            .fuse();
-
-        futures::pin_mut!(split_route_requests_background_work, handler_fut);
+            .fuse());
 
         futures::select! {
             ((), ()) = handler_fut => (),
@@ -3325,7 +3324,7 @@ mod test {
     ) {
         let rules_request_handler = FakeRuleRequestHandler::new(requests_and_responses);
         let (unified_request_sink, unified_request_stream) = mpsc::channel(0);
-        futures::pin_mut!(unified_request_stream);
+        let unified_request_stream = pin!(unified_request_stream);
         let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> { unified_request_sink };
 
         let (mut client_sink, mut client) = {
@@ -3654,7 +3653,7 @@ mod test {
         let (unified_request_sink, unified_request_stream) = mpsc::channel(0);
         let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> { unified_request_sink };
 
-        futures::pin_mut!(unified_request_stream);
+        let mut unified_request_stream = pin!(unified_request_stream);
 
         match req_and_resp {
             None => {

@@ -38,6 +38,7 @@ use std::{
     future::Future,
     num::NonZeroU16,
     ops::Deref,
+    pin::pin,
     // TODO(https://fxbug.dev/42076296): Use RC types exported from Core, after
     // we make sockets reference-backed.
     sync::Arc,
@@ -51,7 +52,7 @@ use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_async as fasync;
 use fuchsia_inspect::health::Reporter as _;
 use fuchsia_zircon as zx;
-use futures::{channel::mpsc, pin_mut, select, FutureExt as _, StreamExt as _};
+use futures::{channel::mpsc, select, FutureExt as _, StreamExt as _};
 use packet::{Buf, BufferMut};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
 use tracing::{error, info};
@@ -1191,7 +1192,7 @@ impl NetstackSeed {
         });
 
         let routes_change_task_fut = routes_change_task.into_future().fuse();
-        pin_mut!(routes_change_task_fut);
+        let mut routes_change_task_fut = pin!(routes_change_task_fut);
 
         let (loopback_stopper, _, loopback_tasks): (
             futures::channel::oneshot::Sender<_>,
@@ -1231,7 +1232,7 @@ impl NetstackSeed {
 
         let unexpected_early_finish_fut = async {
             let no_finish_tasks_fut = no_finish_tasks.by_ref().next().fuse();
-            pin_mut!(no_finish_tasks_fut);
+            let mut no_finish_tasks_fut = pin!(no_finish_tasks_fut);
 
             let name = select! {
                 name = no_finish_tasks_fut => name,
@@ -1496,10 +1497,10 @@ impl NetstackSeed {
             let services_fut = services_fut.fuse();
             // Pin services_fut to this block scope so it's dropped after the
             // select.
-            futures::pin_mut!(services_fut);
+            let mut services_fut = pin!(services_fut);
 
             // Do likewise for unexpected_early_finish_fut.
-            pin_mut!(unexpected_early_finish_fut);
+            let mut unexpected_early_finish_fut = pin!(unexpected_early_finish_fut);
 
             let () = futures::select! {
                 () = services_fut => (),

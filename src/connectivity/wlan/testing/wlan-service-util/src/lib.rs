@@ -115,7 +115,7 @@ mod tests {
         },
         fuchsia_async::TestExecutor,
         futures::{task::Poll, StreamExt},
-        pin_utils::pin_mut,
+        std::pin::pin,
         wlan_common::assert_variant,
     };
 
@@ -187,7 +187,7 @@ mod tests {
     fn test_get_wlan_sta_addr_ok() {
         let (mut exec, proxy, mut req_stream) = setup_fake_service::<DeviceMonitorMarker>();
         let mac_addr_fut = get_wlan_sta_addr(&proxy, 0);
-        pin_mut!(mac_addr_fut);
+        let mut mac_addr_fut = pin!(mac_addr_fut);
 
         assert_variant!(exec.run_until_stalled(&mut mac_addr_fut), Poll::Pending);
 
@@ -206,7 +206,7 @@ mod tests {
     fn test_get_wlan_sta_addr_not_found() {
         let (mut exec, proxy, mut req_stream) = setup_fake_service::<DeviceMonitorMarker>();
         let mac_addr_fut = get_wlan_sta_addr(&proxy, 0);
-        pin_mut!(mac_addr_fut);
+        let mut mac_addr_fut = pin!(mac_addr_fut);
 
         assert_variant!(exec.run_until_stalled(&mut mac_addr_fut), Poll::Pending);
 
@@ -220,7 +220,7 @@ mod tests {
     fn test_get_wlan_sta_addr_service_interrupted() {
         let (mut exec, proxy, req_stream) = setup_fake_service::<DeviceMonitorMarker>();
         let mac_addr_fut = get_wlan_sta_addr(&proxy, 0);
-        pin_mut!(mac_addr_fut);
+        let mut mac_addr_fut = pin!(mac_addr_fut);
 
         assert_variant!(exec.run_until_stalled(&mut mac_addr_fut), Poll::Pending);
 
@@ -236,7 +236,7 @@ mod tests {
         let (mut exec, proxy, mut req_stream) = setup_fake_service::<DeviceMonitorMarker>();
         let iface_id_fut = create_iface(&proxy, 0, WlanMacRole::Client, [0, 0, 0, 0, 0, 0].into());
 
-        pin_mut!(iface_id_fut);
+        let mut iface_id_fut = pin!(iface_id_fut);
 
         assert_variant!(exec.run_until_stalled(&mut iface_id_fut), Poll::Pending);
         respond_to_create_iface_request(&mut exec, &mut req_stream, zx::sys::ZX_OK, 15);
@@ -251,7 +251,7 @@ mod tests {
         let (mut exec, proxy, mut req_stream) = setup_fake_service::<DeviceMonitorMarker>();
         let iface_id_fut = create_iface(&proxy, 0, WlanMacRole::Client, [0, 0, 0, 0, 0, 0].into());
 
-        pin_mut!(iface_id_fut);
+        let mut iface_id_fut = pin!(iface_id_fut);
 
         assert_variant!(exec.run_until_stalled(&mut iface_id_fut), Poll::Pending);
         respond_to_create_iface_request(&mut exec, &mut req_stream, zx::sys::ZX_ERR_INTERNAL, 15);

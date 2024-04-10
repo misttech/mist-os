@@ -16,11 +16,14 @@
 //! about them, such as the reference-counted RouteSets specified in
 //! fuchsia.net.routes.admin.
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    pin::pin,
+};
 
 use futures::{
     channel::{mpsc, oneshot},
-    pin_mut, Future, FutureExt as _, StreamExt as _,
+    Future, FutureExt as _, StreamExt as _,
 };
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
@@ -375,7 +378,7 @@ where
 {
     pub(crate) async fn run_changes(&mut self, mut ctx: Ctx) {
         let State { receiver, table, update_dispatcher } = self;
-        pin_mut!(receiver);
+        let mut receiver = pin!(receiver);
 
         while let Some(WorkItem { change, responder }) = receiver.next().await {
             let result = handle_change::<I>(table, &mut ctx, change, update_dispatcher).await;

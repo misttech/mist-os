@@ -193,7 +193,7 @@ pub(crate) mod tests {
     use async_utils::PollExt;
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::types::{example_host, HostId};
-    use futures::pin_mut;
+    use std::pin::pin;
 
     #[track_caller]
     fn expect_watch_request(
@@ -201,7 +201,7 @@ pub(crate) mod tests {
         stream: &mut sys::HostWatcherRequestStream,
     ) -> sys::HostWatcherWatchResponder {
         let expect_fut = stream.select_next_some();
-        pin_mut!(expect_fut);
+        let mut expect_fut = pin!(expect_fut);
         exec.run_until_stalled(&mut expect_fut)
             .expect("ready")
             .expect("valid FIDL request")

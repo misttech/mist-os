@@ -21,7 +21,7 @@ use {
     fuchsia_async::{self as fasync},
     fuchsia_inspect::{health::Reporter, Inspector},
     fuchsia_zircon as zx,
-    futures::{channel::mpsc, pin_mut, prelude::*, select},
+    futures::{channel::mpsc, prelude::*, select},
     named_timer::NamedTimeoutExt,
     // net_declare::std_ip,
     reachability_core::{
@@ -34,7 +34,10 @@ use {
         NetworkCheckResult, NetworkChecker, NetworkCheckerOutcome, PortType, FIDL_TIMEOUT_ID,
     },
     reachability_handler::ReachabilityHandler,
-    std::collections::{HashMap, HashSet},
+    std::{
+        collections::{HashMap, HashSet},
+        pin::pin,
+    },
     tracing::{debug, error, info, warn},
 };
 
@@ -282,14 +285,12 @@ impl EventLoop {
         let mut netcheck_futures = futures::stream::FuturesUnordered::new();
         let report_stream = fasync::Interval::new(REPORT_PERIOD).fuse();
 
-        pin_mut!(
-            if_watcher_stream,
-            report_stream,
-            neigh_watcher_stream,
-            ipv4_route_event_stream,
-            ipv6_route_event_stream,
-            telemetry_fut,
-        );
+        let mut if_watcher_stream = pin!(if_watcher_stream);
+        let mut report_stream = pin!(report_stream);
+        let mut neigh_watcher_stream = pin!(neigh_watcher_stream);
+        let mut ipv4_route_event_stream = pin!(ipv4_route_event_stream);
+        let mut ipv6_route_event_stream = pin!(ipv6_route_event_stream);
+        let mut telemetry_fut = pin!(telemetry_fut);
 
         // Establish the current routing table state.
         let (v4_routes, v6_routes) = futures::join!(

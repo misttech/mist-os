@@ -13,8 +13,8 @@ use fidl_fuchsia_bluetooth_le::{
 };
 use fuchsia_bluetooth::types::{le::Peer, PeerId, Uuid};
 use fuchsia_sync::RwLock;
-use futures::{future::FutureExt, pin_mut, select};
-use std::sync::Arc;
+use futures::{future::FutureExt, select};
+use std::{pin::pin, sync::Arc};
 
 use crate::gatt::repl::start_gatt_loop;
 
@@ -125,7 +125,7 @@ pub async fn connect(
 
     let mut conn_closed_fut = conn_proxy.on_closed().fuse();
     let gatt_loop_fut = start_gatt_loop(gatt_proxy).fuse();
-    pin_mut!(gatt_loop_fut);
+    let mut gatt_loop_fut = pin!(gatt_loop_fut);
     select! {
         result = gatt_loop_fut => result,
         _ = conn_closed_fut => {

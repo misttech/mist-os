@@ -171,7 +171,8 @@ mod tests {
         fidl_fuchsia_bluetooth_bredr::{SearchResultsMarker, SearchResultsRequest},
         fuchsia_async as fasync,
         fuchsia_bluetooth::{profile::Psm, types::PeerId},
-        futures::{pin_mut, stream::StreamExt, task::Poll},
+        futures::{stream::StreamExt, task::Poll},
+        std::pin::pin,
     };
 
     use crate::profile::tests::a2dp_service_definition;
@@ -249,7 +250,7 @@ mod tests {
         let _handle1 = search_mgr.add(search_id1, attrs1, proxy1);
 
         let server_fut = server.next();
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         assert!(exec.run_until_stalled(&mut server_fut).is_pending());
 
         let (_, mut fake_record) = a2dp_service_definition(Psm::new(25));

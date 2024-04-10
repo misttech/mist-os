@@ -135,7 +135,6 @@ rustc_library("wlan-common") {
       "//src/lib/fuchsia",
       "//third_party/rust_crates:itertools",
       "//third_party/rust_crates:lazy_static",
-      "//third_party/rust_crates:pin-utils",
       "//third_party/rust_crates:test-case",
     ]
   }

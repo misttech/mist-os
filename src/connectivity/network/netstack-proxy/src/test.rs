@@ -11,6 +11,7 @@ use async_utils::stream::FlattenUnorderedExt as _;
 use fidl::prelude::*;
 use fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration;
 use futures::{FutureExt as _, StreamExt as _};
+use std::pin::pin;
 use test_case::test_case;
 
 async fn run_with_proxy_realm<
@@ -95,7 +96,7 @@ async fn run_with_proxy_realm<
         }
     });
     let test_fut = test(realm.clone()).fuse();
-    futures::pin_mut!(test_fut);
+    let mut test_fut = pin!(test_fut);
     futures::select! {
         () = fs_fut => panic!("filesystem future ended unexpectedly"),
         () = test_fut => ()

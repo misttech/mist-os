@@ -8,8 +8,8 @@ use battery_client::BatteryClient;
 use fidl_fuchsia_media as media;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect_derive::Inspect;
-use futures::{channel::mpsc, future, pin_mut};
-use std::collections::HashSet;
+use futures::{channel::mpsc, future};
+use std::{collections::HashSet, pin::pin};
 use tracing::{debug, error, info, warn};
 
 use crate::{
@@ -89,11 +89,9 @@ async fn main() -> Result<(), Error> {
         warn!("Couldn't attach inspect to HFP: {:?}", e);
     }
 
-    let hfp = hfp.run();
-    pin_mut!(hfp);
+    let hfp = pin!(hfp.run());
 
-    let services = run_services(fs, call_manager_sender, test_request_sender);
-    pin_mut!(services);
+    let services = pin!(run_services(fs, call_manager_sender, test_request_sender));
 
     info!("HFP Audio Gateway running.");
 

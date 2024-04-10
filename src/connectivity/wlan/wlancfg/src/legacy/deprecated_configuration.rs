@@ -67,7 +67,7 @@ mod tests {
         fidl::endpoints::create_proxy,
         fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::task::Poll,
-        pin_utils::pin_mut,
+        std::pin::pin,
         std::unimplemented,
         wlan_common::assert_variant,
     };
@@ -189,7 +189,7 @@ mod tests {
 
         // Kick off the serve loop and wait for it to stall out waiting for requests.
         let fut = configurator.serve_deprecated_configuration(stream);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         // Issue a request to set the MAC address.
@@ -200,7 +200,7 @@ mod tests {
 
         // Verify that the MAC has been set on the PhyManager
         let lock_fut = phy_manager.lock();
-        pin_mut!(lock_fut);
+        let mut lock_fut = pin!(lock_fut);
         let phy_manager = assert_variant!(
             exec.run_until_stalled(&mut lock_fut),
             Poll::Ready(phy_manager) => {

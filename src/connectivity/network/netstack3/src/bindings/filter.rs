@@ -7,6 +7,7 @@ mod conversion;
 
 use std::collections::{hash_map::Entry, HashMap};
 use std::num::NonZeroUsize;
+use std::pin::pin;
 use std::sync::Arc;
 
 use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _};
@@ -291,7 +292,7 @@ async fn serve_watcher(
 
     let result = {
         let mut request_stream = stream.map_err(ServeWatcherError::ErrorInStream).fuse();
-        futures::pin_mut!(canceled_fut);
+        let mut canceled_fut = pin!(canceled_fut);
         let mut hanging_get = futures::future::OptionFuture::default();
         loop {
             hanging_get = futures::select! {

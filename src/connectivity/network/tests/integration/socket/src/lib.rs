@@ -70,6 +70,7 @@ use packet_formats::{
     ipv6::{Ipv6Header as _, Ipv6Packet},
 };
 use socket2::SockRef;
+use std::pin::pin;
 use test_case::test_case;
 
 async fn run_udp_socket_test(
@@ -766,7 +767,7 @@ async fn udp_send_msg_preflight_fidl_ndp<N: Netstack>(
         .expect("connect to route state FIDL");
     let event_stream = fnet_routes_ext::event_stream_from_state::<Ipv6>(&routes_state)
         .expect("routes event stream from state");
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
     let mut routes = std::collections::HashSet::new();
 
     match invalidation_reason {
@@ -854,7 +855,7 @@ async fn udp_send_msg_preflight_fidl_ndp<N: Netstack>(
                 .expect("connect to route state FIDL");
             let event_stream = fnet_routes_ext::event_stream_from_state::<Ipv6>(&routes_state)
                 .expect("routes event stream from state");
-            futures::pin_mut!(event_stream);
+            let mut event_stream = pin!(event_stream);
             let _: Vec<_> = fnet_routes_ext::collect_routes_until_idle(event_stream.by_ref())
                 .await
                 .expect("collect routes until idle");
@@ -2107,7 +2108,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         }
         Ok(Some((frame_type, frame_data)))
     });
-    futures::pin_mut!(read_frame);
+    let mut read_frame = pin!(read_frame);
 
     async fn write_frame_and_read_with_timeout<S>(
         tun_dev: &fnet_tun::DeviceProxy,
@@ -3027,7 +3028,7 @@ async fn get_bound_device_errors_after_device_deleted<N: Netstack>(name: &str) {
         fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
     )
     .expect("error getting interface state event stream");
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
     let mut state =
         std::collections::HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new();
 

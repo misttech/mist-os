@@ -177,7 +177,7 @@ mod tests {
     use assert_matches::assert_matches;
     use async_utils::PollExt;
     use fuchsia_async as fasync;
-    use futures::pin_mut;
+    use std::pin::pin;
 
     use crate::header::ConnectionIdentifier;
     use crate::operation::ResponsePacket;
@@ -202,7 +202,7 @@ mod tests {
             HeaderSet::from_headers(vec![Header::Type("file".into()), Header::name("foobar.txt")])
                 .unwrap();
         let put_fut = operation.write_final(&payload[..], headers);
-        pin_mut!(put_fut);
+        let mut put_fut = pin!(put_fut);
         let _ = exec.run_until_stalled(&mut put_fut).expect_pending("waiting for response");
         let response = ResponsePacket::new_no_data(ResponseCode::Ok, HeaderSet::new());
         let expectation = |request: RequestPacket| {
@@ -231,7 +231,7 @@ mod tests {
         let payload: Vec<u8> = (1..100).collect();
         for chunk in payload.chunks(20) {
             let put_fut = operation.write(&chunk[..], HeaderSet::new());
-            pin_mut!(put_fut);
+            let mut put_fut = pin!(put_fut);
             let _ = exec.run_until_stalled(&mut put_fut).expect_pending("waiting for response");
             let response = ResponsePacket::new_no_data(ResponseCode::Continue, HeaderSet::new());
             let expectation = |request: RequestPacket| {
@@ -248,7 +248,7 @@ mod tests {
 
         // Can send final response that is empty to complete the operation.
         let put_final_fut = operation.write_final(&[], HeaderSet::new());
-        pin_mut!(put_final_fut);
+        let mut put_final_fut = pin!(put_final_fut);
         let _ = exec.run_until_stalled(&mut put_final_fut).expect_pending("waiting for response");
         let response = ResponsePacket::new_no_data(ResponseCode::Ok, HeaderSet::new());
         let expectation = |request: RequestPacket| {
@@ -275,7 +275,7 @@ mod tests {
         ])
         .unwrap();
         let put_fut = operation.delete(headers);
-        pin_mut!(put_fut);
+        let mut put_fut = pin!(put_fut);
         let _ = exec.run_until_stalled(&mut put_fut).expect_pending("waiting for response");
         let response = ResponsePacket::new_no_data(ResponseCode::Ok, HeaderSet::new());
         let expectation = |request: RequestPacket| {
@@ -300,7 +300,7 @@ mod tests {
         // Write the first chunk of data to "start" the operation.
         {
             let put_fut = operation.write(&[1, 2, 3, 4, 5], HeaderSet::new());
-            pin_mut!(put_fut);
+            let mut put_fut = pin!(put_fut);
             let _ = exec.run_until_stalled(&mut put_fut).expect_pending("waiting for response");
             let response = ResponsePacket::new_no_data(ResponseCode::Continue, HeaderSet::new());
             expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::Put), response);
@@ -312,7 +312,7 @@ mod tests {
 
         // Terminating early should be Ok - peer acknowledges.
         let terminate_fut = operation.terminate(HeaderSet::new());
-        pin_mut!(terminate_fut);
+        let mut terminate_fut = pin!(terminate_fut);
         let _ = exec.run_until_stalled(&mut terminate_fut).expect_pending("waiting for response");
         let response = ResponsePacket::new_no_data(ResponseCode::Ok, HeaderSet::new());
         expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::Abort), response);
@@ -395,7 +395,7 @@ mod tests {
             let first_buf = [1, 2, 3];
             // Even though the input headers are empty, we should prefer to enable SRM.
             let put_fut = operation.write(&first_buf[..], HeaderSet::new());
-            pin_mut!(put_fut);
+            let mut put_fut = pin!(put_fut);
             let _ = exec.run_until_stalled(&mut put_fut).expect_pending("waiting for response");
 
             // Expect the outgoing request with the SRM Header. Peer responds positively with a SRM
@@ -420,7 +420,7 @@ mod tests {
         {
             let second_buf = [4, 5, 6];
             let put_fut2 = operation.write(&second_buf[..], HeaderSet::new());
-            pin_mut!(put_fut2);
+            let mut put_fut2 = pin!(put_fut2);
             let _ = exec
                 .run_until_stalled(&mut put_fut2)
                 .expect("ready without peer response")
@@ -436,7 +436,7 @@ mod tests {
 
         // Only the final write request will result in a response.
         let put_final_fut = operation.write_final(&[], HeaderSet::new());
-        pin_mut!(put_final_fut);
+        let mut put_final_fut = pin!(put_final_fut);
         let _ = exec.run_until_stalled(&mut put_final_fut).expect_pending("waiting for response");
         let response = ResponsePacket::new_no_data(ResponseCode::Ok, HeaderSet::new());
         let expectation = |request: RequestPacket| {
@@ -464,7 +464,7 @@ mod tests {
         {
             let headers = HeaderSet::from_header(SingleResponseMode::Disable.into());
             let put_fut = operation.write(&[], headers);
-            pin_mut!(put_fut);
+            let mut put_fut = pin!(put_fut);
             let _ = exec
                 .run_until_stalled(&mut put_fut)
                 .expect("ready without peer response")
@@ -560,7 +560,7 @@ mod tests {
 
         let write_headers = HeaderSet::from_header(Header::ConnectionId(ConnectionIdentifier(10)));
         let write_fut = operation.write(&[1, 2, 3], write_headers);
-        pin_mut!(write_fut);
+        let mut write_fut = pin!(write_fut);
         let result = exec.run_until_stalled(&mut write_fut).expect("finished with error");
         assert_matches!(result, Err(Error::AlreadyExists(_)));
     }

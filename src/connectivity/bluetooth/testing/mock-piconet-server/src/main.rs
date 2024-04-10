@@ -18,6 +18,7 @@ use fuchsia_zircon as zx;
 use futures::stream::{SelectAll, StreamExt};
 use futures::{channel::mpsc, future::FutureExt, select, sink::SinkExt};
 use std::collections::{hash_map::Entry, HashMap, HashSet};
+use std::pin::pin;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
@@ -509,8 +510,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let _ = fs.take_and_serve_directory_handle()?;
     let drive_service_fs = fs.collect::<()>().fuse();
 
-    let handle_fut = server.handle_fidl_requests(test_receiver);
-    futures::pin_mut!(handle_fut);
+    let handle_fut = pin!(server.handle_fidl_requests(test_receiver));
     let _ = futures::future::select(handle_fut, drive_service_fs).await;
 
     Ok(())
@@ -525,7 +525,8 @@ mod tests {
     use async_utils::PollExt;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream};
     use fidl_fuchsia_bluetooth_bredr::*;
-    use futures::{pin_mut, task::Poll};
+    use futures::task::Poll;
+    use std::pin::pin;
 
     async fn get_next_profile_test_request(
         stream: &mut ProfileTestRequestStream,
@@ -544,12 +545,12 @@ mod tests {
         let (mock_peer, mock_peer_server) = create_proxy::<MockPeerMarker>().unwrap();
         let (observer, observer_stream) = create_request_stream::<PeerObserverMarker>().unwrap();
         let reg_fut = client.register_peer(&id.into(), mock_peer_server, observer);
-        pin_mut!(reg_fut);
+        let mut reg_fut = pin!(reg_fut);
 
         exec.run_until_stalled(&mut reg_fut).expect_pending("registration waiting for server");
 
         let req_fut = get_next_profile_test_request(&mut server);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         let request = exec.run_singlethreaded(&mut req_fut).unwrap();
 
         (mock_peer, observer_stream, request)
@@ -563,7 +564,7 @@ mod tests {
 
         // The main handler - this is under test.
         let mps_fut = mps.handle_fidl_requests(receiver);
-        pin_mut!(mps_fut);
+        let mut mps_fut = pin!(mps_fut);
         exec.run_until_stalled(&mut mps_fut).expect_pending("server should still be running");
 
         // Register a mock peer.
@@ -573,7 +574,7 @@ mod tests {
         // Forward the request to the handler. After running the main `mps_fut`, the peer
         // should be registered.
         let send = sender.send(request);
-        pin_mut!(send);
+        let mut send = pin!(send);
         let _ = exec.run_until_stalled(&mut send).expect("send should complete");
         exec.run_until_stalled(&mut mps_fut).expect_pending("server should still be running");
         assert!(mps.contains_peer(&id));
@@ -593,7 +594,7 @@ mod tests {
 
         // The main handler - this is under test.
         let mps_fut = mps.handle_fidl_requests(receiver);
-        pin_mut!(mps_fut);
+        let mut mps_fut = pin!(mps_fut);
         exec.run_until_stalled(&mut mps_fut).expect_pending("server should still be running");
 
         // Make two register requests.
@@ -635,7 +636,7 @@ mod tests {
 
         // The main handler - this is under test.
         let mps_fut = mps.handle_fidl_requests(receiver);
-        pin_mut!(mps_fut);
+        let mut mps_fut = pin!(mps_fut);
         exec.run_until_stalled(&mut mps_fut).expect_pending("server should still be running");
 
         // Register a mock peer.
@@ -645,7 +646,7 @@ mod tests {
         // Forward the request to the handler. After running the main `mps_fut`, the peer
         // should be registered.
         let send = sender.send(request);
-        pin_mut!(send);
+        let mut send = pin!(send);
         assert_matches!(exec.run_until_stalled(&mut send), Poll::Ready(Ok(_)));
         exec.run_until_stalled(&mut mps_fut).expect_pending("server should still be running");
         assert!(mps.contains_peer(&id));
@@ -653,7 +654,7 @@ mod tests {
         // Connect the ProfileProxy.
         let (c, s) = create_proxy::<ProfileMarker>().unwrap();
         let connect_fut = mock_peer.connect_proxy_(s);
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
         exec.run_until_stalled(&mut mps_fut).expect_pending("server should still be running");
         assert_matches!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(_)));
 

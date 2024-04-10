@@ -514,7 +514,8 @@ mod tests {
     use fuchsia_async::DurationExt;
     use fuchsia_inspect_derive::WithInspect;
     use fuchsia_zircon::DurationNum;
-    use futures::{pin_mut, task::Poll};
+    use futures::task::Poll;
+    use std::pin::pin;
 
     use crate::rfcomm::test_util::{expect_frame, expect_user_data_frame, poll_stream};
 
@@ -587,7 +588,7 @@ mod tests {
             .is_err());
 
         let data_received_by_client = client.next();
-        pin_mut!(data_received_by_client);
+        let mut data_received_by_client = pin!(data_received_by_client);
         exec.run_until_stalled(&mut data_received_by_client).expect_pending("shouldn't have data");
 
         poll_stream(&mut exec, &mut outgoing_frames).expect_pending("shouldn't have frames");
@@ -719,7 +720,7 @@ mod tests {
         );
 
         let data_received_by_client = client.next();
-        pin_mut!(data_received_by_client);
+        let mut data_received_by_client = pin!(data_received_by_client);
         exec.run_until_stalled(&mut data_received_by_client).expect_pending("shouldn't have data");
 
         poll_stream(&mut exec, &mut outgoing_frames).expect_pending("shouldn't have frames");

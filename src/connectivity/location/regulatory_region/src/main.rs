@@ -131,7 +131,7 @@ mod tests {
     use {
         super::*, assert_matches::assert_matches,
         fidl_fuchsia_location_namedplace::RegulatoryRegionWatcherMarker, fuchsia_async as fasync,
-        pin_utils::pin_mut, std::task::Poll, tempfile::TempDir,
+        std::pin::pin, std::task::Poll, tempfile::TempDir,
     };
 
     #[test]
@@ -145,11 +145,11 @@ mod tests {
         let update_stream = requests.into_stream().expect("Failed to create stream");
 
         let watch_fut = process_watch_requests(&hub, update_stream);
-        pin_mut!(watch_fut);
+        let mut watch_fut = pin!(watch_fut);
 
         // Request an update.
         let get_update_fut = client.get_region_update();
-        pin_mut!(get_update_fut);
+        let mut get_update_fut = pin!(get_update_fut);
 
         // After running process_watch_requests the initial PubSubHub value should be sent.
         assert!(exec.run_until_stalled(&mut watch_fut).is_pending());
@@ -157,7 +157,7 @@ mod tests {
 
         // Subsequent update requests should resolve after there is a changed value.
         let get_update_fut = client.get_region_update();
-        pin_mut!(get_update_fut);
+        let mut get_update_fut = pin!(get_update_fut);
         assert!(exec.run_until_stalled(&mut watch_fut).is_pending());
         assert!(exec.run_until_stalled(&mut get_update_fut).is_pending());
 
@@ -183,14 +183,14 @@ mod tests {
 
         // Start processing update requests.
         let watch_fut = process_watch_requests(&hub, update_stream);
-        pin_mut!(watch_fut);
+        let mut watch_fut = pin!(watch_fut);
 
         // Change the internal value before requesting first update.
         hub.publish("US");
 
         // The first update should be the current value, not the initial value.
         let get_update_fut = client.get_region_update();
-        pin_mut!(get_update_fut);
+        let mut get_update_fut = pin!(get_update_fut);
 
         assert!(exec.run_until_stalled(&mut watch_fut).is_pending());
         assert_matches!(

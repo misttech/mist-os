@@ -83,9 +83,12 @@ mod test {
     use {
         assert_matches::assert_matches,
         fuchsia_async as fasync,
-        futures::{pin_mut, prelude::*, task::Poll},
+        futures::{prelude::*, task::Poll},
         net_declare::fidl_ip,
-        std::sync::{Arc, Mutex},
+        std::{
+            pin::pin,
+            sync::{Arc, Mutex},
+        },
     };
 
     const DNS_DOMAIN: &str = "www.gstatic.com";
@@ -103,7 +106,7 @@ mod test {
             Ok(proxy)
         });
         let dns_lookup_fut = digger.dig("", DNS_DOMAIN);
-        pin_mut!(dns_lookup_fut);
+        let mut dns_lookup_fut = pin!(dns_lookup_fut);
         assert_matches!(exec.run_until_stalled(&mut dns_lookup_fut), Poll::Pending);
 
         let mut locked = server_stream.lock().unwrap();
@@ -138,7 +141,7 @@ mod test {
             Ok(proxy)
         });
         let dns_lookup_fut = digger.dig("", DNS_DOMAIN);
-        pin_mut!(dns_lookup_fut);
+        let mut dns_lookup_fut = pin!(dns_lookup_fut);
         assert_matches!(exec.run_until_stalled(&mut dns_lookup_fut), Poll::Pending);
 
         let mut locked = server_stream.lock().unwrap();
@@ -169,7 +172,7 @@ mod test {
             Ok(proxy)
         });
         let dns_lookup_fut = digger.dig("", DNS_DOMAIN);
-        pin_mut!(dns_lookup_fut);
+        let mut dns_lookup_fut = pin!(dns_lookup_fut);
         assert_matches!(exec.run_until_stalled(&mut dns_lookup_fut), Poll::Pending);
 
         let mut locked = server_stream.lock().unwrap();
@@ -191,7 +194,7 @@ mod test {
             Ok(proxy)
         });
         let dns_lookup_fut = digger.dig("", DNS_DOMAIN);
-        pin_mut!(dns_lookup_fut);
+        let mut dns_lookup_fut = pin!(dns_lookup_fut);
 
         assert_matches!(exec.run_until_stalled(&mut dns_lookup_fut), Poll::Ready(None));
     }

@@ -30,10 +30,11 @@ use fuchsia_component::client;
 use fuchsia_zircon as zx;
 use futures::{
     future::FutureExt as _,
-    pin_mut, select,
+    select,
     stream::{Stream, StreamExt as _, TryStreamExt as _},
     Future,
 };
+use std::pin::pin;
 
 use crate::realms::TestSandboxExt as _;
 
@@ -59,7 +60,7 @@ pub const ASYNC_EVENT_CHECK_INTERVAL: zx::Duration = zx::Duration::from_seconds(
 ///
 /// If the stream never yields `true` or never terminates, `try_any` may never resolve.
 pub async fn try_any<S: Stream<Item = Result<bool>>>(stream: S) -> Result<bool> {
-    futures::pin_mut!(stream);
+    let stream = pin!(stream);
     stream.try_filter(|v| futures::future::ready(*v)).next().await.unwrap_or(Ok(false))
 }
 
@@ -67,7 +68,7 @@ pub async fn try_any<S: Stream<Item = Result<bool>>>(stream: S) -> Result<bool> 
 ///
 /// If the stream never yields `false` or never terminates, `try_all` may never resolve.
 pub async fn try_all<S: Stream<Item = Result<bool>>>(stream: S) -> Result<bool> {
-    futures::pin_mut!(stream);
+    let stream = pin!(stream);
     stream.try_filter(|v| futures::future::ready(!*v)).next().await.unwrap_or(Ok(true))
 }
 
@@ -314,15 +315,14 @@ pub fn annotate<'a, 'b: 'a, T>(
     let caller = std::panic::Location::caller();
 
     async move {
-        let fut = fut.fuse();
+        let mut fut = pin!(fut.fuse());
         let event_name = event_name.to_string();
-        let print_fut = futures::stream::repeat(())
+        let mut print_fut = pin!(futures::stream::repeat(())
             .for_each(|()| async {
                 fasync::Timer::new(interval).await;
                 eprintln!("waiting for {} at {}", event_name, caller);
             })
-            .fuse();
-        pin_mut!(fut, print_fut);
+            .fuse());
         let result = select! {
             result = fut => result,
             () = print_fut => unreachable!("should repeat printing forever"),

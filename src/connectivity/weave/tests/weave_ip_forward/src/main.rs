@@ -15,6 +15,7 @@ use {
     std::collections::HashMap,
     std::io::{Read as _, Write as _},
     std::net::{SocketAddr, TcpListener, TcpStream},
+    std::pin::pin,
     structopt::StructOpt,
     tracing::info,
 };
@@ -128,9 +129,8 @@ async fn run_fuchsia_node() -> Result<(), Error> {
     let ipv6_routing_table = {
         let state_v6 = client::connect_to_protocol::<fnet_routes::StateV6Marker>()
             .context("connect to protocol")?;
-        let stream = fnet_routes_ext::event_stream_from_state::<Ipv6>(&state_v6)
-            .context("failed to connect to watcher")?;
-        futures::pin_mut!(stream);
+        let stream = pin!(fnet_routes_ext::event_stream_from_state::<Ipv6>(&state_v6)
+            .context("failed to connect to watcher")?);
         fnet_routes_ext::collect_routes_until_idle::<_, Vec<_>>(stream)
             .await
             .context("failed to get routing table")?

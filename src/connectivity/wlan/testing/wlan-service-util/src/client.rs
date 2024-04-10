@@ -336,9 +336,9 @@ mod tests {
         futures::stream::{StreamExt, StreamFuture},
         futures::task::Poll,
         ieee80211::Ssid,
-        pin_utils::pin_mut,
         rand::Rng as _,
         std::convert::{TryFrom, TryInto},
+        std::pin::pin,
         wlan_common::{
             assert_variant,
             channel::{Cbw, Channel},
@@ -460,7 +460,7 @@ mod tests {
         let (mut exec, proxy, mut req_stream) =
             crate::tests::setup_fake_service::<DeviceMonitorMarker>();
         let fut = get_first_sme(&proxy);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         let ifaces = (0..iface_list.len() as u16).collect();
 
@@ -494,7 +494,7 @@ mod tests {
         let (mut exec, proxy, mut req_stream) =
             crate::tests::setup_fake_service::<DeviceMonitorMarker>();
         let fut = disconnect_all(&proxy);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         let ifaces = (0..iface_list.len() as u16).collect();
 
@@ -608,7 +608,7 @@ mod tests {
         let ifaces: Vec<u16> = vec![0, 1, 35, 36];
 
         let fut = get_iface_list(&wlan_monitor);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         send_iface_list_response(&mut exec, &mut next_device_monitor_req, ifaces.clone());
@@ -640,7 +640,7 @@ mod tests {
         let iface_list_vec = vec![];
 
         let fut = get_iface_list(&wlan_monitor);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         send_iface_list_response(&mut exec, &mut next_device_monitor_req, iface_list_vec);
@@ -675,7 +675,7 @@ mod tests {
         }
 
         let fut = get_phy_list(&monitor_service);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         send_phy_list_response(&mut exec, &mut next_device_service_req, phy_list_vec);
@@ -707,7 +707,7 @@ mod tests {
         let phy_list_vec = vec![];
 
         let fut = get_phy_list(&monitor_service);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         send_phy_list_response(&mut exec, &mut next_device_service_req, phy_list_vec);
@@ -776,7 +776,7 @@ mod tests {
         let mut next_device_monitor_req = server.into_future();
 
         let fut = get_sme_proxy(&wlan_monitor, 1);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         // pass in that we expect this to succeed
@@ -810,7 +810,7 @@ mod tests {
         let mut next_device_monitor_req = server.into_future();
 
         let fut = get_sme_proxy(&wlan_monitor, 1);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         // pass in that we expect this to fail with zx::Status::NOT_FOUND
@@ -879,7 +879,7 @@ mod tests {
             target_password.to_vec(),
             target_bss_desc.clone(),
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         // have the request, need to send a response
@@ -937,7 +937,7 @@ mod tests {
             target_password.to_vec(),
             target_bss_desc.clone(),
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         // verify the connect request info
@@ -970,7 +970,7 @@ mod tests {
             target_password.to_vec(),
             target_bss_desc.clone(),
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         // verify the connect request info
@@ -1094,7 +1094,7 @@ mod tests {
         let mut client_sme_req = server.into_future();
 
         let fut = disconnect(&client_sme);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         send_disconnect_request_response(&mut exec, &mut client_sme_req);
@@ -1219,7 +1219,7 @@ mod tests {
         let mut client_sme_req = server.into_future();
 
         let fut = passive_scan(&client_sme);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         send_scan_result_response(&mut exec, &mut client_sme_req, scan_results);
@@ -1255,7 +1255,7 @@ mod tests {
         let mut client_sme_req = server.into_future();
 
         let fut = passive_scan(&client_sme);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         send_scan_error_response(&mut exec, &mut client_sme_req);
@@ -1321,7 +1321,7 @@ mod tests {
         let mut next_device_service_req = server.into_future();
 
         let fut = destroy_iface(&monitor_service, 0);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         send_destroy_iface_response(&mut exec, &mut next_device_service_req, zx::Status::OK);

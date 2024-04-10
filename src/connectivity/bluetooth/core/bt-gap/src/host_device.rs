@@ -11,7 +11,7 @@ use fuchsia_bluetooth::inspect::Inspectable;
 use fuchsia_bluetooth::types::{Address, BondingData, HostData, HostId, HostInfo, Peer, PeerId};
 use fuchsia_sync::RwLock;
 use futures::{future::try_join_all, Future, FutureExt, StreamExt, TryFutureExt};
-use pin_utils::pin_mut;
+use std::pin::pin;
 use std::sync::{Arc, Weak};
 use tracing::{error, info, trace, warn};
 
@@ -276,9 +276,9 @@ impl HostDevice {
         let handle_fidl = self.handle_fidl_events(listener.clone());
         let watch_peers = self.watch_peers(listener.clone());
         let watch_state = self.watch_state(listener);
-        pin_mut!(handle_fidl);
-        pin_mut!(watch_peers);
-        pin_mut!(watch_state);
+        let handle_fidl = pin!(handle_fidl);
+        let watch_peers = pin!(watch_peers);
+        let watch_state = pin!(watch_state);
         futures::select! {
             res1 = handle_fidl.fuse() => res1.context("failed to handle fuchsia.bluetooth.Host event"),
             res2 = watch_peers.fuse() => res2.context("failed to relay peer watcher from Host"),

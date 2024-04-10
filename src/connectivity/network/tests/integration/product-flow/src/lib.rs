@@ -22,6 +22,7 @@ use netstack_testing_common::{
 };
 use netstack_testing_macros::netstack_test;
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
+use std::pin::pin;
 use test_case::test_case;
 
 #[allow(dead_code)]
@@ -93,8 +94,8 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
         .expect("wait for link-local address in server realm");
 
     let send_ra_and_wait_for_addr = || async {
-        let send_ra_fut =
-            fasync::Interval::new(zx::Duration::from_seconds(4)).for_each(|()| async {
+        let mut send_ra_fut =
+            pin!(fasync::Interval::new(zx::Duration::from_seconds(4)).for_each(|()| async {
                 let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
                     ipv6_consts::GLOBAL_PREFIX.prefix(),  /* prefix_length */
                     false,                                /* on_link_flag */
@@ -106,9 +107,11 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
                 ndp::send_ra_with_router_lifetime(&fake_ep, 9999, &options, server_link_local)
                     .await
                     .expect("failed to send router advertisement")
-            });
-        let wait_addr_fut =
-            interfaces::wait_for_addresses(&client_interfaces_state, client_if.id(), |addresses| {
+            }));
+        let mut wait_addr_fut = pin!(interfaces::wait_for_addresses(
+            &client_interfaces_state,
+            client_if.id(),
+            |addresses| {
                 addresses.iter().find_map(
                     |&fnet_interfaces_ext::Address {
                          addr: fnet::Subnet { addr, prefix_len: _ },
@@ -128,9 +131,9 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
                         }
                     },
                 )
-            })
-            .map(|r| r.expect("wait for SLAAC IPv6 address to appear"));
-        futures::pin_mut!(send_ra_fut, wait_addr_fut);
+            }
+        )
+        .map(|r| r.expect("wait for SLAAC IPv6 address to appear")));
         let addr = futures::select! {
             () = send_ra_fut => unreachable!("sending Router Advertisements should never stop"),
             addr = wait_addr_fut => addr

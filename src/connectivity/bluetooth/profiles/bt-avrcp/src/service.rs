@@ -233,8 +233,8 @@ mod tests {
     use fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileProxy, ProfileRequestStream};
     use fuchsia_bluetooth::{profile::Psm, types::Channel};
     use packet_encoding::Decodable;
-    use pin_utils::pin_mut;
     use std::collections::HashSet;
+    use std::pin::pin;
     use std::sync::Arc;
 
     use crate::{
@@ -292,7 +292,7 @@ mod tests {
         let (target_client, _target_server) = create_endpoints::<TargetHandlerMarker>();
 
         let request_fut = peer_manager_proxy.register_target_handler(target_client);
-        pin_mut!(request_fut);
+        let mut request_fut = pin!(request_fut);
 
         let handler_fut = handle_peer_manager_requests(
             peer_manager_requests,
@@ -300,7 +300,7 @@ mod tests {
             fail_fn,
             noop_browse_fn,
         );
-        pin_mut!(handler_fut);
+        let mut handler_fut = pin!(handler_fut);
 
         // Make the request.
         exec.run_until_stalled(&mut request_fut).expect_pending("should not be ready");
@@ -358,11 +358,11 @@ mod tests {
             spawn_controller_fn,
             spawn_browse_controller_fn,
         );
-        pin_mut!(handler_fut);
+        let mut handler_fut = pin!(handler_fut);
 
         let request_fut =
             peer_manager_proxy.get_controller_for_target(&PeerId(123).into(), controller_server);
-        pin_mut!(request_fut);
+        let mut request_fut = pin!(request_fut);
 
         // Make the request.
         assert!(exec.run_until_stalled(&mut request_fut).is_pending());
@@ -386,7 +386,7 @@ mod tests {
 
         let request_fut = peer_manager_proxy
             .get_browse_controller_for_target(&PeerId(123).into(), bcontroller_server);
-        pin_mut!(request_fut);
+        let mut request_fut = pin!(request_fut);
 
         // Make the request.
         assert!(exec.run_until_stalled(&mut request_fut).is_pending());
@@ -443,11 +443,11 @@ mod tests {
             spawn_controller_fn,
             spawn_browse_controller_fn,
         );
-        pin_mut!(handler_fut);
+        let mut handler_fut = pin!(handler_fut);
 
         let request_fut = peer_manager_ext_proxy
             .get_controller_for_target(&PeerId(123).into(), controller_server);
-        pin_mut!(request_fut);
+        let mut request_fut = pin!(request_fut);
 
         // Make the request.
         exec.run_until_stalled(&mut request_fut).expect_pending("should be pending");
@@ -471,7 +471,7 @@ mod tests {
 
         let request_fut = peer_manager_ext_proxy
             .get_browse_controller_for_target(&PeerId(123).into(), bcontroller_server);
-        pin_mut!(request_fut);
+        let mut request_fut = pin!(request_fut);
 
         // Make the request.
         exec.run_until_stalled(&mut request_fut).expect_pending("should be pending");
@@ -539,7 +539,7 @@ mod tests {
 
         // Make a request and start it.  It should be pending.
         let register_fut = peer_manager_proxy.register_target_handler(target_client);
-        pin_mut!(register_fut);
+        let mut register_fut = pin!(register_fut);
 
         exec.run_until_stalled(&mut register_fut).expect_pending("should be pending");
 
@@ -565,7 +565,7 @@ mod tests {
 
         // should succeed if the previous handler was dropped.
         let register_fut = peer_manager_proxy.register_target_handler(target_client_2);
-        pin_mut!(register_fut);
+        let mut register_fut = pin!(register_fut);
         exec.run_until_stalled(&mut register_fut).expect_pending("should be pending");
         let request = service_request_receiver
             .try_next()
@@ -582,7 +582,7 @@ mod tests {
 
         // should fail since the target handler is already set.
         let register_fut = peer_manager_proxy.register_target_handler(target_client_3);
-        pin_mut!(register_fut);
+        let mut register_fut = pin!(register_fut);
         exec.run_until_stalled(&mut register_fut).expect_pending("should be pending");
         let request = service_request_receiver
             .try_next()
@@ -605,7 +605,7 @@ mod tests {
 
         // Make a request and start it.  It should be pending.
         let register_fut = peer_manager_proxy.set_absolute_volume_handler(volume_client);
-        pin_mut!(register_fut);
+        let mut register_fut = pin!(register_fut);
 
         exec.run_until_stalled(&mut register_fut).expect_pending("should be pending");
 
@@ -631,7 +631,7 @@ mod tests {
 
         // should succeed if the previous handler was dropped.
         let register_fut = peer_manager_proxy.set_absolute_volume_handler(volume_client_2);
-        pin_mut!(register_fut);
+        let mut register_fut = pin!(register_fut);
         exec.run_until_stalled(&mut register_fut).expect_pending("should be pending");
         let request = service_request_receiver
             .try_next()
@@ -648,7 +648,7 @@ mod tests {
 
         // should fail since the target handler is already set.
         let register_fut = peer_manager_proxy.set_absolute_volume_handler(volume_client_3);
-        pin_mut!(register_fut);
+        let mut register_fut = pin!(register_fut);
         exec.run_until_stalled(&mut register_fut).expect_pending("should be pending");
         let request = service_request_receiver
             .try_next()
@@ -740,7 +740,7 @@ mod tests {
             &browse_controller_service::spawn_service,
         )
         .fuse();
-        pin_mut!(handler_fut);
+        let mut handler_fut = pin!(handler_fut);
 
         let test_handler_fut = handle_peer_manager_ext_requests(
             ext_requests,
@@ -749,54 +749,55 @@ mod tests {
             &browse_controller_service::spawn_ext_service,
         )
         .fuse();
-        pin_mut!(test_handler_fut);
+        let mut test_handler_fut = pin!(test_handler_fut);
 
         let (controller_proxy, controller_server) = create_proxy().unwrap();
         let get_controller_fut = peer_manager_proxy
             .get_controller_for_target(&fake_peer_id.into(), controller_server)
             .fuse();
-        pin_mut!(get_controller_fut);
+        let mut get_controller_fut = pin!(get_controller_fut);
 
         let (controller_ext_proxy, controller_ext_server) = create_proxy().unwrap();
         let get_test_controller_fut =
             ext_proxy.get_controller_for_target(&fake_peer_id.into(), controller_ext_server).fuse();
-        pin_mut!(get_test_controller_fut);
+        let mut get_test_controller_fut = pin!(get_test_controller_fut);
 
         let is_connected_fut = controller_ext_proxy.is_connected().fuse();
-        pin_mut!(is_connected_fut);
+        let mut is_connected_fut = pin!(is_connected_fut);
 
         let passthrough_fut = controller_proxy.send_command(AvcPanelCommand::Key0).fuse();
-        pin_mut!(passthrough_fut);
+        let mut passthrough_fut = pin!(passthrough_fut);
         expected_commands += 1;
         let mut keydown_pressed = false;
         let mut keyup_pressed = false;
 
         let volume_fut = controller_proxy.set_absolute_volume(REQUESTED_VOLUME).fuse();
-        pin_mut!(volume_fut);
+        let mut volume_fut = pin!(volume_fut);
         expected_commands += 1;
 
         let events_fut = controller_ext_proxy.get_events_supported().fuse();
-        pin_mut!(events_fut);
+        let mut events_fut = pin!(events_fut);
         expected_commands += 1;
 
         let get_media_attributes_fut = controller_proxy.get_media_attributes().fuse();
-        pin_mut!(get_media_attributes_fut);
+        let mut get_media_attributes_fut = pin!(get_media_attributes_fut);
         expected_commands += 1;
 
         let get_play_status_fut = controller_proxy.get_play_status().fuse();
-        pin_mut!(get_play_status_fut);
+        let mut get_play_status_fut = pin!(get_play_status_fut);
         expected_commands += 1;
 
         let attribute_ids =
             &[fidl_fuchsia_bluetooth_avrcp::PlayerApplicationSettingAttributeId::Equalizer];
         let get_player_application_settings_fut =
             controller_proxy.get_player_application_settings(attribute_ids).fuse();
-        pin_mut!(get_player_application_settings_fut);
+        let mut get_player_application_settings_fut = pin!(get_player_application_settings_fut);
         expected_commands += 1;
 
         let get_all_player_application_settings_fut =
             controller_proxy.get_player_application_settings(&[]).fuse();
-        pin_mut!(get_all_player_application_settings_fut);
+        let mut get_all_player_application_settings_fut =
+            pin!(get_all_player_application_settings_fut);
         expected_commands += 1;
 
         let mut settings = fidl_fuchsia_bluetooth_avrcp::PlayerApplicationSettings::default();
@@ -804,13 +805,13 @@ mod tests {
         settings.shuffle_mode = Some(fidl_fuchsia_bluetooth_avrcp::ShuffleMode::Off);
         let set_player_application_settings_fut =
             controller_proxy.set_player_application_settings(&settings).fuse();
-        pin_mut!(set_player_application_settings_fut);
+        let mut set_player_application_settings_fut = pin!(set_player_application_settings_fut);
         expected_commands += 1;
 
         let current_battery_status = BatteryStatus::Warning;
         let inform_battery_status_fut =
             controller_proxy.inform_battery_status(current_battery_status).fuse();
-        pin_mut!(inform_battery_status_fut);
+        let mut inform_battery_status_fut = pin!(inform_battery_status_fut);
         expected_commands += 1;
 
         let mut additional_packets: Vec<Vec<u8>> = vec![];
@@ -823,12 +824,12 @@ mod tests {
         let mut volume_value_received = false;
 
         let event_stream = controller_proxy.take_event_stream();
-        pin_mut!(event_stream);
+        let mut event_stream = pin!(event_stream);
 
         let mut position_changed_events = 0;
 
         let remote_command_stream = remote_peer.take_command_stream().fuse();
-        pin_mut!(remote_command_stream);
+        let mut remote_command_stream = pin!(remote_command_stream);
 
         let mut handle_remote_command = |avc_command: AvcCommand| {
             if avc_command.is_vendor_dependent() {

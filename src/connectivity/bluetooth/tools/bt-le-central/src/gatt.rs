@@ -780,7 +780,8 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth_gatt2::{ClientMarker, ServiceHandle};
     use fuchsia_zircon::DurationNum;
-    use futures::{future::FutureExt, join, pin_mut, select};
+    use futures::{future::FutureExt, join, select};
+    use std::pin::pin;
 
     #[fuchsia::test]
     async fn test_read_by_type() {
@@ -815,10 +816,9 @@ mod tests {
         gatt_client.write().set_services(services);
 
         let args = vec!["0"]; // service index
-        let connect_fut = do_connect(&args, &gatt_client).fuse();
-        let expect_connect_fut =
-            client_mock.expect_connect_to_service(ServiceHandle { value: 1 }).fuse();
-        pin_mut!(connect_fut, expect_connect_fut);
+        let mut connect_fut = pin!(do_connect(&args, &gatt_client).fuse());
+        let mut expect_connect_fut =
+            pin!(client_mock.expect_connect_to_service(ServiceHandle { value: 1 }).fuse());
 
         let (_, service_server) = select! {
             _ = connect_fut =>  panic!("connect_fut completed prematurely (characteristics haven't been discovered)"),

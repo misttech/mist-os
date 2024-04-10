@@ -8,7 +8,7 @@ use {
     fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::DurationNum,
     ieee80211::{Bssid, Ssid},
-    pin_utils::pin_mut,
+    std::pin::pin,
     wlan_common::{
         bss::Protection,
         channel::{Cbw, Channel},
@@ -90,11 +90,10 @@ async fn connect_with_failed_association() {
 
     let (mut client_controller, mut client_state_update_stream) =
         wlan_hw_sim::init_client_controller(helper.test_ns_prefix()).await;
-    let save_network_fut = save_network_and_await_failed_connection(
+    let save_network_fut = pin!(save_network_and_await_failed_connection(
         &mut client_controller,
         &mut client_state_update_stream,
-    );
-    pin_mut!(save_network_fut);
+    ));
 
     let phy = helper.proxy();
     let () = helper

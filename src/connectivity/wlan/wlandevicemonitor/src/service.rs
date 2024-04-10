@@ -557,9 +557,9 @@ mod tests {
         crate::device::PhyOwnership,
         fidl::endpoints::{create_proxy, create_proxy_and_stream, ControlHandle},
         fidl_fuchsia_wlan_common as fidl_wlan_common, fuchsia_async as fasync,
-        futures::{future::BoxFuture, pin_mut, task::Poll},
+        futures::{future::BoxFuture, task::Poll},
         ieee80211::{MacAddrBytes, NULL_ADDR},
-        std::convert::Infallible,
+        std::{convert::Infallible, pin::pin},
         test_case::test_case,
         wlan_common::assert_variant,
     };
@@ -644,13 +644,13 @@ mod tests {
             test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Request the list of available PHYs.
         let list_fut = test_values.monitor_proxy.list_phys();
-        pin_mut!(list_fut);
+        let mut list_fut = pin!(list_fut);
         assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
@@ -667,7 +667,7 @@ mod tests {
 
         // Request the list of available PHYs.
         let list_fut = test_values.monitor_proxy.list_phys();
-        pin_mut!(list_fut);
+        let mut list_fut = pin!(list_fut);
         assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
@@ -683,7 +683,7 @@ mod tests {
 
         // Request the list of available PHYs.
         let list_fut = test_values.monitor_proxy.list_phys();
-        pin_mut!(list_fut);
+        let mut list_fut = pin!(list_fut);
         assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
@@ -709,13 +709,13 @@ mod tests {
             test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Request the list of available ifaces.
         let list_fut = test_values.monitor_proxy.list_ifaces();
-        pin_mut!(list_fut);
+        let mut list_fut = pin!(list_fut);
         assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
@@ -739,7 +739,7 @@ mod tests {
 
         // Request the list of available ifaces.
         let list_fut = test_values.monitor_proxy.list_ifaces();
-        pin_mut!(list_fut);
+        let mut list_fut = pin!(list_fut);
         assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
@@ -770,13 +770,13 @@ mod tests {
             test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Initiate a GetDevPath request. The returned future should not be able
         // to produce a result immediately
         let query_fut = test_values.monitor_proxy.get_dev_path(10u16);
-        pin_mut!(query_fut);
+        let mut query_fut = pin!(query_fut);
         assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
@@ -803,13 +803,13 @@ mod tests {
             test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Query a PHY's dev path.
         let query_fut = test_values.monitor_proxy.get_dev_path(0);
-        pin_mut!(query_fut);
+        let mut query_fut = pin!(query_fut);
         assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Pending);
 
         // Progress the service loop.
@@ -836,13 +836,13 @@ mod tests {
             test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Initiate a GetWlanMacRoles request. The returned future should not be able
         // to produce a result immediately
         let get_supported_mac_roles_fut = test_values.monitor_proxy.get_supported_mac_roles(10u16);
-        pin_mut!(get_supported_mac_roles_fut);
+        let mut get_supported_mac_roles_fut = pin!(get_supported_mac_roles_fut);
         assert_variant!(exec.run_until_stalled(&mut get_supported_mac_roles_fut), Poll::Pending);
 
         // The call above should trigger a Query message to the phy.
@@ -881,13 +881,13 @@ mod tests {
             test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Query a PHY's dev path.
         let get_supported_mac_roles_fut = test_values.monitor_proxy.get_supported_mac_roles(0);
-        pin_mut!(get_supported_mac_roles_fut);
+        let mut get_supported_mac_roles_fut = pin!(get_supported_mac_roles_fut);
         assert_variant!(exec.run_until_stalled(&mut get_supported_mac_roles_fut), Poll::Pending);
 
         // Progress the service loop.
@@ -905,7 +905,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let watcher_fut = test_values.watcher_fut;
-        pin_mut!(watcher_fut);
+        let mut watcher_fut = pin!(watcher_fut);
 
         let service_fut = serve_monitor_requests(
             test_values.monitor_req_stream,
@@ -917,7 +917,7 @@ mod tests {
             test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
@@ -935,7 +935,7 @@ mod tests {
         // Initially there should be no devices and the future should be pending.
         let mut events_fut = watcher_proxy.take_event_stream();
         let next_fut = events_fut.try_next();
-        pin_mut!(next_fut);
+        let mut next_fut = pin!(next_fut);
         assert_variant!(exec.run_until_stalled(&mut next_fut), Poll::Pending);
 
         // Add a PHY and make sure the update is received.
@@ -961,7 +961,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let watcher_fut = test_values.watcher_fut;
-        pin_mut!(watcher_fut);
+        let mut watcher_fut = pin!(watcher_fut);
 
         let service_fut = serve_monitor_requests(
             test_values.monitor_req_stream,
@@ -973,7 +973,7 @@ mod tests {
             test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
@@ -996,7 +996,7 @@ mod tests {
         // Start listening for device events.
         let mut events_fut = watcher_proxy.take_event_stream();
         let next_fut = events_fut.try_next();
-        pin_mut!(next_fut);
+        let mut next_fut = pin!(next_fut);
         assert_variant!(exec.run_until_stalled(&mut next_fut), Poll::Pending);
 
         // We should be notified of the existing PHY.
@@ -1020,7 +1020,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let watcher_fut = test_values.watcher_fut;
-        pin_mut!(watcher_fut);
+        let mut watcher_fut = pin!(watcher_fut);
 
         let service_fut = serve_monitor_requests(
             test_values.monitor_req_stream,
@@ -1032,7 +1032,7 @@ mod tests {
             test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
@@ -1050,7 +1050,7 @@ mod tests {
         // Initially there should be no devices and the future should be pending.
         let mut events_fut = watcher_proxy.take_event_stream();
         let next_fut = events_fut.try_next();
-        pin_mut!(next_fut);
+        let mut next_fut = pin!(next_fut);
         assert_variant!(exec.run_until_stalled(&mut next_fut), Poll::Pending);
 
         // Create a generic SME proxy but drop the server since we won't use it.
@@ -1084,7 +1084,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let watcher_fut = test_values.watcher_fut;
-        pin_mut!(watcher_fut);
+        let mut watcher_fut = pin!(watcher_fut);
 
         let service_fut = serve_monitor_requests(
             test_values.monitor_req_stream,
@@ -1096,7 +1096,7 @@ mod tests {
             test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
 
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
@@ -1127,7 +1127,7 @@ mod tests {
         // Start listening for device events.
         let mut events_fut = watcher_proxy.take_event_stream();
         let next_fut = events_fut.try_next();
-        pin_mut!(next_fut);
+        let mut next_fut = pin!(next_fut);
         assert_variant!(exec.run_until_stalled(&mut next_fut), Poll::Pending);
 
         // We should be notified of the existing interface.
@@ -1161,7 +1161,7 @@ mod tests {
         // Issue service.fidl::SetCountryRequest()
         let req_msg = fidl_svc::SetCountryRequest { phy_id, alpha2: alpha2.clone() };
         let req_fut = super::set_country(&test_values.phys, req_msg);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
@@ -1192,7 +1192,7 @@ mod tests {
         // Issue service.fidl::SetCountryRequest()
         let req_msg = fidl_svc::SetCountryRequest { phy_id, alpha2: alpha2.clone() };
         let req_fut = super::set_country(&test_values.phys, req_msg);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         let (req, responder) = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
@@ -1225,7 +1225,7 @@ mod tests {
         // to produce a result immediately
         // Issue service.fidl::GetCountryRequest()
         let req_fut = super::get_country(&test_values.phys, phy_id);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
@@ -1256,7 +1256,7 @@ mod tests {
         // to produce a result immediately
         // Issue service.fidl::GetCountryRequest()
         let req_fut = super::get_country(&test_values.phys, phy_id);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
@@ -1285,7 +1285,7 @@ mod tests {
         // Issue service.fidl::ClearCountryRequest()
         let req_msg = fidl_svc::ClearCountryRequest { phy_id };
         let req_fut = super::clear_country(&test_values.phys, req_msg);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
@@ -1314,7 +1314,7 @@ mod tests {
         // Issue service.fidl::ClearCountryRequest()
         let req_msg = fidl_svc::ClearCountryRequest { phy_id };
         let req_fut = super::clear_country(&test_values.phys, req_msg);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         let responder = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
@@ -1348,7 +1348,7 @@ mod tests {
             ps_mode: fidl_wlan_common::PowerSaveType::PsModeBalanced,
         };
         let req_fut = super::set_power_save_mode(&test_values.phys, req_msg);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
@@ -1381,7 +1381,7 @@ mod tests {
             ps_mode: fidl_wlan_common::PowerSaveType::PsModeLowPower,
         };
         let req_fut = super::set_power_save_mode(&test_values.phys, req_msg);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         let (req, responder) = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
@@ -1413,7 +1413,7 @@ mod tests {
         // to produce a result immediately
         // Issue service.fidl::SetCountryRequest()
         let req_fut = super::get_power_save_mode(&test_values.phys, phy_id);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
@@ -1446,7 +1446,7 @@ mod tests {
         // to produce a result immediately
         // Issue service.fidl::GetCountryRequest()
         let req_fut = super::get_power_save_mode(&test_values.phys, phy_id);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
@@ -1498,7 +1498,7 @@ mod tests {
             &wlandevicemonitor_config::Config { wep_supported: true, wpa1_supported: true },
             &mut ifaces_node,
         );
-        pin_mut!(create_fut);
+        let mut create_fut = pin!(create_fut);
         assert_variant!(exec.run_until_stalled(&mut create_fut), Poll::Pending);
 
         // Validate the PHY request
@@ -1579,12 +1579,12 @@ mod tests {
             test_values.ifaces_node,
             fake_wlandevicemonitor_config(),
         );
-        pin_mut!(service_fut);
+        let mut service_fut = pin!(service_fut);
         assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
         // Request the list of available ifaces.
         let list_fut = test_values.monitor_proxy.list_ifaces();
-        pin_mut!(list_fut);
+        let mut list_fut = pin!(list_fut);
         assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
@@ -1608,7 +1608,7 @@ mod tests {
                     role: fidl_wlan_common::WlanMacRole::Client,
                     sta_addr,
                 });
-            pin_mut!(create_iface_fut);
+            let mut create_iface_fut = pin!(create_iface_fut);
             assert_variant!(exec.run_until_stalled(&mut create_iface_fut), Poll::Pending);
             assert_variant!(exec.run_until_stalled(&mut service_fut), Poll::Pending);
 
@@ -1649,7 +1649,7 @@ mod tests {
 
         // Request the list of available ifaces.
         let list_fut = test_values.monitor_proxy.list_ifaces();
-        pin_mut!(list_fut);
+        let mut list_fut = pin!(list_fut);
         assert_variant!(exec.run_until_stalled(&mut list_fut), Poll::Pending);
 
         // Progress the service loop.
@@ -1682,7 +1682,7 @@ mod tests {
             &wlandevicemonitor_config::Config { wep_supported: true, wpa1_supported: true },
             &mut ifaces_node,
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(
             exec.run_until_stalled(&mut fut),
             Poll::Ready(Err(zx::Status::NOT_FOUND)),
@@ -1723,7 +1723,7 @@ mod tests {
             test_values.ifaces_node,
             42,
         );
-        pin_mut!(destroy_fut);
+        let mut destroy_fut = pin!(destroy_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut destroy_fut));
 
         let (req, responder) = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
@@ -1752,7 +1752,7 @@ mod tests {
             test_values.ifaces_node,
             42,
         );
-        pin_mut!(destroy_fut);
+        let mut destroy_fut = pin!(destroy_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut destroy_fut));
 
         let (req, responder) = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
@@ -1784,7 +1784,7 @@ mod tests {
             test_values.ifaces_node,
             42,
         );
-        pin_mut!(destroy_fut);
+        let mut destroy_fut = pin!(destroy_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut destroy_fut));
 
         let (req, responder) = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
@@ -1822,7 +1822,7 @@ mod tests {
             test_values.ifaces_node,
             43,
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_eq!(Poll::Ready(Err(zx::Status::NOT_FOUND)), exec.run_until_stalled(&mut fut));
     }
 
@@ -1851,7 +1851,7 @@ mod tests {
             test_values.ifaces_node,
             1,
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_eq!(Poll::Ready(Err(zx::Status::NOT_FOUND)), exec.run_until_stalled(&mut fut));
 
         assert!(test_values.ifaces.get(&1).is_none());
@@ -1882,7 +1882,7 @@ mod tests {
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("Failed to create client SME");
 
         let req_fut = super::get_client_sme(&test_values.ifaces, 42, client_sme_server);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         // Respond to a client SME request with a client endpoint.
@@ -1928,7 +1928,7 @@ mod tests {
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("Failed to create client SME");
 
         let req_fut = super::get_client_sme(&test_values.ifaces, 42, client_sme_server);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         // Respond to a client SME request with an error.
@@ -1966,7 +1966,7 @@ mod tests {
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("Failed to create client SME");
 
         let req_fut = super::get_client_sme(&test_values.ifaces, 1337, client_sme_server);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
     }
 
@@ -1995,7 +1995,7 @@ mod tests {
         );
 
         let req_fut = super::get_feature_support(&test_values.ifaces, 42, feature_support_server);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         // Respond to a feature support request with a feature support endpoint.
@@ -2029,7 +2029,7 @@ mod tests {
         );
 
         let req_fut = super::query_iface(&test_values.ifaces, 42);
-        pin_mut!(req_fut);
+        let mut req_fut = pin!(req_fut);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
 
         // Respond to a query with appropriate info.
@@ -2067,7 +2067,7 @@ mod tests {
             test_values.ifaces_node,
             test_values.new_iface_stream,
         );
-        pin_mut!(new_iface_fut);
+        let mut new_iface_fut = pin!(new_iface_fut);
 
         let (phy, mut phy_stream) = fake_phy();
         let phy_id = 10u16;

@@ -461,7 +461,7 @@ mod tests {
     use fidl_fuchsia_bluetooth_bredr::{
         ProfileMarker, ProfileRequestStream, ServiceClassProfileIdentifier,
     };
-    use futures::pin_mut;
+    use std::pin::pin;
 
     use crate::{media_task::tests::TestMediaTaskBuilder, media_types::*, stream::Stream};
 
@@ -477,7 +477,7 @@ mod tests {
         let avdtp = peer.avdtp();
         let discover_fut = avdtp.discover();
 
-        futures::pin_mut!(discover_fut);
+        let mut discover_fut = pin!(discover_fut);
 
         assert!(exec.run_until_stalled(&mut discover_fut).is_pending());
 
@@ -724,7 +724,7 @@ mod tests {
         let seid: avdtp::StreamEndpointId = SBC_SINK_SEID.try_into().expect("seid to be okay");
         let config_caps = &[ServiceCapability::MediaTransport, sbc_codec];
         let set_config_fut = remote.set_configuration(&seid, &seid, config_caps);
-        pin_mut!(set_config_fut);
+        let mut set_config_fut = pin!(set_config_fut);
         match exec.run_until_stalled(&mut set_config_fut) {
             Poll::Ready(Ok(())) => {}
             x => panic!("Expected set config to be ready and Ok, got {:?}", x),
@@ -818,7 +818,7 @@ mod tests {
         let seid: avdtp::StreamEndpointId = SBC_SINK_SEID.try_into().expect("seid to be okay");
         let config_caps = &[ServiceCapability::MediaTransport, sbc_codec.clone()];
         let set_config_fut = remote.set_configuration(&seid, &seid, config_caps);
-        pin_mut!(set_config_fut);
+        let mut set_config_fut = pin!(set_config_fut);
         match exec.run_until_stalled(&mut set_config_fut) {
             Poll::Ready(Ok(())) => {}
             x => panic!("Expected set config to be ready and Ok, got {:?}", x),

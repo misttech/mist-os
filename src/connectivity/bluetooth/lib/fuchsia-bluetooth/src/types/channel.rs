@@ -300,7 +300,8 @@ impl io::AsyncWrite for Channel {
 mod tests {
     use super::*;
     use fidl::endpoints::create_request_stream;
-    use futures::{pin_mut, FutureExt, StreamExt};
+    use futures::{FutureExt, StreamExt};
+    use std::pin::pin;
 
     #[test]
     fn test_channel_create_and_write() {
@@ -345,7 +346,7 @@ mod tests {
         let (recv, send) = Channel::create();
 
         let closed_fut = recv.closed();
-        pin_mut!(closed_fut);
+        let mut closed_fut = pin!(closed_fut);
 
         assert!(exec.run_until_stalled(&mut closed_fut).is_pending());
 
@@ -386,7 +387,7 @@ mod tests {
         let channel = Channel::try_from(ext).unwrap();
 
         let audio_direction_fut = channel.set_audio_priority(A2dpDirection::Normal);
-        pin_mut!(audio_direction_fut);
+        let mut audio_direction_fut = pin!(audio_direction_fut);
 
         assert!(exec.run_until_stalled(&mut audio_direction_fut).is_pending());
 
@@ -407,7 +408,7 @@ mod tests {
         };
 
         let audio_direction_fut = channel.set_audio_priority(A2dpDirection::Sink);
-        pin_mut!(audio_direction_fut);
+        let mut audio_direction_fut = pin!(audio_direction_fut);
 
         assert!(exec.run_until_stalled(&mut audio_direction_fut).is_pending());
 
@@ -475,7 +476,7 @@ mod tests {
 
         {
             let flush_timeout_fut = channel.set_flush_timeout(None);
-            pin_mut!(flush_timeout_fut);
+            let mut flush_timeout_fut = pin!(flush_timeout_fut);
 
             // Requesting no change returns right away with no change.
             match exec.run_until_stalled(&mut flush_timeout_fut) {
@@ -488,7 +489,7 @@ mod tests {
 
         {
             let flush_timeout_fut = channel.set_flush_timeout(Some(req_duration));
-            pin_mut!(flush_timeout_fut);
+            let mut flush_timeout_fut = pin!(flush_timeout_fut);
 
             assert!(exec.run_until_stalled(&mut flush_timeout_fut).is_pending());
 

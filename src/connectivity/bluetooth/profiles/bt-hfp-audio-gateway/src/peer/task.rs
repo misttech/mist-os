@@ -901,11 +901,10 @@ mod tests {
         fuchsia_bluetooth::types::Channel,
         futures::{
             future::ready,
-            pin_mut,
             stream::{FusedStream, Stream},
         },
         proptest::prelude::*,
-        std::collections::HashSet,
+        std::{collections::HashSet, pin::pin},
     };
 
     use crate::{
@@ -1029,8 +1028,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
 
         {
-            let request_fut = peer.peer_request(PeerRequest::Handle(proxy));
-            pin_mut!(request_fut);
+            let request_fut = pin!(peer.peer_request(PeerRequest::Handle(proxy)));
 
             let (result, request_fut) = run_while(&mut exec, request_fut, stream.next());
             match result {
@@ -1167,7 +1165,7 @@ mod tests {
 
         // The stream should produce the network update while the peer runs in the background.
         let run_fut = peer.run(receiver);
-        pin_mut!(run_fut);
+        let run_fut = pin!(run_fut);
 
         // Send the first network update - should be relayed to the peer.
         let (responder, run_fut) = run_while(&mut exec, run_fut, stream.next());
@@ -1203,7 +1201,7 @@ mod tests {
         let (peer, _sender, receiver, _profile) = setup_peer_task(Some(connection));
 
         let run_fut = peer.run(receiver);
-        pin_mut!(run_fut);
+        let mut run_fut = pin!(run_fut);
 
         // The peer task is pending with no futher work to do at this time.
         let result = exec.run_until_stalled(&mut run_fut);
@@ -1224,7 +1222,7 @@ mod tests {
         let (peer, _sender, receiver, _profile) = setup_peer_task(Some(connection));
 
         let run_fut = peer.run(receiver);
-        pin_mut!(run_fut);
+        let mut run_fut = pin!(run_fut);
 
         // Produces an error when polling the ServiceLevelConnection stream by disabling write
         // on the remote socket and read on the local socket.
@@ -1320,7 +1318,7 @@ mod tests {
         assert!(result.is_ok());
 
         let run_fut = peer.run(receiver);
-        pin_mut!(run_fut);
+        let run_fut = pin!(run_fut);
         let (mut stream, run_fut) = run_while(&mut exec, run_fut, wait_for_call_stream(stream));
 
         // Send the incoming call
@@ -1364,7 +1362,7 @@ mod tests {
         assert!(result.is_ok());
 
         let run_fut = peer.run(receiver);
-        pin_mut!(run_fut);
+        let run_fut = pin!(run_fut);
         let (mut stream, run_fut) = run_while(&mut exec, run_fut, wait_for_call_stream(stream));
 
         // Send the incoming call
@@ -1464,7 +1462,7 @@ mod tests {
 
         // Run the PeerTask.
         let run_fut = peer.run(receiver);
-        pin_mut!(run_fut);
+        let run_fut = pin!(run_fut);
 
         let headset_level_stream_fut = filtered_stream(stream, |item| match item {
             PeerHandlerRequest::ReportHeadsetBatteryLevel { level, .. } => Ok(level),
@@ -1506,7 +1504,7 @@ mod tests {
 
         // Run the PeerTask.
         let run_fut = peer.run(receiver);
-        pin_mut!(run_fut);
+        let run_fut = pin!(run_fut);
 
         // Receive a local update from the Fuchsia Battery Manager about a battery level change.
         let request = PeerRequest::BatteryLevel(3);
@@ -1544,7 +1542,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
 
         let run_fut = peer.run(receiver);
-        pin_mut!(run_fut);
+        let run_fut = pin!(run_fut);
 
         // Pass in the client end connected to the call manager
         let result = exec.run_singlethreaded(sender.send(PeerRequest::Handle(proxy)));
@@ -1597,7 +1595,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
 
         let run_fut = peer.run(receiver);
-        pin_mut!(run_fut);
+        let run_fut = pin!(run_fut);
 
         // Pass in the client end connected to the call manager
         exec.run_singlethreaded(sender.send(PeerRequest::Handle(proxy))).expect("Connecting peer");
@@ -1737,7 +1735,7 @@ mod tests {
         assert!(!peer.connection.connected());
 
         let run_fut = peer.run(receiver);
-        pin_mut!(run_fut);
+        let mut run_fut = pin!(run_fut);
 
         let event_fut = sender.send(PeerRequest::Profile(ProfileEvent::PeerConnected {
             id: PeerId(0),
@@ -1769,7 +1767,7 @@ mod tests {
         assert!(peer.connection.connected());
 
         let run_fut = peer.run(receiver);
-        pin_mut!(run_fut);
+        let mut run_fut = pin!(run_fut);
 
         // create a new connection for the SLC
         let (local, mut new_remote) = Channel::create();
@@ -1804,7 +1802,7 @@ mod tests {
     fn run_peer_until_stalled(exec: &mut fasync::TestExecutor, peer: PeerTask) -> PeerTask {
         let (_sender, receiver) = mpsc::channel(0);
         let run_fut = peer.run(receiver);
-        pin_mut!(run_fut);
+        let mut run_fut = pin!(run_fut);
         exec.run_until_stalled(&mut run_fut)
             .expect_pending("shouldn't be done while _sender is live");
         drop(_sender);
@@ -1899,13 +1897,13 @@ mod tests {
         let codecs = peer.get_codecs();
         let sco_connector = peer.sco_connector.clone();
         let audio_connection_fut = sco_connector.connect(peer.id.clone(), codecs).fuse();
-        pin_mut!(audio_connection_fut);
+        let mut audio_connection_fut = pin!(audio_connection_fut);
 
         exec.run_until_stalled(&mut audio_connection_fut).expect_pending("shouldn't be done yet");
 
         // Expect a sco connection, and have it succeed.
         let sco_complete_fut = expect_sco_connection(profile_requests, true, Ok(()));
-        pin_mut!(sco_complete_fut);
+        let sco_complete_fut = pin!(sco_complete_fut);
         let result = exec.run_singlethreaded(&mut futures::future::select(
             audio_connection_fut,
             sco_complete_fut,
@@ -1919,7 +1917,7 @@ mod tests {
         let res = exec.run_until_stalled(&mut audio_connection_fut).expect("should be done");
         let local_sco = res.expect("should have started up okay");
         let audio_connection_fut2 = peer.finish_sco_connection(local_sco);
-        pin_mut!(audio_connection_fut2);
+        let mut audio_connection_fut2 = pin!(audio_connection_fut2);
         exec.run_singlethreaded(&mut audio_connection_fut2).expect("finished");
 
         remote_sco.unwrap()
@@ -1973,7 +1971,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
 
         let run_fut = peer.run(receiver);
-        pin_mut!(run_fut);
+        let run_fut = pin!(run_fut);
 
         // Pass in the client end connected to the call manager
         exec.run_singlethreaded(sender.send(PeerRequest::Handle(proxy))).expect("Connecting peer");
@@ -2069,7 +2067,7 @@ mod tests {
 
         // Set up the run task.
         let run_fut = peer.run(receiver);
-        pin_mut!(run_fut);
+        let mut run_fut = pin!(run_fut);
         let _ = exec.run_until_stalled(&mut run_fut);
 
         drop(remote_sco);
@@ -2127,7 +2125,7 @@ mod tests {
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
         let call_manager_fut = call_manager(stream);
-        pin_mut!(call_manager_fut);
+        let call_manager_fut = pin!(call_manager_fut);
 
         let (mut sender, receiver) = mpsc::channel(0);
         // Wire up the HFP side of PeerHandler by passing the proxy into the PeerTask.
@@ -2137,8 +2135,7 @@ mod tests {
         let join_fut = futures::future::join(call_manager_fut, handle_fut);
 
         // Create the run future to drive the PeerTask forward.
-        let run_fut = peer.run(receiver);
-        pin_mut!(run_fut);
+        let run_fut = pin!(peer.run(receiver));
 
         // Run until `join_fut` completes.
         let (_stream, mut run_fut) = run_while(&mut exec, run_fut, join_fut);

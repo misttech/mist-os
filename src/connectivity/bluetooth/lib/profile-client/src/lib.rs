@@ -248,8 +248,9 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::types::Uuid;
-    use futures::{pin_mut, Future};
+    use futures::Future;
     use futures_test::task::new_count_waker;
+    use std::pin::pin;
 
     fn make_profile_service_definition(service_uuid: Uuid) -> bredr::ServiceDefinition {
         bredr::ServiceDefinition {
@@ -298,7 +299,7 @@ mod tests {
 
         {
             let event_fut = profile.next();
-            pin_mut!(event_fut);
+            let mut event_fut = pin!(event_fut);
             assert!(exec.run_until_stalled(&mut event_fut).is_pending());
 
             adv_responder.send(Ok(())).expect("able to respond");
@@ -338,7 +339,7 @@ mod tests {
         let remote_peer = PeerId(12343);
         {
             let event_fut = profile.next();
-            pin_mut!(event_fut);
+            let mut event_fut = pin!(event_fut);
             assert!(exec.run_until_stalled(&mut event_fut).is_pending());
 
             let (_local, remote) = Channel::create();
@@ -451,7 +452,7 @@ mod tests {
         let found_peer_id = PeerId(1);
         let results_fut =
             source_results_proxy.service_found(&found_peer_id.into(), None, attributes);
-        pin_mut!(results_fut);
+        let mut results_fut = pin!(results_fut);
 
         match exec.run_until_stalled(&mut profile.next()) {
             Poll::Ready(Some(Ok(ProfileEvent::SearchResult { id, .. }))) => {
@@ -466,7 +467,7 @@ mod tests {
         };
 
         let results_fut = sink_results_proxy.service_found(&found_peer_id.into(), None, attributes);
-        pin_mut!(results_fut);
+        let mut results_fut = pin!(results_fut);
 
         match exec.run_until_stalled(&mut profile.next()) {
             Poll::Ready(Some(Ok(ProfileEvent::SearchResult { id, .. }))) => {
@@ -509,7 +510,7 @@ mod tests {
         let (waker, profile_fut_wake_count) = new_count_waker();
         let mut counting_ctx = Context::from_waker(&waker);
 
-        pin_mut!(profile_fut);
+        let profile_fut = pin!(profile_fut);
         assert!(profile_fut.poll(&mut counting_ctx).is_pending());
 
         // Since there are no poll targets, save the initial count. We expect this count
@@ -531,7 +532,7 @@ mod tests {
         let attributes = &[];
         let found_peer_id = PeerId(123);
         let results_fut = search_proxy.service_found(&found_peer_id.into(), None, attributes);
-        pin_mut!(results_fut);
+        let mut results_fut = pin!(results_fut);
 
         match exec.run_until_stalled(&mut profile.next()) {
             Poll::Ready(Some(Ok(ProfileEvent::SearchResult { id, .. }))) => {

@@ -7,6 +7,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::convert::From as _;
+use std::pin::pin;
 
 use fidl_fuchsia_net_ext::FromExt as _;
 
@@ -1351,7 +1352,7 @@ async fn channel_is_closed_if_not_polled<N: Netstack>(name: &str) {
         }
     }
     .fuse();
-    futures::pin_mut!(create_entries);
+    let mut create_entries = pin!(create_entries);
 
     let mut event_stream = iter.take_event_stream();
     futures::select! {

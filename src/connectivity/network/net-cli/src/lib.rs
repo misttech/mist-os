@@ -30,7 +30,7 @@ use prettytable::{cell, format, row, Row, Table};
 use ser::AddressAssignmentState;
 use serde_json::{json, value::Value};
 use std::collections::hash_map::HashMap;
-use std::{convert::TryFrom as _, iter::FromIterator as _, str::FromStr as _};
+use std::{convert::TryFrom as _, iter::FromIterator as _, pin::pin, str::FromStr as _};
 use tracing::{info, warn};
 
 mod opts;
@@ -845,23 +845,22 @@ async fn do_route_list<C: NetCliDepsConnector>(
     out: &mut ffx_writer::Writer,
     connector: &C,
 ) -> Result<(), Error> {
-    let ipv4_route_event_stream = {
+    let ipv4_route_event_stream = pin!({
         let state_v4 = connect_with_context::<froutes::StateV4Marker, _>(connector)
             .await
             .context("failed to connect to fuchsia.net.routes/StateV4")?;
         froutes_ext::event_stream_from_state::<Ipv4>(&state_v4)
             .context("failed to initialize a `WatcherV4` client")?
             .fuse()
-    };
-    let ipv6_route_event_stream = {
+    });
+    let ipv6_route_event_stream = pin!({
         let state_v6 = connect_with_context::<froutes::StateV6Marker, _>(connector)
             .await
             .context("failed to connect to fuchsia.net.routes/StateV6")?;
         froutes_ext::event_stream_from_state::<Ipv6>(&state_v6)
             .context("failed to initialize a `WatcherV6` client")?
             .fuse()
-    };
-    futures::pin_mut!(ipv4_route_event_stream, ipv6_route_event_stream);
+    });
     let (v4_routes, v6_routes) = futures::future::join(
         froutes_ext::collect_routes_until_idle::<_, Vec<_>>(ipv4_route_event_stream),
         froutes_ext::collect_routes_until_idle::<_, Vec<_>>(ipv6_route_event_stream),
@@ -983,7 +982,7 @@ async fn do_filter<C: NetCliDepsConnector, W: std::io::Write>(
         opts::filter::FilterEnum::List(opts::filter::List {}) => {
             let state = connect_with_context::<fnet_filter::StateMarker, _>(connector).await?;
             let stream = fnet_filter_ext::event_stream_from_state(state)?;
-            futures::pin_mut!(stream);
+            let mut stream = pin!(stream);
             let resources: FilteringResources =
                 fnet_filter_ext::get_existing_resources(&mut stream).await?;
 
@@ -2268,7 +2267,7 @@ mod tests {
         let interfaces_fut =
             always_answer_with_interfaces(interfaces_requests, vec![interface1_properties.into()])
                 .fuse();
-        futures::pin_mut!(interfaces_fut);
+        let mut interfaces_fut = pin!(interfaces_fut);
 
         let connector = TestConnector {
             root_interfaces: Some(root_interfaces),

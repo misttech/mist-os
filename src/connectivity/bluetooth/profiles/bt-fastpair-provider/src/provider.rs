@@ -14,6 +14,7 @@ use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::stream::{FusedStream, StreamExt};
 use futures::{channel::mpsc, select, FutureExt};
 use host_watcher::{HostEvent, HostWatcher};
+use std::pin::pin;
 use tracing::{debug, info, trace, warn};
 
 use crate::advertisement::LowEnergyAdvertiser;
@@ -638,7 +639,7 @@ mod tests {
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::types::{example_host, Address, HostId};
     use fuchsia_inspect_derive::WithInspect;
-    use futures::{pin_mut, SinkExt};
+    use futures::SinkExt;
 
     use crate::fidl_client::tests::MockUpstreamClient;
     use crate::gatt_service::tests::setup_gatt_service;
@@ -706,8 +707,7 @@ mod tests {
         let (provider, _peripheral, _gatt, host_watcher_stream, _mock_pairing, _mock_upstream) =
             setup_provider().await;
         let (_sender, receiver) = mpsc::channel(0);
-        let provider_fut = provider.run(receiver);
-        pin_mut!(provider_fut);
+        let provider_fut = pin!(provider.run(receiver));
 
         // Upstream `bt-gap` can no longer service HostWatcher requests.
         host_watcher_stream.control_handle().shutdown();
@@ -722,8 +722,7 @@ mod tests {
         let (provider, _peripheral, gatt, _host_watcher, _mock_pairing, _mock_upstream) =
             setup_provider().await;
         let (_sender, receiver) = mpsc::channel(0);
-        let provider_fut = provider.run(receiver);
-        pin_mut!(provider_fut);
+        let provider_fut = pin!(provider.run(receiver));
 
         // Upstream bt-host no longer can support advertising the GATT service.
         drop(gatt);
@@ -737,8 +736,7 @@ mod tests {
         let (provider, _peripheral, _gatt, _host_watcher, _mock_pairing, _mock_upstream) =
             setup_provider().await;
         let (sender, receiver) = mpsc::channel(0);
-        let provider_fut = provider.run(receiver);
-        pin_mut!(provider_fut);
+        let provider_fut = pin!(provider.run(receiver));
 
         drop(sender);
         let result = provider_fut.await;
@@ -856,13 +854,13 @@ mod tests {
     fn subsequent_enabling_when_previous_closed_is_ok() {
         let mut exec = fasync::TestExecutor::new();
         let setup_fut = setup_provider();
-        pin_mut!(setup_fut);
+        let mut setup_fut = pin!(setup_fut);
         let (provider, mut le_peripheral, _gatt, mut host_watcher, _mock_pairing, _mock_upstream) =
             exec.run_singlethreaded(&mut setup_fut);
 
         let (mut sender, receiver) = mpsc::channel(0);
         let server_fut = provider.run(receiver);
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("still active");
 
         // Existing client disables the service.
@@ -871,7 +869,7 @@ mod tests {
 
         // Simulate an active host so that we can verify the LE advertisement gets set.
         let watch_request_fut = host_watcher.select_next_some();
-        pin_mut!(watch_request_fut);
+        let mut watch_request_fut = pin!(watch_request_fut);
         let watch_request = exec
             .run_until_stalled(&mut watch_request_fut)
             .expect("watch request")
@@ -887,8 +885,7 @@ mod tests {
             .expect_pending("no advertise request");
 
         // A new client can request to enable the service.
-        let enable_request_fut = MockUpstreamClient::make_enable_request();
-        pin_mut!(enable_request_fut);
+        let enable_request_fut = pin!(MockUpstreamClient::make_enable_request());
         let (request_fut, service_request, _mock_upstream1) =
             exec.run_singlethreaded(enable_request_fut);
 
@@ -910,13 +907,13 @@ mod tests {
     fn gatt_update_when_disabled_is_rejected() {
         let mut exec = fasync::TestExecutor::new();
         let setup_fut = setup_provider();
-        pin_mut!(setup_fut);
+        let mut setup_fut = pin!(setup_fut);
         let (provider, _le_peripheral, gatt, _host_watcher, _mock_pairing, _mock_upstream) =
             exec.run_singlethreaded(&mut setup_fut);
 
         let (_sender, receiver) = mpsc::channel(0);
         let server_fut = provider.run(receiver);
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("still active");
 
         // Existing client disables the service.
@@ -987,7 +984,7 @@ mod tests {
     fn key_based_pairing_procedure() {
         let mut exec = fasync::TestExecutor::new();
         let setup_fut = setup_provider();
-        pin_mut!(setup_fut);
+        let mut setup_fut = pin!(setup_fut);
         let (
             mut provider,
             _le_peripheral,
@@ -1007,7 +1004,7 @@ mod tests {
         );
         let (_sender, receiver) = mpsc::channel(0);
         let server_fut = provider.run(receiver);
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("still active");
 
         // Before starting the pairing procedure, there should be no saved Account Keys.
@@ -1031,7 +1028,7 @@ mod tests {
         // Peer requests to pair - drive the future associated with the request and the server to
         // process it.
         let pairing_fut = mock_pairing.make_pairing_request(PEER_ID, 0x123456);
-        pin_mut!(pairing_fut);
+        let mut pairing_fut = pin!(pairing_fut);
         let _ = exec.run_until_stalled(&mut pairing_fut).expect_pending("waiting for response");
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("main loop still active");
         // The request shouldn't resolve yet as we are waiting for passkey verification.
@@ -1091,11 +1088,11 @@ mod tests {
 
         // Upstream client should be notified that Fast Pair pairing has successfully completed.
         let pairing_complete_fut = mock_upstream.expect_on_pairing_complete(PEER_ID);
-        pin_mut!(pairing_complete_fut);
+        let mut pairing_complete_fut = pin!(pairing_complete_fut);
         let () = exec.run_until_stalled(&mut pairing_complete_fut).expect("should resolve");
         // `sys.Pairing` client should also be notified of completion.
         let pairing_complete_fut = mock_pairing.expect_on_pairing_complete(PEER_ID);
-        pin_mut!(pairing_complete_fut);
+        let mut pairing_complete_fut = pin!(pairing_complete_fut);
         let () = exec.run_until_stalled(&mut pairing_complete_fut).expect("should resolve");
     }
 
@@ -1316,7 +1313,7 @@ mod tests {
     fn passkey_write_with_no_pairing_manager_is_error() {
         let mut exec = fasync::TestExecutor::new();
         let setup_fut = setup_provider();
-        pin_mut!(setup_fut);
+        let mut setup_fut = pin!(setup_fut);
         let (mut provider, _le_peripheral, gatt, _host_watcher, mut mock_pairing, _mock_upstream) =
             exec.run_singlethreaded(&mut setup_fut);
 
@@ -1328,7 +1325,7 @@ mod tests {
         );
         let (_sender, receiver) = mpsc::channel(0);
         let server_fut = provider.run(receiver);
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("still active");
 
         // Key-based pairing begins.
@@ -1368,7 +1365,7 @@ mod tests {
     fn account_key_write_before_pairing_complete_is_error() {
         let mut exec = fasync::TestExecutor::new();
         let setup_fut = setup_provider();
-        pin_mut!(setup_fut);
+        let mut setup_fut = pin!(setup_fut);
         let (mut provider, _le_peripheral, gatt, _host_watcher, mut mock_pairing, _mock_upstream) =
             exec.run_singlethreaded(&mut setup_fut);
 
@@ -1381,7 +1378,7 @@ mod tests {
         );
         let (_sender, receiver) = mpsc::channel(0);
         let server_fut = provider.run(receiver);
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("still active");
 
         // Initiating a Key-based pairing request should succeed. The buffer is encrypted by the key
@@ -1402,7 +1399,7 @@ mod tests {
         // Peer requests to pair - drive the future associated with the request and the server to
         // process it.
         let pairing_fut = mock_pairing.make_pairing_request(PEER_ID, 0x123456);
-        pin_mut!(pairing_fut);
+        let mut pairing_fut = pin!(pairing_fut);
         let _ = exec.run_until_stalled(&mut pairing_fut).expect_pending("waiting for response");
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("main loop still active");
         let _ = exec.run_until_stalled(&mut pairing_fut).expect_pending("waiting for response");
@@ -1438,7 +1435,7 @@ mod tests {
     fn retroactive_account_key_write_procedure() {
         let mut exec = fasync::TestExecutor::new();
         let setup_fut = setup_provider();
-        pin_mut!(setup_fut);
+        let mut setup_fut = pin!(setup_fut);
         let (mut provider, _le_peripheral, gatt, _host_watcher, _mock_pairing, _mock_upstream) =
             exec.run_singlethreaded(&mut setup_fut);
 
@@ -1452,7 +1449,7 @@ mod tests {
         );
         let (_sender, receiver) = mpsc::channel(0);
         let server_fut = provider.run(receiver);
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("still active");
 
         // Before starting the pairing procedure, there should be no saved Account Keys.
@@ -1604,12 +1601,12 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let setup_fut = setup_provider();
-        pin_mut!(setup_fut);
+        let mut setup_fut = pin!(setup_fut);
         let (provider, _le_peripheral, _gatt, _host_watcher, mut mock_pairing, _mock_upstream) =
             exec.run_singlethreaded(&mut setup_fut);
         let (mut sender, receiver) = mpsc::channel(0);
         let server_fut = provider.run(receiver);
-        pin_mut!(server_fut);
+        let mut server_fut = pin!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("still active");
 
         // Shutting down and dropping the existing upstream delegate indicates client termination.
@@ -1628,15 +1625,13 @@ mod tests {
         // longer is an active Pairing Delegate.
         let client =
             PairingArgs { input: InputCapability::None, output: OutputCapability::None, delegate };
-        let send_fut = sender.send(ServiceRequest::Pairing(client));
-        pin_mut!(send_fut);
+        let send_fut = pin!(sender.send(ServiceRequest::Pairing(client)));
         let (send_result, server_fut) = run_while(&mut exec, server_fut, send_fut);
         assert_matches!(send_result, Ok(_));
 
         // We expect the downstream pairing handler to receive the SetPairingDelegate request that
         // is made as a result of the aforementioned FIDL client request.
-        let expect_fut = mock_pairing.expect_set_pairing_delegate();
-        pin_mut!(expect_fut);
+        let expect_fut = pin!(mock_pairing.expect_set_pairing_delegate());
         let ((), _server_fut) = run_while(&mut exec, server_fut, expect_fut);
     }
 

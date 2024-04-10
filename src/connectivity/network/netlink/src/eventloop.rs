@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::convert::Infallible as Never;
+use std::{convert::Infallible as Never, pin::pin};
 
 use anyhow::{Context as _, Error};
 use assert_matches::assert_matches;
@@ -174,7 +174,7 @@ impl<
             ),
         )
         .fuse();
-        futures::pin_mut!(unified_event_stream);
+        let mut unified_event_stream = pin!(unified_event_stream);
 
         log_info!("routes and interfaces workers initialized, beginning execution");
 
@@ -190,7 +190,7 @@ impl<
                 }
             }
             .fuse();
-            futures::pin_mut!(request_fut);
+            let mut request_fut = pin!(request_fut);
 
             futures::select! {
                 event = unified_event_stream.next() => {

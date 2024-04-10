@@ -456,10 +456,9 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_power_battery as fpower;
-    use fuchsia_async::pin_mut;
     use fuchsia_inspect_derive::WithInspect;
     use futures::{task::Poll, Future};
-    use std::pin::Pin;
+    use std::pin::{pin, Pin};
     use test_battery_manager::TestBatteryManager;
 
     fn setup_media_relay() -> (sessions2::PlayerProxy, avrcp::PeerManagerRequestStream, impl Future)
@@ -485,8 +484,7 @@ mod tests {
             endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>().unwrap();
         let peer_id = PeerId(1);
 
-        let setup_fut = TestBatteryManager::make_battery_client_with_test_manager();
-        pin_mut!(setup_fut);
+        let mut setup_fut = pin!(TestBatteryManager::make_battery_client_with_test_manager());
         let (battery_client, test_battery_manager) = exec.run_singlethreaded(&mut setup_fut);
 
         let relay = AvrcpRelay::default();
@@ -547,7 +545,7 @@ mod tests {
         mut exec: &mut fasync::TestExecutor,
         avrcp_request_stream: avrcp::PeerManagerRequestStream,
     ) -> (avrcp::ControllerRequestStream, avrcp::BrowseControllerRequestStream) {
-        pin_mut!(avrcp_request_stream);
+        let mut avrcp_request_stream = pin!(avrcp_request_stream);
         // Connects to AVRCP.
         let mut controller_request_stream = match exec
             .run_until_stalled(&mut avrcp_request_stream.select_next_some())
@@ -620,7 +618,7 @@ mod tests {
         let request_streams;
 
         {
-            pin_mut!(relay_fut);
+            let mut relay_fut = pin!(relay_fut);
 
             let res = exec.run_until_stalled(&mut relay_fut);
             assert!(res.is_pending());
@@ -652,7 +650,7 @@ mod tests {
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
 
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
 
         let res = exec.run_until_stalled(&mut relay_fut);
         assert!(res.is_pending());
@@ -681,7 +679,7 @@ mod tests {
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
 
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
 
         let res = exec.run_until_stalled(&mut relay_fut);
         assert!(res.is_pending());
@@ -710,7 +708,7 @@ mod tests {
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
 
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
 
         assert!(exec.run_until_stalled(&mut relay_fut).is_pending());
 
@@ -753,7 +751,7 @@ mod tests {
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
 
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
 
         assert!(exec.run_until_stalled(&mut relay_fut).is_pending());
 
@@ -892,7 +890,7 @@ mod tests {
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
 
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
 
         assert!(exec.run_until_stalled(&mut relay_fut).is_pending());
 
@@ -982,7 +980,7 @@ mod tests {
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
 
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
 
         assert!(exec.run_until_stalled(&mut relay_fut).is_pending());
 
@@ -1032,7 +1030,7 @@ mod tests {
 
         let (_player_client, avrcp_requests, relay_fut, test_battery_manager) =
             setup_media_relay_with_battery_manager(&mut exec);
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
         exec.run_until_stalled(&mut relay_fut).expect_pending("relay fut still running");
 
         let (mut controller_requests, _browse_controller_requests) =
@@ -1046,8 +1044,7 @@ mod tests {
             level_percent: Some(33f32),
             ..Default::default()
         };
-        let update_fut = test_battery_manager.send_update(update);
-        pin_mut!(update_fut);
+        let update_fut = pin!(test_battery_manager.send_update(update));
         let (res, mut relay_fut) = run_while(&mut exec, relay_fut, update_fut);
         assert_matches!(res, Ok(_));
 
@@ -1065,7 +1062,7 @@ mod tests {
 
         let (_player_client, avrcp_requests, relay_fut, test_battery_manager) =
             setup_media_relay_with_battery_manager(&mut exec);
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
         exec.run_until_stalled(&mut relay_fut).expect_pending("relay fut still running");
 
         let (mut controller_requests, _browse_controller_requests) =
@@ -1077,8 +1074,7 @@ mod tests {
             status: Some(fpower::BatteryStatus::Unknown),
             ..Default::default()
         };
-        let update_fut = test_battery_manager.send_update(update);
-        pin_mut!(update_fut);
+        let update_fut = pin!(test_battery_manager.send_update(update));
         let (res, mut relay_fut) = run_while(&mut exec, relay_fut, update_fut);
         assert_matches!(res, Ok(_));
 
@@ -1092,7 +1088,7 @@ mod tests {
 
         let (_player_client, avrcp_requests, relay_fut, test_battery_manager) =
             setup_media_relay_with_battery_manager(&mut exec);
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
         exec.run_until_stalled(&mut relay_fut).expect_pending("relay fut still running");
 
         let _request_streams = finish_relay_setup(&mut relay_fut, &mut exec, avrcp_requests);
@@ -1114,7 +1110,7 @@ mod tests {
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
 
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
 
         assert!(exec.run_until_stalled(&mut relay_fut).is_pending());
 
@@ -1207,7 +1203,7 @@ mod tests {
             .with_inspect(inspector.root(), "avrcp_relay")
             .expect("can attach");
         let relay_fut = relay.session_relay(avrcp_proxy, peer_id, player_requests, None.into());
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("relay active");
 

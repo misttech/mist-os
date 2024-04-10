@@ -40,10 +40,7 @@ rustc_library("wlan-dev") {
       "//src/connectivity/wlan/lib/rsn:wlan-rsn",
       "//third_party/rust_crates:hex",
     ]
-    test_deps += [
-      "//src/lib/fuchsia-async",
-      "//third_party/rust_crates:pin-utils",
-    ]
+    test_deps += [ "//src/lib/fuchsia-async" ]
   }
 }
 

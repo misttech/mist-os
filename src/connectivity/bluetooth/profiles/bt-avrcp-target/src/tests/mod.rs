@@ -9,7 +9,8 @@ use {
     fidl_fuchsia_bluetooth_avrcp::*,
     fidl_fuchsia_media_sessions2::*,
     fuchsia_async as fasync,
-    futures::{pin_mut, task::Poll, TryStreamExt},
+    futures::{task::Poll, TryStreamExt},
+    std::pin::pin,
 };
 
 use crate::avrcp_handler::handle_target_requests;
@@ -343,7 +344,7 @@ fn test_listen_to_media_sessions() -> Result<(), Error> {
         assert_eq!(Ok(()), res);
     };
 
-    pin_mut!(test_fut);
+    let mut test_fut = pin!(test_fut);
     let _ = exec.run_until_stalled(&mut test_fut);
     Ok(())
 }
@@ -494,7 +495,7 @@ fn test_media_and_avrcp_listener() -> Result<(), Error> {
             .await
     };
 
-    pin_mut!(test_fut);
+    let mut test_fut = pin!(test_fut);
     // We expect the future to not complete yet because system time is currently fixed.
     let r0 = exec.run_until_stalled(&mut test_fut).map_err(|e| format!("{}", e));
     assert_eq!(Poll::Pending, r0);

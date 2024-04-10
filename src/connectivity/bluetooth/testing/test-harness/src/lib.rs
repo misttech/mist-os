@@ -7,9 +7,9 @@ use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
 use futures::future::BoxFuture;
 use futures::{future, select, stream::TryStreamExt, Future, FutureExt};
-use pin_utils::pin_mut;
 use std::any::{Any, TypeId};
 use std::collections::{hash_map::Entry, HashMap};
+use std::pin::pin;
 use std::sync::Arc;
 
 /// SharedState is a string-indexed map used to share state across multiple TestHarnesses that are
@@ -129,8 +129,8 @@ where
     drop(state);
 
     let run_test = test_func(harness);
-    pin_mut!(run_test);
-    pin_mut!(runner);
+    let run_test = pin!(run_test);
+    let runner = pin!(runner);
 
     let result = select! {
         () = run_test.fuse() => Ok(()),

@@ -4,7 +4,7 @@
 
 //! FIDL Worker for the `fuchsia.net.routes` suite of protocols.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, pin::pin};
 
 use async_utils::event::Event;
 use either::Either;
@@ -256,7 +256,7 @@ async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
 
     let result = {
         let mut request_stream = request_stream.map_err(ServeWatcherError::ErrorInStream).fuse();
-        futures::pin_mut!(canceled_fut);
+        let mut canceled_fut = pin!(canceled_fut);
         let mut pending_watch_request = futures::future::OptionFuture::default();
         loop {
             pending_watch_request = futures::select! {

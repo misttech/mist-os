@@ -1448,7 +1448,7 @@ mod tests {
         futures::StreamExt as _,
         net_declare::{fidl_ip, fidl_subnet, std_ip, std_socket_addr},
         net_types::ip,
-        std::task::Poll,
+        std::{pin::pin, task::Poll},
         test_case::test_case,
     };
 
@@ -1854,7 +1854,7 @@ mod tests {
             states
         };
 
-        futures::pin_mut!(network_check_fut);
+        let mut network_check_fut = pin!(network_check_fut);
         match exec.run_until_stalled(&mut network_check_fut) {
             Poll::Ready(got) => Ok(got.into_iter().collect()),
             Poll::Pending => Err(anyhow::anyhow!("network_check blocked unexpectedly")),

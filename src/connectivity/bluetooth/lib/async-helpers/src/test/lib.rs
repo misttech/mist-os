@@ -5,7 +5,8 @@
 use async_utils::PollExt;
 use fuchsia_async as fasync;
 use futures::stream::{Stream, StreamExt};
-use futures::{future::Either, pin_mut, task::Poll, Future};
+use futures::{future::Either, task::Poll, Future};
+use std::pin::pin;
 
 ///! Utilities for tests
 
@@ -24,7 +25,7 @@ where
     BackgroundFut: Future + Unpin,
     ResultFut: Future<Output = Out>,
 {
-    pin_mut!(result_fut);
+    let result_fut = pin!(result_fut);
     let mut select_fut = futures::future::select(background_fut, result_fut);
     loop {
         match exec.run_until_stalled(&mut select_fut) {

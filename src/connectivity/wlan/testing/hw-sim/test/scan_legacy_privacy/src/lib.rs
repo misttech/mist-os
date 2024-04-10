@@ -7,7 +7,7 @@ use {
     fidl_test_wlan_realm::WlanConfig,
     ieee80211::{Bssid, MacAddrBytes, Ssid},
     lazy_static::lazy_static,
-    pin_utils::pin_mut,
+    std::pin::pin,
     wlan_common::{
         bss::Protection,
         channel::{Cbw, Channel},
@@ -38,8 +38,7 @@ async fn scan_legacy_privacy() {
     // Create a client controller.
     let (client_controller, _update_stream) = init_client_controller(helper.test_ns_prefix()).await;
 
-    let scan_result_list_fut = test_utils::policy_scan_for_networks(client_controller);
-    pin_mut!(scan_result_list_fut);
+    let scan_result_list_fut = pin!(test_utils::policy_scan_for_networks(client_controller));
     let scan_result_list = helper
         .run_until_complete_or_timeout(
             *SCAN_RESPONSE_TEST_TIMEOUT,

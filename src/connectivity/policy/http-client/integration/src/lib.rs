@@ -13,6 +13,7 @@ use futures::stream::FuturesUnordered;
 use futures::{select, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use std::future::Future;
 use std::net::SocketAddr;
+use std::pin::pin;
 use test_case::test_case;
 
 const ROOT_DOCUMENT: &str = "Root document\n";
@@ -117,8 +118,7 @@ async fn run_without_connecting<F: Future<Output = ()>>(
     let http_client = ScopedInstance::new(behavior.into(), HTTP_CLIENT_URL.into())
         .await
         .expect("failed to create http-client");
-    let fut = func(server_addr, http_client);
-    futures::pin_mut!(fut);
+    let fut = pin!(func(server_addr, http_client));
     match futures::future::select(fut, server).await {
         Either::Left(((), _server)) => {}
         Either::Right((result, _fut)) => {

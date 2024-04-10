@@ -7,7 +7,7 @@ use {
     fuchsia_async::{self as fasync, TimeoutExt},
     fuchsia_zircon as zx,
     futures::{future::Either, prelude::*, stream::StreamFuture, task::Poll},
-    pin_utils::pin_mut,
+    std::pin::pin,
 };
 
 /// Run a background task while waiting for a future that should occur.
@@ -26,7 +26,7 @@ where
     BackgroundFut: Future + Unpin,
     ResultFut: Future<Output = Out>,
 {
-    pin_mut!(result_fut);
+    let result_fut = pin!(result_fut);
 
     // Set an arbitrary timeout to catch the case where `result_fut` never provides a result.
     // Even a few milliseconds should be sufficient on all but the slowest hardware.
@@ -62,7 +62,7 @@ mod tests {
     fn test_run_while() {
         let mut exec = fasync::TestExecutor::new();
         let neverending_background_fut: future::Pending<bool> = future::pending();
-        pin_mut!(neverending_background_fut);
+        let mut neverending_background_fut = pin!(neverending_background_fut);
 
         // You can directly pass in the future
         let result_fut = future::ready(1);
@@ -71,7 +71,6 @@ mod tests {
 
         // You can pass in a reference to the future
         let result_fut = future::ready(1);
-        pin_mut!(result_fut);
         let result = run_while(&mut exec, &mut neverending_background_fut, result_fut);
         assert_eq!(result, 1);
     }

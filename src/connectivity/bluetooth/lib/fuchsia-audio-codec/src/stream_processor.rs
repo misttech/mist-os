@@ -740,6 +740,7 @@ mod tests {
     use sha2::{Digest as _, Sha256};
     use std::fs::File;
     use std::io::{Read, Write};
+    use std::pin::pin;
 
     use stream_processor_test::ExpectedDigest;
 
@@ -875,12 +876,11 @@ mod tests {
 
         // Polling the encoded stream before the encoder has started up should wake it when
         // output starts happening, set up the poll here.
-        let encoded_fut = encoded_stream.next();
+        let encoded_fut = pin!(encoded_stream.next());
 
         let (waker, encoder_fut_wake_count) = new_count_waker();
         let mut counting_ctx = Context::from_waker(&waker);
 
-        fasync::pin_mut!(encoded_fut);
         assert!(encoded_fut.poll(&mut counting_ctx).is_pending());
 
         let mut frames_sent = first_packet.len() / pcm_audio.frame_size();
@@ -990,8 +990,7 @@ mod tests {
 
         assert_eq!(INPUT_FRAMES, frames_sent);
 
-        let flush_fut = decoder.flush();
-        fasync::pin_mut!(flush_fut);
+        let mut flush_fut = pin!(decoder.flush());
         exec.run_singlethreaded(&mut flush_fut).expect("to flush the decoder");
 
         decoder.close().expect("stream should always be closable");
@@ -1053,12 +1052,11 @@ mod tests {
 
         // Polling the decoded stream before the decoder has started up should wake it when
         // output starts happening, set up the poll here.
-        let decoded_fut = decoded_stream.next();
+        let decoded_fut = pin!(decoded_stream.next());
 
         let (waker, decoder_fut_wake_count) = new_count_waker();
         let mut counting_ctx = Context::from_waker(&waker);
 
-        fasync::pin_mut!(decoded_fut);
         assert!(decoded_fut.poll(&mut counting_ctx).is_pending());
 
         // Send only one frame. This is not eneough to automatically cause output to be generated
@@ -1068,8 +1066,7 @@ mod tests {
         let written_bytes = exec.run_singlethreaded(&mut written_fut).expect("to write to decoder");
         assert_eq!(frame.len(), written_bytes);
 
-        let flush_fut = decoder.flush();
-        fasync::pin_mut!(flush_fut);
+        let mut flush_fut = pin!(decoder.flush());
         exec.run_singlethreaded(&mut flush_fut).expect("to flush the decoder");
 
         // When an unprocessed event has happened on the stream, even if intervening events have been
@@ -1108,8 +1105,7 @@ mod tests {
 
         let mut decoded_stream = decoder.take_output_stream().expect("Stream should be taken");
 
-        let decoded_fut = decoded_stream.next();
-        fasync::pin_mut!(decoded_fut);
+        let decoded_fut = pin!(decoded_stream.next());
 
         let mut chunks = sbc_data.as_slice().chunks(SBC_FRAME_SIZE);
         let next_frame = chunks.next().unwrap();
@@ -1144,8 +1140,7 @@ mod tests {
                 break;
             }
             // Flush the packet, to make input buffers get spent faster.
-            let flush_fut = decoder.flush();
-            fasync::pin_mut!(flush_fut);
+            let mut flush_fut = pin!(decoder.flush());
             exec.run_singlethreaded(&mut flush_fut).expect("to flush the decoder");
         }
 
@@ -1167,8 +1162,7 @@ mod tests {
                 break;
             }
             // Flush the packet, to make input buffers get spent faster.
-            let flush_fut = decoder.flush();
-            fasync::pin_mut!(flush_fut);
+            let mut flush_fut = pin!(decoder.flush());
             exec.run_singlethreaded(&mut flush_fut).expect("to flush the decoder");
         }
 

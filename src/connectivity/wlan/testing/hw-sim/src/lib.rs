@@ -19,8 +19,8 @@ use {
     fuchsia_zircon::prelude::*,
     ieee80211::{Bssid, MacAddr, Ssid},
     lazy_static::lazy_static,
-    pin_utils::pin_mut,
     std::future::Future,
+    std::pin::pin,
     wlan_common::{
         bss::Protection,
         channel::{Cbw, Channel},
@@ -660,9 +660,12 @@ pub async fn connect_or_timeout(
 
     let credential = password_or_psk_to_policy_credential(password_or_psk);
     let test_ns_prefix = helper.test_ns_prefix().to_string();
-    let connect =
-        save_network_and_wait_until_connected(&test_ns_prefix, ssid, security_type, credential);
-    pin_mut!(connect);
+    let connect = pin!(save_network_and_wait_until_connected(
+        &test_ns_prefix,
+        ssid,
+        security_type,
+        credential
+    ));
     connect_or_timeout_with(helper, timeout, ssid, bssid, bss_protection, authenticator, connect)
         .await;
 }
@@ -718,8 +721,7 @@ pub async fn loop_until_iface_is_found(helper: &mut test_utils::TestHelper) {
         let (scan_proxy, server_end) = create_proxy().unwrap();
         client_controller.scan_for_networks(server_end).expect("requesting scan");
 
-        let fut = async move { scan_proxy.get_next().await.expect("getting scan results") };
-        pin_mut!(fut);
+        let fut = pin!(async move { scan_proxy.get_next().await.expect("getting scan results") });
 
         let phy = helper.proxy();
         match helper

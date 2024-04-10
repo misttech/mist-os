@@ -4,7 +4,7 @@
 
 #![cfg(test)]
 
-use std::{borrow::Cow, convert::TryFrom as _};
+use std::{borrow::Cow, convert::TryFrom as _, pin::pin};
 
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext as fnet_ext;
@@ -245,7 +245,7 @@ pub async fn setup_masquerade_nat_network<'a, N: Netstack>(
         let router_ep2_id = router_ep2.id();
         let state_stream =
             router_ep2.get_interface_event_stream().expect("error getting interface event stream");
-        futures::pin_mut!(state_stream);
+        let mut state_stream = pin!(state_stream);
 
         // Make sure the interfaces watcher stream knows about router_ep2's existence
         // so we can reliably observe its removal later.

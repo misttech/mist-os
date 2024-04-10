@@ -11,9 +11,10 @@ use {
     fuchsia_bluetooth::types::{Channel, PeerId, Uuid},
     fuchsia_component_test::{Capability, RealmInstance},
     fuchsia_zircon::Duration,
-    futures::{pin_mut, stream::StreamExt},
+    futures::stream::StreamExt,
     mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember},
     profile_client::{ProfileClient, ProfileEvent},
+    std::pin::pin,
 };
 
 /// RFCOMM component URL.
@@ -251,7 +252,7 @@ async fn rfcomm_component_connecting_to_another_rfcomm_component() {
     // Client #2 can now connect via RFCOMM to Client #1.
     let params = rfcomm_connect_parameters(rfcomm_channel_number);
     let connect_fut = other_rfcomm_proxy.connect(&this_rfcomm.peer_id().into(), &params);
-    pin_mut!(connect_fut);
+    let connect_fut = pin!(connect_fut);
 
     // Each client should be delivered one end of the RFCOMM channel.
     let (channel1, channel2): (Channel, Channel) =

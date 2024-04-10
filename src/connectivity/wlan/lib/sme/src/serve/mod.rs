@@ -322,7 +322,7 @@ mod tests {
         fuchsia_async as fasync,
         fuchsia_inspect::Inspector,
         futures::task::Poll,
-        pin_utils::pin_mut,
+        std::pin::pin,
         test_case::test_case,
         wlan_common::{
             assert_variant,
@@ -386,7 +386,7 @@ mod tests {
             generic_sme_stream,
         )
         .unwrap();
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Also close secondary SME endpoint in the Generic SME.

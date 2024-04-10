@@ -32,6 +32,7 @@ use net_types::ip::{Ipv4, Ipv6};
 use std::collections::{hash_map::Entry, HashMap};
 use std::convert::TryFrom as _;
 use std::num::NonZeroU64;
+use std::pin::pin;
 use tracing::{error, info, warn};
 
 /// URL for the realm that contains the hermetic network components with a
@@ -322,7 +323,7 @@ async fn find_interface_id_and_status(
         },
     );
 
-    futures::pin_mut!(results);
+    let mut results = pin!(results);
 
     results.next().await.ok_or(fntr::Error::InterfaceNotFound)
 }

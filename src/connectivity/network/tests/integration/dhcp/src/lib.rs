@@ -4,7 +4,7 @@
 
 #![cfg(test)]
 
-use std::{cell::RefCell, collections::HashSet, time::Duration};
+use std::{cell::RefCell, collections::HashSet, pin::pin, time::Duration};
 
 use async_utils::async_once::Once;
 use dhcpv4::protocol::IntoFidlExt as _;
@@ -115,7 +115,7 @@ async fn assert_client_acquires_addr<D: DhcpClient>(
         fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
     )
     .expect("event stream from state");
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
 
     let mut properties =
         fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(client_interface.id());
@@ -521,7 +521,7 @@ async fn does_not_crash_with_overlapping_subnet_route<
         .expect("connect to routes StateV4");
     let routes_event_stream =
         fnet_routes_ext::event_stream_from_state::<Ipv4>(&state_v4).expect("routes event stream");
-    futures::pin_mut!(routes_event_stream);
+    let mut routes_event_stream = pin!(routes_event_stream);
 
     let mut routes = HashSet::new();
     fnet_routes_ext::wait_for_routes::<Ipv4, _, _>(

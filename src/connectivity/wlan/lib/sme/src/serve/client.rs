@@ -17,7 +17,7 @@ use fuchsia_inspect_contrib::auto_persist;
 use fuchsia_zircon as zx;
 use futures::channel::mpsc;
 use futures::{prelude::*, select};
-use pin_utils::pin_mut;
+use std::pin::pin;
 use std::sync::{Arc, Mutex};
 use tracing::error;
 use wlan_common::scan::write_vmo;
@@ -58,8 +58,8 @@ pub fn serve(
         let sme_fidl = super::serve_fidl(&*sme, new_fidl_clients, handle_fidl_request);
         let telemetry_fidl =
             super::serve_fidl(&*sme, new_telemetry_fidl_clients, handle_telemetry_fidl_request);
-        pin_mut!(mlme_sme);
-        pin_mut!(sme_fidl);
+        let mlme_sme = pin!(mlme_sme);
+        let sme_fidl = pin!(sme_fidl);
         select! {
             mlme_sme = mlme_sme.fuse() => mlme_sme?,
             sme_fidl = sme_fidl.fuse() => match sme_fidl? {},
@@ -251,8 +251,8 @@ mod tests {
         fidl_fuchsia_wlan_sme::{self as fidl_sme},
         fuchsia_async as fasync,
         futures::{stream::StreamFuture, task::Poll},
-        pin_utils::pin_mut,
         rand::{prelude::ThreadRng, Rng},
+        std::pin::pin,
         test_case::test_case,
         wlan_common::{assert_variant, random_bss_description, scan::read_vmo},
         wlan_rsn::auth,
@@ -387,7 +387,7 @@ mod tests {
         }
 
         let result_fut = request_and_collect_result(&client_sme_proxy);
-        pin_mut!(result_fut);
+        let mut result_fut = pin!(result_fut);
 
         assert_variant!(exec.run_until_stalled(&mut result_fut), Poll::Pending);
 
@@ -422,12 +422,12 @@ mod tests {
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create ConnectTransaction proxy and stream");
         let fidl_client_fut = fidl_client_proxy.take_event_stream().into_future();
-        pin_mut!(fidl_client_fut);
+        let mut fidl_client_fut = pin!(fidl_client_fut);
         let fidl_connect_txn_handle = fidl_connect_txn_stream.control_handle();
 
         let test_fut =
             serve_connect_txn_stream(Some(fidl_connect_txn_handle), sme_connect_txn_stream);
-        pin_mut!(test_fut);
+        let mut test_fut = pin!(test_fut);
 
         // Test sending OnConnectResult
         sme_proxy

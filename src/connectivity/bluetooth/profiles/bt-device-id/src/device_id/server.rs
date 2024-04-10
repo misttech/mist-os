@@ -192,7 +192,8 @@ pub(crate) mod tests {
     use async_utils::PollExt;
     use fidl_fuchsia_bluetooth::ErrorCode;
     use fuchsia_async as fasync;
-    use futures::{pin_mut, SinkExt};
+    use futures::SinkExt;
+    use std::pin::pin;
 
     use crate::device_id::service_record::tests::minimal_record;
     use crate::DEFAULT_MAX_DEVICE_ID_ADVERTISEMENTS;
@@ -266,15 +267,14 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn fidl_client_terminates_advertisement() {
         let (mut exec, server, mut profile_server, sender) = setup_server(None);
-        let server_fut = server.run();
-        pin_mut!(server_fut);
+        let server_fut = pin!(server.run());
 
         // Connect a new FIDL client and make a SetDeviceId request.
         let (mut server_fut, client) = connect_fidl_client(&mut exec, server_fut, sender.clone());
         let (token, fidl_client_fut) = make_request(&client, false);
         // Run the server task to process the request.
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server still active");
-        pin_mut!(fidl_client_fut);
+        let mut fidl_client_fut = pin!(fidl_client_fut);
 
         // Should expect the server to attempt to advertise over BR/EDR.
         let _adv_request = expect_advertise_request(&mut exec, &mut profile_server)
@@ -292,15 +292,14 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn fidl_client_notified_when_upstream_advertisement_terminated() {
         let (mut exec, server, mut profile_server, sender) = setup_server(None);
-        let server_fut = server.run();
-        pin_mut!(server_fut);
+        let server_fut = pin!(server.run());
 
         // Connect a new FIDL client and make a SetDeviceId request.
         let (mut server_fut, client) = connect_fidl_client(&mut exec, server_fut, sender.clone());
         let (_token, fidl_client_fut) = make_request(&client, false);
         // Run the server task to process the request.
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server still active");
-        pin_mut!(fidl_client_fut);
+        let mut fidl_client_fut = pin!(fidl_client_fut);
 
         // Should expect the server to attempt to advertise over BR/EDR.
         let (_request, responder) = expect_advertise_request(&mut exec, &mut profile_server)
@@ -319,8 +318,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn multiple_clients_advertise_success() {
         let (mut exec, server, mut profile_server, sender) = setup_server(None);
-        let server_fut = server.run();
-        pin_mut!(server_fut);
+        let server_fut = pin!(server.run());
 
         // Connect two FIDL clients and make two SetDeviceId requests.
         let (server_fut, client1) = connect_fidl_client(&mut exec, server_fut, sender.clone());
@@ -329,8 +327,8 @@ pub(crate) mod tests {
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server still active");
         let (_token2, fidl_client_fut2) = make_request(&client2, false);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server still active");
-        pin_mut!(fidl_client_fut1);
-        pin_mut!(fidl_client_fut2);
+        let mut fidl_client_fut1 = pin!(fidl_client_fut1);
+        let mut fidl_client_fut2 = pin!(fidl_client_fut2);
 
         // Both FIDL client advertise requests shouldn't resolve yet as the advertisement is OK.
         let _ = exec.run_until_stalled(&mut fidl_client_fut1).expect_pending("still active");
@@ -348,8 +346,7 @@ pub(crate) mod tests {
     fn client_advertisement_rejected_when_server_full() {
         // Make a server with no capacity.
         let (mut exec, server, _profile_server, sender) = setup_server(Some(0));
-        let server_fut = server.run();
-        pin_mut!(server_fut);
+        let server_fut = pin!(server.run());
 
         let (mut server_fut, client) = connect_fidl_client(&mut exec, server_fut, sender.clone());
         let (_token, fidl_client_fut) = make_request(&client, false);
@@ -364,13 +361,12 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn second_client_rejected_when_requesting_primary() {
         let (mut exec, server, _profile_server, sender) = setup_server(None);
-        let server_fut = server.run();
-        pin_mut!(server_fut);
+        let server_fut = pin!(server.run());
 
         // First FIDL client makes a request with a primary record.
         let (mut server_fut, client1) = connect_fidl_client(&mut exec, server_fut, sender.clone());
         let (_token1, fidl_client_fut1) = make_request(&client1, true);
-        pin_mut!(fidl_client_fut1);
+        let mut fidl_client_fut1 = pin!(fidl_client_fut1);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server still active");
         let _ = exec
             .run_until_stalled(&mut fidl_client_fut1)
@@ -379,7 +375,7 @@ pub(crate) mod tests {
         // Second FIDL client tries to make a request with another primary record - should be rejected.
         let (server_fut, client2) = connect_fidl_client(&mut exec, server_fut, sender.clone());
         let (_token2, fidl_client_fut2) = make_request(&client2, true);
-        pin_mut!(fidl_client_fut2);
+        let fidl_client_fut2 = pin!(fidl_client_fut2);
         // The FIDL client request should immediately resolve as the server cannot register it.
         let (fidl_client_result, _server_fut) = run_while(&mut exec, server_fut, fidl_client_fut2);
         let expected_err = zx::Status::ALREADY_EXISTS.into_raw();

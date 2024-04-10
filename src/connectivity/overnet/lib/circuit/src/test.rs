@@ -73,8 +73,8 @@ async fn connect_nodes(a: &Node, b: &Node) -> impl std::future::Future<Output = 
             }
         };
 
-        futures::pin_mut!(a_to_b);
-        futures::pin_mut!(b_to_a);
+        let a_to_b = pin!(a_to_b);
+        let b_to_a = pin!(b_to_a);
 
         let control = futures::future::join(a_to_b, b_to_a);
 
@@ -85,8 +85,8 @@ async fn connect_nodes(a: &Node, b: &Node) -> impl std::future::Future<Output = 
             let _ = b_runner.await;
         };
 
-        futures::pin_mut!(a_runner);
-        futures::pin_mut!(b_runner);
+        let a_runner = pin!(a_runner);
+        let b_runner = pin!(b_runner);
 
         let runners = futures::future::join(a_runner, b_runner);
 
@@ -106,8 +106,8 @@ async fn connect_nodes(a: &Node, b: &Node) -> impl std::future::Future<Output = 
             }
         };
 
-        futures::pin_mut!(a_to_b);
-        futures::pin_mut!(b_to_a);
+        let a_to_b = pin!(a_to_b);
+        let b_to_a = pin!(b_to_a);
 
         let streams = futures::future::join(a_to_b, b_to_a);
 
@@ -235,8 +235,8 @@ async fn connection_test_duplex() {
             .unwrap();
     };
 
-    futures::pin_mut!(a_task);
-    futures::pin_mut!(b_task);
+    let a_task = pin!(a_task);
+    let b_task = pin!(b_task);
 
     futures::future::join(a_task, b_task).await;
 }
@@ -324,8 +324,8 @@ async fn connection_test_with_router() {
             .unwrap();
     };
 
-    futures::pin_mut!(a_task);
-    futures::pin_mut!(b_task);
+    let a_task = pin!(a_task);
+    let b_task = pin!(b_task);
 
     futures::future::join(a_task, b_task).await;
 }
@@ -412,8 +412,8 @@ async fn connection_test_with_injected_route() {
             .unwrap();
     };
 
-    futures::pin_mut!(a_task);
-    futures::pin_mut!(b_task);
+    let a_task = pin!(a_task);
+    let b_task = pin!(b_task);
 
     futures::future::join(a_task, b_task).await;
 }
@@ -429,7 +429,7 @@ async fn connection_node_test() {
 
     let _conn = fasync::Task::spawn(connect_nodes(a.node(), b.node()).await);
     let _a_runner = fasync::Task::spawn(async move {
-        futures::pin_mut!(a_incoming_conns);
+        let mut a_incoming_conns = pin!(a_incoming_conns);
         if a_incoming_conns.next().await.is_some() {
             unreachable!("Got connection from node 'a'")
         }
@@ -449,7 +449,7 @@ async fn connection_node_test() {
         })
         .unwrap();
 
-    futures::pin_mut!(b_incoming_conns);
+    let mut b_incoming_conns = pin!(b_incoming_conns);
     let conn = b_incoming_conns.next().await.unwrap();
     assert_eq!("a", conn.from());
 
@@ -475,7 +475,7 @@ async fn connection_node_test_duplex() {
 
     let _conn = fasync::Task::spawn(connect_nodes(a.node(), b.node()).await);
     let _a_runner = fasync::Task::spawn(async move {
-        futures::pin_mut!(a_incoming_conns);
+        let mut a_incoming_conns = pin!(a_incoming_conns);
         if a_incoming_conns.next().await.is_some() {
             unreachable!("Got connection from node 'a'")
         }
@@ -495,7 +495,7 @@ async fn connection_node_test_duplex() {
         })
         .unwrap();
 
-    futures::pin_mut!(b_incoming_conns);
+    let mut b_incoming_conns = pin!(b_incoming_conns);
     let conn_b = b_incoming_conns.next().await.unwrap();
     assert_eq!("a", conn_b.from());
 
@@ -550,7 +550,7 @@ async fn connection_node_test_with_router() {
 
     let _conn_a = fasync::Task::spawn(connect_nodes(a.node(), router.node()).await);
     let _a_runner = fasync::Task::spawn(async move {
-        futures::pin_mut!(a_incoming_conns);
+        let mut a_incoming_conns = pin!(a_incoming_conns);
         if a_incoming_conns.next().await.is_some() {
             unreachable!("Got connection from node 'a'")
         }
@@ -558,7 +558,7 @@ async fn connection_node_test_with_router() {
 
     let _conn_b = fasync::Task::spawn(connect_nodes(b.node(), router.node()).await);
     let _router_runner = fasync::Task::spawn(async move {
-        futures::pin_mut!(router_incoming_conns);
+        let mut router_incoming_conns = pin!(router_incoming_conns);
         if router_incoming_conns.next().await.is_some() {
             unreachable!("Got connection from router node")
         }
@@ -580,7 +580,7 @@ async fn connection_node_test_with_router() {
         })
         .unwrap();
 
-    futures::pin_mut!(b_incoming_conns);
+    let mut b_incoming_conns = pin!(b_incoming_conns);
     let conn = b_incoming_conns.next().await.unwrap();
     assert_eq!("a", conn.from());
 
@@ -614,7 +614,7 @@ async fn connection_node_test_with_router_massively_parallel() {
 
     let _conn_a = fasync::Task::spawn(connect_nodes(a.node(), router.node()).await);
     let _a_runner = fasync::Task::spawn(async move {
-        futures::pin_mut!(a_incoming_conns);
+        let mut a_incoming_conns = pin!(a_incoming_conns);
         if a_incoming_conns.next().await.is_some() {
             unreachable!("Got connection from node 'a'")
         }
@@ -622,7 +622,7 @@ async fn connection_node_test_with_router_massively_parallel() {
 
     let _conn_b = fasync::Task::spawn(connect_nodes(b.node(), router.node()).await);
     let _router_runner = fasync::Task::spawn(async move {
-        futures::pin_mut!(router_incoming_conns);
+        let mut router_incoming_conns = pin!(router_incoming_conns);
         if router_incoming_conns.next().await.is_some() {
             unreachable!("Got connection from router node")
         }

@@ -94,7 +94,6 @@ async fn print_response_loop(
     match_opcode: u16,
     continue_listening: bool,
 ) -> Result<(), Error> {
-    pin_utils::pin_mut!(command_channel);
     // read each packet until we get a response to the opcode we sent
     loop {
         if let Some(packet) = command_channel.next().await {
@@ -220,10 +219,8 @@ fn match_filter(addr: &[u8], filter: &[u8]) -> bool {
 async fn scan_command(
     verbose: bool,
     filter: Option<String>,
-    command_channel: CommandChannel,
+    mut command_channel: CommandChannel,
 ) -> Result<(), Error> {
-    pin_utils::pin_mut!(command_channel);
-
     let mac = match filter {
         Some(filter) => match parse_payload(&[&filter]) {
             Ok(filter) => {

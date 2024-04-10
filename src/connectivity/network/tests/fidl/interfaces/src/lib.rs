@@ -23,7 +23,7 @@ use netstack_testing_common::{
 };
 use netstack_testing_macros::netstack_test;
 use std::collections::{HashMap, HashSet};
-use std::convert::TryInto as _;
+use std::{convert::TryInto as _, pin::pin};
 use test_case::test_case;
 
 #[netstack_test]
@@ -327,7 +327,7 @@ async fn test_add_remove_interface<N: Netstack>(name: &str) {
         fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
     )
     .expect("get interface event stream");
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
 
     let mut if_map = HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new();
     let () = fidl_fuchsia_net_interfaces_ext::wait_interface(
@@ -364,7 +364,7 @@ async fn test_include_all_addresses<N: Netstack>(name: &str) {
         fidl_fuchsia_net_interfaces_ext::IncludedAddresses::All,
     )
     .expect("get interface event stream");
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
 
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
     device.set_link_up(true).await.expect("send link up");
@@ -489,7 +489,7 @@ async fn test_add_remove_default_route<N: Netstack, I: net_types::ip::Ip>(name: 
         fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
     )
     .expect("get interface event stream");
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
     let mut if_map = HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new();
     fidl_fuchsia_net_interfaces_ext::wait_interface(event_stream.by_ref(), &mut if_map, |if_map| {
         if_map.contains_key(&id).then_some(())
@@ -576,7 +576,7 @@ async fn test_close_interface<N: Netstack>(test_name: &str, sub_test_name: &str,
         fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
     )
     .expect("get interface event stream");
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
     let mut if_map = HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new();
     let () = fidl_fuchsia_net_interfaces_ext::wait_interface(
         event_stream.by_ref(),
@@ -611,7 +611,7 @@ async fn test_down_close_race<N: Netstack>(name: &str) {
         fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
     )
     .expect("event stream from state");
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
     let mut if_map = HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new();
 
     for _ in 0..10u64 {
@@ -677,7 +677,7 @@ async fn test_close_data_race<N: Netstack>(name: &str) {
         fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
     )
     .expect("get interface event stream");
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
     let mut if_map = HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new();
     for _ in 0..10u64 {
         let dev = net
@@ -792,7 +792,7 @@ async fn test_remove_enabled_interface<N: Netstack>(name: &str) {
     .expect("get interface event stream")
     .map(|r| r.expect("watcher error"))
     .fuse();
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
 
     // Consume the watcher until we see the idle event.
     let mut existing = fidl_fuchsia_net_interfaces_ext::existing(
@@ -862,7 +862,7 @@ async fn test_watcher_online_edges<N: Netstack>(name: &str) {
     .expect("get interface event stream")
     .map(|r| r.expect("watcher error"))
     .fuse();
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
 
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
@@ -1232,7 +1232,7 @@ async fn addresses_while_offline<N: Netstack>(
     )
     .expect("event stream from state")
     .fuse();
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
     let mut if_state =
         fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(interface.id());
 
@@ -1324,9 +1324,9 @@ async fn watcher<N: Netstack>(name: &str) {
         realm.connect_to_protocol::<fnet_stack::StackMarker>().expect("connect to protocol");
 
     let blocking_stream = realm.get_interface_event_stream().expect("get interface event stream");
-    futures::pin_mut!(blocking_stream);
+    let mut blocking_stream = pin!(blocking_stream);
     let stream = realm.get_interface_event_stream().expect("get interface event stream");
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
 
     async fn next<S>(stream: &mut S) -> fidl_fuchsia_net_interfaces::Event
     where
@@ -1765,7 +1765,7 @@ async fn test_lifetime_change_on_hidden_addr<N: Netstack>(
     // Note that the interface is still offline since it is not admin enabled yet.
 
     let event_stream = interface.get_interface_event_stream().expect("get interface event stream");
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
 
     // Must wait until the interface is observed via an Existing/Added event.
     let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(interface.id());

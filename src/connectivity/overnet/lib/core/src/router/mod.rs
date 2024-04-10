@@ -41,6 +41,7 @@ use futures::{future::poll_fn, lock::Mutex, prelude::*, ready};
 use rand::Rng;
 use std::{
     collections::{BTreeMap, HashMap},
+    pin::pin,
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
     sync::{Arc, Weak},
     task::{Context, Poll, Waker},
@@ -665,7 +666,7 @@ async fn run_circuits(
     let new_peer_fut = {
         let router = router.clone();
         async move {
-            futures::pin_mut!(peers);
+            let mut peers = pin!(peers);
             while let Some(peer_node_id) = peers.next().await {
                 let router = match router.upgrade() {
                     Some(x) => x,
@@ -722,7 +723,7 @@ async fn run_circuits(
     // Loops over incoming connections, wraps them in a server-side Peer object and stuffs them in
     // the PeerMaps table.
     let new_conn_fut = async move {
-        futures::pin_mut!(connections);
+        let mut connections = pin!(connections);
         while let Some(conn) = connections.next().await {
             let peer_name = conn.from().to_owned();
             let res = async {

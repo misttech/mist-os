@@ -655,7 +655,7 @@ mod tests {
     use assert_matches::assert_matches;
     use futures::{Future, StreamExt};
     use netstack3_core::sync::Mutex;
-    use std::{sync::Arc, task::Poll};
+    use std::{pin::pin, sync::Arc, task::Poll};
     use test_case::test_case;
 
     type TestDispatcher = TimerDispatcher<usize>;
@@ -752,7 +752,7 @@ mod tests {
         executor: &mut fasync::TestExecutor,
         f: Fut,
     ) -> R {
-        futures::pin_mut!(f);
+        let mut f = pin!(f);
         match executor.run_until_stalled(&mut f) {
             Poll::Ready(r) => r,
             Poll::Pending => panic!("Executor stalled"),

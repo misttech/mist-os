@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::collections::HashSet;
-use std::pin::Pin;
+use std::pin::{pin, Pin};
 
 use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_hardware_network as fhardware_network;
@@ -235,7 +235,7 @@ impl<'a, B: BridgeHandler> Virtualization<'a, B> {
                         .try_collect::<()>();
                     let mut device_control_closure = device_control.on_closed().fuse();
                     let control_termination = control.wait_termination().fuse();
-                    futures::pin_mut!(control_termination);
+                    let mut control_termination = pin!(control_termination);
                     let reason = futures::select! {
                         // The interface channel has been closed by the client.
                         result = interface_closure => {

@@ -7,10 +7,10 @@ use {
     fidl_fuchsia_wlan_device as fidl_wlan_dev, fidl_fuchsia_wlan_sme as fidl_wlan_sme,
     fuchsia_inspect_contrib::inspect_log,
     futures::{
-        pin_mut, select,
+        select,
         stream::{FuturesUnordered, StreamExt, TryStreamExt},
     },
-    std::{convert::Infallible, sync::Arc},
+    std::{convert::Infallible, pin::pin, sync::Arc},
     tracing::{error, info},
 };
 
@@ -68,7 +68,7 @@ pub async fn serve_phys(
     device_directory: &str,
 ) -> Result<Infallible, Error> {
     let new_phys = device_watch::watch_phy_devices(device_directory)?.fuse();
-    pin_mut!(new_phys);
+    let mut new_phys = pin!(new_phys);
     let mut active_phys = FuturesUnordered::new();
     loop {
         select! {
@@ -150,7 +150,7 @@ mod tests {
         let inspector = Inspector::new(InspectorConfig::default().size(inspect::VMO_SIZE_BYTES));
         let inspect_tree = Arc::new(inspect::WlanMonitorTree::new(inspector));
         let fut = serve_phys(phys.clone(), inspect_tree, "/wrong/path");
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
@@ -171,7 +171,7 @@ mod tests {
         };
 
         let fut = serve_phy(&phys, new_phy, inspect_tree);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Run the PHY service to pick up the new PHY.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);

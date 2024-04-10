@@ -417,8 +417,9 @@ mod test {
     use super::testutil::*;
     use super::*;
     use fuchsia_async as fasync;
-    use futures::{channel::mpsc, pin_mut, FutureExt, StreamExt};
+    use futures::{channel::mpsc, FutureExt, StreamExt};
     use net_declare::std_socket_addr;
+    use std::pin::pin;
 
     #[test]
     fn test_rng() {
@@ -564,18 +565,13 @@ mod test {
         assert_eq!(time_ctl.borrow().current_time, std::time::Duration::from_secs(0));
         assert_eq!(time_ctl.now(), std::time::Duration::from_secs(0));
 
-        let timer_registered_before_should_fire_1 =
-            time_ctl.wait_until(std::time::Duration::from_secs(1));
-        let timer_registered_before_should_fire_2 =
-            time_ctl.wait_until(std::time::Duration::from_secs(1));
+        let mut timer_registered_before_should_fire_1 =
+            pin!(time_ctl.wait_until(std::time::Duration::from_secs(1)));
+        let mut timer_registered_before_should_fire_2 =
+            pin!(time_ctl.wait_until(std::time::Duration::from_secs(1)));
 
-        let timer_should_not_fire = time_ctl.wait_until(std::time::Duration::from_secs(10));
-
-        pin_mut!(
-            timer_registered_before_should_fire_1,
-            timer_registered_before_should_fire_2,
-            timer_should_not_fire
-        );
+        let mut timer_should_not_fire =
+            pin!(time_ctl.wait_until(std::time::Duration::from_secs(10)));
 
         // Poll the timer futures once so that they have the chance to
         // register themselves in our timer heap.

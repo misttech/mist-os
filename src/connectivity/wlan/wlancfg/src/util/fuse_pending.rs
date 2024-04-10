@@ -61,7 +61,7 @@ mod tests {
         super::*,
         fuchsia_async as fasync,
         futures::{channel::mpsc, future, select, stream::FuturesOrdered},
-        pin_utils::pin_mut,
+        std::pin::pin,
     };
 
     #[fuchsia::test]
@@ -71,7 +71,7 @@ mod tests {
         let (sink, stream) = mpsc::unbounded();
 
         let fut = do_correct_work(stream);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Pass over explicit next() call.
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut fut));
@@ -87,7 +87,7 @@ mod tests {
 
         let (sink, stream) = mpsc::unbounded();
         let fut = do_broken_work(stream);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Pass over explicit next() call.
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut fut));

@@ -4,6 +4,7 @@
 
 use std::{
     collections::HashMap,
+    pin::pin,
     sync::{Arc, Once},
 };
 
@@ -1278,7 +1279,7 @@ async fn device_strong_ids_delay_clean_shutdown() {
     let loopback_id = test_stack.ctx().bindings_ctx().devices.get_core_id(loopback_id).unwrap();
 
     let shutdown = t.shutdown();
-    futures::pin_mut!(shutdown);
+    let mut shutdown = pin!(shutdown);
     // Poll shutdown a number of times while yielding to executor to show that
     // shutdown is stuck because we are holding onto a strong loopback id.
     for _ in 0..50 {

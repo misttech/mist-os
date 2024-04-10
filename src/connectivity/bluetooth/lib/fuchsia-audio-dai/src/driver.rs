@@ -159,7 +159,8 @@ mod tests {
 
     use async_utils::PollExt;
     use fuchsia_async as fasync;
-    use futures::{pin_mut, task::Poll, StreamExt};
+    use futures::{task::Poll, StreamExt};
+    use std::pin::pin;
 
     fn connected_dai() -> (DigitalAudioInterface, DaiRequestStream) {
         let (proxy, requests) =
@@ -181,7 +182,7 @@ mod tests {
         let (dai, mut requests) = connected_dai();
 
         let properties_fut = dai.properties();
-        pin_mut!(properties_fut);
+        let mut properties_fut = pin!(properties_fut);
 
         exec.run_until_stalled(&mut properties_fut).expect_pending("should be pending");
 
@@ -208,7 +209,7 @@ mod tests {
         let (dai, mut requests) = connected_dai();
 
         let supported_formats_fut = dai.dai_formats();
-        pin_mut!(supported_formats_fut);
+        let mut supported_formats_fut = pin!(supported_formats_fut);
 
         // Doesn't need to continue to be held to complete this
         drop(dai);

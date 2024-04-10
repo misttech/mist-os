@@ -9,7 +9,7 @@ use {
     fuchsia_zircon::DurationNum as _,
     futures::{channel::oneshot, join, TryFutureExt},
     ieee80211::MacAddr,
-    pin_utils::pin_mut,
+    std::pin::pin,
     tracing::{info, warn},
     wlan_common::{bss::Protection::Wpa2Personal, buffer_reader::BufferReader, mac},
     wlan_hw_sim::{
@@ -74,8 +74,8 @@ async fn verify_client_connects_to_ap(
 
     let network_id = network_config.id.unwrap();
 
-    let connect_fut = initiate_connect(&client_controller, update_stream, &network_id, sender);
-    pin_mut!(connect_fut);
+    let connect_fut =
+        pin!(initiate_connect(&client_controller, update_stream, &network_id, sender));
 
     let client_fut = client_helper.run_until_complete_or_timeout(
         10.seconds(),
@@ -96,7 +96,7 @@ async fn verify_client_connects_to_ap(
         connect_fut,
     );
 
-    pin_mut!(connect_confirm_receiver);
+    let connect_confirm_receiver = pin!(connect_confirm_receiver);
     let ap_fut = ap_helper
         .run_until_complete_or_timeout(
             10.seconds(),
@@ -163,7 +163,7 @@ async fn send_then_receive(
             Some(sender_to_peer) => {
                 info!("{} awaiting payload from {}", me.name, peer.name);
                 let get_next_frame_fut = netdevice_helper::recv(session);
-                pin_mut!(get_next_frame_fut);
+                let mut get_next_frame_fut = pin!(get_next_frame_fut);
                 match test_utils::timeout_after(
                     WAIT_FOR_PAYLOAD_INTERVAL.millis(),
                     &mut get_next_frame_fut,
@@ -281,8 +281,8 @@ async fn verify_ethernet_in_both_directions(
         receiver_ap_from_client,
     );
 
-    pin_mut!(client_fut);
-    pin_mut!(peer_behind_ap_fut);
+    let client_fut = pin!(client_fut);
+    let peer_behind_ap_fut = pin!(peer_behind_ap_fut);
 
     let client_with_timeout = client_helper.run_until_complete_or_timeout(
         // TODO(https://fxbug.dev/42153436): This time should be reduced to 5 seconds

@@ -172,7 +172,7 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
     use fuchsia_bluetooth::types::PeerId;
-    use pin_utils::pin_mut;
+    use std::pin::pin;
     use std::sync::Arc;
 
     fn setup() -> Controller {
@@ -201,7 +201,7 @@ mod tests {
             create_proxy_and_stream::<BrowseControllerMarker>().expect("Controller proxy creation");
         let mut client = BrowseControllerService::new(controller, bc_server);
         let run_fut = client.run();
-        pin_mut!(run_fut);
+        let run_fut = pin!(run_fut);
 
         // Verify that the client can process a request.
         let request_fut = bc_proxy.set_browsed_player(0);
@@ -229,8 +229,7 @@ mod tests {
             .expect("Controller proxy creation");
         let mut client = BrowseControllerExtService { controller, fidl_stream: bc_server };
 
-        let run_fut = client.run();
-        pin_mut!(run_fut);
+        let run_fut = pin!(client.run());
 
         // Verify that the client can process a request.
         let request_fut = bc_proxy.is_connected();

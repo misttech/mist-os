@@ -14,10 +14,10 @@ use fidl_fuchsia_bluetooth_hfp as fidl_hfp;
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::{Channel, PeerId};
 use futures::channel::mpsc;
-use futures::{pin_mut, StreamExt};
+use futures::StreamExt;
 use profile_client::ProfileClient;
 use std::future::Future;
-use std::pin::Pin;
+use std::pin::{pin, Pin};
 use std::task::Poll;
 use test_profile_server::{ConnectChannel, TestProfileServer, TestProfileServerEndpoints};
 
@@ -65,14 +65,14 @@ fn hfp_future(
 fn set_up_server(exec: &mut fasync::TestExecutor, profile_server: &mut TestProfileServer) {
     {
         let expect_advertise_fut = profile_server.expect_advertise();
-        pin_mut!(expect_advertise_fut);
+        let mut expect_advertise_fut = pin!(expect_advertise_fut);
         exec.run_until_stalled(&mut expect_advertise_fut)
             .expect("Pending while expecting advertise.");
     }
 
     {
         let expect_search_fut = profile_server.expect_search();
-        pin_mut!(expect_search_fut);
+        let mut expect_search_fut = pin!(expect_search_fut);
         exec.run_until_stalled(&mut expect_search_fut).expect("Pending while expecting search.");
     }
 }
@@ -90,15 +90,14 @@ fn send_search_result(
     hfp_fut: &mut HfpRunFuture,
     profile_server: &mut TestProfileServer,
 ) {
-    let send_fut = profile_server.send_service_found(PEER_ID, Some(protocol_list()), vec![]);
-    pin_mut!(send_fut);
+    let send_fut = pin!(profile_server.send_service_found(PEER_ID, Some(protocol_list()), vec![]));
 
     let (result, _hfp_fut) = run_while(exec, hfp_fut, send_fut);
     result.expect("Error sending search result");
 }
 
 fn run_hfp(exec: &mut fasync::TestExecutor, hfp_fut: &mut HfpRunFuture) {
-    pin_mut!(hfp_fut);
+    let mut hfp_fut = pin!(hfp_fut);
 
     let _timers_were_expired = exec.wake_expired_timers();
     exec.run_until_stalled(&mut hfp_fut).expect_pending("Done while running search result");
@@ -111,7 +110,7 @@ fn expect_no_requests(
     test_profile_server: &mut TestProfileServer,
 ) {
     let no_requests_fut = test_profile_server.next();
-    pin_mut!(no_requests_fut);
+    let mut no_requests_fut = pin!(no_requests_fut);
 
     let poll = exec.run_until_stalled(&mut no_requests_fut);
     if let Poll::Ready(request) = poll {
@@ -125,7 +124,7 @@ fn expect_connect(
 ) -> Channel {
     let expect_connect_fut =
         test_profile_server.expect_connect(Some(ConnectChannel::RfcommChannel(1)));
-    pin_mut!(expect_connect_fut);
+    let mut expect_connect_fut = pin!(expect_connect_fut);
 
     let near =
         exec.run_until_stalled(&mut expect_connect_fut).expect("Pending while expecting connect");
@@ -135,7 +134,7 @@ fn expect_connect(
 
 fn expect_channel_closed(exec: &mut fasync::TestExecutor, channel: &Channel) {
     let closed_fut = channel.closed();
-    pin_mut!(closed_fut);
+    let mut closed_fut = pin!(closed_fut);
 
     exec.run_until_stalled(&mut closed_fut)
         .expect("Channel not closed")
@@ -144,7 +143,7 @@ fn expect_channel_closed(exec: &mut fasync::TestExecutor, channel: &Channel) {
 
 fn expect_channel_still_open(exec: &mut fasync::TestExecutor, channel: &Channel) {
     let closed_fut = channel.closed();
-    pin_mut!(closed_fut);
+    let mut closed_fut = pin!(closed_fut);
 
     exec.run_until_stalled(&mut closed_fut).expect_pending("Channel closed");
 }

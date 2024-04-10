@@ -6,6 +6,7 @@ use {
     fidl::endpoints::{create_proxy, Proxy},
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     futures::{FutureExt as _, StreamExt as _, TryStreamExt as _},
+    std::pin::pin,
     wlan_common::{appendable::Appendable, big_endian::BigEndianU16, mac},
 };
 
@@ -65,7 +66,7 @@ pub async fn create_client(
 
         (addr.octets == mac.octets).then(move || (client, netdev_port))
     });
-    futures::pin_mut!(results);
+    let mut results = pin!(results);
     results.next().await
 }
 

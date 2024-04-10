@@ -794,7 +794,7 @@ mod tests {
         fuchsia_async as fasync,
         futures::task::Poll,
         ieee80211::SsidError,
-        pin_utils::pin_mut,
+        std::pin::pin,
         wlan_common::{assert_variant, fake_bss_description},
     };
 
@@ -868,7 +868,7 @@ mod tests {
         let mut monitor_svc_stream =
             monitor_svc_remote.into_stream().expect("failed to create stream");
         let del_fut = do_iface(IfaceCmd::Delete { iface_id: 5 }, monitor_svc_local);
-        pin_mut!(del_fut);
+        let mut del_fut = pin!(del_fut);
 
         assert_variant!(exec.run_until_stalled(&mut del_fut), Poll::Pending);
         assert_variant!(
@@ -902,7 +902,7 @@ mod tests {
         let mut monitor_svc_stream =
             monitor_svc_remote.into_stream().expect("failed to create stream");
         let fut = do_phy(PhyCmd::GetCountry { phy_id: 45 }, monitor_svc_local);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(
@@ -930,7 +930,7 @@ mod tests {
             monitor_svc_remote.into_stream().expect("failed to create stream");
         let fut =
             do_phy(PhyCmd::SetCountry { phy_id: 45, country: "RS".to_string() }, monitor_svc_local);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(
@@ -953,7 +953,7 @@ mod tests {
         let mut monitor_svc_stream =
             monitor_svc_remote.into_stream().expect("failed to create stream");
         let fut = do_phy(PhyCmd::ClearCountry { phy_id: 45 }, monitor_svc_local);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(
@@ -975,7 +975,7 @@ mod tests {
         let mut monitor_svc_stream =
             monitor_svc_remote.into_stream().expect("failed to create stream");
         let fut = do_phy(PhyCmd::GetPowerSaveMode { phy_id: 45 }, monitor_svc_local);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(
@@ -1005,7 +1005,7 @@ mod tests {
             PhyCmd::SetPowerSaveMode { phy_id: 45, mode: PsModeArg::PsModeBalanced },
             monitor_svc_local,
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(
@@ -1083,7 +1083,7 @@ mod tests {
         };
 
         let connect_fut = do_client_connect(cmd, monitor_local.clone());
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
 
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(e)) => {
           assert_eq!(format!("{}", e), format!("{}", SsidError::Size(33)));
@@ -1105,7 +1105,7 @@ mod tests {
                 monitor_local,
                 &mut stdout,
             );
-            pin_mut!(fut);
+            let mut fut = pin!(fut);
 
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
             let mut fake_sme_server_stream = assert_variant!(

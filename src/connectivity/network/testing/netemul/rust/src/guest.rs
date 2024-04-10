@@ -178,17 +178,17 @@ impl Controller {
         let mut stdout_buf = Vec::new();
         let mut stderr_buf = Vec::new();
 
-        let stdout_fut = async_stdout
+        let stdout_fut = pin!(async_stdout
             .read_to_end(&mut stdout_buf)
             .map(|res| res.context("failed to read from stdout"))
-            .fuse();
-        let stderr_fut = async {
+            .fuse());
+        let stderr_fut = pin!(async {
             async_stderr.read_to_end(&mut stderr_buf).await.context("failed to read from socket")
         }
-        .fuse();
+        .fuse());
 
         let mut command_listener_stream = command_listener_client.take_event_stream();
-        let listener_fut = async {
+        let listener_fut = pin!(async {
             loop {
                 let event = command_listener_stream
                     .try_next()
@@ -231,14 +231,13 @@ impl Controller {
                 }
             }
         }
-        .fuse();
+        .fuse());
 
         // Scope required to limit the lifetime of pinned futures.
         let return_code = {
             // Poll the stdout and stderr sockets in parallel while waiting for the remote
             // process to terminate. This avoids deadlock in case the remote process blocks
             // on writing to stdout/stderr.
-            futures::pin_mut!(stderr_fut, listener_fut, stdout_fut);
             let (_, return_code, _): (usize, _, usize) =
                 futures::try_join!(stderr_fut, listener_fut, stdout_fut)?;
             return_code

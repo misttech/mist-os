@@ -377,6 +377,7 @@ mod test {
     use futures::task::noop_waker;
     use futures::FutureExt;
     use std::future::Future;
+    use std::pin::pin;
     use std::task::{Context, Poll};
 
     use super::*;
@@ -617,9 +618,6 @@ mod test {
                 .unwrap();
         };
 
-        futures::pin_mut!(reader_task);
-        futures::pin_mut!(writer_task);
-
-        futures::future::join(reader_task, writer_task).await;
+        futures::future::join(pin!(reader_task), pin!(writer_task)).await;
     }
 }

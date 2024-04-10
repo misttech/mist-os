@@ -11,6 +11,7 @@ use futures::FutureExt;
 use futures::SinkExt as _;
 use std::collections::HashMap;
 use std::future::Future;
+use std::pin::pin;
 use std::sync::{Arc, Mutex, Weak};
 use std::task::Poll;
 use std::time::Duration;
@@ -344,8 +345,8 @@ impl Node {
                 Error::ConnectionClosed(Some("Control stream handler disappeared".to_owned()))
             })?;
 
-            futures::pin_mut!(control_stream_loop);
-            futures::pin_mut!(new_streams_loop);
+            let control_stream_loop = pin!(control_stream_loop);
+            let new_streams_loop = pin!(new_streams_loop);
 
             let ret = match futures::future::select(control_stream_loop, new_streams_loop).await {
                 Either::Left((result, new_streams)) => {

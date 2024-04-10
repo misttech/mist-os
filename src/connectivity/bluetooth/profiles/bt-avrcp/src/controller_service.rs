@@ -432,7 +432,7 @@ mod tests {
     use fuchsia_bluetooth::types::Channel;
     use fuchsia_bluetooth::types::PeerId;
     use packet_encoding::Decodable;
-    use pin_utils::pin_mut;
+    use std::pin::pin;
     use std::sync::Arc;
 
     /// Sets up control and browse connections for a peer acting as AVRCP Target role.
@@ -477,8 +477,7 @@ mod tests {
         let (proxy, server) =
             create_proxy_and_stream::<ControllerMarker>().expect("Controller proxy creation");
         let mut client = ControllerService::new(controller, server);
-        let run_fut = client.run();
-        pin_mut!(run_fut);
+        let run_fut = pin!(client.run());
 
         // Verify that the client can process a request.
         let request_fut = proxy.set_addressed_player(1);
@@ -502,8 +501,7 @@ mod tests {
             create_proxy_and_stream::<ControllerExtMarker>().expect("Controller proxy creation");
         let mut client = ControllerExtService { controller, fidl_stream: server };
 
-        let run_fut = client.run();
-        pin_mut!(run_fut);
+        let run_fut = pin!(client.run());
 
         // Verify that the client can process a request.
         let request_fut = proxy.is_connected();
@@ -564,7 +562,7 @@ mod tests {
                 fuchsia_runtime::utc_time().into_nanos(),
                 PeerControllerEvent::AvailablePlayersChanged,
             );
-            pin_mut!(handle_available_players);
+            let mut handle_available_players = pin!(handle_available_players);
             exec.run_until_stalled(&mut handle_available_players)
                 .expect_pending("should be pending");
 
@@ -585,7 +583,7 @@ mod tests {
                 fuchsia_runtime::utc_time().into_nanos(),
                 PeerControllerEvent::AddressedPlayerChanged(1004),
             );
-            pin_mut!(handle_addressed_player);
+            let mut handle_addressed_player = pin!(handle_addressed_player);
             exec.run_until_stalled(&mut handle_addressed_player)
                 .expect_pending("should be pending");
 
@@ -652,7 +650,7 @@ mod tests {
             create_proxy_and_stream::<ControllerMarker>().expect("Controller proxy creation");
         let mut client = ControllerService::new(controller, server);
         let run_fut = client.run();
-        pin_mut!(run_fut);
+        let mut run_fut = pin!(run_fut);
         exec.run_until_stalled(&mut run_fut).expect_pending("should be pending");
 
         // Verify that `GetElementAttributes` command is sent when browsed player is not set.
@@ -682,7 +680,7 @@ mod tests {
         // Set the browsed player for test.
         {
             let setup_fut = controller.set_browsed_player(1);
-            pin_mut!(setup_fut);
+            let mut setup_fut = pin!(setup_fut);
             exec.run_until_stalled(&mut setup_fut).expect_pending("should be pending");
             let command = get_next_avctp_command(&mut exec, &mut avctp_cmd_stream);
             let _ = decode_avctp_command(&command, PduId::SetBrowsedPlayer);
@@ -698,7 +696,7 @@ mod tests {
         let mut client = ControllerService::new(controller, server);
         client.cache_controller_notification_state(&PeerControllerEvent::TrackIdChanged(2));
         let run_fut = client.run();
-        pin_mut!(run_fut);
+        let mut run_fut = pin!(run_fut);
         exec.run_until_stalled(&mut run_fut).expect_pending("should be pending");
 
         {

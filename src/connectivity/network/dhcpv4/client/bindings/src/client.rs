@@ -15,12 +15,13 @@ use fidl_fuchsia_net_ext::IntoExt as _;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::{channel::mpsc, pin_mut, select, FutureExt as _, TryStreamExt as _};
+use futures::{channel::mpsc, select, FutureExt as _, TryStreamExt as _};
 use net_types::{
     ip::{Ipv4, Ipv4Addr, PrefixLength},
     SpecifiedAddr, Witness as _,
 };
 use rand::SeedableRng as _;
+use std::pin::pin;
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum Error {
@@ -168,7 +169,7 @@ impl Lease {
                 }
             }
         });
-        futures::pin_mut!(event_stream);
+        let mut event_stream = pin!(event_stream);
 
         event_stream
             .try_next()
@@ -561,10 +562,10 @@ impl Client {
         //    (e.g. failing to Rebind and having to go back to Init), at
         //    which point `current_lease` will be cleared for the next
         //    iteration.
-        let core_step_fut = core
+        let mut core_step_fut = pin!(core
             .run(config, packet_socket_provider, udp_socket_provider, rng, &clock, stop_receiver)
-            .fuse();
-        let address_removed_fut = async {
+            .fuse());
+        let mut address_removed_fut = pin!(async {
             match current_lease {
                 Some(current_lease) => match current_lease.watch_for_address_removal().await {
                     Ok(reason) => (Some(reason), current_lease.ip_address),
@@ -584,9 +585,7 @@ impl Client {
                 None => futures::future::pending().await,
             }
         }
-        .fuse();
-
-        pin_mut!(core_step_fut, address_removed_fut);
+        .fuse());
 
         select! {
             address_removed = address_removed_fut => {

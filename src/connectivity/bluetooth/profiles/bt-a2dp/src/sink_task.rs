@@ -365,8 +365,11 @@ mod tests {
         fuchsia_inspect_derive::WithInspect,
         fuchsia_sync::Mutex,
         fuchsia_zircon::DurationNum,
-        futures::{channel::mpsc, io::AsyncWriteExt, pin_mut, task::Poll},
-        std::sync::{Arc, RwLock},
+        futures::{channel::mpsc, io::AsyncWriteExt, task::Poll},
+        std::{
+            pin::pin,
+            sync::{Arc, RwLock},
+        },
     };
 
     fn fake_cobalt_sender() -> (bt_metrics::MetricsLogger, cobalt::MetricEventLoggerRequestStream) {
@@ -413,7 +416,7 @@ mod tests {
         drop(session_requests);
 
         let finished_fut = running_task.finished();
-        pin_mut!(finished_fut);
+        let mut finished_fut = pin!(finished_fut);
 
         // Shouldn't end the running media task
         assert!(exec.run_until_stalled(&mut finished_fut).is_pending());
@@ -529,7 +532,7 @@ mod tests {
         let player_gen = once_player_gen(player);
 
         let decode_fut = media_stream_task(PeerId(0), &mut empty_stream, player_gen, inspect);
-        pin_mut!(decode_fut);
+        let mut decode_fut = pin!(decode_fut);
 
         match exec.run_until_stalled(&mut decode_fut) {
             Poll::Ready(StreamingError::MediaStreamEnd) => {}
@@ -550,7 +553,7 @@ mod tests {
         let player_gen = once_player_gen(player);
 
         let decode_fut = media_stream_task(PeerId(0), &mut error_stream, player_gen, inspect);
-        pin_mut!(decode_fut);
+        let mut decode_fut = pin!(decode_fut);
 
         match exec.run_until_stalled(&mut decode_fut) {
             Poll::Ready(StreamingError::MediaStreamError(avdtp::Error::PeerDisconnected)) => {}
@@ -574,7 +577,7 @@ mod tests {
         let player_gen = once_player_gen(player);
 
         let decode_fut = media_stream_task(PeerId(0), &mut stream, player_gen, inspect);
-        pin_mut!(decode_fut);
+        let mut decode_fut = pin!(decode_fut);
 
         match exec.run_until_stalled(&mut decode_fut) {
             Poll::Pending => {}
@@ -602,7 +605,7 @@ mod tests {
         let mut stream = packets_stream();
 
         let decode_fut = media_stream_task(PeerId(0), &mut stream, player_gen, inspect);
-        pin_mut!(decode_fut);
+        let mut decode_fut = pin!(decode_fut);
 
         match exec.run_until_stalled(&mut decode_fut) {
             Poll::Ready(StreamingError::PlayerFailedSetup(_)) => {}
@@ -628,7 +631,7 @@ mod tests {
         let player_gen = once_player_gen(player);
 
         let decode_fut = media_stream_task(PeerId(0), &mut media_receiver, player_gen, inspect);
-        pin_mut!(decode_fut);
+        let mut decode_fut = pin!(decode_fut);
 
         assert!(exec.run_until_stalled(&mut decode_fut).is_pending());
 
@@ -713,7 +716,7 @@ mod tests {
             }),
             inspect,
         );
-        pin_mut!(media_stream_fut);
+        let mut media_stream_fut = pin!(media_stream_fut);
 
         assert!(exec.run_until_stalled(&mut media_stream_fut).is_pending());
 

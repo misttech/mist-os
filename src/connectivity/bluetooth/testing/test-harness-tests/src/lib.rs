@@ -29,9 +29,9 @@ mod test {
             futures::{
                 channel::oneshot,
                 future::{self, BoxFuture},
-                pin_mut, FutureExt,
+                FutureExt,
             },
-            std::{sync::Arc, task::Poll},
+            std::{pin::pin, sync::Arc, task::Poll},
             test_harness::{SharedState, TestHarness},
         };
         const SHARED_KEY: &'static str = "U64";
@@ -85,7 +85,7 @@ mod test {
                 }
             };
             let insert_fut_1 = s.get_or_insert_with(SHARED_KEY, inserter1);
-            pin_mut!(insert_fut_1);
+            let mut insert_fut_1 = pin!(insert_fut_1);
             // `insert_fut_1` should hang on the oneshot without putting anything into SharedState.
             assert_matches!(exec.run_until_stalled(&mut insert_fut_1), Poll::Pending);
             assert_matches!(s.get::<i32>(SHARED_KEY), None);

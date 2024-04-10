@@ -31,7 +31,7 @@
 //! ownership semantics (removing the interface closes the protocol; closing
 //! protocol does not remove the interface).
 
-use std::{collections::hash_map, num::NonZeroU16, ops::DerefMut as _};
+use std::{collections::hash_map, num::NonZeroU16, ops::DerefMut as _, pin::pin};
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{ProtocolMarker, ServerEnd};
@@ -129,8 +129,8 @@ async fn run_device_control(
     let stop_event = async_utils::event::Event::new();
     let req_stream =
         req_stream.take_until(stop_event.wait_or_dropped()).map_err(DeviceControlError::Fidl);
-    futures::pin_mut!(worker_fut);
-    futures::pin_mut!(req_stream);
+    let mut worker_fut = pin!(worker_fut);
+    let mut req_stream = pin!(req_stream);
     let mut detached = false;
     let mut tasks = futures::stream::FuturesUnordered::new();
     let res = loop {
@@ -399,7 +399,7 @@ async fn run_netdevice_interface_control<
         status_stream,
     )
     .fuse();
-    futures::pin_mut!(interface_control_fut);
+    let mut interface_control_fut = pin!(interface_control_fut);
     futures::select! {
         o = device_stopped_fut => {
             o.expect("event was orphaned");
@@ -544,7 +544,7 @@ pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>
             })
         });
 
-        futures::pin_mut!(device_state);
+        let mut device_state = pin!(device_state);
         futures::select! {
             // One of the interface's owning channels hung up or `Remove` was
             // called; inform the other channels.
@@ -1432,9 +1432,9 @@ async fn address_state_provider_main_loop(
         AssignmentStateChange(fnet_interfaces::AddressAssignmentState),
         Canceled(AddressStateProviderCancellationReason),
     }
-    futures::pin_mut!(req_stream);
-    futures::pin_mut!(stop_receiver);
-    futures::pin_mut!(assignment_state_receiver);
+    let mut req_stream = pin!(req_stream);
+    let mut stop_receiver = pin!(stop_receiver);
+    let mut assignment_state_receiver = pin!(assignment_state_receiver);
     let cancelation_reason = loop {
         let next_event = futures::select! {
             req = req_stream.try_next() => AddressStateProviderEvent::Request(req),
@@ -1986,7 +1986,7 @@ mod tests {
                 | InterfaceEvent::Removed(id) => futures::future::ready(id.get() == binding_id),
             })
             .fuse();
-        futures::pin_mut!(event_receiver);
+        let mut event_receiver = pin!(event_receiver);
 
         // We should see the interface get added.
         let event = event_receiver.next().await;

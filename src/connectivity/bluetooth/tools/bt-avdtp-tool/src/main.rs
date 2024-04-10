@@ -9,8 +9,8 @@ use fuchsia_async as fasync;
 use fuchsia_sync::RwLock;
 use futures::channel::mpsc::{channel, SendError};
 use futures::{try_join, FutureExt, Sink, SinkExt, Stream, StreamExt, TryStreamExt};
-use pin_utils::pin_mut;
 use rustyline::{error::ReadlineError, CompletionType, Config, EditMode, Editor};
+use std::pin::pin;
 use std::{collections::hash_map::Entry, collections::HashMap, sync::Arc, thread};
 use tracing::info;
 
@@ -359,8 +359,8 @@ async fn main() -> Result<(), Error> {
     let event_fut = peer_manager_listener(&avdtp_svc, evt_stream, peer_map.clone()).fuse();
     let repl_fut = run_repl(peer_map.clone()).fuse();
 
-    pin_mut!(event_fut);
-    pin_mut!(repl_fut);
+    let event_fut = pin!(event_fut);
+    let repl_fut = pin!(repl_fut);
 
     try_join!(event_fut, repl_fut).map(|((), ())| ())
 }

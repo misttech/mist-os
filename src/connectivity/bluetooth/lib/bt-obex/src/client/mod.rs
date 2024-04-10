@@ -270,7 +270,7 @@ mod tests {
     use assert_matches::assert_matches;
     use async_utils::PollExt;
     use fuchsia_async as fasync;
-    use futures::pin_mut;
+    use std::pin::pin;
 
     use crate::transport::test_utils::{expect_code, expect_request_and_reply};
 
@@ -310,7 +310,7 @@ mod tests {
 
         {
             let connect_fut = client.connect(HeaderSet::new());
-            pin_mut!(connect_fut);
+            let mut connect_fut = pin!(connect_fut);
             exec.run_until_stalled(&mut connect_fut).expect_pending("waiting for response");
 
             // Expect the Connect request on the remote and reply positively.
@@ -380,7 +380,7 @@ mod tests {
 
         let headers = HeaderSet::from_header(Header::Description("finished".into()));
         let disconnect_fut = client.disconnect(headers);
-        pin_mut!(disconnect_fut);
+        let mut disconnect_fut = pin!(disconnect_fut);
         exec.run_until_stalled(&mut disconnect_fut).expect_pending("waiting for response");
 
         // Expect the Disconnect request on the remote. The typical response is a positive `Ok`.
@@ -410,7 +410,7 @@ mod tests {
         let (client, mut remote) = new_obex_client(ConnectionStatus::connected_no_id());
 
         let disconnect_fut = client.disconnect(HeaderSet::new());
-        pin_mut!(disconnect_fut);
+        let mut disconnect_fut = pin!(disconnect_fut);
         exec.run_until_stalled(&mut disconnect_fut).expect_pending("waiting for response");
 
         // Expect the Disconnect request on the remote. An Error response still results in
@@ -435,7 +435,7 @@ mod tests {
 
         let headers = HeaderSet::from_header(Header::name("myfolder"));
         let setpath_fut = client.set_path(SetPathFlags::empty(), headers);
-        pin_mut!(setpath_fut);
+        let mut setpath_fut = pin!(setpath_fut);
         exec.run_until_stalled(&mut setpath_fut).expect_pending("waiting for response");
 
         // Expect the SetPath request on the remote. The typical response is a positive `Ok`.
@@ -463,7 +463,7 @@ mod tests {
         // Peer doesn't support SetPath.
         {
             let setpath_fut = client.set_path(SetPathFlags::BACKUP, HeaderSet::new());
-            pin_mut!(setpath_fut);
+            let mut setpath_fut = pin!(setpath_fut);
             exec.run_until_stalled(&mut setpath_fut).expect_pending("waiting for response");
 
             // Expect the SetPath request on the remote - peer doesn't support SetPath.
@@ -485,7 +485,7 @@ mod tests {
         // Peer rejects SetPath.
         let headers = HeaderSet::from_header(Header::name("file"));
         let setpath_fut = client.set_path(SetPathFlags::DONT_CREATE, headers);
-        pin_mut!(setpath_fut);
+        let mut setpath_fut = pin!(setpath_fut);
         exec.run_until_stalled(&mut setpath_fut).expect_pending("waiting for response");
 
         // Expect the SetPath request on the remote - peer responds with error.

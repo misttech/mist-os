@@ -1070,7 +1070,8 @@ mod tests {
     use async_utils::PollExt;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_async as fasync;
-    use futures::{pin_mut, task::Poll, Future};
+    use futures::{task::Poll, Future};
+    use std::pin::pin;
 
     use crate::{rfcomm::session::multiplexer::ParameterNegotiationState, rfcomm::test_util::*};
 
@@ -1328,7 +1329,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (processing_fut, remote) = setup_session_task();
-        pin_mut!(processing_fut);
+        let mut processing_fut = pin!(processing_fut);
         exec.run_until_stalled(&mut processing_fut)
             .expect_pending("shouldn't be done while remote is live");
 
@@ -1341,7 +1342,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (processing_fut, remote) = setup_session_task();
-        pin_mut!(processing_fut);
+        let mut processing_fut = pin!(processing_fut);
         exec.run_until_stalled(&mut processing_fut)
             .expect_pending("shouldn't be done while remote is live");
 
@@ -1742,13 +1743,13 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (session_fut, mut remote) = setup_session_task();
-        pin_mut!(session_fut);
+        let mut session_fut = pin!(session_fut);
         exec.run_until_stalled(&mut session_fut)
             .expect_pending("shouldn't be done while remote is live");
 
         {
             let remote_closed_fut = remote.closed();
-            pin_mut!(remote_closed_fut);
+            let mut remote_closed_fut = pin!(remote_closed_fut);
             exec.run_until_stalled(&mut remote_closed_fut)
                 .expect_pending("shouldn't be done while remote is live");
         }
@@ -1772,7 +1773,7 @@ mod tests {
         // Remote should be closed, since the session has terminated.
         {
             let remote_closed_fut = remote.closed();
-            pin_mut!(remote_closed_fut);
+            let mut remote_closed_fut = pin!(remote_closed_fut);
             let _ = exec
                 .run_until_stalled(&mut remote_closed_fut)
                 .expect("L2CAP channel should be closed now");

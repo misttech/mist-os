@@ -10,8 +10,9 @@ use fuchsia_audio_codec::{StreamProcessor, StreamProcessorOutputStream};
 use fuchsia_audio_device::{driver::SoftPcm, AudioFrameSink, AudioFrameStream};
 use fuchsia_bluetooth::types::{peer_audio_stream_id, Uuid};
 use fuchsia_zircon as zx;
-use futures::{pin_mut, task::Context, AsyncWriteExt, FutureExt, StreamExt};
+use futures::{task::Context, AsyncWriteExt, FutureExt, StreamExt};
 use media::AudioDeviceEnumeratorProxy;
+use std::pin::pin;
 use tracing::{error, info, warn};
 
 use super::*;
@@ -211,19 +212,19 @@ impl AudioSession {
         };
         let sco_write =
             AudioSession::encoder_to_sco(encoded_stream, self.sco.proxy.clone(), self.codec);
-        pin_mut!(sco_write);
+        let sco_write = pin!(sco_write);
         let audio_to_encoder = AudioSession::pcm_to_encoder(self.encoder, self.audio_frame_stream);
-        pin_mut!(audio_to_encoder);
+        let audio_to_encoder = pin!(audio_to_encoder);
 
         let Ok(decoded_stream) = self.decoder.take_output_stream() else {
             error!("Couldn't take decoder output stream");
             return;
         };
-        let decoder_to_sink = AudioSession::decoder_to_pcm(decoded_stream, self.audio_frame_sink);
-        pin_mut!(decoder_to_sink);
+        let decoder_to_sink =
+            pin!(AudioSession::decoder_to_pcm(decoded_stream, self.audio_frame_sink));
         let sco_read =
             AudioSession::sco_to_decoder(self.sco.proxy.clone(), self.decoder, self.codec);
-        pin_mut!(sco_read);
+        let sco_read = pin!(sco_read);
 
         futures::select! {
             e = audio_to_encoder.fuse() => warn!(?e, "PCM to encoder write"),

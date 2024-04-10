@@ -39,7 +39,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_async as fasync, pin_utils::pin_mut, wlan_common::assert_variant};
+    use {super::*, fuchsia_async as fasync, std::pin::pin, wlan_common::assert_variant};
 
     #[fuchsia::test]
     fn assign_and_read_metadata_in_future_output() {
@@ -55,7 +55,7 @@ mod tests {
             TestMetadata { has_been_written: false },
             future::ready("future result").boxed(),
         );
-        pin_mut!(test_future);
+        let mut test_future = pin!(test_future);
 
         // Ensure the initial value is as expected
         assert_eq!(test_future.metadata.has_been_written, false);

@@ -8,7 +8,7 @@ use {
     fuchsia_zircon::DurationNum,
     ieee80211::Bssid,
     lazy_static::lazy_static,
-    pin_utils::pin_mut,
+    std::pin::pin,
     wlan_common::{
         bss::Protection,
         buffer_reader::BufferReader,
@@ -61,8 +61,7 @@ async fn verify_tx_and_rx(
             &mock_payload[..],
             &mut buf,
         );
-        let tx_rx_fut = send_and_receive(session, port, &buf);
-        pin_mut!(tx_rx_fut);
+        let tx_rx_fut = pin!(send_and_receive(session, port, &buf));
 
         let mut sent_payload = Vec::new();
         let (header, received_payload) = helper

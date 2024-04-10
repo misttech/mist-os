@@ -75,6 +75,7 @@ mod tests {
     use fidl::endpoints::RequestStream;
     use fuchsia_async as fasync;
     use futures::task::Poll;
+    use std::pin::pin;
 
     #[fuchsia::test]
     fn when_a2dp_not_accessible() {
@@ -82,12 +83,12 @@ mod tests {
         let control = Control::connect();
 
         let pause_fut = control.pause(None);
-        futures::pin_mut!(pause_fut);
+        let mut pause_fut = pin!(pause_fut);
 
         let _ = exec.run_singlethreaded(&mut pause_fut).expect("should be Ok");
 
         let pause_single_fut = control.pause(Some(PeerId(1)));
-        futures::pin_mut!(pause_single_fut);
+        let mut pause_single_fut = pin!(pause_single_fut);
 
         let _ = exec.run_singlethreaded(&mut pause_single_fut).expect("should be Ok");
     }
@@ -128,7 +129,7 @@ mod tests {
         let control = Control::from_proxy(proxy);
 
         let pause_fut = control.pause(Some(PeerId(1)));
-        futures::pin_mut!(pause_fut);
+        let mut pause_fut = pin!(pause_fut);
 
         let (responder_one, mut stream1) =
             expect_suspend_request(&mut exec, &mut control_requests, Some(PeerId(1)));
@@ -141,7 +142,7 @@ mod tests {
 
         // Should be able to have overlapping pauses.
         let pause_fut = control.pause(None);
-        futures::pin_mut!(pause_fut);
+        let mut pause_fut = pin!(pause_fut);
         let (responder_two, mut stream2) =
             expect_suspend_request(&mut exec, &mut control_requests, None);
         stream2.control_handle().send_on_suspended().expect("should send on suspended event");
@@ -166,7 +167,7 @@ mod tests {
         let control = Control::from_proxy(proxy);
 
         let pause_fut = control.pause(Some(PeerId(1)));
-        futures::pin_mut!(pause_fut);
+        let mut pause_fut = pin!(pause_fut);
 
         let (responder, stream1) =
             expect_suspend_request(&mut exec, &mut control_requests, Some(PeerId(1)));
@@ -186,7 +187,7 @@ mod tests {
         let control = Control::from_proxy(proxy);
 
         let pause_fut = control.pause(Some(PeerId(1)));
-        futures::pin_mut!(pause_fut);
+        let mut pause_fut = pin!(pause_fut);
 
         let (responder, stream1) =
             expect_suspend_request(&mut exec, &mut control_requests, Some(PeerId(1)));

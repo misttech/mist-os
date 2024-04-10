@@ -126,7 +126,10 @@ impl Fetch for Fetcher {
 mod test {
     use super::*;
 
-    use std::net::{Ipv4Addr, SocketAddr};
+    use std::{
+        net::{Ipv4Addr, SocketAddr},
+        pin::pin,
+    };
 
     use {
         fuchsia_async::{self as fasync, net::TcpListener},
@@ -187,9 +190,9 @@ mod test {
         let domain = url.host().expect("no host").to_string();
         let path = url.path().to_string();
 
-        let fetch_fut = fetch("", &domain, &path, &addr).fuse();
+        let mut fetch_fut = pin!(fetch("", &domain, &path, &addr).fuse());
 
-        futures::pin_mut!(server_fut, fetch_fut);
+        let mut server_fut = pin!(server_fut);
 
         let mut request = None;
         let result = loop {

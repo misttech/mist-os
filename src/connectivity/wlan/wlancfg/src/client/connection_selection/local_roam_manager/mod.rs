@@ -272,7 +272,7 @@ mod tests {
         fuchsia_async::TestExecutor,
         futures::task::Poll,
         ieee80211::MacAddrBytes,
-        pin_utils::pin_mut,
+        std::pin::pin,
         wlan_common::{assert_variant, random_fidl_bss_description, security::SecurityDescriptor},
     };
 
@@ -394,7 +394,7 @@ mod tests {
         exec.run_singlethreaded(test_values.fake_scan_requester.add_scan_result(Ok(scan_results)));
 
         let serve_fut = test_values.roam_manager_service.serve();
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         let init_rssi = -80;
@@ -437,7 +437,7 @@ mod tests {
         let channels = vec![];
         let verify_scan_fut =
             test_values.fake_scan_requester.verify_scan_request((scan_reason, ssids, channels));
-        pin_mut!(verify_scan_fut);
+        let mut verify_scan_fut = pin!(verify_scan_fut);
         assert_variant!(&mut exec.run_until_stalled(&mut verify_scan_fut), Poll::Ready(()));
 
         //  A metric will be logged for BSS selection, ignore it.
@@ -469,7 +469,7 @@ mod tests {
 
         // Start roam manager service
         let serve_fut = test_values.roam_manager_service.serve();
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Initialize current connection data.
@@ -510,7 +510,7 @@ mod tests {
             vec![],
             vec![],
         ));
-        pin_mut!(verify_scan_fut);
+        let mut verify_scan_fut = pin!(verify_scan_fut);
         assert_variant!(&mut exec.run_until_stalled(&mut verify_scan_fut), Poll::Ready(()));
 
         //  A metric will be logged for BSS selection, ignore it.
@@ -552,7 +552,7 @@ mod tests {
 
         // Start roam manager service
         let serve_fut = test_values.roam_manager_service.serve();
-        pin_mut!(serve_fut);
+        let mut serve_fut = pin!(serve_fut);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Initialize current connection data.
@@ -593,7 +593,7 @@ mod tests {
             vec![],
             vec![],
         ));
-        pin_mut!(verify_scan_fut);
+        let mut verify_scan_fut = pin!(verify_scan_fut);
         assert_variant!(&mut exec.run_until_stalled(&mut verify_scan_fut), Poll::Ready(()));
 
         //  A metric will be logged for BSS selection, ignore it.

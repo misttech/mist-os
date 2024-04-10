@@ -113,7 +113,8 @@ mod tests {
         ConnectionReceiverMarker, ConnectionReceiverProxy, ProfileAdvertiseRequest, ProfileMarker,
     };
     use fuchsia_async as fasync;
-    use futures::{future::MaybeDone, pin_mut};
+    use futures::future::MaybeDone;
+    use std::pin::pin;
 
     use crate::device_id::service_record::tests::minimal_record;
 
@@ -188,7 +189,7 @@ mod tests {
         let (request, _request_client, client_fut) = make_set_device_id_request(&mut exec);
         let (_record, request_server, responder) =
             request.into_set_device_identification().expect("set device id request");
-        pin_mut!(client_fut);
+        let mut client_fut = pin!(client_fut);
 
         let (token, _connect_client, _junk_task) =
             make_token(responder, request_server.into_stream().unwrap(), /* done= */ false);
@@ -211,11 +212,11 @@ mod tests {
         let (request, _request_client, client_fut) = make_set_device_id_request(&mut exec);
         let (_record, request_server, responder) =
             request.into_set_device_identification().expect("set device id request");
-        pin_mut!(client_fut);
+        let mut client_fut = pin!(client_fut);
 
         let (token, _connect_client, _junk_task) =
             make_token(responder, request_server.into_stream().unwrap(), /* done= */ true);
-        pin_mut!(token);
+        let mut token = pin!(token);
 
         // The client request should still be alive since the `token` is alive.
         exec.run_until_stalled(&mut client_fut).expect_pending("Token is still alive");
@@ -241,11 +242,11 @@ mod tests {
         let (request, _request_client, client_fut) = make_set_device_id_request(&mut exec);
         let (_record, request_server, responder) =
             request.into_set_device_identification().expect("set device id request");
-        pin_mut!(client_fut);
+        let mut client_fut = pin!(client_fut);
 
         let (token, _connect_client, _junk_task) =
             make_token(responder, request_server.into_stream().unwrap(), /* done= */ false);
-        pin_mut!(token);
+        let mut token = pin!(token);
         assert!(!token.is_terminated());
 
         // The client request should still be alive since the `token` is alive.

@@ -233,7 +233,7 @@ mod tests {
 
     use async_utils::PollExt;
     use fuchsia_async as fasync;
-    use futures::pin_mut;
+    use std::pin::pin;
 
     use crate::header::HeaderSet;
     use crate::operation::{RequestPacket, ResponseCode};
@@ -281,7 +281,7 @@ mod tests {
         );
         // Expect it on the ObexTransport
         let receive_fut = transport.receive_response(OpCode::Connect);
-        pin_mut!(receive_fut);
+        let mut receive_fut = pin!(receive_fut);
         let received_response = exec
             .run_until_stalled(&mut receive_fut)
             .expect("stream item from response")

@@ -868,7 +868,8 @@ pub(crate) mod tests {
     use fidl_fuchsia_bluetooth_sys::{PairingKeypress, PairingMarker, PairingRequestStream};
     use fuchsia_bluetooth::types::Address;
     use fuchsia_inspect_derive::WithInspect;
-    use futures::{future::Either, pin_mut};
+    use futures::future::Either;
+    use std::pin::pin;
 
     use crate::types::keys;
 
@@ -1001,9 +1002,8 @@ pub(crate) mod tests {
 
         // OnPairingRequest propagated to upstream.
         let sent_passkey = 123456;
-        let downstream_fut = mock.make_pairing_request(PeerId(123), sent_passkey);
-        let upstream_fut = mock.upstream_delegate_server.select_next_some();
-        pin_mut!(downstream_fut, upstream_fut);
+        let downstream_fut = pin!(mock.make_pairing_request(PeerId(123), sent_passkey));
+        let upstream_fut = pin!(mock.upstream_delegate_server.select_next_some());
         match futures::future::select(downstream_fut, upstream_fut).await {
             Either::Left(_) => panic!("Pairing Request fut resolved before receiving response"),
             Either::Right((Ok(upstream_result), downstream_fut)) => {
@@ -1152,9 +1152,8 @@ pub(crate) mod tests {
             assert_matches!(manager.key_for_procedure(&id), Some(_));
 
             let request_fut =
-                mock.make_pairing_request_internal(id, unsupported_pairing_method, 555666);
-            let manager_fut = manager.select_next_some();
-            pin_mut!(request_fut, manager_fut);
+                pin!(mock.make_pairing_request_internal(id, unsupported_pairing_method, 555666));
+            let manager_fut = pin!(manager.select_next_some());
 
             match futures::future::select(manager_fut, request_fut).await {
                 Either::Left(_) => panic!("Unexpected Pairing Manager stream item"),
@@ -1200,10 +1199,9 @@ pub(crate) mod tests {
             .downstream_delegate_client
             .on_pairing_complete(&id.into(), false)
             .expect("valid fidl request");
-        let manager_fut = manager.select_next_some();
+        let manager_fut = pin!(manager.select_next_some());
         // There are no active pairing procedures so pairing is handed back to upstream.
-        let expect_fut = mock.expect_set_pairing_delegate();
-        pin_mut!(manager_fut, expect_fut);
+        let expect_fut = pin!(mock.expect_set_pairing_delegate());
         match futures::future::select(manager_fut, expect_fut).await {
             Either::Left(_) => panic!("Unexpected Pairing Manager stream item"),
             Either::Right(((), _manager_fut)) => {}
@@ -1447,7 +1445,7 @@ pub(crate) mod tests {
 
         let id = PeerId(123);
         let procedure = Procedure::new(id, keys::tests::example_aes_key());
-        pin_mut!(procedure);
+        let mut procedure = pin!(procedure);
         let _ = exec.run_until_stalled(&mut procedure).expect_pending("deadline not reached");
 
         // Advancing time by less than the deadline means the Procedure Future isn't done.
@@ -1479,7 +1477,7 @@ pub(crate) mod tests {
         exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
 
         let setup_fut = MockPairing::new_with_manager();
-        pin_mut!(setup_fut);
+        let mut setup_fut = pin!(setup_fut);
         let (mut manager, mut mock) =
             exec.run_until_stalled(&mut setup_fut).expect("can create pairing manager");
 
@@ -1492,7 +1490,7 @@ pub(crate) mod tests {
         let _ = exec.run_until_stalled(&mut manager.next()).expect_pending("no stream item");
         {
             let expect_fut = mock.expect_set_pairing_delegate();
-            pin_mut!(expect_fut);
+            let mut expect_fut = pin!(expect_fut);
             let () = exec.run_until_stalled(&mut expect_fut).expect("pairing delegate request");
         }
         assert_matches!(manager.key_for_procedure(&id), Some(_));
@@ -1506,7 +1504,7 @@ pub(crate) mod tests {
 
         // Peer makes a pairing request - should transition to the next state in the procedure.
         let request_fut = mock.make_pairing_request(id, 555666);
-        pin_mut!(request_fut);
+        let mut request_fut = pin!(request_fut);
         let _ = exec.run_until_stalled(&mut request_fut).expect_pending("waiting for response");
         let _ = exec.run_until_stalled(&mut manager.next()).expect_pending("no stream item");
         assert_matches!(manager.key_for_procedure(&id), Some(_));
@@ -1525,7 +1523,7 @@ pub(crate) mod tests {
         assert!(!accepted);
         // Because there are no other active procedures, the PairingDelegate should be handed back.
         let expect_fut = mock.expect_set_pairing_delegate();
-        pin_mut!(expect_fut);
+        let mut expect_fut = pin!(expect_fut);
         let () = exec.run_until_stalled(&mut expect_fut).expect("pairing delegate request");
     }
 
@@ -1593,7 +1591,7 @@ pub(crate) mod tests {
         exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
 
         let setup_fut = MockPairing::new_with_manager();
-        pin_mut!(setup_fut);
+        let mut setup_fut = pin!(setup_fut);
         let (mut manager, mut mock) =
             exec.run_until_stalled(&mut setup_fut).expect("can create pairing manager");
 
@@ -1606,7 +1604,7 @@ pub(crate) mod tests {
         let _ = exec.run_until_stalled(&mut manager.next()).expect_pending("no stream item");
         {
             let expect_fut = mock.expect_set_pairing_delegate();
-            pin_mut!(expect_fut);
+            let mut expect_fut = pin!(expect_fut);
             let () = exec.run_until_stalled(&mut expect_fut).expect("pairing delegate request");
         }
 
@@ -1619,7 +1617,7 @@ pub(crate) mod tests {
 
         // Peer tries to pair.
         let request_fut = mock.make_pairing_request(id, 555666);
-        pin_mut!(request_fut);
+        let mut request_fut = pin!(request_fut);
         let _ = exec.run_until_stalled(&mut request_fut).expect_pending("waiting for response");
         let _ = exec.run_until_stalled(&mut manager.next()).expect_pending("no stream item");
         assert_matches!(manager.key_for_procedure(&id), Some(_));
@@ -1650,7 +1648,7 @@ pub(crate) mod tests {
         assert_matches!(manager.key_for_procedure(&id), None);
         // Because there are no other active procedures, the PairingDelegate should be handed back.
         let expect_fut = mock.expect_set_pairing_delegate();
-        pin_mut!(expect_fut);
+        let mut expect_fut = pin!(expect_fut);
         let () = exec.run_until_stalled(&mut expect_fut).expect("pairing delegate request");
     }
 

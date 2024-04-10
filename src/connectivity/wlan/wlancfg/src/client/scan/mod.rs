@@ -22,11 +22,11 @@ use {
         channel::{mpsc, oneshot},
         future::{Fuse, FusedFuture, FutureExt},
         lock::Mutex,
-        pin_mut, select,
+        select,
         stream::{FuturesUnordered, StreamExt},
     },
     itertools::Itertools,
-    std::{collections::HashMap, sync::Arc},
+    std::{collections::HashMap, pin::pin, sync::Arc},
     tracing::{debug, error, info, trace, warn},
 };
 
@@ -116,7 +116,7 @@ pub async fn serve_scanning_loop(
     // Use `Fuse::terminated()` to create an already-terminated future
     // which may be instantiated later.
     let ongoing_scan = Fuse::terminated();
-    pin_mut!(ongoing_scan);
+    let mut ongoing_scan = pin!(ongoing_scan);
 
     let transform_next_sme_req = |next_sme_req: Option<fidl_sme::ScanRequest>| match next_sme_req {
         None => Fuse::terminated(),
@@ -475,7 +475,7 @@ mod tests {
         fidl_fuchsia_wlan_common_security as fidl_security, fuchsia_async as fasync,
         fuchsia_zircon as zx,
         futures::{future, task::Poll},
-        pin_utils::pin_mut,
+        std::pin::pin,
         test_case::test_case,
         wlan_common::{
             assert_variant, fake_bss_description,
@@ -750,7 +750,7 @@ mod tests {
 
             defects
         };
-        pin_mut!(defects_fut);
+        let mut defects_fut = pin!(defects_fut);
         assert_variant!(exec.run_until_stalled(&mut defects_fut), Poll::Ready(defects) => defects)
     }
 
@@ -765,7 +765,7 @@ mod tests {
         let scan_request = fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {});
         let mut scan_defects = vec![];
         let scan_fut = sme_scan(&sme_proxy, &scan_request, &mut scan_defects);
-        pin_mut!(scan_fut);
+        let mut scan_fut = pin!(scan_fut);
 
         // Request scan data from SME
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
@@ -813,7 +813,7 @@ mod tests {
         });
         let mut scan_defects = vec![];
         let scan_fut = sme_scan(&sme_proxy, &scan_request, &mut scan_defects);
-        pin_mut!(scan_fut);
+        let mut scan_fut = pin!(scan_fut);
 
         // Request scan data from SME
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
@@ -855,7 +855,7 @@ mod tests {
         let scan_request = fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {});
         let mut scan_defects = vec![];
         let scan_fut = sme_scan(&sme_proxy, &scan_request, &mut scan_defects);
-        pin_mut!(scan_fut);
+        let mut scan_fut = pin!(scan_fut);
 
         // Request scan data from SME
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
@@ -890,7 +890,7 @@ mod tests {
         let sme_scan = passive_sme_req();
         let scan_fut =
             perform_scan(sme_scan.clone(), client, saved_networks_manager, telemetry_sender);
-        pin_mut!(scan_fut);
+        let mut scan_fut = pin!(scan_fut);
 
         // Progress scan handler forward so that it will respond to the iterator get next request.
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
@@ -940,7 +940,7 @@ mod tests {
             saved_networks_manager,
             telemetry_sender,
         );
-        pin_mut!(scan_fut);
+        let mut scan_fut = pin!(scan_fut);
 
         // Progress scan handler
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
@@ -992,7 +992,7 @@ mod tests {
             saved_networks_manager,
             telemetry_sender,
         );
-        pin_mut!(scan_fut);
+        let mut scan_fut = pin!(scan_fut);
 
         // Progress scan handler
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
@@ -1051,7 +1051,7 @@ mod tests {
             saved_networks_manager.clone(),
             telemetry_sender,
         );
-        pin_mut!(scan_fut);
+        let mut scan_fut = pin!(scan_fut);
 
         // Progress scan handler
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
@@ -1235,7 +1235,7 @@ mod tests {
             saved_networks_manager,
             telemetry_sender,
         );
-        pin_mut!(scan_fut);
+        let mut scan_fut = pin!(scan_fut);
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
 
         // Send back a failure to the scan request that was generated.
@@ -1277,7 +1277,7 @@ mod tests {
             saved_networks_manager,
             telemetry_sender,
         );
-        pin_mut!(scan_fut);
+        let mut scan_fut = pin!(scan_fut);
 
         // Progress scan handler
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
@@ -1367,7 +1367,7 @@ mod tests {
         let sme_scan = passive_sme_req();
         let scan_fut =
             perform_scan(sme_scan.clone(), client, saved_networks_manager, telemetry_sender);
-        pin_mut!(scan_fut);
+        let mut scan_fut = pin!(scan_fut);
 
         // Progress scan handler forward so that it will respond to the iterator get next request.
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
@@ -1424,13 +1424,13 @@ mod tests {
                 let mut iface_manager = cloned_iface_manager.lock().await;
                 iface_manager.get_sme_proxy_for_scan().await
             };
-            pin_mut!(fut);
+            let mut fut = pin!(fut);
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(sme)) => sme)
         };
 
         // Report the desired scan error or success.
         let fut = report_scan_defects_to_sme(&sme, &scan_result, &scan_request);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Based on the expected defect (or lack thereof), ensure that the correct value is obsered
@@ -1461,7 +1461,7 @@ mod tests {
             location_sensor,
             scan_request_receiver,
         );
-        pin_mut!(scanning_loop);
+        let mut scanning_loop = pin!(scanning_loop);
 
         // Issue request to scan.
         let first_req_channels = vec![13];
@@ -1470,7 +1470,7 @@ mod tests {
             vec!["foo".try_into().unwrap()],
             first_req_channels.iter().map(|c| generate_channel(*c)).collect(),
         );
-        pin_mut!(scan_req_fut1);
+        let mut scan_req_fut1 = pin!(scan_req_fut1);
         assert_variant!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
@@ -1503,7 +1503,7 @@ mod tests {
             vec!["foo".try_into().unwrap()],
             second_req_channels.iter().map(|c| generate_channel(*c)).collect(),
         );
-        pin_mut!(scan_req_fut2);
+        let mut scan_req_fut2 = pin!(scan_req_fut2);
         assert_variant!(exec.run_until_stalled(&mut scan_req_fut2), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
@@ -1546,7 +1546,7 @@ mod tests {
             location_sensor,
             scan_request_receiver,
         );
-        pin_mut!(scanning_loop);
+        let mut scanning_loop = pin!(scanning_loop);
 
         // Issue request to scan.
         let first_req_channels = vec![13];
@@ -1555,7 +1555,7 @@ mod tests {
             vec!["foo".try_into().unwrap()],
             first_req_channels.iter().map(|c| generate_channel(*c)).collect(),
         );
-        pin_mut!(scan_req_fut1);
+        let mut scan_req_fut1 = pin!(scan_req_fut1);
         assert_variant!(exec.run_until_stalled(&mut scan_req_fut1), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
@@ -1579,7 +1579,7 @@ mod tests {
             vec!["foo".try_into().unwrap()],
             second_req_channels.iter().map(|c| generate_channel(*c)).collect(),
         );
-        pin_mut!(scan_req_fut2);
+        let mut scan_req_fut2 = pin!(scan_req_fut2);
         assert_variant!(exec.run_until_stalled(&mut scan_req_fut2), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
@@ -1637,11 +1637,11 @@ mod tests {
             location_sensor,
             scan_request_receiver,
         );
-        pin_mut!(scanning_loop);
+        let mut scanning_loop = pin!(scanning_loop);
 
         // Issue request to scan.
         let scan_req_fut = scan_requester.perform_scan(ScanReason::BssSelection, vec![], vec![]);
-        pin_mut!(scan_req_fut);
+        let mut scan_req_fut = pin!(scan_req_fut);
         assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
@@ -1688,14 +1688,14 @@ mod tests {
             location_sensor,
             scan_request_receiver,
         );
-        pin_mut!(scanning_loop);
+        let mut scanning_loop = pin!(scanning_loop);
 
         // Make location sensor stalled
         *(exec.run_singlethreaded(location_sensor_stalled.lock())) = true;
 
         // Issue request to scan.
         let scan_req_fut = scan_requester.perform_scan(ScanReason::BssSelection, vec![], vec![]);
-        pin_mut!(scan_req_fut);
+        let mut scan_req_fut = pin!(scan_req_fut);
         assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
@@ -1719,7 +1719,7 @@ mod tests {
 
         // Issue another request to scan.
         let scan_req_fut = scan_requester.perform_scan(ScanReason::BssSelection, vec![], vec![]);
-        pin_mut!(scan_req_fut);
+        let mut scan_req_fut = pin!(scan_req_fut);
         assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 
@@ -1760,11 +1760,11 @@ mod tests {
             location_sensor,
             scan_request_receiver,
         );
-        pin_mut!(scanning_loop);
+        let mut scanning_loop = pin!(scanning_loop);
 
         // Issue request to scan
         let scan_req_fut = scan_requester.perform_scan(ScanReason::BssSelection, vec![], vec![]);
-        pin_mut!(scan_req_fut);
+        let mut scan_req_fut = pin!(scan_req_fut);
         assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
 

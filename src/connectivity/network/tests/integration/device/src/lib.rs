@@ -279,7 +279,7 @@ async fn ping_succeeds_with_expected_payload<N: Netstack>(
     .await;
 
     let icmp_event_stream = icmp_event_stream(&fake_ep);
-    futures::pin_mut!(icmp_event_stream);
+    let mut icmp_event_stream = pin!(icmp_event_stream);
 
     assert_eq!(
         icmp_event_stream.next().await,
@@ -327,7 +327,7 @@ async fn starts_device_in_multicast_promiscuous<N: Netstack>(name: &str) {
             }
         },
     );
-    futures::pin_mut!(mac_state_stream);
+    let mut mac_state_stream = pin!(mac_state_stream);
 
     assert_matches::assert_matches!(
         mac_state_stream.next().await,

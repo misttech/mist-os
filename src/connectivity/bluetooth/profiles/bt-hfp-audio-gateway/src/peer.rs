@@ -332,9 +332,9 @@ mod tests {
     use async_utils::PollExt;
     use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
     use fuchsia_async as fasync;
-    use futures::pin_mut;
     use futures::StreamExt;
     use std::collections::HashSet;
+    use std::pin::pin;
 
     use crate::audio::TestAudioControl;
 
@@ -381,7 +381,7 @@ mod tests {
         // The inner task is replaced by a no-op task so that it can be consumed and canceled.
         let task = std::mem::replace(&mut peer.task, fasync::Task::local(async move {}));
         let cancellation = task.cancel();
-        pin_mut!(cancellation);
+        let mut cancellation = pin!(cancellation);
         let _ = exec.run_until_stalled(&mut cancellation).expect("task to stop completely");
 
         // create profile_event_fut in a block to limit its lifetime
@@ -389,7 +389,7 @@ mod tests {
             let event =
                 ProfileEvent::SearchResult { id: PeerId(1), protocol: None, attributes: vec![] };
             let profile_event_fut = peer.profile_event(event);
-            pin_mut!(profile_event_fut);
+            let mut profile_event_fut = pin!(profile_event_fut);
             exec.run_until_stalled(&mut profile_event_fut)
                 .expect("Profile Event to complete")
                 .expect("Profile Event to succeed");
@@ -397,7 +397,7 @@ mod tests {
 
         // A new task has been spun up and is actively running.
         let task = std::mem::replace(&mut peer.task, fasync::Task::local(async move {}));
-        pin_mut!(task);
+        let mut task = pin!(task);
         assert!(exec.run_until_stalled(&mut task).is_pending());
     }
 
@@ -450,7 +450,7 @@ mod tests {
 
         // A new task has been spun up and is actively running (the remote hasn't been dropped)
         let task = std::mem::replace(&mut peer.task, fasync::Task::local(async move {}));
-        pin_mut!(task);
+        let mut task = pin!(task);
         assert!(exec.run_until_stalled(&mut task).is_pending());
     }
 
@@ -465,11 +465,11 @@ mod tests {
         // The inner task is replaced by a no-op task so that it can be consumed and canceled.
         let cancellation =
             std::mem::replace(&mut peer.task, fasync::Task::local(async move {})).cancel();
-        pin_mut!(cancellation);
+        let mut cancellation = pin!(cancellation);
         let _ = exec.run_until_stalled(&mut cancellation).expect("task to stop completely");
 
         let build_handler_fut = peer.build_handler();
-        pin_mut!(build_handler_fut);
+        let mut build_handler_fut = pin!(build_handler_fut);
         let result = exec
             .run_until_stalled(&mut build_handler_fut)
             .expect("Manager handler registration to complete successfully");

@@ -9,12 +9,12 @@ use fidl_fuchsia_bluetooth_avrcp::{
 use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
 use fuchsia_zircon::Duration;
-use futures::{future::Either, pin_mut, Future, FutureExt};
+use futures::{future::Either, Future, FutureExt};
 use std::collections::{
     hash_map::Entry::{Occupied, Vacant},
     HashMap, VecDeque,
 };
-use std::sync::Arc;
+use std::{pin::pin, sync::Arc};
 use tracing::{trace, warn};
 
 pub mod browse_channel;
@@ -236,7 +236,6 @@ async fn handle_passthrough_command<'a>(
 ) -> Result<(), Error> {
     // Passthrough commands need to be handled in 100ms
     let timer = fasync::Timer::new(fasync::Time::after(Duration::from_millis(100))).fuse();
-    pin_mut!(timer);
 
     // As per Table 9.27 in AV/C 4.0, send back the state_flag, operation_id, and operation_data.
     let buf: Vec<u8> = command.body().to_vec();
@@ -249,7 +248,7 @@ async fn handle_passthrough_command<'a>(
         }
     }
     .fuse();
-    pin_mut!(handle_cmd);
+    let handle_cmd = pin!(handle_cmd);
 
     match futures::future::select(timer, handle_cmd).await {
         Either::Left((_, _)) => {
@@ -362,10 +361,10 @@ async fn handle_notify_command(
     }
 
     let notification_fut = delegate.send_get_notification(notify_command.event_id().into()).fuse();
-    pin_mut!(notification_fut);
+    let mut notification_fut = pin!(notification_fut);
 
     let interim_timer = fasync::Timer::new(fasync::Time::after(T_MTP)).fuse();
-    pin_mut!(interim_timer);
+    let mut interim_timer = pin!(interim_timer);
 
     let notification: Notification = futures::select! {
         _ = interim_timer => {
@@ -658,10 +657,10 @@ async fn handle_status_command(
     // status final responses should be returned in 1000ms.
 
     let status_fut = status_fut.fuse();
-    pin_mut!(status_fut);
+    let mut status_fut = pin!(status_fut);
 
     let interim_timer = fasync::Timer::new(fasync::Time::after(Duration::from_millis(100))).fuse();
-    pin_mut!(interim_timer);
+    let mut interim_timer = pin!(interim_timer);
 
     loop {
         futures::select! {
@@ -818,10 +817,10 @@ async fn handle_control_command(
     // control final responses should be returned in 200ms.
 
     let control_fut = control_fut.fuse();
-    pin_mut!(control_fut);
+    let mut control_fut = pin!(control_fut);
 
     let interim_timer = fasync::Timer::new(fasync::Time::after(Duration::from_millis(100))).fuse();
-    pin_mut!(interim_timer);
+    let mut interim_timer = pin!(interim_timer);
 
     loop {
         futures::select! {
@@ -1399,8 +1398,7 @@ mod test {
         )
         .expect_interim();
 
-        let handle_cmd = cmd_handler.handle_command_internal(command);
-        pin_utils::pin_mut!(handle_cmd);
+        let mut handle_cmd = pin!(cmd_handler.handle_command_internal(command));
         assert!(exec.run_until_stalled(&mut handle_cmd).is_pending());
         let _ = exec.wake_next_timer();
         // we should still be pending.
@@ -1727,8 +1725,7 @@ mod test {
         )
         .expect_reject();
 
-        let handle_cmd = cmd_handler.handle_command_internal(command);
-        pin_utils::pin_mut!(handle_cmd);
+        let mut handle_cmd = pin!(cmd_handler.handle_command_internal(command));
         assert!(exec.run_until_stalled(&mut handle_cmd).is_pending());
         let _ = exec.wake_next_timer();
         // we should be ready right away
@@ -1835,7 +1832,7 @@ mod test {
         ]);
 
         let handle_command_fut = cmd_handler.handle_command_internal(command).fuse();
-        pin_mut!(handle_command_fut);
+        let mut handle_command_fut = pin!(handle_command_fut);
 
         let handle_stream = async move {
             match volume_stream.next().await {
@@ -1850,7 +1847,7 @@ mod test {
             }
         }
         .fuse();
-        pin_mut!(handle_stream);
+        let mut handle_stream = pin!(handle_stream);
 
         loop {
             futures::select! {

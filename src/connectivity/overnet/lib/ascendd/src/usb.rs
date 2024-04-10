@@ -10,7 +10,7 @@ use bind_fuchsia_usb::BIND_USB_CLASS_VENDOR_SPECIFIC;
 use futures::future::{select, try_join, Either, FutureExt};
 use futures::stream::StreamExt;
 use overnet_core::Router;
-use std::sync::Weak;
+use std::{pin::pin, sync::Weak};
 
 static OVERNET_MAGIC: &[u8; 16] = b"OVERNET USB\xff\x00\xff\x00\xff";
 const MAGIC_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
@@ -117,7 +117,7 @@ async fn run_usb_link(
     loop {
         let size = {
             let read_fut = in_ep.read(&mut buf);
-            futures::pin_mut!(read_fut);
+            let read_fut = pin!(read_fut);
             match select(read_fut, &mut magic_timer).await {
                 Either::Left((got, _)) => got?,
                 Either::Right((_, fut)) => {
@@ -169,8 +169,8 @@ async fn run_usb_link(
     };
 
     let conn = async move {
-        futures::pin_mut!(conn);
-        futures::pin_mut!(error_logger);
+        let conn = pin!(conn);
+        let error_logger = pin!(error_logger);
 
         match select(conn, error_logger).await {
             Either::Left((e, _)) => {
@@ -218,8 +218,8 @@ async fn run_usb_link(
     };
 
     let tx_rx = async move {
-        futures::pin_mut!(tx);
-        futures::pin_mut!(rx);
+        let tx = pin!(tx);
+        let rx = pin!(rx);
         match select(tx, rx).await {
             Either::Left((e, _)) => {
                 if let Result::<(), Error>::Err(e) = e {

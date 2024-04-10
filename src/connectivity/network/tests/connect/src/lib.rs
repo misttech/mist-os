@@ -12,6 +12,7 @@ use net_declare::{fidl_subnet, std_ip};
 use netemul::{RealmTcpListener as _, RealmTcpStream as _};
 use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
+use std::pin::pin;
 use tcp_stream_ext::TcpStreamExt as _;
 
 async fn measure(fut: impl std::future::Future<Output = ()>) -> std::time::Duration {
@@ -152,19 +153,11 @@ async fn timeouts<N: Netstack>(name: &str) {
         socket.write_all(&[0xde]).await.expect("write to socket");
     }
 
-    let connect_timeout = measure(connect_timeout).fuse();
-    let keepalive_timeout = measure(verify_error(keepalive_timeout)).fuse();
-    let keepalive_usertimeout = measure(verify_error(keepalive_usertimeout)).fuse();
-    let retransmit_timeout = measure(verify_error(retransmit_timeout)).fuse();
-    let retransmit_usertimeout = measure(verify_error(retransmit_usertimeout)).fuse();
-
-    futures_util::pin_mut!(
-        connect_timeout,
-        keepalive_timeout,
-        keepalive_usertimeout,
-        retransmit_timeout,
-        retransmit_usertimeout,
-    );
+    let mut connect_timeout = pin!(measure(connect_timeout).fuse());
+    let mut keepalive_timeout = pin!(measure(verify_error(keepalive_timeout)).fuse());
+    let mut keepalive_usertimeout = pin!(measure(verify_error(keepalive_usertimeout)).fuse());
+    let retransmit_timeout = pin!(measure(verify_error(retransmit_timeout)).fuse());
+    let mut retransmit_usertimeout = pin!(measure(verify_error(retransmit_usertimeout)).fuse());
 
     macro_rules! print_elapsed {
         ($val:expr) => {

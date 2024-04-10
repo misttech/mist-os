@@ -1187,6 +1187,7 @@ pub async fn main() -> Result<(), Error> {
 mod tests {
     use std::{
         net::{Ipv4Addr, Ipv6Addr, SocketAddr},
+        pin::pin,
         str::FromStr,
     };
 
@@ -2069,7 +2070,7 @@ mod tests {
         let start_time = fasync::Time::now();
         let () = exec.set_fake_time(fasync::Time::after(delay));
         let update_stats = stats.finish_query(start_time, result);
-        futures::pin_mut!(update_stats);
+        let mut update_stats = pin!(update_stats);
         assert!(exec.run_until_stalled(&mut update_stats).is_ready());
     }
 
@@ -2437,7 +2438,7 @@ mod tests {
         // requests before `send` fails.
         const BEFORE_LAST_INDEX: usize = MAX_PARALLEL_REQUESTS * 2;
         const LAST_INDEX: usize = MAX_PARALLEL_REQUESTS * 2 + 1;
-        let send_fut = async {
+        let mut send_fut = pin!(async {
             for (i, req) in requests.into_iter().enumerate() {
                 match i {
                     BEFORE_LAST_INDEX => assert_matches!(sender.try_send(req), Ok(())),
@@ -2446,8 +2447,8 @@ mod tests {
                 }
             }
         }
-        .fuse();
-        let recv_fut = {
+        .fuse());
+        let mut recv_fut = pin!({
             let resolver = SharedResolver::new(BlockingResolver::new(
                 ResolverConfig::default(),
                 ResolverOpts::default(),
@@ -2458,8 +2459,7 @@ mod tests {
                     .expect("failed to create routes.StateProxy");
             async move { create_ip_lookup_fut(&resolver, stats.clone(), routes_proxy, recv).await }
                 .fuse()
-        };
-        futures::pin_mut!(send_fut, recv_fut);
+        });
         futures::select! {
             () = send_fut => {},
             () = recv_fut => panic!("recv_fut should never complete"),

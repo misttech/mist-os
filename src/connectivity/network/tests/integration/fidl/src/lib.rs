@@ -32,6 +32,7 @@ use packet_formats::{
     },
     ip::{IpExt, IpPacketBuilder as _},
 };
+use std::pin::pin;
 use test_case::test_case;
 
 #[netstack_test]
@@ -105,7 +106,7 @@ async fn disable_interface_loopback<N: Netstack>(name: &str) {
         fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
     )
     .expect("get interface event stream");
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
 
     let loopback_id = assert_matches::assert_matches!(
         stream.try_next().await,

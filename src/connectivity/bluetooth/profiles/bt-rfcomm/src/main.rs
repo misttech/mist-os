@@ -8,7 +8,8 @@ use anyhow::{Context as _, Error};
 use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect_derive::Inspect;
-use futures::{channel::mpsc, future, pin_mut};
+use futures::{channel::mpsc, future};
+use std::pin::pin;
 use tracing::{debug, warn};
 
 mod fidl_service;
@@ -33,8 +34,7 @@ pub async fn main() -> Result<(), Error> {
     let _inspect_server_task =
         inspect_runtime::publish(&inspect, inspect_runtime::PublishOptions::default());
 
-    let services = run_services(fs, service_sender)?;
-    pin_mut!(services);
+    let services = pin!(run_services(fs, service_sender)?);
 
     let mut profile_registrar = ProfileRegistrar::new(profile_svc);
     if let Err(e) = profile_registrar.iattach(inspect.root(), "rfcomm_server") {

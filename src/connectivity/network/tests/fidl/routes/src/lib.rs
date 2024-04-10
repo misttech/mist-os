@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::pin::pin;
 
 use anyhow::Context as _;
 use assert_matches::assert_matches;
@@ -584,7 +585,7 @@ async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::F
         realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect to routes/State");
     let event_stream = fnet_routes_ext::event_stream_from_state::<I>(&state_proxy)
         .expect("failed to connect to routes watcher");
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
 
     // Collect the routes installed in the Netstack.
     let mut routes = Vec::new();
@@ -647,7 +648,7 @@ async fn watcher_add_before_watch<
         .expect("failed to connect to routes watcher");
 
     // Verify that the previously added route is observed as `existing`.
-    futures::pin_mut!(event_stream);
+    let event_stream = pin!(event_stream);
     let existing = fnet_routes_ext::collect_routes_until_idle::<I, Vec<_>>(event_stream)
         .await
         .expect("failed to collect existing routes");
@@ -679,7 +680,7 @@ async fn watcher_add_remove<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext:
         realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect to routes/State");
     let event_stream = fnet_routes_ext::event_stream_from_state::<I>(&state_proxy)
         .expect("failed to connect to routes watcher");
-    futures::pin_mut!(event_stream);
+    let mut event_stream = pin!(event_stream);
 
     // Skip all `existing` events.
     let _existing_routes =
@@ -775,7 +776,7 @@ async fn watcher_outlives_state<
         realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect to routes/State");
     let event_stream = fnet_routes_ext::event_stream_from_state::<I>(&state_proxy)
         .expect("failed to connect to routes watcher");
-    futures::pin_mut!(event_stream);
+    let event_stream = pin!(event_stream);
 
     // Drop the state proxy and verify the event_stream stays open
     drop(state_proxy);

@@ -39,7 +39,7 @@ use packet_formats::{
     testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame,
 };
 use reachability_core::{LinkState, State, FIDL_TIMEOUT_ID};
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, pin::pin, rc::Rc};
 use test_case::test_case;
 use tracing::info;
 
@@ -596,9 +596,9 @@ async fn test_state<N: Netstack>(
         configs.iter().cloned().map(|(c, _)| c).collect::<Vec<InterfaceConfig>>();
     let (sender, receiver) = mpsc::unbounded();
     let echo_receiver = receiver.fuse();
-    futures::pin_mut!(echo_receiver);
+    let mut echo_receiver = pin!(echo_receiver);
     let echo_reply_streams = echo_reply_streams(interfaces, interface_configs, sender).fuse();
-    futures::pin_mut!(echo_reply_streams);
+    let mut echo_reply_streams = pin!(echo_reply_streams);
     let () = accelerate_fake_clock(&env.fake_clock).await;
 
     // TODO(https://fxbug.dev/42144302): Get reachability monitor's reachability state over FIDL rather
@@ -629,7 +629,7 @@ async fn test_state<N: Netstack>(
         Some((yielded, Some(duration)))
     })
     .fuse();
-    futures::pin_mut!(inspect_data_stream);
+    let mut inspect_data_stream = pin!(inspect_data_stream);
 
     // Ensure that at least one echo request has been replied to before polling the inspect data
     // stream to guarantee that reachability monitor has initialized its inspect data tree.
@@ -650,7 +650,7 @@ async fn test_state<N: Netstack>(
     let reachability_monitor_wait_fut =
         wait_for_component_stopped(&env.realm, constants::reachability::COMPONENT_NAME, None)
             .fuse();
-    futures::pin_mut!(reachability_monitor_wait_fut);
+    let mut reachability_monitor_wait_fut = pin!(reachability_monitor_wait_fut);
 
     loop {
         futures::select! {
@@ -754,10 +754,10 @@ impl<'a> ReachabilityTestHelper<'a> {
             None,
         )
         .fuse();
-        futures::pin_mut!(reachability_monitor_wait_fut);
+        let mut reachability_monitor_wait_fut = pin!(reachability_monitor_wait_fut);
 
         let snapshot_fut = self.monitor.watch();
-        futures::pin_mut!(snapshot_fut);
+        let mut snapshot_fut = pin!(snapshot_fut);
 
         futures::select! {
             _ = self.echo_reply_streams.as_mut() => {

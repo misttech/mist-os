@@ -567,7 +567,7 @@ mod tests {
         fidl::endpoints::create_proxy,
         fidl_fuchsia_wlan_common as fidl_common,
         futures::{stream::StreamFuture, task::Poll, Future},
-        pin_utils::pin_mut,
+        std::pin::pin,
         wlan_common::assert_variant,
     };
 
@@ -662,12 +662,12 @@ mod tests {
         // Run the started state and ignore the status request
         let fut = started_state(test_values.deps, req);
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
@@ -725,12 +725,12 @@ mod tests {
         // Run the started state and ignore the status request
         let fut = started_state(test_values.deps, req);
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
@@ -779,12 +779,12 @@ mod tests {
         // Run the started state and ignore the status request
         let fut = started_state(test_values.deps, req);
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
@@ -862,12 +862,12 @@ mod tests {
         // Run the started state and send back an identical status.
         let fut = started_state(test_values.deps, req);
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
@@ -916,12 +916,12 @@ mod tests {
         // Run the started state and send back an identical status.
         let fut = started_state(test_values.deps, req);
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
@@ -974,7 +974,7 @@ mod tests {
         // Run the started state and send back an identical status.
         let fut = started_state(test_values.deps, req);
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The state machine should exit when it is unable to query status.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
@@ -996,7 +996,7 @@ mod tests {
         // Run the stopped state.
         let fut = stopped_state(test_values.deps);
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -1018,7 +1018,7 @@ mod tests {
         // Run the stopped state.
         let fut = stopped_state(test_values.deps);
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Issue an exit request.
         let mut ap = AccessPoint::new(test_values.ap_req_sender);
@@ -1038,7 +1038,7 @@ mod tests {
         // Run the stopped state.
         let fut = stopped_state(test_values.deps);
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Issue a start request.
         let (sender, mut receiver) = oneshot::channel();
@@ -1056,7 +1056,7 @@ mod tests {
 
         // Expect that the state machine issues a stop request.
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(
@@ -1114,7 +1114,7 @@ mod tests {
         let (stop_sender, mut stop_receiver) = oneshot::channel();
         let fut = stopping_state(test_values.deps, stop_sender);
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Issue an exit request.
         let mut ap = AccessPoint::new(test_values.ap_req_sender);
@@ -1128,7 +1128,7 @@ mod tests {
 
         // Once stop AP request is finished, the state machine can terminate
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => {
@@ -1149,7 +1149,7 @@ mod tests {
         let (stop_sender, mut stop_receiver) = oneshot::channel();
         let fut = stopping_state(test_values.deps, stop_sender);
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Verify that no state update is ready yet.
         assert_variant!(&mut test_values.update_receiver.try_next(), Err(_));
@@ -1161,7 +1161,7 @@ mod tests {
 
         // Expect the stop request from the SME proxy
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(
@@ -1193,7 +1193,7 @@ mod tests {
         let (stop_sender, mut stop_receiver) = oneshot::channel();
         let fut = stopping_state(test_values.deps, stop_sender);
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Issue a start request.
         let (start_sender, mut start_receiver) = oneshot::channel();
@@ -1213,7 +1213,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut stop_receiver), Poll::Pending);
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
         let stop_responder = assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Stop{ responder }) => responder
@@ -1266,7 +1266,7 @@ mod tests {
         let (stop_sender, mut stop_receiver) = oneshot::channel();
         let fut = stopping_state(test_values.deps, stop_sender);
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The state machine should exit when it is unable to issue the stop command.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
@@ -1289,14 +1289,14 @@ mod tests {
         let (stop_sender, mut stop_receiver) = oneshot::channel();
         let fut = stopping_state(test_values.deps, stop_sender);
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Verify that no state update is ready yet.
         assert_variant!(&mut test_values.update_receiver.try_next(), Err(_));
 
         // Expect the stop request from the SME proxy
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(
@@ -1336,13 +1336,13 @@ mod tests {
         // Start off in the starting state
         let fut = starting_state(test_values.deps, req, 0, Some(start_sender));
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Handle the initial disconnect request
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(
@@ -1420,13 +1420,13 @@ mod tests {
         // Start off in the starting state
         let fut = starting_state(test_values.deps, req, 0, Some(start_sender));
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Handle the initial disconnect request
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(
@@ -1535,13 +1535,13 @@ mod tests {
         // Start off in the starting state
         let fut = starting_state(test_values.deps, req, 0, Some(start_sender));
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Handle the initial disconnect request
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(
@@ -1607,7 +1607,7 @@ mod tests {
         // Start off in the starting state
         let fut = starting_state(test_values.deps, req, 0, Some(start_sender));
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Run the state machine and expect it to exit
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
@@ -1634,13 +1634,13 @@ mod tests {
         // Start off in the starting state
         let fut = starting_state(test_values.deps, req, 0, Some(start_sender));
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Handle the initial disconnect request and send back a failure.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(
@@ -1685,11 +1685,11 @@ mod tests {
         // Start off in the starting state with AP_START_MAX_RETRIES retry attempts.
         let fut = starting_state(test_values.deps, req, AP_START_MAX_RETRIES, Some(start_sender));
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // We'll need to inject some SME responses.
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         for retry_number in 0..(AP_START_MAX_RETRIES + 1) {
             // Handle the initial stop request.
@@ -1797,11 +1797,11 @@ mod tests {
         // Start off in the starting state with AP_START_MAX_RETRIES retry attempts.
         let fut = starting_state(test_values.deps, req, AP_START_MAX_RETRIES, Some(start_sender));
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // We'll need to inject some SME responses.
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Handle the initial stop request.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -1920,11 +1920,11 @@ mod tests {
         // Start off in the starting state with AP_START_MAX_RETRIES retry attempts.
         let fut = starting_state(test_values.deps, req, AP_START_MAX_RETRIES, Some(start_sender));
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // We'll need to inject some SME responses.
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Handle the initial stop request.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2028,11 +2028,11 @@ mod tests {
         // Start off in the starting state with AP_START_MAX_RETRIES retry attempts.
         let fut = starting_state(test_values.deps, req, AP_START_MAX_RETRIES, Some(start_sender));
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // We'll need to inject some SME responses.
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         // Handle the initial stop request.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2109,12 +2109,12 @@ mod tests {
 
         let fut = async move { perform_manual_request(test_values.deps, Some(manual_request)) };
         let fut = run_state_machine(fut);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // We should get a stop request
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
@@ -2148,7 +2148,7 @@ mod tests {
         let test_values = test_setup();
         let sme_event_stream = test_values.deps.proxy.take_event_stream();
         let sme_fut = test_values.sme_req_stream.into_future();
-        pin_mut!(sme_fut);
+        let mut sme_fut = pin!(sme_fut);
 
         let update_sender = test_values.deps.state_tracker.inner.lock().sender.clone();
 
@@ -2161,7 +2161,7 @@ mod tests {
             test_values.deps.telemetry_sender,
             test_values.deps.defect_sender,
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Run the state machine. No request is made initially.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2184,7 +2184,7 @@ mod tests {
             test_values.deps.telemetry_sender,
             test_values.deps.defect_sender,
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Cause the SME event stream to terminate.
         drop(test_values.sme_req_stream);
@@ -2216,7 +2216,7 @@ mod tests {
             test_values.deps.telemetry_sender,
             test_values.deps.defect_sender,
         );
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Make a request to start the access point.
         let mut ap = AccessPoint::new(test_values.ap_req_sender);

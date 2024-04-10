@@ -8,7 +8,8 @@ use fidl_fuchsia_bluetooth_sys::{
     InputCapability, OutputCapability, PairingDelegateMarker, PairingMarker,
 };
 use fuchsia_bluetooth::types::HostId;
-use futures::{pin_mut, select, stream::StreamExt, FutureExt};
+use futures::{select, stream::StreamExt, FutureExt};
+use std::pin::pin;
 
 use crate::{host_dispatcher, services::pairing};
 
@@ -28,8 +29,7 @@ async fn set_pairing_delegate() {
     // Create the pairing server
     let (pairing_client, pairing_server) =
         endpoints::create_proxy_and_stream::<PairingMarker>().unwrap();
-    let run_pairing = pairing::run(hd.clone(), pairing_server);
-    pin_mut!(run_pairing);
+    let run_pairing = pin!(pairing::run(hd.clone(), pairing_server));
 
     // First client to request to set the delegate should be OK.
     let input = InputCapability::None;

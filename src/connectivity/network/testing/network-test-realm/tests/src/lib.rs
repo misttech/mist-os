@@ -30,7 +30,7 @@ use netstack_testing_common::{
 };
 use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
-use std::convert::TryInto as _;
+use std::{convert::TryInto as _, pin::pin};
 use test_case::test_case;
 
 const INTERFACE1_MAC_ADDRESS: fnet::MacAddress = fidl_mac!("02:03:04:05:06:07");
@@ -1619,7 +1619,7 @@ async fn expect_multicast_event(
             // must wait for the expected event.
             events.contains(expected_event).then(|| ())
         });
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
     stream.next().await.expect("failed to find expected multicast event");
 }
 

@@ -22,7 +22,7 @@ use fidl_fuchsia_net_routes_ext::{
 use fidl_fuchsia_net_stack as fnet_stack;
 use fuchsia_async::TimeoutExt as _;
 use fuchsia_zircon as zx;
-use futures::{future::FutureExt as _, pin_mut, StreamExt};
+use futures::{future::FutureExt as _, StreamExt};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix};
 use net_types::{
@@ -34,6 +34,7 @@ use netstack_testing_common::{
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
+use std::pin::pin;
 use test_case::test_case;
 
 const METRIC_TRACKS_INTERFACE: fnet_routes::SpecifiedMetric =
@@ -159,7 +160,7 @@ async fn add_remove_route<
 
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
-    pin_mut!(routes_stream);
+    let mut routes_stream = pin!(routes_stream);
 
     let mut routes =
         fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
@@ -491,7 +492,7 @@ async fn add_route_twice_with_same_set<
 
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
-    pin_mut!(routes_stream);
+    let mut routes_stream = pin!(routes_stream);
 
     let mut routes =
         fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
@@ -580,7 +581,7 @@ async fn add_route_with_multiple_route_sets<
 
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
-    pin_mut!(routes_stream);
+    let mut routes_stream = pin!(routes_stream);
 
     let mut routes =
         fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
@@ -677,7 +678,7 @@ async fn add_remove_system_route<
 
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
-    pin_mut!(routes_stream);
+    let mut routes_stream = pin!(routes_stream);
 
     let mut routes =
         fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
@@ -787,7 +788,7 @@ async fn system_removes_route_from_route_set<
 
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
-    pin_mut!(routes_stream);
+    let mut routes_stream = pin!(routes_stream);
 
     let mut routes =
         fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
@@ -896,7 +897,7 @@ async fn root_route_apis_can_remove_loopback_route<
 
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
-    pin_mut!(routes_stream);
+    let mut routes_stream = pin!(routes_stream);
 
     let mut routes = HashSet::new();
     let loopback_dest = I::map_ip(
@@ -1014,7 +1015,7 @@ async fn removing_one_default_route_does_not_flip_presence<
 
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
-    pin_mut!(routes_stream);
+    let mut routes_stream = pin!(routes_stream);
 
     let route_set_1 =
         fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
@@ -1034,7 +1035,7 @@ async fn removing_one_default_route_does_not_flip_presence<
     let route_set_2 = authenticate(route_set_2).await;
 
     let events = interface.get_interface_event_stream().expect("get interface event stream").fuse();
-    pin_mut!(events);
+    let mut events = pin!(events);
 
     let default_route = |metric| {
         let destination =
@@ -1175,7 +1176,7 @@ async fn dropping_global_route_set_does_not_remove_routes<
 
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
-    pin_mut!(routes_stream);
+    let mut routes_stream = pin!(routes_stream);
 
     let mut routes =
         fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
@@ -1285,7 +1286,7 @@ async fn interface_authorization_fails_with_invalid_token<
 
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
-    pin_mut!(routes_stream);
+    let mut routes_stream = pin!(routes_stream);
 
     let proxy = match route_set_type {
         RouteSet::Global => fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
@@ -1412,7 +1413,7 @@ async fn unauthenticated_connections_cannot_remove_routes<
         TestSetup::<I>::new::<N>(&sandbox, name).await;
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
-    pin_mut!(routes_stream);
+    let mut routes_stream = pin!(routes_stream);
 
     let route_to_add = test_route(&interface, METRIC_TRACKS_INTERFACE);
     let mut routes =

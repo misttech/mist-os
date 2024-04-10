@@ -564,9 +564,9 @@ mod tests {
 
     use async_utils::PollExt;
     use fidl::endpoints::create_proxy_and_stream;
-    use futures::pin_mut;
     use futures::task::{Context, Poll};
     use futures_test::task::new_count_waker;
+    use std::pin::pin;
 
     /// Returns true if the provided `service` has an assigned Server Channel.
     fn service_def_has_assigned_server_channel(service: &bredr::ServiceDefinition) -> bool {
@@ -671,7 +671,7 @@ mod tests {
         let (profile_client, profile_server) =
             create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
         let send_fut = service_sender.send(Service::Profile(profile_server));
-        pin_mut!(send_fut);
+        let mut send_fut = pin!(send_fut);
         let _ = exec.run_until_stalled(&mut send_fut);
         profile_client
     }
@@ -705,7 +705,7 @@ mod tests {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
-        pin_mut!(handler_fut);
+        let mut handler_fut = pin!(handler_fut);
         exec.run_until_stalled(&mut handler_fut)
             .expect_pending("shouldn't be done while service_sender is live");
 
@@ -719,7 +719,7 @@ mod tests {
         // Client decides to advertise empty services.
         let services = vec![];
         let (_connection_stream, adv_fut) = make_advertise_request(&client, services);
-        pin_mut!(adv_fut);
+        let mut adv_fut = pin!(adv_fut);
         exec.run_until_stalled(&mut adv_fut).expect_pending("should still be advertising");
 
         let _ = exec.run_until_stalled(&mut handler_fut);
@@ -746,7 +746,7 @@ mod tests {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
-        pin_mut!(handler_fut);
+        let mut handler_fut = pin!(handler_fut);
         exec.run_until_stalled(&mut handler_fut)
             .expect_pending("shouldn't be done while service_sender is live");
 
@@ -761,7 +761,7 @@ mod tests {
         let services =
             vec![bredr::ServiceDefinition::try_from(&other_service_definition(Psm::new(1)))?];
         let (_connection_stream, adv_fut) = make_advertise_request(&client, services);
-        pin_mut!(adv_fut);
+        let mut adv_fut = pin!(adv_fut);
         exec.run_until_stalled(&mut adv_fut).expect_pending("should be advertising");
 
         exec.run_until_stalled(&mut handler_fut)
@@ -783,7 +783,7 @@ mod tests {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
-        pin_mut!(handler_fut);
+        let mut handler_fut = pin!(handler_fut);
         exec.run_until_stalled(&mut handler_fut)
             .expect_pending("shouldn't be done while service_sender is live");
 
@@ -800,7 +800,7 @@ mod tests {
                 bredr::ServiceDefinition::try_from(&other_service_definition(Psm::new(1))).unwrap()
             ];
         let (_connection_stream, adv_fut) = make_advertise_request(&client, services);
-        pin_mut!(adv_fut);
+        let mut adv_fut = pin!(adv_fut);
         exec.run_until_stalled(&mut adv_fut).expect_pending("should still be advertising");
 
         exec.run_until_stalled(&mut handler_fut)
@@ -820,7 +820,7 @@ mod tests {
         let expected_peer_id = PeerId(1);
         let connect_fut =
             make_l2cap_connection_request(&client, expected_peer_id, bredr::PSM_AVDTP);
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
 
         let _ = exec.run_until_stalled(&mut handler_fut);
         // The advertisement request should be relayed directly upstream.
@@ -880,7 +880,7 @@ mod tests {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
-        pin_mut!(handler_fut);
+        let mut handler_fut = pin!(handler_fut);
         exec.run_until_stalled(&mut handler_fut)
             .expect_pending("shouldn't be done while service_sender is live");
 
@@ -894,7 +894,7 @@ mod tests {
         // Client decides to advertise.
         let services = vec![bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None))?];
         let (_connection_stream, adv_fut) = make_advertise_request(&client, services);
-        pin_mut!(adv_fut);
+        let mut adv_fut = pin!(adv_fut);
         exec.run_until_stalled(&mut adv_fut).expect_pending("should still be advertising");
 
         exec.run_until_stalled(&mut handler_fut)
@@ -919,7 +919,7 @@ mod tests {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
-        pin_mut!(handler_fut);
+        let mut handler_fut = pin!(handler_fut);
         exec.run_until_stalled(&mut handler_fut)
             .expect_pending("shouldn't be done while service_sender is live");
 
@@ -938,7 +938,7 @@ mod tests {
         ];
         let n = services.len();
         let (_connection_stream, adv_fut) = make_advertise_request(&client, services);
-        pin_mut!(adv_fut);
+        let mut adv_fut = pin!(adv_fut);
         exec.run_until_stalled(&mut adv_fut).expect_pending("should still be advertising");
 
         let _ = exec.run_until_stalled(&mut handler_fut);
@@ -971,7 +971,7 @@ mod tests {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
-        pin_mut!(handler_fut);
+        let mut handler_fut = pin!(handler_fut);
         exec.run_until_stalled(&mut handler_fut)
             .expect_pending("shouldn't be done while service_sender is live");
 
@@ -989,7 +989,7 @@ mod tests {
             bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None))?,
         ];
         let (_connection_stream1, adv_fut1) = make_advertise_request(&client1, services1);
-        pin_mut!(adv_fut1);
+        let mut adv_fut1 = pin!(adv_fut1);
         exec.run_until_stalled(&mut adv_fut1).expect_pending("should still be advertising");
 
         exec.run_until_stalled(&mut handler_fut)
@@ -1012,7 +1012,7 @@ mod tests {
             bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None))?,
         ];
         let (_connection_stream2, adv_fut2) = make_advertise_request(&client2, services2);
-        pin_mut!(adv_fut2);
+        let mut adv_fut2 = pin!(adv_fut2);
         exec.run_until_stalled(&mut adv_fut2).expect_pending("should should be advertising");
 
         exec.run_until_stalled(&mut handler_fut)
@@ -1035,7 +1035,7 @@ mod tests {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
-        pin_mut!(handler_fut);
+        let mut handler_fut = pin!(handler_fut);
         exec.run_until_stalled(&mut handler_fut)
             .expect_pending("shouldn't be done while service_sender is live");
 
@@ -1054,7 +1054,7 @@ mod tests {
         ];
         let n1 = services1.len();
         let (_connection_stream1, adv_fut1) = make_advertise_request(&client1, services1);
-        pin_mut!(adv_fut1);
+        let mut adv_fut1 = pin!(adv_fut1);
         exec.run_until_stalled(&mut adv_fut1).expect_pending("should still be advertising");
 
         exec.run_until_stalled(&mut handler_fut)
@@ -1083,7 +1083,7 @@ mod tests {
             bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None)).unwrap(),
         ];
         let (_connection_stream2, adv_fut2) = make_advertise_request(&client2, services2);
-        pin_mut!(adv_fut2);
+        let mut adv_fut2 = pin!(adv_fut2);
         exec.run_until_stalled(&mut adv_fut2).expect_pending("should still be advertising");
 
         let _ = exec.run_until_stalled(&mut handler_fut);
@@ -1114,7 +1114,7 @@ mod tests {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
-        pin_mut!(handler_fut);
+        let mut handler_fut = pin!(handler_fut);
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // A new client connection to bt-rfcomm and advertises an OBEX service.
@@ -1127,7 +1127,7 @@ mod tests {
         let services =
             vec![bredr::ServiceDefinition::try_from(&obex_service_definition(obex_psm)).unwrap()];
         let (mut connection_stream, adv_fut) = make_advertise_request(&client, services);
-        pin_mut!(adv_fut);
+        let mut adv_fut = pin!(adv_fut);
         exec.run_until_stalled(&mut adv_fut).expect_pending("still advertising");
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
@@ -1159,7 +1159,7 @@ mod tests {
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         let connect_fut = connection_stream.next();
-        pin_mut!(connect_fut);
+        let mut connect_fut = pin!(connect_fut);
         let _handle = match exec.run_until_stalled(&mut connect_fut).expect("ready result") {
             Some(Ok(bredr::ConnectionReceiverRequest::Connected {
                 peer_id,
@@ -1183,7 +1183,7 @@ mod tests {
         let (search_request, _stream) = generate_search_request(&mut exec);
 
         let handle_fut = server.handle_profile_request(search_request);
-        pin_mut!(handle_fut);
+        let mut handle_fut = pin!(handle_fut);
 
         assert!(exec.run_until_stalled(&mut handle_fut).is_ready());
 
@@ -1202,7 +1202,7 @@ mod tests {
         let (connect_sco_request, _receiver_server) = generate_connect_sco_request(&mut exec);
 
         let handle_fut = server.handle_profile_request(connect_sco_request);
-        pin_mut!(handle_fut);
+        let mut handle_fut = pin!(handle_fut);
 
         assert!(exec.run_until_stalled(&mut handle_fut).is_ready());
 
@@ -1225,7 +1225,7 @@ mod tests {
         let params = AdvertiseParams { services: vec![], parameters: ChannelParameters::default() };
 
         let advertise_fut = ProfileRegistrar::advertise(upstream, params, connect_client);
-        pin_mut!(advertise_fut);
+        let mut advertise_fut = pin!(advertise_fut);
         exec.run_until_stalled(&mut advertise_fut).expect_pending("should still be advertising");
 
         let (_connection_receiver, responder) = match exec
@@ -1255,10 +1255,10 @@ mod tests {
         let (sender, mut receiver) = mpsc::channel(0);
 
         let relay_fut = ProfileRegistrar::connection_request_relay(connect_requests, sender);
-        pin_mut!(relay_fut);
+        let mut relay_fut = pin!(relay_fut);
 
         let receiver_fut = receiver.next();
-        pin_mut!(receiver_fut);
+        let mut receiver_fut = pin!(receiver_fut);
 
         // The task should still be active and no messages sent.
         exec.run_until_stalled(&mut relay_fut)

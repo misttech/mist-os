@@ -342,8 +342,8 @@ mod tests {
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::types::Uuid;
     use fuchsia_zircon as zx;
-    use futures::{pin_mut, SinkExt, TryStreamExt};
-    use std::collections::HashSet;
+    use futures::{SinkExt, TryStreamExt};
+    use std::{collections::HashSet, pin::pin};
     use test_battery_manager::TestBatteryManager;
 
     use crate::audio::TestAudioControl;
@@ -430,7 +430,7 @@ mod tests {
         let mut exec = fuchsia_async::TestExecutor::new();
         let (profile, profile_svc, server) = setup_profile_and_test_server();
         let setup_fut = TestBatteryManager::make_battery_client_with_test_manager();
-        pin_mut!(setup_fut);
+        let mut setup_fut = pin!(setup_fut);
         let (battery_client, _test_mgr) = exec.run_singlethreaded(&mut setup_fut);
         let (proxy, stream) = create_proxy_and_stream::<CallManagerMarker>().unwrap();
 
@@ -460,7 +460,7 @@ mod tests {
 
         // Peer Connected notification occurs after channel is connected.
         let call_manager = call_manager_init_and_peer_handling(stream);
-        futures::pin_mut!(call_manager);
+        let mut call_manager = pin!(call_manager);
         assert!(exec.run_until_stalled(&mut call_manager).is_pending());
 
         let (remote, _local) = zx::Socket::create_datagram();
@@ -589,7 +589,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (profile, profile_svc, mut server) = setup_profile_and_test_server();
         let setup_fut = TestBatteryManager::make_battery_client_with_test_manager();
-        pin_mut!(setup_fut);
+        let mut setup_fut = pin!(setup_fut);
         let (battery_client, _test_mgr) = exec.run_singlethreaded(&mut setup_fut);
         let (proxy, mut stream) = create_proxy_and_stream::<CallManagerMarker>().unwrap();
 
@@ -612,8 +612,7 @@ mod tests {
             rx,
         );
 
-        let hfp_fut = hfp.run();
-        futures::pin_mut!(hfp_fut);
+        let hfp_fut = pin!(hfp.run());
         // Complete registration by the peer.
         let ((), hfp_fut) = run_while(&mut exec, hfp_fut, server.complete_registration());
 
@@ -762,7 +761,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (profile, profile_svc, _server) = setup_profile_and_test_server();
         let setup_fut = TestBatteryManager::make_battery_client_with_test_manager();
-        pin_mut!(setup_fut);
+        let mut setup_fut = pin!(setup_fut);
         let (battery_client, test_battery_manager) = exec.run_singlethreaded(&mut setup_fut);
 
         let (_sender, receiver) = mpsc::channel(1);
@@ -787,8 +786,7 @@ mod tests {
         let (mut peer_receiver, peer) = PeerFake::new(id);
         let _ = hfp.peers.insert(id, Box::new(peer));
 
-        let hfp_fut = hfp.run();
-        futures::pin_mut!(hfp_fut);
+        let hfp_fut = pin!(hfp.run());
 
         // Make a battery update via the TestBatteryManager.
         let update = fpower::BatteryInfo {
@@ -797,8 +795,7 @@ mod tests {
             level_percent: Some(88f32),
             ..Default::default()
         };
-        let update_fut = test_battery_manager.send_update(update);
-        pin_mut!(update_fut);
+        let update_fut = pin!(test_battery_manager.send_update(update));
         let (res, hfp_fut) = run_while(&mut exec, hfp_fut, update_fut);
         assert_matches!(res, Ok(_));
 

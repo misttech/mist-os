@@ -749,6 +749,7 @@ mod tests {
             PeerHandlerMarker, PeerHandlerRequest, PeerHandlerRequestStream,
         },
         fuchsia_async as fasync,
+        std::pin::pin,
     };
 
     #[fuchsia::test]
@@ -1409,7 +1410,7 @@ mod tests {
         // Send DTMF code to a call that is not in a state which accepts DTMF codes.
         {
             let send = calls.send_dtmf_code(DtmfCode::One);
-            futures::pin_mut!(send);
+            let mut send = pin!(send);
             let result = exec.run_until_stalled(&mut send).unwrap();
             // Call is IncomingRinging so it cannot accept a DTMF Code.
             assert!(result.is_err());
@@ -1423,7 +1424,7 @@ mod tests {
         // Sending a DTMF code should now succeed.
         {
             let send = calls.send_dtmf_code(DtmfCode::One);
-            futures::pin_mut!(send);
+            let mut send = pin!(send);
             assert!(exec.run_until_stalled(&mut send).is_pending());
             assert_dtmf_code(&mut exec, &mut call_1, DtmfCode::One, Ok(()));
             let result = exec.run_until_stalled(&mut send).unwrap();
@@ -1434,7 +1435,7 @@ mod tests {
         // Errors from DTMF codes are propagated back to sender.
         {
             let send = calls.send_dtmf_code(DtmfCode::One);
-            futures::pin_mut!(send);
+            let mut send = pin!(send);
             assert!(exec.run_until_stalled(&mut send).is_pending());
             assert_dtmf_code(&mut exec, &mut call_1, DtmfCode::One, Err(0));
             let result = exec.run_until_stalled(&mut send).unwrap();
@@ -1448,7 +1449,7 @@ mod tests {
         poll_calls_until_pending(&mut exec, &mut calls);
         {
             let send = calls.send_dtmf_code(DtmfCode::One);
-            futures::pin_mut!(send);
+            let mut send = pin!(send);
             let result = exec.run_until_stalled(&mut send).unwrap();
             // There are no calls present to which to direct the DTMF code.
             assert!(result.is_err());

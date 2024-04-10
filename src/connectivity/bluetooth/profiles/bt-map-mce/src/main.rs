@@ -6,12 +6,12 @@
 
 use anyhow::{format_err, Context, Error};
 use fidl_fuchsia_bluetooth_bredr as bredr;
-use fuchsia_async::pin_mut;
 use fuchsia_bluetooth::profile::psm_from_protocol;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
 use futures::{channel::mpsc, FutureExt};
 use profile_client::ProfileEvent;
+use std::pin::pin;
 use tracing::{error, info, trace, warn};
 
 mod fidl_service;
@@ -36,8 +36,7 @@ async fn main() -> Result<(), Error> {
 
     // Run the fidl service to accept incoming fidl requests.
     let fs = ServiceFs::new();
-    let service_fut = run_service(fs, fidl_request_sender).fuse();
-    pin_mut!(service_fut);
+    let mut service_fut = pin!(run_service(fs, fidl_request_sender).fuse());
 
     // Process requests.
     loop {

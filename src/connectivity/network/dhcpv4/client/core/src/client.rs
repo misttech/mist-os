@@ -8,9 +8,7 @@ use crate::deps::{self, DatagramInfo, Instant as _, Socket as _};
 use crate::parse::{OptionCodeMap, OptionRequested};
 use anyhow::Context as _;
 use dhcp_protocol::{AtLeast, AtMostBytes, CLIENT_PORT, SERVER_PORT};
-use futures::{
-    channel::mpsc, pin_mut, select, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _,
-};
+use futures::{channel::mpsc, select, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
 use net_types::{ethernet::Mac, SpecifiedAddr, Witness as _};
 use rand::Rng as _;
 
@@ -18,6 +16,7 @@ use std::{
     fmt::{Debug, Display},
     net::Ipv4Addr,
     num::{NonZeroU32, NonZeroU64},
+    pin::pin,
     time::Duration,
 };
 
@@ -624,7 +623,7 @@ impl<I: deps::Instant> WaitingToRestart<I> {
     ) -> WaitingToRestartOutcome {
         let Self { waiting_until } = self;
         let wait_fut = clock.wait_until(*waiting_until).fuse();
-        pin_mut!(wait_fut);
+        let mut wait_fut = pin!(wait_fut);
 
         select! {
             () = wait_fut => WaitingToRestartOutcome::Init(Init::default()),
@@ -968,7 +967,7 @@ impl<I: deps::Instant> Selecting<I> {
             SERVER_PORT,
         );
 
-        let send_fut = send_with_retransmits(
+        let mut send_fut = pin!(send_with_retransmits(
             time,
             retransmit_schedule_during_acquisition(rng.get_rng()),
             message.as_ref(),
@@ -976,10 +975,10 @@ impl<I: deps::Instant> Selecting<I> {
             /* dest= */ Mac::BROADCAST,
             *debug_log_prefix,
         )
-        .fuse();
+        .fuse());
 
         let mut recv_buf = [0u8; BUFFER_SIZE];
-        let offer_fields_stream = recv_stream(
+        let mut offer_fields_stream = pin!(recv_stream(
             &socket,
             &mut recv_buf,
             |packet, src_addr| {
@@ -1011,9 +1010,7 @@ impl<I: deps::Instant> Selecting<I> {
                 }
             })
         })
-        .fuse();
-
-        pin_mut!(send_fut, offer_fields_stream);
+        .fuse());
 
         select! {
             send_discovers_result = send_fut => {
@@ -1153,7 +1150,7 @@ impl<I: deps::Instant> Requesting<I> {
             debug_log_prefix,
         } = client_config;
 
-        let send_fut = send_with_retransmits(
+        let mut send_fut = pin!(send_with_retransmits(
             time,
             retransmit_schedule_during_acquisition(rng.get_rng()).take(NUM_REQUEST_RETRANSMITS),
             message.as_ref(),
@@ -1161,11 +1158,11 @@ impl<I: deps::Instant> Requesting<I> {
             Mac::BROADCAST,
             *debug_log_prefix,
         )
-        .fuse();
+        .fuse());
 
         let mut recv_buf = [0u8; BUFFER_SIZE];
 
-        let ack_or_nak_stream = recv_stream(
+        let mut ack_or_nak_stream = pin!(recv_stream(
             &socket,
             &mut recv_buf,
             |packet, src_addr| {
@@ -1198,9 +1195,8 @@ impl<I: deps::Instant> Requesting<I> {
                 }
             })
         })
-        .fuse();
+        .fuse());
 
-        pin_mut!(send_fut, ack_or_nak_stream);
         let (src_addr, fields_to_retain) = select! {
             send_requests_result = send_fut => {
                 send_requests_result?;
@@ -1369,7 +1365,7 @@ impl<I: deps::Instant> Bound<I> {
         );
 
         let renewal_timeout_fut = time.wait_until(start_time.add(renewal_time)).fuse();
-        pin_mut!(renewal_timeout_fut);
+        let mut renewal_timeout_fut = pin!(renewal_timeout_fut);
         select! {
             () = renewal_timeout_fut => BoundOutcome::Renewing(Renewing { bound: self.clone() }),
             () = stop_receiver.select_next_some() => BoundOutcome::GracefulShutdown,
@@ -1470,7 +1466,7 @@ impl<I: deps::Instant> Renewing<I> {
             server_identifier.get().into(),
             SERVER_PORT.get(),
         ));
-        let send_fut = send_with_retransmits_at_instants(
+        let mut send_fut = pin!(send_with_retransmits_at_instants(
             time,
             std::iter::from_fn(|| {
                 let now = time.now();
@@ -1482,10 +1478,10 @@ impl<I: deps::Instant> Renewing<I> {
             server_sockaddr,
             debug_log_prefix,
         )
-        .fuse();
+        .fuse());
 
         let mut recv_buf = [0u8; BUFFER_SIZE];
-        let responses_stream = recv_stream(
+        let mut responses_stream = pin!(recv_stream(
             &socket,
             &mut recv_buf,
             |packet, addr| {
@@ -1514,10 +1510,9 @@ impl<I: deps::Instant> Renewing<I> {
                 }
             })
         })
-        .fuse();
+        .fuse());
 
-        let timeout_fut = time.wait_until(t2).fuse();
-        pin_mut!(send_fut, responses_stream, timeout_fut);
+        let mut timeout_fut = pin!(time.wait_until(t2).fuse());
 
         let response = select! {
             () = timeout_fut => return Ok(RenewingOutcome::Rebinding(
@@ -1677,7 +1672,7 @@ impl<I: deps::Instant> Rebinding<I> {
             Ipv4Addr::BROADCAST,
             SERVER_PORT.get(),
         ));
-        let send_fut = send_with_retransmits_at_instants(
+        let mut send_fut = pin!(send_with_retransmits_at_instants(
             time,
             std::iter::from_fn(|| {
                 let now = time.now();
@@ -1689,10 +1684,10 @@ impl<I: deps::Instant> Rebinding<I> {
             server_sockaddr,
             debug_log_prefix,
         )
-        .fuse();
+        .fuse());
 
         let mut recv_buf = [0u8; BUFFER_SIZE];
-        let responses_stream = recv_stream(
+        let mut responses_stream = pin!(recv_stream(
             &socket,
             &mut recv_buf,
             |packet, _addr| {
@@ -1735,10 +1730,9 @@ impl<I: deps::Instant> Rebinding<I> {
                 }
             })
         })
-        .fuse();
+        .fuse());
 
-        let timeout_fut = time.wait_until(lease_expiry).fuse();
-        pin_mut!(send_fut, responses_stream, timeout_fut);
+        let mut timeout_fut = pin!(time.wait_until(lease_expiry).fuse());
 
         let response = select! {
             () = timeout_fut => return Ok(RebindingOutcome::TimedOut),
@@ -1936,7 +1930,7 @@ mod test {
 
         let (stop_sender, mut stop_receiver) = mpsc::unbounded();
 
-        let selecting_fut = selecting
+        let mut selecting_fut = pin!(selecting
             .do_selecting(
                 &client_config,
                 &test_socket_provider,
@@ -1944,18 +1938,16 @@ mod test {
                 &time,
                 &mut stop_receiver,
             )
-            .fuse();
+            .fuse());
 
         let time = &time;
 
-        let wait_fut = async {
+        let mut wait_fut = pin!(async {
             // Wait some arbitrary amount of time to ensure `do_selecting` is waiting on a reply.
             // Note that this is fake time, not 30 actual seconds.
             time.wait_until(std::time::Duration::from_secs(30)).await;
         }
-        .fuse();
-
-        pin_mut!(selecting_fut, wait_fut);
+        .fuse());
 
         {
             let main_future = async {
@@ -1964,7 +1956,7 @@ mod test {
                     () = wait_fut => (),
                 }
             };
-            pin_mut!(main_future);
+            let mut main_future = pin!(main_future);
 
             run_with_accelerated_time(&mut executor, time, &mut main_future);
         }
@@ -2028,7 +2020,7 @@ mod test {
 
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
 
-        let selecting_fut = selecting
+        let mut selecting_fut = pin!(selecting
             .do_selecting(
                 &client_config,
                 &test_socket_provider,
@@ -2036,7 +2028,7 @@ mod test {
                 &time,
                 &mut stop_receiver,
             )
-            .fuse();
+            .fuse());
 
         let time = &time;
 
@@ -2046,7 +2038,7 @@ mod test {
         const EXPECTED_RANGES: [(u64, u64); 7] =
             [(0, 0), (3, 5), (7, 9), (15, 17), (31, 33), (63, 65), (63, 65)];
 
-        let receive_fut = async {
+        let mut receive_fut = pin!(async {
             let mut previous_time = std::time::Duration::from_secs(0);
 
             for (start, end) in EXPECTED_RANGES {
@@ -2092,9 +2084,7 @@ mod test {
                 previous_time = received_time;
             }
         }
-        .fuse();
-
-        pin_mut!(selecting_fut, receive_fut);
+        .fuse());
 
         let main_future = async {
             select! {
@@ -2102,7 +2092,7 @@ mod test {
                 () = receive_fut => (),
             }
         };
-        pin_mut!(main_future);
+        let mut main_future = pin!(main_future);
 
         run_with_accelerated_time(&mut executor, time, &mut main_future);
     }
@@ -2173,7 +2163,7 @@ mod test {
 
         let client_config = test_client_config();
 
-        let selecting_fut = selecting
+        let selecting_fut = pin!(selecting
             .do_selecting(
                 &client_config,
                 &test_socket_provider,
@@ -2181,9 +2171,9 @@ mod test {
                 &time,
                 &mut stop_receiver,
             )
-            .fuse();
+            .fuse());
 
-        let server_fut = async {
+        let server_fut = pin!(async {
             let mut recv_buf = [0u8; BUFFER_SIZE];
 
             if reply_to_discover_with_garbage {
@@ -2318,16 +2308,14 @@ mod test {
 
             send_reply(good_reply).await;
         }
-        .fuse();
-
-        pin_mut!(selecting_fut, server_fut);
+        .fuse());
 
         let main_future = async move {
             let (selecting_result, ()) = join!(selecting_fut, server_fut);
             selecting_result
         }
         .fuse();
-        pin_mut!(main_future);
+        let mut main_future = pin!(main_future);
         let mut executor = fasync::TestExecutor::new();
         let selecting_result = run_with_accelerated_time(&mut executor, &time, &mut main_future);
 
@@ -2403,7 +2391,7 @@ mod test {
                 &mut stop_receiver,
             )
             .fuse();
-        pin_mut!(requesting_fut);
+        let mut requesting_fut = pin!(requesting_fut);
 
         let mut executor = fasync::TestExecutor::new();
         assert_matches!(executor.run_until_stalled(&mut requesting_fut), std::task::Poll::Pending);
@@ -2434,7 +2422,7 @@ mod test {
 
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
 
-        let requesting_fut = requesting
+        let requesting_fut = pin!(requesting
             .do_requesting(
                 &client_config,
                 &test_socket_provider,
@@ -2442,7 +2430,7 @@ mod test {
                 &time,
                 &mut stop_receiver,
             )
-            .fuse();
+            .fuse());
 
         let time = &time;
 
@@ -2452,7 +2440,7 @@ mod test {
         const EXPECTED_RANGES: [(u64, u64); NUM_REQUEST_RETRANSMITS + 1] =
             [(0, 0), (3, 5), (7, 9), (15, 17), (31, 33)];
 
-        let receive_fut = async {
+        let receive_fut = pin!(async {
             let mut previous_time = std::time::Duration::from_secs(0);
 
             for (start, end) in EXPECTED_RANGES {
@@ -2503,12 +2491,10 @@ mod test {
                 previous_time = received_time;
             }
         }
-        .fuse();
-
-        pin_mut!(requesting_fut, receive_fut);
+        .fuse());
 
         let main_future = async { join!(requesting_fut, receive_fut) };
-        pin_mut!(main_future);
+        let mut main_future = pin!(main_future);
 
         let (requesting_result, ()) =
             run_with_accelerated_time(&mut executor, time, &mut main_future);
@@ -2623,7 +2609,7 @@ mod test {
 
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
 
-        let requesting_fut = requesting
+        let requesting_fut = pin!(requesting
             .do_requesting(
                 &client_config,
                 &test_socket_provider,
@@ -2631,9 +2617,9 @@ mod test {
                 time,
                 &mut stop_receiver,
             )
-            .fuse();
+            .fuse());
 
-        let server_fut = async {
+        let server_fut = pin!(async {
             let mut recv_buf = [0u8; BUFFER_SIZE];
 
             let DatagramInfo { length, address } = server_end
@@ -2689,9 +2675,7 @@ mod test {
                 .await
                 .expect("send_to on test socket should succeed");
         }
-        .fuse();
-
-        pin_mut!(requesting_fut, server_fut);
+        .fuse());
 
         let main_future = async move {
             let (requesting_result, ()) = join!(requesting_fut, server_fut);
@@ -2699,7 +2683,7 @@ mod test {
         }
         .fuse();
 
-        pin_mut!(main_future);
+        let mut main_future = pin!(main_future);
 
         let mut executor = fasync::TestExecutor::new();
         let requesting_result = run_with_accelerated_time(&mut executor, time, &mut main_future);
@@ -2803,7 +2787,7 @@ mod test {
                 net_types::ip::Ipv4Addr::from(YIADDR).try_into().expect("should be specified"),
             )
             .fuse();
-        pin_mut!(reject_fut);
+        let mut reject_fut = pin!(reject_fut);
 
         let mut executor = fasync::TestExecutor::new();
         let reject_result = run_with_accelerated_time(&mut executor, time, &mut reject_fut);
@@ -2860,7 +2844,7 @@ mod test {
         let waiting = WaitingToRestart { waiting_until: WAITING_UNTIL };
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
         let main_fut = waiting.do_waiting_to_restart(time, &mut stop_receiver).fuse();
-        pin_mut!(main_fut);
+        let mut main_fut = pin!(main_fut);
         let mut executor = fasync::TestExecutor::new();
         let outcome = run_with_accelerated_time(&mut executor, time, &mut main_fut);
         assert_eq!(outcome, WaitingToRestartOutcome::Init(Init));
@@ -2883,7 +2867,7 @@ mod test {
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
         let config = &test_client_config();
         let main_fut = bound.do_bound(config, time, &mut stop_receiver).fuse();
-        pin_mut!(main_fut);
+        let mut main_fut = pin!(main_fut);
         let mut executor = fasync::TestExecutor::new();
         let outcome = run_with_accelerated_time(&mut executor, time, &mut main_fut);
         assert_eq!(outcome, BoundOutcome::Renewing(Renewing { bound: bound.clone() }));
@@ -2934,7 +2918,7 @@ mod test {
         let renewing_fut = renewing
             .do_renewing(client_config, test_socket_provider, time, &mut stop_receiver)
             .fuse();
-        pin_mut!(renewing_fut);
+        let mut renewing_fut = pin!(renewing_fut);
 
         let mut executor = fasync::TestExecutor::new();
         assert_matches!(executor.run_until_stalled(&mut renewing_fut), std::task::Poll::Pending);
@@ -2992,9 +2976,9 @@ mod test {
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
         let time = &FakeTimeController::new();
 
-        let renewing_fut = renewing
+        let renewing_fut = pin!(renewing
             .do_renewing(client_config, test_socket_provider, time, &mut stop_receiver)
-            .fuse();
+            .fuse());
 
         // Observe the "64, 4" instead of "64, 32" due to the 60 second minimum
         // retransmission delay.
@@ -3003,7 +2987,7 @@ mod test {
                 Duration::from_secs(1024 - time_remaining_when_request_is_sent)
             });
 
-        let receive_fut = async {
+        let receive_fut = pin!(async {
             for expected_time in expected_times_requests_are_sent {
                 let mut recv_buf = [0u8; BUFFER_SIZE];
                 let DatagramInfo { length, address } = server_end
@@ -3042,12 +3026,10 @@ mod test {
                 );
             }
         }
-        .fuse();
-
-        pin_mut!(renewing_fut, receive_fut);
+        .fuse());
 
         let main_future = async { join!(renewing_fut, receive_fut) };
-        pin_mut!(main_future);
+        let mut main_future = pin!(main_future);
 
         let mut executor = fasync::TestExecutor::new();
         let (requesting_result, ()) =
@@ -3175,15 +3157,15 @@ mod test {
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
         let time = &FakeTimeController::new();
 
-        let renewing_fut = renewing
+        let mut renewing_fut = pin!(renewing
             .do_renewing(client_config, test_socket_provider, time, &mut stop_receiver)
-            .fuse();
-        pin_mut!(renewing_fut);
+            .fuse());
+        let renewing_fut = pin!(renewing_fut);
 
         let server_socket_addr =
             std::net::SocketAddr::V4(std::net::SocketAddrV4::new(SERVER_IP, SERVER_PORT.into()));
 
-        let server_fut = async {
+        let server_fut = pin!(async {
             let mut recv_buf = [0u8; BUFFER_SIZE];
 
             let DatagramInfo { length, address } = server_end
@@ -3226,9 +3208,7 @@ mod test {
                 .await
                 .expect("send_to on test socket should succeed");
         }
-        .fuse();
-
-        pin_mut!(renewing_fut, server_fut);
+        .fuse());
 
         let main_future = async move {
             let (renewing_result, ()) = join!(renewing_fut, server_fut);
@@ -3236,7 +3216,7 @@ mod test {
         }
         .fuse();
 
-        pin_mut!(main_future);
+        let mut main_future = pin!(main_future);
 
         let mut executor = fasync::TestExecutor::new();
         let renewing_result = run_with_accelerated_time(&mut executor, time, &mut main_future);
@@ -3273,9 +3253,9 @@ mod test {
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
         let time = &FakeTimeController::new();
 
-        let rebinding_fut = rebinding
+        let rebinding_fut = pin!(rebinding
             .do_rebinding(client_config, test_socket_provider, time, &mut stop_receiver)
-            .fuse();
+            .fuse());
 
         // Observe the "64, 4" instead of "64, 32" due to the 60 second minimum
         // retransmission delay.
@@ -3284,7 +3264,7 @@ mod test {
                 Duration::from_secs(1024 - time_remaining_when_request_is_sent)
             });
 
-        let receive_fut = async {
+        let receive_fut = pin!(async {
             for expected_time in expected_times_requests_are_sent {
                 let mut recv_buf = [0u8; BUFFER_SIZE];
                 let DatagramInfo { length, address } = server_end
@@ -3323,12 +3303,10 @@ mod test {
                 );
             }
         }
-        .fuse();
-
-        pin_mut!(rebinding_fut, receive_fut);
+        .fuse());
 
         let main_future = async { join!(rebinding_fut, receive_fut) };
-        pin_mut!(main_future);
+        let mut main_future = pin!(main_future);
 
         let mut executor = fasync::TestExecutor::new();
         let (requesting_result, ()) =
@@ -3454,17 +3432,16 @@ mod test {
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
         let time = &FakeTimeController::new();
 
-        let rebinding_fut = rebinding
+        let rebinding_fut = pin!(rebinding
             .do_rebinding(client_config, test_socket_provider, time, &mut stop_receiver)
-            .fuse();
-        pin_mut!(rebinding_fut);
+            .fuse());
 
         let server_socket_addr = std::net::SocketAddr::V4(std::net::SocketAddrV4::new(
             OTHER_SERVER_IP,
             SERVER_PORT.into(),
         ));
 
-        let server_fut = async {
+        let server_fut = pin!(async {
             let mut recv_buf = [0u8; BUFFER_SIZE];
 
             let DatagramInfo { length, address } = server_end
@@ -3513,9 +3490,7 @@ mod test {
                 .await
                 .expect("send_to on test socket should succeed");
         }
-        .fuse();
-
-        pin_mut!(rebinding_fut, server_fut);
+        .fuse());
 
         let main_future = async move {
             let (rebinding_result, ()) = join!(rebinding_fut, server_fut);
@@ -3523,7 +3498,7 @@ mod test {
         }
         .fuse();
 
-        pin_mut!(main_future);
+        let mut main_future = pin!(main_future);
 
         let mut executor = fasync::TestExecutor::new();
         let rebinding_result = run_with_accelerated_time(&mut executor, time, &mut main_future);

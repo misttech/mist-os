@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_test_wlan_realm::WlanConfig,
     fuchsia_component::client::connect_to_protocol_at,
-    pin_utils::pin_mut,
+    std::pin::pin,
     wlan_hw_sim::{event::action, *},
 };
 
@@ -38,7 +38,7 @@ async fn run_without_regulatory_manager() {
     // Issue a scan request to verify that the scan module can function in the absence of the
     // regulatory manager.
     let phy = helper.proxy();
-    let fut = async move {
+    let fut = pin!(async move {
         let (scan_proxy, server_end) = create_proxy().unwrap();
         client_controller.scan_for_networks(server_end).expect("requesting scan");
         loop {
@@ -49,8 +49,7 @@ async fn run_without_regulatory_manager() {
             }
         }
         return;
-    };
-    pin_mut!(fut);
+    });
     helper
         .run_until_complete_or_timeout(
             *SCAN_RESPONSE_TEST_TIMEOUT,

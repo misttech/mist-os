@@ -7,6 +7,7 @@
 use std::{
     convert::{TryFrom as _, TryInto as _},
     num::NonZeroU16,
+    pin::pin,
     str::FromStr as _,
 };
 
@@ -294,7 +295,7 @@ async fn discovered_dns<M: Manager, N: Netstack>(name: &str) {
     let wait_for_netmgr =
         wait_for_component_stopped(&client_realm, M::MANAGEMENT_AGENT.get_component_name(), None)
             .fuse();
-    futures::pin_mut!(wait_for_netmgr);
+    let mut wait_for_netmgr = pin!(wait_for_netmgr);
     poll_lookup_admin(&lookup_admin, &expect, &mut wait_for_netmgr, POLL_WAIT, RETRY_COUNT).await
 }
 
@@ -355,7 +356,7 @@ async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str) {
         .expect("connect to fuchsia.net.interfaces/State service");
     let wait_for_netmgr =
         wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None).fuse();
-    futures::pin_mut!(wait_for_netmgr);
+    let mut wait_for_netmgr = pin!(wait_for_netmgr);
     let _: (u64, String) = interfaces::wait_for_non_loopback_interface_up(
         &interface_state,
         &mut wait_for_netmgr,
@@ -566,7 +567,7 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout<N: Netstack>(na
     let name_lookup =
         realm.connect_to_protocol::<net_name::LookupMarker>().expect("failed to connect to Lookup");
 
-    let lookup_fut = async {
+    let mut lookup_fut = pin!(async {
         let ips = name_lookup
             .lookup_ip(
                 EXAMPLE_HOSTNAME,
@@ -586,9 +587,9 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout<N: Netstack>(na
         };
         assert_eq!(ips, want);
     }
-    .fuse();
+    .fuse());
 
-    let response_fut = async {
+    let mut response_fut = pin!(async {
         use trust_dns_proto::op::{MessageType, OpCode};
 
         match async_utils::fold::fold_while(
@@ -664,9 +665,7 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout<N: Netstack>(na
             ),
         }
     }
-    .fuse();
-
-    futures::pin_mut!(lookup_fut, response_fut);
+    .fuse());
 
     let () = futures::select! {
         () = lookup_fut => panic!("lookup_fut not expected to have completed"),
@@ -772,7 +771,7 @@ async fn fallback_on_error_response_code<N: Netstack>(name: &str) {
         let name_lookup = realm
             .connect_to_protocol::<net_name::LookupMarker>()
             .expect("failed to connect to Lookup");
-        let lookup_fut = async {
+        let mut lookup_fut = pin!(async {
             let ips = {
                 let mut ips = name_lookup
                     .lookup_ip(
@@ -805,23 +804,23 @@ async fn fallback_on_error_response_code<N: Netstack>(name: &str) {
                 net_name::LookupResult { addresses: Some(want_addresses), ..Default::default() };
             assert_eq!(ips, want, "test case: {:?}", test_case);
         }
-        .fuse();
+        .fuse());
 
         // The erroring name server expects initial queries from dns-resolver, and always replies
         // with an error response code.
-        let error_server_fut = mock_udp_name_server(&erroring_sock, |_: &Message| {
+        let mut error_server_fut = pin!(mock_udp_name_server(&erroring_sock, |_: &Message| {
             let mut response = Message::new();
             let _: &mut Message = response.set_response_code(error_response_code);
             response
         })
-        .fuse();
+        .fuse());
         let expected_record_types = std::iter::empty()
             .chain(ipv4_lookup.then(|| RecordType::A))
             .chain(ipv6_lookup.then(|| RecordType::AAAA))
             .collect::<std::collections::HashSet<_>>();
         // The fallback name server expects fallback queries from dns-resolver, and replies with a
         // non-error response, unless it gets a query for a different record type than it expects.
-        let fallback_fut = {
+        let mut fallback_fut = pin!({
             mock_udp_name_server(&fallback_sock, move |message| {
                 let query = {
                     let mut queries = message.queries().into_iter();
@@ -866,9 +865,8 @@ async fn fallback_on_error_response_code<N: Netstack>(name: &str) {
                 }
             })
         }
-        .fuse();
+        .fuse());
 
-        futures::pin_mut!(lookup_fut, error_server_fut, fallback_fut);
         futures::select! {
             () = lookup_fut => {},
             () = error_server_fut => panic!("error_server_fut should never complete"),
@@ -918,7 +916,7 @@ async fn no_fallback_to_tcp_on_failed_udp<N: Netstack>(name: &str) {
 
     let name_lookup =
         realm.connect_to_protocol::<net_name::LookupMarker>().expect("connect to protocol");
-    let lookup_fut = async {
+    let mut lookup_fut = pin!(async {
         let lookup_result = name_lookup
             .lookup_ip(
                 EXAMPLE_HOSTNAME,
@@ -930,28 +928,27 @@ async fn no_fallback_to_tcp_on_failed_udp<N: Netstack>(name: &str) {
         // fails, the overall lookup should result in an error.
         assert_eq!(lookup_result, Err(net_name::LookupError::NotFound));
     }
-    .fuse();
+    .fuse());
 
     let (udp_socket, tcp_listener) =
         setup_dns_server(&realm, std_socket_addr!("127.0.0.1:1234")).await;
     // The name server responds to queries over UDP with a `SERVFAIL` response.
-    let udp_fut = mock_udp_name_server(&udp_socket, |_: &Message| {
+    let mut udp_fut = pin!(mock_udp_name_server(&udp_socket, |_: &Message| {
         let mut response = Message::new();
         let _: &mut Message = response.set_response_code(ResponseCode::ServFail);
         response
     })
-    .fuse();
+    .fuse());
     // The name server panics if it gets any connection requests over TCP.
-    let tcp_fut = async {
+    let mut tcp_fut = pin!(async {
         let mut incoming = tcp_listener.accept_stream();
         if let Some(result) = incoming.next().await {
             let (_stream, addr) = result.expect("accept incoming TCP connection");
             panic!("we expect no queries over TCP; got a connection request from {:?}", addr);
         }
     }
-    .fuse();
+    .fuse());
 
-    futures::pin_mut!(lookup_fut, udp_fut, tcp_fut);
     futures::select! {
         () = lookup_fut => {},
         () = udp_fut => panic!("mock UDP name server future should never complete"),
@@ -976,7 +973,7 @@ async fn fallback_to_tcp_on_truncated_response<N: Netstack>(name: &str) {
 
     let name_lookup =
         realm.connect_to_protocol::<net_name::LookupMarker>().expect("connect to protocol");
-    let lookup_fut = async {
+    let mut lookup_fut = pin!(async {
         let ips = name_lookup
             .lookup_ip(
                 EXAMPLE_HOSTNAME,
@@ -993,7 +990,7 @@ async fn fallback_to_tcp_on_truncated_response<N: Netstack>(name: &str) {
             }
         );
     }
-    .fuse();
+    .fuse());
 
     let (udp_socket, tcp_listener) =
         setup_dns_server(&realm, std_socket_addr!("127.0.0.1:1234")).await;
@@ -1002,7 +999,7 @@ async fn fallback_to_tcp_on_truncated_response<N: Netstack>(name: &str) {
     //
     // Also, reply with an incorrect resolved IP address here to ensure that the eventual lookup
     // result comes from the TCP name server.
-    let udp_fut = mock_udp_name_server(&udp_socket, |_: &Message| {
+    let mut udp_fut = pin!(mock_udp_name_server(&udp_socket, |_: &Message| {
         let answer = answer_for_hostname(EXAMPLE_HOSTNAME, fidl_ip!("2.2.2.2"));
         let mut response = Message::new();
         let _: &mut Message = response
@@ -1011,9 +1008,9 @@ async fn fallback_to_tcp_on_truncated_response<N: Netstack>(name: &str) {
             .set_truncated(true);
         response
     })
-    .fuse();
+    .fuse());
     // The name server responds to queries over TCP with the full response.
-    let tcp_fut = async {
+    let mut tcp_fut = pin!(async {
         let mut incoming = tcp_listener.accept_stream();
         let (mut stream, _src_addr) = incoming
             .next()
@@ -1052,9 +1049,8 @@ async fn fallback_to_tcp_on_truncated_response<N: Netstack>(name: &str) {
             assert_eq!(written, response.len());
         }
     }
-    .fuse();
+    .fuse());
 
-    futures::pin_mut!(lookup_fut, udp_fut, tcp_fut);
     futures::select! {
         () = lookup_fut => {},
         () = udp_fut => panic!("mock UDP name server future should never complete"),
@@ -1193,8 +1189,8 @@ async fn query_preferred_name_servers_first<N: Netstack>(name: &str) {
         // haven't.
         //
         // Expect that the preferred name servers are queried first.
-        let preferred_queried =
-            futures::future::select_all(preferred_servers.iter().map(|server| {
+        let mut preferred_queried =
+            pin!(futures::future::select_all(preferred_servers.iter().map(|server| {
                 server
                     .handle_next_query(|message| {
                         let _: &mut Message = message
@@ -1203,9 +1199,8 @@ async fn query_preferred_name_servers_first<N: Netstack>(name: &str) {
                     })
                     .boxed()
             }))
-            .fuse();
-        let secondary_queried = secondary_server.ignore_next_query().fuse();
-        futures::pin_mut!(preferred_queried, secondary_queried);
+            .fuse());
+        let mut secondary_queried = pin!(secondary_server.ignore_next_query().fuse());
         futures::select! {
             ((), i, _remaining) = preferred_queried =>
                 println!("observed a query to preferred name server {}, exiting", i),

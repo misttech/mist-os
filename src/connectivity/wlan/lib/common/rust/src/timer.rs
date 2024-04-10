@@ -95,7 +95,7 @@ mod tests {
         fuchsia_async as fasync,
         fuchsia_zircon::{self as zx, DurationNum},
         futures::channel::mpsc::UnboundedSender,
-        pin_utils::pin_mut,
+        std::pin::pin,
         std::task::Poll,
     };
 
@@ -189,7 +189,7 @@ mod tests {
             }
             events
         };
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         for _ in 0u32..4 {
             assert_eq!(Poll::Pending, exec.run_until_stalled(&mut fut));
             assert!(exec.wake_next_timer().is_some());

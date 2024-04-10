@@ -10,6 +10,7 @@ use fuchsia_inspect::component;
 use futures::{channel::mpsc::unbounded, FutureExt as _, StreamExt as _};
 use reachability_core::{Monitor, NetworkCheckAction, NetworkCheckCookie};
 use reachability_handler::ReachabilityHandler;
+use std::pin::pin;
 use tracing::info;
 
 mod eventloop;
@@ -45,9 +46,8 @@ pub fn main() {
 
     info!("monitoring");
     let mut eventloop = EventLoop::new(monitor, handler, receiver, inspector);
-    let eventloop_fut = eventloop.run().fuse();
-    let serve_fut = fs.fuse().collect();
-    futures::pin_mut!(eventloop_fut, serve_fut);
+    let mut eventloop_fut = pin!(eventloop.run().fuse());
+    let mut serve_fut = pin!(fs.fuse().collect());
 
     executor.run_singlethreaded(async {
         futures::select! {

@@ -497,8 +497,8 @@ pub(crate) mod tests {
             StreamSinkRequest, StreamSinkRequestStream,
         },
         fuchsia_async as fasync,
-        futures::pin_mut,
         futures_test::task::new_count_waker,
+        std::pin::pin,
     };
 
     #[test]
@@ -648,7 +648,7 @@ pub(crate) mod tests {
 
         {
             let player_next_event_fut = player.next_event();
-            pin_mut!(player_next_event_fut);
+            let mut player_next_event_fut = pin!(player_next_event_fut);
 
             // player creation is done in stages, waiting for the below source/sink
             // objects to be created. Just run the creation up until the first
@@ -699,7 +699,7 @@ pub(crate) mod tests {
         let (mut player, _sink_request_stream, mut audio_consumer_request_stream, _sink_vmo) =
             setup_player(&mut exec, build_config(&MediaCodecType::AUDIO_AAC));
         let player_next_event_fut = player.next_event();
-        pin_mut!(player_next_event_fut);
+        let mut player_next_event_fut = pin!(player_next_event_fut);
 
         // player creation is done in stages, waiting for the below source/sink
         // objects to be created. Just run the creation up until the first
@@ -756,7 +756,7 @@ pub(crate) mod tests {
         let payload = build_rtp_aac_packet(content);
 
         let payload_fut = player.push_payload(&payload);
-        pin_mut!(payload_fut);
+        let mut payload_fut = pin!(payload_fut);
 
         match exec.run_singlethreaded(&mut payload_fut) {
             Ok(()) => {}
@@ -798,7 +798,7 @@ pub(crate) mod tests {
     ) -> u32 {
         {
             let push_fut = player.push_payload(payload);
-            pin_mut!(push_fut);
+            let mut push_fut = pin!(push_fut);
             exec.run_singlethreaded(&mut push_fut).expect("wrote payload");
         }
         // Drive until the sink receives a packet.
@@ -875,7 +875,7 @@ pub(crate) mod tests {
         raw[RtpHeader::LENGTH + 1] = 0xff;
 
         let push_fut = player.push_payload(&raw);
-        pin_mut!(push_fut);
+        let mut push_fut = pin!(push_fut);
         let _ =
             exec.run_singlethreaded(&mut push_fut).expect_err("fail to write corrupted payload");
     }

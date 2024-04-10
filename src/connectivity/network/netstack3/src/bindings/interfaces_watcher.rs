@@ -916,6 +916,7 @@ mod tests {
     use std::{
         convert::{TryFrom as _, TryInto as _},
         num::NonZeroU64,
+        pin::pin,
     };
     use test_case::test_case;
 
@@ -1814,7 +1815,7 @@ mod tests {
             let pending_watchers = result.expect("worker finished with error");
             pending_watchers.len()
         });
-        futures::pin_mut!(worker_fut);
+        let mut worker_fut = pin!(worker_fut);
         assert_eq!(executor.run_until_stalled(&mut worker_fut), std::task::Poll::Pending);
         // If executor stalled then the task must've finished.
         assert_eq!(create_watchers.now_or_never(), Some(()));

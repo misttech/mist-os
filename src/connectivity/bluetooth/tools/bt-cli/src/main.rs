@@ -15,10 +15,10 @@ use fuchsia_bluetooth::types::{addresses_to_custom_string, HostId, HostInfo, Pee
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
 use futures::{channel::mpsc, select, FutureExt, Sink, SinkExt, Stream, StreamExt, TryFutureExt};
-use pin_utils::pin_mut;
 use prettytable::{cell, format, row, Row, Table};
 use regex::Regex;
 use rustyline::{error::ReadlineError, CompletionType, Config, EditMode, Editor};
+use std::pin::pin;
 use std::sync::Arc;
 use std::thread;
 use std::{cmp::Ordering, collections::HashMap, str::FromStr};
@@ -758,8 +758,8 @@ async fn main() -> Result<(), Error> {
     let repl = run_repl(access_svc, host_watcher_svc.clone(), pairing_svc, state.clone())
         .map_err(|e| e.context("REPL failed unexpectedly").into());
     let host_watcher = watch_hosts(host_watcher_svc, state);
-    pin_mut!(repl);
-    pin_mut!(peer_watcher);
+    let repl = pin!(repl);
+    let peer_watcher = pin!(peer_watcher);
     select! {
         r = repl.fuse() => r,
         p = peer_watcher.fuse() => p,
@@ -1253,7 +1253,7 @@ mod tests {
         let args = vec![];
         let (proxy, mut mock) = PairingMock::new(1.second()).expect("failed to create mock");
         let pair = allow_pairing(args.as_slice(), &proxy);
-        pin_mut!(pair);
+        let mut pair = pin!(pair);
 
         assert!(exec.run_until_stalled(&mut pair).is_pending());
 
@@ -1272,7 +1272,7 @@ mod tests {
         // Enable pairing with confirmation input cap and display output cap.
         let args = vec!["confirmation", "display"];
         let pair = allow_pairing(args.as_slice(), &proxy);
-        pin_mut!(pair);
+        let mut pair = pin!(pair);
 
         // Should be waiting until pairing is completed.
         assert!(exec.run_until_stalled(&mut pair).is_pending());

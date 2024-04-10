@@ -68,7 +68,8 @@ mod tests {
 
     use assert_matches::assert_matches;
     use fidl_fuchsia_bluetooth_power::{Identifier, ReporterMarker, ReporterProxy};
-    use futures::{pin_mut, select, FutureExt};
+    use futures::{select, FutureExt};
+    use std::pin::pin;
 
     fn make_reporter_task(
     ) -> (impl Future<Output = Result<(), Error>>, ReporterProxy, Arc<PeripheralState>) {
@@ -92,15 +93,14 @@ mod tests {
     #[fuchsia::test]
     async fn invalid_request_is_error() {
         let (reporter_task, reporter_proxy, _state) = make_reporter_task();
-        let server_task = reporter_task.fuse();
+        let mut server_task = pin!(reporter_task.fuse());
 
         let info = Information {
             identifier: Some(Identifier::PeerId(PeerId(123).into())),
             battery_info: Some(fidl_fuchsia_power_battery::BatteryInfo::default()),
             ..Default::default()
         };
-        let report_request_fut = reporter_proxy.report(&info);
-        pin_mut!(server_task, report_request_fut);
+        let mut report_request_fut = pin!(reporter_proxy.report(&info));
 
         select! {
             _ = server_task => panic!("Server shouldn't terminate"),
@@ -113,7 +113,7 @@ mod tests {
     #[fuchsia::test]
     async fn valid_power_report_is_saved() {
         let (reporter_task, reporter_proxy, state) = make_reporter_task();
-        let server_task = reporter_task.fuse();
+        let mut server_task = pin!(reporter_task.fuse());
 
         let id = PeerId(123);
         let info = Information {
@@ -124,8 +124,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let report_request_fut = reporter_proxy.report(&info);
-        pin_mut!(server_task, report_request_fut);
+        let mut report_request_fut = pin!(reporter_proxy.report(&info));
 
         select! {
             _ = server_task => panic!("Server shouldn't terminate"),

@@ -15,7 +15,6 @@ rust_wlan_integration_test("scan_legacy_privacy") {
     "//src/connectivity/wlan/tests/helpers/realm-factory/fidl:test.wlan.realm_rust",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:lazy_static",
-    "//third_party/rust_crates:pin-utils",
   ]
 
   sources = [ "src/lib.rs" ]

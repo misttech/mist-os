@@ -11,7 +11,7 @@ use {
     fuchsia_zircon::sys::ZX_OK,
     fuchsia_zircon::DurationNum,
     futures::channel::oneshot,
-    pin_utils::pin_mut,
+    std::pin::pin,
     wlan_hw_sim::{event::Handler, *},
 };
 
@@ -49,8 +49,7 @@ async fn set_country() {
 
     let (sender, receiver) = oneshot::channel();
     // Set the country and await a signal from the event handler via `sender`.
-    let set_country_and_await_match = set_country_and_await_match(receiver, &svc, &mut req);
-    pin_mut!(set_country_and_await_match);
+    let set_country_and_await_match = pin!(set_country_and_await_match(receiver, &svc, &mut req));
 
     helper
         .run_until_complete_or_timeout(

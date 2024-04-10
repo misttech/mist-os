@@ -14,7 +14,7 @@ use fuchsia_zircon as zx;
 use futures::{SinkExt as _, StreamExt as _};
 use net_declare::fidl_mac;
 use net_types::{ip::Ip as _, Witness as _};
-use std::collections::HashMap;
+use std::{collections::HashMap, pin::pin};
 
 pub struct Interfaces;
 
@@ -34,7 +34,7 @@ impl crate::Workload for Interfaces {
                 fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
             )
             .expect("get interface event stream");
-            futures::pin_mut!(stream);
+            let mut stream = pin!(stream);
             let mut if_state = fnet_interfaces_ext::existing(
                 stream.by_ref(),
                 HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new(),
@@ -73,7 +73,7 @@ impl crate::Workload for Interfaces {
             fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("get interface event stream");
-        futures::pin_mut!(stream);
+        let mut stream = pin!(stream);
         let mut interfaces = fnet_interfaces_ext::existing(
             stream.by_ref(),
             HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new(),
@@ -148,7 +148,7 @@ async fn stress_interface(interface: Interface, interfaces_state: &fnet_interfac
         fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
     )
     .expect("get interface event stream");
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
     let mut state = fnet_interfaces_ext::InterfaceState::<()>::Unknown(id);
 
     // Repeatedly toggle interface up/down and send traffic through it

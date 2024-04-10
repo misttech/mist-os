@@ -164,7 +164,7 @@ mod tests {
         fuchsia_async as fasync,
         futures::{channel::oneshot, task::Poll, StreamExt},
         ieee80211::MacAddr,
-        pin_utils::pin_mut,
+        std::pin::pin,
         wlan_common::assert_variant,
     };
 
@@ -201,7 +201,7 @@ mod tests {
 
         // Add Phy 0.
         let fut = on_phy_added(&listener, 0);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify that Phy 0 is now present
@@ -209,7 +209,7 @@ mod tests {
             let phy_manager = test_values.phy_manager.lock().await;
             phy_manager.phys.clone()
         };
-        pin_mut!(list_phys_fut);
+        let mut list_phys_fut = pin!(list_phys_fut);
         let phys =
             assert_variant!(exec.run_until_stalled(&mut list_phys_fut), Poll::Ready(phys) => phys);
 
@@ -230,7 +230,7 @@ mod tests {
 
         // Add Phy 0.
         let fut = on_phy_added(&listener, 0);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify that Phy 0 was not added and its failure was logged.
@@ -239,7 +239,7 @@ mod tests {
             assert!(phy_manager.phys.is_empty());
             assert_eq!(phy_manager.failed_phys, 1);
         };
-        pin_mut!(phy_manager_fut);
+        let mut phy_manager_fut = pin!(phy_manager_fut);
         assert_variant!(exec.run_until_stalled(&mut phy_manager_fut), Poll::Ready(()));
     }
 
@@ -256,7 +256,7 @@ mod tests {
         );
 
         let fut = on_iface_added_legacy(&listener, 0);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Run the future until it queries the interface's properties.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -288,7 +288,7 @@ mod tests {
         );
 
         let fut = on_iface_added_legacy(&listener, 0);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Run the future until it queries the interface's properties.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -321,7 +321,7 @@ mod tests {
         );
 
         let fut = on_iface_added_legacy(&listener, 0);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Run the future until it queries the interface's properties.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -353,7 +353,7 @@ mod tests {
         );
 
         let fut = on_iface_added_legacy(&listener, 0);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Run the future until it queries the interface's properties.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -399,7 +399,7 @@ mod tests {
         );
 
         let fut = on_iface_added_legacy(&listener, 0);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Run the future until it queries the interface's properties.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -448,7 +448,7 @@ mod tests {
         drop(test_values.monitor_stream);
 
         let fut = on_iface_added_legacy(&listener, 0);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Run the future should immediately return an error.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
@@ -471,7 +471,7 @@ mod tests {
 
         // Simulate an OnPhyAdded event
         let fut = handle_event(&listener, DeviceWatcherEvent::OnPhyAdded { phy_id: 0 });
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify that Phy 0 is now present
@@ -479,7 +479,7 @@ mod tests {
             let phy_manager = test_values.phy_manager.lock().await;
             phy_manager.phys.clone()
         };
-        pin_mut!(list_phys_fut);
+        let mut list_phys_fut = pin!(list_phys_fut);
         let phys =
             assert_variant!(exec.run_until_stalled(&mut list_phys_fut), Poll::Ready(phys) => phys);
 
@@ -498,7 +498,7 @@ mod tests {
                 let mut phy_manager = phy_manager.lock().await;
                 phy_manager.phys.push(0);
             };
-            pin_mut!(add_phy_fut);
+            let mut add_phy_fut = pin!(add_phy_fut);
             assert_variant!(exec.run_until_stalled(&mut add_phy_fut), Poll::Ready(()));
         }
 
@@ -511,7 +511,7 @@ mod tests {
 
         // Simulate an OnPhyRemoved event.
         let fut = handle_event(&listener, DeviceWatcherEvent::OnPhyRemoved { phy_id: 0 });
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify that the PHY ID is no longer present
@@ -519,7 +519,7 @@ mod tests {
             let phy_manager = test_values.phy_manager.lock().await;
             phy_manager.phys.clone()
         };
-        pin_mut!(list_phys_fut);
+        let mut list_phys_fut = pin!(list_phys_fut);
         let phys =
             assert_variant!(exec.run_until_stalled(&mut list_phys_fut), Poll::Ready(phys) => phys);
 
@@ -538,7 +538,7 @@ mod tests {
                 let mut iface_manager = iface_manager.lock().await;
                 iface_manager.ifaces.push(0);
             };
-            pin_mut!(add_iface_fut);
+            let mut add_iface_fut = pin!(add_iface_fut);
             assert_variant!(exec.run_until_stalled(&mut add_iface_fut), Poll::Ready(()));
         }
 
@@ -557,7 +557,7 @@ mod tests {
 
         // Run the iface removal handler.
         let fut = handle_event(&listener, DeviceWatcherEvent::OnIfaceRemoved { iface_id: 123 });
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // The IfaceRef should still have its interface.
@@ -576,7 +576,7 @@ mod tests {
                 let mut iface_manager = iface_manager.lock().await;
                 iface_manager.ifaces.push(0);
             };
-            pin_mut!(add_iface_fut);
+            let mut add_iface_fut = pin!(add_iface_fut);
             assert_variant!(exec.run_until_stalled(&mut add_iface_fut), Poll::Ready(()));
         }
 
@@ -595,7 +595,7 @@ mod tests {
 
         // Run the iface removal handler.
         let fut = handle_event(&listener, DeviceWatcherEvent::OnIfaceRemoved { iface_id: 0 });
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // The PhyManager and IfaceManager should have no reference to the interface.
@@ -608,7 +608,7 @@ mod tests {
                 assert!(phy_manager.ifaces.is_empty());
                 assert!(iface_manager.ifaces.is_empty());
             };
-            pin_mut!(verify_fut);
+            let mut verify_fut = pin!(verify_fut);
             assert_variant!(exec.run_until_stalled(&mut verify_fut), Poll::Ready(()));
         }
 
@@ -629,7 +629,7 @@ mod tests {
         );
 
         let fut = handle_event(&listener, DeviceWatcherEvent::OnIfaceAdded { iface_id: 0 });
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The future should stall out while performing the legacy add interface routine.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -668,7 +668,7 @@ mod tests {
                 assert_eq!(phy_manager.ifaces, vec![0]);
                 assert_eq!(iface_manager.ifaces, vec![0]);
             };
-            pin_mut!(verify_fut);
+            let mut verify_fut = pin!(verify_fut);
             assert_variant!(exec.run_until_stalled(&mut verify_fut), Poll::Ready(()));
         }
 
@@ -689,7 +689,7 @@ mod tests {
         );
 
         let fut = handle_event(&listener, DeviceWatcherEvent::OnIfaceAdded { iface_id: 0 });
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The future should complete immediately without attempting to populate the IfaceRef.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
@@ -704,7 +704,7 @@ mod tests {
                 assert!(phy_manager.ifaces.is_empty());
                 assert!(iface_manager.ifaces.is_empty());
             };
-            pin_mut!(verify_fut);
+            let mut verify_fut = pin!(verify_fut);
             assert_variant!(exec.run_until_stalled(&mut verify_fut), Poll::Ready(()));
         }
 
@@ -730,7 +730,7 @@ mod tests {
 
         // Handle the interface addition and expect it to complete immediately.
         let fut = handle_event(&listener, DeviceWatcherEvent::OnIfaceAdded { iface_id: 0 });
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
         // Verify that the PhyManager and IfaceManager are updated.
@@ -743,7 +743,7 @@ mod tests {
                 assert_eq!(phy_manager.ifaces, vec![0]);
                 assert_eq!(iface_manager.ifaces, vec![0]);
             };
-            pin_mut!(verify_fut);
+            let mut verify_fut = pin!(verify_fut);
             assert_variant!(exec.run_until_stalled(&mut verify_fut), Poll::Ready(()));
         }
 

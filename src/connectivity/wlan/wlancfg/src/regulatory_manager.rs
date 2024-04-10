@@ -96,7 +96,7 @@ mod tests {
             stream::{self, Stream, StreamExt},
             task::Poll,
         },
-        pin_utils::pin_mut,
+        std::pin::pin,
         std::unimplemented,
         wlan_common::assert_variant,
     };
@@ -151,7 +151,7 @@ mod tests {
     fn ignore_update_with_short_region_code() {
         let mut context = TestContext::new(make_default_stub_iface_manager());
         let regulatory_fut = context.regulatory_manager.run(context.regulatory_sender);
-        pin_mut!(regulatory_fut);
+        let mut regulatory_fut = pin!(regulatory_fut);
         assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
         let region_request_fut = &mut context.regulatory_region_requests.next();
@@ -179,7 +179,7 @@ mod tests {
     fn update_with_long_region_code_fails() {
         let mut context = TestContext::new(make_default_stub_iface_manager());
         let regulatory_fut = context.regulatory_manager.run(context.regulatory_sender);
-        pin_mut!(regulatory_fut);
+        let mut regulatory_fut = pin!(regulatory_fut);
         assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
         let region_request_fut = &mut context.regulatory_region_requests.next();
@@ -195,7 +195,7 @@ mod tests {
     fn propagates_update_on_region_code_with_valid_length() {
         let mut context = TestContext::new(make_default_stub_iface_manager());
         let regulatory_fut = context.regulatory_manager.run(context.regulatory_sender);
-        pin_mut!(regulatory_fut);
+        let mut regulatory_fut = pin!(regulatory_fut);
         assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
         let region_request_fut = &mut context.regulatory_region_requests.next();
@@ -207,7 +207,7 @@ mod tests {
         assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
         let iface_manager_fut = context.iface_manager.lock();
-        pin_mut!(iface_manager_fut);
+        let mut iface_manager_fut = pin!(iface_manager_fut);
         match context.executor.run_until_stalled(&mut iface_manager_fut) {
             Poll::Ready(iface_manager) => {
                 assert_eq!(iface_manager.country_code, Some([b'U', b'S']))
@@ -220,7 +220,7 @@ mod tests {
     fn does_not_propagate_invalid_length_region_code() {
         let mut context = TestContext::new(make_default_stub_iface_manager());
         let regulatory_fut = context.regulatory_manager.run(context.regulatory_sender);
-        pin_mut!(regulatory_fut);
+        let mut regulatory_fut = pin!(regulatory_fut);
         assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
         let region_request_fut = &mut context.regulatory_region_requests.next();
@@ -235,7 +235,7 @@ mod tests {
         let _ = context.executor.run_until_stalled(&mut regulatory_fut);
 
         let iface_manager_fut = context.iface_manager.lock();
-        pin_mut!(iface_manager_fut);
+        let mut iface_manager_fut = pin!(iface_manager_fut);
         match context.executor.run_until_stalled(&mut iface_manager_fut) {
             Poll::Ready(iface_manager) => assert_eq!(iface_manager.country_code, None),
             Poll::Pending => panic!("Expected to be able to lock the IfaceManager."),
@@ -251,13 +251,13 @@ mod tests {
     fn does_not_propagate_null_update() {
         let mut context = TestContext::new(make_default_stub_iface_manager());
         let regulatory_fut = context.regulatory_manager.run(context.regulatory_sender);
-        pin_mut!(regulatory_fut);
+        let mut regulatory_fut = pin!(regulatory_fut);
         assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
         // Set the regulatory region to be non-None initially.
         {
             let iface_manager_fut = context.iface_manager.lock();
-            pin_mut!(iface_manager_fut);
+            let mut iface_manager_fut = pin!(iface_manager_fut);
             match context.executor.run_until_stalled(&mut iface_manager_fut) {
                 Poll::Ready(mut iface_manager) => iface_manager.country_code = Some([b'U', b'S']),
                 Poll::Pending => panic!("Expected to be able to lock the IfaceManager."),
@@ -276,7 +276,7 @@ mod tests {
         // Verify that no region change is applied to the IfaceManager.
         {
             let iface_manager_fut = context.iface_manager.lock();
-            pin_mut!(iface_manager_fut);
+            let mut iface_manager_fut = pin!(iface_manager_fut);
             match context.executor.run_until_stalled(&mut iface_manager_fut) {
                 Poll::Ready(iface_manager) => assert!(iface_manager.country_code.is_some()),
                 Poll::Pending => panic!("Expected to be able to lock the IfaceManager."),
@@ -296,7 +296,7 @@ mod tests {
         let mut context =
             TestContext::new(StubIfaceManager { country_code: None, set_country_response_stream });
         let regulatory_fut = context.regulatory_manager.run(context.regulatory_sender);
-        pin_mut!(regulatory_fut);
+        let mut regulatory_fut = pin!(regulatory_fut);
         assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
         // Drive the RegulatoryManager to request an update from RegulatoryRegionWatcher,
@@ -328,7 +328,7 @@ mod tests {
     fn propagates_multiple_valid_region_code_updates_to_device_service() {
         let mut context = TestContext::new(make_default_stub_iface_manager());
         let regulatory_fut = context.regulatory_manager.run(context.regulatory_sender);
-        pin_mut!(regulatory_fut);
+        let mut regulatory_fut = pin!(regulatory_fut);
 
         // Receive first `RegulatoryRegionWatcher` update, and propagate it to `IfaceManager`.
         {
@@ -344,7 +344,7 @@ mod tests {
             assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
             let iface_manager_fut = context.iface_manager.lock();
-            pin_mut!(iface_manager_fut);
+            let mut iface_manager_fut = pin!(iface_manager_fut);
             match context.executor.run_until_stalled(&mut iface_manager_fut) {
                 Poll::Ready(iface_manager) => {
                     assert_eq!(iface_manager.country_code, Some([b'U', b'S']))
@@ -373,7 +373,7 @@ mod tests {
             assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
             let iface_manager_fut = context.iface_manager.lock();
-            pin_mut!(iface_manager_fut);
+            let mut iface_manager_fut = pin!(iface_manager_fut);
             match context.executor.run_until_stalled(&mut iface_manager_fut) {
                 Poll::Ready(iface_manager) => {
                     assert_eq!(iface_manager.country_code, Some([b'C', b'A']))

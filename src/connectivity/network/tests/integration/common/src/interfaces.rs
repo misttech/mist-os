@@ -13,7 +13,10 @@ use anyhow::Context as _;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_zircon as zx;
 use futures::future::{FusedFuture, Future, FutureExt as _, TryFutureExt as _};
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    pin::pin,
+};
 
 /// Waits for a non-loopback interface to come up with an ID not in `exclude_ids`.
 ///
@@ -30,7 +33,7 @@ pub async fn wait_for_non_loopback_interface_up<
     timeout: zx::Duration,
 ) -> Result<(u64, String)> {
     let mut if_map = HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new();
-    let wait_for_interface = fidl_fuchsia_net_interfaces_ext::wait_interface(
+    let mut wait_for_interface = pin!(fidl_fuchsia_net_interfaces_ext::wait_interface(
         fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
             interface_state,
             fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
@@ -65,8 +68,7 @@ pub async fn wait_for_non_loopback_interface_up<
     .map_err(anyhow::Error::from)
     .on_timeout(timeout.after_now(), || Err(anyhow::anyhow!("timed out")))
     .map(|r| r.context("failed to wait for non-loopback interface up"))
-    .fuse();
-    fuchsia_async::pin_mut!(wait_for_interface);
+    .fuse());
     futures::select! {
         wait_for_interface_res = wait_for_interface => {
             wait_for_interface_res
@@ -100,10 +102,10 @@ pub async fn add_address_wait_assigned(
     .await?;
 
     {
-        let state_stream = fidl_fuchsia_net_interfaces_ext::admin::assignment_state_stream(
-            address_state_provider.clone(),
-        );
-        futures::pin_mut!(state_stream);
+        let mut state_stream =
+            pin!(fidl_fuchsia_net_interfaces_ext::admin::assignment_state_stream(
+                address_state_provider.clone(),
+            ));
         let () = fidl_fuchsia_net_interfaces_ext::admin::wait_assignment_state(
             &mut state_stream,
             fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,

@@ -1326,9 +1326,9 @@ mod tests {
         super::*,
         fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream, Proxy},
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-        futures::{pin_mut, task::Poll, Future},
+        futures::{task::Poll, Future},
         ifaces::test_utils::{ClientIfaceCall, TestIfaceManager},
-        std::pin::Pin,
+        std::pin::{pin, Pin},
         test_case::test_case,
         wlan_common::assert_variant,
     };
@@ -1352,7 +1352,7 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let get_state_fut = test_helper.wifi_proxy.get_state();
-        pin_mut!(get_state_fut);
+        let mut get_state_fut = pin!(get_state_fut);
         assert_variant!(test_helper.exec.run_until_stalled(&mut get_state_fut), Poll::Pending);
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let response = assert_variant!(
@@ -1367,11 +1367,11 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let start_fut = test_helper.wifi_proxy.start();
-        pin_mut!(start_fut);
+        let mut start_fut = pin!(start_fut);
         assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
 
         let get_state_fut = test_helper.wifi_proxy.get_state();
-        pin_mut!(get_state_fut);
+        let mut get_state_fut = pin!(get_state_fut);
         assert_variant!(test_helper.exec.run_until_stalled(&mut get_state_fut), Poll::Pending);
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let response = assert_variant!(
@@ -1386,15 +1386,15 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let start_fut = test_helper.wifi_proxy.start();
-        pin_mut!(start_fut);
+        let mut start_fut = pin!(start_fut);
         assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
 
         let stop_fut = test_helper.wifi_proxy.stop();
-        pin_mut!(stop_fut);
+        let mut stop_fut = pin!(stop_fut);
         assert_variant!(test_helper.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
 
         let get_state_fut = test_helper.wifi_proxy.get_state();
-        pin_mut!(get_state_fut);
+        let mut get_state_fut = pin!(get_state_fut);
         assert_variant!(test_helper.exec.run_until_stalled(&mut get_state_fut), Poll::Pending);
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let response = assert_variant!(
@@ -1417,7 +1417,7 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let get_chip_ids_fut = test_helper.wifi_proxy.get_chip_ids();
-        pin_mut!(get_chip_ids_fut);
+        let mut get_chip_ids_fut = pin!(get_chip_ids_fut);
         assert_variant!(test_helper.exec.run_until_stalled(&mut get_chip_ids_fut), Poll::Pending);
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let response = assert_variant!(
@@ -1432,7 +1432,7 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let get_available_modes_fut = test_helper.wifi_chip_proxy.get_available_modes();
-        pin_mut!(get_available_modes_fut);
+        let mut get_available_modes_fut = pin!(get_available_modes_fut);
         assert_variant!(
             test_helper.exec.run_until_stalled(&mut get_available_modes_fut),
             Poll::Pending
@@ -1465,7 +1465,7 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let get_id_fut = test_helper.wifi_chip_proxy.get_id();
-        pin_mut!(get_id_fut);
+        let mut get_id_fut = pin!(get_id_fut);
         assert_variant!(test_helper.exec.run_until_stalled(&mut get_id_fut), Poll::Pending);
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let response = assert_variant!(test_helper.exec.run_until_stalled(&mut get_id_fut), Poll::Ready(Ok(response)) => response);
@@ -1477,7 +1477,7 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let get_mode_fut = test_helper.wifi_chip_proxy.get_mode();
-        pin_mut!(get_mode_fut);
+        let mut get_mode_fut = pin!(get_mode_fut);
         assert_variant!(test_helper.exec.run_until_stalled(&mut get_mode_fut), Poll::Pending);
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let response = assert_variant!(test_helper.exec.run_until_stalled(&mut get_mode_fut), Poll::Ready(Ok(response)) => response);
@@ -1489,7 +1489,7 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let get_capabilities_fut = test_helper.wifi_chip_proxy.get_capabilities();
-        pin_mut!(get_capabilities_fut);
+        let mut get_capabilities_fut = pin!(get_capabilities_fut);
         assert_variant!(
             test_helper.exec.run_until_stalled(&mut get_capabilities_fut),
             Poll::Pending
@@ -1508,7 +1508,7 @@ mod tests {
 
         // We observe the iface created by setup_wifi_test.
         let get_iface_names_fut = test_helper.wifi_chip_proxy.get_sta_iface_names();
-        pin_mut!(get_iface_names_fut);
+        let mut get_iface_names_fut = pin!(get_iface_names_fut);
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let result = assert_variant!(test_helper.exec.run_until_stalled(&mut get_iface_names_fut), Poll::Ready(Ok(result)) => result);
         assert_eq!(result.iface_names, Some(vec![IFACE_NAME.to_string()]));
@@ -1523,7 +1523,7 @@ mod tests {
 
         // No ifaces show up.
         let get_iface_names_fut = test_helper.wifi_chip_proxy.get_sta_iface_names();
-        pin_mut!(get_iface_names_fut);
+        let mut get_iface_names_fut = pin!(get_iface_names_fut);
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let result = assert_variant!(test_helper.exec.run_until_stalled(&mut get_iface_names_fut), Poll::Ready(Ok(result)) => result);
         assert_eq!(result.iface_names, Some(vec![]));
@@ -1548,7 +1548,7 @@ mod tests {
         assert!(result.is_ok());
 
         let get_name_fut = wifi_sta_iface_proxy.get_name();
-        pin_mut!(get_name_fut);
+        let mut get_name_fut = pin!(get_name_fut);
         assert_variant!(test_helper.exec.run_until_stalled(&mut get_name_fut), Poll::Pending);
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let response = assert_variant!(
@@ -1583,7 +1583,7 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let get_name_fut = test_helper.wifi_sta_iface_proxy.get_name();
-        pin_mut!(get_name_fut);
+        let mut get_name_fut = pin!(get_name_fut);
         assert_variant!(test_helper.exec.run_until_stalled(&mut get_name_fut), Poll::Pending);
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         let response = assert_variant!(
@@ -1625,7 +1625,7 @@ mod tests {
             chip: Some(wifi_chip_server_end),
             ..Default::default()
         });
-        pin_mut!(get_chip_fut);
+        let mut get_chip_fut = pin!(get_chip_fut);
         assert_variant!(exec.run_until_stalled(&mut get_chip_fut), Poll::Pending);
 
         let (wifi_sta_iface_proxy, wifi_sta_iface_server_end) =
@@ -1636,7 +1636,7 @@ mod tests {
                 iface: Some(wifi_sta_iface_server_end),
                 ..Default::default()
             });
-        pin_mut!(create_sta_iface_fut);
+        let mut create_sta_iface_fut = pin!(create_sta_iface_fut);
         assert_variant!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Pending);
 
         let wifi_state = Arc::new(Mutex::new(WifiState::default()));
@@ -1680,7 +1680,7 @@ mod tests {
 
         let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
         let next_mcast = next_mcast_message(&mut mcast_stream);
-        pin_mut!(next_mcast);
+        let mut next_mcast = pin!(next_mcast);
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
@@ -1726,7 +1726,7 @@ mod tests {
 
         let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
         let next_mcast = next_mcast_message(&mut mcast_stream);
-        pin_mut!(next_mcast);
+        let mut next_mcast = pin!(next_mcast);
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
@@ -1777,7 +1777,7 @@ mod tests {
 
         let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
         let next_mcast = next_mcast_message(&mut mcast_stream);
-        pin_mut!(next_mcast);
+        let mut next_mcast = pin!(next_mcast);
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
@@ -1830,7 +1830,7 @@ mod tests {
 
         let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
         let next_mcast = next_mcast_message(&mut mcast_stream);
-        pin_mut!(next_mcast);
+        let mut next_mcast = pin!(next_mcast);
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
@@ -1895,7 +1895,7 @@ mod tests {
 
         {
             let next_mcast = next_mcast_message(mcast_stream);
-            pin_mut!(next_mcast);
+            let mut next_mcast = pin!(next_mcast);
             let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
             assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Connect);
         }
@@ -1914,7 +1914,7 @@ mod tests {
 
         let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
         let next_mcast = next_mcast_message(&mut mcast_stream);
-        pin_mut!(next_mcast);
+        let mut next_mcast = pin!(next_mcast);
         assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
@@ -1988,7 +1988,7 @@ mod tests {
         );
 
         let next_mcast = next_mcast_message(&mut mcast_stream);
-        pin_mut!(next_mcast);
+        let mut next_mcast = pin!(next_mcast);
         let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
         assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Disconnect);
 
@@ -2045,7 +2045,7 @@ mod tests {
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
         assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Pending);
         let next_mcast = next_mcast_message(&mut mcast_stream);
-        pin_mut!(next_mcast);
+        let mut next_mcast = pin!(next_mcast);
         assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
         // Send and process the reconnect result.
@@ -2247,7 +2247,7 @@ mod tests {
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new());
         let wlanix_fut = serve_wlanix(stream, state, iface_manager);
-        pin_mut!(wlanix_fut);
+        let mut wlanix_fut = pin!(wlanix_fut);
         let (nl_proxy, nl_server) =
             create_proxy::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
         proxy
@@ -2269,14 +2269,14 @@ mod tests {
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new());
         let nl80211_fut = serve_nl80211(stream, state, iface_manager);
-        pin_mut!(nl80211_fut);
+        let mut nl80211_fut = pin!(nl80211_fut);
 
         let mut mcast_stream = get_nl80211_mcast(&proxy, "doesnt_exist");
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
 
         // The stream should immediately terminate.
         let next_mcast = mcast_stream.next();
-        pin_mut!(next_mcast);
+        let mut next_mcast = pin!(next_mcast);
         assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Ready(None));
 
         // serve_nl80211 should complete successfully.
@@ -2323,7 +2323,7 @@ mod tests {
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
         let nl80211_fut = serve_nl80211(stream, state, iface_manager);
-        pin_mut!(nl80211_fut);
+        let mut nl80211_fut = pin!(nl80211_fut);
 
         // Create an nl80211 message with invalid command
         let genl_message = GenlMessage::from_payload(TestNl80211 { cmd: 255, attrs: vec![] });
@@ -2339,7 +2339,7 @@ mod tests {
             message: Some(invalid_message),
             ..Default::default()
         });
-        pin_mut!(query_resp_fut);
+        let mut query_resp_fut = pin!(query_resp_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut query_resp_fut),
@@ -2356,14 +2356,14 @@ mod tests {
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
         let nl80211_fut = serve_nl80211(stream, state, iface_manager);
-        pin_mut!(nl80211_fut);
+        let mut nl80211_fut = pin!(nl80211_fut);
 
         let get_interface_message = build_nl80211_message(Nl80211Cmd::GetInterface, vec![]);
         let get_interface_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
             message: Some(get_interface_message),
             ..Default::default()
         });
-        pin_mut!(get_interface_fut);
+        let mut get_interface_fut = pin!(get_interface_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         let responses = assert_variant!(
             exec.run_until_stalled(&mut get_interface_fut),
@@ -2390,7 +2390,7 @@ mod tests {
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
         let nl80211_fut = serve_nl80211(stream, state, iface_manager);
-        pin_mut!(nl80211_fut);
+        let mut nl80211_fut = pin!(nl80211_fut);
 
         let get_station_message =
             build_nl80211_message(Nl80211Cmd::GetStation, vec![Nl80211Attr::IfaceIndex(0)]);
@@ -2399,7 +2399,7 @@ mod tests {
             ..Default::default()
         });
 
-        pin_mut!(get_station_fut);
+        let mut get_station_fut = pin!(get_station_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         let responses = assert_variant!(
             exec.run_until_stalled(&mut get_station_fut),
@@ -2418,13 +2418,13 @@ mod tests {
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
         let nl80211_fut = serve_nl80211(stream, state, iface_manager);
-        pin_mut!(nl80211_fut);
+        let mut nl80211_fut = pin!(nl80211_fut);
 
         let mut mcast_stream = get_nl80211_mcast(&proxy, "scan");
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
 
         let next_mcast = next_mcast_message(&mut mcast_stream);
-        pin_mut!(next_mcast);
+        let mut next_mcast = pin!(next_mcast);
         assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
         let trigger_scan_message =
@@ -2434,7 +2434,7 @@ mod tests {
             ..Default::default()
         });
 
-        pin_mut!(trigger_scan_fut);
+        let mut trigger_scan_fut = pin!(trigger_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         let responses = assert_variant!(
             exec.run_until_stalled(&mut trigger_scan_fut),
@@ -2458,7 +2458,7 @@ mod tests {
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
         let nl80211_fut = serve_nl80211(stream, state, iface_manager);
-        pin_mut!(nl80211_fut);
+        let mut nl80211_fut = pin!(nl80211_fut);
 
         let trigger_scan_message = build_nl80211_message(Nl80211Cmd::TriggerScan, vec![]);
         let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
@@ -2466,7 +2466,7 @@ mod tests {
             ..Default::default()
         });
 
-        pin_mut!(trigger_scan_fut);
+        let mut trigger_scan_fut = pin!(trigger_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut trigger_scan_fut),
@@ -2485,13 +2485,13 @@ mod tests {
             TestIfaceManager::new_with_client_and_scan_end_sender();
         let iface_manager = Arc::new(iface_manager);
         let nl80211_fut = serve_nl80211(stream, state, iface_manager);
-        pin_mut!(nl80211_fut);
+        let mut nl80211_fut = pin!(nl80211_fut);
 
         let mut mcast_stream = get_nl80211_mcast(&proxy, "scan");
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
 
         let next_mcast = next_mcast_message(&mut mcast_stream);
-        pin_mut!(next_mcast);
+        let mut next_mcast = pin!(next_mcast);
         assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
         let trigger_scan_message =
@@ -2500,7 +2500,7 @@ mod tests {
             message: Some(trigger_scan_message),
             ..Default::default()
         });
-        pin_mut!(trigger_scan_fut);
+        let mut trigger_scan_fut = pin!(trigger_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut trigger_scan_fut), Poll::Ready(_));
         assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
@@ -2521,7 +2521,7 @@ mod tests {
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
         let nl80211_fut = serve_nl80211(stream, state, iface_manager);
-        pin_mut!(nl80211_fut);
+        let mut nl80211_fut = pin!(nl80211_fut);
 
         let get_scan_message =
             build_nl80211_message(Nl80211Cmd::GetScan, vec![Nl80211Attr::IfaceIndex(0)]);
@@ -2530,7 +2530,7 @@ mod tests {
             ..Default::default()
         });
 
-        pin_mut!(get_scan_fut);
+        let mut get_scan_fut = pin!(get_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         let responses = assert_variant!(
             exec.run_until_stalled(&mut get_scan_fut),
@@ -2550,7 +2550,7 @@ mod tests {
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
         let nl80211_fut = serve_nl80211(stream, state, iface_manager);
-        pin_mut!(nl80211_fut);
+        let mut nl80211_fut = pin!(nl80211_fut);
 
         let get_scan_message = build_nl80211_message(Nl80211Cmd::GetScan, vec![]);
         let get_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
@@ -2558,7 +2558,7 @@ mod tests {
             ..Default::default()
         });
 
-        pin_mut!(get_scan_fut);
+        let mut get_scan_fut = pin!(get_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut get_scan_fut),
@@ -2575,7 +2575,7 @@ mod tests {
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
         let nl80211_fut = serve_nl80211(stream, state, iface_manager);
-        pin_mut!(nl80211_fut);
+        let mut nl80211_fut = pin!(nl80211_fut);
 
         let get_reg_message =
             build_nl80211_message(Nl80211Cmd::GetReg, vec![Nl80211Attr::Wiphy(123)]);
@@ -2584,7 +2584,7 @@ mod tests {
             ..Default::default()
         });
 
-        pin_mut!(get_reg_fut);
+        let mut get_reg_fut = pin!(get_reg_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         let responses = assert_variant!(
             exec.run_until_stalled(&mut get_reg_fut),

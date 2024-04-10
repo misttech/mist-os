@@ -92,7 +92,7 @@ mod tests {
     use {
         super::*, crate::legacy::Iface, fidl::endpoints::create_proxy,
         fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, futures::task::Poll,
-        pin_utils::pin_mut, wlan_common::assert_variant,
+        std::pin::pin, wlan_common::assert_variant,
     };
 
     struct TestValues {
@@ -119,7 +119,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let iface = IfaceRef::new();
         let status_fut = status(&iface);
-        pin_mut!(status_fut);
+        let mut status_fut = pin!(status_fut);
 
         // Expect that no client is reported and the AP status information is empty.
         assert_variant!(
@@ -140,7 +140,7 @@ mod tests {
         drop(test_values.sme_stream);
 
         let status_fut = status(&test_values.iface);
-        pin_mut!(status_fut);
+        let mut status_fut = pin!(status_fut);
 
         // Expect that no client is reported and the AP status information is empty.
         assert_variant!(
@@ -157,7 +157,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
         let status_fut = status(&test_values.iface);
-        pin_mut!(status_fut);
+        let mut status_fut = pin!(status_fut);
 
         // Expect an SME status request and send back a response indicating that the SME is neither
         // connected nor connecting.
@@ -184,7 +184,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
         let status_fut = status(&test_values.iface);
-        pin_mut!(status_fut);
+        let mut status_fut = pin!(status_fut);
 
         // Expect an SME status request and send back a response indicating that the SME is
         // connecting.
@@ -214,7 +214,7 @@ mod tests {
         let ssid = "test_ssid";
         let rssi_dbm = -70;
         let status_fut = status(&test_values.iface);
-        pin_mut!(status_fut);
+        let mut status_fut = pin!(status_fut);
 
         // Expect an SME status request and send back a response indicating that the SME is
         // connected.

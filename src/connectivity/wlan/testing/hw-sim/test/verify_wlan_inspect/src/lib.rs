@@ -12,7 +12,7 @@ use {
     fuchsia_zircon::DurationNum,
     ieee80211::Bssid,
     lazy_static::lazy_static,
-    pin_utils::pin_mut,
+    std::pin::pin,
     wlan_common::{
         bss::Protection,
         channel::{Cbw, Channel},
@@ -96,7 +96,7 @@ async fn verify_wlan_inspect() {
             wsc_ie: Some(WSC_IE_BODY.to_vec()),
         }];
 
-        let connect_future = async {
+        let connect_future = pin!(async {
             save_network(
                 &client_controller,
                 &AP_SSID,
@@ -110,8 +110,7 @@ async fn verify_wlan_inspect() {
                 has_id_and_state(update, &id, fidl_policy::ConnectionState::Connected)
             })
             .await;
-        };
-        pin_mut!(connect_future);
+        });
         let () = helper
             .run_until_complete_or_timeout(
                 240.seconds(),

@@ -4,7 +4,7 @@
 
 #![cfg(test)]
 
-use std::{collections::HashSet, mem::size_of};
+use std::{collections::HashSet, mem::size_of, pin::pin};
 
 use assert_matches::assert_matches;
 use fidl_fuchsia_net as net;
@@ -682,7 +682,7 @@ async fn on_and_off_link_route_discovery<N: Netstack>(
             fnet_routes_ext::event_stream_from_state::<Ipv6>(&state_v6)
                 .expect("failed to connect to watcher")
         };
-        futures::pin_mut!(ipv6_route_stream);
+        let ipv6_route_stream = pin!(ipv6_route_stream);
         let mut routes = HashSet::new();
         fnet_routes_ext::wait_for_routes(ipv6_route_stream, &mut routes, |accumulated_routes| {
             want_routes.iter().all(|route| accumulated_routes.contains(route))
@@ -1181,7 +1181,7 @@ async fn sends_mld_reports<N: Netstack>(
                 Ok(check_mld_report(mld_version, N::VERSION, dst_ip, mld, snmc).then_some(()))
             }
         });
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
     let () = stream
         .try_next()
         .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
@@ -1329,7 +1329,7 @@ async fn add_device_adds_link_local_subnet_route<N: Netstack>(name: &str) {
             }
         })
     });
-    futures::pin_mut!(link_local_subnet_route_events);
+    let mut link_local_subnet_route_events = pin!(link_local_subnet_route_events);
 
     // Verify the link local subnet route is added.
     assert_matches!(

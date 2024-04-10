@@ -714,7 +714,7 @@ mod tests {
         fuchsia_async::TestExecutor,
         fuchsia_zircon_status as zx_status,
         futures::{stream::StreamExt, task::Poll},
-        pin_utils::pin_mut,
+        std::pin::pin,
         test_case::test_case,
         wlan_common::assert_variant,
     };
@@ -1041,7 +1041,7 @@ mod tests {
         let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
         let fut = handle_start_client_connections(test_values.client_proxy);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Wait for the fidl request to go out to start client connections
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1062,7 +1062,7 @@ mod tests {
         let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
         let fut = handle_start_client_connections(test_values.client_proxy);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Wait for the fidl request to go out to start client connections
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1083,7 +1083,7 @@ mod tests {
         let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
         let fut = handle_stop_client_connections(test_values.client_proxy);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Wait for the fidl request to go out to stop client connections
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1104,7 +1104,7 @@ mod tests {
         let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
         let fut = handle_stop_client_connections(test_values.client_proxy);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Wait for the fidl request to go out to stop client connections
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1126,7 +1126,7 @@ mod tests {
         let mut test_values = client_test_setup();
         let config = create_network_config(TEST_SSID);
         let fut = handle_save_network(test_values.client_proxy, config);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Wait for the fidl request to go out to save a network
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1144,7 +1144,7 @@ mod tests {
         let mut test_values = client_test_setup();
         let config = create_network_config(TEST_SSID);
         let fut = handle_save_network(test_values.client_proxy, config);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Wait for the fidl request to go out to save a network
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1164,7 +1164,7 @@ mod tests {
         let credential = Some(create_password(TEST_PASSWORD));
         let fut =
             handle_remove_network(test_values.client_proxy, TEST_SSID.into(), security, credential);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         // Respond to the get saved networks request for checking whether anything will be removed
@@ -1200,7 +1200,7 @@ mod tests {
         let credential = None;
         let fut =
             handle_remove_network(test_values.client_proxy, TEST_SSID.into(), security, credential);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Wait for the request to get saved networks
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1238,7 +1238,7 @@ mod tests {
         let credential = Some(create_password(TEST_PASSWORD));
         let fut =
             handle_remove_network(test_values.client_proxy, TEST_SSID.into(), security, credential);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Wait for the request to get saved networks
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1276,7 +1276,7 @@ mod tests {
         let credential = None;
         let fut =
             handle_remove_network(test_values.client_proxy, TEST_SSID.into(), security, credential);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Wait for the request to get saved networks
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1313,7 +1313,7 @@ mod tests {
         let credential = None;
         let fut =
             handle_remove_network(test_values.client_proxy, TEST_SSID.into(), security, credential);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Wait for the request to get saved networks
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1341,7 +1341,7 @@ mod tests {
         let credential = Some(create_password(TEST_PASSWORD));
         let fut =
             handle_remove_network(test_values.client_proxy, TEST_SSID.into(), security, credential);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         // Respond to the get saved networks request for checking whether anything will be removed
@@ -1368,7 +1368,7 @@ mod tests {
         let credential = Some(create_password(TEST_PASSWORD));
         let fut =
             handle_remove_network(test_values.client_proxy, TEST_SSID.into(), security, credential);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
         // Respond to the get saved networks request for checking whether anything will be removed
@@ -1451,7 +1451,7 @@ mod tests {
         let security = Some(wlan_policy::SecurityType::Wpa2);
         let fut =
             handle_connect(test_values.client_proxy, test_values.update_stream, ssid, security);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The function should now stall out waiting on the connect call to go out
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1491,7 +1491,7 @@ mod tests {
         // Start the connect routine without giving a security type.
         let ssid = TEST_SSID.to_string();
         let fut = handle_connect(test_values.client_proxy, test_values.update_stream, ssid, None);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The function should now stall out waiting on the get saved networks call to go out.
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1542,7 +1542,7 @@ mod tests {
         // Start the connect routine.
         let ssid = TEST_SSID.to_string();
         let fut = handle_connect(test_values.client_proxy, test_values.update_stream, ssid, None);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Progress future forward until it waits on a get saved networks call.
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1571,7 +1571,7 @@ mod tests {
         // Start the connect routine.
         let ssid = TEST_SSID.to_string();
         let fut = handle_connect(test_values.client_proxy, test_values.update_stream, ssid, None);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Progress future forward until it waits on a get saved networks call.
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1609,7 +1609,7 @@ mod tests {
         let security = Some(wlan_policy::SecurityType::Wpa2);
         let fut =
             handle_connect(test_values.client_proxy, test_values.update_stream, ssid, security);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The function should now stall out waiting on the connect call to go out
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1639,7 +1639,7 @@ mod tests {
         let test_values = client_test_setup();
 
         let fut = handle_scan(test_values.client_proxy);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The function should now stall out waiting on the scan call to go out
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1671,7 +1671,7 @@ mod tests {
         let test_values = client_test_setup();
 
         let fut = handle_scan(test_values.client_proxy);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The function should now stall out waiting on the scan call to go out
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1691,7 +1691,7 @@ mod tests {
         let mut test_values = client_test_setup();
 
         let fut = handle_get_saved_networks(&test_values.client_proxy);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The future should stall out waiting on the get saved networks request
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1721,7 +1721,7 @@ mod tests {
         let test_values = client_test_setup();
 
         let fut = handle_listen(test_values.update_stream, false);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Listen should stall waiting for updates
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1748,7 +1748,7 @@ mod tests {
         let test_values = client_test_setup();
 
         let fut = handle_listen(test_values.update_stream, true);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Listen should stall waiting for updates
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1770,7 +1770,7 @@ mod tests {
 
         let network_config = create_network_config(&TEST_SSID);
         let fut = handle_stop_ap(test_values.ap_proxy, network_config);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The request should stall waiting for the service
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1794,7 +1794,7 @@ mod tests {
 
         let network_config = create_network_config(&TEST_SSID);
         let fut = handle_stop_ap(test_values.ap_proxy, network_config);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The request should stall waiting for the service
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1818,7 +1818,7 @@ mod tests {
 
         let network_config = create_network_config(&TEST_SSID);
         let fut = handle_start_ap(test_values.ap_proxy, test_values.update_stream, network_config);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The request should stall waiting for the service
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1843,7 +1843,7 @@ mod tests {
 
         let network_config = create_network_config(&TEST_SSID);
         let fut = handle_start_ap(test_values.ap_proxy, test_values.update_stream, network_config);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The request should stall waiting for the service
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1884,7 +1884,7 @@ mod tests {
 
         let network_config = create_network_config(&TEST_SSID);
         let fut = handle_start_ap(test_values.ap_proxy, test_values.update_stream, network_config);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The request should stall waiting for the service
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1914,7 +1914,7 @@ mod tests {
         let mut test_values = ap_test_setup();
 
         let fut = handle_stop_all_aps(test_values.ap_proxy);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // The future should finish immediately
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
@@ -1935,7 +1935,7 @@ mod tests {
         let test_values = ap_test_setup();
 
         let fut = handle_ap_listen(test_values.update_stream, false);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Listen should stall waiting for updates
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1965,7 +1965,7 @@ mod tests {
         let test_values = ap_test_setup();
 
         let fut = handle_ap_listen(test_values.update_stream, true);
-        pin_mut!(fut);
+        let mut fut = pin!(fut);
 
         // Listen should stall waiting for updates
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -1986,7 +1986,7 @@ mod tests {
                 .expect("failed to create DeprecatedConfigurator proxy");
         let mac = MacAddress::from_bytes(&[0, 1, 2, 3, 4, 5]).unwrap();
         let suggest_fut = handle_suggest_ap_mac(configurator_proxy, mac);
-        pin_mut!(suggest_fut);
+        let mut suggest_fut = pin!(suggest_fut);
 
         assert_variant!(exec.run_until_stalled(&mut suggest_fut), Poll::Pending);
 
@@ -2011,7 +2011,7 @@ mod tests {
                 .expect("failed to create DeprecatedConfigurator proxy");
         let mac = MacAddress::from_bytes(&[0, 1, 2, 3, 4, 5]).unwrap();
         let suggest_fut = handle_suggest_ap_mac(configurator_proxy, mac);
-        pin_mut!(suggest_fut);
+        let mut suggest_fut = pin!(suggest_fut);
 
         assert_variant!(exec.run_until_stalled(&mut suggest_fut), Poll::Pending);
 
