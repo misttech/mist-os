@@ -14,6 +14,7 @@ rustc_library("lib") {
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/lib/versioning/version-history/rust:version-history",
+    "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
   ]

@@ -9,7 +9,8 @@ import subprocess
 from collections.abc import Iterable
 from typing import Any
 
-from honeydew.typing import custom_types
+from honeydew.typing import custom_types, ffx
+from honeydew.typing import ffx as ffx_types
 from honeydew.utils import properties
 
 TIMEOUTS: dict[str, float] = {
@@ -64,7 +65,7 @@ class FFX(abc.ABC):
     @abc.abstractmethod
     def get_target_information(
         self, timeout: float = TIMEOUTS["FFX_CLI"]
-    ) -> list[dict[str, Any]]:
+    ) -> ffx_types.TargetInfoData:
         """Executed and returns the output of `ffx -t {target} target show`.
 
         Args:

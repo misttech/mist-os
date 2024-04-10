@@ -1,9 +1,10 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{fmt, io};
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Clone, Deserialize, JsonSchema, Serialize, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum CompatibilityState {
     /// An error was encountered determining the compatibility status.

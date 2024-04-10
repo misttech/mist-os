@@ -9,7 +9,6 @@ from __future__ import annotations
 import enum
 import ipaddress
 from dataclasses import dataclass
-
 import fuchsia_controller_py as fuchsia_controller
 
 

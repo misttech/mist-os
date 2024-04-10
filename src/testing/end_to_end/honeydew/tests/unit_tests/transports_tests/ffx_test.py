@@ -5,6 +5,7 @@
 """Unit tests for honeydew.transports.ffx.py."""
 
 import ipaddress
+import json
 import subprocess
 import unittest
 from typing import Any
@@ -16,6 +17,7 @@ from parameterized import parameterized
 from honeydew import errors
 from honeydew.transports import ffx
 from honeydew.typing import custom_types
+from honeydew.typing import ffx as ffx_types
 
 # pylint: disable=protected-access
 _TARGET_NAME: str = "fuchsia-emulator"
@@ -36,76 +38,56 @@ _LOGS_LEVEL: str = "debug"
 _MDNS_ENABLED: bool = False
 _SUBTOOLS_SEARCH_PATH: str = "/subtools"
 
-_FFX_TARGET_SHOW_OUTPUT: bytes = (
-    r'[{"title":"Target","label":"target","description":"",'
-    r'"child":[{"title":"Name","label":"name","description":"Target name.",'
-    r'"value":"fuchsia-emulator"},{"title":"SSH Address",'
-    r'"label":"ssh_address","description":"Interface address",'
-    r'"value":'
-    f'"{_SSH_ADDRESS}:{_SSH_PORT}"'
-    r'}]},{"title":"Build",'
-    r'"label":"build","description":"","child":[{"title":"Version",'
-    r'"label":"version","description":"Build version.",'
-    r'"value":"2023-02-01T17:26:40+00:00"},{"title":"Product",'
-    r'"label":"product","description":"Product config.",'
-    r'"value":"workstation_eng"},{"title":"Board","label":"board",'
-    r'"description":"Board config.","value":"qemu-x64"},{"title":"Commit",'
-    r'"label":"commit","description":"Integration Commit Date",'
-    r'"value":"2023-02-01T17:26:40+00:00"}]}]'
-).encode()
+_FFX_TARGET_SHOW_JSON: dict[str, Any] = {
+    "target": {
+        "name": _TARGET_NAME,
+        "ssh_address": {"host": f"{_SSH_ADDRESS}", "port": _SSH_PORT},
+        "compatibility_state": "supported",
+        "compatibility_message": "",
+        "last_reboot_graceful": "false",
+        "last_reboot_reason": None,
+        "uptime_nanos": -1,
+    },
+    "board": {
+        "name": "default-board",
+        "revision": None,
+        "instruction_set": "x64",
+    },
+    "device": {
+        "serial_number": "1234321",
+        "retail_sku": None,
+        "retail_demo": None,
+        "device_id": None,
+    },
+    "product": {
+        "audio_amplifier": None,
+        "build_date": None,
+        "build_name": None,
+        "colorway": None,
+        "display": None,
+        "emmc_storage": None,
+        "language": None,
+        "regulatory_domain": None,
+        "locale_list": None,
+        "manufacturer": None,
+        "microphone": None,
+        "model": None,
+        "name": None,
+        "nand_storage": None,
+        "memory": None,
+        "sku": None,
+    },
+    "update": {"current_channel": None, "next_channel": None},
+    "build": {
+        "version": "2023-02-01T17:26:40+00:00",
+        "product": "workstation_eng",
+        "board": "qemu-x64",
+        "commit": "2023-02-01T17:26:40+00:00",
+    },
+}
 
-_FFX_TARGET_SHOW_JSON: list[dict[str, Any]] = [
-    {
-        "title": "Target",
-        "label": "target",
-        "description": "",
-        "child": [
-            {
-                "title": "Name",
-                "label": "name",
-                "description": "Target name.",
-                "value": _TARGET_NAME,
-            },
-            {
-                "title": "SSH Address",
-                "label": "ssh_address",
-                "description": "Interface address",
-                "value": f"{_SSH_ADDRESS}:{_SSH_PORT}",
-            },
-        ],
-    },
-    {
-        "title": "Build",
-        "label": "build",
-        "description": "",
-        "child": [
-            {
-                "title": "Version",
-                "label": "version",
-                "description": "Build version.",
-                "value": "2023-02-01T17:26:40+00:00",
-            },
-            {
-                "title": "Product",
-                "label": "product",
-                "description": "Product config.",
-                "value": "workstation_eng",
-            },
-            {
-                "title": "Board",
-                "label": "board",
-                "description": "Board config.",
-                "value": "qemu-x64",
-            },
-            {
-                "title": "Commit",
-                "label": "commit",
-                "description": "Integration Commit Date",
-                "value": "2023-02-01T17:26:40+00:00",
-            },
-        ],
-    },
-]
+_FFX_TARGET_SHOW_OUTPUT = json.dumps(_FFX_TARGET_SHOW_JSON).encode()
+_FFX_TARGET_SHOW_INFO = ffx_types.TargetInfoData(**_FFX_TARGET_SHOW_JSON)
 
 _FFX_TARGET_LIST_OUTPUT: str = (
     '[{"nodename":"fuchsia-emulator","rcs_state":"Y","serial":"<unknown>",'
@@ -150,6 +132,7 @@ _INPUT_ARGS: dict[str, Any] = {
 _MOCK_ARGS: dict[str, Any] = {
     "ffx_target_show_output": _FFX_TARGET_SHOW_OUTPUT,
     "ffx_target_show_json": _FFX_TARGET_SHOW_JSON,
+    "ffx_target_show_object": _FFX_TARGET_SHOW_INFO,
     "ffx_target_ssh_address_output": f"[{_SSH_ADDRESS}]:{_SSH_PORT}",
     "ffx_target_list_output": _FFX_TARGET_LIST_OUTPUT,
     "ffx_target_list_json": _FFX_TARGET_LIST_JSON,
@@ -157,6 +140,7 @@ _MOCK_ARGS: dict[str, Any] = {
 
 _EXPECTED_VALUES: dict[str, Any] = {
     "ffx_target_show_output": _FFX_TARGET_SHOW_OUTPUT.decode(),
+    "ffx_target_show_object": _FFX_TARGET_SHOW_INFO,
     "ffx_target_show_json": _FFX_TARGET_SHOW_JSON,
     "ffx_target_list_json": _FFX_TARGET_LIST_JSON,
 }
@@ -405,7 +389,7 @@ class FfxTests(unittest.TestCase):
         host."""
         self.assertEqual(
             self.ffx_obj_with_ip.get_target_information(),
-            _EXPECTED_VALUES["ffx_target_show_json"],
+            _EXPECTED_VALUES["ffx_target_show_object"],
         )
 
         mock_ffx_run.assert_called()
@@ -534,13 +518,13 @@ class FfxTests(unittest.TestCase):
     @mock.patch.object(
         ffx.FFX,
         "get_target_information",
-        return_value=_MOCK_ARGS["ffx_target_show_json"],
+        return_value=_MOCK_ARGS["ffx_target_show_object"],
         autospec=True,
     )
     def test_get_target_board(self, mock_get_target_information) -> None:
         """Verify ffx.get_target_board returns board value of fuchsia device."""
         result: str = self.ffx_obj_with_ip.get_target_board()
-        expected: str = _FFX_TARGET_SHOW_JSON[1]["child"][2]["value"]
+        expected: str | None = _FFX_TARGET_SHOW_INFO.build.board
 
         self.assertEqual(result, expected)
 
@@ -549,14 +533,14 @@ class FfxTests(unittest.TestCase):
     @mock.patch.object(
         ffx.FFX,
         "get_target_information",
-        return_value=_MOCK_ARGS["ffx_target_show_json"],
+        return_value=_MOCK_ARGS["ffx_target_show_object"],
         autospec=True,
     )
     def test_get_target_product(self, mock_get_target_information) -> None:
         """Verify ffx.get_target_product returns product value of fuchsia
         device."""
         result: str = self.ffx_obj_with_ip.get_target_product()
-        expected: str = _FFX_TARGET_SHOW_JSON[1]["child"][1]["value"]
+        expected: str | None = _FFX_TARGET_SHOW_INFO.build.product
 
         self.assertEqual(result, expected)
 
@@ -829,7 +813,7 @@ class FfxTests(unittest.TestCase):
     @mock.patch.object(
         ffx.FFX,
         "get_target_information",
-        return_value=_MOCK_ARGS["ffx_target_show_json"],
+        return_value=_MOCK_ARGS["ffx_target_show_object"],
         autospec=True,
     )
     def test_get_target_name(self, mock_ffx_get_target_information) -> None:
@@ -856,7 +840,7 @@ class FfxTests(unittest.TestCase):
     @mock.patch.object(
         ffx.FFX,
         "get_target_information",
-        return_value=_MOCK_ARGS["ffx_target_show_output"],
+        return_value=_MOCK_ARGS["ffx_target_show_object"],
         autospec=True,
     )
     def test_get_target_name_exception(

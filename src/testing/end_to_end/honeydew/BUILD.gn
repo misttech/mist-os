@@ -97,6 +97,7 @@ python_library("honeydew_no_testonly") {
     "typing/__init__.py",
     "typing/bluetooth.py",
     "typing/custom_types.py",
+    "typing/ffx.py",
     "typing/screenshot_image.py",
     "typing/ui.py",
     "typing/wlan.py",

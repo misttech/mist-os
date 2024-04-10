@@ -18,6 +18,7 @@ from honeydew import errors
 from honeydew.interfaces.transports import ffx as ffx_interface
 from honeydew.typing import custom_types
 from honeydew.utils import properties
+from honeydew.typing.ffx import TargetInfoData
 
 _FFX_BINARY: str = "ffx"
 
@@ -334,7 +335,7 @@ class FFX(ffx_interface.FFX):
 
     def get_target_information(
         self, timeout: float = ffx_interface.TIMEOUTS["FFX_CLI"]
-    ) -> list[dict[str, Any]]:
+    ) -> TargetInfoData:
         """Executed and returns the output of `ffx -t {target} target show`.
 
         Args:
@@ -351,12 +352,10 @@ class FFX(ffx_interface.FFX):
         try:
             output: str = self.run(cmd=cmd, timeout=timeout)
 
-            ffx_target_show_info: list[dict[str, Any]] = json.loads(output)
-            _LOGGER.debug(
-                "`%s` returned: %s", " ".join(cmd), ffx_target_show_info
-            )
+            target_info = TargetInfoData(**json.loads(output))
+            _LOGGER.debug("`%s` returned: %s", " ".join(cmd), target_info)
 
-            return ffx_target_show_info
+            return target_info
         except subprocess.TimeoutExpired as err:
             _LOGGER.debug(err, exc_info=True)
             raise
@@ -406,37 +405,11 @@ class FFX(ffx_interface.FFX):
         Raises:
             errors.FfxCommandError: In case of failure.
         """
-        # {
-        #    "title": "Target",
-        #    "label": "target",
-        #    "description": "",
-        #    "child": [
-        #      {
-        #        "title": "Name",
-        #        "label": "name",
-        #        "description": "Target name.",
-        #        "value": "fuchsia-201f-3b5a-1c1b"
-        #      },
-        #      {
-        #        "title": "SSH Address",
-        #        "label": "ssh_address",
-        #        "description": "Interface address",
-        #        "value": "::1:8022"
-        #      }
-        #    ]
-        #  },
-
         try:
-            ffx_target_show_info: list[
-                dict[str, Any]
-            ] = self.get_target_information(timeout)
-            target_entry: dict[str, Any] = self._get_label_entry(
-                ffx_target_show_info, label_value="target"
+            ffx_target_show_info: TargetInfoData = self.get_target_information(
+                timeout
             )
-            name_entry: dict[str, Any] = self._get_label_entry(
-                target_entry["child"], label_value="name"
-            )
-            return str(name_entry["value"])
+            return ffx_target_show_info.target.name
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FfxCommandError(
                 f"Failed to get the target name of {self._target_name}"
@@ -490,50 +463,12 @@ class FFX(ffx_interface.FFX):
         Raises:
             errors.FfxCommandError: In case of failure.
         """
-        # Sample ffx_target_show_info containing the target's board:
-        # [
-        #     {
-        #         'title': 'Build',
-        #         'label': 'build',
-        #         'description': '',
-        #         'child': [
-        #             {
-        #                 'title': 'Version',
-        #                 'label': 'version',
-        #                 'description': 'Build version.',
-        #                 'value': '2023-02-01T17:26:40+00:00'
-        #             },
-        #             {
-        #                 'title': 'Product',
-        #                 'label': 'product',
-        #                 'description': 'Product config.',
-        #                 'value': 'workstation_eng'
-        #             },
-        #             {
-        #                 'title': 'Board',
-        #                 'label': 'board',
-        #                 'description': 'Board config.',
-        #                 'value': 'qemu-x64'
-        #             },
-        #             {
-        #                 'title': 'Commit',
-        #                 'label': 'commit',
-        #                 'description': 'Integration Commit Date',
-        #                 'value': '2023-02-01T17:26:40+00:00'
-        #             }
-        #         ]
-        #     },
-        # ]
-        target_show_info: list[dict[str, Any]] = self.get_target_information(
+        target_show_info: TargetInfoData = self.get_target_information(
             timeout=timeout
         )
-        build_entry: dict[str, Any] = self._get_label_entry(
-            target_show_info, label_value="build"
+        return (
+            target_show_info.build.board if target_show_info.build.board else ""
         )
-        board_entry: dict[str, Any] = self._get_label_entry(
-            build_entry["child"], label_value="board"
-        )
-        return str(board_entry["value"])
 
     def get_target_product(
         self, timeout: float = ffx_interface.TIMEOUTS["FFX_CLI"]
@@ -549,50 +484,14 @@ class FFX(ffx_interface.FFX):
         Raises:
             errors.FfxCommandError: In case of failure.
         """
-        # Sample ffx_target_show_info containing the target's product:
-        # [
-        #     {
-        #         'title': 'Build',
-        #         'label': 'build',
-        #         'description': '',
-        #         'child': [
-        #             {
-        #                 'title': 'Version',
-        #                 'label': 'version',
-        #                 'description': 'Build version.',
-        #                 'value': '2023-02-01T17:26:40+00:00'
-        #             },
-        #             {
-        #                 'title': 'Product',
-        #                 'label': 'product',
-        #                 'description': 'Product config.',
-        #                 'value': 'workstation_eng'
-        #             },
-        #             {
-        #                 'title': 'Board',
-        #                 'label': 'board',
-        #                 'description': 'Board config.',
-        #                 'value': 'qemu-x64'
-        #             },
-        #             {
-        #                 'title': 'Commit',
-        #                 'label': 'commit',
-        #                 'description': 'Integration Commit Date',
-        #                 'value': '2023-02-01T17:26:40+00:00'
-        #             }
-        #         ]
-        #     },
-        # ]
-        target_show_info: list[dict[str, Any]] = self.get_target_information(
+        target_show_info: TargetInfoData = self.get_target_information(
             timeout=timeout
         )
-        build_entry: dict[str, Any] = self._get_label_entry(
-            target_show_info, label_value="build"
+        return (
+            target_show_info.build.product
+            if target_show_info.build.product
+            else ""
         )
-        product_entry: dict[str, Any] = self._get_label_entry(
-            build_entry["child"], label_value="product"
-        )
-        return str(product_entry["value"])
 
     # pylint: disable=missing-raises-doc
     # To handle below pylint warning:
@@ -856,24 +755,3 @@ class FFX(ffx_interface.FFX):
         ffx_args.extend(["--isolate-dir", self.config.isolate_dir.directory()])
 
         return [self.config.binary_path] + ffx_args + cmd
-
-    def _get_label_entry(
-        self, data: list[dict[str, Any]], label_value: str
-    ) -> dict[str, Any]:
-        """Find and return ("label", label_value) entry in (list of dict) data
-        provided.
-
-        If a match is found, returns the corresponding dictionary entry from the
-        list. Otherwise returns an empty dict.
-
-        Args:
-            data: Input data.
-            label_value: Label value
-
-        Returns:
-            Dictionary matching the search criteria.
-        """
-        for entry in data:
-            if entry.get("label") == label_value:
-                return entry
-        return {}
