@@ -26,7 +26,7 @@ use fuchsia_zircon::{self as zx, Peered as _};
 use futures::{future::FusedFuture as _, FutureExt as _, StreamExt as _};
 use net_types::ip::{IpAddress, IpVersion, Ipv4, Ipv6};
 use netstack3_core::{
-    device::WeakDeviceId,
+    device::{DeviceId, WeakDeviceId},
     socket::ShutdownType,
     tcp::{
         self, AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
@@ -870,6 +870,20 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         ctx.api().tcp().set_device(id, device).map_err(IntoErrno::into_errno)
     }
 
+    fn bind_to_device_index(self, device: u64) -> Result<(), fposix::Errno> {
+        let Self {
+            ctx,
+            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
+        } = self;
+
+        // If `device` is 0, then this will clear the bound device.
+        let device: Option<DeviceId<_>> = NonZeroU64::new(device)
+            .map(|index| ctx.bindings_ctx().devices.get_core_id(index).ok_or(fposix::Errno::Enodev))
+            .transpose()?;
+
+        ctx.api().tcp().set_device(id, device).map_err(IntoErrno::into_errno)
+    }
+
     fn set_send_buffer_size(self, new_size: u64) {
         let Self {
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
@@ -952,6 +966,24 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         fposix_socket::StreamSocketCloseResponder,
         Option<fposix_socket::StreamSocketRequestStream>,
     > {
+        // On Error, logs the `Errno` with additional debugging context.
+        //
+        // Implemented as a macro to avoid erasing the callsite information.
+        macro_rules! maybe_log_error {
+            ($operation:expr, $result:expr) => {
+                match $result {
+                    Ok(_) => {}
+                    Err(errno) => crate::bindings::socket::log_errno!(
+                        errno,
+                        "Tcp {} failed to handle {}: {:?}",
+                        I::NAME,
+                        $operation,
+                        errno
+                    ),
+                }
+            };
+        }
+
         let Self {
             data: BindingData { id: _, peer, local_socket_and_watcher: _, send_task_abort: _ },
             ctx: _,
@@ -1016,6 +1048,13 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 let identifier = (!value.is_empty()).then_some(value.as_str());
                 responder
                     .send(self.set_bind_to_device(identifier))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+            }
+            fposix_socket::StreamSocketRequest::SetBindToInterfaceIndex { value, responder } => {
+                let result = self.bind_to_device_index(value);
+                maybe_log_error!("set_bind_to_if_index", &result);
+                responder
+                    .send(result)
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::Query { responder } => {
@@ -1113,6 +1152,9 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
             }
             fposix_socket::StreamSocketRequest::GetBindToDevice { responder } => {
                 respond_not_supported!("stream::GetBindToDevice", responder);
+            }
+            fposix_socket::StreamSocketRequest::GetBindToInterfaceIndex { responder } => {
+                respond_not_supported!("stream::GetBindToInterfaceIndex", responder);
             }
             fposix_socket::StreamSocketRequest::SetTimestamp { value: _, responder } => {
                 respond_not_supported!("stream::SetTimestamp", responder);

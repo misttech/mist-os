@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <netdb.h>
+#include <sys/socket.h>
 
 #include <array>
 #include <future>
@@ -28,6 +29,11 @@
 
 #include "src/connectivity/network/tests/os.h"
 #include "util.h"
+
+#ifndef SO_BINDTOIFINDEX
+// Our host toolchain's <sys/socket.h> appears not to define SO_BINDTOIFINDEX.
+#define SO_BINDTOIFINDEX 62
+#endif
 
 // TODO(C++20): Remove this; std::chrono::duration defines operator<< in c++20. See
 // https://en.cppreference.com/w/cpp/chrono/duration/operator_ltlt.
@@ -275,6 +281,86 @@ TEST(LocalhostTest, BindToDevice) {
     EXPECT_EQ(errno, EINVAL) << strerror(errno);
     EXPECT_EQ(get_dev_length, sizeof(get_dev));
     EXPECT_STREQ(get_dev, "");
+  }
+
+  EXPECT_EQ(close(fd.release()), 0) << strerror(errno);
+}
+
+TEST(LocalhostTest, BindToInterfaceIndex) {
+  fbl::unique_fd fd;
+  ASSERT_TRUE(fd = fbl::unique_fd(socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))) << strerror(errno);
+
+  {
+    // The default is that a socket is not bound to a device.
+    int32_t get_dev = 0;
+    socklen_t get_dev_length = sizeof(get_dev);
+    EXPECT_EQ(getsockopt(fd.get(), SOL_SOCKET, SO_BINDTOIFINDEX, &get_dev, &get_dev_length), 0)
+        << strerror(errno);
+    EXPECT_EQ(get_dev_length, socklen_t(sizeof(get_dev)));
+    EXPECT_EQ(get_dev, 0);
+  }
+
+  // Bind to 1 should work (assuming loopback interface exists).
+  const int32_t set_dev = 1;
+  {
+    ASSERT_EQ(setsockopt(fd.get(), SOL_SOCKET, SO_BINDTOIFINDEX, &set_dev, sizeof(set_dev)), 0)
+        << strerror(errno);
+  }
+
+  if (kIsFuchsia) {
+    // On Fuchsia, binding to unknown interface should fail.
+    const int32_t set_dev_unknown = 42;
+    EXPECT_EQ(setsockopt(fd.get(), SOL_SOCKET, SO_BINDTOIFINDEX, &set_dev_unknown,
+                         sizeof(set_dev_unknown)),
+              -1);
+    EXPECT_EQ(errno, ENODEV) << strerror(errno);
+  }
+
+  {
+    // Reading it back should work.
+    int32_t get_dev;
+    socklen_t get_dev_length = sizeof(get_dev);
+    EXPECT_EQ(getsockopt(fd.get(), SOL_SOCKET, SO_BINDTOIFINDEX, &get_dev, &get_dev_length), 0)
+        << strerror(errno);
+    EXPECT_EQ(get_dev_length, socklen_t(sizeof(get_dev)));
+    EXPECT_EQ(get_dev, set_dev);
+  }
+
+  // Once a bound device is set, unsetting it requires CAP_NET_RAW on Linux.
+  SKIP_IF_CANT_ACCESS_RAW_SOCKETS();
+
+  {
+    // Binding to 0 should unset the bound device.
+    const int32_t unset_dev = 0;
+    ASSERT_EQ(setsockopt(fd.get(), SOL_SOCKET, SO_BINDTOIFINDEX, &unset_dev, sizeof(unset_dev)), 0)
+        << strerror(errno);
+
+    int32_t get_dev = 42;
+    socklen_t get_dev_length = sizeof(get_dev);
+    EXPECT_EQ(getsockopt(fd.get(), SOL_SOCKET, SO_BINDTOIFINDEX, &get_dev, &get_dev_length), 0)
+        << strerror(errno);
+    EXPECT_EQ(get_dev_length, socklen_t(sizeof(get_dev)));
+    EXPECT_EQ(get_dev, unset_dev);
+  }
+
+  // Setting using a wider type for interface IDs happens to work, so it's good
+  // to have a test documenting this is the case. This is discouraged, though.
+  const uint64_t set_dev_wide = 1;
+  {
+    ASSERT_EQ(
+        setsockopt(fd.get(), SOL_SOCKET, SO_BINDTOIFINDEX, &set_dev_wide, sizeof(set_dev_wide)), 0)
+        << strerror(errno);
+  }
+
+  // Reading using a wider type also happens to work, but is likewise
+  // discouraged.
+  {
+    uint64_t get_dev = 0;
+    socklen_t get_dev_length = sizeof(get_dev);
+    EXPECT_EQ(getsockopt(fd.get(), SOL_SOCKET, SO_BINDTOIFINDEX, &get_dev, &get_dev_length), 0)
+        << strerror(errno);
+    EXPECT_EQ(get_dev_length, socklen_t(sizeof(uint32_t)));
+    EXPECT_EQ(get_dev, set_dev_wide);
   }
 
   EXPECT_EQ(close(fd.release()), 0) << strerror(errno);

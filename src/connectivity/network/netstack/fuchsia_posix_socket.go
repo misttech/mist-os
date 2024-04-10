@@ -725,6 +725,33 @@ func (ep *endpoint) GetBindToDevice(fidl.Context) (socket.BaseSocketGetBindToDev
 	return socket.BaseSocketGetBindToDeviceResultWithErr(posix.ErrnoEnodev), nil
 }
 
+func (ep *endpointWithMutators) SetBindToInterfaceIndex(ctx fidl.Context, value uint64) (socket.BaseSocketSetBindToInterfaceIndexResult, error) {
+	id := tcpip.NICID(value)
+
+	if err := func() tcpip.Error {
+		if value == 0 {
+			return ep.ep.ep.SocketOptions().SetBindToDevice(0)
+		}
+
+		if _, ok := ep.ep.ns.stack.NICInfo()[id]; ok {
+			return ep.ep.ep.SocketOptions().SetBindToDevice(int32(id))
+		}
+
+		return &tcpip.ErrUnknownDevice{}
+	}(); err != nil {
+		return socket.BaseSocketSetBindToInterfaceIndexResultWithErr(tcpipErrorToCode(err)), nil
+	}
+	return socket.BaseSocketSetBindToInterfaceIndexResultWithResponse(socket.BaseSocketSetBindToInterfaceIndexResponse{}), nil
+}
+
+func (ep *endpoint) GetBindToInterfaceIndex(fidl.Context) (socket.BaseSocketGetBindToInterfaceIndexResult, error) {
+	id := ep.ep.SocketOptions().GetBindToDevice()
+
+	return socket.BaseSocketGetBindToInterfaceIndexResultWithResponse(socket.BaseSocketGetBindToInterfaceIndexResponse{
+		Value: uint64(id),
+	}), nil
+}
+
 func (ep *endpointWithMutators) SetBroadcast(_ fidl.Context, value bool) (socket.BaseSocketSetBroadcastResult, error) {
 	ep.ep.sockOptStats.SetBroadcast.Add(1)
 	ep.ep.ep.SocketOptions().SetBroadcast(value)
@@ -2546,6 +2573,12 @@ func (s *datagramSocketImpl) SetBindToDevice(ctx fidl.Context, value string) (so
 	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetBindToDeviceResult, error) {
 		return ewm.SetBindToDevice(ctx, value)
+	})
+}
+
+func (s *datagramSocketImpl) SetBindToInterfaceIndex(ctx fidl.Context, value uint64) (socket.BaseSocketSetBindToInterfaceIndexResult, error) {
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetBindToInterfaceIndexResult, error) {
+		return ewm.SetBindToInterfaceIndex(ctx, value)
 	})
 }
 

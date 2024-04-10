@@ -21,23 +21,9 @@
 #include <gtest/gtest.h>
 
 #include "src/connectivity/network/tests/os.h"
+#include "src/connectivity/network/tests/socket/util.h"
 
 namespace {
-
-#if defined(__linux__)
-#define SKIP_IF_CANT_ACCESS_RAW_SOCKETS()                                              \
-  do {                                                                                 \
-    struct __user_cap_header_struct header = {_LINUX_CAPABILITY_VERSION_3, 0};         \
-    struct __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3] = {};                 \
-    auto ret = syscall(SYS_capget, &header, &caps);                                    \
-    ASSERT_GE(ret, 0) << strerror(errno);                                              \
-    if ((caps[CAP_TO_INDEX(CAP_NET_RAW)].effective & CAP_TO_MASK(CAP_NET_RAW)) == 0) { \
-      GTEST_SKIP() << "Do not have CAP_NET_RAW capability";                            \
-    }                                                                                  \
-  } while (false)
-#else
-#define SKIP_IF_CANT_ACCESS_RAW_SOCKETS() ((void*)0)
-#endif
 
 TEST(RawSocketTest, ProtocolZeroNotSupported) {
   // This test intentionally does not check if we have access to raw sockets as

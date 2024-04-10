@@ -323,6 +323,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.packet/Socket.GetBindToInterfaceIndex",
+        "strictness": "strict",
+        "ordinal": "6468046285718389397",
+        "direction": "two_way",
+        "response": "fuchsia.posix.socket/BaseSocket_GetBindToInterfaceIndex_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.posix.socket.packet/Socket.GetBroadcast",
         "strictness": "strict",
         "ordinal": "7528171145484924941",
@@ -465,6 +474,16 @@
         "direction": "two_way",
         "request": "fuchsia.posix.socket/BaseSocketSetBindToDeviceRequest",
         "response": "fuchsia.posix.socket/BaseSocket_SetBindToDevice_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.packet/Socket.SetBindToInterfaceIndex",
+        "strictness": "strict",
+        "ordinal": "496389508945676321",
+        "direction": "two_way",
+        "request": "fuchsia.posix.socket/BaseSocketSetBindToInterfaceIndexRequest",
+        "response": "fuchsia.posix.socket/BaseSocket_SetBindToInterfaceIndex_Response",
         "error": "fuchsia.posix/Errno"
     },
     {

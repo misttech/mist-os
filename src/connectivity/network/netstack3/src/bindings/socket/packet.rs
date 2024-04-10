@@ -499,6 +499,12 @@ impl<'a> RequestHandler<'a> {
             fppacket::SocketRequest::GetBindToDevice { responder } => {
                 respond_not_supported!("packet::GetBindToDevice", responder)
             }
+            fppacket::SocketRequest::SetBindToInterfaceIndex { value: _, responder } => {
+                respond_not_supported!("packet::SetBindToInterfaceIndex", responder)
+            }
+            fppacket::SocketRequest::GetBindToInterfaceIndex { responder } => {
+                respond_not_supported!("packet::GetBindToInterfaceIndex", responder)
+            }
             fppacket::SocketRequest::SetTimestamp { value: _, responder } => {
                 respond_not_supported!("packet::SetTimestamp", responder)
             }

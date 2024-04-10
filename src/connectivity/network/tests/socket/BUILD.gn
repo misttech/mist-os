@@ -164,6 +164,7 @@ test("netstack_${rawsocket_label}_test") {
   ]
 
   deps = [
+    ":util",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/fbl",
   ]

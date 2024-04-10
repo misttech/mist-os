@@ -105,6 +105,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.posix.socket/BaseDatagramSocket.GetBindToInterfaceIndex",
+        "strictness": "strict",
+        "ordinal": "6468046285718389397",
+        "direction": "two_way",
+        "response": "fuchsia.posix.socket/BaseSocket_GetBindToInterfaceIndex_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.posix.socket/BaseDatagramSocket.GetBroadcast",
         "strictness": "strict",
         "ordinal": "7528171145484924941",
@@ -425,6 +434,16 @@
         "direction": "two_way",
         "request": "fuchsia.posix.socket/BaseSocketSetBindToDeviceRequest",
         "response": "fuchsia.posix.socket/BaseSocket_SetBindToDevice_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket/BaseDatagramSocket.SetBindToInterfaceIndex",
+        "strictness": "strict",
+        "ordinal": "496389508945676321",
+        "direction": "two_way",
+        "request": "fuchsia.posix.socket/BaseSocketSetBindToInterfaceIndexRequest",
+        "response": "fuchsia.posix.socket/BaseSocket_SetBindToInterfaceIndex_Response",
         "error": "fuchsia.posix/Errno"
     },
     {
@@ -855,6 +874,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.posix.socket/BaseNetworkSocket.GetBindToInterfaceIndex",
+        "strictness": "strict",
+        "ordinal": "6468046285718389397",
+        "direction": "two_way",
+        "response": "fuchsia.posix.socket/BaseSocket_GetBindToInterfaceIndex_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.posix.socket/BaseNetworkSocket.GetBroadcast",
         "strictness": "strict",
         "ordinal": "7528171145484924941",
@@ -1166,6 +1194,16 @@
         "direction": "two_way",
         "request": "fuchsia.posix.socket/BaseSocketSetBindToDeviceRequest",
         "response": "fuchsia.posix.socket/BaseSocket_SetBindToDevice_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket/BaseNetworkSocket.SetBindToInterfaceIndex",
+        "strictness": "strict",
+        "ordinal": "496389508945676321",
+        "direction": "two_way",
+        "request": "fuchsia.posix.socket/BaseSocketSetBindToInterfaceIndexRequest",
+        "response": "fuchsia.posix.socket/BaseSocket_SetBindToInterfaceIndex_Response",
         "error": "fuchsia.posix/Errno"
     },
     {
@@ -1997,6 +2035,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.posix.socket/BaseSocket.GetBindToInterfaceIndex",
+        "strictness": "strict",
+        "ordinal": "6468046285718389397",
+        "direction": "two_way",
+        "response": "fuchsia.posix.socket/BaseSocket_GetBindToInterfaceIndex_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.posix.socket/BaseSocket.GetBroadcast",
         "strictness": "strict",
         "ordinal": "7528171145484924941",
@@ -2114,6 +2161,16 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.posix.socket/BaseSocket.SetBindToInterfaceIndex",
+        "strictness": "strict",
+        "ordinal": "496389508945676321",
+        "direction": "two_way",
+        "request": "fuchsia.posix.socket/BaseSocketSetBindToInterfaceIndexRequest",
+        "response": "fuchsia.posix.socket/BaseSocket_SetBindToInterfaceIndex_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.posix.socket/BaseSocket.SetBroadcast",
         "strictness": "strict",
         "ordinal": "6927627499941452103",
@@ -2227,6 +2284,16 @@
     {
         "kind": "struct",
         "name": "fuchsia.posix.socket/BaseSocketSetBindToDeviceRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.posix.socket/BaseSocketSetBindToInterfaceIndexRequest.value",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.posix.socket/BaseSocketSetBindToInterfaceIndexRequest"
     },
     {
         "kind": "struct/member",
@@ -2353,6 +2420,16 @@
     {
         "kind": "struct",
         "name": "fuchsia.posix.socket/BaseSocket_GetBindToDevice_Response"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.posix.socket/BaseSocket_GetBindToInterfaceIndex_Response.value",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.posix.socket/BaseSocket_GetBindToInterfaceIndex_Response"
     },
     {
         "kind": "struct/member",
@@ -2612,6 +2689,15 @@
         "ordinal": "1923595528092321480",
         "direction": "two_way",
         "response": "fuchsia.posix.socket/BaseSocket_GetBindToDevice_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket/DatagramSocket.GetBindToInterfaceIndex",
+        "strictness": "strict",
+        "ordinal": "6468046285718389397",
+        "direction": "two_way",
+        "response": "fuchsia.posix.socket/BaseSocket_GetBindToInterfaceIndex_Response",
         "error": "fuchsia.posix/Errno"
     },
     {
@@ -2955,6 +3041,16 @@
         "direction": "two_way",
         "request": "fuchsia.posix.socket/BaseSocketSetBindToDeviceRequest",
         "response": "fuchsia.posix.socket/BaseSocket_SetBindToDevice_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket/DatagramSocket.SetBindToInterfaceIndex",
+        "strictness": "strict",
+        "ordinal": "496389508945676321",
+        "direction": "two_way",
+        "request": "fuchsia.posix.socket/BaseSocketSetBindToInterfaceIndexRequest",
+        "response": "fuchsia.posix.socket/BaseSocket_SetBindToInterfaceIndex_Response",
         "error": "fuchsia.posix/Errno"
     },
     {
@@ -4248,6 +4344,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.posix.socket/StreamSocket.GetBindToInterfaceIndex",
+        "strictness": "strict",
+        "ordinal": "6468046285718389397",
+        "direction": "two_way",
+        "response": "fuchsia.posix.socket/BaseSocket_GetBindToInterfaceIndex_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.posix.socket/StreamSocket.GetBroadcast",
         "strictness": "strict",
         "ordinal": "7528171145484924941",
@@ -4704,6 +4809,16 @@
         "direction": "two_way",
         "request": "fuchsia.posix.socket/BaseSocketSetBindToDeviceRequest",
         "response": "fuchsia.posix.socket/BaseSocket_SetBindToDevice_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket/StreamSocket.SetBindToInterfaceIndex",
+        "strictness": "strict",
+        "ordinal": "496389508945676321",
+        "direction": "two_way",
+        "request": "fuchsia.posix.socket/BaseSocketSetBindToInterfaceIndexRequest",
+        "response": "fuchsia.posix.socket/BaseSocket_SetBindToInterfaceIndex_Response",
         "error": "fuchsia.posix/Errno"
     },
     {
@@ -5601,6 +5716,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.posix.socket/SynchronousDatagramSocket.GetBindToInterfaceIndex",
+        "strictness": "strict",
+        "ordinal": "6468046285718389397",
+        "direction": "two_way",
+        "response": "fuchsia.posix.socket/BaseSocket_GetBindToInterfaceIndex_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.posix.socket/SynchronousDatagramSocket.GetBroadcast",
         "strictness": "strict",
         "ordinal": "7528171145484924941",
@@ -5941,6 +6065,16 @@
         "direction": "two_way",
         "request": "fuchsia.posix.socket/BaseSocketSetBindToDeviceRequest",
         "response": "fuchsia.posix.socket/BaseSocket_SetBindToDevice_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket/SynchronousDatagramSocket.SetBindToInterfaceIndex",
+        "strictness": "strict",
+        "ordinal": "496389508945676321",
+        "direction": "two_way",
+        "request": "fuchsia.posix.socket/BaseSocketSetBindToInterfaceIndexRequest",
+        "response": "fuchsia.posix.socket/BaseSocket_SetBindToInterfaceIndex_Response",
         "error": "fuchsia.posix/Errno"
     },
     {

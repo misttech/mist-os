@@ -1288,6 +1288,26 @@ where
                     })
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
+            fposix_socket::SynchronousDatagramSocketRequest::SetBindToInterfaceIndex {
+                value,
+                responder,
+            } => {
+                let result = self.bind_to_device_index(value);
+                maybe_log_error!("set_bind_to_if_index", &result);
+                responder
+                    .send(result)
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+            }
+            fposix_socket::SynchronousDatagramSocketRequest::GetBindToInterfaceIndex { responder } => {
+                let result = self.get_bound_device_index();
+                maybe_log_error!("get_bind_to_if_index", &result);
+                responder
+                    .send(match result {
+                        Ok(d) => Ok(d.map(|d| d.get()).unwrap_or(0)),
+                        Err(e) => Err(e),
+                    })
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+            }
             fposix_socket::SynchronousDatagramSocketRequest::SetBroadcast { value, responder } => {
                 // We allow a no-op since the core does not yet support limiting
                 // broadcast packets. Until we implement this, we leave this as a
@@ -1922,30 +1942,52 @@ where
         .map(|()| len)
     }
 
-    fn bind_to_device(self, device: Option<&str>) -> Result<(), fposix::Errno> {
+    fn bind_to_device_id(self, device: Option<DeviceId<BindingsCtx>>) -> Result<(), fposix::Errno> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+
+        T::set_socket_device(ctx, id, device.as_ref()).map_err(IntoErrno::into_errno)
+    }
+
+    fn bind_to_device(self, device: Option<&str>) -> Result<(), fposix::Errno> {
+        let Self { ctx, .. } = &self;
         let device = device
             .map(|name| {
                 ctx.bindings_ctx().devices.get_device_by_name(name).ok_or(fposix::Errno::Enodev)
             })
             .transpose()?;
 
-        T::set_socket_device(ctx, id, device.as_ref()).map_err(IntoErrno::into_errno)
+        self.bind_to_device_id(device)
     }
 
-    fn get_bound_device(self) -> Result<Option<String>, fposix::Errno> {
+    fn bind_to_device_index(self, device: u64) -> Result<(), fposix::Errno> {
+        let Self { ctx, .. } = &self;
+
+        // If `device` is 0, then this will clear the bound device.
+        let device = NonZeroU64::new(device)
+            .map(|index| ctx.bindings_ctx().devices.get_core_id(index).ok_or(fposix::Errno::Enodev))
+            .transpose()?;
+
+        self.bind_to_device_id(device)
+    }
+
+    fn get_bound_device_id(self) -> Result<Option<DeviceId<BindingsCtx>>, fposix::Errno> {
+        // NB: Ensure that we do not return a device that was removed from the
+        // stack. This matches Linux behavior.
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         let device = match T::get_bound_device(ctx, id) {
             None => return Ok(None),
             Some(d) => d,
         };
-        // NB: Even though we can get the device name from a weak device, ensure
-        // that we do not return a device that was removed from the stack. This
-        // matches Linux behavior.
-        device
-            .upgrade()
-            .map(|core_id| Some(core_id.bindings_id().name.clone()))
-            .ok_or(fposix::Errno::Enodev)
+
+        device.upgrade().ok_or(fposix::Errno::Enodev).map(Some)
+    }
+
+    fn get_bound_device(self) -> Result<Option<String>, fposix::Errno> {
+        Ok(self.get_bound_device_id()?.map(|core_id| core_id.bindings_id().name.clone()))
+    }
+
+    fn get_bound_device_index(self) -> Result<Option<NonZeroU64>, fposix::Errno> {
+        Ok(self.get_bound_device_id()?.map(|core_id| core_id.bindings_id().id))
     }
 
     fn set_dual_stack_enabled(self, enabled: bool) -> Result<(), fposix::Errno> {

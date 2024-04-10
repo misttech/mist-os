@@ -163,6 +163,18 @@ closed protocol BaseSocket {
         value fuchsia.net.interfaces.Name;
     }) error fuchsia.posix.Errno;
 
+    /// Set `SOL_SOCKET` -> `SO_BINDTOIFINDEX`.
+    /// If `value` is 0, this clears the bound interface.
+    @available(added=20)
+    strict SetBindToInterfaceIndex(struct {
+        value fuchsia.net.InterfaceId;
+    }) -> () error fuchsia.posix.Errno;
+    /// Get `SOL_SOCKET` -> `SO_BINDTOIFINDEX`.
+    @available(added=20)
+    strict GetBindToInterfaceIndex() -> (struct {
+        value fuchsia.net.InterfaceId;
+    }) error fuchsia.posix.Errno;
+
     /// Set `SOL_SOCKET` -> `SO_TIMESTAMP` or `SO_TIMESTAMPNS`.
     // These two options are mutually exclusive. Enabling one disables the
     // other. Disabling either disables both.

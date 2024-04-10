@@ -741,7 +741,16 @@ class base_socket {
       case SO_BINDTODEVICE:
         return proc.Process(
             client()->GetBindToDevice(),
-            [](auto& response) -> const fidl::StringView& { return response.value; });
+            [](const auto& response) -> const fidl::StringView& { return response.value; });
+#if __Fuchsia_API_level__ >= 20
+      case SO_BINDTOIFINDEX:
+        return proc.Process(client()->GetBindToInterfaceIndex(), [](const auto& response) {
+          // It's unfortunate to cast through `int32_t`, but since this is what
+          // Linux uses to represent interface IDs, we want to be able to report
+          // the same values.
+          return static_cast<int32_t>(response.value);
+        });
+#endif
       case SO_BROADCAST:
         return proc.Process(client()->GetBroadcast(),
                             [](const auto& response) { return response.value; });
@@ -811,6 +820,15 @@ class base_socket {
       case SO_BINDTODEVICE:
         return proc.Process<fidl::StringView>(
             [this](fidl::StringView value) { return client()->SetBindToDevice(value); });
+#if __Fuchsia_API_level__ >= 20
+      case SO_BINDTOIFINDEX:
+        // It's unfortunate to cast through `int32_t`, but since this is what
+        // Linux uses to represent interface IDs, we want to be able to accept
+        // the same values.
+        return proc.Process<int32_t>([this](int32_t value) {
+          return client()->SetBindToInterfaceIndex(static_cast<uint64_t>(value));
+        });
+#endif
       case SO_BROADCAST:
         return proc.Process<bool>([this](bool value) { return client()->SetBroadcast(value); });
       case SO_KEEPALIVE:

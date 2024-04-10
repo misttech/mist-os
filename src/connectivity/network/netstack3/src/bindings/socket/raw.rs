@@ -175,6 +175,12 @@ impl<'a> RequestHandler<'a> {
             fpraw::SocketRequest::GetBindToDevice { responder } => {
                 respond_not_supported!("raw::GetBindToDevice", responder)
             }
+            fpraw::SocketRequest::SetBindToInterfaceIndex { value: _, responder } => {
+                respond_not_supported!("raw::SetBindToInterfaceIndex", responder)
+            }
+            fpraw::SocketRequest::GetBindToInterfaceIndex { responder } => {
+                respond_not_supported!("raw::GetBindToInterfaceIndex", responder)
+            }
             fpraw::SocketRequest::SetTimestamp { value: _, responder } => {
                 respond_not_supported!("raw::SetTimestamp", responder)
             }
