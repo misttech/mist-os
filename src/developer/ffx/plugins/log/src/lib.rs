@@ -15,13 +15,10 @@ use log_command::{
         dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
         Symbolize, WriterContainer,
     },
-    InstanceGetter, LogSubCommand, SymbolizeMode, WatchCommand,
+    InstanceGetter, LogSubCommand, WatchCommand,
 };
-use log_symbolizer::LogSymbolizer;
-use std::{fmt::Debug, io::Write};
-use symbolizer::NonTransactionalSymbolizer;
-use tokio::io::{AsyncRead, AsyncWrite};
-use transactional_symbolizer::{RealSymbolizerProcess, SymbolizerProcess, TransactionalSymbolizer};
+use std::io::Write;
+use transactional_symbolizer::{RealSymbolizerProcess, TransactionalSymbolizer};
 
 // NOTE: This is required for the legacy ffx toolchain
 // which automatically adds ffx_core even though we don't use it.
@@ -30,7 +27,6 @@ use ffx_core as _;
 mod condition_variable;
 mod error;
 mod mutex;
-mod symbolizer;
 #[cfg(test)]
 mod testing_utils;
 mod transactional_symbolizer;
@@ -75,107 +71,24 @@ pub async fn log_impl(
     target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
 ) -> Result<(), LogError> {
-    let enable_transactional_symbolizer =
-        ffx_config::get("log_cmd.pretty_backtraces").await.unwrap_or(false);
-    let mut disable_prettification = false;
-    let mut no_symbolize = cmd.no_symbolize;
-    // TODO(b/299980894): Clean this up once no longer needed.
-    if cmd.no_symbolize || cmd.raw {
-        eprintln!(concat!(
-            "WARNING: --no-symbolize and --raw have been deprecated",
-            " and replaced with --symbolize."
-        ));
-        eprintln!("These legacy options will eventually be removed.");
-        if cmd.raw {
-            no_symbolize = true;
-        }
-    } else {
-        match cmd.symbolize {
-            SymbolizeMode::Off => {
-                no_symbolize = true;
-            }
-            SymbolizeMode::Pretty => {}
-            SymbolizeMode::Classic => {
-                disable_prettification = true;
-            }
-        }
-    }
+    let symbolize_disabled = cmd.symbolize.is_symbolize_disabled();
+    let prettification_disabled = cmd.symbolize.is_prettification_disabled();
     let instance_getter = rcs::root_realm_query(&rcs_proxy, TIMEOUT).await?;
     log_main(
         writer,
         rcs_proxy,
         target_collection_proxy,
         cmd,
-        if no_symbolize {
+        if symbolize_disabled {
             None
         } else {
-            if enable_transactional_symbolizer {
-                Some(EitherSymbolizer::Left(TransactionalSymbolizer::new(
-                    RealSymbolizerProcess::new(!disable_prettification).await?,
-                )?))
-            } else {
-                Some(EitherSymbolizer::Right(LogSymbolizer::new()))
-            }
+            Some(TransactionalSymbolizer::new(
+                RealSymbolizerProcess::new(!prettification_disabled).await?,
+            )?)
         },
         instance_getter,
     )
     .await
-}
-
-/// Temporary compatibility enum allowing for the usage of Symbolize
-/// and Symbolizer, until the legacy Symbolizer trait is removed.
-/// This is needed because we can't implement a foreign trait (Symbolize)
-/// on a foreign type (Either), and we likely don't want to define
-/// this in log_formatter as this is specific to ffx and not needed
-/// on the device.
-enum EitherSymbolizer<A, B> {
-    Left(A),
-    Right(B),
-}
-
-/// Temporary compatibility trait allowing for the usage of Symbolize
-/// and Symbolizer, until the legacy Symbolizer trait is removed.
-trait AsyncIntoSymbolize {
-    async fn into_symbolize(self) -> Result<impl Symbolize, LogError>;
-}
-
-impl AsyncIntoSymbolize for LogSymbolizer {
-    async fn into_symbolize(self) -> Result<impl Symbolize, LogError> {
-        NonTransactionalSymbolizer::new(self).await
-    }
-}
-
-impl<T: SymbolizerProcess + 'static> AsyncIntoSymbolize for TransactionalSymbolizer<T>
-where
-    T::Stdin: AsyncWrite + Unpin + Debug,
-    T::Stdout: AsyncRead + Unpin + Debug,
-{
-    async fn into_symbolize(self) -> Result<impl Symbolize, LogError> {
-        Ok(self)
-    }
-}
-
-impl<A: AsyncIntoSymbolize, B: AsyncIntoSymbolize> AsyncIntoSymbolize for EitherSymbolizer<A, B> {
-    async fn into_symbolize(self) -> Result<impl Symbolize, LogError> {
-        Ok(match self {
-            EitherSymbolizer::Left(result) => {
-                EitherSymbolizer::Left(result.into_symbolize().await?)
-            }
-            EitherSymbolizer::Right(result) => {
-                EitherSymbolizer::Right(result.into_symbolize().await?)
-            }
-        })
-    }
-}
-
-#[async_trait(?Send)]
-impl<A: Symbolize, B: Symbolize> Symbolize for EitherSymbolizer<A, B> {
-    async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry> {
-        match self {
-            EitherSymbolizer::Left(value) => value.symbolize(entry).await,
-            EitherSymbolizer::Right(value) => value.symbolize(entry).await,
-        }
-    }
 }
 
 // Main logging event loop.
@@ -184,7 +97,7 @@ async fn log_main<W>(
     rcs_proxy: RemoteControlProxy,
     target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
-    symbolizer: Option<impl AsyncIntoSymbolize>,
+    symbolizer: Option<impl Symbolize>,
     instance_getter: impl InstanceGetter,
 ) -> Result<(), LogError>
 where
@@ -278,14 +191,14 @@ async fn log_loop<W>(
     target_query: TargetQuery,
     cmd: LogCommand,
     mut formatter: impl LogFormatter + BootTimeAccessor + WriterContainer<W>,
-    symbolizer: Option<impl AsyncIntoSymbolize>,
+    symbolizer: Option<impl Symbolize>,
     realm_query: &impl InstanceGetter,
 ) -> Result<(), LogError>
 where
     W: ToolIO<OutputItem = LogEntry> + Write,
 {
     let symbolizer_channel: Box<dyn Symbolize> = match symbolizer {
-        Some(inner) => Box::new(inner.into_symbolize().await?),
+        Some(inner) => Box::new(inner),
         None => Box::new(NoOpSymoblizer {}),
     };
     let mut stream_mode = get_stream_mode(cmd.clone())?;
@@ -393,7 +306,6 @@ mod tests {
         log_formatter::{LogData, TIMESTAMP_FORMAT},
         parse_seconds_string_as_duration, parse_time, DumpCommand, TimeFormat,
     };
-    use log_symbolizer::{FakeSymbolizerForTest, NoOpSymbolizer};
     use moniker::Moniker;
     use selectors::parse_log_interest_selector;
     use std::{
@@ -410,18 +322,6 @@ mod tests {
         expected_selector: Option<String>,
     }
 
-    impl AsyncIntoSymbolize for NoOpSymbolizer {
-        async fn into_symbolize(self) -> Result<impl Symbolize, LogError> {
-            NonTransactionalSymbolizer::new(self).await
-        }
-    }
-
-    impl AsyncIntoSymbolize for FakeSymbolizerForTest {
-        async fn into_symbolize(self) -> Result<impl Symbolize, LogError> {
-            NonTransactionalSymbolizer::new(self).await
-        }
-    }
-
     #[async_trait(?Send)]
     impl InstanceGetter for FakeInstanceGetter {
         async fn get_monikers_from_query(
@@ -436,84 +336,6 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn symbolizer_replaces_markers_with_symbolized_logs() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            ..LogCommand::default()
-        };
-        let symbolizer = FakeSymbolizerForTest::new("prefix", vec![]);
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
-            messages: vec![
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(0),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("{{{reset}}}")
-                .build(),
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(0),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("{{{mmap:something}}")
-                .build(),
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(0),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("not_real")
-                .build(),
-            ],
-            ..Default::default()
-        }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
-            target_collection_server,
-            scheduler.clone(),
-        ));
-        let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
-
-        assert_eq!(
-            test_buffers.stdout.into_string().split('\n').collect::<Vec<_>>(),
-            vec![
-                "[00000.000000][ffx] INFO: prefix{{{reset}}}\u{1b}[m",
-                "[00000.000000][ffx] INFO: prefix{{{mmap:something}}\u{1b}[m",
-                "[00000.000000][ffx] INFO: not_real\u{1b}[m",
-                ""
-            ]
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
-    }
-
-    #[fuchsia::test]
     async fn json_logger_test() {
         let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
@@ -522,7 +344,7 @@ mod tests {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let task_manager = TaskManager::new();
         let scheduler = task_manager.get_scheduler();
         task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
@@ -575,7 +397,7 @@ mod tests {
             select: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let task_manager = TaskManager::new();
         let scheduler = task_manager.get_scheduler();
         task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
@@ -631,7 +453,7 @@ ffx log --force-select.
             select: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new();
         let mut event_stream = task_manager.take_event_stream().unwrap();
         let scheduler = task_manager.get_scheduler();
@@ -673,7 +495,7 @@ ffx log --force-select.
             since: Some(parse_time("now").unwrap()),
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let task_manager = TaskManager::new();
         let scheduler = task_manager.get_scheduler();
         task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
@@ -706,7 +528,7 @@ ffx log --force-select.
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new();
         let mut event_stream = task_manager.take_event_stream().unwrap();
         let scheduler = task_manager.get_scheduler();
@@ -746,7 +568,7 @@ ffx log --force-select.
             no_color: true,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new();
         let mut event_stream = task_manager.take_event_stream().unwrap();
         let scheduler = task_manager.get_scheduler();
@@ -787,7 +609,7 @@ ffx log --force-select.
             no_color: true,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new();
         let mut event_stream = task_manager.take_event_stream().unwrap();
         let scheduler = task_manager.get_scheduler();
@@ -827,7 +649,7 @@ ffx log --force-select.
             clock: TimeFormat::Utc,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -880,7 +702,7 @@ ffx log --force-select.
             severity: Severity::Error,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![
                 LogsDataBuilder::new(BuilderArgs {
@@ -978,7 +800,7 @@ ffx log --force-select.
             until: None,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -1066,7 +888,7 @@ ffx log --force-select.
             until: None,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -1160,7 +982,7 @@ ffx log --force-select.
             until: Some(parse_time("1980-01-01T00:00:05").unwrap()),
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![
                 LogsDataBuilder::new(BuilderArgs {
@@ -1254,7 +1076,7 @@ ffx log --force-select.
             until_monotonic: Some(parse_seconds_string_as_duration("5").unwrap()),
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![
                 LogsDataBuilder::new(BuilderArgs {
@@ -1328,7 +1150,7 @@ ffx log --force-select.
             clock: TimeFormat::Local,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -1382,7 +1204,7 @@ ffx log --force-select.
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -1434,7 +1256,7 @@ ffx log --force-select.
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -1487,7 +1309,7 @@ ffx log --force-select.
             show_full_moniker: true,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -1540,7 +1362,7 @@ ffx log --force-select.
             hide_tags: true,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -1594,7 +1416,7 @@ ffx log --force-select.
             select: severity.clone(),
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new();
         let mut event_stream = task_manager.take_event_stream().unwrap();
         let scheduler = task_manager.get_scheduler();
@@ -1634,7 +1456,7 @@ ffx log --force-select.
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -1690,7 +1512,7 @@ ffx log --force-select.
             hide_file: true,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymbolizer::new();
+        let symbolizer = NoOpSymoblizer;
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
