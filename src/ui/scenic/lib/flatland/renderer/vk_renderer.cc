@@ -276,8 +276,8 @@ bool IsValidImage(const allocation::ImageMetadata& metadata) {
 
   // Check we have valid dimensions.
   if (metadata.width == 0 || metadata.height == 0) {
-    FX_LOGS(WARNING) << "Image has invalid dimensions: "
-                     << "(" << metadata.width << ", " << metadata.height << ").";
+    FX_LOGS(WARNING) << "Image has invalid dimensions: " << "(" << metadata.width << ", "
+                     << metadata.height << ").";
     return false;
   }
 
@@ -799,9 +799,9 @@ void VkRenderer::Render(const ImageMetadata& render_target,
   }
 
   // Transition pending images to their correct layout
-  // TODO(https://fxbug.dev/42129471): The way we are transitioning image layouts here and in the rest of
-  // Scenic is incorrect for "external" images. It just happens to be working by luck on our current
-  // hardware.
+  // TODO(https://fxbug.dev/42129471): The way we are transitioning image layouts here and in the
+  // rest of Scenic is incorrect for "external" images. It just happens to be working by luck on our
+  // current hardware.
   for (auto texture_id : local_pending_textures) {
     FX_DCHECK(local_texture_map.find(texture_id) != local_texture_map.end());
     const auto texture = local_texture_map.at(texture_id);
@@ -894,7 +894,8 @@ void VkRenderer::Render(const ImageMetadata& render_target,
       FX_DCHECK(result == vk::Result::eSuccess);
     }
 
-    {  // Create a flow event that ends in the magma system driver.
+    // Create a flow event that ends in the magma system driver.
+    if (TRACE_ENABLED()) {
       const zx::event semaphore_event = GetEventForSemaphore(escher_->device(), sema);
       zx_info_handle_basic_t koid_info;
       semaphore_event.get_info(ZX_INFO_HANDLE_BASIC, &koid_info, sizeof(koid_info), nullptr,
@@ -904,8 +905,8 @@ void VkRenderer::Render(const ImageMetadata& render_target,
 
     semaphores.emplace_back(sema);
 
-    // TODO(https://fxbug.dev/42174813): Semaphore lifetime should be guaranteed by Escher. This wait is a
-    // workaround for the issue where we destroy semaphores before they are signalled.
+    // TODO(https://fxbug.dev/42174813): Semaphore lifetime should be guaranteed by Escher. This
+    // wait is a workaround for the issue where we destroy semaphores before they are signalled.
     TRACE_DURATION("gfx", "VkRenderer::Render[WaitOnce]");
     auto wait = std::make_shared<async::WaitOnce>(fence_original.get(), ZX_EVENT_SIGNALED,
                                                   ZX_WAIT_ASYNC_TIMESTAMP);
