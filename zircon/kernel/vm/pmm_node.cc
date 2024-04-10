@@ -258,44 +258,50 @@ void PmmNode::AllocPageHelperLocked(vm_page_t* page) {
 
 zx_status_t PmmNode::AllocPage(uint alloc_flags, vm_page_t** page_out, paddr_t* pa_out) {
   DEBUG_ASSERT(Thread::Current::memory_allocation_state().IsEnabled());
-  AutoPreemptDisabler preempt_disable;
-  Guard<Mutex> guard{&lock_};
 
-  // If the caller sets PMM_ALLOC_FLAG_MUST_BORROW, the caller must also set
-  // PMM_ALLOC_FLAG_CAN_BORROW, and must not set PMM_ALLOC_FLAG_CAN_WAIT.
-  DEBUG_ASSERT(
-      !(alloc_flags & PMM_ALLOC_FLAG_MUST_BORROW) ||
-      ((alloc_flags & PMM_ALLOC_FLAG_CAN_BORROW) && !((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT))));
-  const bool can_borrow = pmm_physical_page_borrowing_config()->is_any_borrowing_enabled() &&
-                          !!(alloc_flags & PMM_ALLOC_FLAG_CAN_BORROW);
-  const bool must_borrow = can_borrow && !!(alloc_flags & PMM_ALLOC_FLAG_MUST_BORROW);
-  const bool use_loaned_list = can_borrow && (!list_is_empty(&free_loaned_list_) || must_borrow);
-  list_node* const which_list = use_loaned_list ? &free_loaned_list_ : &free_list_;
+  vm_page* page = nullptr;
 
-  // Note that we do not care if the allocation is happening from the loaned list or not since if
-  // we are in the OOM state we still want to preference those loaned pages to allocations that
-  // cannot be delayed.
-  if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && InOomStateLocked() && !never_return_should_wait_) {
-    pmm_alloc_delayed.Add(1);
-    return ZX_ERR_SHOULD_WAIT;
-  }
+  {
+    AutoPreemptDisabler preempt_disable;
+    Guard<Mutex> guard{&lock_};
 
-  vm_page* page = list_remove_head_type(which_list, vm_page, queue_node);
-  if (!page) {
-    if (!must_borrow) {
-      // Allocation failures from the regular free list are likely to become user-visible.
-      ReportAllocFailureLocked();
+    // If the caller sets PMM_ALLOC_FLAG_MUST_BORROW, the caller must also set
+    // PMM_ALLOC_FLAG_CAN_BORROW, and must not set PMM_ALLOC_FLAG_CAN_WAIT.
+    DEBUG_ASSERT(
+        !(alloc_flags & PMM_ALLOC_FLAG_MUST_BORROW) ||
+        ((alloc_flags & PMM_ALLOC_FLAG_CAN_BORROW) && !((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT))));
+    const bool can_borrow = pmm_physical_page_borrowing_config()->is_any_borrowing_enabled() &&
+                            !!(alloc_flags & PMM_ALLOC_FLAG_CAN_BORROW);
+    const bool must_borrow = can_borrow && !!(alloc_flags & PMM_ALLOC_FLAG_MUST_BORROW);
+    const bool use_loaned_list = can_borrow && (!list_is_empty(&free_loaned_list_) || must_borrow);
+    list_node* const which_list = use_loaned_list ? &free_loaned_list_ : &free_list_;
+
+    // Note that we do not care if the allocation is happening from the loaned list or not since if
+    // we are in the OOM state we still want to preference those loaned pages to allocations that
+    // cannot be delayed.
+    if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && InOomStateLocked() &&
+        !never_return_should_wait_) {
+      pmm_alloc_delayed.Add(1);
+      return ZX_ERR_SHOULD_WAIT;
     }
-    return ZX_ERR_NO_MEMORY;
-  }
 
-  DEBUG_ASSERT(can_borrow || !page->is_loaned());
-  AllocPageHelperLocked(page);
+    page = list_remove_head_type(which_list, vm_page, queue_node);
+    if (!page) {
+      if (!must_borrow) {
+        // Allocation failures from the regular free list are likely to become user-visible.
+        ReportAllocFailureLocked();
+      }
+      return ZX_ERR_NO_MEMORY;
+    }
 
-  if (use_loaned_list) {
-    DecrementFreeLoanedCountLocked(1);
-  } else {
-    DecrementFreeCountLocked(1);
+    DEBUG_ASSERT(can_borrow || !page->is_loaned());
+    AllocPageHelperLocked(page);
+
+    if (use_loaned_list) {
+      DecrementFreeLoanedCountLocked(1);
+    } else {
+      DecrementFreeCountLocked(1);
+    }
   }
 
   if (pa_out) {
@@ -336,90 +342,93 @@ zx_status_t PmmNode::AllocPages(size_t count, uint alloc_flags, list_node* list)
                           !!(alloc_flags & PMM_ALLOC_FLAG_CAN_BORROW);
   const bool must_borrow = can_borrow && !!(alloc_flags & PMM_ALLOC_FLAG_MUST_BORROW);
 
-  AutoPreemptDisabler preempt_disable;
-  Guard<Mutex> guard{&lock_};
+  {
+    AutoPreemptDisabler preempt_disable;
+    Guard<Mutex> guard{&lock_};
 
-  uint64_t free_count;
-  if (must_borrow) {
-    free_count = 0;
-  } else {
-    free_count = free_count_.load(ktl::memory_order_relaxed);
-  }
-  uint64_t available_count = free_count;
-  uint64_t free_loaned_count = 0;
-  if (can_borrow) {
-    free_loaned_count = free_loaned_count_.load(ktl::memory_order_relaxed);
-    available_count += free_loaned_count;
-  }
+    uint64_t free_count;
+    if (must_borrow) {
+      free_count = 0;
+    } else {
+      free_count = free_count_.load(ktl::memory_order_relaxed);
+    }
+    uint64_t available_count = free_count;
+    uint64_t free_loaned_count = 0;
+    if (can_borrow) {
+      free_loaned_count = free_loaned_count_.load(ktl::memory_order_relaxed);
+      available_count += free_loaned_count;
+    }
 
-  if (unlikely(count > available_count)) {
-    if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && !never_return_should_wait_) {
+    if (unlikely(count > available_count)) {
+      if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && !never_return_should_wait_) {
+        pmm_alloc_delayed.Add(1);
+        return ZX_ERR_SHOULD_WAIT;
+      }
+      if (!must_borrow) {
+        // Allocation failures from the regular free list are likely to become user-visible.
+        ReportAllocFailureLocked();
+      }
+      return ZX_ERR_NO_MEMORY;
+    }
+    // Prefer to allocate from loaned, if allowed by this allocation.  If loaned is not allowed by
+    // this allocation, free_loaned_count will be zero here.
+    DEBUG_ASSERT(can_borrow || !free_loaned_count);
+    DEBUG_ASSERT(!must_borrow || !free_count);
+    uint64_t from_loaned_free = ktl::min(count, free_loaned_count);
+    uint64_t from_free = count - from_loaned_free;
+
+    DecrementFreeCountLocked(from_free);
+
+    // For simplicity of oom state detection we do this check after decrementing the free count,
+    // since the error case is unlikely and not performance critical. Even if no pages are being
+    // requested from the regular free list (if loaned pages can be used) we still fail in the oom
+    // state since we would prefer those loaned pages to be used to fulfill allocations that cannot
+    // be delayed.
+    if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && InOomStateLocked() &&
+        !never_return_should_wait_) {
+      IncrementFreeCountLocked(from_free);
       pmm_alloc_delayed.Add(1);
       return ZX_ERR_SHOULD_WAIT;
     }
-    if (!must_borrow) {
-      // Allocation failures from the regular free list are likely to become user-visible.
-      ReportAllocFailureLocked();
-    }
-    return ZX_ERR_NO_MEMORY;
+
+    DecrementFreeLoanedCountLocked(from_loaned_free);
+
+    do {
+      DEBUG_ASSERT(count == from_loaned_free + from_free);
+      list_node* which_list;
+      size_t which_count;
+      if (can_borrow && !list_is_empty(&free_loaned_list_)) {
+        which_list = &free_loaned_list_;
+        which_count = from_loaned_free;
+        from_loaned_free = 0;
+      } else {
+        DEBUG_ASSERT(!must_borrow);
+        which_list = &free_list_;
+        which_count = from_free;
+        from_free = 0;
+      }
+      count -= which_count;
+
+      DEBUG_ASSERT(which_count > 0);
+      auto node = which_list;
+      while (which_count > 0) {
+        node = list_next(which_list, node);
+        DEBUG_ASSERT(can_borrow || !containerof(node, vm_page, queue_node)->is_loaned());
+        AllocPageHelperLocked(containerof(node, vm_page, queue_node));
+        --which_count;
+      }
+
+      list_node tmp_list = LIST_INITIAL_VALUE(tmp_list);
+      list_split_after(which_list, node, &tmp_list);
+      if (list_is_empty(list)) {
+        list_move(which_list, list);
+      } else {
+        list_splice_after(which_list, list_peek_tail(list));
+      }
+      list_move(&tmp_list, which_list);
+      DEBUG_ASSERT(count == from_loaned_free + from_free);
+    } while (count > 0);
   }
-  // Prefer to allocate from loaned, if allowed by this allocation.  If loaned is not allowed by
-  // this allocation, free_loaned_count will be zero here.
-  DEBUG_ASSERT(can_borrow || !free_loaned_count);
-  DEBUG_ASSERT(!must_borrow || !free_count);
-  uint64_t from_loaned_free = ktl::min(count, free_loaned_count);
-  uint64_t from_free = count - from_loaned_free;
-
-  DecrementFreeCountLocked(from_free);
-
-  // For simplicity of oom state detection we do this check after decrementing the free count, since
-  // the error case is unlikely and not performance critical.
-  // Even if no pages are being requested from the regular free list (if loaned pages can be used)
-  // we still fail in the oom state since we would prefer those loaned pages to be used to fulfill
-  // allocations that cannot be delayed.
-  if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && InOomStateLocked() && !never_return_should_wait_) {
-    IncrementFreeCountLocked(from_free);
-    pmm_alloc_delayed.Add(1);
-    return ZX_ERR_SHOULD_WAIT;
-  }
-
-  DecrementFreeLoanedCountLocked(from_loaned_free);
-
-  do {
-    DEBUG_ASSERT(count == from_loaned_free + from_free);
-    list_node* which_list;
-    size_t which_count;
-    if (can_borrow && !list_is_empty(&free_loaned_list_)) {
-      which_list = &free_loaned_list_;
-      which_count = from_loaned_free;
-      from_loaned_free = 0;
-    } else {
-      DEBUG_ASSERT(!must_borrow);
-      which_list = &free_list_;
-      which_count = from_free;
-      from_free = 0;
-    }
-    count -= which_count;
-
-    DEBUG_ASSERT(which_count > 0);
-    auto node = which_list;
-    while (which_count > 0) {
-      node = list_next(which_list, node);
-      DEBUG_ASSERT(can_borrow || !containerof(node, vm_page, queue_node)->is_loaned());
-      AllocPageHelperLocked(containerof(node, vm_page, queue_node));
-      --which_count;
-    }
-
-    list_node tmp_list = LIST_INITIAL_VALUE(tmp_list);
-    list_split_after(which_list, node, &tmp_list);
-    if (list_is_empty(list)) {
-      list_move(which_list, list);
-    } else {
-      list_splice_after(which_list, list_peek_tail(list));
-    }
-    list_move(&tmp_list, which_list);
-    DEBUG_ASSERT(count == from_loaned_free + from_free);
-  } while (count > 0);
 
   return ZX_OK;
 }
@@ -441,48 +450,50 @@ zx_status_t PmmNode::AllocRange(paddr_t address, size_t count, list_node* list) 
 
   address = ROUNDDOWN(address, PAGE_SIZE);
 
-  AutoPreemptDisabler preempt_disable;
-  Guard<Mutex> guard{&lock_};
+  {
+    AutoPreemptDisabler preempt_disable;
+    Guard<Mutex> guard{&lock_};
 
-  // walk through the arenas, looking to see if the physical page belongs to it
-  for (auto& a : arena_list_) {
-    for (; allocated < count && a.address_in_arena(address); address += PAGE_SIZE) {
-      vm_page_t* page = a.FindSpecific(address);
-      if (!page) {
-        break;
+    // walk through the arenas, looking to see if the physical page belongs to it
+    for (auto& a : arena_list_) {
+      for (; allocated < count && a.address_in_arena(address); address += PAGE_SIZE) {
+        vm_page_t* page = a.FindSpecific(address);
+        if (!page) {
+          break;
+        }
+
+        // As we hold lock_, we can assume that any page in the FREE state is owned by us, and
+        // protected by lock_, and so should is_free() be true we will be allowed to assume it is in
+        // the free list, remove it from said list, and allocate it.
+        if (!page->is_free()) {
+          break;
+        }
+
+        // We never allocate loaned pages for caller of AllocRange()
+        if (page->is_loaned()) {
+          break;
+        }
+
+        list_delete(&page->queue_node);
+
+        AllocPageHelperLocked(page);
+
+        list_add_tail(list, &page->queue_node);
+
+        allocated++;
+        DecrementFreeCountLocked(1);
       }
 
-      // As we hold lock_, we can assume that any page in the FREE state is owned by us, and
-      // protected by lock_, and so should is_free() be true we will be allowed to assume it is in
-      // the free list, remove it from said list, and allocate it.
-      if (!page->is_free()) {
+      if (allocated == count) {
         break;
       }
-
-      // We never allocate loaned pages for caller of AllocRange()
-      if (page->is_loaned()) {
-        break;
-      }
-
-      list_delete(&page->queue_node);
-
-      AllocPageHelperLocked(page);
-
-      list_add_tail(list, &page->queue_node);
-
-      allocated++;
-      DecrementFreeCountLocked(1);
     }
 
-    if (allocated == count) {
-      break;
+    if (allocated != count) {
+      // we were not able to allocate the entire run, free these pages
+      FreeListLocked(list);
+      return ZX_ERR_NOT_FOUND;
     }
-  }
-
-  if (allocated != count) {
-    // we were not able to allocate the entire run, free these pages
-    FreeListLocked(list);
-    return ZX_ERR_NOT_FOUND;
   }
 
   return ZX_OK;
@@ -946,36 +957,41 @@ void PmmNode::CancelLoan(paddr_t address, size_t count) {
 }
 
 void PmmNode::EndLoan(paddr_t address, size_t count, list_node* page_list) {
-  AutoPreemptDisabler preempt_disable;
-  Guard<Mutex> guard{&lock_};
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(address));
-  paddr_t end = address + count * PAGE_SIZE;
-  DEBUG_ASSERT(address <= end);
+  {
+    AutoPreemptDisabler preempt_disable;
+    Guard<Mutex> guard{&lock_};
+    DEBUG_ASSERT(IS_PAGE_ALIGNED(address));
+    paddr_t end = address + count * PAGE_SIZE;
+    DEBUG_ASSERT(address <= end);
 
-  uint64_t loan_ended_count = 0;
+    uint64_t loan_ended_count = 0;
 
-  ForPagesInPhysRangeLocked(address, count, [this, &page_list, &loan_ended_count](vm_page_t* page) {
-    AssertHeld(lock_);
+    ForPagesInPhysRangeLocked(address, count,
+                              [this, &page_list, &loan_ended_count](vm_page_t* page) {
+                                AssertHeld(lock_);
 
-    // PageSource serializing such that there's only one request to PageProvider in flight at a time
-    // for any given page is the main reason we can assert these instead of needing to check these.
-    DEBUG_ASSERT(page->is_loaned());
-    DEBUG_ASSERT(page->is_loan_cancelled());
-    DEBUG_ASSERT(page->is_free());
+                                // PageSource serializing such that there's only one request to
+                                // PageProvider in flight at a time for any given page is the main
+                                // reason we can assert these instead of needing to check these.
+                                DEBUG_ASSERT(page->is_loaned());
+                                DEBUG_ASSERT(page->is_loan_cancelled());
+                                DEBUG_ASSERT(page->is_free());
 
-    // Already not in free_loaned_list_ (because loan_cancelled already).
-    DEBUG_ASSERT(!list_in_list(&page->queue_node));
+                                // Already not in free_loaned_list_ (because loan_cancelled
+                                // already).
+                                DEBUG_ASSERT(!list_in_list(&page->queue_node));
 
-    page->clear_is_loaned();
-    page->clear_is_loan_cancelled();
-    ++loan_ended_count;
+                                page->clear_is_loaned();
+                                page->clear_is_loan_cancelled();
+                                ++loan_ended_count;
 
-    AllocPageHelperLocked(page);
-    list_add_tail(page_list, &page->queue_node);
-  });
+                                AllocPageHelperLocked(page);
+                                list_add_tail(page_list, &page->queue_node);
+                              });
 
-  DecrementLoanCancelledCountLocked(loan_ended_count);
-  DecrementLoanedCountLocked(loan_ended_count);
+    DecrementLoanCancelledCountLocked(loan_ended_count);
+    DecrementLoanedCountLocked(loan_ended_count);
+  }
 }
 
 void PmmNode::DeleteLender(paddr_t address, size_t count) {
