@@ -46,7 +46,6 @@ pub async fn main() {
                                     <fpacket::ProviderMarker as fidl::endpoints::ProtocolMarker>
                                     ::DEBUG_NAME)
                             }),
-                        &crate::udpsocket::LibcUdpSocketProvider,
                     )
                     .await
                     .unwrap_or_else(|e| {

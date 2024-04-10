@@ -7,6 +7,8 @@ use fidl_fuchsia_net_dhcp::{ClientExitReason, ClientProviderRequest, ClientProvi
 use fidl_fuchsia_posix_socket_packet as fpacket;
 use futures::{StreamExt as _, TryStreamExt as _};
 
+use crate::udpsocket::LibcUdpSocketProvider;
+
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum Error {
     #[error("the interface identifier was zero")]
@@ -60,7 +62,6 @@ struct AlreadyInUse;
 pub(crate) async fn serve_client_provider(
     stream: ClientProviderRequestStream,
     provider: fpacket::ProviderProxy,
-    udp_socket_provider: &impl dhcp_client_core::deps::UdpSocketProvider,
 ) -> Result<(), Error> {
     let provider = &provider;
     let interfaces_in_use = &InterfacesInUse::new();
@@ -85,6 +86,8 @@ pub(crate) async fn serve_client_provider(
                 } => {
                     let interface_id =
                         NonZeroU64::new(interface_id).ok_or(Error::InvalidInterfaceIdentifier)?;
+                    let udp_socket_provider = LibcUdpSocketProvider { interface_id };
+
                     let (client_requests_stream, control_handle) =
                         request.into_stream_and_control_handle().expect("fidl error");
                     let _handle: InterfaceInUseHandle<'_> = {
@@ -142,7 +145,7 @@ pub(crate) async fn serve_client_provider(
                         mac,
                         interface_id,
                         provider,
-                        udp_socket_provider,
+                        &udp_socket_provider,
                         params,
                         client_requests_stream,
                     )

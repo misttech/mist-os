@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::{num::NonZeroU64, os::fd::AsRawFd};
+
 use dhcp_client_core::deps::UdpSocketProvider;
 use fidl_fuchsia_posix as fposix;
 use fuchsia_async as fasync;
@@ -201,7 +203,37 @@ impl dhcp_client_core::deps::Socket<std::net::SocketAddr> for UdpSocket {
     }
 }
 
-pub(crate) struct LibcUdpSocketProvider;
+// TODO(https://fxbug.dev/333754253): Replace this with `libc::SO_BINDTOIFINDEX`
+// once the `libc` crate is updated.
+const SO_BINDTOIFINDEX: libc::c_int = 62;
+
+fn set_bindtoifindex(
+    socket: &impl AsRawFd,
+    interface_id: NonZeroU64,
+) -> Result<(), dhcp_client_core::deps::SocketError> {
+    let interface_id =
+        libc::c_int::try_from(interface_id.get()).expect("interface_id should fit in c_int");
+
+    // SAFETY: `setsockopt` does not take ownership of anything passed to it.
+    if unsafe {
+        libc::setsockopt(
+            socket.as_raw_fd(),
+            libc::SOL_SOCKET,
+            SO_BINDTOIFINDEX,
+            &interface_id as *const _ as *const libc::c_void,
+            std::mem::size_of_val(&interface_id) as libc::socklen_t,
+        )
+    } != 0
+    {
+        return Err(translate_io_error(std::io::Error::last_os_error()));
+    }
+
+    Ok(())
+}
+
+pub(crate) struct LibcUdpSocketProvider {
+    pub(crate) interface_id: NonZeroU64,
+}
 
 impl UdpSocketProvider for LibcUdpSocketProvider {
     type Sock = UdpSocket;
@@ -210,7 +242,10 @@ impl UdpSocketProvider for LibcUdpSocketProvider {
         &self,
         bound_addr: std::net::SocketAddr,
     ) -> Result<Self::Sock, dhcp_client_core::deps::SocketError> {
-        let socket = fasync::net::UdpSocket::bind(&bound_addr).map_err(translate_io_error)?;
+        let socket = std::net::UdpSocket::bind(&bound_addr).map_err(translate_io_error)?;
+        set_bindtoifindex(&socket, self.interface_id)?;
+
+        let socket = fasync::net::UdpSocket::from_socket(socket).map_err(translate_io_error)?;
         socket.set_broadcast(true).map_err(translate_io_error)?;
         Ok(UdpSocket { inner: socket })
     }
@@ -222,24 +257,28 @@ mod testutil {
     use fidl_fuchsia_posix_socket as fposix_socket;
     use fidl_fuchsia_posix_socket_ext as fposix_socket_ext;
 
-    pub(crate) struct TestUdpSocketProviderImpl {
+    pub(crate) struct TestUdpSocketProvider {
         provider: fposix_socket::ProviderProxy,
+        interface_id: NonZeroU64,
     }
 
-    impl TestUdpSocketProviderImpl {
-        pub(crate) fn new(provider: fposix_socket::ProviderProxy) -> Self {
-            Self { provider }
+    impl TestUdpSocketProvider {
+        pub(crate) fn new(
+            provider: fposix_socket::ProviderProxy,
+            interface_id: NonZeroU64,
+        ) -> Self {
+            Self { provider, interface_id }
         }
     }
 
-    impl UdpSocketProvider for TestUdpSocketProviderImpl {
+    impl UdpSocketProvider for TestUdpSocketProvider {
         type Sock = UdpSocket;
 
         async fn bind_new_udp_socket(
             &self,
             bound_addr: std::net::SocketAddr,
         ) -> Result<Self::Sock, dhcp_client_core::deps::SocketError> {
-            let Self { provider } = self;
+            let Self { provider, interface_id } = self;
 
             let socket = fposix_socket_ext::datagram_socket(
                 provider,
@@ -253,6 +292,8 @@ mod testutil {
             socket.bind(&bound_addr.into()).map_err(translate_io_error)?;
             socket.set_broadcast(true).map_err(translate_io_error)?;
 
+            set_bindtoifindex(&socket, *interface_id)?;
+
             let socket =
                 fasync::net::UdpSocket::from_socket(socket.into()).map_err(translate_io_error)?;
 
@@ -264,7 +305,7 @@ mod testutil {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::udpsocket::testutil::TestUdpSocketProviderImpl;
+    use crate::udpsocket::testutil::TestUdpSocketProvider;
     use dhcp_client_core::deps::{DatagramInfo, Socket as _};
     use fidl_fuchsia_net_ext as fnet_ext;
     use fidl_fuchsia_netemul_network as fnetemul_network;
@@ -331,15 +372,17 @@ mod test {
             .await
             .expect("add address should succeed");
 
-        let socket_a = TestUdpSocketProviderImpl::new(
+        let socket_a = TestUdpSocketProvider::new(
             realm_a.connect_to_protocol::<fposix_socket::ProviderMarker>().unwrap(),
+            NonZeroU64::new(iface_a.id()).unwrap(),
         )
         .bind_new_udp_socket(SOCKET_ADDR_A)
         .await
         .expect("get udp socket");
 
-        let socket_b = TestUdpSocketProviderImpl::new(
+        let socket_b = TestUdpSocketProvider::new(
             realm_b.connect_to_protocol::<fposix_socket::ProviderMarker>().unwrap(),
+            NonZeroU64::new(iface_b.id()).unwrap(),
         )
         .bind_new_udp_socket(SOCKET_ADDR_B)
         .await
