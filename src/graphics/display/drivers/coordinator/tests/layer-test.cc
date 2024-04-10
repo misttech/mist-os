@@ -39,14 +39,13 @@ class LayerTest : public TestBase {
     EXPECT_OK(import_result.status_value());
     EXPECT_NE(import_result.value(), kInvalidDriverImageId);
 
-    image_t dc_image = {
+    static constexpr ImageMetadata image_metadata({
         .width = kDisplayWidth,
         .height = kDisplayHeight,
-        .tiling_type = fhdt::wire::kImageTilingTypeLinear,
-        .handle = ToBanjoDriverImageId(import_result.value()),
-    };
-    fbl::RefPtr<Image> image =
-        fbl::AdoptRef(new Image(controller(), dc_image, zx::vmo(0), nullptr, ClientId(1)));
+        .tiling_type = kImageTilingTypeLinear,
+    });
+    fbl::RefPtr<Image> image = fbl::AdoptRef(new Image(
+        controller(), image_metadata, import_result.value(), zx::vmo(0), nullptr, ClientId(1)));
     image->id = next_image_id_++;
     image->Acquire();
     return image;

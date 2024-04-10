@@ -23,7 +23,9 @@
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 
 namespace display {
 
@@ -67,11 +69,12 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   using DoublyLinkedList = fbl::DoublyLinkedList<DoublyLinkedListPointer, fbl::DefaultObjectTag,
                                                  fbl::SizeOrder::N, DefaultDoublyLinkedListTraits>;
 
-  Image(Controller* controller, const image_t& info, zx::vmo vmo, inspect::Node* parent_node,
-        ClientId client_id);
+  Image(Controller* controller, const ImageMetadata& metadata, DriverImageId driver_id, zx::vmo vmo,
+        inspect::Node* parent_node, ClientId client_id);
   ~Image();
 
-  image_t& info() { return info_; }
+  DriverImageId driver_id() const { return driver_id_; }
+  const ImageMetadata& metadata() const { return metadata_; }
 
   // The client that owns the image.
   ClientId client_id() const { return client_id_; }
@@ -149,12 +152,12 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   // waiting list is only accessed on the loop and thus is not generally
   // protected. However, transfers between the lists are protected by the
   // controller mutex.
-  fbl::DoublyLinkedListNodeState<
-      DoublyLinkedListPointer,
-      fbl::NodeOptions::AllowRemoveFromContainer> doubly_linked_list_node_state_
-      __TA_GUARDED(mtx());
+  fbl::DoublyLinkedListNodeState<DoublyLinkedListPointer,
+                                 fbl::NodeOptions::AllowRemoveFromContainer>
+      doubly_linked_list_node_state_ __TA_GUARDED(mtx());
 
-  image_t info_;
+  const DriverImageId driver_id_;
+  const ImageMetadata metadata_;
 
   Controller* const controller_;
   const ClientId client_id_;

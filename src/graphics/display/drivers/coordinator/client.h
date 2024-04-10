@@ -285,18 +285,16 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   //
   // `image_id` must be unused and `image_metadata` contains metadata for an
   // image used for display.
-  zx_status_t ImportImageForDisplay(
-      const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata, BufferId buffer_id,
-      ImageId image_id);
+  zx_status_t ImportImageForDisplay(const ImageMetadata& image_metadata, BufferId buffer_id,
+                                    ImageId image_id);
 
   // `fuchsia.hardware.display/Coordinator.ImportImage()` helper for capture
   // images.
   //
   // `image_id` must be unused and `image_metadata` contains metadata for an
   // image used for capture.
-  zx_status_t ImportImageForCapture(
-      const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata, BufferId buffer_id,
-      ImageId image_id);
+  zx_status_t ImportImageForCapture(const ImageMetadata& image_metadata, BufferId buffer_id,
+                                    ImageId image_id);
 
   // Discards all the pending config on all Displays and Layers.
   void DiscardConfig();

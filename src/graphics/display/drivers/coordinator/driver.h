@@ -17,6 +17,8 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-buffer-usage.h"
+#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 
 namespace display {
 
@@ -56,14 +58,14 @@ class Driver : public ddk::Device<Driver> {
   void SetDisplayControllerInterface(display_controller_interface_protocol_ops_t* ops);
   void ResetDisplayControllerInterface();
 
-  zx::result<DriverImageId> ImportImage(const image_metadata_t& image_metadata,
+  zx::result<DriverImageId> ImportImage(const ImageMetadata& image_metadata,
                                         DriverBufferCollectionId collection_id, uint32_t index);
   zx::result<DriverCaptureImageId> ImportImageForCapture(DriverBufferCollectionId collection_id,
                                                          uint32_t index);
   zx::result<> ImportBufferCollection(DriverBufferCollectionId collection_id,
                                       zx::channel collection_token);
   zx::result<> ReleaseBufferCollection(DriverBufferCollectionId collection_id);
-  zx::result<> SetBufferCollectionConstraints(const image_buffer_usage_t& usage,
+  zx::result<> SetBufferCollectionConstraints(const ImageBufferUsage& usage,
                                               DriverBufferCollectionId collection_id);
 
   bool IsCaptureSupported();

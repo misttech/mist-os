@@ -70,7 +70,9 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types-cpp/image-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 
@@ -128,10 +130,15 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
     return;
   }
 
-  if (request->image_metadata.tiling_type ==
-      fuchsia_hardware_display_types::wire::kImageTilingTypeCapture) {
+  if (!ImageMetadata::IsValid(request->image_metadata)) {
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  const ImageMetadata image_metadata(request->image_metadata);
+
+  if (image_metadata.tiling_type() == kImageTilingTypeCapture) {
     zx_status_t import_status =
-        ImportImageForCapture(request->image_metadata, ToBufferId(request->buffer_id), image_id);
+        ImportImageForCapture(image_metadata, ToBufferId(request->buffer_id), image_id);
     if (import_status == ZX_OK) {
       completer.ReplySuccess();
     } else {
@@ -141,7 +148,7 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
   }
 
   zx_status_t import_status =
-      ImportImageForDisplay(request->image_metadata, ToBufferId(request->buffer_id), image_id);
+      ImportImageForDisplay(image_metadata, ToBufferId(request->buffer_id), image_id);
   if (import_status == ZX_OK) {
     completer.ReplySuccess();
   } else {
@@ -149,11 +156,9 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
   }
 }
 
-zx_status_t Client::ImportImageForDisplay(
-    const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata, BufferId buffer_id,
-    ImageId image_id) {
-  ZX_DEBUG_ASSERT(image_metadata.tiling_type !=
-                  fuchsia_hardware_display_types::wire::kImageTilingTypeCapture);
+zx_status_t Client::ImportImageForDisplay(const ImageMetadata& image_metadata, BufferId buffer_id,
+                                          ImageId image_id) {
+  ZX_DEBUG_ASSERT(image_metadata.tiling_type() != kImageTilingTypeCapture);
   ZX_DEBUG_ASSERT(!images_.find(image_id).IsValid());
   ZX_DEBUG_ASSERT(!capture_images_.find(image_id).IsValid());
 
@@ -163,14 +168,8 @@ zx_status_t Client::ImportImageForDisplay(
   }
   const Collections& collections = collection_map_it->second;
 
-  const image_metadata_t banjo_image_metadata = {
-      .width = image_metadata.width,
-      .height = image_metadata.height,
-      .tiling_type = image_metadata.tiling_type,
-  };
-
   zx::result<DriverImageId> result = controller_->driver()->ImportImage(
-      banjo_image_metadata, collections.driver_buffer_collection_id, buffer_id.buffer_index);
+      image_metadata, collections.driver_buffer_collection_id, buffer_id.buffer_index);
   if (result.is_error()) {
     return result.error_value();
   }
@@ -179,15 +178,9 @@ zx_status_t Client::ImportImageForDisplay(
   auto release_image =
       fit::defer([this, driver_image_id]() { controller_->ReleaseImage(driver_image_id); });
 
-  const image_t dc_image = {
-      .width = image_metadata.width,
-      .height = image_metadata.height,
-      .tiling_type = image_metadata.tiling_type,
-      .handle = driver_image_id.value(),
-  };
   fbl::AllocChecker alloc_checker;
-  fbl::RefPtr<Image> image = fbl::AdoptRef(
-      new (&alloc_checker) Image(controller_, dc_image, zx::vmo(), &proxy_->node(), id_));
+  fbl::RefPtr<Image> image = fbl::AdoptRef(new (&alloc_checker) Image(
+      controller_, image_metadata, driver_image_id, zx::vmo(), &proxy_->node(), id_));
   if (!alloc_checker.check()) {
     zxlogf(DEBUG, "Alloc checker failed while constructing Image.\n");
     return ZX_ERR_NO_MEMORY;
@@ -301,11 +294,9 @@ void Client::SetBufferCollectionConstraints(
   }
   auto& collections = it->second;
 
-  const image_buffer_usage_t banjo_image_buffer_usage = {
-      .tiling_type = request->buffer_usage.tiling_type,
-  };
+  const ImageBufferUsage image_buffer_usage = ToImageBufferUsage(request->buffer_usage);
   zx::result<> result = controller_->driver()->SetBufferCollectionConstraints(
-      banjo_image_buffer_usage, collections.driver_buffer_collection_id);
+      image_buffer_usage, collections.driver_buffer_collection_id);
   if (result.is_error()) {
     zxlogf(WARNING,
            "Cannot set BufferCollection constraints using imported buffer collection (id=%lu) %s.",
@@ -754,11 +745,9 @@ void Client::IsCaptureSupported(IsCaptureSupportedCompleter::Sync& completer) {
   completer.ReplySuccess(controller_->supports_capture());
 }
 
-zx_status_t Client::ImportImageForCapture(
-    const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata, BufferId buffer_id,
-    ImageId image_id) {
-  ZX_DEBUG_ASSERT(image_metadata.tiling_type ==
-                  fuchsia_hardware_display_types::wire::kImageTilingTypeCapture);
+zx_status_t Client::ImportImageForCapture(const ImageMetadata& image_metadata, BufferId buffer_id,
+                                          ImageId image_id) {
+  ZX_DEBUG_ASSERT(image_metadata.tiling_type() == kImageTilingTypeCapture);
   ZX_DEBUG_ASSERT(!images_.find(image_id).IsValid());
   ZX_DEBUG_ASSERT(!capture_images_.find(image_id).IsValid());
 

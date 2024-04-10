@@ -17,7 +17,9 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types-cpp/image-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 
 namespace display {
 
@@ -137,7 +139,7 @@ void Driver::ResetDisplayControllerInterface() {
   dc_.ResetDisplayControllerInterface();
 }
 
-zx::result<DriverImageId> Driver::ImportImage(const image_metadata_t& image_metadata,
+zx::result<DriverImageId> Driver::ImportImage(const ImageMetadata& image_metadata,
                                               DriverBufferCollectionId collection_id,
                                               uint32_t index) {
   if (use_engine_) {
@@ -145,9 +147,10 @@ zx::result<DriverImageId> Driver::ImportImage(const image_metadata_t& image_meta
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
+  const image_metadata_t banjo_image_metadata = image_metadata.ToBanjo();
   uint64_t image_handle = 0;
   zx_status_t banjo_status = dc_.ImportImage(
-      &image_metadata, ToBanjoDriverBufferCollectionId(collection_id), index, &image_handle);
+      &banjo_image_metadata, ToBanjoDriverBufferCollectionId(collection_id), index, &image_handle);
   if (banjo_status != ZX_OK) {
     return zx::error(banjo_status);
   }
@@ -205,15 +208,16 @@ zx::result<> Driver::ReleaseBufferCollection(DriverBufferCollectionId collection
   return zx::make_result(banjo_status);
 }
 
-zx::result<> Driver::SetBufferCollectionConstraints(const image_buffer_usage_t& usage,
+zx::result<> Driver::SetBufferCollectionConstraints(const ImageBufferUsage& usage,
                                                     DriverBufferCollectionId collection_id) {
   if (use_engine_) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
-  zx_status_t banjo_status =
-      dc_.SetBufferCollectionConstraints(&usage, ToBanjoDriverBufferCollectionId(collection_id));
+  const image_buffer_usage_t banjo_usage = ToBanjoImageBufferUsage(usage);
+  zx_status_t banjo_status = dc_.SetBufferCollectionConstraints(
+      &banjo_usage, ToBanjoDriverBufferCollectionId(collection_id));
   return zx::make_result(banjo_status);
 }
 

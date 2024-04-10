@@ -19,6 +19,7 @@
 #include "src/graphics/display/drivers/coordinator/tests/base.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace display {
@@ -28,19 +29,18 @@ class ImageTest : public TestBase, public FenceCallback {
   void OnFenceFired(FenceReference* f) override {}
   void OnRefForFenceDead(Fence* fence) override { fence->OnRefDead(); }
 
-  fbl::RefPtr<Image> ImportImage(zx::vmo&& vmo, image_t dc_image) {
+  fbl::RefPtr<Image> ImportImage(zx::vmo vmo, const ImageMetadata& image_metadata) {
     zx::vmo dup_vmo;
     EXPECT_OK(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_vmo));
-    // TODO: Factor this out of display::Client or make images easier to test without a client.
     zx::result<DriverImageId> import_result =
         display()->ImportVmoImageForTesting(std::move(vmo), /*offset=*/0);
     if (!import_result.is_ok()) {
       return nullptr;
     }
-    dc_image.handle = ToBanjoDriverImageId(import_result.value());
 
     fbl::RefPtr<Image> image =
-        fbl::AdoptRef(new Image(controller(), dc_image, std::move(dup_vmo), nullptr, ClientId(1)));
+        fbl::AdoptRef(new Image(controller(), image_metadata, import_result.value(),
+                                std::move(dup_vmo), nullptr, ClientId(1)));
     image->id = next_image_id_++;
     return image;
   }
@@ -52,10 +52,12 @@ class ImageTest : public TestBase, public FenceCallback {
 TEST_F(ImageTest, MultipleAcquiresAllowed) {
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(1024 * 600 * 4, 0u, &vmo));
-  image_t info = {};
-  info.width = 1024;
-  info.height = 600;
-  auto image = ImportImage(std::move(vmo), info);
+  static constexpr ImageMetadata image_metadata({
+      .width = 1024,
+      .height = 600,
+      .tiling_type = kImageTilingTypeLinear,
+  });
+  fbl::RefPtr<Image> image = ImportImage(std::move(vmo), image_metadata);
 
   EXPECT_TRUE(image->Acquire());
   image->DiscardAcquire();
@@ -68,11 +70,12 @@ TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(1024 * 600 * 4, 0u, &vmo));
-  image_t info = {};
-  info.width = 1024;
-  info.height = 600;
-  info.tiling_type = IMAGE_TILING_TYPE_LINEAR;
-  auto image = ImportImage(std::move(vmo), info);
+  static constexpr ImageMetadata image_metadata({
+      .width = 1024,
+      .height = 600,
+      .tiling_type = kImageTilingTypeLinear,
+  });
+  fbl::RefPtr<Image> image = ImportImage(std::move(vmo), image_metadata);
   auto image_cleanup = fit::defer([image]() {
     fbl::AutoLock l(image->mtx());
     image->ResetFences();

@@ -23,28 +23,34 @@
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types-cpp/image-tiling-type.h"
 
 namespace display {
 
-Image::Image(Controller* controller, const image_t& info, zx::vmo vmo, inspect::Node* parent_node,
-             ClientId client_id)
-    : info_(info), controller_(controller), client_id_(client_id), vmo_(std::move(vmo)) {
-  ZX_DEBUG_ASSERT(info.tiling_type != IMAGE_TILING_TYPE_CAPTURE);
+Image::Image(Controller* controller, const ImageMetadata& metadata, DriverImageId driver_id,
+             zx::vmo vmo, inspect::Node* parent_node, ClientId client_id)
+    : driver_id_(driver_id),
+      metadata_(metadata),
+      controller_(controller),
+      client_id_(client_id),
+      vmo_(std::move(vmo)) {
+  ZX_DEBUG_ASSERT(metadata.tiling_type() != kImageTilingTypeCapture);
   InitializeInspect(parent_node);
 }
 Image::~Image() {
   ZX_ASSERT(!std::atomic_load(&in_use_));
   ZX_ASSERT(!InDoublyLinkedList());
-  controller_->ReleaseImage(ToDriverImageId(info_.handle));
+  controller_->ReleaseImage(driver_id_);
 }
 
 void Image::InitializeInspect(inspect::Node* parent_node) {
   if (!parent_node)
     return;
   node_ = parent_node->CreateChild(fbl::StringPrintf("image-%p", this).c_str());
-  node_.CreateUint("width", info_.width, &properties_);
-  node_.CreateUint("height", info_.height, &properties_);
-  node_.CreateUint("tiling_type", info_.tiling_type, &properties_);
+  node_.CreateInt("width", metadata_.width(), &properties_);
+  node_.CreateInt("height", metadata_.height(), &properties_);
+  node_.CreateUint("tiling_type", metadata_.tiling_type().ValueForLogging(), &properties_);
   presenting_property_ = node_.CreateBool("presenting", false);
   retiring_property_ = node_.CreateBool("retiring", false);
 }
@@ -173,8 +179,12 @@ bool Image::HasSameDisplayPropertiesAsLayer(const image_t& layer_config) const {
   // support for a Layer's image configuration (as opposed of using image_t),
   // and compare this Image's sysmem buffer collection information against the
   // Layer's format support.
-  return info_.width == layer_config.width && info_.height == layer_config.height &&
-         info_.tiling_type == layer_config.tiling_type;
+
+  // The casts will not result in UB, because ImageMetadata's width and height
+  // are guaranteed to be non-negative.
+  return static_cast<uint32_t>(metadata_.width()) == layer_config.width &&
+         static_cast<uint32_t>(metadata_.height()) == layer_config.height &&
+         metadata_.tiling_type().ToBanjo() == layer_config.tiling_type;
 }
 
 }  // namespace display

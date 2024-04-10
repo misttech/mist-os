@@ -25,6 +25,12 @@ class ImageTilingType {
   constexpr fuchsia_hardware_display_types::wire::ImageTilingTypeIdValue ToFidl() const;
   constexpr image_tiling_type_t ToBanjo() const;
 
+  // Raw numerical value.
+  //
+  // This is intended to be used for developer-facing output, such as logging
+  // and Inspect. The values are not guaranteed to have any stable semantics.
+  constexpr uint32_t ValueForLogging() const;
+
  private:
   friend constexpr bool operator==(const ImageTilingType& lhs, const ImageTilingType& rhs);
   friend constexpr bool operator!=(const ImageTilingType& lhs, const ImageTilingType& rhs);
@@ -55,6 +61,10 @@ constexpr fuchsia_hardware_display_types::wire::ImageTilingTypeIdValue ImageTili
 
 constexpr image_tiling_type_t ImageTilingType::ToBanjo() const {
   return static_cast<image_tiling_type_t>(tiling_type_id_);
+}
+
+constexpr uint32_t ImageTilingType::ValueForLogging() const {
+  return static_cast<uint32_t>(tiling_type_id_);
 }
 
 }  // namespace display

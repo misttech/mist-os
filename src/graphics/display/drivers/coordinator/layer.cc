@@ -24,6 +24,7 @@
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
 
@@ -139,7 +140,7 @@ void Layer::ApplyChanges(const display_mode_t& mode) {
   }
 
   if (new_image_config && displayed_image_) {
-    new_image_config->handle = displayed_image_->info().handle;
+    new_image_config->handle = ToBanjoDriverImageId(displayed_image_->driver_id());
   }
 }
 
@@ -216,8 +217,8 @@ bool Layer::ActivateLatestReadyImage() {
   EarlyRetireUpTo(waiting_images_, /*end=*/it);
   displayed_image_ = waiting_images_.pop_front();
 
-  uint64_t handle = displayed_image_->info().handle;
   if (current_layer_.type == LAYER_TYPE_PRIMARY) {
+    uint64_t handle = ToBanjoDriverImageId(displayed_image_->driver_id());
     current_layer_.cfg.primary.image.handle = handle;
   } else {
     // type is validated in Client::CheckConfig, so something must be very wrong.
