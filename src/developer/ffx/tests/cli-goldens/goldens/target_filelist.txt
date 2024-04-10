@@ -12,8 +12,6 @@ ffx/target/default/set.golden
 ffx/target/default/unset.golden
 ffx/target/echo.golden
 ffx/target/flash.golden
-ffx/target/forward.golden
-ffx/target/forward/tcp.golden
 ffx/target/get-ssh-address.golden
 ffx/target/get-time.golden
 ffx/target/list.golden
