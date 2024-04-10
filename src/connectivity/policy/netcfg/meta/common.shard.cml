@@ -26,7 +26,6 @@
             protocol: [
                 "fuchsia.net.dhcp.Server",
                 "fuchsia.net.dhcpv6.ClientProvider",
-                "fuchsia.net.filter.deprecated.Filter",
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.name.DnsServerWatcher",
@@ -35,6 +34,14 @@
                 "fuchsia.net.routes.admin.SetProviderV6",
                 "fuchsia.net.stack.Stack",
             ],
+        },
+        {
+            protocol: "fuchsia.net.filter.deprecated.Filter",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.net.filter.Control",
+            availability: "optional",
         },
         {
             protocol: "fuchsia.net.dhcp.ClientProvider",

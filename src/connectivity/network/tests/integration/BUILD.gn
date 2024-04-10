@@ -109,6 +109,8 @@ package_deps = [
   ":netcfg-with-duplicate-names",
   ":netcfg-with-forwarding-netemul-config",
   ":netcfg-with-iface-name-prefix",
+  ":netcfg-with-packet-filter-ethernet",
+  ":netcfg-with-packet-filter-wlan",
   ":netcfg-without-provisioning-netemul-config",
   "//src/connectivity/policy/netcfg:component-advanced",
   "//src/connectivity/policy/netcfg:component-basic",
@@ -214,6 +216,18 @@ resource("netcfg-with-duplicate-names") {
   testonly = true
   sources = [ "management/config/duplicate_names.json" ]
   outputs = [ "netcfg/duplicate_names.json" ]
+}
+
+resource("netcfg-with-packet-filter-ethernet") {
+  testonly = true
+  sources = [ "management/config/packet_filter_ethernet.json" ]
+  outputs = [ "netcfg/packet_filter_ethernet.json" ]
+}
+
+resource("netcfg-with-packet-filter-wlan") {
+  testonly = true
+  sources = [ "management/config/packet_filter_wlan.json" ]
+  outputs = [ "netcfg/packet_filter_wlan.json" ]
 }
 
 # We keep tests that involve the virtualization stack (and especially guest

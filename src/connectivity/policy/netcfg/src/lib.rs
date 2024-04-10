@@ -31,7 +31,8 @@ use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fidl_fuchsia_net_dhcp_ext as fnet_dhcp_ext;
 use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
 use fidl_fuchsia_net_ext::{self as fnet_ext, DisplayExt as _, IpExt as _};
-use fidl_fuchsia_net_filter_deprecated as fnet_filter;
+use fidl_fuchsia_net_filter as fnet_filter;
+use fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _};
@@ -59,7 +60,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use self::devices::DeviceInfo;
 use self::errors::{accept_error, ContextExt as _};
-use self::filter::FilterEnabledState;
+use self::filter::{FilterControl, FilterEnabledState};
 use self::interface::DeviceInfoRef;
 
 /// Interface metrics.
@@ -467,11 +468,19 @@ impl InterfaceState {
     }
 }
 
+enum MasqueradeHandler {
+    Deprecated(masquerade::Masquerade),
+    // TODO(https://fxbug.dev/331264840): Once NAT is supported in
+    // fuchsia.net.filter, implement equivalent Masquerade
+    // functionality for it.
+    Current(()),
+}
+
 /// Network Configuration state.
 pub struct NetCfg<'a> {
     stack: fnet_stack::StackProxy,
     lookup_admin: fnet_name::LookupAdminProxy,
-    filter: fnet_filter::FilterProxy,
+    filter_control: FilterControl,
     interface_state: fnet_interfaces::StateProxy,
     installer: fidl_fuchsia_net_interfaces_admin::InstallerProxy,
     dhcp_server: Option<fnet_dhcp::Server_Proxy>,
@@ -722,9 +731,18 @@ impl<'a> NetCfg<'a> {
         let lookup_admin = svc_connect::<fnet_name::LookupAdminMarker>(&svc_dir)
             .await
             .context("could not connect to lookup admin")?;
-        let filter = svc_connect::<fnet_filter::FilterMarker>(&svc_dir)
-            .await
-            .context("could not connect to filter")?;
+
+        let filter_control = {
+            let filter_deprecated =
+                optional_svc_connect::<fnet_filter_deprecated::FilterMarker>(&svc_dir)
+                    .await
+                    .context("could not connect to filter deprecated")?;
+            let filter_current = optional_svc_connect::<fnet_filter::ControlMarker>(&svc_dir)
+                .await
+                .context("could not connect to filter")?;
+            filter::FilterControl::new(filter_deprecated, filter_current).await?
+        };
+
         let interface_state = svc_connect::<fnet_interfaces::StateMarker>(&svc_dir)
             .await
             .context("could not connect to interfaces state")?;
@@ -760,7 +778,7 @@ impl<'a> NetCfg<'a> {
         Ok(NetCfg {
             stack,
             lookup_admin,
-            filter,
+            filter_control,
             interface_state,
             dhcp_server,
             installer,
@@ -912,7 +930,15 @@ impl<'a> NetCfg<'a> {
             "dns watchers should be empty"
         );
 
-        let mut masquerade_handler = masquerade::Masquerade::new(self.filter.clone());
+        // TODO(https://fxbug.dev/331264840): Once NAT is supported in
+        // fuchsia.net.filter, make Masquerade functional over the
+        // fuchsia.net.filter.deprecated and fuchsia.net.filter APIs.
+        let mut masquerade_handler = match &self.filter_control {
+            FilterControl::Deprecated(filter) => {
+                MasqueradeHandler::Deprecated(masquerade::Masquerade::new(filter.clone()))
+            }
+            FilterControl::Current(_) => MasqueradeHandler::Current(()),
+        };
 
         // Serve fuchsia.net.virtualization/Control.
         let mut fs = ServiceFs::new_local();
@@ -1109,7 +1135,7 @@ impl<'a> NetCfg<'a> {
         >,
         virtualization_handler: &mut impl virtualization::Handler,
         virtualization_events: &mut futures::stream::SelectAll<virtualization::EventStream>,
-        masquerade_handler: &mut crate::masquerade::Masquerade,
+        masquerade_handler: &mut MasqueradeHandler,
         masquerade_events: &mut futures::stream::SelectAll<masquerade::EventStream>,
     ) -> Result<(), anyhow::Error> {
         match event {
@@ -1167,16 +1193,23 @@ impl<'a> NetCfg<'a> {
                     RequestStream::Dhcpv6PrefixProvider(req_stream) => {
                         dhcpv6_prefix_provider_requests.push(req_stream);
                     }
-                    RequestStream::Masquerade(req_stream) => {
-                        masquerade_handler
-                            .handle_event(
-                                masquerade::Event::FactoryRequestStream(req_stream),
-                                masquerade_events,
-                                &mut self.filter_enabled_state,
-                                &self.interface_states,
-                            )
-                            .await;
-                    }
+                    RequestStream::Masquerade(req_stream) => match masquerade_handler {
+                        MasqueradeHandler::Deprecated(handler) => {
+                            handler
+                                .handle_event(
+                                    masquerade::Event::FactoryRequestStream(req_stream),
+                                    masquerade_events,
+                                    &mut self.filter_enabled_state,
+                                    &self.interface_states,
+                                )
+                                .await
+                        }
+                        MasqueradeHandler::Current(_) => warn!(
+                            "TODO(https://fxbug.dev/331264840): dropping \
+                            masquerade request stream, not yet supported \
+                            with fuchsia.net.filter"
+                        ),
+                    },
                 };
             }
             ProvisioningEvent::Dhcpv4Configuration(config) => {
@@ -1319,16 +1352,23 @@ impl<'a> NetCfg<'a> {
                     .context("handle virtualization event")
                     .or_else(errors::Error::accept_non_fatal)?;
             }
-            ProvisioningEvent::MasqueradeEvent(event) => {
-                masquerade_handler
-                    .handle_event(
-                        event,
-                        masquerade_events,
-                        &mut self.filter_enabled_state,
-                        &self.interface_states,
-                    )
-                    .await;
-            }
+            ProvisioningEvent::MasqueradeEvent(event) => match masquerade_handler {
+                MasqueradeHandler::Deprecated(handler) => {
+                    handler
+                        .handle_event(
+                            event,
+                            masquerade_events,
+                            &mut self.filter_enabled_state,
+                            &self.interface_states,
+                        )
+                        .await
+                }
+                MasqueradeHandler::Current(_) => warn!(
+                    "TODO(https://fxbug.dev/331264840): dropping masquerade event {:?},\
+                    not yet supported with fuchsia.net.filter",
+                    event
+                ),
+            },
         };
         return Ok(());
     }
@@ -2215,7 +2255,7 @@ impl<'a> NetCfg<'a> {
                 info!("configuring DHCP server for WLAN AP (interface ID={})", interface_id);
                 let () = Self::configure_wlan_ap_and_dhcp_server(
                     &mut self.filter_enabled_state,
-                    &self.filter,
+                    &mut self.filter_control,
                     interface_id,
                     dhcp_server,
                     control,
@@ -2283,7 +2323,7 @@ impl<'a> NetCfg<'a> {
 
             let () = Self::configure_host(
                 &mut self.filter_enabled_state,
-                &self.filter,
+                &mut self.filter_control,
                 &self.stack,
                 interface_id,
                 device_info,
@@ -2313,14 +2353,15 @@ impl<'a> NetCfg<'a> {
     /// Configure host interface.
     async fn configure_host(
         filter_enabled_state: &mut FilterEnabledState,
-        filter: &fnet_filter::FilterProxy,
+        filter_control: &mut FilterControl,
         stack: &fnet_stack::StackProxy,
         interface_id: NonZeroU64,
         device_info: &DeviceInfoRef<'_>,
         start_in_stack_dhcpv4: bool,
     ) -> Result<(), errors::Error> {
+        // Handle on-demand interface enabling by using either implementation of Filter.
         filter_enabled_state
-            .maybe_update(Some(device_info.interface_type()), interface_id, filter)
+            .maybe_update(Some(device_info.interface_type()), interface_id, filter_control)
             .await
             .map_err(|e| {
                 anyhow::anyhow!("failed to update filter on nic {interface_id} with error = {e:?}")
@@ -2347,7 +2388,7 @@ impl<'a> NetCfg<'a> {
     /// is received for the WLAN AP.
     async fn configure_wlan_ap_and_dhcp_server(
         filter_enabled_state: &mut FilterEnabledState,
-        filter: &fnet_filter::FilterProxy,
+        filter_control: &mut FilterControl,
         interface_id: NonZeroU64,
         dhcp_server: &fnet_dhcp::Server_Proxy,
         control: &fidl_fuchsia_net_interfaces_ext::admin::Control,
@@ -2361,8 +2402,9 @@ impl<'a> NetCfg<'a> {
         .context("address state provider: failed to create fidl endpoints")
         .map_err(errors::Error::Fatal)?;
 
+        // Handle on-demand interface enabling by using either implementation of Filter.
         filter_enabled_state
-            .maybe_update(Some(device_info.interface_type()), interface_id, filter)
+            .maybe_update(Some(device_info.interface_type()), interface_id, filter_control)
             .await
             .map_err(|e| {
                 anyhow::anyhow!("failed to update filter on nic {interface_id} with error = {e:?}")
@@ -3029,7 +3071,9 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
 
     // TODO(https://fxbug.dev/42080661): Once non-Fuchsia components can control filtering rules, disable
     // setting filters when interfaces are in Delegated provisioning mode.
-    filter::update_filters(&mut netcfg.filter, filter_config)
+    netcfg
+        .filter_control
+        .update_filters(filter_config)
         .await
         .context("update filters based on config")?;
 
@@ -3241,8 +3285,10 @@ mod tests {
         let (lookup_admin, lookup_admin_server) =
             fidl::endpoints::create_proxy::<fnet_name::LookupAdminMarker>()
                 .context("error creating lookup_admin endpoints")?;
-        let (filter, _filter_server) = fidl::endpoints::create_proxy::<fnet_filter::FilterMarker>()
-            .context("create filter endpoints")?;
+        let (filter, _filter_server) =
+            fidl::endpoints::create_proxy::<fnet_filter_deprecated::FilterMarker>()
+                .context("create filter endpoints")?;
+        let filter_control = FilterControl::Deprecated(filter);
         let (interface_state, _interface_state_server) =
             fidl::endpoints::create_proxy::<fnet_interfaces::StateMarker>()
                 .context("create interface state endpoints")?;
@@ -3266,7 +3312,7 @@ mod tests {
             NetCfg {
                 stack,
                 lookup_admin,
-                filter,
+                filter_control,
                 interface_state,
                 installer,
                 dhcp_server: Some(dhcp_server),

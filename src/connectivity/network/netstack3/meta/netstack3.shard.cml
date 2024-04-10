@@ -13,18 +13,12 @@
     },
     capabilities: [
         {
-            protocol: [
-                "fuchsia.net.filter.Control",
-                "fuchsia.net.filter.State",
-            ],
+            protocol: [ "fuchsia.net.filter.State" ],
         },
     ],
     expose: [
         {
-            protocol: [
-                "fuchsia.net.filter.Control",
-                "fuchsia.net.filter.State",
-            ],
+            protocol: [ "fuchsia.net.filter.State" ],
             from: "self",
         },
     ],

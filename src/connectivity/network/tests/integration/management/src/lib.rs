@@ -28,7 +28,7 @@ use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_netemul_network as fnetemul_network;
-use fuchsia_async::{DurationExt as _, TimeoutExt as _};
+use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
 use fuchsia_zircon as zx;
 
 use anyhow::Context as _;
@@ -47,13 +47,14 @@ use net_types::{
     ethernet::Mac,
     ip::{self as net_types_ip, Ipv4},
 };
-use netemul::{RealmTcpListener, RealmTcpStream};
+use netemul::{RealmTcpListener, RealmTcpStream, RealmUdpSocket};
 use netstack_testing_common::{
     dhcpv4 as dhcpv4_helper,
     interfaces::{self, TestInterfaceExt as _},
+    nud::apply_nud_flake_workaround,
     realms::{
         KnownServiceProvider, ManagementAgent, Manager, ManagerConfig, NetCfgBasic, NetCfgVersion,
-        Netstack, Netstack3, TestRealmExt as _, TestSandboxExt,
+        Netstack, Netstack3, NetstackVersion, TestRealmExt as _, TestSandboxExt,
     },
     try_all, try_any, wait_for_component_stopped, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
@@ -173,6 +174,214 @@ async fn test_oir<M: Manager, N: Netstack>(name: &str, config: ManagerConfig, pr
         prefix,
         if_name,
     );
+}
+
+// Create two realms with one netstack each, managed by netcfg. Each realm
+// has an endpoint, which are both on the same network. Send a UDP packet
+// between Realm1 and Realm2, where Realm1 and Realm2 can be initialized
+// with a predefined ManagerConfig.
+#[netstack_test]
+#[test_case(
+    ManagerConfig::Empty,
+    ManagerConfig::PacketFilterEthernet,
+    false; "receiver_eth_enabled")]
+#[test_case(
+    ManagerConfig::PacketFilterEthernet,
+    ManagerConfig::Empty,
+    false; "sender_eth_enabled")]
+#[test_case(
+    ManagerConfig::PacketFilterEthernet,
+    ManagerConfig::PacketFilterEthernet,
+    false; "both_eth_enabled")]
+#[test_case(
+    ManagerConfig::PacketFilterWlan,
+    ManagerConfig::PacketFilterWlan,
+    true; "both_wlan_enabled")]
+#[test_case(
+    ManagerConfig::Empty,
+    ManagerConfig::Empty,
+    true; "both_no_filter")]
+async fn test_filtering_udp<M: Manager, N: Netstack>(
+    name: &str,
+    realm1_manager: ManagerConfig,
+    realm2_manager: ManagerConfig,
+    message_expected: bool,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let eth_network = sandbox.create_network("eth_network").await.expect("create network");
+
+    // Note: these ports correspond with the ports specified in the
+    // packet filter netcfg configuration files.
+    const SENDER_PORT: u16 = 1234;
+    const RECEIVER_PORT: u16 = 8080;
+
+    async fn setup_filtering_iface<'a, M: Manager, N: Netstack>(
+        network: &'a netemul::TestNetwork<'a>,
+        realm: &'a netemul::TestRealm<'a>,
+        port: u16,
+        name: String,
+    ) -> (netemul::TestEndpoint<'a>, SocketAddr) {
+        // Install a new device via devfs so netcfg can pick it up and install filtering rules.
+        let ep = network.create_endpoint(format!("{name}-eth-ep")).await.expect("create endpoint");
+        ep.set_link_up(true).await.expect("set link up");
+        let endpoint_mount_path = netemul::devfs_device_path(format!("{name}-eth-ep").as_str());
+        let endpoint_mount_path = endpoint_mount_path.as_path();
+
+        // TODO(https://fxbug.dev/42177261): The Virtual device type is treated as
+        // Ethernet for the purposes of netcfg's `filter_enabled_interface_types`
+        // config parameter. When implemented, insert this as a device with the
+        // Ethernet device class instead of Virtual. Additionally, add another
+        // device to exercise packet filtering with the Wlan device class.
+        realm.add_virtual_device(&ep, endpoint_mount_path).await.unwrap_or_else(|e| {
+            panic!("add virtual device {}: {:?}", endpoint_mount_path.display(), e)
+        });
+
+        // Make sure the Netstack got the new device added.
+        let interface_state = realm
+            .connect_to_protocol::<fnet_interfaces::StateMarker>()
+            .expect("connect to fuchsia.net.interfaces/State service");
+        let wait_for_netmgr =
+            wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None)
+                .fuse();
+        futures::pin_mut!(wait_for_netmgr);
+        let (if_id, _if_name): (u64, String) = interfaces::wait_for_non_loopback_interface_up(
+            &interface_state,
+            &mut wait_for_netmgr,
+            None,
+            ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+        )
+        .await
+        .expect("wait for non loopback interface");
+
+        // Get the link local address for the interface.
+        let link_local_addr = interfaces::wait_for_v6_ll(&interface_state, if_id)
+            .await
+            .expect("netstack should have assigned a linklocal addr");
+        let ep_addr = std::net::SocketAddr::V6(std::net::SocketAddrV6::new(
+            link_local_addr.into(),
+            port,
+            0,
+            if_id.try_into().unwrap(),
+        ));
+
+        // Since this interface is installed via netcfg, we need to query into
+        // fnet_root to get the Control handle to avoid flakes due to NUD failures.
+        let root_interfaces = realm
+            .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
+            .expect("connect to protocol");
+        let (interface_control, interface_control_server_end) =
+            fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
+                .expect("create proxy");
+        root_interfaces
+            .get_admin(if_id, interface_control_server_end)
+            .expect("create root interfaces connection");
+        apply_nud_flake_workaround(&interface_control).await.expect("nud flake workaround");
+
+        (ep, ep_addr)
+    }
+
+    let sender_realm = sandbox
+        .create_netstack_realm_with::<N, _, _>(
+            format!("{name}-sender_realm"),
+            &[
+                KnownServiceProvider::Manager {
+                    agent: M::MANAGEMENT_AGENT,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: false,
+                    config: realm1_manager,
+                },
+                KnownServiceProvider::DnsResolver,
+                KnownServiceProvider::FakeClock,
+            ],
+        )
+        .expect("failed to create sender realm");
+    let (_sender_ep, sender_ep_addr) = setup_filtering_iface::<M, N>(
+        &eth_network,
+        &sender_realm,
+        SENDER_PORT,
+        format!("sender-eth-ep"),
+    )
+    .await;
+
+    let receiver_realm = sandbox
+        .create_netstack_realm_with::<N, _, _>(
+            format!("{name}-receiver_realm"),
+            &[
+                KnownServiceProvider::Manager {
+                    agent: M::MANAGEMENT_AGENT,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: false,
+                    config: realm2_manager,
+                },
+                KnownServiceProvider::DnsResolver,
+                KnownServiceProvider::FakeClock,
+            ],
+        )
+        .expect("failed to create receiver realm");
+    let (_receiver_ep, receiver_ep_addr) = setup_filtering_iface::<M, N>(
+        &eth_network,
+        &receiver_realm,
+        RECEIVER_PORT,
+        format!("receiver-eth-ep"),
+    )
+    .await;
+
+    let sender_ep_sock = fasync::net::UdpSocket::bind_in_realm(&sender_realm, sender_ep_addr)
+        .await
+        .expect("failed to create sender socket");
+    let receiver_ep_sock = fasync::net::UdpSocket::bind_in_realm(&receiver_realm, receiver_ep_addr)
+        .await
+        .expect("failed to create receiver socket");
+
+    const PAYLOAD: &'static str = "Hello World";
+
+    let sender_fut = async move {
+        let r = sender_ep_sock
+            .send_to(PAYLOAD.as_bytes(), receiver_ep_addr)
+            .await
+            .expect("sendto failed");
+        assert_eq!(r, PAYLOAD.as_bytes().len());
+    };
+    let receiver_fut = async move {
+        let mut buf = [0u8; 1024];
+        let (_, from) = receiver_ep_sock.recv_from(&mut buf[..]).await.expect("recvfrom failed");
+        assert_eq!(from, sender_ep_addr);
+        Some(())
+    };
+
+    // TODO(https://fxbug.dev/42182576): Remove special case for NS3 once we
+    // stop serving filter.deprecated. Without this, there are spurious
+    // failures where the message is not received within the negative
+    // timeout window, causing the test to pass when it is expected to fail.
+    let timeout = match N::VERSION {
+        // Choose a timeout dependent on whether we are looking for a positive
+        // check (message was received) or negative check (message was dropped).
+        NetstackVersion::Netstack2 { .. } | NetstackVersion::ProdNetstack2 => {
+            if message_expected {
+                ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT
+            } else {
+                ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT
+            }
+        }
+        NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => {
+            ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT
+        }
+    };
+
+    let ((), message_received) = futures::future::join(sender_fut, receiver_fut)
+        .on_timeout(timeout.after_now(), || ((), None))
+        .await;
+
+    assert_eq!(message_received.is_some(), message_expected);
+
+    // Wait for orderly shutdown of the test realms to complete before allowing
+    // test interfaces to be cleaned up.
+    //
+    // This is necessary to prevent test interfaces from being removed while
+    // NetCfg is still in the process of configuring them after adding them to
+    // the Netstack, which causes spurious errors.
+    sender_realm.shutdown().await.expect("failed to shutdown realm");
+    receiver_realm.shutdown().await.expect("failed to shutdown realm");
 }
 
 // Test that Netcfg discovers a device, adds it to the Netstack,

@@ -180,6 +180,8 @@ pub enum ManagerConfig {
     AllDelegated,
     IfacePrefix,
     DuplicateNames,
+    PacketFilterEthernet,
+    PacketFilterWlan,
 }
 
 impl ManagerConfig {
@@ -191,6 +193,8 @@ impl ManagerConfig {
             ManagerConfig::AllDelegated => "/pkg/netcfg/all_delegated.json",
             ManagerConfig::IfacePrefix => "/pkg/netcfg/iface_prefix.json",
             ManagerConfig::DuplicateNames => "/pkg/netcfg/duplicate_names.json",
+            ManagerConfig::PacketFilterEthernet => "/pkg/netcfg/packet_filter_ethernet.json",
+            ManagerConfig::PacketFilterWlan => "/pkg/netcfg/packet_filter_wlan.json",
         }
     }
 }
@@ -344,7 +348,9 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                     | ManagerConfig::Empty
                     | ManagerConfig::AllDelegated
                     | ManagerConfig::IfacePrefix
-                    | ManagerConfig::DuplicateNames => false,
+                    | ManagerConfig::DuplicateNames
+                    | ManagerConfig::PacketFilterEthernet
+                    | ManagerConfig::PacketFilterWlan => false,
                 };
 
                 fnetemul::ChildDef {

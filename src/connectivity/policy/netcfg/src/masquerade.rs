@@ -7,7 +7,7 @@ use std::{collections::HashMap, num::NonZeroU64};
 use derivative::Derivative;
 use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_net::Subnet;
-use fidl_fuchsia_net_filter_deprecated as fnet_filter;
+use fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated;
 use fidl_fuchsia_net_masquerade as fnet_masquerade;
 use fnet_masquerade::Error;
 use fuchsia_async::DurationExt as _;
@@ -71,12 +71,12 @@ impl MasqueradeState {
     }
 }
 
-pub(super) struct Masquerade<Filter = fnet_filter::FilterProxy> {
+pub(super) struct Masquerade<Filter = fnet_filter_deprecated::FilterProxy> {
     filter: Filter,
     active_controllers: HashMap<NonZeroU64, MasqueradeState>,
 }
 
-async fn update_interface<Filter: fnet_filter::FilterProxyInterface>(
+async fn update_interface<Filter: fnet_filter_deprecated::FilterProxyInterface>(
     filter: &Filter,
     interface: NonZeroU64,
     enabled: bool,
@@ -89,7 +89,7 @@ async fn update_interface<Filter: fnet_filter::FilterProxyInterface>(
         filter_enabled_state.disable_masquerade_interface_id(interface);
     }
     if let Err(e) = filter_enabled_state
-        .maybe_update(
+        .maybe_update_deprecated(
             interface_states.get(&interface).map(|is| is.device_class.into()),
             interface,
             filter,
@@ -97,7 +97,7 @@ async fn update_interface<Filter: fnet_filter::FilterProxyInterface>(
         .await
     {
         match e {
-            fnet_filter::EnableDisableInterfaceError::NotFound => {
+            fnet_filter_deprecated::EnableDisableInterfaceError::NotFound => {
                 error!("specified input_interface not found: {interface}");
                 return Err(Error::NotFound);
             }
@@ -107,7 +107,7 @@ async fn update_interface<Filter: fnet_filter::FilterProxyInterface>(
     Ok(())
 }
 
-impl<Filter: fnet_filter::FilterProxyInterface> Masquerade<Filter> {
+impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
     pub fn new(filter: Filter) -> Self {
         Self { filter, active_controllers: HashMap::new() }
     }
@@ -154,31 +154,31 @@ impl<Filter: fnet_filter::FilterProxyInterface> Masquerade<Filter> {
 
             if enabled {
                 if rules.iter().any(
-                    |fnet_filter::Nat {
+                    |fnet_filter_deprecated::Nat {
                          src_subnet: old_src_subnet,
                          outgoing_nic: old_outgoing_nic,
                          proto,
                      }| {
                         *old_src_subnet == src_subnet
                             && *old_outgoing_nic == outgoing_nic
-                            && *proto == fnet_filter::SocketProtocol::Any
+                            && *proto == fnet_filter_deprecated::SocketProtocol::Any
                     },
                 ) {
                     return Err(Error::AlreadyExists);
                 }
-                rules.push(fnet_filter::Nat {
-                    proto: fnet_filter::SocketProtocol::Any,
+                rules.push(fnet_filter_deprecated::Nat {
+                    proto: fnet_filter_deprecated::SocketProtocol::Any,
                     src_subnet,
                     outgoing_nic,
                 });
             } else {
                 rules.retain(
-                    |fnet_filter::Nat {
+                    |fnet_filter_deprecated::Nat {
                          src_subnet: old_src_subnet,
                          outgoing_nic: old_outgoing_nic,
                          proto,
                      }| {
-                        !(*proto == fnet_filter::SocketProtocol::Any
+                        !(*proto == fnet_filter_deprecated::SocketProtocol::Any
                             && *old_src_subnet == src_subnet
                             && *old_outgoing_nic == outgoing_nic)
                     },
@@ -196,14 +196,14 @@ impl<Filter: fnet_filter::FilterProxyInterface> Masquerade<Filter> {
                     state.active = enabled;
                     return Ok(was_enabled);
                 }
-                Err(fnet_filter::FilterUpdateNatRulesError::GenerationMismatch) => {
+                Err(fnet_filter_deprecated::FilterUpdateNatRulesError::GenerationMismatch) => {
                     // We need to try again.
                     fuchsia_async::Timer::new(
                         crate::filter::FILTER_CAS_RETRY_INTERVAL_MILLIS.millis().after_now(),
                     )
                     .await;
                 }
-                Err(fnet_filter::FilterUpdateNatRulesError::BadRule) => {
+                Err(fnet_filter_deprecated::FilterUpdateNatRulesError::BadRule) => {
                     panic!("Generated Nat rule was invalid. This should never happen: {rules:?}");
                 }
             }
@@ -406,7 +406,7 @@ pub mod test {
     #[derive(Default)]
     struct MockFilterState {
         active_interfaces: HashSet<u64>,
-        nat_rules: Vec<fnet_filter::Nat>,
+        nat_rules: Vec<fnet_filter_deprecated::Nat>,
         nat_rules_generation: u32,
         fail_generations: i32,
     }
@@ -425,13 +425,13 @@ pub mod test {
         state: Arc<Mutex<MockFilterState>>,
     }
 
-    impl fnet_filter::FilterProxyInterface for MockFilter {
+    impl fnet_filter_deprecated::FilterProxyInterface for MockFilter {
         type EnableInterfaceResponseFut =
-            future::Ready<Result<fnet_filter::FilterEnableInterfaceResult, fidl::Error>>;
+            future::Ready<Result<fnet_filter_deprecated::FilterEnableInterfaceResult, fidl::Error>>;
 
         fn enable_interface(&self, id: u64) -> Self::EnableInterfaceResponseFut {
             if id == NON_EXISTENT_INTERFACE.get() {
-                future::ok(Err(fnet_filter::EnableDisableInterfaceError::NotFound))
+                future::ok(Err(fnet_filter_deprecated::EnableDisableInterfaceError::NotFound))
             } else {
                 let _: bool =
                     self.state.lock().expect("lock poisoned").active_interfaces.insert(id);
@@ -439,12 +439,13 @@ pub mod test {
             }
         }
 
-        type DisableInterfaceResponseFut =
-            future::Ready<Result<fnet_filter::FilterDisableInterfaceResult, fidl::Error>>;
+        type DisableInterfaceResponseFut = future::Ready<
+            Result<fnet_filter_deprecated::FilterDisableInterfaceResult, fidl::Error>,
+        >;
 
         fn disable_interface(&self, id: u64) -> Self::DisableInterfaceResponseFut {
             if id == NON_EXISTENT_INTERFACE.get() {
-                future::ok(Err(fnet_filter::EnableDisableInterfaceError::NotFound))
+                future::ok(Err(fnet_filter_deprecated::EnableDisableInterfaceError::NotFound))
             } else {
                 let _: bool =
                     self.state.lock().expect("lock poisoned").active_interfaces.remove(&id);
@@ -453,7 +454,7 @@ pub mod test {
         }
 
         type GetNatRulesResponseFut =
-            future::Ready<Result<(Vec<fnet_filter::Nat>, u32), fidl::Error>>;
+            future::Ready<Result<(Vec<fnet_filter_deprecated::Nat>, u32), fidl::Error>>;
 
         fn get_nat_rules(&self) -> Self::GetNatRulesResponseFut {
             let mut state = self.state.lock().expect("lock poisoned");
@@ -467,18 +468,20 @@ pub mod test {
         }
 
         type UpdateNatRulesResponseFut =
-            future::Ready<Result<fnet_filter::FilterUpdateNatRulesResult, fidl::Error>>;
+            future::Ready<Result<fnet_filter_deprecated::FilterUpdateNatRulesResult, fidl::Error>>;
 
         fn update_nat_rules(
             &self,
-            rules: &[fnet_filter::Nat],
+            rules: &[fnet_filter_deprecated::Nat],
             generation: u32,
         ) -> Self::UpdateNatRulesResponseFut {
             let mut state = self.state.lock().expect("lock poisoned");
             if state.nat_rules_generation != generation {
-                future::ok(Err(fnet_filter::FilterUpdateNatRulesError::GenerationMismatch))
+                future::ok(Err(
+                    fnet_filter_deprecated::FilterUpdateNatRulesError::GenerationMismatch,
+                ))
             } else {
-                let new_nat_rules: Vec<fnet_filter::Nat> =
+                let new_nat_rules: Vec<fnet_filter_deprecated::Nat> =
                     rules.iter().map(|r| r.clone()).collect();
                 state.nat_rules = new_nat_rules;
                 state.nat_rules_generation += 1;
@@ -487,25 +490,29 @@ pub mod test {
         }
 
         type GetRulesResponseFut =
-            future::Ready<Result<(Vec<fnet_filter::Rule>, u32), fidl::Error>>;
+            future::Ready<Result<(Vec<fnet_filter_deprecated::Rule>, u32), fidl::Error>>;
         fn get_rules(&self) -> Self::GetRulesResponseFut {
             unreachable!();
         }
         type UpdateRulesResponseFut =
-            future::Ready<Result<fnet_filter::FilterUpdateRulesResult, fidl::Error>>;
-        fn update_rules(&self, _: &[fnet_filter::Rule], _: u32) -> Self::UpdateRulesResponseFut {
+            future::Ready<Result<fnet_filter_deprecated::FilterUpdateRulesResult, fidl::Error>>;
+        fn update_rules(
+            &self,
+            _: &[fnet_filter_deprecated::Rule],
+            _: u32,
+        ) -> Self::UpdateRulesResponseFut {
             unreachable!();
         }
         type GetRdrRulesResponseFut =
-            future::Ready<Result<(Vec<fnet_filter::Rdr>, u32), fidl::Error>>;
+            future::Ready<Result<(Vec<fnet_filter_deprecated::Rdr>, u32), fidl::Error>>;
         fn get_rdr_rules(&self) -> Self::GetRdrRulesResponseFut {
             unreachable!();
         }
         type UpdateRdrRulesResponseFut =
-            future::Ready<Result<fnet_filter::FilterUpdateRdrRulesResult, fidl::Error>>;
+            future::Ready<Result<fnet_filter_deprecated::FilterUpdateRdrRulesResult, fidl::Error>>;
         fn update_rdr_rules(
             &self,
-            _: &[fnet_filter::Rdr],
+            _: &[fnet_filter_deprecated::Rdr],
             _: u32,
         ) -> Self::UpdateRdrRulesResponseFut {
             unreachable!();

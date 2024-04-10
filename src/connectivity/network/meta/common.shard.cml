@@ -101,6 +101,22 @@
             availability: "same_as_target",
         },
         {
+            protocol: "fuchsia.net.filter.deprecated.Filter",
+
+            // NS3 will not implement fuchsia.net.filter.deprecated, mark as optional.
+            from: "#netstack",
+            to: "#netcfg",
+            availability: "same_as_target",
+        },
+        {
+            protocol: "fuchsia.net.filter.Control",
+
+            // NS2 will not implement fuchsia.net.filter, mark as optional.
+            from: "#netstack",
+            to: "#netcfg",
+            availability: "same_as_target",
+        },
+        {
             protocol: [ "fuchsia.net.name.Lookup" ],
             from: "#dns-resolver",
             to: [
@@ -116,7 +132,6 @@
         },
         {
             protocol: [
-                "fuchsia.net.filter.deprecated.Filter",
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.name.DnsServerWatcher",
                 "fuchsia.net.routes.admin.SetProviderV4",
