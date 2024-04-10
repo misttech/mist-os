@@ -6,13 +6,14 @@
 // Needed for invocations of the `assert_data_tree` macro.
 #![recursion_limit = "256"]
 
-use std::{collections::HashMap, convert::TryFrom as _};
+use std::{collections::HashMap, convert::TryFrom as _, time::Duration};
 
+use assert_matches::assert_matches;
 use fidl_fuchsia_posix_socket as fposix_socket;
 
-use net_declare::{fidl_mac, fidl_subnet, std_ip_v4};
+use net_declare::{fidl_mac, fidl_subnet, std_ip_v4, std_ip_v6};
 use net_types::{
-    ip::{IpAddress, IpVersion, Ipv4, Ipv6},
+    ip::{IpAddress, IpInvariant, IpVersion, Ipv4, Ipv6},
     AddrAndPortFormatter, Witness as _,
 };
 use netstack_testing_common::{constants, get_inspect_data, realms::TestSandboxExt as _};
@@ -20,10 +21,19 @@ use netstack_testing_macros::netstack_test;
 use packet_formats::ethernet::testutil::ETHERNET_HDR_LEN_NO_TAG;
 use test_case::test_case;
 
+enum TcpSocketState {
+    Unbound,
+    Bound,
+    Listener,
+    Connected,
+}
+
 #[netstack_test]
-#[test_case(false; "bound")]
-#[test_case(true; "listener")]
-async fn inspect_sockets<I: net_types::ip::Ip>(name: &str, listen: bool) {
+#[test_case(TcpSocketState::Unbound; "unbound")]
+#[test_case(TcpSocketState::Bound; "bound")]
+#[test_case(TcpSocketState::Listener; "listener")]
+#[test_case(TcpSocketState::Connected; "connected")]
+async fn inspect_tcp_sockets<I: net_types::ip::Ip>(name: &str, socket_state: TcpSocketState) {
     type N = netstack_testing_common::realms::Netstack3;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
@@ -40,30 +50,93 @@ async fn inspect_sockets<I: net_types::ip::Ip>(name: &str, listen: bool) {
     let scope = dev.id().try_into().unwrap();
 
     // Ensure ns3 has started and that there is a Socket to collect inspect data about.
-    const PORT: u16 = 8080;
-    let (domain, addr) = match I::VERSION {
-        IpVersion::V4 => {
-            (fposix_socket::Domain::Ipv4, std::net::SocketAddr::from((std_ip_v4!("0.0.0.0"), PORT)))
+    const LOCAL_PORT: u16 = 8080;
+    const REMOTE_PORT: u16 = 9999;
+    const BACKLOG: u64 = 123;
+
+    let (domain, local_addr) = match (I::VERSION, &socket_state) {
+        (IpVersion::V4, TcpSocketState::Unbound) => (fposix_socket::Domain::Ipv4, None),
+        // NB: For bound sockets, use the any address, which guards against
+        // a regression where the any address is shown as "[NOT BOUND]".
+        (IpVersion::V4, TcpSocketState::Bound) => (
+            fposix_socket::Domain::Ipv4,
+            Some(std::net::SocketAddr::from((std_ip_v4!("0.0.0.0"), LOCAL_PORT))),
+        ),
+        (IpVersion::V4, TcpSocketState::Listener) | (IpVersion::V4, TcpSocketState::Connected) => {
+            // NB: Ensure the address exists on the device so that we can bind
+            // to it. This only applies to IPv4 since IPv6 is using the link
+            // local address.
+            dev.add_address(fidl_subnet!("192.0.2.1/24")).await.expect("add address");
+            (
+                fposix_socket::Domain::Ipv4,
+                Some(std::net::SocketAddr::from((std_ip_v4!("192.0.2.1"), LOCAL_PORT))),
+            )
         }
-        IpVersion::V6 => (
+        (IpVersion::V6, TcpSocketState::Unbound) => (fposix_socket::Domain::Ipv6, None),
+        // NB: For bound sockets, use the any address, which guards against
+        // a regression where the any address is shown as "[NOT BOUND]".
+        (IpVersion::V6, TcpSocketState::Bound) => (
             fposix_socket::Domain::Ipv6,
-            std::net::SocketAddr::from(std::net::SocketAddrV6::new(
+            Some(std::net::SocketAddr::from((std_ip_v6!("::"), LOCAL_PORT))),
+        ),
+        (IpVersion::V6, TcpSocketState::Listener) | (IpVersion::V6, TcpSocketState::Connected) => (
+            fposix_socket::Domain::Ipv6,
+            Some(std::net::SocketAddr::from(std::net::SocketAddrV6::new(
                 link_local.into(),
-                PORT,
+                LOCAL_PORT,
                 0,
                 scope,
-            )),
+            ))),
         ),
     };
+
     let tcp_socket = realm
         .stream_socket(domain, fposix_socket::StreamSocketProtocol::Tcp)
         .await
         .expect("create TCP socket");
-    tcp_socket.bind(&addr.into()).expect("bind");
+    if let Some(local_addr) = local_addr {
+        tcp_socket.bind(&local_addr.into()).expect("bind");
+    }
 
-    const BACKLOG: u64 = 123;
-    if listen {
-        tcp_socket.listen(BACKLOG.try_into().unwrap()).expect("listen");
+    match socket_state {
+        TcpSocketState::Unbound | TcpSocketState::Bound => {}
+        TcpSocketState::Listener => tcp_socket.listen(BACKLOG.try_into().unwrap()).expect("listen"),
+        TcpSocketState::Connected => {
+            let IpInvariant((default_subnet, peer_addr)) = I::map_ip(
+                (),
+                |()| {
+                    IpInvariant((
+                        fidl_subnet!("0.0.0.0/0"),
+                        std::net::SocketAddr::from(std::net::SocketAddrV4::new(
+                            std_ip_v4!("192.0.2.2"),
+                            REMOTE_PORT,
+                        )),
+                    ))
+                },
+                |()| {
+                    IpInvariant((
+                        fidl_subnet!("::/0"),
+                        std::net::SocketAddr::from(std::net::SocketAddrV6::new(
+                            std_ip_v6!("2001:db8::2"),
+                            REMOTE_PORT,
+                            0,
+                            0,
+                        )),
+                    ))
+                },
+            );
+            // Add a default route to the device, allowing the connection to
+            // begin. Note that because there is no peer end to accept the
+            // connection we setup the socket as non-blocking, and give a large
+            // connection timeout. This ensures the socket is still a "pending
+            // connection" when we fetch the inspect data.
+            dev.add_subnet_route(default_subnet).await.expect("add_default_route");
+            tcp_socket.set_nonblocking(true).expect("set nonblocking");
+            const DAY: Duration = Duration::from_secs(60 * 60 * 24);
+            tcp_socket.set_tcp_user_timeout(Some(DAY)).expect("set timeout");
+            let err = assert_matches!(tcp_socket.connect(&peer_addr.into()), Err(e) => e);
+            assert_eq!(err.raw_os_error(), Some(libc::EINPROGRESS));
+        }
     }
 
     let data =
@@ -79,12 +152,12 @@ async fn inspect_sockets<I: net_types::ip::Ip>(name: &str, listen: bool) {
     assert_eq!(sockets.children.len(), 1);
     let sock_name = sockets.children[0].name.clone();
 
-    match (I::VERSION, listen) {
-        (IpVersion::V4, false) => {
+    match (I::VERSION, socket_state) {
+        (IpVersion::V4, TcpSocketState::Unbound) => {
             diagnostics_assertions::assert_data_tree!(data, "root": contains {
                 "Sockets": {
                     sock_name => {
-                        LocalAddress: format!("0.0.0.0:{PORT}"),
+                        LocalAddress: "[NOT BOUND]",
                         RemoteAddress: "[NOT CONNECTED]",
                         TransportProtocol: "TCP",
                         NetworkProtocol: "IPv4",
@@ -92,11 +165,23 @@ async fn inspect_sockets<I: net_types::ip::Ip>(name: &str, listen: bool) {
                 }
             })
         }
-        (IpVersion::V4, true) => {
+        (IpVersion::V4, TcpSocketState::Bound) => {
             diagnostics_assertions::assert_data_tree!(data, "root": contains {
                 "Sockets": {
                     sock_name => {
-                        LocalAddress: format!("0.0.0.0:{PORT}"),
+                        LocalAddress: format!("0.0.0.0:{LOCAL_PORT}"),
+                        RemoteAddress: "[NOT CONNECTED]",
+                        TransportProtocol: "TCP",
+                        NetworkProtocol: "IPv4",
+                    },
+                }
+            })
+        }
+        (IpVersion::V4, TcpSocketState::Listener) => {
+            diagnostics_assertions::assert_data_tree!(data, "root": contains {
+                "Sockets": {
+                    sock_name => {
+                        LocalAddress: format!("192.0.2.1:{LOCAL_PORT}"),
                         RemoteAddress: "[NOT CONNECTED]",
                         TransportProtocol: "TCP",
                         NetworkProtocol: "IPv4",
@@ -110,11 +195,23 @@ async fn inspect_sockets<I: net_types::ip::Ip>(name: &str, listen: bool) {
                 }
             })
         }
-        (IpVersion::V6, false) => {
+        (IpVersion::V4, TcpSocketState::Connected) => {
             diagnostics_assertions::assert_data_tree!(data, "root": contains {
                 "Sockets": {
                     sock_name => {
-                        LocalAddress: format!("[{link_local}%{scope}]:{PORT}"),
+                        LocalAddress: format!("192.0.2.1:{LOCAL_PORT}"),
+                        RemoteAddress: format!("192.0.2.2:{REMOTE_PORT}"),
+                        TransportProtocol: "TCP",
+                        NetworkProtocol: "IPv4",
+                    },
+                }
+            })
+        }
+        (IpVersion::V6, TcpSocketState::Unbound) => {
+            diagnostics_assertions::assert_data_tree!(data, "root": contains {
+                "Sockets": {
+                    sock_name => {
+                        LocalAddress: "[NOT BOUND]",
                         RemoteAddress: "[NOT CONNECTED]",
                         TransportProtocol: "TCP",
                         NetworkProtocol: "IPv6",
@@ -122,11 +219,23 @@ async fn inspect_sockets<I: net_types::ip::Ip>(name: &str, listen: bool) {
                 }
             })
         }
-        (IpVersion::V6, true) => {
+        (IpVersion::V6, TcpSocketState::Bound) => {
             diagnostics_assertions::assert_data_tree!(data, "root": contains {
                 "Sockets": {
                     sock_name => {
-                        LocalAddress: format!("[{link_local}%{scope}]:{PORT}"),
+                        LocalAddress: format!("[::]:{LOCAL_PORT}"),
+                        RemoteAddress: "[NOT CONNECTED]",
+                        TransportProtocol: "TCP",
+                        NetworkProtocol: "IPv6",
+                    }
+                }
+            })
+        }
+        (IpVersion::V6, TcpSocketState::Listener) => {
+            diagnostics_assertions::assert_data_tree!(data, "root": contains {
+                "Sockets": {
+                    sock_name => {
+                        LocalAddress: format!("[{link_local}%{scope}]:{LOCAL_PORT}"),
                         RemoteAddress: "[NOT CONNECTED]",
                         TransportProtocol: "TCP",
                         NetworkProtocol: "IPv6",
@@ -136,6 +245,18 @@ async fn inspect_sockets<I: net_types::ip::Ip>(name: &str, listen: bool) {
                             NumReady: 0u64,
                             Contents: "{}",
                         }
+                    }
+                }
+            })
+        }
+        (IpVersion::V6, TcpSocketState::Connected) => {
+            diagnostics_assertions::assert_data_tree!(data, "root": contains {
+                "Sockets": {
+                    sock_name => {
+                        LocalAddress: format!("[{link_local}%{scope}]:{LOCAL_PORT}"),
+                        RemoteAddress: format!("[2001:db8::2]:{REMOTE_PORT}"),
+                        TransportProtocol: "TCP",
+                        NetworkProtocol: "IPv6",
                     }
                 }
             })
