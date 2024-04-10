@@ -145,11 +145,19 @@ impl<I: Instant> CongestionControl<I> {
     }
 
     /// Called when a duplicate ack is arrived.
-    pub(super) fn on_dup_ack(&mut self, seg_ack: SeqNum) {
+    ///
+    /// Returns `true` if fast recovery was initiated as a result of this ACK.
+    pub(super) fn on_dup_ack(&mut self, seg_ack: SeqNum) -> bool {
         let Self { params, algorithm, fast_recovery } = self;
         match fast_recovery {
-            None => *fast_recovery = Some(FastRecovery::new()),
-            Some(fast_recovery) => fast_recovery.on_dup_ack(params, algorithm, seg_ack),
+            None => {
+                *fast_recovery = Some(FastRecovery::new());
+                true
+            }
+            Some(fast_recovery) => {
+                fast_recovery.on_dup_ack(params, algorithm, seg_ack);
+                false
+            }
         }
     }
 
@@ -215,6 +223,16 @@ impl<I: Instant> CongestionControl<I> {
 
     pub(super) fn mss(&self) -> Mss {
         self.params.mss
+    }
+
+    /// Returns true if this [`CongestionControl`] is in fast recovery.
+    pub(super) fn in_fast_recovery(&self) -> bool {
+        self.fast_recovery.is_some()
+    }
+
+    /// Returns true if this [`CongestionControl`] is in slow start.
+    pub(super) fn in_slow_start(&self) -> bool {
+        self.params.cwnd < self.params.ssthresh
     }
 }
 
@@ -293,7 +311,7 @@ mod test {
             CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE);
         let old_cwnd = congestion_control.params.cwnd;
         assert_eq!(congestion_control.params.ssthresh, u32::MAX);
-        congestion_control.on_dup_ack(SeqNum::new(0));
+        assert!(congestion_control.on_dup_ack(SeqNum::new(0)));
         congestion_control.on_ack(
             NonZeroU32::new(1).unwrap(),
             FakeInstant::from(Duration::from_secs(0)),

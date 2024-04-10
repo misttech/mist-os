@@ -822,6 +822,7 @@ async fn inspect_counters(name: &str) {
                 "V4": {
                     PassiveConnectionOpenings: 0u64,
                     ActiveConnectionOpenings: 0u64,
+                    FastRecovery: 0u64,
                     "Rx": {
                         ValidSegmentsReceived: 0u64,
                         ReceivedSegmentsDispatched: 0u64,
@@ -842,6 +843,10 @@ async fn inspect_counters(name: &str) {
                         ResetsSent: 0u64,
                         SynsSent: 0u64,
                         FinsSent: 0u64,
+                        Timeouts: 0u64,
+                        Retransmits: 0u64,
+                        FastRetransmits: 0u64,
+                        SlowStartRetransmits: 0u64,
                         "Errors": {
                             SegmentSendErrors: 0u64,
                             ActiveOpenNoRouteErrors: 0u64,
@@ -855,6 +860,7 @@ async fn inspect_counters(name: &str) {
                 "V6": {
                     PassiveConnectionOpenings: 0u64,
                     ActiveConnectionOpenings: 0u64,
+                    FastRecovery: 0u64,
                     "Rx": {
                         ValidSegmentsReceived: 0u64,
                         ReceivedSegmentsDispatched: 0u64,
@@ -875,6 +881,10 @@ async fn inspect_counters(name: &str) {
                         ResetsSent: 0u64,
                         SynsSent: 0u64,
                         FinsSent: 0u64,
+                        Timeouts: 0u64,
+                        Retransmits: 0u64,
+                        FastRetransmits: 0u64,
+                        SlowStartRetransmits: 0u64,
                         "Errors": {
                             SegmentSendErrors: 0u64,
                             ActiveOpenNoRouteErrors: 0u64,

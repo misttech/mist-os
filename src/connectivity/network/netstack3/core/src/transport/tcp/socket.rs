@@ -4401,7 +4401,9 @@ fn do_send_inner<SockI, WireI, CC, BC>(
     BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
     CC: TransportIpContext<WireI, BC> + CounterContext<TcpCounters<SockI>>,
 {
-    while let Some(seg) = conn.state.poll_send(u32::MAX, bindings_ctx.now(), &conn.socket_options) {
+    while let Some(seg) = core_ctx.with_counters(|counters| {
+        conn.state.poll_send(counters, u32::MAX, bindings_ctx.now(), &conn.socket_options)
+    }) {
         send_tcp_segment(
             core_ctx,
             bindings_ctx,

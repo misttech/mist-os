@@ -615,9 +615,9 @@ where
             }
         }
     }
-
-    let (reply, passive_open, data_acked) =
-        state.on_segment::<_, BC>(incoming, bindings_ctx.now(), socket_options, *defunct);
+    let (reply, passive_open, data_acked) = core_ctx.with_counters(|counters| {
+        state.on_segment::<_, BC>(counters, incoming, bindings_ctx.now(), socket_options, *defunct)
+    });
 
     let mut confirm_reachable = || {
         let remote_ip = *ip_sock.remote_ip();
@@ -938,8 +938,17 @@ where
     //
     // We might end up discarding the reply in case we can't instantiate this
     // new connection.
+    let result = core_ctx.with_counters(|counters| {
+        state.on_segment::<_, BC>(
+            counters,
+            incoming,
+            bindings_ctx.now(),
+            &SocketOptions::default(),
+            false, /* defunct */
+        )
+    });
     let reply = assert_matches!(
-        state.on_segment::<_, BC>(incoming, bindings_ctx.now(), &SocketOptions::default(), false /* defunct */),
+        result,
         (reply, None, /* data_acked */ _) => reply
     );
 

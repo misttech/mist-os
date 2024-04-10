@@ -418,6 +418,16 @@ pub struct TcpCountersInner {
     pub fins_received: Counter,
     /// Count of sent segments with the FIN flag set.
     pub fins_sent: Counter,
+    /// Count of retransmission timeouts.
+    pub timeouts: Counter,
+    /// Count of retransmissions of segments.
+    pub retransmits: Counter,
+    /// Count of retransmissions of segments while in slow start.
+    pub slow_start_retransmits: Counter,
+    /// Count of retransmissions of segments while in fast recovery.
+    pub fast_retransmits: Counter,
+    /// Count of times fast recovery was initiated to recover from packet loss.
+    pub fast_recovery: Counter,
     // TODO(https://fxbug.dev/42052879): Add additional counters to achieve
     // parity with Netstack2.
 }
