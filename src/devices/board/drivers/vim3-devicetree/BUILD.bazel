@@ -107,11 +107,12 @@ fuchsia_cc_test(
         "-Wno-vla-cxx-extension",
     ],
     deps = [
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@fuchsia_sdk//pkg/async-loop-cpp",
         "@fuchsia_sdk//pkg/async-loop-default",
         "@internal_sdk//pkg/board-test-helper",
         "@internal_sdk//pkg/ddk-platform-defs",
-        "@internal_sdk//pkg/zxtest",
     ],
 )
 

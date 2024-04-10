@@ -7,7 +7,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/devicetree/testing/board-test-helper.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace example_board {
 
@@ -21,9 +21,9 @@ const zbi_platform_id_t kPlatformId = []() {
   return plat_id;
 }();
 
-}
+}  // namespace
 
-class ExampleBoardTest : public zxtest::Test {
+class ExampleBoardTest : public testing::Test {
  public:
   ExampleBoardTest()
       : board_test_("/pkg/test-data/example-board.dtb", kPlatformId, loop_.dispatcher()) {

@@ -8,7 +8,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/devicetree/testing/board-test-helper.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace vim3_dt {
 
@@ -22,7 +22,7 @@ const zbi_platform_id_t kPlatformId = {
 
 }
 
-class Vim3DevicetreeTest : public zxtest::Test {
+class Vim3DevicetreeTest : public testing::Test {
  public:
   Vim3DevicetreeTest()
       : board_test_("/pkg/test-data/khadas-vim3.dtb", kPlatformId, loop_.dispatcher()) {
