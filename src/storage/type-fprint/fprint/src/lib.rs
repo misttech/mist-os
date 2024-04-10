@@ -169,6 +169,7 @@ mod tests {
     #[derive(TypeFingerprint)]
     struct Bar(Foo);
 
+    // Example
     #[allow(dead_code)]
     #[derive(TypeFingerprint)]
     struct Baz {
@@ -177,6 +178,7 @@ mod tests {
         bizz: u64,
     }
 
+    // Example
     #[allow(dead_code)]
     #[derive(TypeFingerprint)]
     enum Buzz {

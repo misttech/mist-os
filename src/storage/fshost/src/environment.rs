@@ -117,13 +117,15 @@ pub enum Filesystem {
     Queue(Vec<ServerEnd<fio::DirectoryMarker>>),
     Serving(ServingSingleVolumeFilesystem),
     ServingMultiVolume(
-        // TODO(https://fxbug.dev/332407981): Remove or explain #[allow(dead_code)].
+        // We hold onto crypt service here to avoid it prematurely shutting down.
+        // Fxfs may expect to find it in via VFS at a later time and it stops running
+        // when all channels are closed.
         #[allow(dead_code)] CryptService,
         ServingMultiVolumeFilesystem,
         String,
     ),
     ServingVolumeInFxblob(
-        // TODO(https://fxbug.dev/332407981): Remove or explain #[allow(dead_code)].
+        // We hold onto crypt service here to avoid it prematurely shutting down.
         #[allow(dead_code)] Option<CryptService>,
         String,
     ),

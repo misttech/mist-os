@@ -46,7 +46,7 @@ use {
 
 pub enum FshostShutdownResponder {
     Lifecycle(
-        // TODO(https://fxbug.dev/332407981): Remove or explain #[allow(dead_code)].
+        // TODO(fxbug.dev/333319162): Implement me.
         #[allow(dead_code)] LifecycleRequestStream,
     ),
 }
