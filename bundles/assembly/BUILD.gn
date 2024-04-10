@@ -315,6 +315,10 @@ assembly_input_bundle("bootstrap") {
       package_target = "//src/devices/usb/drivers/usb-peripheral:package"
       driver_components = [ "meta/usb-peripheral.cm" ]
     },
+    {
+      package_target = "//src/devices/registers/drivers/registers:package"
+      driver_components = [ "meta/registers.cm" ]
+    },
   ]
 }
 
@@ -356,17 +360,6 @@ assembly_input_bundle("bootstrap_userdebug") {
     {
       package_target = "//src/devices/nand/drivers/broker:package"
       driver_components = [ "meta/nand-broker.cm" ]
-    },
-  ]
-}
-
-# This is a temporary AIB hold register driver. This driver will eventually
-# be moved to bootstrap AIB and this AIB will be removed.
-assembly_input_bundle("register_driver") {
-  boot_driver_packages = [
-    {
-      package_target = "//src/devices/registers/drivers/registers:package"
-      driver_components = [ "meta/registers.cm" ]
     },
   ]
 }

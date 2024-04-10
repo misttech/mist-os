@@ -18,7 +18,6 @@ _base = {
     "fuchsia::pmm_checker",
     "fuchsia::usb_peripheral_support",
     "fuchsia::wlan_fullmac",
-    "fuchsia::platform_driver_migration",
   ]
 
   input_bundles = [

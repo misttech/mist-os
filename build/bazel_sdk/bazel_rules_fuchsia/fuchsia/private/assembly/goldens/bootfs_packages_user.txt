@@ -43,7 +43,7 @@ power-manager
 pwm
 pwrbtn-monitor
 ramdisk
-?registers
+registers
 rndis-function
 role_manager
 root
