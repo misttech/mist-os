@@ -7,7 +7,6 @@
 #ifndef ZIRCON_KERNEL_LIB_OBJECT_CACHE_INCLUDE_LIB_OBJECT_CACHE_H_
 #define ZIRCON_KERNEL_LIB_OBJECT_CACHE_INCLUDE_LIB_OBJECT_CACHE_H_
 
-#include <inttypes.h>
 #include <lib/ktrace.h>
 #include <lib/zx/result.h>
 #include <stdint.h>
@@ -206,11 +205,6 @@ struct Deleter {
 template <typename T, typename Allocator = DefaultAllocator>
 using UniquePtr = ktl::unique_ptr<T, Deleter<T, Allocator>>;
 
-// The maximum size of the slab control block. Custom allocators may use this
-// constant to compute slab sizes, taking into account the size of the control
-// block and the desired number of objects per slab.
-static constexpr size_t kSlabControlMaxSize = 152 + (kSchedulerLockSpinTracingEnabled ? 8 : 0);
-
 // Specialization of ObjectCache for the single slab cache variant. Operations
 // serialize on the main object cache lock, regardless of CPU.
 template <typename T, typename Allocator>
@@ -318,6 +312,8 @@ class ObjectCache<T, Option::Single, Allocator> : private Allocator {
   }
 
   static constexpr size_t objects_per_slab() { return kEntriesPerSlab; }
+  static constexpr size_t slab_control_size() { return kSlabControlSize; }
+  static constexpr size_t entry_size() { return sizeof(Entry); }
 
   Allocator& allocator() { return *this; }
   const Allocator& allocator() const { return *this; }
@@ -404,11 +400,12 @@ class ObjectCache<T, Option::Single, Allocator> : private Allocator {
     TA_GUARDED(lock)
     fbl::DoublyLinkedListCustomTraits<Entry*, Entry, fbl::SizeOrder::Constant> free_list;
   };
-  static_assert(sizeof(SlabControl) <= kSlabControlMaxSize);
+
+  static constexpr size_t kSlabControlSize =
+      fbl::round_up(sizeof(SlabControl), alignof(SlabControl));
 
   static constexpr ssize_t kEntriesPerSlab =
-      (Allocator::kSlabSize - fbl::round_up(sizeof(SlabControl), alignof(SlabControl))) /
-      sizeof(Entry);
+      (Allocator::kSlabSize - kSlabControlSize) / sizeof(Entry);
   static_assert(kEntriesPerSlab > 0);
 
   // A slab of objects in the object cache. Constructed on a raw block of power
