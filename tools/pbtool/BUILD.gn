@@ -20,6 +20,7 @@ rustc_binary("pbtool") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:flate2",
     "//third_party/rust_crates:pathdiff",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:walkdir",
@@ -31,6 +32,7 @@ rustc_binary("pbtool") {
     "//src/lib/assembly/partitions_config",
     "//src/sys/pkg/lib/fuchsia-repo",
     "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:flate2",
     "//third_party/rust_crates:tempfile",
   ]
 

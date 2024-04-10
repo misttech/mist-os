@@ -10,6 +10,10 @@ use assembly_manifest::{AssemblyManifest, Image};
 use camino::Utf8PathBuf;
 use sdk_metadata::ProductBundle;
 
+use flate2::read::GzDecoder;
+use std::fs::File;
+use std::io::{copy, BufReader};
+
 const FLASH_SCRIPT_TEMPLATE: &str = r#"#!/bin/sh
 DIR="$(dirname "$0")"
 set -e
@@ -199,15 +203,31 @@ impl GenerateBuildArchive {
         images_manifest.write(images_manifest_path).context("Writing images manifest")?;
 
         if let Some(path) = self.fastboot {
-            copy_artifact(&path, "fastboot.exe.linux-x64")?;
+            let input = File::open(&path).context("Could not read fastboot file")?;
 
-            // Create flash.sh file
-            let flash_script_content =
-                FLASH_SCRIPT_TEMPLATE.replace("BOOTLOADER_STR", &bootloader_string.trim());
-            let flash_script_path = self.out_dir.join("flash.sh");
-            std::fs::write(flash_script_path, flash_script_content)
-                .context("Failed to write flash.sh")?;
+            let mut gz = GzDecoder::new(BufReader::new(&input));
+            match gz.header() {
+                Some(_) => {
+                    // copy gzip file to destination path
+                    let destination = self.out_dir.join("fastboot.exe.linux-x64");
+                    let mut output = File::create(&destination)
+                        .context("Could not create output 'fastboot.exe.linux-x64' file")?;
+                    copy(&mut gz, &mut output)
+                        .context("Fail to write to 'fastboot.exe.linux-x64' file")?;
+                }
+                None => {
+                    // copy regular file to destination path
+                    copy_artifact(&path, "fastboot.exe.linux-x64")?;
+                }
+            };
         }
+
+        // Create flash.sh file
+        let flash_script_content =
+            FLASH_SCRIPT_TEMPLATE.replace("BOOTLOADER_STR", &bootloader_string.trim());
+        let flash_script_path = self.out_dir.join("flash.sh");
+        std::fs::write(flash_script_path, flash_script_content)
+            .context("Failed to write flash.sh")?;
 
         Ok(())
     }
@@ -221,7 +241,6 @@ mod tests {
     use camino::Utf8Path;
     use sdk_metadata::ProductBundleV2;
     use serde_json::Value;
-    use std::fs::File;
     use std::io::Write;
     use tempfile::tempdir;
 
