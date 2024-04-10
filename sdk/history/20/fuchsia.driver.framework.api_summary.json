@@ -600,6 +600,11 @@
         "value": "8"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/NodeError.UNBIND_CHILDREN_IN_PROGRESS",
+        "value": "11"
+    },
+    {
         "kind": "enum",
         "name": "fuchsia.driver.framework/NodeError",
         "strictness": "flexible",

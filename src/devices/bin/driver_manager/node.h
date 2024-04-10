@@ -480,6 +480,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // implementation.
   std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> devfs_controller_connector_;
   fidl::ServerBindingGroup<fuchsia_device::Controller> dev_controller_bindings_;
+
+  // Completers that are waiting for the node to unbind all of its children.
+  std::vector<UnbindChildrenCompleter::Async> unbinding_children_completers_;
 };
 
 }  // namespace driver_manager

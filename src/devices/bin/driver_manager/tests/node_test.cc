@@ -4,6 +4,13 @@
 
 #include "src/devices/bin/driver_manager/node.h"
 
+#include <fidl/fuchsia.driver.host/cpp/test_base.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/sync/cpp/completion.h>
+
 #include <bind/fuchsia/platform/cpp/bind.h>
 
 #include "src/devices/bin/driver_manager/composite_node_spec_v2.h"
@@ -58,6 +65,16 @@ class FakeDriverHost : public driver_manager::DriverHost {
     clients_[node_name].reset();
   }
 
+  std::tuple<fidl::ServerEnd<fuchsia_driver_host::Driver>,
+             fidl::ClientEnd<fuchsia_driver_framework::Node>>
+  TakeDriver(const std::string& node_name) {
+    auto driver = std::move(drivers_[node_name]);
+    auto client = std::move(clients_[node_name]);
+    drivers_.erase(node_name);
+    clients_.erase(node_name);
+    return std::make_tuple(std::move(driver), std::move(client));
+  }
+
  private:
   std::unordered_map<std::string, fidl::ServerEnd<fuchsia_driver_host::Driver>> drivers_;
   std::unordered_map<std::string, fidl::ClientEnd<fuchsia_driver_framework::Node>> clients_;
@@ -86,6 +103,8 @@ class FakeNodeManager : public TestNodeManagerBase {
 
   void CloseDriverForNode(std::string node_name) { driver_host_.CloseDriver(node_name); }
 
+  FakeDriverHost& driver_host() { return driver_host_; }
+
   void AddClient(const std::string& node_name,
                  fidl::ClientEnd<fuchsia_component_runner::ComponentController> client) {
     clients_[node_name] = std::move(client);
@@ -96,6 +115,34 @@ class FakeNodeManager : public TestNodeManagerBase {
   std::unordered_map<std::string, fidl::ClientEnd<fuchsia_component_runner::ComponentController>>
       clients_;
   FakeDriverHost driver_host_;
+};
+
+class FakeDriver : public fidl::testing::TestBase<fuchsia_driver_host::Driver> {
+ public:
+  using StopCallback = fit::function<void()>;
+
+  FakeDriver(
+      async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_driver_host::Driver> server_end,
+      fidl::ClientEnd<fuchsia_driver_framework::Node> node, StopCallback stop_callback = []() {})
+      : binding_(async_get_default_dispatcher(), std::move(server_end), this,
+                 fidl::kIgnoreBindingClosure),
+        node_(std::move(node)),
+        stop_callback_(std::move(stop_callback)) {}
+
+  void Stop(StopCompleter::Sync& completer) override {
+    stop_callback_();
+    node_.reset();
+    binding_.Close(ZX_OK);
+  }
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    printf("Not implemented: Driver::%s\n", name.c_str());
+  }
+
+ private:
+  fidl::ServerBinding<fuchsia_driver_host::Driver> binding_;
+  fidl::ClientEnd<fuchsia_driver_framework::Node> node_;
+  StopCallback stop_callback_;
 };
 
 class Dfv2NodeTest : public DriverManagerTestBase {
@@ -156,12 +203,23 @@ class Dfv2NodeTest : public DriverManagerTestBase {
   }
 
  protected:
+  fidl::WireClient<fuchsia_device::Controller> ConnectToDeviceController(
+      std::shared_ptr<driver_manager::Node> node) {
+    zx::result device_controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
+    EXPECT_EQ(device_controller_endpoints.status_value(), ZX_OK);
+    device_controller_bindings_.AddBinding(dispatcher(),
+                                           std::move(device_controller_endpoints->server),
+                                           node.get(), fidl::kIgnoreBindingClosure);
+    return {std::move(device_controller_endpoints->client), dispatcher()};
+  }
+
   driver_manager::NodeManager* GetNodeManager() override { return node_manager.get(); }
 
   std::unique_ptr<FakeNodeManager> node_manager;
 
  private:
   std::unique_ptr<TestRealm> realm_;
+  fidl::ServerBindingGroup<fuchsia_device::Controller> device_controller_bindings_;
 };
 
 TEST_F(Dfv2NodeTest, RemoveDuringFailedBind) {
@@ -410,4 +468,154 @@ TEST_F(Dfv2NodeTest, TestCompositeNodeProperties) {
             parent_2_node_property_2.key.string_value().get());
   ASSERT_TRUE(parent_2_node_property_2.value.is_int_value());
   ASSERT_EQ(2ul, parent_2_node_property_2.value.int_value());
+}
+
+// Verify Node::UnbindChildren() unbinds all of the children of a node with zero child.
+TEST_F(Dfv2NodeTest, UnbindChildrenZeroChildren) {
+  auto parent = CreateNode("parent");
+  auto device_controller = ConnectToDeviceController(parent);
+
+  ASSERT_TRUE(parent->children().empty());
+  device_controller->UnbindChildren().ThenExactlyOnce(
+      [](auto& result) { ASSERT_EQ(result.status(), ZX_OK); });
+  ASSERT_TRUE(RunLoopUntilIdle());
+  ASSERT_TRUE(parent->children().empty());
+}
+
+// Verify Node::UnbindChildren() unbinds all of the children of a node with one child.
+TEST_F(Dfv2NodeTest, UnbindChildrenOneChild) {
+  auto parent = CreateNode("parent");
+  auto child = CreateNode("child", parent);
+  auto device_controller = ConnectToDeviceController(parent);
+
+  ASSERT_EQ(parent->children().size(), 1u);
+  device_controller->UnbindChildren().ThenExactlyOnce(
+      [](auto& result) { ASSERT_EQ(result.status(), ZX_OK); });
+  ASSERT_TRUE(RunLoopUntilIdle());
+  ASSERT_TRUE(parent->children().empty());
+}
+
+// Verify Node::UnbindChildren() unbinds all of the children of a node with one child that has a
+// driver bound to it.
+TEST_F(Dfv2NodeTest, UnbindChildrenOneBoundChild) {
+  const std::string kChildNodeName = "child";
+
+  auto parent = CreateNode("parent");
+  auto child = CreateNode(kChildNodeName, parent);
+  StartTestDriver(child);
+  ASSERT_TRUE(child->HasDriverComponent());
+  auto device_controller = ConnectToDeviceController(parent);
+
+  // Get the driver so that the test can properly close the driver's connection when the driver
+  // receives a Stop fidl request.
+  auto [driver_server, node_client] = node_manager->driver_host().TakeDriver(kChildNodeName);
+  FakeDriver driver{dispatcher(), std::move(driver_server), std::move(node_client)};
+
+  ASSERT_EQ(parent->children().size(), 1u);
+  device_controller->UnbindChildren().ThenExactlyOnce(
+      [](auto& result) { ASSERT_EQ(result.status(), ZX_OK); });
+  ASSERT_TRUE(RunLoopUntilIdle());
+  ASSERT_TRUE(parent->children().empty());
+}
+
+// Verify Node::UnbindChildren() unbinds all of the children of a node with four children.
+TEST_F(Dfv2NodeTest, UnbindChildrenFourChildren) {
+  const size_t kNumChildren = 4;
+
+  auto parent = CreateNode("parent");
+  std::vector<std::shared_ptr<driver_manager::Node>> children;
+  for (size_t i = 0; i < kNumChildren; ++i) {
+    children.emplace_back(CreateNode("child-" + std::to_string(i), parent));
+  }
+  auto device_controller = ConnectToDeviceController(parent);
+
+  ASSERT_EQ(parent->children().size(), kNumChildren);
+  device_controller->UnbindChildren().ThenExactlyOnce(
+      [](auto& result) { ASSERT_EQ(result.status(), ZX_OK); });
+  ASSERT_TRUE(RunLoopUntilIdle());
+  ASSERT_TRUE(parent->children().empty());
+}
+
+// Verify that multiple requests to Node::UnbindChildren() will succeed. Both of these requests are
+// sent before the node can complete either.
+TEST_F(Dfv2NodeTest, UnbindChildrenMultipleCalls) {
+  auto parent = CreateNode("parent");
+  auto child = CreateNode("child", parent);
+  auto device_controller = ConnectToDeviceController(parent);
+
+  ASSERT_EQ(parent->children().size(), 1u);
+  size_t unbind_children_complete_count = 0;
+  device_controller->UnbindChildren().ThenExactlyOnce(
+      [&unbind_children_complete_count](auto& result) {
+        ASSERT_EQ(result.status(), ZX_OK);
+        unbind_children_complete_count += 1;
+      });
+  device_controller->UnbindChildren().ThenExactlyOnce(
+      [&unbind_children_complete_count](auto& result) {
+        ASSERT_EQ(result.status(), ZX_OK);
+        unbind_children_complete_count += 1;
+      });
+  ASSERT_TRUE(RunLoopUntilIdle());
+  ASSERT_EQ(unbind_children_complete_count, 2u);
+  ASSERT_TRUE(parent->children().empty());
+}
+
+// Verify that Node::AddChild() fails when a node is in the middle of unbinding children.
+TEST_F(Dfv2NodeTest, UnbindChildrenFailAddChild) {
+  const std::string kChildNode1Name = "child-1";
+
+  auto parent = CreateNode("parent");
+  auto child_1 = CreateNode(kChildNode1Name, parent);
+  StartTestDriver(child_1);
+  ASSERT_TRUE(child_1->HasDriverComponent());
+  auto device_controller = ConnectToDeviceController(parent);
+
+  // Get the driver so that the test can prevent Node::UnbindChildren() from fully completing by
+  // pausing TestDriver::Stop(). The driver will live on a separate thread in order to not block the
+  // main thread while the driver waits to complete stopping.
+  async::Loop driver_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
+  ASSERT_EQ(driver_loop.StartThread("driver"), ZX_OK);
+  auto [driver_server, node_client] = node_manager->driver_host().TakeDriver(kChildNode1Name);
+  auto complete_stop = std::make_shared<libsync::Completion>();
+  async_patterns::TestDispatcherBound<FakeDriver> driver{
+      driver_loop.dispatcher(),       std::in_place,
+      async_patterns::PassDispatcher, std::move(driver_server),
+      std::move(node_client),         [complete_stop]() {
+        complete_stop->Wait(); }};
+
+  ASSERT_EQ(parent->children().size(), 1u);
+  device_controller->UnbindChildren().ThenExactlyOnce(
+      [](auto& result) { ASSERT_EQ(result.status(), ZX_OK); });
+
+  ASSERT_TRUE(RunLoopUntilIdle());
+  // At this point, the node has received the UnbindChildren request and is waiting for child-1's
+  // driver to fully stop.
+
+  // Fail to add a second child.
+  zx::result node_controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  ASSERT_EQ(node_controller_endpoints.status_value(), ZX_OK);
+  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+  ASSERT_EQ(node_endpoints.status_value(), ZX_OK);
+  fuchsia_driver_framework::NodeAddArgs args{{.name = "child-2"}};
+  parent->AddChild(std::move(args), std::move(node_controller_endpoints->server),
+                   std::move(node_endpoints->server),
+                   [](fit::result<fuchsia_driver_framework::wire::NodeError,
+                                  std::shared_ptr<driver_manager::Node>>
+                          result) {
+                     ASSERT_TRUE(result.is_error());
+                     ASSERT_EQ(
+                         result.error_value(),
+                         fuchsia_driver_framework::wire::NodeError::kUnbindChildrenInProgress);
+                   });
+
+  // Let the driver complete stopping.
+  complete_stop->Signal();
+  // Wait for the driver to complete stopping.
+  driver.SyncCall([](FakeDriver* driver) {});
+
+  // Let Node::UnbindChildren() complete.
+  ASSERT_TRUE(RunLoopUntilIdle());
+
+  ASSERT_TRUE(parent->children().empty());
 }

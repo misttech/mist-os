@@ -423,6 +423,10 @@ Node::~Node() {
   CloseIfExists(controller_ref_);
   CloseIfExists(node_ref_);
 
+  for (auto& completer : unbinding_children_completers_) {
+    completer.Reply(zx::error(ZX_ERR_CANCELED));
+  }
+
   if (pending_bind_completer_.has_value()) {
     pending_bind_completer_.value()(zx::error(ZX_ERR_CANCELED));
     pending_bind_completer_.reset();
@@ -532,6 +536,12 @@ ShutdownHelper& Node::GetShutdownHelper() {
 void Node::RemoveChild(const std::shared_ptr<Node>& child) {
   LOGF(DEBUG, "RemoveChild %s from parent %s", child->name().c_str(), name().c_str());
   children_.erase(std::find(children_.begin(), children_.end(), child));
+  if (!unbinding_children_completers_.empty() && children_.empty()) {
+    for (auto& completer : unbinding_children_completers_) {
+      completer.ReplySuccess();
+    }
+    unbinding_children_completers_.clear();
+  }
   GetShutdownHelper().CheckNodeState();
 }
 
@@ -738,6 +748,10 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
     fuchsia_driver_framework::NodeAddArgs args,
     fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller,
     fidl::ServerEnd<fuchsia_driver_framework::Node> node) {
+  if (!unbinding_children_completers_.empty()) {
+    LOGF(ERROR, "Failed to add node: Node is currently unbinding all of its children");
+    return fit::as_error(fdf::wire::NodeError::kUnbindChildrenInProgress);
+  }
   if (node_manager_ == nullptr) {
     LOGF(WARNING, "Failed to add Node, as this Node '%s' was removed", name().data());
     return fit::as_error(fdf::wire::NodeError::kNodeRemoved);
@@ -1406,7 +1420,20 @@ void Node::Rebind(RebindRequestView request, RebindCompleter::Sync& completer) {
 }
 
 void Node::UnbindChildren(UnbindChildrenCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
+  if (children_.empty()) {
+    completer.ReplySuccess();
+    return;
+  }
+
+  unbinding_children_completers_.emplace_back(completer.ToAsync());
+  if (unbinding_children_completers_.size() == 1) {
+    // Iterate over a copy of `children_` because `children_` may be modified during `Node::Remove`
+    // which would mess up the for loop.
+    std::vector<std::shared_ptr<Node>> children{children_.begin(), children_.end()};
+    for (const auto& child : children) {
+      child->Remove(RemovalSet::kAll, nullptr);
+    }
+  }
 }
 
 void Node::ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) {

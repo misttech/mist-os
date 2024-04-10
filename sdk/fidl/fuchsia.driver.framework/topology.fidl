@@ -181,6 +181,9 @@ type NodeError = flexible enum {
     SYMBOL_ADDRESS_MISSING = 9;
     /// There is another symbol for this Node with the same name.
     SYMBOL_ALREADY_EXISTS = 10;
+    /// The node is in the process of unbinding all of its children.
+    @available(added=20)
+    UNBIND_CHILDREN_IN_PROGRESS = 11;
 };
 
 /// Protocol through which a driver manages a node that it is bound to.
