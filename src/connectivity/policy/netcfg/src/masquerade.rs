@@ -16,7 +16,8 @@ use futures::{future, stream::LocalBoxStream, StreamExt as _, TryStreamExt as _}
 use net_declare::fidl_subnet;
 use tracing::error;
 
-use crate::{FilterEnabledState, InterfaceState};
+use crate::filter::FilterEnabledState;
+use crate::InterfaceState;
 
 const UNSPECIFIED_SUBNET: Subnet = fidl_subnet!("0.0.0.0/0");
 
@@ -147,7 +148,7 @@ impl<Filter: fnet_filter::FilterProxyInterface> Masquerade<Filter> {
         )
         .await?;
 
-        for _ in 0..super::FILTER_CAS_RETRY_MAX {
+        for _ in 0..crate::filter::FILTER_CAS_RETRY_MAX {
             let (mut rules, generation) =
                 self.filter.get_nat_rules().await.expect("call to GetNatRules failed");
 
@@ -198,7 +199,7 @@ impl<Filter: fnet_filter::FilterProxyInterface> Masquerade<Filter> {
                 Err(fnet_filter::FilterUpdateNatRulesError::GenerationMismatch) => {
                     // We need to try again.
                     fuchsia_async::Timer::new(
-                        super::FILTER_CAS_RETRY_INTERVAL_MILLIS.millis().after_now(),
+                        crate::filter::FILTER_CAS_RETRY_INTERVAL_MILLIS.millis().after_now(),
                     )
                     .await;
                 }
@@ -390,8 +391,6 @@ pub mod test {
     use const_unwrap::const_unwrap_option;
     use test_case::test_case;
 
-    use crate::FILTER_CAS_RETRY_MAX;
-
     use super::*;
 
     impl ValidatedConfig {
@@ -563,7 +562,7 @@ pub mod test {
 
     #[test_case(
         DEFAULT_CONFIG,
-        Some(FILTER_CAS_RETRY_MAX),
+        Some(crate::filter::FILTER_CAS_RETRY_MAX),
         Ok(()),
         Err(Error::RetryExceeded),
         Ok(false);

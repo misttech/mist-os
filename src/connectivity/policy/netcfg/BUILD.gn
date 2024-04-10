@@ -75,6 +75,7 @@ rustc_library("lib") {
     "src/dhcpv6.rs",
     "src/dns.rs",
     "src/errors.rs",
+    "src/filter.rs",
     "src/interface.rs",
     "src/lib.rs",
     "src/masquerade.rs",
