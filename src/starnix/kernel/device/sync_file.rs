@@ -19,7 +19,7 @@ use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
 use starnix_lifecycle::AtomicUsizeCounter;
 use starnix_logging::{impossible_error, log_warn};
-use starnix_sync::{FileOpsCore, Locked, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, FileOpsToHandle, Locked, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     c_char, error,
@@ -115,6 +115,7 @@ impl FileOps for SyncFile {
 
     fn to_handle(
         &self,
+        _locked: &mut Locked<'_, FileOpsToHandle>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {

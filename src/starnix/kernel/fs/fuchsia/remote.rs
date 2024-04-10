@@ -26,8 +26,8 @@ use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_logging::{impossible_error, log_warn, trace_duration, CATEGORY_STARNIX_MM};
 use starnix_sync::{
-    FileOpsCore, FsNodeAllocate, Locked, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
-    Unlocked, WriteOps,
+    FileOpsCore, FileOpsToHandle, FsNodeAllocate, Locked, Mutex, RwLock, RwLockReadGuard,
+    RwLockWriteGuard, Unlocked, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
@@ -1359,6 +1359,7 @@ impl FileOps for RemoteDirectoryObject {
 
     fn to_handle(
         &self,
+        _locked: &mut Locked<'_, FileOpsToHandle>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
@@ -1452,6 +1453,7 @@ impl FileOps for RemoteFileObject {
 
     fn to_handle(
         &self,
+        _locked: &mut Locked<'_, FileOpsToHandle>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
@@ -1553,6 +1555,7 @@ impl FileOps for RemotePipeObject {
 
     fn to_handle(
         &self,
+        _locked: &mut Locked<'_, FileOpsToHandle>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
@@ -1760,7 +1763,7 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_remote_directory() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let pkg_channel: zx::Channel = directory::open_in_namespace(
             "/pkg",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -1773,12 +1776,12 @@ mod test {
         let fd = new_remote_file(&current_task, pkg_channel.into(), OpenFlags::RDWR)
             .expect("new_remote_file");
         assert!(fd.node().is_dir());
-        assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
+        assert!(fd.to_handle(&mut locked, &current_task).expect("to_handle").is_some());
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_remote_file() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let content_channel: zx::Channel =
             file::open_in_namespace("/pkg/meta/contents", fio::OpenFlags::RIGHT_READABLE)
                 .expect("failed to open /pkg/meta/contents")
@@ -1789,17 +1792,17 @@ mod test {
         let fd = new_remote_file(&current_task, content_channel.into(), OpenFlags::RDONLY)
             .expect("new_remote_file");
         assert!(!fd.node().is_dir());
-        assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
+        assert!(fd.to_handle(&mut locked, &current_task).expect("to_handle").is_some());
     }
 
     #[::fuchsia::test]
     async fn test_new_remote_vmo() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let vmo = zx::Vmo::create(*PAGE_SIZE).expect("Vmo::create");
         let fd =
             new_remote_file(&current_task, vmo.into(), OpenFlags::RDWR).expect("new_remote_file");
         assert!(!fd.node().is_dir());
-        assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
+        assert!(fd.to_handle(&mut locked, &current_task).expect("to_handle").is_some());
     }
 
     #[::fuchsia::test(threads = 2)]

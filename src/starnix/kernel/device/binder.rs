@@ -2947,8 +2947,9 @@ impl ResourceAccessor for RemoteResourceAccessor {
         _flags: FdFlags,
     ) -> Result<FdNumber, Errno> {
         profile_duration!("RemoteAddFile");
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/333539667): ResourceAllocatorAddFile before FileOpsToHandle
         let flags: fbinder::FileFlags = file.flags().into();
-        let handle = file.to_handle(current_task)?;
+        let handle = file.to_handle(&mut locked, current_task)?;
         let response = self.run_file_request(fbinder::FileRequest {
             add_requests: Some(vec![fbinder::FileHandle { file: handle, flags }]),
             ..Default::default()

@@ -21,6 +21,7 @@ lock_level!(ProcessGroupState);
 // SocketOps.read use the same level because of the circular dependencies between them.
 lock_level!(FileOpsCore);
 lock_level!(WriteOps);
+lock_level!(FileOpsToHandle);
 
 // Lock level for DeviceOps.open. Must be before FileOpsCore because of get_or_create_loop_device
 lock_level!(DeviceOpen);
@@ -36,7 +37,8 @@ impl_lock_after!(Unlocked => DiagnosticsCoreDumpList);
 impl_lock_after!(Unlocked => MmDumpable);
 
 impl_lock_after!(Unlocked => TaskRelease);
-impl_lock_after!(TaskRelease => DeviceOpen);
+impl_lock_after!(TaskRelease => FileOpsToHandle);
+impl_lock_after!(FileOpsToHandle => DeviceOpen);
 impl_lock_after!(DeviceOpen => FsNodeAllocate);
 impl_lock_after!(FsNodeAllocate => FileOpsCore);
 impl_lock_after!(FileOpsCore => WriteOps);

@@ -24,7 +24,8 @@ use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, trace_duration, track_stub, CATEGORY_STARNIX_MM};
 use starnix_sync::{
-    FileOpsCore, FsNodeAllocate, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked, WriteOps,
+    FileOpsCore, FileOpsToHandle, FsNodeAllocate, LockBefore, LockEqualOrBefore, Locked, Mutex,
+    Unlocked, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -362,11 +363,11 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// If None is returned, the file will act as if it was a fd to `/dev/null`.
     fn to_handle(
         &self,
+        locked: &mut Locked<'_, FileOpsToHandle>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): FileOpsToHandle before FileOpsCore
-        serve_file(&mut locked, current_task, file).map(|c| Some(c.0.into_handle()))
+        serve_file(locked, current_task, file).map(|c| Some(c.0.into_handle()))
     }
 
     /// Returns the associated pid_t.
@@ -1388,8 +1389,16 @@ impl FileObject {
         self.node().fallocate(locked, current_task, mode, offset, length)
     }
 
-    pub fn to_handle(&self, current_task: &CurrentTask) -> Result<Option<zx::Handle>, Errno> {
-        self.ops().to_handle(self, current_task)
+    pub fn to_handle<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<Option<zx::Handle>, Errno>
+    where
+        L: LockBefore<FileOpsToHandle>,
+    {
+        let mut locked = locked.cast_locked::<FileOpsToHandle>();
+        self.ops().to_handle(&mut locked, self, current_task)
     }
 
     pub fn as_pid(&self) -> Result<pid_t, Errno> {
