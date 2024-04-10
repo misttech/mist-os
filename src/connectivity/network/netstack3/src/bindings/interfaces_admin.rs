@@ -68,7 +68,7 @@ use crate::bindings::{
     devices::{self, EthernetInfo, StaticCommonInfo},
     netdevice_worker,
     routes::{self, admin::RouteSet},
-    util::{self, IllegalZeroValueError, IntoCore as _, IntoFidl, TryIntoCore},
+    util::{self, IllegalNonPositiveValueError, IntoCore as _, IntoFidl, TryIntoCore},
     BindingId, Ctx, DeviceIdExt as _, Netstack, StackTime,
 };
 
@@ -853,11 +853,14 @@ fn set_configuration(
                     },
                     ..Default::default()
                 }),
-                arp.map(TryIntoCore::try_into_core).transpose().map_err(
-                    |IllegalZeroValueError| {
+                arp.map(TryIntoCore::try_into_core).transpose().map_err(|e| match e {
+                    IllegalNonPositiveValueError::Zero => {
                         fnet_interfaces_admin::ControlSetConfigurationError::IllegalZeroValue
-                    },
-                )?,
+                    }
+                    IllegalNonPositiveValueError::Negative => {
+                        fnet_interfaces_admin::ControlSetConfigurationError::IllegalNegativeValue
+                    }
+                })?,
             )
         }
         None => (None, None),
@@ -901,8 +904,13 @@ fn set_configuration(
                 }),
                 nud.map(|nud| Ok(NdpConfigurationUpdate { nud: Some(nud.try_into_core()?) }))
                     .transpose()
-                    .map_err(|IllegalZeroValueError| {
-                        fnet_interfaces_admin::ControlSetConfigurationError::IllegalZeroValue
+                    .map_err(|e| match e {
+                        IllegalNonPositiveValueError::Zero => {
+                            fnet_interfaces_admin::ControlSetConfigurationError::IllegalZeroValue
+                        }
+                        IllegalNonPositiveValueError::Negative => {
+                            fnet_interfaces_admin::ControlSetConfigurationError::IllegalNegativeValue
+                        }
                     })?,
             )
         }

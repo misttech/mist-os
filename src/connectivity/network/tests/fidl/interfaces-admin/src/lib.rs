@@ -3250,6 +3250,33 @@ fn to_ip_nud_configuration<I: net_types::ip::Ip>(
     }
 }
 
+fn new_nud_config<I: net_types::ip::Ip>(
+    nud: finterfaces_admin::NudConfiguration,
+) -> finterfaces_admin::Configuration {
+    match I::VERSION {
+        net_types::ip::IpVersion::V4 => finterfaces_admin::Configuration {
+            ipv4: Some(finterfaces_admin::Ipv4Configuration {
+                arp: Some(finterfaces_admin::ArpConfiguration {
+                    nud: Some(nud),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+        net_types::ip::IpVersion::V6 => finterfaces_admin::Configuration {
+            ipv6: Some(finterfaces_admin::Ipv6Configuration {
+                ndp: Some(finterfaces_admin::NdpConfiguration {
+                    nud: Some(nud),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    }
+}
+
 #[netstack_test]
 async fn nud_max_multicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
@@ -3280,26 +3307,11 @@ async fn nud_max_multicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name
     iface.add_address_and_subnet_route(client_addr).await.expect("add address");
 
     let make_nud_config = |v: u16| {
-        let nud = Some(finterfaces_admin::NudConfiguration {
+        let nud = finterfaces_admin::NudConfiguration {
             max_multicast_solicitations: Some(v),
             ..Default::default()
-        });
-        match I::VERSION {
-            net_types::ip::IpVersion::V4 => finterfaces_admin::Configuration {
-                ipv4: Some(finterfaces_admin::Ipv4Configuration {
-                    arp: Some(finterfaces_admin::ArpConfiguration { nud, ..Default::default() }),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            net_types::ip::IpVersion::V6 => finterfaces_admin::Configuration {
-                ipv6: Some(finterfaces_admin::Ipv6Configuration {
-                    ndp: Some(finterfaces_admin::NdpConfiguration { nud, ..Default::default() }),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        }
+        };
+        new_nud_config::<I>(nud)
     };
 
     // Setting a zero value should fail.
@@ -3371,38 +3383,18 @@ async fn nud_config_not_supported_on_loopback<N: Netstack, I: net_types::ip::Ip>
         .interface_control(loopback_id.get())
         .expect("failed to get loopback interface control client proxy");
 
-    let set_config = Some(finterfaces_admin::NudConfiguration {
+    let set_config = new_nud_config::<I>(finterfaces_admin::NudConfiguration {
         max_multicast_solicitations: Some(2),
         max_unicast_solicitations: Some(3),
         ..Default::default()
     });
-    let (set_config, expect_err) = match I::VERSION {
-        net_types::ip::IpVersion::V4 => (
-            finterfaces_admin::Configuration {
-                ipv4: Some(finterfaces_admin::Ipv4Configuration {
-                    arp: Some(finterfaces_admin::ArpConfiguration {
-                        nud: set_config,
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            finterfaces_admin::ControlSetConfigurationError::ArpNotSupported,
-        ),
-        net_types::ip::IpVersion::V6 => (
-            finterfaces_admin::Configuration {
-                ipv6: Some(finterfaces_admin::Ipv6Configuration {
-                    ndp: Some(finterfaces_admin::NdpConfiguration {
-                        nud: set_config,
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            finterfaces_admin::ControlSetConfigurationError::NdpNotSupported,
-        ),
+    let expect_err = match I::VERSION {
+        net_types::ip::IpVersion::V4 => {
+            finterfaces_admin::ControlSetConfigurationError::ArpNotSupported
+        }
+        net_types::ip::IpVersion::V6 => {
+            finterfaces_admin::ControlSetConfigurationError::NdpNotSupported
+        }
     };
 
     // Can't set.
@@ -3439,26 +3431,11 @@ async fn nud_max_unicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name: 
     let iface = realm.join_network(&network, "client").await.expect("join network");
 
     let make_nud_config = |v: u16| {
-        let nud = Some(finterfaces_admin::NudConfiguration {
+        let nud = finterfaces_admin::NudConfiguration {
             max_unicast_solicitations: Some(v),
             ..Default::default()
-        });
-        match I::VERSION {
-            net_types::ip::IpVersion::V4 => finterfaces_admin::Configuration {
-                ipv4: Some(finterfaces_admin::Ipv4Configuration {
-                    arp: Some(finterfaces_admin::ArpConfiguration { nud, ..Default::default() }),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            net_types::ip::IpVersion::V6 => finterfaces_admin::Configuration {
-                ipv6: Some(finterfaces_admin::Ipv6Configuration {
-                    ndp: Some(finterfaces_admin::NdpConfiguration { nud, ..Default::default() }),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        }
+        };
+        new_nud_config::<I>(nud)
     };
 
     // Setting a zero value should fail.
@@ -3468,9 +3445,7 @@ async fn nud_max_unicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name: 
         "can't set to zero"
     );
 
-    // Set a higher value than the default and attempt a neighbor resolution
-    // that will not complete, counting the number of solicitations we see on
-    // the wire.
+    // Set a higher value than the default.
     const WANT_SOLICITS: u16 = 4;
     let config = iface
         .control()
@@ -3493,6 +3468,68 @@ async fn nud_max_unicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name: 
         to_ip_nud_configuration::<I>(config).expect("nud present")
     };
     assert_eq!(max_unicast_solicitations, Some(WANT_SOLICITS));
+}
+
+/// Test that setting/getting base reachable time works.
+///
+/// Note that this test does not assert that the time a neighbor entry spends
+/// in REACHABLE changes as a result of changing base reachable time due to
+/// timing sensitivity.
+#[netstack_test]
+async fn nud_base_reachable_time<N: Netstack, I: net_types::ip::Ip>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm::<N, _>(format!("{name}_client"))
+        .expect("create netstack realm");
+
+    let network = sandbox.create_network(name).await.expect("create network");
+    let iface = realm.join_network(&network, "client").await.expect("join network");
+
+    let make_nud_config = |v: i64| {
+        let nud = finterfaces_admin::NudConfiguration {
+            base_reachable_time: Some(v),
+            ..Default::default()
+        };
+        new_nud_config::<I>(nud)
+    };
+
+    // Setting a zero value should fail.
+    assert_matches!(
+        iface.control().set_configuration(&make_nud_config(0)).await,
+        Ok(Err(finterfaces_admin::ControlSetConfigurationError::IllegalZeroValue)),
+        "can't set to zero"
+    );
+
+    // Setting a negative value should fail.
+    assert_matches!(
+        iface.control().set_configuration(&make_nud_config(-1)).await,
+        Ok(Err(finterfaces_admin::ControlSetConfigurationError::IllegalNegativeValue)),
+        "can't set to negative value"
+    );
+
+    // Set a lower value than the default.
+    const DEFAULT_BASE_REACHABLE_TIME: zx::Duration = zx::Duration::from_seconds(30);
+    let want_base_reachable_time = DEFAULT_BASE_REACHABLE_TIME / 2;
+    let config = iface
+        .control()
+        .set_configuration(&make_nud_config(want_base_reachable_time.into_nanos()))
+        .await
+        .expect("setting configuration")
+        .expect("setting lower base reachable time");
+    let finterfaces_admin::NudConfiguration { base_reachable_time, .. } =
+        to_ip_nud_configuration::<I>(config).expect("missing nud config");
+    // Previous value is the default as defined in RFC 4861.
+    assert_eq!(base_reachable_time, Some(DEFAULT_BASE_REACHABLE_TIME.into_nanos()));
+    let finterfaces_admin::NudConfiguration { base_reachable_time, .. } = {
+        let config = iface
+            .control()
+            .get_configuration()
+            .await
+            .expect("get configuration failed")
+            .expect("get configuration error");
+        to_ip_nud_configuration::<I>(config).expect("nud present")
+    };
+    assert_eq!(base_reachable_time, Some(want_base_reachable_time.into_nanos()));
 }
 
 #[netstack_test]

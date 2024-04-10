@@ -47,6 +47,7 @@ use netstack3_core::{
     sync::{RemoveResourceResult, RemoveResourceResultWithContext},
     types::WorkQueueReport,
 };
+use packet_formats::utils::NonZeroDuration;
 use tracing::debug;
 
 use crate::bindings::{
@@ -1249,6 +1250,18 @@ impl<I: Ip> TryIntoFidlWithContext<fnet_routes_ext::InstalledRoute<I>>
 #[derive(Debug)]
 pub(crate) struct IllegalZeroValueError;
 
+#[derive(Debug)]
+pub(crate) enum IllegalNonPositiveValueError {
+    Zero,
+    Negative,
+}
+
+impl From<IllegalZeroValueError> for IllegalNonPositiveValueError {
+    fn from(_: IllegalZeroValueError) -> Self {
+        Self::Zero
+    }
+}
+
 impl TryFromFidl<u16> for NonZeroU16 {
     type Error = IllegalZeroValueError;
 
@@ -1257,13 +1270,25 @@ impl TryFromFidl<u16> for NonZeroU16 {
     }
 }
 
+impl TryFromFidl<i64> for NonZeroDuration {
+    type Error = IllegalNonPositiveValueError;
+
+    fn try_from_fidl(fidl: i64) -> Result<Self, Self::Error> {
+        NonZeroDuration::from_nanos(
+            u64::try_from(fidl).map_err(|_| IllegalNonPositiveValueError::Negative)?,
+        )
+        .ok_or(IllegalNonPositiveValueError::Zero)
+    }
+}
+
 impl TryFromFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfigUpdate {
-    type Error = IllegalZeroValueError;
+    type Error = IllegalNonPositiveValueError;
 
     fn try_from_fidl(fidl: fnet_interfaces_admin::NudConfiguration) -> Result<Self, Self::Error> {
         let fnet_interfaces_admin::NudConfiguration {
             max_multicast_solicitations,
             max_unicast_solicitations,
+            base_reachable_time,
             __source_breaking,
         } = fidl;
         Ok(NudUserConfigUpdate {
@@ -1273,6 +1298,7 @@ impl TryFromFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfigUpdat
             max_unicast_solicitations: max_unicast_solicitations
                 .map(TryIntoCore::try_into_core)
                 .transpose()?,
+            base_reachable_time: base_reachable_time.map(TryIntoCore::try_into_core).transpose()?,
             ..Default::default()
         })
     }
@@ -1280,10 +1306,22 @@ impl TryFromFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfigUpdat
 
 impl IntoFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfigUpdate {
     fn into_fidl(self) -> fnet_interfaces_admin::NudConfiguration {
-        let NudUserConfigUpdate { max_unicast_solicitations, max_multicast_solicitations } = self;
+        let NudUserConfigUpdate {
+            max_unicast_solicitations,
+            max_multicast_solicitations,
+            base_reachable_time,
+        } = self;
         fnet_interfaces_admin::NudConfiguration {
             max_multicast_solicitations: max_multicast_solicitations.map(|c| c.get()),
             max_unicast_solicitations: max_unicast_solicitations.map(|c| c.get()),
+            base_reachable_time: base_reachable_time.map(|c| {
+                // Even though `as_nanos` returns a `u128`, the value will
+                // always fit in an `i64` because it is either set via FIDL
+                // (stored as a `zx_duration_t`, i.e. `i64`) or learnt via
+                // the Reachable Time field in RA messages which is a 32-bit
+                // value in milliseconds.
+                c.get().as_nanos().try_into().unwrap()
+            }),
             __source_breaking: fidl::marker::SourceBreaking,
         }
     }
@@ -1292,10 +1330,15 @@ impl IntoFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfigUpdate {
 /// A helper function to transform a NudUserConfig to a NudUserConfigUpdate with
 /// all the fields set so we can maximize reusing FIDL conversion functions.
 fn nud_user_config_to_update(c: NudUserConfig) -> NudUserConfigUpdate {
-    let NudUserConfig { max_multicast_solicitations, max_unicast_solicitations } = c;
+    let NudUserConfig {
+        max_multicast_solicitations,
+        max_unicast_solicitations,
+        base_reachable_time,
+    } = c;
     NudUserConfigUpdate {
         max_unicast_solicitations: Some(max_unicast_solicitations),
         max_multicast_solicitations: Some(max_multicast_solicitations),
+        base_reachable_time: Some(base_reachable_time),
     }
 }
 
@@ -1306,7 +1349,7 @@ impl IntoFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfig {
 }
 
 impl TryFromFidl<fnet_interfaces_admin::ArpConfiguration> for ArpConfigurationUpdate {
-    type Error = IllegalZeroValueError;
+    type Error = IllegalNonPositiveValueError;
 
     fn try_from_fidl(fidl: fnet_interfaces_admin::ArpConfiguration) -> Result<Self, Self::Error> {
         let fnet_interfaces_admin::ArpConfiguration { nud, __source_breaking } = fidl;

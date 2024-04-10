@@ -24,6 +24,16 @@ type NudConfiguration = table {
     ///
     /// Must be nonzero.
     2: max_unicast_solicitations uint16;
+    /// A base duration for computing the random reachable time.
+    ///
+    /// Reachable time is the duration for which a neighbor is considered
+    /// reachable after a positive reachability confirmation is received.
+    /// After this time, an entry will transition from REACHABLE to STALE state.
+    ///
+    /// Referred to as "BaseReachableTime" by RFC 4861.
+    ///
+    /// Must be greater than 0.
+    3: base_reachable_time zx.Duration;
 };
 
 /// DAD (Duplicate Address Detection) configuration for an interface.
@@ -217,6 +227,9 @@ closed protocol Control {
         ///
         /// Devices without a link (notably loopback) do not support NDP.
         NDP_NOT_SUPPORTED = 9;
+        /// Indicates that a negative value was provided for a field that must be
+        /// non-negative.
+        ILLEGAL_NEGATIVE_VALUE = 10;
     };
 
     /// Gets a snapshot of the interface's configuration.

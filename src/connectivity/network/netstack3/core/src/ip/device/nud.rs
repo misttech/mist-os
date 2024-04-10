@@ -81,10 +81,10 @@ const BACKOFF_MULTIPLE: NonZeroU32 = const_unwrap::const_unwrap_option(NonZeroU3
 const MAX_PENDING_FRAMES: usize = 10;
 
 /// The time a neighbor is considered reachable after receiving a reachability
-/// confirmation, as defined in [RFC 4861 section 10].
+/// confirmation, as defined in [RFC 4861 section 6.3.2].
 ///
-/// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-const REACHABLE_TIME: NonZeroDuration =
+/// [RFC 4861 section 6.3.2]: https://tools.ietf.org/html/rfc4861#section-6.3.2
+const DEFAULT_BASE_REACHABLE_TIME: NonZeroDuration =
     const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(30));
 
 /// The time after which a neighbor in the DELAY state transitions to PROBE, as
@@ -970,7 +970,12 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
             neighbor,
             link_address,
         );
-        timers.schedule_neighbor(bindings_ctx, REACHABLE_TIME, neighbor, NudEvent::ReachableTime);
+        timers.schedule_neighbor(
+            bindings_ctx,
+            core_ctx.base_reachable_time(),
+            neighbor,
+            NudEvent::ReachableTime,
+        );
     }
 
     // Enters the Stale state.
@@ -1716,6 +1721,12 @@ pub struct NudUserConfig {
     ///
     /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
     pub max_multicast_solicitations: NonZeroU16,
+    /// The base value used for computing the duration a neighbor is considered
+    /// reachable after receiving a reachability confirmation as defined in
+    /// [RFC 4861 section 6.3.2].
+    ///
+    /// [RFC 4861 section 6.3.2]: https://tools.ietf.org/html/rfc4861#section-6.3.2
+    pub base_reachable_time: NonZeroDuration,
 }
 
 impl Default for NudUserConfig {
@@ -1723,6 +1734,7 @@ impl Default for NudUserConfig {
         NudUserConfig {
             max_unicast_solicitations: DEFAULT_MAX_UNICAST_SOLICIT,
             max_multicast_solicitations: DEFAULT_MAX_MULTICAST_SOLICIT,
+            base_reachable_time: DEFAULT_BASE_REACHABLE_TIME,
         }
     }
 }
@@ -1738,6 +1750,12 @@ pub struct NudUserConfigUpdate {
     /// The maximum number of multicast solicitations as defined in [RFC 4861
     /// section 10].
     pub max_multicast_solicitations: Option<NonZeroU16>,
+    /// The base value used for computing the duration a neighbor is considered
+    /// reachable after receiving a reachability confirmation as defined in
+    /// [RFC 4861 section 6.3.2].
+    ///
+    /// [RFC 4861 section 6.3.2]: https://tools.ietf.org/html/rfc4861#section-6.3.2
+    pub base_reachable_time: Option<NonZeroDuration>,
 }
 
 impl NudUserConfigUpdate {
@@ -1747,9 +1765,11 @@ impl NudUserConfigUpdate {
                 core::mem::swap(opt, target)
             }
         }
-        let Self { max_unicast_solicitations, max_multicast_solicitations } = &mut self;
+        let Self { max_unicast_solicitations, max_multicast_solicitations, base_reachable_time } =
+            &mut self;
         swap_if_set(max_unicast_solicitations, &mut config.max_unicast_solicitations);
         swap_if_set(max_multicast_solicitations, &mut config.max_multicast_solicitations);
+        swap_if_set(base_reachable_time, &mut config.base_reachable_time);
 
         self
     }
@@ -1781,6 +1801,12 @@ pub trait NudConfigContext<I: Ip> {
         self.with_nud_user_config(|NudUserConfig { max_multicast_solicitations, .. }| {
             *max_multicast_solicitations
         })
+    }
+
+    /// Returns the base reachable time, the duration a neighbor is considered
+    /// reachable after receiving a reachability confirmation.
+    fn base_reachable_time(&mut self) -> NonZeroDuration {
+        self.with_nud_user_config(|NudUserConfig { base_reachable_time, .. }| *base_reachable_time)
     }
 }
 
@@ -2022,7 +2048,7 @@ fn handle_neighbor_timer<I, D, CC, BC>(
                     assert_eq!(event, NudEvent::ReachableTime);
                     let link_address = *link_address;
 
-                    let expiration = last_confirmed_at.add(REACHABLE_TIME.get());
+                    let expiration = last_confirmed_at.add(core_ctx.base_reachable_time().get());
                     if expiration > bindings_ctx.now() {
                         timer_heap.schedule_neighbor_at(
                             bindings_ctx,
@@ -2663,6 +2689,7 @@ mod tests {
                     nud_config: NudUserConfig {
                         max_unicast_solicitations: NonZeroU16::new(4).unwrap(),
                         max_multicast_solicitations: NonZeroU16::new(5).unwrap(),
+                        base_reachable_time: NonZeroDuration::from_secs(23).unwrap(),
                     },
                 },
                 FakeNudContext {
@@ -2851,7 +2878,11 @@ mod tests {
             NeighborState::Dynamic(DynamicNeighborState::Reachable { .. }) => {
                 core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
                     bindings_ctx,
-                    [(lookup_addr, NudEvent::ReachableTime, REACHABLE_TIME.get())],
+                    [(
+                        lookup_addr,
+                        NudEvent::ReachableTime,
+                        core_ctx.inner.base_reachable_time().get(),
+                    )],
                 );
             }
             NeighborState::Dynamic(DynamicNeighborState::Delay { .. }) => {
@@ -3478,9 +3509,10 @@ mod tests {
         // Initialize a neighbor in REACHABLE.
         init_reachable_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
 
-        // After REACHABLE_TIME, neighbor should transition to STALE.
+        // After reachable time, neighbor should transition to STALE.
         assert_eq!(
-            bindings_ctx.trigger_timers_for(REACHABLE_TIME.into(), &mut core_ctx,),
+            bindings_ctx
+                .trigger_timers_for(core_ctx.inner.base_reachable_time().into(), &mut core_ctx,),
             [NudTimerId::neighbor()]
         );
         assert_neighbor_state(
@@ -4124,7 +4156,11 @@ mod tests {
             );
             core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
                 &mut bindings_ctx,
-                [(I::LOOKUP_ADDR1, NudEvent::ReachableTime, REACHABLE_TIME.get())],
+                [(
+                    I::LOOKUP_ADDR1,
+                    NudEvent::ReachableTime,
+                    core_ctx.inner.base_reachable_time().get(),
+                )],
             );
             let last_confirmed_at = bindings_ctx.now();
             assert_neighbor_state(
@@ -4665,6 +4701,7 @@ mod tests {
         should_transition_to_reachable: bool,
     ) {
         let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let base_reachable_time = core_ctx.inner.base_reachable_time().get();
 
         let initial = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
 
@@ -4688,13 +4725,13 @@ mod tests {
         );
         core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
             &mut bindings_ctx,
-            [(I::LOOKUP_ADDR1, NudEvent::ReachableTime, REACHABLE_TIME.get())],
+            [(I::LOOKUP_ADDR1, NudEvent::ReachableTime, base_reachable_time)],
         );
 
-        // Advance the clock by less than REACHABLE_TIME and confirm reachability again.
+        // Advance the clock by less than ReachableTime and confirm reachability again.
         // The existing timer should not have been rescheduled; only the entry's
         // `last_confirmed_at` timestamp should have been updated.
-        bindings_ctx.timer_ctx_mut().instant.sleep(REACHABLE_TIME.get() / 2);
+        bindings_ctx.timer_ctx_mut().instant.sleep(base_reachable_time / 2);
         confirm_reachable(&mut core_ctx, &mut bindings_ctx, &FakeLinkDeviceId, I::LOOKUP_ADDR1);
         let now = bindings_ctx.now();
         assert_neighbor_state(
@@ -4708,13 +4745,13 @@ mod tests {
         );
         core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
             &mut bindings_ctx,
-            [(I::LOOKUP_ADDR1, NudEvent::ReachableTime, REACHABLE_TIME.get() / 2)],
+            [(I::LOOKUP_ADDR1, NudEvent::ReachableTime, base_reachable_time / 2)],
         );
 
         // When the original timer eventually does expire, a new timer should be
         // scheduled based on when the entry was last confirmed.
         assert_eq!(
-            bindings_ctx.trigger_timers_for(REACHABLE_TIME.get() / 2, &mut core_ctx,),
+            bindings_ctx.trigger_timers_for(base_reachable_time / 2, &mut core_ctx,),
             [NudTimerId::neighbor()]
         );
         let now = bindings_ctx.now();
@@ -4723,20 +4760,20 @@ mod tests {
             &mut bindings_ctx,
             DynamicNeighborState::Reachable(Reachable {
                 link_address: LINK_ADDR1,
-                last_confirmed_at: now - REACHABLE_TIME.get() / 2,
+                last_confirmed_at: now - base_reachable_time / 2,
             }),
             None,
         );
 
         core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
             &mut bindings_ctx,
-            [(I::LOOKUP_ADDR1, NudEvent::ReachableTime, REACHABLE_TIME.get() / 2)],
+            [(I::LOOKUP_ADDR1, NudEvent::ReachableTime, base_reachable_time / 2)],
         );
 
         // When *that* timer fires, if the entry has not been confirmed since it was
         // scheduled, it should move into STALE.
         assert_eq!(
-            bindings_ctx.trigger_timers_for(REACHABLE_TIME.get() / 2, &mut core_ctx,),
+            bindings_ctx.trigger_timers_for(base_reachable_time / 2, &mut core_ctx,),
             [NudTimerId::neighbor()]
         );
         assert_neighbor_state(

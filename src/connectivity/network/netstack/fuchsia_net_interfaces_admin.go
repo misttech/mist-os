@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"syscall/zx"
 	"syscall/zx/fidl"
+	"time"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link/netdevice"
@@ -581,6 +582,7 @@ func toAdminNudConfiguration(stackNud stack.NUDConfigurations) admin.NudConfigur
 	var adminNud admin.NudConfiguration
 	adminNud.SetMaxMulticastSolicitations(uint16(stackNud.MaxMulticastProbes))
 	adminNud.SetMaxUnicastSolicitations(uint16(stackNud.MaxUnicastProbes))
+	adminNud.SetBaseReachableTime(stackNud.BaseReachableTime.Nanoseconds())
 	return adminNud
 }
 
@@ -610,6 +612,12 @@ func (ci *adminControlImpl) applyNUDConfig(netProto tcpip.NetworkProtocolNumber,
 		prev := stackNudConfig.MaxUnicastProbes
 		stackNudConfig.MaxUnicastProbes = uint32(nudConfig.MaxUnicastSolicitations)
 		previousNudConfig.SetMaxUnicastSolicitations(uint16(prev))
+		needsNudUpdate = true
+	}
+	if nudConfig.HasBaseReachableTime() {
+		prev := stackNudConfig.BaseReachableTime
+		stackNudConfig.BaseReachableTime = time.Duration(nudConfig.BaseReachableTime)
+		previousNudConfig.SetBaseReachableTime(prev.Nanoseconds())
 		needsNudUpdate = true
 	}
 
@@ -689,6 +697,14 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 				if config.Ipv4.Arp.Nud.HasMaxUnicastSolicitations() && config.Ipv4.Arp.Nud.MaxUnicastSolicitations == 0 {
 					return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIllegalZeroValue), nil
 				}
+				if config.Ipv4.Arp.Nud.HasBaseReachableTime() {
+					if config.Ipv4.Arp.Nud.BaseReachableTime < 0 {
+						return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIllegalNegativeValue), nil
+					} else if config.Ipv4.Arp.Nud.BaseReachableTime == 0 {
+						return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIllegalZeroValue), nil
+					}
+
+				}
 			}
 		}
 	}
@@ -725,6 +741,14 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 				}
 				if config.Ipv6.Ndp.Nud.HasMaxUnicastSolicitations() && config.Ipv6.Ndp.Nud.MaxUnicastSolicitations == 0 {
 					return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIllegalZeroValue), nil
+				}
+				if config.Ipv6.Ndp.Nud.HasBaseReachableTime() {
+					if config.Ipv6.Ndp.Nud.BaseReachableTime < 0 {
+						return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIllegalNegativeValue), nil
+					} else if config.Ipv6.Ndp.Nud.BaseReachableTime == 0 {
+						return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIllegalZeroValue), nil
+					}
+
 				}
 			}
 		}
