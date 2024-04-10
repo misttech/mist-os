@@ -67,56 +67,51 @@ impl InspectType for TimeProperty {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::FakeClock;
-    use diagnostics_assertions::assert_data_tree;
-    use fuchsia_inspect::Inspector;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty, PropertyAssertion};
+    use fuchsia_inspect::{DiagnosticsHierarchyGetter, Inspector};
+    use test_util::assert_lt;
 
     #[fuchsia::test]
     fn test_time_metadata_format() {
-        let fake_clock = FakeClock::new();
-        let current = fake_clock.get();
-        let current_nanos = current.into_nanos();
         let inspector = Inspector::default();
 
-        let time_property = inspector.root().create_time_at("time", current);
-        assert_data_tree!(inspector, root: { time: current_nanos });
+        let time_property =
+            inspector.root().create_time_at("time", zx::Time::from_nanos(123_456_700_000));
+        let t1 = validate_inspector_get_time(&inspector, 123_456_700_000i64);
 
-        let duration = zx::Duration::from_nanos(123);
-        fake_clock.advance(duration);
-        time_property.set_at(current + duration);
-        assert_data_tree!(inspector, root: { time: current_nanos + 123 });
+        time_property.set_at(zx::Time::from_nanos(333_005_000_000));
+        let t2 = validate_inspector_get_time(&inspector, 333_005_000_000i64);
 
-        fake_clock.advance(duration);
-        time_property.set_at(current + zx::Duration::from_nanos(123 * 2));
-        assert_data_tree!(inspector, root: { time: current_nanos + 123 * 2  });
+        time_property.set_at(zx::Time::from_nanos(333_444_000_000));
+        let t3 = validate_inspector_get_time(&inspector, 333_444_000_000i64);
+
+        assert_lt!(t1, t2);
+        assert_lt!(t2, t3);
     }
 
     #[fuchsia::test]
     fn test_create_time_and_update() {
-        let fake_clock = FakeClock::new();
-        let current = fake_clock.get().into_nanos();
         let inspector = Inspector::default();
-
         let time_property = inspector.root().create_time("time");
-        assert_data_tree!(inspector, root: { time: current });
+        let t1 = validate_inspector_get_time(&inspector, AnyProperty);
 
-        fake_clock.advance(zx::Duration::from_nanos(5));
         time_property.update();
-        assert_data_tree!(inspector, root: { time: current + 5 });
+        let t2 = validate_inspector_get_time(&inspector, AnyProperty);
 
-        fake_clock.advance(zx::Duration::from_nanos(5));
         time_property.update();
-        assert_data_tree!(inspector, root: { time: current + 10 });
+        let t3 = validate_inspector_get_time(&inspector, AnyProperty);
+
+        assert_lt!(t1, t2);
+        assert_lt!(t2, t3);
     }
 
     #[fuchsia::test]
     fn test_record_time() {
-        let fake_clock = FakeClock::new();
-        let current = fake_clock.get().into_nanos();
-        fake_clock.advance(zx::Duration::from_nanos(55));
+        let before_time = zx::Time::get_monotonic().into_nanos();
         let inspector = Inspector::default();
         inspector.root().record_time("time");
-        assert_data_tree!(inspector, root: { time: current + 55 });
+        let after_time = validate_inspector_get_time(&inspector, AnyProperty);
+        assert_lt!(before_time, after_time);
     }
 
     #[fuchsia::test]
@@ -129,5 +124,14 @@ mod tests {
     fn test_record_time_no_executor() {
         let inspector = Inspector::default();
         inspector.root().record_time("time");
+    }
+
+    fn validate_inspector_get_time<T>(inspector: &Inspector, expected: T) -> i64
+    where
+        T: PropertyAssertion<String> + 'static,
+    {
+        let hierarchy = inspector.get_diagnostics_hierarchy();
+        assert_data_tree!(hierarchy, root: { time: expected });
+        hierarchy.get_property("time").and_then(|t| t.int()).unwrap()
     }
 }

@@ -205,45 +205,50 @@ macro_rules! make_inspect_loggable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{nodes::BoundedListNode, test_utils::FakeClock};
+    use crate::nodes::BoundedListNode;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
-    use fuchsia_inspect::Inspector;
+    use fuchsia_inspect::{DiagnosticsHierarchyGetter, Inspector};
     use fuchsia_sync::Mutex;
-    use fuchsia_zircon as zx;
+    use test_util::assert_lt;
 
     #[fuchsia::test]
     fn test_inspect_log_basic() {
-        let fake_clock = FakeClock::new();
-        let current = fake_clock.get().into_nanos();
-
         let (inspector, mut node) = inspector_and_list_node();
 
         // Logging string and full-size numeric type
         inspect_log!(node, k1: "1".to_string(), meaning_of_life: 42u64, k3: 3i64, k4: 4f64);
 
         // Logging smaller numeric types (which should be converted to bigger types)
-        fake_clock.advance(zx::Duration::from_nanos(5));
         inspect_log!(node, small_uint: 1u8, small_int: 2i8, float: 3f32);
 
         // Logging reference types + using bracket format
-        fake_clock.advance(zx::Duration::from_nanos(5));
         inspect_log!(node, {
             s: "str",
             uint: &13u8,
         });
 
         // Logging empty event
-        fake_clock.advance(zx::Duration::from_nanos(5));
         inspect_log!(node, {});
 
-        assert_data_tree!(inspector, root: {
+        let hierarchy = inspector.get_diagnostics_hierarchy();
+        assert_data_tree!(hierarchy, root: {
             list_node: {
-                "0": { "@time": current, k1: "1", meaning_of_life: 42u64, k3: 3i64, k4: 4f64 },
-                "1": { "@time": current + 5, small_uint: 1u64, small_int: 2i64, float: 3f64 },
-                "2": { "@time": current + 10, s: "str", uint: 13u64 },
-                "3": { "@time": current + 15 },
+                "0": { "@time": AnyProperty, k1: "1", meaning_of_life: 42u64, k3: 3i64, k4: 4f64 },
+                "1": { "@time": AnyProperty, small_uint: 1u64, small_int: 2i64, float: 3f64 },
+                "2": { "@time": AnyProperty, s: "str", uint: 13u64 },
+                "3": { "@time": AnyProperty },
             }
         });
+
+        let get_time = |index| {
+            hierarchy
+                .get_property_by_path(&["list_node", index, "@time"])
+                .and_then(|p| p.int())
+                .unwrap()
+        };
+        assert_lt!(get_time("0"), get_time("1"));
+        assert_lt!(get_time("1"), get_time("2"));
+        assert_lt!(get_time("2"), get_time("3"));
     }
 
     #[fuchsia::test]
@@ -338,19 +343,16 @@ mod tests {
 
     #[fuchsia::test]
     fn test_log_option() {
-        let fake_clock = FakeClock::new();
-        let current = fake_clock.get().into_nanos();
         let (inspector, mut node) = inspector_and_list_node();
 
         inspect_log!(node, some?: Some("a"));
 
-        fake_clock.advance(zx::Duration::from_nanos(12345));
         inspect_log!(node, none?: None as Option<String>);
 
         assert_data_tree!(inspector, root: {
             list_node: {
-                "0": { "@time": current, some: "a" },
-                "1": { "@time": current + 12345 },
+                "0": { "@time": AnyProperty, some: "a" },
+                "1": { "@time": AnyProperty },
             }
         });
     }

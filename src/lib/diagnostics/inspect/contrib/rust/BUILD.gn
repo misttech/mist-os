@@ -27,12 +27,10 @@ rustc_library("fuchsia-inspect-contrib") {
 
   test_deps = [
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
-    "//src/lib/fake-clock/fidl:fidl_rust",
-    "//src/lib/fake-clock/lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-component",
+    "//src/lib/test_util",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:pin-utils",
   ]
@@ -51,22 +49,17 @@ rustc_library("fuchsia-inspect-contrib") {
     "src/nodes/list.rs",
     "src/nodes/mod.rs",
     "src/self_profile.rs",
-    "src/test_utils.rs",
   ]
 }
 
 fuchsia_unittest_package("fuchsia-inspect-contrib-tests") {
   deps = [ ":fuchsia-inspect-contrib_test" ]
-  manifest = "meta/test.cml"
 
   test_specs = {
-    parallel = 1
     log_settings = {
       max_severity = "ERROR"
     }
   }
-
-  subpackages = [ "//src/lib/fake-clock/svc:pkg" ]
 }
 
 group("rust") {
