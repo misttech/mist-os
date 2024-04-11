@@ -36,8 +36,12 @@
 
 namespace media_audio {
 
+static constexpr bool kLogDeviceTestNotifyResponses = false;
+
 // Test class to verify the driver initialization/configuration sequence.
 class DeviceTestBase : public gtest::TestLoopFixture {
+  static inline const std::string_view kClassName = "DeviceTestBase";
+
  public:
   void SetUp() override {
     notify_ = std::make_shared<NotifyStub>(*this);
@@ -48,6 +52,10 @@ class DeviceTestBase : public gtest::TestLoopFixture {
  protected:
   static fuchsia_audio_device::Info GetDeviceInfo(const std::shared_ptr<Device>& device) {
     return *device->info();
+  }
+
+  static std::shared_ptr<Clock> device_clock(const std::shared_ptr<Device>& device) {
+    return device->device_clock_;
   }
 
   static bool HasError(const std::shared_ptr<Device>& device) {
@@ -63,35 +71,47 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     return (device->GetControlNotify() != nullptr);
   }
 
+  static bool HasRingBuffer(const std::shared_ptr<Device>& device, ElementId element_id) {
+    return device->ring_buffer_map_.find(element_id) != device->ring_buffer_map_.end();
+  }
+
   static bool RingBufferIsCreatingOrStopped(const std::shared_ptr<Device>& device,
                                             ElementId element_id) {
     auto match = device->ring_buffer_map_.find(element_id);
 
-    return (match != device->ring_buffer_map_.end() &&
+    return (HasRingBuffer(device, element_id) &&
             (match->second.ring_buffer_state == Device::RingBufferState::Creating ||
              match->second.ring_buffer_state == Device::RingBufferState::Stopped));
   }
   static bool RingBufferIsOperational(const std::shared_ptr<Device>& device, ElementId element_id) {
     auto match = device->ring_buffer_map_.find(element_id);
 
-    return (match != device->ring_buffer_map_.end() &&
+    return (HasRingBuffer(device, element_id) &&
             (match->second.ring_buffer_state == Device::RingBufferState::Stopped ||
              match->second.ring_buffer_state == Device::RingBufferState::Started));
   }
   static bool RingBufferIsStopped(const std::shared_ptr<Device>& device, ElementId element_id) {
     auto match = device->ring_buffer_map_.find(element_id);
 
-    return (match != device->ring_buffer_map_.end() &&
+    return (HasRingBuffer(device, element_id) &&
             match->second.ring_buffer_state == Device::RingBufferState::Stopped);
   }
   static bool RingBufferIsStarted(const std::shared_ptr<Device>& device, ElementId element_id) {
     auto match = device->ring_buffer_map_.find(element_id);
 
-    return (match != device->ring_buffer_map_.end() &&
+    return (HasRingBuffer(device, element_id) &&
             match->second.ring_buffer_state == Device::RingBufferState::Started);
   }
 
+  // Accessor for a Device private member.
+  static const std::optional<fuchsia_hardware_audio::DelayInfo>& DeviceDelayInfo(
+      const std::shared_ptr<Device>& device, ElementId element_id) {
+    return device->ring_buffer_map_.find(element_id)->second.delay_info;
+  }
+
   class NotifyStub : public std::enable_shared_from_this<NotifyStub>, public ControlNotify {
+    static inline const std::string_view kClassName = "DeviceTestBase::NotifyStub";
+
    public:
     explicit NotifyStub(DeviceTestBase& parent) : parent_(parent) {}
     virtual ~NotifyStub() = default;
@@ -106,39 +126,42 @@ class DeviceTestBase : public gtest::TestLoopFixture {
 
     // ObserverNotify
     //
-    void DeviceIsRemoved() final { FX_LOGS(INFO) << __func__; }
-    void DeviceHasError() final { FX_LOGS(INFO) << __func__; }
+    void DeviceIsRemoved() final { ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses); }
+    void DeviceHasError() final { ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses); }
     void GainStateChanged(const fuchsia_audio_device::GainState& new_gain_state) final {
+      ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses);
       gain_state_ = new_gain_state;
     }
     void PlugStateChanged(const fuchsia_audio_device::PlugState& new_plug_state,
                           zx::time plug_change_time) final {
+      ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses);
       plug_state_ = std::make_pair(new_plug_state, plug_change_time);
     }
     void TopologyChanged(TopologyId topology_id) final {
-      FX_LOGS(INFO) << __func__ << "(topology_id " << topology_id << ")";
+      ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses) << "(topology_id " << topology_id << ")";
       topology_id_ = topology_id;
     }
     void ElementStateChanged(
         ElementId element_id,
         fuchsia_hardware_audio_signalprocessing::ElementState element_state) final {
-      FX_LOGS(INFO) << __func__ << "(element_id " << element_id << ")";
+      ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses) << "(element_id " << element_id << ")";
       element_states_.insert({element_id, element_state});
     }
 
     // ControlNotify
     //
     void DeviceDroppedRingBuffer(ElementId element_id) final {
-      FX_LOGS(INFO) << __func__ << ": element_id " << element_id;
+      ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses) << "(element_id " << element_id << ")";
     }
     void DelayInfoChanged(ElementId element_id,
                           const fuchsia_audio_device::DelayInfo& new_delay_info) final {
-      FX_LOGS(INFO) << __func__ << ": element_id " << element_id;
-      delay_info_ = new_delay_info;
+      ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses) << "(element_id " << element_id << ")";
+      delay_infos_.insert_or_assign(element_id, new_delay_info);
     }
     void DaiFormatChanged(
         ElementId element_id, const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
         const std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info) final {
+      ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses) << "(element_id " << element_id << ")";
       dai_format_errors_.erase(element_id);
 
       codec_format_infos_.erase(element_id);
@@ -155,27 +178,31 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     }
     void DaiFormatNotSet(ElementId element_id, const fuchsia_hardware_audio::DaiFormat& dai_format,
                          fuchsia_audio_device::ControlSetDaiFormatError error) final {
-      FX_LOGS(INFO) << __func__ << "(id " << element_id << ", " << error << ")";
+      ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses)
+          << "(element_id " << element_id << ", " << error << ")";
       dai_format_errors_.insert_or_assign(element_id, error);
     }
 
     void CodecStarted(const zx::time& start_time) final {
-      FX_LOGS(INFO) << __func__ << "(" << start_time.get() << ")";
+      ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses) << "(" << start_time.get() << ")";
       codec_start_failed_ = false;
       codec_start_time_ = start_time;
       codec_stop_time_.reset();
     }
     void CodecNotStarted() final {
-      FX_LOGS(INFO) << __func__;
+      ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses);
       codec_start_failed_ = true;
     }
     void CodecStopped(const zx::time& stop_time) final {
-      FX_LOGS(INFO) << __func__ << "(" << stop_time.get() << ")";
+      ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses) << "(" << stop_time.get() << ")";
       codec_stop_failed_ = false;
       codec_stop_time_ = stop_time;
       codec_start_time_.reset();
     }
-    void CodecNotStopped() final { codec_stop_failed_ = true; }
+    void CodecNotStopped() final {
+      ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses);
+      codec_stop_failed_ = true;
+    }
 
     // control and access internal state, for validating that correct responses were received.
     //
@@ -207,15 +234,28 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     }
 
     const std::optional<fuchsia_audio_device::GainState>& gain_state() const { return gain_state_; }
+    std::optional<fuchsia_audio_device::GainState>& gain_state() { return gain_state_; }
+
     const std::optional<std::pair<fuchsia_audio_device::PlugState, zx::time>>& plug_state() const {
       return plug_state_;
     }
-    const std::optional<fuchsia_audio_device::DelayInfo>& delay_info() const { return delay_info_; }
-    std::optional<fuchsia_audio_device::GainState>& gain_state() { return gain_state_; }
     std::optional<std::pair<fuchsia_audio_device::PlugState, zx::time>>& plug_state() {
       return plug_state_;
     }
-    std::optional<fuchsia_audio_device::DelayInfo>& delay_info() { return delay_info_; }
+
+    std::optional<fuchsia_audio_device::DelayInfo> delay_info(
+        ElementId element_id = fuchsia_audio_device::kDefaultRingBufferElementId) const {
+      auto delay_match = delay_infos_.find(element_id);
+      if (delay_match == delay_infos_.end()) {
+        return std::nullopt;
+      }
+      return delay_match->second;
+    }
+    void clear_delay_info(
+        ElementId element_id = fuchsia_audio_device::kDefaultRingBufferElementId) {
+      delay_infos_.erase(element_id);
+    }
+    void clear_delay_infos() { delay_infos_.clear(); }
 
     std::optional<fuchsia_hardware_audio::DaiFormat> dai_format(
         ElementId element_id = fuchsia_audio_device::kDefaultDaiInterconnectElementId) {
@@ -258,7 +298,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     [[maybe_unused]] DeviceTestBase& parent_;
     std::optional<fuchsia_audio_device::GainState> gain_state_;
     std::optional<std::pair<fuchsia_audio_device::PlugState, zx::time>> plug_state_;
-    std::optional<fuchsia_audio_device::DelayInfo> delay_info_;
+    std::unordered_map<ElementId, fuchsia_audio_device::DelayInfo> delay_infos_;
 
     std::unordered_map<ElementId, std::optional<fuchsia_hardware_audio::DaiFormat>> dai_formats_;
     std::unordered_map<ElementId, fuchsia_audio_device::ControlSetDaiFormatError>
@@ -340,11 +380,11 @@ class DeviceTestBase : public gtest::TestLoopFixture {
 
 class CodecTest : public DeviceTestBase {
  protected:
-  std::unique_ptr<FakeCodec> MakeFakeCodecInput() { return MakeFakeCodec(true); }
-  std::unique_ptr<FakeCodec> MakeFakeCodecOutput() { return MakeFakeCodec(false); }
-  std::unique_ptr<FakeCodec> MakeFakeCodecNoDirection() { return MakeFakeCodec(std::nullopt); }
+  std::shared_ptr<FakeCodec> MakeFakeCodecInput() { return MakeFakeCodec(true); }
+  std::shared_ptr<FakeCodec> MakeFakeCodecOutput() { return MakeFakeCodec(false); }
+  std::shared_ptr<FakeCodec> MakeFakeCodecNoDirection() { return MakeFakeCodec(std::nullopt); }
 
-  std::shared_ptr<Device> InitializeDeviceForFakeCodec(const std::unique_ptr<FakeCodec>& driver) {
+  std::shared_ptr<Device> InitializeDeviceForFakeCodec(const std::shared_ptr<FakeCodec>& driver) {
     auto codec_client_end = driver->Enable();
     EXPECT_TRUE(codec_client_end.is_valid());
     auto device =
@@ -359,10 +399,10 @@ class CodecTest : public DeviceTestBase {
   }
 
  private:
-  std::unique_ptr<FakeCodec> MakeFakeCodec(std::optional<bool> is_input = false) {
+  std::shared_ptr<FakeCodec> MakeFakeCodec(std::optional<bool> is_input = false) {
     auto codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
     EXPECT_TRUE(codec_endpoints.is_ok());
-    auto fake_codec = std::make_unique<FakeCodec>(
+    auto fake_codec = std::make_shared<FakeCodec>(
         codec_endpoints->server.TakeChannel(), codec_endpoints->client.TakeChannel(), dispatcher());
     fake_codec->set_is_input(is_input);
     return fake_codec;
@@ -379,17 +419,17 @@ class CompositeTest : public DeviceTestBase {
     return device->element_driver_ring_buffer_format_sets_;
   }
 
-  std::unique_ptr<FakeComposite> MakeFakeComposite() {
+  std::shared_ptr<FakeComposite> MakeFakeComposite() {
     auto composite_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Composite>();
     EXPECT_TRUE(composite_endpoints.is_ok());
     auto fake_composite =
-        std::make_unique<FakeComposite>(composite_endpoints->server.TakeChannel(),
+        std::make_shared<FakeComposite>(composite_endpoints->server.TakeChannel(),
                                         composite_endpoints->client.TakeChannel(), dispatcher());
     return fake_composite;
   }
 
   std::shared_ptr<Device> InitializeDeviceForFakeComposite(
-      const std::unique_ptr<FakeComposite>& driver) {
+      const std::shared_ptr<FakeComposite>& driver) {
     auto composite_client_end = driver->Enable();
     EXPECT_TRUE(composite_client_end.is_valid());
     auto device = Device::Create(
@@ -410,15 +450,15 @@ class CompositeTest : public DeviceTestBase {
                               const fuchsia_hardware_audio::DaiFormat& dai_format) {
     auto format_match = notify()->dai_formats().find(dai_element_id);
     if (format_match == notify()->dai_formats().end()) {
-      FX_LOGS(WARNING) << "Dai element " << dai_element_id << " not found";
+      ADR_WARN_METHOD() << "Dai element " << dai_element_id << " not found";
       return false;
     }
     if (!format_match->second.has_value()) {
-      FX_LOGS(WARNING) << "Dai format not set for element " << dai_element_id;
+      ADR_WARN_METHOD() << "Dai format not set for element " << dai_element_id;
       return false;
     }
     if (*format_match->second != dai_format) {
-      FX_LOGS(WARNING) << "Dai format for element " << dai_element_id << " is not the expected";
+      ADR_WARN_METHOD() << "Dai format for element " << dai_element_id << " is not the expected";
       return false;
     }
     return true;
@@ -428,13 +468,13 @@ class CompositeTest : public DeviceTestBase {
                             fuchsia_audio_device::ControlSetDaiFormatError expected_error) {
     auto error_match = notify()->dai_format_errors().find(element_id);
     if (error_match == notify()->dai_format_errors().end()) {
-      FX_LOGS(WARNING) << "No dai format errors for element " << element_id;
+      ADR_WARN_METHOD() << "No dai format errors for element " << element_id;
       return false;
     }
 
     if (error_match->second != expected_error) {
-      FX_LOGS(WARNING) << "For element " << element_id << ", expected error " << expected_error
-                       << " but instead received " << error_match->second;
+      ADR_WARN_METHOD() << "For element " << element_id << ", expected error " << expected_error
+                        << " but instead received " << error_match->second;
       return false;
     }
     return true;
@@ -453,15 +493,15 @@ class StreamConfigTest : public DeviceTestBase {
       }},
   }};
 
-  std::unique_ptr<FakeStreamConfig> MakeFakeStreamConfigInput() {
+  std::shared_ptr<FakeStreamConfig> MakeFakeStreamConfigInput() {
     return MakeFakeStreamConfig(true);
   }
-  std::unique_ptr<FakeStreamConfig> MakeFakeStreamConfigOutput() {
+  std::shared_ptr<FakeStreamConfig> MakeFakeStreamConfigOutput() {
     return MakeFakeStreamConfig(false);
   }
 
   std::shared_ptr<Device> InitializeDeviceForFakeStreamConfig(
-      const std::unique_ptr<FakeStreamConfig>& driver) {
+      const std::shared_ptr<FakeStreamConfig>& driver) {
     auto device_type = *driver->is_input() ? fuchsia_audio_device::DeviceType::kInput
                                            : fuchsia_audio_device::DeviceType::kOutput;
     auto stream_config_client_end = driver->Enable();
@@ -532,12 +572,6 @@ class StreamConfigTest : public DeviceTestBase {
         external_delay.value_or(0));
   }
 
-  // Accessor for a Device private member.
-  static const std::optional<fuchsia_hardware_audio::DelayInfo>& DeviceDelayInfo(
-      const std::shared_ptr<Device>& device, ElementId element_id) {
-    return device->ring_buffer_map_.find(element_id)->second.delay_info;
-  }
-
   void GetDriverVmoAndExpectValid(const std::shared_ptr<Device>& device, ElementId element_id) {
     ASSERT_TRUE(RingBufferIsCreatingOrStopped(device, element_id));
 
@@ -553,15 +587,19 @@ class StreamConfigTest : public DeviceTestBase {
     ASSERT_TRUE(RingBufferIsCreatingOrStopped(device, element_id));
     const auto now = zx::clock::get_monotonic();
     auto& ring_buffer = device->ring_buffer_map_.find(element_id)->second;
+    bool callback_received = false;
 
-    device->SetActiveChannels(element_id, expected_bitmask,
-                              [&ring_buffer](zx::result<zx::time> result) {
-                                EXPECT_TRUE(result.is_ok()) << result.status_string();
-                                ASSERT_TRUE(ring_buffer.active_channels_set_time);
-                                EXPECT_EQ(result.value(), *ring_buffer.active_channels_set_time);
-                              });
+    auto succeeded = device->SetActiveChannels(
+        element_id, expected_bitmask,
+        [&ring_buffer, &callback_received](zx::result<zx::time> result) {
+          EXPECT_TRUE(result.is_ok()) << result.status_string();
+          ASSERT_TRUE(ring_buffer.active_channels_set_time);
+          EXPECT_EQ(result.value(), *ring_buffer.active_channels_set_time);
+          callback_received = true;
+        });
 
     RunLoopUntilIdle();
+    ASSERT_TRUE(succeeded);
     ASSERT_TRUE(ring_buffer.active_channels_set_time);
     EXPECT_GT(*ring_buffer.active_channels_set_time, now);
     ExpectActiveChannels(device, element_id, expected_bitmask);
@@ -608,15 +646,11 @@ class StreamConfigTest : public DeviceTestBase {
     EXPECT_TRUE(RingBufferIsStopped(device, element_id));
   }
 
-  static std::shared_ptr<Clock> device_clock(const std::shared_ptr<Device>& device) {
-    return device->device_clock_;
-  }
-
  private:
-  std::unique_ptr<FakeStreamConfig> MakeFakeStreamConfig(bool is_input = false) {
+  std::shared_ptr<FakeStreamConfig> MakeFakeStreamConfig(bool is_input = false) {
     auto stream_config_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::StreamConfig>();
     EXPECT_TRUE(stream_config_endpoints.is_ok());
-    auto fake_stream = std::make_unique<FakeStreamConfig>(
+    auto fake_stream = std::make_shared<FakeStreamConfig>(
         stream_config_endpoints->server.TakeChannel(),
         stream_config_endpoints->client.TakeChannel(), dispatcher());
     fake_stream->set_is_input(is_input);

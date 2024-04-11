@@ -108,8 +108,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingToken) {
 
   registry->client()
       ->CreateObserver({{
-          .observer_server =
-              fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
+          .observer_server = std::move(observer_server_end),
       }})
       .Then([&received_callback](
                 fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
@@ -138,8 +137,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadToken) {
   registry->client()
       ->CreateObserver({{
           .token_id = 0,  // no device is present yet.
-          .observer_server =
-              fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
+          .observer_server = std::move(observer_server_end),
       }})
       .Then([&received_callback](
                 fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
@@ -241,7 +239,7 @@ TEST_F(RegistryServerCodecWarningTest, CreateObserverBadObserver) {
   registry->client()
       ->CreateObserver({{
           .token_id = *added_id,
-          .observer_server = fidl::ServerEnd<fuchsia_audio_device::Observer>(zx::channel()),
+          .observer_server = fidl::ServerEnd<fuchsia_audio_device::Observer>(),
       }})
       .Then([&received_callback](
                 fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
@@ -345,7 +343,7 @@ TEST_F(RegistryServerStreamConfigWarningTest, CreateObserverBadObserver) {
   registry->client()
       ->CreateObserver({{
           .token_id = *added_id,
-          .observer_server = fidl::ServerEnd<fuchsia_audio_device::Observer>(zx::channel()),
+          .observer_server = fidl::ServerEnd<fuchsia_audio_device::Observer>(),
       }})
       .Then([&received_callback](
                 fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {

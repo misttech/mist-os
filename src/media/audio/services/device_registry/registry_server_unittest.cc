@@ -385,8 +385,7 @@ TEST_F(RegistryServerCodecTest, CreateObserver) {
   registry->client()
       ->CreateObserver({{
           .token_id = *added_id,
-          .observer_server =
-              fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
+          .observer_server = std::move(observer_server_end),
       }})
       .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
         received_callback = true;
@@ -738,8 +737,7 @@ TEST_F(RegistryServerStreamConfigTest, CreateObserver) {
   registry->client()
       ->CreateObserver({{
           .token_id = *added_id,
-          .observer_server =
-              fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
+          .observer_server = std::move(observer_server_end),
       }})
       .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
         received_callback = true;

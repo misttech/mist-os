@@ -679,6 +679,20 @@ TEST_F(CompositeWarningTest, CreateRingBufferUnsupportedFormat) {
 
 // CreateRingBufferSizeTooLarge test?
 
+// TODO: negative RingBufferProperties cases?
+
+// TODO: negative GetVmo cases?
+
+// TODO: negative SetActiveChannels cases.
+
+// TODO: negative RingBuffer Start cases.
+
+// TODO: negative RingBuffer Stop  cases.
+
+// TODO: negative WatchDelayInfo cases.
+
+// TODO: negative WatchClockRecoveryPositionInfo cases?
+
 ////////////////////
 // StreamConfig tests
 //

@@ -32,12 +32,14 @@ class RingBufferServer
   // fuchsia.audio.device.RingBuffer implementation
   void SetActiveChannels(SetActiveChannelsRequest& request,
                          SetActiveChannelsCompleter::Sync& completer) override;
-
   void Start(StartRequest& request, StartCompleter::Sync& completer) override;
   void Stop(StopRequest& request, StopCompleter::Sync& completer) override;
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
 
+  // Forwarded from ControlNotify
   void DelayInfoChanged(const fuchsia_audio_device::DelayInfo& delay_info);
+
+  void MaybeCompleteWatchDelayInfo();
 
   ElementId element_id() const { return element_id_; }
 

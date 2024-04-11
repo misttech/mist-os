@@ -42,10 +42,9 @@ inline constexpr bool kLogDeviceDetection = false;
 inline constexpr bool kLogDeviceInitializationProgress = false;
 inline constexpr bool kLogAudioDeviceRegistryMethods = false;
 inline constexpr bool kLogSummaryFinalDeviceInfo = true;
-inline constexpr bool kLogDetailedFinalDeviceInfo = true;
+inline constexpr bool kLogDetailedFinalDeviceInfo = false;
 
 inline constexpr bool kLogDeviceMethods = false;
-
 inline constexpr bool kLogObjectLifetimes = false;
 inline constexpr bool kLogDeviceState = false;
 inline constexpr bool kLogObjectCounts = false;

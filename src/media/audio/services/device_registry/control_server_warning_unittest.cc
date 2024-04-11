@@ -62,8 +62,7 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
     control_creator_client
         ->Create({{
             .token_id = token_id,
-            .control_server =
-                fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(control_server_end)),
+            .control_server = std::move(control_server_end),
         }})
         .Then([&received_callback](
                   fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) {
@@ -87,7 +86,7 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
 
 class ControlServerCodecWarningTest : public ControlServerWarningTest {
  protected:
-  std::unique_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
+  std::shared_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeCodecInput();
 
     adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
@@ -100,7 +99,7 @@ class ControlServerCodecWarningTest : public ControlServerWarningTest {
 
 class ControlServerCompositeWarningTest : public ControlServerWarningTest {
  protected:
-  std::unique_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
+  std::shared_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeComposite();
 
     adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test composite name",
@@ -136,7 +135,7 @@ class ControlServerCompositeWarningTest : public ControlServerWarningTest {
           ->CreateRingBuffer({{
               ring_buffer_element_id,
               bad_options,
-              fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
+              std::move(ring_buffer_server_end),
           }})
           .Then([&received_callback,
                  expected_error](fidl::Result<Control::CreateRingBuffer>& result) {
@@ -155,7 +154,7 @@ class ControlServerCompositeWarningTest : public ControlServerWarningTest {
 
 class ControlServerStreamConfigWarningTest : public ControlServerWarningTest {
  protected:
-  std::unique_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
+  std::shared_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeStreamConfigOutput();
 
     adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
@@ -232,8 +231,7 @@ class ControlServerStreamConfigWarningTest : public ControlServerWarningTest {
     control_client
         ->CreateRingBuffer({{
             .options = bad_options,
-            .ring_buffer_server = fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(
-                std::move(ring_buffer_server_end)),
+            .ring_buffer_server = std::move(ring_buffer_server_end),
         }})
         .Then([&received_callback,
                expected_error](fidl::Result<Control::CreateRingBuffer>& result) {
@@ -665,8 +663,7 @@ TEST_F(ControlServerCodecWarningTest, CreateRingBufferWrongDeviceType) {
               }},
               .ring_buffer_min_bytes = 2000,
           }},
-          .ring_buffer_server =
-              fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
+          .ring_buffer_server = std::move(ring_buffer_server_end),
       }})
       .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
         received_callback = true;
@@ -779,7 +776,6 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatInvalidFormat) {
 }
 
 // SetDaiFormat unsupported
-// TODO: enable
 TEST_F(ControlServerCompositeWarningTest, SetDaiFormatUnsupportedFormat) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -1011,7 +1007,7 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferWrongElementType) {
                 }},
                 .ring_buffer_min_bytes = 2000,
             }},
-            fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
+            std::move(ring_buffer_server_end),
         }})
         .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
           received_callback = true;
@@ -1178,7 +1174,7 @@ TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferWhilePending)
         ->CreateRingBuffer({{
             ring_buffer_element_id,
             options,
-            fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end1)),
+            std::move(ring_buffer_server_end1),
         }})
         .Then([&received_callback_1](fidl::Result<Control::CreateRingBuffer>& result) {
           ASSERT_TRUE(result.is_ok()) << result.error_value();
@@ -1188,7 +1184,7 @@ TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferWhilePending)
         ->CreateRingBuffer({{
             ring_buffer_element_id,
             options,
-            fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end2)),
+            std::move(ring_buffer_server_end2),
         }})
         .Then([&received_callback_2](fidl::Result<Control::CreateRingBuffer>& result) {
           ASSERT_TRUE(result.is_error());
@@ -1233,7 +1229,7 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferUnknownElementId) {
       ->CreateRingBuffer({{
           unknown_element_id,
           options,
-          fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
+          std::move(ring_buffer_server_end),
       }})
       .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
         received_callback = true;
@@ -1319,7 +1315,7 @@ TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferBadRingBuffer
                 }},
                 .ring_buffer_min_bytes = 8192,
             }},
-            .ring_buffer_server = fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(),  // bad value
+            .ring_buffer_server = {},  // bad value
         }})
         .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
           ASSERT_TRUE(result.is_error());
@@ -1540,8 +1536,7 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferWhilePending) {
   control_client
       ->CreateRingBuffer({{
           .options = options,
-          .ring_buffer_server =
-              fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end1)),
+          .ring_buffer_server = std::move(ring_buffer_server_end1),
       }})
       .Then([&received_callback_1](fidl::Result<Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
@@ -1550,8 +1545,7 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferWhilePending) {
   control_client
       ->CreateRingBuffer({{
           .options = options,
-          .ring_buffer_server =
-              fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end2)),
+          .ring_buffer_server = std::move(ring_buffer_server_end2),
       }})
       .Then([&received_callback_2](fidl::Result<Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_error());
@@ -1613,8 +1607,7 @@ TEST_F(ControlServerStreamConfigWarningTest, DISABLED_CreateRingBufferHugeRingBu
               }},
               .ring_buffer_min_bytes = -1u,
           }},
-          .ring_buffer_server =
-              fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
+          .ring_buffer_server = std::move(ring_buffer_server_end),
       }})
       .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
         if (result.is_ok()) {

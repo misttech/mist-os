@@ -69,8 +69,7 @@ class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
     registry_client
         ->CreateObserver({{
             .token_id = token_id,
-            .observer_server =
-                fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
+            .observer_server = std::move(observer_server_end),
         }})
         .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
           received_callback = true;
@@ -96,11 +95,11 @@ class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
 
 class ObserverServerCodecTest : public ObserverServerTest {
  protected:
-  std::unique_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
+  std::shared_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
     EXPECT_EQ(dispatcher(), test_loop().dispatcher());
     auto codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
     EXPECT_TRUE(codec_endpoints.is_ok());
-    auto fake_driver = std::make_unique<FakeCodec>(
+    auto fake_driver = std::make_shared<FakeCodec>(
         codec_endpoints->server.TakeChannel(), codec_endpoints->client.TakeChannel(), dispatcher());
 
     adr_service_->AddDevice(Device::Create(
@@ -114,7 +113,7 @@ class ObserverServerCodecTest : public ObserverServerTest {
 
 class ObserverServerCompositeTest : public ObserverServerTest {
  protected:
-  std::unique_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
+  std::shared_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeComposite();
 
     adr_service_->AddDevice(Device::Create(
@@ -135,7 +134,7 @@ class ObserverServerStreamConfigTest : public ObserverServerTest {
       .frames_per_second = 48000,
   }};
 
-  std::unique_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
+  std::shared_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeStreamConfigOutput();
 
     adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
@@ -199,8 +198,7 @@ TEST_F(ObserverServerCodecTest, Creation) {
   registry->client()
       ->CreateObserver({{
           .token_id = *added_device_id,
-          .observer_server =
-              fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
+          .observer_server = std::move(observer_server_end),
       }})
       .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
         received_callback = true;
@@ -421,8 +419,7 @@ TEST_F(ObserverServerCompositeTest, Creation) {
   registry->client()
       ->CreateObserver({{
           .token_id = *added_device_id,
-          .observer_server =
-              fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
+          .observer_server = std::move(observer_server_end),
       }})
       .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
         received_callback = true;
@@ -512,7 +509,7 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfDriverRingBufferDrops) 
       ->CreateRingBuffer({{
           ring_buffer_element_id,
           fuchsia_audio_device::RingBufferOptions{{format, 2000}},
-          fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
+          std::move(ring_buffer_server_end),
       }})
       .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
         received_callback = true;
@@ -554,7 +551,7 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientRingBufferDrops) 
         ->CreateRingBuffer({{
             ring_buffer_element_id,
             fuchsia_audio_device::RingBufferOptions{{format, 2000}},
-            fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
+            std::move(ring_buffer_server_end),
         }})
         .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
           received_callback = true;
@@ -653,8 +650,7 @@ TEST_F(ObserverServerStreamConfigTest, Creation) {
   registry->client()
       ->CreateObserver({{
           .token_id = *added_device_id,
-          .observer_server =
-              fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
+          .observer_server = std::move(observer_server_end),
       }})
       .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
         received_callback = true;
@@ -927,8 +923,7 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfDriverRingBufferDrop
       ->CreateRingBuffer(
           {{.options = fuchsia_audio_device::RingBufferOptions{{.format = kDefaultRingBufferFormat,
                                                                 .ring_buffer_min_bytes = 2000}},
-            .ring_buffer_server = fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(
-                std::move(ring_buffer_server_end))}})
+            .ring_buffer_server = std::move(ring_buffer_server_end)}})
       .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
         received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
@@ -967,8 +962,7 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientRingBufferDrop
             {{.options =
                   fuchsia_audio_device::RingBufferOptions{
                       {.format = kDefaultRingBufferFormat, .ring_buffer_min_bytes = 2000}},
-              .ring_buffer_server = fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(
-                  std::move(ring_buffer_server_end))}})
+              .ring_buffer_server = std::move(ring_buffer_server_end)}})
         .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
           received_callback = true;
           EXPECT_TRUE(result.is_ok()) << result.error_value();
@@ -1007,8 +1001,7 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientControlDrops) 
                 .format = kDefaultRingBufferFormat,
                 .ring_buffer_min_bytes = 2000,
             }},
-            .ring_buffer_server = fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(
-                std::move(ring_buffer_server_end)),
+            .ring_buffer_server = std::move(ring_buffer_server_end),
         }})
         .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
           received_callback = true;

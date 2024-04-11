@@ -44,7 +44,7 @@ TokenId NextTokenId() {
 template <>
 void Device::EndpointFidlErrorHandler<fuchsia_hardware_audio::RingBuffer>::on_fidl_error(
     fidl::UnbindInfo info) {
-  ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogDeviceState) << "(RingBuffer)";
+  ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogObjectLifetimes) << "(RingBuffer)";
   if (device()->state_ == State::Error) {
     ADR_WARN_METHOD() << "device already has an error; no device state to unwind";
   } else if (info.is_peer_closed() || info.is_user_initiated()) {
@@ -56,13 +56,14 @@ void Device::EndpointFidlErrorHandler<fuchsia_hardware_audio::RingBuffer>::on_fi
   }
   auto& ring_buffer = device()->ring_buffer_map_.find(element_id_)->second;
   ring_buffer.ring_buffer_client.reset();
+  device()->ring_buffer_map_.erase(element_id_);
 }
 
 // Invoked when a SignalProcessing channel drops. This can occur during device initialization.
 template <>
 void Device::FidlErrorHandler<fuchsia_hardware_audio_signalprocessing::SignalProcessing>::
     on_fidl_error(fidl::UnbindInfo info) {
-  ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogDeviceState) << "(SignalProcessing)";
+  ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogObjectLifetimes) << "(SignalProcessing)";
   // If a device already encountered some other error, disconnects like this are not unexpected.
   if (device_->state_ == State::Error) {
     ADR_WARN_METHOD() << "(signalprocessing) device already has error; no state to unwind";
@@ -98,7 +99,7 @@ void Device::FidlErrorHandler<T>::on_fidl_error(fidl::UnbindInfo info) {
     device_->OnError(info.status());
   } else {
     ADR_LOG_METHOD(kLogCodecFidlResponses || kLogCompositeFidlResponses ||
-                   kLogStreamConfigFidlResponses || kLogDeviceState || kLogObjectLifetimes)
+                   kLogStreamConfigFidlResponses || kLogObjectLifetimes)
         << name_ << " disconnected: " << info;
   }
   device_->OnRemoval();
@@ -1656,6 +1657,11 @@ void Device::CreateDeviceClock() {
 zx::result<zx::clock> Device::GetReadOnlyClock() const {
   ADR_LOG_METHOD(kLogDeviceMethods);
 
+  if (!device_clock_) {
+    // This device type does not expose a clock.
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
   auto dupe_clock = device_clock_->DuplicateZxClockReadOnly();
   if (!dupe_clock) {
     return zx::error(ZX_ERR_ACCESS_DENIED);
@@ -2223,8 +2229,7 @@ bool Device::CreateRingBuffer(
     return false;
   }
 
-  if ((is_stream_config() && element_id != fuchsia_audio_device::kDefaultRingBufferElementId) ||
-      (ring_buffer_endpoint_ids_.find(element_id) == ring_buffer_endpoint_ids_.end())) {
+  if (ring_buffer_endpoint_ids_.find(element_id) == ring_buffer_endpoint_ids_.end()) {
     create_ring_buffer_callback(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kInvalidElementId));
     return false;
@@ -2345,7 +2350,7 @@ fuchsia_audio_device::ControlCreateRingBufferError Device::ConnectRingBufferFidl
 
   ring_buffer_map_.insert_or_assign(element_id, std::move(ring_buffer_record));
 
-  SetActiveChannels(element_id, active_channels_bitmask, [this](zx::result<zx::time> result) {
+  (void)SetActiveChannels(element_id, active_channels_bitmask, [this](zx::result<zx::time> result) {
     if (result.is_ok()) {
       ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/SetActiveChannels IS supported";
       return;
@@ -2523,7 +2528,9 @@ void Device::CheckForRingBufferReady(ElementId element_id) {
   ring_buffer.create_ring_buffer_callback = nullptr;
 }
 
-void Device::SetActiveChannels(
+// Returns TRUE if it actually calls out to the driver. It avoid doing so if it already knows
+// that this RingBuffer does not support SetActiveChannels.
+bool Device::SetActiveChannels(
     ElementId element_id, uint64_t channel_bitmask,
     fit::callback<void(zx::result<zx::time>)> set_active_channels_callback) {
   ADR_LOG_METHOD(kLogRingBufferFidlCalls);
@@ -2532,11 +2539,9 @@ void Device::SetActiveChannels(
   FX_CHECK(ring_buffer.ring_buffer_client.has_value() &&
            ring_buffer.ring_buffer_client->is_valid());
 
-  // Split this out by element_id!
-
   // If we already know this device doesn't support SetActiveChannels, do nothing.
   if (!ring_buffer.supports_set_active_channels.value_or(true)) {
-    return;
+    return false;
   }
   (*ring_buffer.ring_buffer_client)
       ->SetActiveChannels({{.active_channels_bitmask = channel_bitmask}})
@@ -2566,6 +2571,7 @@ void Device::SetActiveChannels(
             LogActiveChannels(ring_buffer.active_channels_bitmask,
                               *ring_buffer.active_channels_set_time);
           });
+  return true;
 }
 
 void Device::StartRingBuffer(ElementId element_id,
@@ -2653,13 +2659,35 @@ void Device::CalculateRequiredRingBufferSizes(ElementId element_id) {
       media::TimelineRate{1, ring_buffer.bytes_per_frame}.Scale(
           *ring_buffer.requested_ring_buffer_bytes, media::TimelineRate::RoundingMode::Ceiling);
 
+  // Determine whether the RingBuffer client is a Producer or a Consumer.
+  // If the RingBuffer element is "outgoing" (if it is a source in Topology edges), then the client
+  // indeed _produces_ the frames that populate the RingBuffer.
+  bool element_is_outgoing = false, element_is_incoming = false;
+  if (is_composite()) {
+    FX_CHECK(current_topology_id_.has_value());
+    auto topology_match = sig_proc_topology_map_.find(*current_topology_id_);
+    FX_CHECK(topology_match != sig_proc_topology_map_.end());
+    auto& topology = sig_proc_topology_map_.find(*current_topology_id_)->second;
+    for (auto& edge : topology) {
+      if (edge.processing_element_id_from() == element_id) {
+        element_is_outgoing = true;
+      }
+      if (edge.processing_element_id_to() == element_id) {
+        element_is_incoming = true;
+      }
+    }
+    FX_CHECK(element_is_outgoing != element_is_incoming);
+  } else if (is_stream_config_output()) {
+    element_is_outgoing = true;
+  }
+
   // We don't include driver transfer size in our VMO size request (requested_ring_buffer_frames_)
   // ... but we do communicate it in our description of ring buffer producer/consumer "zones".
   uint64_t driver_bytes = *ring_buffer.ring_buffer_properties->driver_transfer_bytes() +
                           ring_buffer.bytes_per_frame - 1;
   driver_bytes -= (driver_bytes % ring_buffer.bytes_per_frame);
 
-  if (*device_info_->device_type() == fuchsia_audio_device::DeviceType::kOutput) {
+  if (element_is_outgoing) {
     ring_buffer.ring_buffer_consumer_bytes = driver_bytes;
     ring_buffer.ring_buffer_producer_bytes =
         ring_buffer.requested_ring_buffer_frames * ring_buffer.bytes_per_frame;

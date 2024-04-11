@@ -23,6 +23,7 @@
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_composite.h"
+#include "src/media/audio/services/device_registry/testing/fake_composite_ring_buffer.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 #include "src/media/audio/services/device_registry/validate.h"
 
@@ -124,6 +125,28 @@ TEST_F(CodecTest, DeviceInfo) {
   EXPECT_FALSE(info.signal_processing_topologies().has_value());
 }
 
+TEST_F(CodecTest, DistinctTokenIds) {
+  auto fake_driver = MakeFakeCodecOutput();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+
+  // Set up a second, entirely distinct fake device.
+  auto codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
+  ASSERT_TRUE(codec_endpoints.is_ok());
+
+  auto fake_driver2 = std::make_shared<FakeCodec>(
+      codec_endpoints->server.TakeChannel(), codec_endpoints->client.TakeChannel(), dispatcher());
+  fake_driver2->set_is_input(true);
+
+  auto device2 = InitializeDeviceForFakeCodec(fake_driver2);
+  EXPECT_TRUE(IsInitialized(device2));
+
+  EXPECT_NE(device->token_id(), device2->token_id());
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 2u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+}
+
 // Verify that a driver's dropping the Codec causes a DeviceIsRemoved notification.
 TEST_F(CodecTest, Disconnect) {
   auto fake_driver = MakeFakeCodecNoDirection();
@@ -159,6 +182,16 @@ TEST_F(CodecTest, EmptyHealthResponse) {
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
 
+TEST_F(CodecTest, GetClock) {
+  auto fake_driver = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+
+  auto clock = device->GetReadOnlyClock();
+  ASSERT_TRUE(clock.is_error());
+  EXPECT_EQ(clock.error_value(), ZX_ERR_NOT_SUPPORTED);
+}
+
 TEST_F(CodecTest, Observer) {
   auto fake_driver = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
@@ -186,6 +219,44 @@ TEST_F(CodecTest, InitialGainState) {
   RunLoopUntilIdle();
   EXPECT_FALSE(notify()->gain_state().has_value())
       << "ObserverNotify was notified of initial GainState";
+}
+
+// This tests the driver's ability to inform its ObserverNotify of initial plug state.
+TEST_F(CodecTest, InitialPlugState) {
+  auto fake_driver = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(AddObserver(device));
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(device_plugged_state(device));
+  ASSERT_TRUE(notify()->plug_state());
+  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify()->plug_state()->second.get(), zx::time::infinite_past().get());
+}
+
+// This tests the driver's ability to originate plug changes, such as from jack detection. It also
+// validates that plug notifications are delivered through ControlNotify (not just ObserverNotify).
+TEST_F(CodecTest, DynamicPlugUpdate) {
+  auto fake_driver = MakeFakeCodecOutput();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(SetControl(device));
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(device_plugged_state(device));
+  ASSERT_TRUE(notify()->plug_state());
+  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify()->plug_state()->second.get(), zx::time::infinite_past().get());
+  notify()->plug_state().reset();
+
+  auto unplug_time = zx::clock::get_monotonic();
+  fake_driver->InjectUnpluggedAt(unplug_time);
+  RunLoopUntilIdle();
+  EXPECT_FALSE(device_plugged_state(device));
+  ASSERT_TRUE(notify()->plug_state());
+  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kUnplugged);
+  EXPECT_EQ(notify()->plug_state()->second.get(), unplug_time.get());
 }
 
 TEST_F(CodecTest, GetDaiFormats) {
@@ -554,44 +625,6 @@ TEST_F(CodecTest, Reset) {
   // Observe the signalprocessing Topology - was it reset?
 }
 
-// This tests the driver's ability to inform its ObserverNotify of initial plug state.
-TEST_F(CodecTest, InitialPlugState) {
-  auto fake_driver = MakeFakeCodecNoDirection();
-  auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
-  ASSERT_TRUE(AddObserver(device));
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(device_plugged_state(device));
-  ASSERT_TRUE(notify()->plug_state());
-  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
-  EXPECT_EQ(notify()->plug_state()->second.get(), zx::time::infinite_past().get());
-}
-
-// This tests the driver's ability to originate plug changes, such as from jack detection. It also
-// validates that plug notifications are delivered through ControlNotify (not just ObserverNotify).
-TEST_F(CodecTest, DynamicPlugUpdate) {
-  auto fake_driver = MakeFakeCodecOutput();
-  auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
-  ASSERT_TRUE(SetControl(device));
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(device_plugged_state(device));
-  ASSERT_TRUE(notify()->plug_state());
-  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
-  EXPECT_EQ(notify()->plug_state()->second.get(), zx::time::infinite_past().get());
-  notify()->plug_state().reset();
-
-  auto unplug_time = zx::clock::get_monotonic();
-  fake_driver->InjectUnpluggedAt(unplug_time);
-  RunLoopUntilIdle();
-  EXPECT_FALSE(device_plugged_state(device));
-  ASSERT_TRUE(notify()->plug_state());
-  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kUnplugged);
-  EXPECT_EQ(notify()->plug_state()->second.get(), unplug_time.get());
-}
-
 /////////////////////
 // Composite tests
 //
@@ -740,6 +773,28 @@ TEST_F(CompositeTest, DeviceInfo) {
   EXPECT_FALSE(info.signal_processing_topologies()->empty());
 }
 
+TEST_F(CompositeTest, DistinctTokenIds) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+
+  // Set up a second, entirely distinct fake device.
+  auto composite_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Composite>();
+  ASSERT_TRUE(composite_endpoints.is_ok());
+
+  auto fake_driver2 =
+      std::make_shared<FakeComposite>(composite_endpoints->server.TakeChannel(),
+                                      composite_endpoints->client.TakeChannel(), dispatcher());
+
+  auto device2 = InitializeDeviceForFakeComposite(fake_driver2);
+  EXPECT_TRUE(IsInitialized(device2));
+
+  EXPECT_NE(device->token_id(), device2->token_id());
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 2u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+}
+
 // Verify that a driver's dropping the Composite causes a DeviceIsRemoved notification.
 TEST_F(CompositeTest, Disconnect) {
   auto fake_driver = MakeFakeComposite();
@@ -775,12 +830,59 @@ TEST_F(CompositeTest, EmptyHealthResponse) {
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
 
+TEST_F(CompositeTest, DefaultClock) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+
+  EXPECT_EQ(device_clock(device)->domain(), fuchsia_hardware_audio::kClockDomainMonotonic);
+  EXPECT_TRUE(device_clock(device)->IdenticalToMonotonicClock());
+  EXPECT_FALSE(device_clock(device)->adjustable());
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+}
+
+TEST_F(CompositeTest, ClockInOtherDomain) {
+  const uint32_t kNonMonotonicClockDomain = fuchsia_hardware_audio::kClockDomainMonotonic + 1;
+  auto fake_driver = MakeFakeComposite();
+  fake_driver->set_clock_domain(kNonMonotonicClockDomain);
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+
+  EXPECT_EQ(device_clock(device)->domain(), kNonMonotonicClockDomain);
+  EXPECT_TRUE(device_clock(device)->IdenticalToMonotonicClock());
+  EXPECT_TRUE(device_clock(device)->adjustable());
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+}
+
 TEST_F(CompositeTest, Observer) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
 
   EXPECT_TRUE(AddObserver(device));
+}
+
+// This tests the driver's ability to inform its ObserverNotify of initial signalprocessing state.
+TEST_F(CompositeTest, InitialSignalProcessingForObserver) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(AddObserver(device));
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(notify()->topology_id().has_value())
+      << "ObserverNotify was not notified of initial TopologyId";
+  EXPECT_FALSE(notify()->element_states().empty());
+
+  ASSERT_TRUE(device->info().has_value());
+  ASSERT_TRUE(device->info()->signal_processing_elements().has_value());
+  EXPECT_FALSE(device->info()->signal_processing_elements()->empty());
+  EXPECT_EQ(notify()->element_states().size(),
+            device->info()->signal_processing_elements()->size());
 }
 
 TEST_F(CompositeTest, Control) {
@@ -790,6 +892,25 @@ TEST_F(CompositeTest, Control) {
   ASSERT_TRUE(SetControl(device));
 
   EXPECT_TRUE(DropControl(device));
+}
+
+// This tests the driver's ability to inform its ControlNotify of initial signalprocessing state.
+TEST_F(CompositeTest, InitialSignalProcessingForControl) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(SetControl(device));
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(notify()->topology_id().has_value())
+      << "ObserverNotify was not notified of initial TopologyId";
+  EXPECT_FALSE(notify()->element_states().empty());
+
+  ASSERT_TRUE(device->info().has_value());
+  ASSERT_TRUE(device->info()->signal_processing_elements().has_value());
+  EXPECT_FALSE(device->info()->signal_processing_elements()->empty());
+  EXPECT_EQ(notify()->element_states().size(),
+            device->info()->signal_processing_elements()->size());
 }
 
 // This tests whether a Composite driver notifies Observers of initial gain state. (It shouldn't.)
@@ -814,44 +935,6 @@ TEST_F(CompositeTest, NoInitialPlugState) {
   RunLoopUntilIdle();
   EXPECT_FALSE(notify()->plug_state().has_value())
       << "ObserverNotify was notified of initial PlugState";
-}
-
-// This tests the driver's ability to inform its ObserverNotify of initial signalprocessing state.
-TEST_F(CompositeTest, InitialSignalProcessingForObserver) {
-  auto fake_driver = MakeFakeComposite();
-  auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
-  ASSERT_TRUE(AddObserver(device));
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(notify()->topology_id().has_value())
-      << "ObserverNotify was not notified of initial TopologyId";
-  EXPECT_FALSE(notify()->element_states().empty());
-
-  ASSERT_TRUE(device->info().has_value());
-  ASSERT_TRUE(device->info()->signal_processing_elements().has_value());
-  EXPECT_FALSE(device->info()->signal_processing_elements()->empty());
-  EXPECT_EQ(notify()->element_states().size(),
-            device->info()->signal_processing_elements()->size());
-}
-
-// This tests the driver's ability to inform its ControlNotify of initial signalprocessing state.
-TEST_F(CompositeTest, InitialSignalProcessingForControl) {
-  auto fake_driver = MakeFakeComposite();
-  auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
-  ASSERT_TRUE(SetControl(device));
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(notify()->topology_id().has_value())
-      << "ObserverNotify was not notified of initial TopologyId";
-  EXPECT_FALSE(notify()->element_states().empty());
-
-  ASSERT_TRUE(device->info().has_value());
-  ASSERT_TRUE(device->info()->signal_processing_elements().has_value());
-  EXPECT_FALSE(device->info()->signal_processing_elements()->empty());
-  EXPECT_EQ(notify()->element_states().size(),
-            device->info()->signal_processing_elements()->size());
 }
 
 // Verify setting initial DAI format, with ControlNotify receiving appropriate notification.
@@ -910,9 +993,8 @@ TEST_F(CompositeTest, SetDaiFormatNoChange) {
     auto error_match = notify()->dai_format_errors().find(dai_element_id);
     ASSERT_NE(error_match, notify()->dai_format_errors().end());
     EXPECT_EQ(error_match->second, fuchsia_audio_device::ControlSetDaiFormatError(0));
-    EXPECT_TRUE(notify()->dai_formats().empty());
-    // format_match = notify()->dai_formats().find(dai_element_id);
-    // EXPECT_EQ(format_match, notify()->dai_formats().end());
+    format_match = notify()->dai_formats().find(dai_element_id);
+    EXPECT_EQ(format_match, notify()->dai_formats().end());
     EXPECT_TRUE(notify()->codec_format_infos().empty());
   }
 }
@@ -962,8 +1044,10 @@ TEST_F(CompositeTest, Reset) {
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
 
+  // Set DAI formats on every DAI endpoint.
   auto dai_format_sets_by_element = device->dai_format_sets();
-  ASSERT_FALSE(dai_format_sets_by_element.empty());
+  // ASSERT_FALSE(dai_format_sets_by_element.empty());
+  ASSERT_EQ(device->dai_endpoint_ids().size(), dai_format_sets_by_element.size());
   for (auto dai_element_id : device->dai_endpoint_ids()) {
     auto safe_format =
         SafeDaiFormatFromElementDaiFormatSets(dai_element_id, dai_format_sets_by_element);
@@ -972,6 +1056,37 @@ TEST_F(CompositeTest, Reset) {
     RunLoopUntilIdle();
     ASSERT_TRUE(ExpectDaiFormatMatches(dai_element_id, safe_format));
   }
+
+  // Create RingBuffers on every RingBuffer endpoint.
+  auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
+  // ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
+  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+    fake_driver->ReserveRingBufferSize(element_id, 4096);
+    auto safe_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
+        element_id, ring_buffer_format_sets_by_element);
+
+    std::stringstream stream;
+    stream << "Validating CreateRingBuffer on element_id " << element_id << " with format "
+           << *safe_format.pcm_format();
+    SCOPED_TRACE(stream.str());
+
+    uint32_t requested_ring_buffer_bytes = 2000;
+    auto callback_received = false;
+    Device::RingBufferInfo rb_info;
+
+    ASSERT_TRUE(device->CreateRingBuffer(
+        element_id, safe_format, requested_ring_buffer_bytes,
+        [&callback_received](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
+                                               Device::RingBufferInfo>& result) {
+          callback_received = true;
+          EXPECT_TRUE(result.is_ok());
+        }));
+
+    RunLoopUntilIdle();
+    ASSERT_TRUE(callback_received);
+  }
+  EXPECT_EQ(FakeCompositeRingBuffer::count(), device->ring_buffer_endpoint_ids().size());
 
   EXPECT_TRUE(device->Reset());
 
@@ -986,6 +1101,7 @@ TEST_F(CompositeTest, Reset) {
   EXPECT_TRUE(notify()->dai_format_errors().empty());
 
   // Expect any RingBuffers to drop, eventually. Our Control should still be valid though.
+  EXPECT_EQ(FakeCompositeRingBuffer::count(), 0u);
 
   // Expect ElementState notifications, when implemented.
 
@@ -1013,7 +1129,7 @@ void CompositeTest::TestCreateRingBuffer(const std::shared_ptr<Device>& device,
           fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>
               result) {
         callback_received = true;
-        EXPECT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok());
         rb_info = std::move(result.value());
       }));
 
@@ -1055,6 +1171,9 @@ void CompositeTest::TestCreateRingBuffer(const std::shared_ptr<Device>& device,
   ASSERT_TRUE(rb_info.ring_buffer.reference_clock_domain().has_value());
   EXPECT_EQ(*rb_info.ring_buffer.reference_clock_domain(),
             fuchsia_hardware_audio::kClockDomainMonotonic);
+
+  // Now client can drop its RingBuffer connection.
+  device->DropRingBuffer(element_id);
 }
 
 TEST_F(CompositeTest, CreateRingBuffers) {
@@ -1076,6 +1195,348 @@ TEST_F(CompositeTest, CreateRingBuffers) {
     TestCreateRingBuffer(device, element_id, safe_format);
   }
 }
+
+// Tests on the Composite RingBuffer interface
+//
+// Maybe, rather than testing the entire CreateRingBuffer meta-method, we should test the individual
+// component-level methods: ConnectRingBufferFidl, RetrieveRingBufferProperties, GetVmo.
+
+// Verify that we get DeviceDroppedRingBuffer notifications
+TEST_F(CompositeTest, DeviceDroppedRingBuffer) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(SetControl(device));
+
+  auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
+  ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
+  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  constexpr uint32_t reserved_ring_buffer_bytes = 8192;
+  constexpr uint32_t requested_ring_buffer_bytes = 4000;
+
+  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+    SCOPED_TRACE(std::string("Testing DropRingBuffer: element_id ") + std::to_string(element_id));
+    fake_driver->ReserveRingBufferSize(element_id, reserved_ring_buffer_bytes);
+    auto safe_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
+        element_id, ring_buffer_format_sets_by_element);
+    auto callback_received = false;
+    Device::RingBufferInfo rb_info;
+    ASSERT_TRUE(device->CreateRingBuffer(
+        element_id, safe_format, requested_ring_buffer_bytes,
+        [&callback_received](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
+                                               Device::RingBufferInfo>& result) {
+          callback_received = true;
+          EXPECT_TRUE(result.is_ok());
+        }));
+
+    RunLoopUntilIdle();
+    ASSERT_TRUE(callback_received);
+    ASSERT_TRUE(RingBufferIsStopped(device, element_id));
+
+    fake_driver->DropRingBuffer(element_id);
+
+    RunLoopUntilIdle();
+    EXPECT_FALSE(HasRingBuffer(device, element_id));
+    EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+    EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+  }
+}
+
+// Verify Start and Stop
+TEST_F(CompositeTest, RingBufferStartAndStop) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(SetControl(device));
+
+  auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
+  ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
+  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  constexpr uint32_t reserved_ring_buffer_bytes = 8192;
+  constexpr uint32_t requested_ring_buffer_bytes = 4000;
+
+  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+    SCOPED_TRACE(std::string("Testing RingBuffer Start/Stop: element_id ") +
+                 std::to_string(element_id));
+    fake_driver->ReserveRingBufferSize(element_id, reserved_ring_buffer_bytes);
+    auto safe_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
+        element_id, ring_buffer_format_sets_by_element);
+    auto callback_received = false;
+    Device::RingBufferInfo rb_info;
+    ASSERT_TRUE(device->CreateRingBuffer(
+        element_id, safe_format, requested_ring_buffer_bytes,
+        [&callback_received](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
+                                               Device::RingBufferInfo>& result) {
+          callback_received = true;
+          EXPECT_TRUE(result.is_ok());
+        }));
+
+    RunLoopUntilIdle();
+    ASSERT_TRUE(callback_received);
+    zx::time before_start = zx::clock::get_monotonic();
+    zx::time start_time;
+    callback_received = false;
+
+    device->StartRingBuffer(element_id,
+                            [&callback_received, &start_time](zx::result<zx::time> result) {
+                              callback_received = true;
+                              EXPECT_TRUE(result.is_ok());
+                              start_time = result.value();
+                              EXPECT_LT(start_time.get(), zx::clock::get_monotonic().get());
+                            });
+
+    RunLoopUntilIdle();
+    ASSERT_TRUE(callback_received);
+    EXPECT_GT(start_time.get(), before_start.get());
+    callback_received = false;
+
+    device->StopRingBuffer(element_id, [&callback_received](zx_status_t status) {
+      callback_received = true;
+      EXPECT_EQ(status, ZX_OK);
+    });
+
+    RunLoopUntilIdle();
+    EXPECT_TRUE(callback_received);
+  }
+}
+
+// Verify SetActiveChannels -- for a driver that supports it.
+TEST_F(CompositeTest, SetActiveChannelsSupported) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(SetControl(device));
+
+  auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
+  ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
+  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  constexpr uint32_t reserved_ring_buffer_bytes = 8192;
+  constexpr uint32_t requested_ring_buffer_bytes = 4000;
+
+  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+    SCOPED_TRACE(std::string("Testing SetActiveChannels (supported): element_id ") +
+                 std::to_string(element_id));
+    fake_driver->EnableActiveChannelsSupport(element_id);
+    fake_driver->ReserveRingBufferSize(element_id, reserved_ring_buffer_bytes);
+    auto safe_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
+        element_id, ring_buffer_format_sets_by_element);
+    auto callback_received = false;
+    Device::RingBufferInfo rb_info;
+    ASSERT_TRUE(device->CreateRingBuffer(
+        element_id, safe_format, requested_ring_buffer_bytes,
+        [&callback_received](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
+                                               Device::RingBufferInfo>& result) {
+          callback_received = true;
+          EXPECT_TRUE(result.is_ok());
+        }));
+
+    RunLoopUntilIdle();
+    ASSERT_TRUE(callback_received);
+    uint64_t channel_bitmask = (1U << safe_format.pcm_format()->number_of_channels()) - 2;
+    zx::time set_time;
+    callback_received = false;
+    zx::time before_set = zx::clock::get_monotonic();
+
+    auto succeeded = device->SetActiveChannels(
+        element_id, channel_bitmask, [&callback_received, &set_time](zx::result<zx::time> result) {
+          callback_received = true;
+          EXPECT_TRUE(result.is_ok());
+          set_time = result.value();
+          EXPECT_LT(set_time.get(), zx::clock::get_monotonic().get());
+        });
+
+    RunLoopUntilIdle();
+    ASSERT_TRUE(succeeded);
+    ASSERT_TRUE(callback_received);
+    EXPECT_GT(set_time.get(), before_set.get());
+    // Use the same channel_bitmask value -- it should succeed, but set_time should be unchanged.
+    zx::time set_time2;
+    callback_received = false;
+    zx::time before_set2 = zx::clock::get_monotonic();
+
+    succeeded = device->SetActiveChannels(
+        element_id, channel_bitmask, [&callback_received, &set_time2](zx::result<zx::time> result) {
+          callback_received = true;
+          EXPECT_TRUE(result.is_ok());
+          set_time2 = result.value();
+        });
+
+    RunLoopUntilIdle();
+    EXPECT_TRUE(succeeded);
+    EXPECT_TRUE(callback_received);
+    EXPECT_LT(set_time2.get(), before_set2.get());
+    EXPECT_EQ(set_time.get(), set_time2.get())
+        << "set_time should only change if the channel bitmask does (still " << std::hex
+        << channel_bitmask << ")";
+  }
+}
+
+// Verify SetActiveChannels -- for a driver that does not support it.
+TEST_F(CompositeTest, SetActiveChannelsUnsupported) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(SetControl(device));
+
+  auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
+  ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
+  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  constexpr uint32_t reserved_ring_buffer_bytes = 8192;
+  constexpr uint32_t requested_ring_buffer_bytes = 4000;
+
+  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+    SCOPED_TRACE(std::string("Testing SetActiveChannels (unsupported): element_id ") +
+                 std::to_string(element_id));
+    fake_driver->DisableActiveChannelsSupport(element_id);
+    fake_driver->ReserveRingBufferSize(element_id, reserved_ring_buffer_bytes);
+    auto safe_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
+        element_id, ring_buffer_format_sets_by_element);
+    auto callback_received = false;
+    Device::RingBufferInfo rb_info;
+    ASSERT_TRUE(device->CreateRingBuffer(
+        element_id, safe_format, requested_ring_buffer_bytes,
+        [&callback_received](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
+                                               Device::RingBufferInfo>& result) {
+          callback_received = true;
+          EXPECT_TRUE(result.is_ok());
+        }));
+
+    RunLoopUntilIdle();
+    ASSERT_TRUE(callback_received);
+    uint64_t channel_bitmask = (1U << safe_format.pcm_format()->number_of_channels()) - 2;
+    callback_received = false;
+
+    // During CreateRingBuffer, SetActiveChannels is called, so Device already knows if RingBuffer
+    // supports this method. In this case it does NOT (DisableActiveChannelsSupport above), so we
+    // expect the method to return false (meaning it did NOT call the driver), without no callback.
+    auto succeeded = device->SetActiveChannels(
+        element_id, channel_bitmask, [&callback_received](zx::result<zx::time> result) {
+          callback_received = true;
+          FAIL() << "Unexpected response to SetActiveChannels";
+        });
+
+    RunLoopUntilIdle();
+    EXPECT_FALSE(succeeded);
+    EXPECT_FALSE(callback_received);
+  }
+}
+
+// Verify that we get DelayInfo change notifications
+TEST_F(CompositeTest, WatchDelayInfoInitial) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(SetControl(device));
+  auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
+  ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
+  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  constexpr uint32_t reserved_ring_buffer_bytes = 8192;
+  constexpr uint32_t requested_ring_buffer_bytes = 4000;
+
+  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+    SCOPED_TRACE(std::string("Testing RingBuffer initial DelayInfo: element_id ") +
+                 std::to_string(element_id));
+    fake_driver->ReserveRingBufferSize(element_id, reserved_ring_buffer_bytes);
+    auto safe_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
+        element_id, ring_buffer_format_sets_by_element);
+    auto created_ring_buffer = false;
+    Device::RingBufferInfo rb_info;
+    ASSERT_TRUE(device->CreateRingBuffer(
+        element_id, safe_format, requested_ring_buffer_bytes,
+        [&created_ring_buffer](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
+                                                 Device::RingBufferInfo>& result) {
+          created_ring_buffer = true;
+          EXPECT_TRUE(result.is_ok());
+        }));
+
+    RunLoopUntilIdle();
+    ASSERT_TRUE(created_ring_buffer);
+    // Verify that the Device received the expected values from the driver.
+    ASSERT_TRUE(DeviceDelayInfo(device, element_id));
+    ASSERT_TRUE(DeviceDelayInfo(device, element_id)->internal_delay());
+    EXPECT_EQ(*DeviceDelayInfo(device, element_id)->internal_delay(),
+              FakeCompositeRingBuffer::kDefaultInternalDelay->get());
+    EXPECT_TRUE(!DeviceDelayInfo(device, element_id)->external_delay().has_value() &&
+                !FakeCompositeRingBuffer::kDefaultExternalDelay.has_value());
+
+    // Verify that the ControlNotify was sent the expected values.
+    ASSERT_TRUE(notify()->delay_info(element_id))
+        << "ControlNotify was not notified of initial delay info";
+    ASSERT_TRUE(notify()->delay_info(element_id)->internal_delay());
+    EXPECT_EQ(*notify()->delay_info(element_id)->internal_delay(),
+              FakeCompositeRingBuffer::kDefaultInternalDelay->get());
+    EXPECT_TRUE(!notify()->delay_info(element_id)->external_delay().has_value() &&
+                !FakeCompositeRingBuffer::kDefaultExternalDelay.has_value());
+  }
+}
+
+// Dynamic delay updates
+TEST_F(CompositeTest, WatchDelayInfoUpdate) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(SetControl(device));
+  auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
+  ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
+  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  constexpr uint32_t reserved_ring_buffer_bytes = 8192;
+  constexpr uint32_t requested_ring_buffer_bytes = 4000;
+
+  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+    SCOPED_TRACE(std::string("Testing RingBuffer initial DelayInfo: element_id ") +
+                 std::to_string(element_id));
+    fake_driver->ReserveRingBufferSize(element_id, reserved_ring_buffer_bytes);
+    auto safe_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
+        element_id, ring_buffer_format_sets_by_element);
+    auto created_ring_buffer = false;
+    Device::RingBufferInfo rb_info;
+    ASSERT_TRUE(device->CreateRingBuffer(
+        element_id, safe_format, requested_ring_buffer_bytes,
+        [&created_ring_buffer](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
+                                                 Device::RingBufferInfo>& result) {
+          created_ring_buffer = true;
+          EXPECT_TRUE(result.is_ok());
+        }));
+
+    RunLoopUntilIdle();
+    ASSERT_TRUE(created_ring_buffer);
+    ASSERT_TRUE(DeviceDelayInfo(device, element_id));
+    ASSERT_TRUE(notify()->delay_info(element_id))
+        << "ControlNotify was not notified of initial delay info";
+  }
+
+  notify()->clear_delay_infos();
+  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+    EXPECT_FALSE(notify()->delay_info(element_id))
+        << "ControlNotify was not cleared for element_id " << element_id;
+    // For each element, inject int_delay [`element_id` nsec] and ext_delay [`element_id` usec].
+    fake_driver->InjectDelayUpdate(element_id, zx::nsec(static_cast<int64_t>(element_id)),
+                                   zx::usec(static_cast<int64_t>(element_id)));
+  }
+
+  RunLoopUntilIdle();
+
+  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+    // Ensure the Device received the updated values from the driver.
+    ASSERT_TRUE(DeviceDelayInfo(device, element_id));
+    ASSERT_TRUE(DeviceDelayInfo(device, element_id)->internal_delay());
+    ASSERT_TRUE(DeviceDelayInfo(device, element_id)->external_delay());
+    EXPECT_EQ(*DeviceDelayInfo(device, element_id)->internal_delay(), ZX_NSEC(element_id));
+    EXPECT_EQ(*DeviceDelayInfo(device, element_id)->external_delay(), ZX_USEC(element_id));
+
+    // Ensure that ControlNotify received these updates as well.
+    ASSERT_TRUE(notify()->delay_info(element_id))
+        << "ControlNotify was not notified with updated delay info";
+    ASSERT_TRUE(notify()->delay_info(element_id)->internal_delay());
+    ASSERT_TRUE(notify()->delay_info(element_id)->external_delay());
+    EXPECT_EQ(*notify()->delay_info(element_id)->internal_delay(), ZX_NSEC(element_id));
+    EXPECT_EQ(*notify()->delay_info(element_id)->external_delay(), ZX_USEC(element_id));
+  }
+}
+
+//// This is needed to support hardware where the audio device is NOT in kClockDomainMonotonic.
+//// Until then, it is not a high priority.
+// TEST_F(CompositeTest, PositionNotifications) { FAIL() << "NOT YET IMPLEMENTED"; }
 
 /////////////////////
 // StreamConfig tests
@@ -1103,6 +1564,50 @@ TEST_F(StreamConfigTest, Initialization) {
 
   EXPECT_FALSE(device->supports_signalprocessing());
   EXPECT_TRUE(device->info().has_value());
+}
+
+TEST_F(StreamConfigTest, DeviceInfo) {
+  auto fake_driver = MakeFakeStreamConfigOutput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+  auto info = GetDeviceInfo(device);
+
+  EXPECT_TRUE(info.token_id());
+  EXPECT_TRUE(info.device_type());
+  EXPECT_EQ(*info.device_type(), fuchsia_audio_device::DeviceType::kOutput);
+  EXPECT_TRUE(info.device_name());
+  // manufacturer is optional, but it can't be an empty string
+  EXPECT_TRUE(!info.manufacturer().has_value() || !info.manufacturer()->empty());
+  // product is optional, but it can't be an empty string
+  EXPECT_TRUE(!info.product().has_value() || !info.product()->empty());
+  // unique_instance_id is optional
+  EXPECT_TRUE(info.gain_caps());
+  EXPECT_TRUE(info.plug_detect_caps());
+  EXPECT_TRUE(info.clock_domain());
+  EXPECT_EQ(*info.clock_domain(), fuchsia_hardware_audio::kClockDomainMonotonic);
+}
+
+TEST_F(StreamConfigTest, DistinctTokenIds) {
+  auto fake_driver = MakeFakeStreamConfigOutput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+
+  // Set up a second, entirely distinct fake device.
+  auto stream_config_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::StreamConfig>();
+  ASSERT_TRUE(stream_config_endpoints.is_ok());
+
+  auto fake_driver2 = std::make_shared<FakeStreamConfig>(
+      stream_config_endpoints->server.TakeChannel(), stream_config_endpoints->client.TakeChannel(),
+      dispatcher());
+  fake_driver2->set_is_input(true);
+
+  auto device2 = InitializeDeviceForFakeStreamConfig(fake_driver2);
+  EXPECT_TRUE(IsInitialized(device2));
+
+  EXPECT_NE(device->token_id(), device2->token_id());
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 2u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
 
 // Verify that a driver's dropping the StreamConfig causes a DeviceIsRemoved notification.
@@ -1140,29 +1645,6 @@ TEST_F(StreamConfigTest, EmptyHealthResponse) {
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
 
-TEST_F(StreamConfigTest, DistinctTokenIds) {
-  auto fake_driver = MakeFakeStreamConfigOutput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
-
-  // Set up a second, entirely distinct fake device.
-  auto stream_config_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::StreamConfig>();
-  ASSERT_TRUE(stream_config_endpoints.is_ok());
-
-  auto fake_driver2 = std::make_unique<FakeStreamConfig>(
-      stream_config_endpoints->server.TakeChannel(), stream_config_endpoints->client.TakeChannel(),
-      dispatcher());
-  fake_driver2->set_is_input(true);
-
-  auto device2 = InitializeDeviceForFakeStreamConfig(fake_driver2);
-  EXPECT_TRUE(IsInitialized(device2));
-
-  EXPECT_NE(device->token_id(), device2->token_id());
-
-  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 2u);
-  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
-}
-
 TEST_F(StreamConfigTest, DefaultClock) {
   auto fake_driver = MakeFakeStreamConfigInput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
@@ -1189,27 +1671,6 @@ TEST_F(StreamConfigTest, ClockInOtherDomain) {
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
-}
-
-TEST_F(StreamConfigTest, DeviceInfo) {
-  auto fake_driver = MakeFakeStreamConfigOutput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
-  auto info = GetDeviceInfo(device);
-
-  EXPECT_TRUE(info.token_id());
-  EXPECT_TRUE(info.device_type());
-  EXPECT_EQ(*info.device_type(), fuchsia_audio_device::DeviceType::kOutput);
-  EXPECT_TRUE(info.device_name());
-  // manufacturer is optional, but it can't be an empty string
-  EXPECT_TRUE(!info.manufacturer().has_value() || !info.manufacturer()->empty());
-  // product is optional, but it can't be an empty string
-  EXPECT_TRUE(!info.product().has_value() || !info.product()->empty());
-  // unique_instance_id is optional
-  EXPECT_TRUE(info.gain_caps());
-  EXPECT_TRUE(info.plug_detect_caps());
-  EXPECT_TRUE(info.clock_domain());
-  EXPECT_EQ(*info.clock_domain(), fuchsia_hardware_audio::kClockDomainMonotonic);
 }
 
 TEST_F(StreamConfigTest, SupportedDriverFormatForClientFormat) {
@@ -1390,8 +1851,8 @@ TEST_F(StreamConfigTest, CreateRingBuffer) {
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [](fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>
-             result) {
+      [](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
+                           Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok()) << fidl::ToUnderlying(result.error_value());
         auto& info = result.value();
         ASSERT_TRUE(info.ring_buffer.buffer());
@@ -1438,11 +1899,11 @@ TEST_F(StreamConfigTest, BasicStartAndStop) {
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [](fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>
-             result) {
-        EXPECT_TRUE(result.is_ok());
+      [](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
+                           Device::RingBufferInfo>& result) {
+        ASSERT_TRUE(result.is_ok());
         auto& info = result.value();
-        EXPECT_TRUE(info.ring_buffer.buffer());
+        ASSERT_TRUE(info.ring_buffer.buffer());
         EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
 
         EXPECT_TRUE(info.ring_buffer.format());
@@ -1458,7 +1919,7 @@ TEST_F(StreamConfigTest, BasicStartAndStop) {
   StopAndExpectValid(device, ring_buffer_element_id());
 }
 
-TEST_F(StreamConfigTest, InitialDelay) {
+TEST_F(StreamConfigTest, WatchDelayInfoInitial) {
   auto fake_driver = MakeFakeStreamConfigInput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   fake_driver->AllocateRingBuffer(8192);
@@ -1475,7 +1936,7 @@ TEST_F(StreamConfigTest, InitialDelay) {
   EXPECT_TRUE(connected_to_ring_buffer_fidl);
   RunLoopUntilIdle();
 
-  // Verify that the device received the expected values.
+  // Verify that the Device received the expected values from the driver.
   EXPECT_TRUE(created_ring_buffer);
   ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_element_id()));
   ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_element_id())->internal_delay());
@@ -1489,12 +1950,11 @@ TEST_F(StreamConfigTest, InitialDelay) {
   EXPECT_EQ(*notify()->delay_info()->internal_delay(), 0);
 }
 
-TEST_F(StreamConfigTest, DynamicDelay) {
+TEST_F(StreamConfigTest, WatchDelayInfoUpdate) {
   auto fake_driver = MakeFakeStreamConfigOutput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
-
   auto created_ring_buffer = false;
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
@@ -1503,20 +1963,20 @@ TEST_F(StreamConfigTest, DynamicDelay) {
         EXPECT_TRUE(result.is_ok());
         created_ring_buffer = true;
       });
-  EXPECT_TRUE(connected_to_ring_buffer_fidl);
-  RunLoopUntilIdle();
 
+  RunLoopUntilIdle();
+  EXPECT_TRUE(connected_to_ring_buffer_fidl);
   EXPECT_TRUE(created_ring_buffer);
   ASSERT_TRUE(notify()->delay_info()) << "ControlNotify was not notified of initial delay info";
   ASSERT_TRUE(notify()->delay_info()->internal_delay());
   EXPECT_FALSE(notify()->delay_info()->external_delay());
   EXPECT_EQ(*notify()->delay_info()->internal_delay(), 0);
-  notify()->delay_info().reset();
+  notify()->clear_delay_info();
 
   RunLoopUntilIdle();
   EXPECT_FALSE(notify()->delay_info());
-
   fake_driver->InjectDelayUpdate(zx::nsec(123'456), zx::nsec(654'321));
+
   RunLoopUntilIdle();
   ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_element_id()));
   ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_element_id())->internal_delay());
@@ -1541,11 +2001,11 @@ TEST_F(StreamConfigTest, ReportsThatItSupportsSetActiveChannels) {
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [](fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>
-             result) {
-        EXPECT_TRUE(result.is_ok());
+      [](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
+                           Device::RingBufferInfo>& result) {
+        ASSERT_TRUE(result.is_ok());
         auto& info = result.value();
-        EXPECT_TRUE(info.ring_buffer.buffer());
+        ASSERT_TRUE(info.ring_buffer.buffer());
         EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
 
         EXPECT_TRUE(info.ring_buffer.format());
@@ -1556,7 +2016,7 @@ TEST_F(StreamConfigTest, ReportsThatItSupportsSetActiveChannels) {
   EXPECT_TRUE(connected_to_ring_buffer_fidl);
 
   ExpectRingBufferReady(device, ring_buffer_element_id());
-  EXPECT_THAT(device->supports_set_active_channels(ring_buffer_element_id()), Optional(true));
+  EXPECT_TRUE(device->supports_set_active_channels(ring_buffer_element_id()).value_or(false));
 }
 
 TEST_F(StreamConfigTest, ReportsThatItDoesNotSupportSetActiveChannels) {
@@ -1569,11 +2029,11 @@ TEST_F(StreamConfigTest, ReportsThatItDoesNotSupportSetActiveChannels) {
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
       ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
-      [](fit::result<fuchsia_audio_device::ControlCreateRingBufferError, Device::RingBufferInfo>
-             result) {
-        EXPECT_TRUE(result.is_ok());
+      [](const fit::result<fuchsia_audio_device::ControlCreateRingBufferError,
+                           Device::RingBufferInfo>& result) {
+        ASSERT_TRUE(result.is_ok());
         auto& info = result.value();
-        EXPECT_TRUE(info.ring_buffer.buffer());
+        ASSERT_TRUE(info.ring_buffer.buffer());
         EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
 
         EXPECT_TRUE(info.ring_buffer.format());
@@ -1584,7 +2044,7 @@ TEST_F(StreamConfigTest, ReportsThatItDoesNotSupportSetActiveChannels) {
   EXPECT_TRUE(connected_to_ring_buffer_fidl);
 
   ExpectRingBufferReady(device, ring_buffer_element_id());
-  EXPECT_THAT(device->supports_set_active_channels(ring_buffer_element_id()), Optional(false));
+  EXPECT_FALSE(device->supports_set_active_channels(ring_buffer_element_id()).value_or(true));
 }
 
 TEST_F(StreamConfigTest, SetActiveChannels) {

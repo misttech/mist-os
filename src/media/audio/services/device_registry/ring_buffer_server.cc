@@ -127,7 +127,7 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
   }
 
   active_channels_completer_ = completer.ToAsync();
-  device_->SetActiveChannels(
+  auto succeeded = device_->SetActiveChannels(
       element_id_, *request.channel_bitmask(), [this](zx::result<zx::time> result) {
         ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "Device/SetActiveChannels response";
         // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
@@ -149,6 +149,18 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
             .set_time = result.value().get(),
         }}));
       });
+
+  // Should be prevented by the `supports_set_active_channels` check above, but if Device returns
+  // false, it's because the element returned NOT_SUPPORTED from a previous SetActiveChannels.
+  if (!succeeded) {
+    ADR_LOG_METHOD(kLogRingBufferServerMethods) << "device does not support SetActiveChannels";
+    auto completer = std::move(active_channels_completer_);
+    active_channels_completer_.reset();
+    completer->Reply(
+        fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kMethodNotSupported));
+  }
+
+  // Otherwise, `active_channels_completer_` is saved for the future async response.
 }
 
 void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& completer) {
@@ -254,30 +266,29 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
     return;
   }
 
-  if (new_delay_info_to_notify_) {
-    completer.Reply(fit::success(fuchsia_audio_device::RingBufferWatchDelayInfoResponse{{
-        .delay_info = *new_delay_info_to_notify_,
-    }}));
-    new_delay_info_to_notify_.reset();
-    return;
-  }
-
   delay_info_completer_ = completer.ToAsync();
+  MaybeCompleteWatchDelayInfo();
 }
 
 void RingBufferServer::DelayInfoChanged(const fuchsia_audio_device::DelayInfo& delay_info) {
   ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogNotifyMethods);
 
-  if (!delay_info_completer_) {
-    new_delay_info_to_notify_ = delay_info;
-    return;
-  }
-  FX_CHECK(!new_delay_info_to_notify_);
+  new_delay_info_to_notify_ = delay_info;
+  MaybeCompleteWatchDelayInfo();
+}
 
-  delay_info_completer_->Reply(fit::success(fuchsia_audio_device::RingBufferWatchDelayInfoResponse{{
-      .delay_info = delay_info,
-  }}));
-  delay_info_completer_.reset();
+void RingBufferServer::MaybeCompleteWatchDelayInfo() {
+  if (new_delay_info_to_notify_ && delay_info_completer_) {
+    auto delay_info = *new_delay_info_to_notify_;
+    new_delay_info_to_notify_.reset();
+
+    auto completer = std::move(*delay_info_completer_);
+    delay_info_completer_.reset();
+
+    completer.Reply(fit::success(fuchsia_audio_device::RingBufferWatchDelayInfoResponse{{
+        .delay_info = delay_info,
+    }}));
+  }
 }
 
 }  // namespace media_audio

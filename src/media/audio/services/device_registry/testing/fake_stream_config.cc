@@ -102,7 +102,7 @@ void FakeStreamConfig::DropRingBuffer() {
     ADR_LOG_METHOD(kLogFakeStreamConfig);
 
     ring_buffer_binding_->Close(ZX_ERR_PEER_CLOSED);
-    is_running_ = false;
+    started_ = false;
     mono_start_time_ = zx::time(0);
 
     delay_has_changed_ = true;
@@ -381,7 +381,7 @@ void FakeStreamConfig::PositionNotification() {
   FX_CHECK(position_notification_values_are_set_);
 
   // Real audio drivers can't emit position notifications until started; we shouldn't either
-  if (is_running_) {
+  if (started_) {
     // Clear both prerequisites for sending this notification
     position_notification_values_are_set_ = false;
     auto callback = *std::move(position_notify_callback_);
@@ -430,9 +430,9 @@ void FakeStreamConfig::GetVmo(uint32_t min_frames, uint32_t clock_recovery_notif
 void FakeStreamConfig::Start(fha::RingBuffer::StartCallback callback) {
   ADR_LOG_METHOD(kLogFakeStreamConfig);
 
-  EXPECT_TRUE(!is_running_);
+  EXPECT_TRUE(!started_);
   mono_start_time_ = zx::clock::get_monotonic();
-  is_running_ = true;
+  started_ = true;
 
   callback(mono_start_time_.get());
 }
@@ -440,8 +440,8 @@ void FakeStreamConfig::Start(fha::RingBuffer::StartCallback callback) {
 void FakeStreamConfig::Stop(fha::RingBuffer::StopCallback callback) {
   ADR_LOG_METHOD(kLogFakeStreamConfig);
 
-  EXPECT_TRUE(is_running_);
-  is_running_ = false;
+  EXPECT_TRUE(started_);
+  started_ = false;
 
   position_notify_callback_.reset();
   position_notification_values_are_set_ = false;

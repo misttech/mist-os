@@ -46,26 +46,26 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
  protected:
   // Create a FakeCodec that can mock a real device that has been detected, using default settings.
   // From here, the fake Codec can be customized before it is enabled.
-  std::unique_ptr<FakeCodec> CreateFakeCodecInput() { return CreateFakeCodec(true); }
-  std::unique_ptr<FakeCodec> CreateFakeCodecOutput() { return CreateFakeCodec(false); }
-  std::unique_ptr<FakeCodec> CreateFakeCodecNoDirection() { return CreateFakeCodec(std::nullopt); }
+  std::shared_ptr<FakeCodec> CreateFakeCodecInput() { return CreateFakeCodec(true); }
+  std::shared_ptr<FakeCodec> CreateFakeCodecOutput() { return CreateFakeCodec(false); }
+  std::shared_ptr<FakeCodec> CreateFakeCodecNoDirection() { return CreateFakeCodec(std::nullopt); }
 
   // Create a FakeComposite that can mock a real device that has been detected, using default
   // settings. From here, the fake Composite can be customized before it is enabled.
-  std::unique_ptr<FakeComposite> CreateFakeComposite() {
+  std::shared_ptr<FakeComposite> CreateFakeComposite() {
     EXPECT_EQ(dispatcher(), test_loop().dispatcher());
     auto composite_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Composite>();
     EXPECT_TRUE(composite_endpoints.is_ok());
-    return std::make_unique<FakeComposite>(composite_endpoints->server.TakeChannel(),
+    return std::make_shared<FakeComposite>(composite_endpoints->server.TakeChannel(),
                                            composite_endpoints->client.TakeChannel(), dispatcher());
   }
 
   // Create a FakeStreamConfig that can mock a real device that has been detected, using default
   // settings. From here, the fake StreamConfig can be customized before it is enabled.
-  std::unique_ptr<FakeStreamConfig> CreateFakeStreamConfigInput() {
+  std::shared_ptr<FakeStreamConfig> CreateFakeStreamConfigInput() {
     return CreateFakeStreamConfig(true);
   }
-  std::unique_ptr<FakeStreamConfig> CreateFakeStreamConfigOutput() {
+  std::shared_ptr<FakeStreamConfig> CreateFakeStreamConfigOutput() {
     return CreateFakeStreamConfig(false);
   }
 
@@ -236,22 +236,22 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
  private:
   // Create a FakeStreamConfig that can mock a real device that has been detected, using default
   // settings. From here, the fake StreamConfig can be customized before it is enabled.
-  std::unique_ptr<FakeStreamConfig> CreateFakeStreamConfig(bool is_input = false) {
+  std::shared_ptr<FakeStreamConfig> CreateFakeStreamConfig(bool is_input = false) {
     EXPECT_EQ(dispatcher(), test_loop().dispatcher());
     auto stream_config_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::StreamConfig>();
     EXPECT_TRUE(stream_config_endpoints.is_ok());
-    auto fake_stream = std::make_unique<FakeStreamConfig>(
+    auto fake_stream = std::make_shared<FakeStreamConfig>(
         stream_config_endpoints->server.TakeChannel(),
         stream_config_endpoints->client.TakeChannel(), dispatcher());
     fake_stream->set_is_input(is_input);
     return fake_stream;
   }
 
-  std::unique_ptr<FakeCodec> CreateFakeCodec(std::optional<bool> is_input = false) {
+  std::shared_ptr<FakeCodec> CreateFakeCodec(std::optional<bool> is_input = false) {
     EXPECT_EQ(dispatcher(), test_loop().dispatcher());
     auto codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
     EXPECT_TRUE(codec_endpoints.is_ok());
-    auto fake_codec = std::make_unique<FakeCodec>(
+    auto fake_codec = std::make_shared<FakeCodec>(
         codec_endpoints->server.TakeChannel(), codec_endpoints->client.TakeChannel(), dispatcher());
     fake_codec->set_is_input(is_input);
     return fake_codec;

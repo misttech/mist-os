@@ -61,8 +61,7 @@ TEST_F(ControlCreatorServerCodecTest, CreateControl) {
   control_creator->client()
       ->Create({{
           .token_id = (*adr_service_->devices().begin())->token_id(),
-          .control_server =
-              fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(control_endpoints->server)),
+          .control_server = std::move(control_endpoints->server),
       }})
       .Then([&received_callback](
                 fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) mutable {

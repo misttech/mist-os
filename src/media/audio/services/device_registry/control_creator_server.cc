@@ -20,7 +20,7 @@ namespace media_audio {
 std::shared_ptr<ControlCreatorServer> ControlCreatorServer::Create(
     std::shared_ptr<const FidlThread> thread,
     fidl::ServerEnd<fuchsia_audio_device::ControlCreator> server_end,
-    std::shared_ptr<AudioDeviceRegistry> parent) {
+    const std::shared_ptr<AudioDeviceRegistry>& parent) {
   ADR_LOG_STATIC(kLogControlCreatorServerMethods) << " parent " << parent;
 
   return BaseFidlServer::Create(std::move(thread), std::move(server_end), parent);

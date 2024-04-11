@@ -44,7 +44,7 @@ class ObserverServerWarningTest : public AudioDeviceRegistryServerTestBase,
 
 class ObserverServerCodecWarningTest : public ObserverServerWarningTest {
  protected:
-  std::unique_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
+  std::shared_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeCodecNoDirection();
 
     adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
@@ -57,7 +57,7 @@ class ObserverServerCodecWarningTest : public ObserverServerWarningTest {
 
 class ObserverServerCompositeWarningTest : public ObserverServerWarningTest {
  protected:
-  std::unique_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
+  std::shared_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeComposite();
 
     adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test composite name",
@@ -70,7 +70,7 @@ class ObserverServerCompositeWarningTest : public ObserverServerWarningTest {
 
 class ObserverServerStreamConfigWarningTest : public ObserverServerWarningTest {
  protected:
-  std::unique_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
+  std::shared_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeStreamConfigOutput();
 
     adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",

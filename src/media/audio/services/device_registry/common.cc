@@ -12,7 +12,6 @@
 #include <vector>
 
 #include "src/media/audio/services/device_registry/basic_types.h"
-#include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/validate.h"
 
 namespace media_audio {

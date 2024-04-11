@@ -128,7 +128,7 @@ class Device : public std::enable_shared_from_this<Device> {
           create_ring_buffer_callback);
 
   // Change the channels that are currently active (powered-up).
-  void SetActiveChannels(ElementId element_id, uint64_t channel_bitmask,
+  bool SetActiveChannels(ElementId element_id, uint64_t channel_bitmask,
                          fit::callback<void(zx::result<zx::time>)> set_active_channels_callback);
   // Start the device ring buffer now (including clock recovery).
   void StartRingBuffer(ElementId element_id,
@@ -144,10 +144,14 @@ class Device : public std::enable_shared_from_this<Device> {
   bool is_composite() const {
     return (device_type_ == fuchsia_audio_device::DeviceType::kComposite);
   }
-  bool is_stream_config() const {
-    return (device_type_ == fuchsia_audio_device::DeviceType::kInput ||
-            device_type_ == fuchsia_audio_device::DeviceType::kOutput);
+  bool is_stream_config_input() const {
+    return (device_type_ == fuchsia_audio_device::DeviceType::kInput);
   }
+  bool is_stream_config_output() const {
+    return (device_type_ == fuchsia_audio_device::DeviceType::kOutput);
+  }
+  bool is_stream_config() const { return (is_stream_config_input() || is_stream_config_output()); }
+
   // Assigned by this service, guaranteed unique for this boot session, but not across reboots.
   TokenId token_id() const { return token_id_; }
   // `info` is only populated once the device is initialized.

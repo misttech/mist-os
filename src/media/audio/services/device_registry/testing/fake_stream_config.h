@@ -155,16 +155,15 @@ class FakeStreamConfig : public fuchsia::hardware::audio::StreamConfig,
   bool delay_callback_pending() const { return (pending_delay_callback_ != nullptr); }
 
   zx::time mono_start_time() const { return mono_start_time_; }
-  bool is_running() const { return is_running_; }
+  bool started() const { return started_; }
 
   // The returned optional will be empty if no |CreateRingBuffer| command has been received.
   std::optional<fuchsia::hardware::audio::PcmFormat> selected_format() const {
     return selected_format_;
   }
 
-  void set_turn_on_delay(std::optional<zx::duration> turn_on_delay) {
-    turn_on_delay_ = turn_on_delay;
-  }
+  void set_turn_on_delay(zx::duration turn_on_delay) { turn_on_delay_ = turn_on_delay; }
+  void clear_turn_on_delay() { turn_on_delay_.reset(); }
 
  private:
   static inline const std::string_view kClassName = "FakeStreamConfig";
@@ -268,7 +267,7 @@ class FakeStreamConfig : public fuchsia::hardware::audio::StreamConfig,
   uint64_t active_channels_bitmask_;
   zx::time active_channels_set_time_{0};
 
-  bool is_running_ = false;
+  bool started_ = false;
   zx::time mono_start_time_{0};
 
   async_dispatcher_t* dispatcher_;

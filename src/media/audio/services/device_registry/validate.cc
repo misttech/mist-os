@@ -243,7 +243,6 @@ bool ValidateStreamProperties(const fuchsia_hardware_audio::StreamProperties& st
 
 bool ValidateRingBufferFormatSets(
     const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
-  ADR_LOG(kLogDeviceMethods);
   LogRingBufferFormatSets(ring_buffer_format_sets);
 
   if (ring_buffer_format_sets.empty()) {
@@ -442,7 +441,6 @@ bool ValidateCodecProperties(const fuchsia_hardware_audio::CodecProperties& code
 
 bool ValidateDaiFormatSets(
     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
-  ADR_LOG(kLogDeviceMethods);
   LogDaiFormatSets(dai_format_sets);
 
   if (dai_format_sets.empty()) {
@@ -682,7 +680,6 @@ bool ValidateGainState(const fuchsia_hardware_audio::GainState& gain_state,
 bool ValidatePlugState(
     const fuchsia_hardware_audio::PlugState& plug_state,
     std::optional<fuchsia_hardware_audio::PlugDetectCapabilities> plug_detect_capabilities) {
-  ADR_LOG(kLogDeviceMethods);
   LogPlugState(plug_state);
 
   if (!plug_state.plugged() || !plug_state.plug_state_time()) {
@@ -710,7 +707,6 @@ bool ValidatePlugState(
 
 // Validate only DeviceInfo-specific aspects. For example, don't re-validate format correctness.
 bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info) {
-  ADR_LOG(kLogDeviceMethods);
   LogDeviceInfo(device_info);
 
   // Validate top-level required members.

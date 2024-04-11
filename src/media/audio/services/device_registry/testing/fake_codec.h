@@ -135,15 +135,12 @@ class FakeCodec : public fidl::testing::TestBase<CodecConnector>,
     return selected_format_;
   }
 
-  void set_external_delay(std::optional<zx::duration> external_delay) {
-    external_delay_ = external_delay;
-  }
-  void set_turn_on_delay(std::optional<zx::duration> turn_on_delay) {
-    turn_on_delay_ = turn_on_delay;
-  }
-  void set_turn_off_delay(std::optional<zx::duration> turn_off_delay) {
-    turn_off_delay_ = turn_off_delay;
-  }
+  void set_external_delay(zx::duration external_delay) { external_delay_ = external_delay; }
+  void clear_external_delay() { external_delay_.reset(); }
+  void set_turn_on_delay(zx::duration turn_on_delay) { turn_on_delay_ = turn_on_delay; }
+  void clear_turn_on_delay() { turn_on_delay_.reset(); }
+  void set_turn_off_delay(zx::duration turn_off_delay) { turn_off_delay_ = turn_off_delay; }
+  void clear_turn_off_delay() { turn_off_delay_.reset(); }
 
   // Explicitly trigger a plug change.
   void InjectPluggedAt(zx::time plug_time);

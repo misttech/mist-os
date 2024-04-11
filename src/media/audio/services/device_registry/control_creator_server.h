@@ -23,7 +23,7 @@ class ControlCreatorServer : public std::enable_shared_from_this<ControlCreatorS
   static std::shared_ptr<ControlCreatorServer> Create(
       std::shared_ptr<const FidlThread> thread,
       fidl::ServerEnd<fuchsia_audio_device::ControlCreator> server_end,
-      std::shared_ptr<AudioDeviceRegistry> parent);
+      const std::shared_ptr<AudioDeviceRegistry>& parent);
 
   ~ControlCreatorServer() override;
 

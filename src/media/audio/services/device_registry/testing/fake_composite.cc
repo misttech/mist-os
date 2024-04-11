@@ -12,9 +12,13 @@
 #include <lib/fit/result.h>
 #include <zircon/errors.h>
 
+#include <string>
 #include <unordered_map>
 
 #include <gtest/gtest.h>
+
+#include "src/media/audio/services/device_registry/logging.h"
+#include "src/media/audio/services/device_registry/testing/fake_composite_ring_buffer.h"
 
 namespace media_audio {
 using fuchsia_hardware_audio::Composite;
@@ -97,15 +101,76 @@ FakeComposite::FakeComposite(zx::channel server_end, zx::channel client_end,
   SetupElementsMap();
 }
 
-FakeComposite::~FakeComposite() {
-  ADR_LOG_METHOD(kLogFakeComposite || kLogObjectLifetimes);
-  signal_processing_binding_.reset();
+// From the device side, drop the Composite protocol connection as if the device has been removed.
+void FakeComposite::DropComposite() {
+  FX_CHECK(binding_.has_value()) << "Should not call DropComposite() twice";
+
+  binding_->Close(ZX_ERR_PEER_CLOSED);  // This in turn will trigger on_unbind -> DropChildren().
   binding_.reset();
 }
 
 void on_unbind(FakeComposite* fake_composite, fidl::UnbindInfo info,
                fidl::ServerEnd<fuchsia_hardware_audio::Composite> server_end) {
-  FX_LOGS(INFO) << "FakeComposite disconnected";
+  ADR_LOG(kLogFakeComposite) << "for FakeComposite";
+  fake_composite->DropChildren();
+}
+
+void FakeComposite::DropChildren() {
+  ADR_LOG_METHOD(kLogFakeComposite);
+
+  health_completer_.reset();
+  watch_topology_completer_.reset();
+
+  DropRingBuffers();
+
+  for (auto& element_entry_pair : elements_) {
+    if (element_entry_pair.second.watch_completer.has_value()) {
+      element_entry_pair.second.watch_completer.reset();
+    }
+  }
+  if (signal_processing_binding_.has_value()) {
+    signal_processing_binding_->Close(ZX_ERR_PEER_CLOSED);
+    signal_processing_binding_.reset();
+  }
+}
+
+// From the driver side, drop the RingBuffer protocol connection for this element_id.
+void FakeComposite::DropRingBuffers() {
+  ADR_LOG_METHOD(kLogFakeComposite);
+
+  for (auto& binding : ring_buffer_bindings_) {
+    binding.second.Unbind();
+  }
+}
+
+// From the driver side, drop the RingBuffer protocol connection for this element_id.
+void FakeComposite::DropRingBuffer(ElementId element_id) {
+  ADR_LOG_METHOD(kLogFakeComposite) << "element_id " << element_id;
+
+  for (auto& binding : ring_buffer_bindings_) {
+    if (binding.first == element_id) {
+      binding.second.Unbind();
+      return;
+    }
+  }
+  ADR_WARN_METHOD() << "No ring_buffer binding found for element_id " << element_id;
+}
+
+// static
+void FakeComposite::on_rb_unbind(FakeCompositeRingBuffer* fake_ring_buffer, fidl::UnbindInfo info,
+                                 fidl::ServerEnd<fuchsia_hardware_audio::RingBuffer>) {
+  ADR_LOG(kLogFakeComposite) << "for FakeCompositeRingBuffer";
+
+  fake_ring_buffer->parent()->RingBufferWasDropped(fake_ring_buffer->element_id());
+}
+
+// The RingBuffer FIDL connection has already been dropped, so there's nothing else for the parent
+// driver to do, except clean up our accounting.
+void FakeComposite::RingBufferWasDropped(ElementId element_id) {
+  ADR_LOG_METHOD(kLogFakeComposite) << "element_id " << element_id;
+
+  ring_buffer_bindings_.erase((element_id));
+  ring_buffers_.erase(element_id);
 }
 
 fidl::ClientEnd<fuchsia_hardware_audio::Composite> FakeComposite::Enable() {
@@ -115,25 +180,10 @@ fidl::ClientEnd<fuchsia_hardware_audio::Composite> FakeComposite::Enable() {
   EXPECT_TRUE(dispatcher_);
   EXPECT_FALSE(binding_);
 
-  binding_ = fidl::BindServer(dispatcher_, std::move(server_end_), this);
+  binding_ = fidl::BindServer(dispatcher_, std::move(server_end_), shared_from_this(), &on_unbind);
   EXPECT_FALSE(server_end_.is_valid());
 
   return std::move(client_end_);
-}
-
-void FakeComposite::DropComposite() {
-  ADR_LOG_METHOD(kLogFakeComposite);
-
-  health_completer_.reset();
-  watch_topology_completer_.reset();
-  for (auto& element_entry_pair : elements_) {
-    if (element_entry_pair.second.watch_completer.has_value()) {
-      element_entry_pair.second.watch_completer.reset();
-    }
-  }
-
-  signal_processing_binding_->Close(ZX_ERR_PEER_CLOSED);
-  binding_->Close(ZX_ERR_PEER_CLOSED);
 }
 
 void FakeComposite::SetupElementsMap() {
@@ -186,8 +236,12 @@ void FakeComposite::Reset(ResetCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeComposite);
 
   // Reset any RingBuffers (start, format)
+  DropRingBuffers();
+
   // Reset any DAIs (start, format)
+
   // Reset all signalprocessing Elements
+
   // Reset the signalprocessing Topology
 
   completer.Reply(fit::ok());
@@ -254,6 +308,15 @@ void FakeComposite::EnableActiveChannelsSupport(ElementId element_id) {
 void FakeComposite::DisableActiveChannelsSupport(ElementId element_id) {
   active_channels_support_overrides_.insert_or_assign(element_id, false);
 }
+void FakeComposite::PresetTurnOnDelay(ElementId element_id,
+                                      std::optional<zx::duration> turn_on_delay) {
+  turn_on_delay_overrides_.insert_or_assign(element_id, turn_on_delay);
+}
+void FakeComposite::PresetInternalExternalDelays(ElementId element_id, zx::duration internal_delay,
+                                                 std::optional<zx::duration> external_delay) {
+  internal_delay_overrides_.insert_or_assign(element_id, internal_delay);
+  external_delay_overrides_.insert_or_assign(element_id, external_delay);
+}
 
 void FakeComposite::CreateRingBuffer(CreateRingBufferRequest& request,
                                      CreateRingBufferCompleter::Sync& completer) {
@@ -299,10 +362,12 @@ void FakeComposite::CreateRingBuffer(CreateRingBufferRequest& request,
   auto match = ring_buffer_allocation_sizes_.find(element_id);
   if (match != ring_buffer_allocation_sizes_.end()) {
     ring_buffer_allocated_size = match->second;
+  } else {
+    ADR_WARN_METHOD() << "ring buffer allocation size not found";
   }
+
   auto ring_buffer_impl = std::make_unique<FakeCompositeRingBuffer>(
-      element_id, dispatcher(), std::move(request.ring_buffer()), *request.format().pcm_format(),
-      ring_buffer_allocated_size);
+      this, element_id, *request.format().pcm_format(), ring_buffer_allocated_size);
 
   auto match_active_channels = active_channels_support_overrides_.find(element_id);
   if (match_active_channels != active_channels_support_overrides_.end()) {
@@ -313,8 +378,38 @@ void FakeComposite::CreateRingBuffer(CreateRingBufferRequest& request,
     }
   }
 
+  auto match_turn_on_delay = turn_on_delay_overrides_.find(element_id);
+  if (match_turn_on_delay != turn_on_delay_overrides_.end()) {
+    FX_LOGS(INFO) << "Setting turn_on_delay to "
+                  << (match_turn_on_delay->second.has_value()
+                          ? (std::to_string(match_turn_on_delay->second->get()) + " ns")
+                          : "nullopt");
+    match_turn_on_delay->second ? ring_buffer_impl->set_turn_on_delay(*match_turn_on_delay->second)
+                                : ring_buffer_impl->clear_turn_on_delay();
+  }
+  auto match_internal_delay = internal_delay_overrides_.find(element_id);
+  if (match_internal_delay != internal_delay_overrides_.end()) {
+    FX_LOGS(INFO) << "Setting internal_delay to "
+                  << std::to_string(match_internal_delay->second.get()) + " ns";
+    ring_buffer_impl->set_internal_delay(match_internal_delay->second);
+  }
+  auto match_external_delay = external_delay_overrides_.find(element_id);
+  if (match_external_delay != external_delay_overrides_.end()) {
+    FX_LOGS(INFO) << "Setting external_delay to "
+                  << (match_external_delay->second.has_value()
+                          ? (std::to_string(match_external_delay->second->get()) + " ns")
+                          : "nullopt");
+    match_external_delay->second
+        ? ring_buffer_impl->set_external_delay(*match_external_delay->second)
+        : ring_buffer_impl->clear_external_delay();
+  }
+
   ring_buffers_.erase(element_id);
   ring_buffers_.insert({element_id, std::move(ring_buffer_impl)});
+  ring_buffer_bindings_.insert_or_assign(
+      element_id,
+      fidl::BindServer(dispatcher_, std::move(request.ring_buffer()),
+                       ring_buffers_.at(element_id).get(), &FakeComposite::on_rb_unbind));
 
   completer.Reply(fit::ok());
 }
@@ -376,7 +471,7 @@ bool FakeComposite::DaiFormatIsSupported(ElementId element_id,
     }
 
     match = false;
-    for (auto frame_format : dai_format_set.frame_formats()) {
+    for (const auto& frame_format : dai_format_set.frame_formats()) {
       if (frame_format == format.frame_format()) {
         match = true;
         break;
