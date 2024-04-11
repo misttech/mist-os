@@ -44,6 +44,10 @@ PagerProxy::~PagerProxy() {
   // In error paths shortly after construction, we can destruct without page_source_closed_ becoming
   // true.
   DEBUG_ASSERT(!complete_pending_);
+  // We vend out a raw pointer to ourselves in the form of being the allocator for our internal
+  // PortPacket. Ensure that the packet is not somehow still in use, and that a PortDispatcher would
+  // therefore not be able to call Free.
+  DEBUG_ASSERT(!packet_busy_);
 }
 
 const PageSourceProperties& PagerProxy::properties() const { return kProperties; }
@@ -260,6 +264,10 @@ void PagerProxy::Free(PortPacket* packet) {
     // Freeing the complete_request_ indicates we have completed a pending action that might have
     // been delaying cleanup.
     complete_pending_ = false;
+    // Should be nothing else queued.
+    DEBUG_ASSERT(pending_requests_.is_empty());
+    active_request_ = nullptr;
+    packet_busy_ = false;
     // If the source is closed, we need to do delayed cleanup. Make sure we are not still in the
     // pager's proxy list (if the pager is not closed yet), and then break our refptr cycle.
     if (page_source_closed_) {
