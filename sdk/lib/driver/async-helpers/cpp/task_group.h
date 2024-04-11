@@ -11,7 +11,7 @@
 
 namespace fdf::async_helpers {
 
-class TaskGroup {
+class TaskGroup final {
  public:
   TaskGroup()
       : sync_checker_(fdf::Dispatcher::GetCurrent()->async_dispatcher(),

@@ -15,7 +15,7 @@ namespace fdf::async_helpers {
 // Forward declaration.
 class TaskGroup;
 
-class [[nodiscard]] AsyncTask {
+class [[nodiscard]] AsyncTask final {
   struct SharedState {
     explicit SharedState(bool completed) : completed(completed) {}
     async::synchronization_checker sync_checker =

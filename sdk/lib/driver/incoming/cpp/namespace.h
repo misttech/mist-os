@@ -84,7 +84,7 @@ zx::result<> DriverTransportConnect(fidl::UnownedClientEnd<fuchsia_io::Directory
 }  // namespace internal
 
 // Manages a driver's namespace.
-class Namespace {
+class Namespace final {
  public:
   // Creates a namespace from `DriverStartArgs::ns`.
   static zx::result<Namespace> Create(

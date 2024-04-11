@@ -30,7 +30,7 @@ enum class Error : uint8_t {
   DEPENDENCY_NOT_FOUND,
 };
 
-class ParentElementHasher {
+class ParentElementHasher final {
  public:
   /// Make a unique string as our hash key. The string is the ordinal of the SAG
   /// value or 0 if not present followed by a forward slash, followed by the

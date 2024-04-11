@@ -20,7 +20,7 @@
 namespace fdf {
 
 // Provides a driver's logger.
-class Logger {
+class Logger final {
  public:
   // Creates a logger with a given |name|, which will only send logs that are of
   // at least |min_severity|.

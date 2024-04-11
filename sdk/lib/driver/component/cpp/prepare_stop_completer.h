@@ -13,7 +13,7 @@
 namespace fdf {
 
 // This is the completer for the PrepareStop operation in |DriverBase|.
-class PrepareStopCompleter : public Completer {
+class PrepareStopCompleter final : public Completer {
  public:
   using Completer::Completer;
   using Completer::operator();

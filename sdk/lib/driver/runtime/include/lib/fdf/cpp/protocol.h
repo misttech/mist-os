@@ -21,7 +21,7 @@ namespace fdf {
 // # Thread safety
 //
 // This class is thread-unsafe.
-class Protocol : public fdf_token_t {
+class Protocol final : public fdf_token_t {
  public:
   // Handles the connection request to |protocol|. If |status| is ZX_OK, transfers
   // ownership of |channel|.

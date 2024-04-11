@@ -170,7 +170,7 @@ class Dispatcher {
   friend class fdf_env::DispatcherBuilder;
   friend class fdf_internal::TestDispatcherBuilder;
 
-  class DispatcherShutdownContext {
+  class DispatcherShutdownContext final {
    public:
     explicit DispatcherShutdownContext(ShutdownHandler handler)
         : observer_{CallHandler}, handler_(std::move(handler)) {}
@@ -196,7 +196,7 @@ class Dispatcher {
 };
 
 // Dispatcher that disallows parallel calls into callbacks.
-class SynchronizedDispatcher : public Dispatcher {
+class SynchronizedDispatcher final : public Dispatcher {
  public:
   // Options that may be passed to |fdf::SynchronizedDispatcher::Create|.
   // When using the |SynchronizedDispatcher| class, the dispatcher options must set
@@ -277,7 +277,7 @@ inline constexpr SynchronizedDispatcher::Options SynchronizedDispatcher::Options
     {FDF_DISPATCHER_OPTION_SYNCHRONIZED | FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS};
 
 // Dispatcher that allows parallel calls into callbacks.
-class UnsynchronizedDispatcher : public Dispatcher {
+class UnsynchronizedDispatcher final : public Dispatcher {
  public:
   // Options that may be passed to |fdf::UnsynchronizedDispatcher::Create|.
   // When using the |UnsynchronizedDispatcher| class, the dispatcher options must set

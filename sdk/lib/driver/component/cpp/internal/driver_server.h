@@ -21,7 +21,7 @@ namespace fdf_internal {
 
 // This will shim a |DriverBase| based driver with the new FIDL based registration.
 template <typename DriverBaseImpl>
-class DriverServer : public fdf::WireServer<fuchsia_driver_framework::Driver> {
+class DriverServer final : public fdf::WireServer<fuchsia_driver_framework::Driver> {
   static_assert(std::is_base_of_v<fdf::DriverBase, DriverBaseImpl>,
                 "The driver type must implement the fdf::DriverBase class.");
 

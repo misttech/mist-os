@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_TESTING_CPP_DRIVER_RUNTIME_ENV_H_
-#define LIB_DRIVER_TESTING_CPP_DRIVER_RUNTIME_ENV_H_
+#ifndef LIB_DRIVER_TESTING_CPP_DRIVER_RUNTIME_H_
+#define LIB_DRIVER_TESTING_CPP_DRIVER_RUNTIME_H_
 
 #include <lib/async/cpp/executor.h>
 #include <lib/driver/runtime/testing/cpp/internal/dispatcher.h>
@@ -19,7 +19,7 @@ namespace fdf_testing {
 namespace internal {
 
 // Starts the runtime environment on creation, and resets it on destruction.
-class DriverRuntimeEnv {
+class DriverRuntimeEnv final {
  public:
   DriverRuntimeEnv();
   ~DriverRuntimeEnv();
@@ -40,7 +40,7 @@ class DriverRuntimeEnv {
 // This class is thread-unsafe. Instances must be created and used from the unit test's main thread.
 // The exception to this is the |Quit| and |ResetQuit| functions which can be called from any
 // thread.
-class DriverRuntime {
+class DriverRuntime final {
  public:
   // This class wraps a fpromise::promise for an asynchronous task. This prevents the user from
   // being exposed directly to the fpromise type inside.
@@ -252,4 +252,4 @@ Result DriverRuntime::PerformBlockingWorkImpl(Callable&& work) {
 
 }  // namespace fdf_testing
 
-#endif  // LIB_DRIVER_TESTING_CPP_DRIVER_RUNTIME_ENV_H_
+#endif  // LIB_DRIVER_TESTING_CPP_DRIVER_RUNTIME_H_

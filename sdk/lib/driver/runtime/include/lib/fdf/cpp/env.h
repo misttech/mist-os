@@ -13,7 +13,7 @@
 
 namespace fdf_env {
 
-class DispatcherBuilder {
+class DispatcherBuilder final {
  public:
   // Same as |fdf::SynchronizedDispatcher::Create| but allows setting the driver owner for the
   // dispatcher.
@@ -74,7 +74,7 @@ class DispatcherBuilder {
 };
 
 // For shutting down all dispatchers owned by a driver.
-class DriverShutdown : public fdf_env_driver_shutdown_observer_t {
+class DriverShutdown final : public fdf_env_driver_shutdown_observer_t {
  public:
   // Called when the asynchronous shutdown of all dispatchers owned by |driver| completes.
   using Handler = fit::callback<void(const void* driver)>;

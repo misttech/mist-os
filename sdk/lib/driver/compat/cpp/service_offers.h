@@ -18,7 +18,7 @@ using FidlServiceOffers = std::vector<std::string>;
 // The SerivceOffers class supports the services that a DFv1 driver exports.
 // DFv1 drivers export their services via a directory, with a list of names
 // of the services hosted in that directory.
-class ServiceOffersV1 {
+class ServiceOffersV1 final {
  public:
   ServiceOffersV1(std::string name, fidl::ClientEnd<fuchsia_io::Directory> dir,
                   FidlServiceOffers zircon_offers, FidlServiceOffers driver_offers)

@@ -26,7 +26,7 @@ using MetadataMap = std::unordered_map<MetadataKey, const Metadata>;
 
 using BanjoProtoId = uint32_t;
 
-class ForwardMetadata {
+class ForwardMetadata final {
  public:
   // Creates a ForwardMetadata object in which all of the available metadata from the parent(s)
   // are forwarded.

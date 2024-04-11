@@ -38,7 +38,7 @@ class Completer {
 };
 
 // This is the completer for the Start operation in |DriverBase|.
-class StartCompleter : public Completer {
+class StartCompleter final : public Completer {
  public:
   using Completer::Completer;
   using Completer::operator();

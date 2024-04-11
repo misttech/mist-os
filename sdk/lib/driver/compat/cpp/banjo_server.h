@@ -12,7 +12,7 @@
 
 namespace compat {
 
-class BanjoServer {
+class BanjoServer final {
  public:
   BanjoServer(uint32_t proto_id, void* ctx, void* ops)
       : proto_id_(proto_id), ctx_(ctx), ops_(ops) {}

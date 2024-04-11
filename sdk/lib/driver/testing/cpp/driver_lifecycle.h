@@ -105,7 +105,7 @@ class DriverUnderTestBase : public fdf::WireAsyncEventHandler<fuchsia_driver_fra
 // dispatcher that this object lives on, therefore the driver's initial dispatcher will be this
 // same dispatcher.
 template <typename Driver = void>
-class DriverUnderTest : public DriverUnderTestBase {
+class DriverUnderTest final : public DriverUnderTestBase {
  public:
   explicit DriverUnderTest(
       DriverRegistration driver_registration_symbol = __fuchsia_driver_registration__)

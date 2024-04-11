@@ -45,7 +45,7 @@ namespace fdf {
 //         ...
 //  });
 //  zx_status_t status = channel_read->Begin(dispatcher_.get());
-class Channel {
+class Channel final {
  public:
   using HandleType = fdf_handle_t;
 
@@ -247,7 +247,7 @@ class Channel {
   fdf_handle_t channel_;
 };
 
-class ChannelPair {
+class ChannelPair final {
  public:
   ChannelPair(Channel channel0, Channel channel1)
       : end0(std::move(channel0)), end1(std::move(channel1)) {}

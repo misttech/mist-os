@@ -36,7 +36,7 @@ namespace fdf {
 //   void* addr2 = arena.Allocate(arena, 0x2000);
 //
 //   // Use the allocated memory...
-class Arena : public fidl::AnyArena {
+class Arena final : public fidl::AnyArena {
  public:
   explicit Arena(fdf_arena_t* arena) : arena_(arena) {}
 
