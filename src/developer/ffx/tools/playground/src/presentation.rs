@@ -2,102 +2,177 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Result};
-use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
-use fuchsia_fs::directory::readdir;
 use futures::future::{FutureExt, LocalBoxFuture};
 use futures::io::{AsyncWrite, AsyncWriteExt as _};
 use futures::stream::StreamExt;
 use playground::interpreter::Interpreter;
-use playground::value::{InUseHandle, PlaygroundValue, Value, ValueExt};
+use playground::value::{PlaygroundValue, Value};
+use std::collections::HashMap;
 use std::io;
-use std::task::Poll;
 
-/// Given a fuchsia.io/Directory channel that has come to us as a value, print a
-/// directory listing.
-async fn display_dir<W: AsyncWrite + Unpin>(mut writer: W, handle: InUseHandle) -> io::Result<()> {
-    let (dir, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    let server = fasync::Channel::from_channel(server.into_channel());
-    let _task = fasync::Task::spawn(futures::future::poll_fn(move |ctx| -> Poll<Result<()>> {
-        let mut handle_read_bytes = Vec::new();
-        let mut handle_read_handles = Vec::new();
-        let mut server_read_bytes = Vec::new();
-        let mut server_read_handles = Vec::new();
-        loop {
-            let read_handle = handle
-                .poll_read_channel_etc(ctx, &mut handle_read_bytes, &mut handle_read_handles)
-                .map_err(|x| anyhow!("{x:?}"))?;
-            let read_server =
-                server.read_etc(ctx, &mut server_read_bytes, &mut server_read_handles)?;
-            if read_handle.is_ready() {
-                let mut handle_read_handles = handle_read_handles
-                    .drain(..)
-                    .map(|x| fidl::HandleDisposition {
-                        handle_op: fidl::HandleOp::Move(x.handle),
-                        object_type: x.object_type,
-                        rights: x.rights,
-                        result: fidl::Status::OK,
-                    })
-                    .collect::<Vec<_>>();
-                server.write_etc(&handle_read_bytes, &mut handle_read_handles)?;
-            }
-            if read_server.is_ready() {
-                let mut server_read_handles = server_read_handles
-                    .drain(..)
-                    .map(|x| fidl::HandleDisposition {
-                        handle_op: fidl::HandleOp::Move(x.handle),
-                        object_type: x.object_type,
-                        rights: x.rights,
-                        result: fidl::Status::OK,
-                    })
-                    .collect::<Vec<_>>();
-                handle
-                    .write_channel_etc(&server_read_bytes, &mut server_read_handles)
-                    .map_err(|x| anyhow!("{x:?}"))?;
-            }
-
-            if read_server.is_pending() && read_handle.is_pending() {
-                return Poll::Pending;
-            }
-            handle_read_bytes.clear();
-            server_read_bytes.clear();
+/// Display a list of values which came as the result of a command in a pretty way.
+async fn display_result_list<'a, W: AsyncWrite + Unpin + 'a>(
+    writer: &'a mut W,
+    values: Vec<Value>,
+    interpreter: &'a Interpreter,
+) -> io::Result<()> {
+    if values.is_empty() {
+        writer.write_all(format!("{}\n", Value::List(values)).as_bytes()).await?
+    } else if values.iter().all(|x| matches!(x, Value::U8(_))) {
+        let string = values
+            .iter()
+            .map(|x| {
+                let Value::U8(x) = x else { unreachable!() };
+                *x
+            })
+            .collect::<Vec<_>>();
+        if let Ok(string) = String::from_utf8(string) {
+            writer.write_all(format!("{string}\n").as_bytes()).await?;
+        } else {
+            writer.write_all(format!("{}\n", Value::List(values)).as_bytes()).await?
         }
-    }));
+    } else if values.windows(2).all(|arr| {
+        let Value::Object(a) = &arr[0] else {
+            return false;
+        };
+        let Value::Object(b) = &arr[1] else {
+            return false;
+        };
 
-    match readdir(&dir).await {
-        Ok(items) => {
-            for entry in items {
-                writer.write_all(format!("{} {:?}\n", entry.name, entry.kind).as_bytes()).await?;
+        if a.len() != b.len() {
+            return false;
+        }
+
+        a.iter().zip(b.iter()).all(|((a, _), (b, _))| a == b)
+    }) {
+        let mut columns = HashMap::new();
+        let mut column_order = Vec::new();
+        let row_count = values.len();
+
+        for value in values {
+            let Value::Object(value) = value else { unreachable!() };
+
+            if column_order.is_empty() {
+                column_order = value.iter().map(|x| x.0.clone()).collect();
+            }
+
+            for (column, value) in value {
+                let mut value_text = Vec::new();
+                let mut cursor = futures::io::Cursor::new(&mut value_text);
+                display_result(&mut cursor, true, Ok(value), interpreter).await?;
+                let value_text = String::from_utf8(value_text).unwrap();
+                columns.entry(column).or_insert(Vec::new()).push(value_text);
             }
         }
-        Err(e) => writer.write_all(format!("Err: {:#}\n", e).as_bytes()).await?,
+
+        let column_lengths: HashMap<_, _> = column_order
+            .iter()
+            .map(|column| {
+                let max =
+                    columns.get(column).unwrap().iter().map(|x| x.chars().count()).max().unwrap();
+                let max = std::cmp::max(max, column.chars().count());
+                (column, max)
+            })
+            .collect();
+
+        let header = column_order
+            .iter()
+            .map(|column| {
+                format!(" {column:<length$}", length = column_lengths.get(column).unwrap())
+            })
+            .collect::<Vec<_>>()
+            .join("  ");
+        writer.write_all(format!("\x1b[1;30;103m{header}\x1b[0m\n").as_bytes()).await?;
+
+        for row in 0..row_count {
+            let row = column_order
+                .iter()
+                .map(|column| {
+                    let column_text = &columns.get(column).unwrap()[row];
+                    format!(" {column_text:<length$}", length = column_lengths.get(column).unwrap())
+                })
+                .collect::<Vec<_>>()
+                .join(" |");
+            writer.write_all(format!("{row}\n").as_bytes()).await?;
+        }
+    } else {
+        writer.write_all(format!("{}\n", Value::List(values)).as_bytes()).await?
     }
+
     Ok(())
 }
 
 /// Display a result from running a command in a prettified way.
 pub fn display_result<'a, W: AsyncWrite + Unpin + 'a>(
     writer: &'a mut W,
+    inline: bool,
     result: playground::error::Result<Value>,
     interpreter: &'a Interpreter,
 ) -> LocalBoxFuture<'a, io::Result<()>> {
     async move {
         match result {
-            Ok(Value::OutOfLine(PlaygroundValue::Iterator(x))) => {
-                let mut stream = interpreter.replayable_iterator_to_stream(x);
-
-                while let Some(x) = stream.next().await {
-                    display_result(writer, x, interpreter).await?;
+            Ok(Value::OutOfLine(PlaygroundValue::Iterator(x))) if !inline => {
+                let stream = interpreter.replayable_iterator_to_stream(x);
+                let values = stream
+                    .collect::<Vec<_>>()
+                    .await
+                    .into_iter()
+                    .collect::<playground::error::Result<Vec<_>>>();
+                match values {
+                    Ok(values) => display_result_list(writer, values, interpreter).await?,
+                    Err(other) => display_result(writer, inline, Err(other), interpreter).await?,
                 }
             }
-            Ok(x) if x.is_client("fuchsia.io/Directory") => {
-                display_dir(writer, x.to_in_use_handle().unwrap()).await?
+            Ok(Value::List(values)) if !inline => {
+                display_result_list(writer, values, interpreter).await?
             }
-            Ok(x) => writer.write_all(format!("{}\n", x).as_bytes()).await?,
-            Err(x) => writer.write_all(format!("Err: {:#}\n", x).as_bytes()).await?,
+            Ok(Value::String(s)) if !inline => {
+                writer.write_all(format!("{s}\n").as_bytes()).await?
+            }
+            Ok(Value::String(s)) => writer.write_all(s.as_bytes()).await?,
+            Ok(x) if !inline => writer.write_all(format!("{}\n", x).as_bytes()).await?,
+            Ok(x) => writer.write_all(format!("{}", x).as_bytes()).await?,
+            Err(x) if !inline => writer.write_all(format!("Err: {:#}\n", x).as_bytes()).await?,
+            Err(x) => writer.write_all(format!("Err: {:#}", x).as_bytes()).await?,
         }
         Ok(())
     }
     .boxed_local()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[fuchsia::test]
+    async fn test_table() {
+        let mut got = Vec::<u8>::new();
+        let ns = fidl_codec::library::Namespace::new();
+        let (fs_root, _server) = fidl::endpoints::create_endpoints();
+        let (interpreter, task) = playground::interpreter::Interpreter::new(ns, fs_root).await;
+        fuchsia_async::Task::spawn(task).detach();
+
+        display_result(
+            &mut got,
+            false,
+            Ok(Value::List(vec![
+                Value::Object(vec![
+                    ("a".to_owned(), Value::U8(1)),
+                    ("b".to_owned(), Value::String("Hi".to_owned())),
+                ]),
+                Value::Object(vec![
+                    ("a".to_owned(), Value::U8(2)),
+                    ("b".to_owned(), Value::String("Hello".to_owned())),
+                ]),
+                Value::Object(vec![
+                    ("a".to_owned(), Value::U8(3)),
+                    ("b".to_owned(), Value::String("Good Evening".to_owned())),
+                ]),
+            ])),
+            &interpreter,
+        )
+        .await
+        .unwrap();
+        assert_eq!(b"\x1b[1;30;103m a     b           \x1b[0m\n 1u8 | Hi          \n 2u8 | Hello       \n 3u8 | Good Evening\n", got.as_slice());
+    }
 }

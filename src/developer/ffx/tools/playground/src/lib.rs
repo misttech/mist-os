@@ -155,14 +155,14 @@ pub async fn exec_playground(
         } else {
             let res = interpreter.run(cmd.as_str()).await;
             analytics::emit_playground_cmd_event(res.is_ok(), "argument");
-            display_result(&mut AllowStdIo::new(&io::stdout()), res, &interpreter).await?;
+            display_result(&mut AllowStdIo::new(&io::stdout()), false, res, &interpreter).await?;
             Ok(())
         }
     } else if let Some(file) = command.file {
         afs::File::open(&file).await?.read_to_string(&mut text).await?;
         let res = interpreter.run(text.as_str()).await;
         analytics::emit_playground_cmd_event(res.is_ok(), "script");
-        display_result(&mut AllowStdIo::new(&io::stdout()), res, &interpreter).await?;
+        display_result(&mut AllowStdIo::new(&io::stdout()), false, res, &interpreter).await?;
         Ok(())
     } else {
         let node_name = remote_proxy
@@ -195,7 +195,7 @@ pub async fn exec_playground(
                 fasync::Task::local(async move {
                     let res = interpreter.run(line.as_str()).await;
                     analytics::emit_playground_cmd_event(res.is_ok(), "interactive");
-                    display_result(&mut repl::ReplWriter::new(&*repl), res, &interpreter)
+                    display_result(&mut repl::ReplWriter::new(&*repl), false, res, &interpreter)
                         .await
                         .unwrap();
                 })
