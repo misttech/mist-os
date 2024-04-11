@@ -289,7 +289,7 @@ int cmd_peripheral_map(int argc, const cmd_args* argv, uint32_t flags) {
 }  // namespace
 
 STATIC_COMMAND_START
-STATIC_COMMAND("pm", "peripheral mapping commands", &cmd_peripheral_map)
+STATIC_COMMAND_MASKED("pm", "peripheral mapping commands", &cmd_peripheral_map, CMD_AVAIL_ALWAYS)
 STATIC_COMMAND_END(pm)
 
 zx_status_t add_periph_range(paddr_t base_phys, size_t length) {
@@ -305,6 +305,13 @@ zx_status_t add_periph_range(paddr_t base_phys, size_t length) {
   for (auto& range : periph_ranges) {
     if (range.length == 0) {
       base_virt -= length;
+
+      // Round down to try to align the mappings to maximize usage of large pages
+      uint64_t phys_log = log2_floor(base_phys);
+      uint64_t len_log = log2_floor(length);
+      uint64_t log2_align = ktl::min(ktl::min(phys_log, len_log), 30UL);  // No point aligning > 1GB
+      base_virt = ROUNDDOWN(base_virt, 1UL << log2_align);
+
       auto status = arm64_boot_map_v(base_virt, base_phys, length, MMU_INITIAL_MAP_DEVICE, true);
       if (status == ZX_OK) {
         range.base_phys = base_phys;
@@ -313,7 +320,7 @@ zx_status_t add_periph_range(paddr_t base_phys, size_t length) {
       }
       return status;
     } else {
-      base_virt -= range.length;
+      base_virt = range.base_virt;
     }
   }
   return ZX_ERR_OUT_OF_RANGE;
@@ -329,6 +336,8 @@ void reserve_periph_ranges() {
       break;
     }
 
+    dprintf(INFO, "Periphmap: reserving physical %#lx virtual [%#lx, %#lx) flags %#x\n",
+            range.base_phys, range.base_virt, range.base_virt + range.length, arch_mmu_flags);
     zx_status_t status =
         vmar->ReserveSpace("periph", range.base_virt, range.length, arch_mmu_flags);
     ASSERT_MSG(status == ZX_OK, "status %d\n", status);
