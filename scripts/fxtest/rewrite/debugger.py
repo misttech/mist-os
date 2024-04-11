@@ -125,7 +125,12 @@ def spawn(
         sys.stdout.close()
         sys.stdout = open(os.devnull, "w")
 
-        os.remove(fifo)
+        try:
+            os.remove(fifo)
+        except FileNotFoundError as e:
+            # The tests for this don't actually create a file for the fifo, and we don't want to
+            # throw an exception, since we were trying to remove the file anyway.
+            pass
 
         try:
             # Give zxdb a chance to gracefully shutdown, in the normal case this should return
