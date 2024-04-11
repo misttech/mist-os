@@ -143,7 +143,7 @@
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
             ],
-            from: "#svchost",
+            from: "#kernel_debug_broker",
             to: "#console-launcher",
         },
         {

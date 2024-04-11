@@ -231,7 +231,7 @@
             to: "#core",
         },
 
-        // Non-zircon services for svchost
+        // Non-zircon services for bootstrap
         {
             protocol: [
                 "fuchsia.device.NameProvider",
@@ -291,7 +291,7 @@
             availability: "same_as_target",
         },
 
-        // Non-zircon services for archivist, svchost, and console.
+        // Non-zircon services for archivist, pwrbtn-monitor, and console.
         {
             protocol: [
                 "fuchsia.component.KcounterBinder",

@@ -319,7 +319,7 @@ the kernel.
 
 Zircon code that uses exceptions can be viewed for further examples, including:
 
-- `system/core/svchost/crashsvc`: system-level crash handler
+- `src/bringup/bin/pwrbtn-monitor/crashsvc`: system-level crash handler
 - `system/utest/exception`: exception unit tests
 - `system/utest/debugger`: debugger-related functionality unit tests
 

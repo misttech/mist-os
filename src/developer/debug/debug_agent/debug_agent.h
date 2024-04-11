@@ -163,18 +163,18 @@ class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public 
   // NOTE(01/2020): The reason for this is because the limbo gets the exception from crashsvc,
   //                which has an exception channel upon the root job handle. Exceptions obtained
   //                through an exception channel will hold the same rights as the origin handle (the
-  //                root job one in this case). Now, the root job handle svchost receives doesn't
-  //                have the ZX_RIGHT_DESTROY right, as you don't really want to be able to kill
-  //                the root job. This means that all the handles obtained through an exception
+  //                root job one in this case). Now, the root job handle pwrbtn-monitor receives
+  //                doesn't have the ZX_RIGHT_DESTROY right, as you don't really want to be able to
+  //                kill the root job. This means that all the handles obtained through an exception
   //                will not have the destroy right, thus making the debugger jump through this
   //                hoop.
   //
-  //                See src/bringup/bin/svchost/crashsvc.cc for more details.
+  //                See src/bringup/bin/pwrbtn-monitor/crashsvc.cc for more details.
   //
-  //                Note that if the situation changes and the svchost actually gets destroy rights
-  //                on the exception channel, that situation will seamlessly work here. This is
-  //                because the debug agent will only track "limbo killed processes" if trying
-  //                to kill results in ZX_ERR_ACCESS_DENIED *and* they came from limbo. If the limbo
+  //                Note that if the situation changes and the pwrbtn-monitor actually gets destroy
+  //                rights on the exception channel, that situation will seamlessly work here. This
+  //                is because the debug agent will only track "limbo killed processes" if trying to
+  //                kill results in ZX_ERR_ACCESS_DENIED *and* they came from limbo. If the limbo
   //                process handles now have destroy rights, killing them will work, thus skipping
   //                this dance.
   std::set<zx_koid_t> killed_limbo_procs_;

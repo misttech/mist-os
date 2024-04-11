@@ -38,7 +38,7 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/console",
-                    "/bootstrap/svchost",
+                    "/bootstrap/kernel_debug_broker",
                 ],
             },
             {
@@ -111,7 +111,6 @@
                     "/bootstrap/console-launcher",
                     "/bootstrap/netsvc",
                     "/bootstrap/critical-services",
-                    "/bootstrap/svchost",
                 ],
             },
             {
@@ -162,7 +161,6 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap",
-                    "/bootstrap/svchost",
                     "/bootstrap/console-launcher",
                     "/bootstrap/role_manager",
                 ],

@@ -5,8 +5,8 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
-executable("svchost") {
-  sources = [ "svchost.cc" ]
+executable("kernel_debug_broker") {
+  sources = [ "kernel_debug_broker.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp",
@@ -26,12 +26,12 @@ executable("svchost") {
 }
 
 fuchsia_component("component") {
-  component_name = "svchost"
-  manifest = "meta/svchost.cml"
-  deps = [ ":svchost" ]
+  component_name = "kernel_debug_broker"
+  manifest = "meta/kernel_debug_broker.cml"
+  deps = [ ":kernel_debug_broker" ]
 }
 
 fuchsia_package("pkg") {
-  package_name = "svchost"
+  package_name = "kernel_debug_broker"
   deps = [ ":component" ]
 }

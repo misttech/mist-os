@@ -38,13 +38,13 @@ You should see output similar to the (truncated) list below:
 /bootstrap/device_name_provider
 /bootstrap/driver_manager
 /bootstrap/fshost
+/bootstrap/kernel_debug_broker
 /bootstrap/miscsvc
 /bootstrap/netsvc
 /bootstrap/power_manager
 /bootstrap/ptysvc
 /bootstrap/pwrbtn-monitor
 /bootstrap/shutdown_shim
-/bootstrap/svchost
 /bootstrap/sysinfo
 /bootstrap/virtual_console
 /core

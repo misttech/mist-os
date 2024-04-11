@@ -104,8 +104,8 @@ assembly_input_bundle("bootstrap") {
   ]
   bootfs_packages = [
     "//src/bringup/bin/critical-services:package",
-    "//src/bringup/bin/svchost:pkg",
     "//src/bringup/bin/device-name-provider:package",
+    "//src/bringup/bin/kernel_debug_broker:pkg",
     "//src/bringup/bin/paver:package",
     "//src/bringup/bin/sysinfo:package",
     "//src/devices/sysmem/bin/sysmem_connector:pkg",

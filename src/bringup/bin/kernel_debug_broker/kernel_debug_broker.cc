@@ -104,7 +104,7 @@ static zx_status_t provider_load(zx_service_provider_instance_t* instance,
 
 int main(int argc, char** argv) {
   if (zx_status_t status = StdoutToDebuglog::Init(); status != ZX_OK) {
-    fprintf(stderr, "svchost: unable to forward stdout to debuglog: %s\n",
+    fprintf(stderr, "kernel_debug_broker: unable to forward stdout to debuglog: %s\n",
             zx_status_get_string(status));
     return 1;
   }
@@ -113,7 +113,8 @@ int main(int argc, char** argv) {
   {
     zx::result result = component::OpenServiceRoot();
     if (result.is_error()) {
-      fprintf(stderr, "svchost: unable to open service root: %s\n", result.status_string());
+      fprintf(stderr, "kernel_debug_broker: unable to open service root: %s\n",
+              result.status_string());
       return 1;
     }
     svc = std::move(result.value());
@@ -128,7 +129,7 @@ int main(int argc, char** argv) {
   {
     zx::result client = component::ConnectAt<fuchsia_kernel::DebugResource>(svc);
     if (client.is_error()) {
-      fprintf(stderr, "svchost: unable to connect to %s: %s\n",
+      fprintf(stderr, "kernel_debug_broker: unable to connect to %s: %s\n",
               fidl::DiscoverableProtocolName<fuchsia_kernel::DebugResource>,
               client.status_string());
       return 1;
@@ -136,7 +137,8 @@ int main(int argc, char** argv) {
 
     fidl::WireResult result = fidl::WireCall(client.value())->Get();
     if (!result.ok()) {
-      fprintf(stderr, "svchost: unable to get root resource: %s\n", result.status_string());
+      fprintf(stderr, "kernel_debug_broker: unable to get root resource: %s\n",
+              result.status_string());
       return 1;
     }
     auto& response = result.value();
@@ -144,8 +146,8 @@ int main(int argc, char** argv) {
   }
 
   if (zx_status_t status = outgoing.ServeFromStartupInfo(); status != ZX_OK) {
-    fprintf(stderr, "svchost: error: Failed to serve outgoing directory: %d (%s).\n", status,
-            zx_status_get_string(status));
+    fprintf(stderr, "kernel_debug_broker: error: Failed to serve outgoing directory: %d (%s).\n",
+            status, zx_status_get_string(status));
     return 1;
   }
 
@@ -167,8 +169,8 @@ int main(int argc, char** argv) {
   for (size_t i = 0; i < std::size(service_providers); ++i) {
     if (zx_status_t status = provider_load(&service_providers[i], dispatcher, outgoing.svc_dir());
         status != ZX_OK) {
-      fprintf(stderr, "svchost: error: Failed to load service provider %zu: %d (%s).\n", i, status,
-              zx_status_get_string(status));
+      fprintf(stderr, "kernel_debug_broker: error: Failed to load service provider %zu: %d (%s).\n", i,
+              status, zx_status_get_string(status));
       return 1;
     }
   }

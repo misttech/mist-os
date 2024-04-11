@@ -244,7 +244,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//sdk/lib/fit:*",
     "//sdk/lib/fit-promise:*",
     "//sdk/lib/stdcompat:*",
-    "//src/bringup/bin/svchost:*",
     "//src/devices/block/lib/scsi:*",
     "//src/devices/bus/lib/device-protocol-pdev:*",
     "//src/devices/bus/lib/virtio:*",

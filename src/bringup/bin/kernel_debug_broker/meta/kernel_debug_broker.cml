@@ -5,7 +5,7 @@
     include: [ "syslog/client.shard.cml" ],
     program: {
         runner: "elf",
-        binary: "bin/svchost",
+        binary: "bin/kernel_debug_broker",
     },
     capabilities: [
         {

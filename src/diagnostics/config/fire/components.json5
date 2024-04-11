@@ -629,4 +629,9 @@
         label: "Critical Services",
         moniker: "bootstrap/critical-services",
     },
+    {
+        id: 259,
+        label: "Kernel Debug Service",
+        moniker: "bootstrap/kernel_debug_broker",
+    },
 ]
