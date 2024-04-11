@@ -91,8 +91,7 @@ for in-tree tests, while OOT test executors will need their own
 scripts to process the coverage output of tests.
 
 Learn how to write driver unit tests in the
-[Driver unit testing
-tutorial](/docs/development/sdk/driver-testing/driver-unit-testing-tutorial.md).
+[Driver unit testing quick start](/docs/development/sdk/driver-testing/driver-unit-testing-quick-start.md).
 
 ### Hermetic Integration Tests {#hermetic-integration-tests}
 

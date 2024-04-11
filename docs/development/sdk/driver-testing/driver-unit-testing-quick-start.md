@@ -1,195 +1,251 @@
 # Driver unit testing quick start
 
-Once you are familiar with the Driver Framework v2 testing framework, follow
-this quick start to write a test for drivers that need to make synchronous FIDL
-(see
-[driver FIDL test code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc)).
-If your driver doesn't need to make synchronous FIDL calls, see the
-[driver base test](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_base_test.cc).
+Follow this quick start to write a driver unit test based on the
+[simple unit test code example](https://cs.opensource.google/fuchsia/fuchsia/+/main:examples/drivers/simple/dfv2/tests/test.cc):
 
 ## Include library dependencies
 
-To test drivers, unit tests need to have access to the various resources and
-environments needed by the drivers themselves. For example, these are the
-library dependencies for the
-[Driver FIDL test](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc):
+Include this library dependency:
 
 ```cpp
-#include <fidl/fuchsia.driver.component.test/cpp/driver/wire.h>
-#include <fidl/fuchsia.driver.component.test/cpp/wire.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/component/incoming/cpp/service.h>
-#include <lib/driver/component/cpp/tests/test_driver.h>
-#include <lib/driver/incoming/cpp/namespace.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
-#include <lib/driver/testing/cpp/test_node.h>
-#include <lib/fdio/directory.h>
-#include <gtest/gtest.h>
+#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
 ```
 
-[DispatcherBound](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/async_patterns/cpp/dispatcher_bound.h)
-is required to test how the driver uses FIDL clients when calling into its
-environment. It ensures a server-end object runs in a single dispatcher,
-enabling the test to construct, call methods on, and destroy the object used
-(see [Threading tips in tests](/docs/development/drivers/testing/threading-tips-in-tests.md)).
+The [DriverTestFixture](#drivertestfixture-configuration-arguments)
+is a base class that driver unit test fixture classes can inherit from.
+Tests define a configuration class to pass into the fixture
+through a template parameter.
+The fixture takes care of setting up the test environment and driver
+on the correct dispatchers, starting and stoping the driver as requested.
 
-[GTest Runner](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/sys/test_runners/gtest/README.md)
-is a test runner that launches a `gtest` binary as a component, parses its
-output, and translates it to `fuchsia.test.Suite` protocol on behalf of the
-test.
+## Create fixture configuration class
 
-## Provide handler to easily add server bindings
+The `DriverTestFixture` base class takes in a configuration class
+through a template parameter.
+This configuration class must be provided with certain values
+that dictate how the test should run.
 
-It's good practice for servers to provide a `GetInstanceHandler` to easily add
-server bindings and run them off a binding group. The bindings should be added
-on the current driver dispatcher. The expectation is that this class is run
-inside of a dispatcher bound to the environment. For example,
-[Driver FIDL test, line 35-52](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc#35),
-provides a handler to the driver service:
-
-```
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc" region_tag="provide_handler" adjust_indentation="auto" %}
-```
-
-## Set up testing framework
-
-### Create driver runtime
-
-Creating the driver runtime automatically attaches a foreground dispatcher,
-[Driver FIDL test, line 115](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc#115):
+Here is an example of a configuration class:
 
 ```cpp
-fdf_testing::DriverRuntime runtime_;
+class FixtureConfig final {
+ public:
+  static constexpr bool kDriverOnForeground = true;
+  static constexpr bool kAutoStartDriver = true;
+  static constexpr bool kAutoStopDriver = true;
+
+  using DriverType = simple::SimpleDriver;
+  using EnvironmentType = SimpleDriverTestEnvironment;
+};
 ```
 
-### Start background dispatcher
+## Define environment type class
 
-The driver dispatcher is set as a background dispatcher,
-[Driver FIDL test, line 118](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc#118):
+The `EnvironmentType` must be an isolated class
+that provides your driver’s custom dependencies.
+It does not need to provide framework dependencies (except for `compat::DeviceServer`),
+as the fixture does that already.
+If no extra dependencies are needed, use `fdf_testing::MinimalEnvironment`
+which provides a default `compat::DeviceServer`.
 
-```cpp {:.devsite-disable-click-to-copy}
-fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
-```
-
-### Create TestNode object
-
-The test node serves the `fdf::Node protocol` to the driver,
-[Driver FIDL test, lines 127-128](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc#127):
+Here's an example of a basic test with the minimal environment:
 
 ```cpp
-async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
-    env_dispatcher(), std::in_place, std::string("root")};
+#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+
+class FixtureConfig final {
+ public:
+  static constexpr bool kDriverOnForeground = true;
+  static constexpr bool kAutoStartDriver = true;
+  static constexpr bool kAutoStopDriver = true;
+
+  using DriverType = MyDriverType;
+  using EnvironmentType = fdf_testing::MinimalEnvironment;
+};
+
+class MyFixture : public fdf_testing::DriverTestFixture<FixtureConfiguration> {};
+
+TEST_F(MyFixture, MyTest) {
+  driver().DoSomething();
+}
 ```
 
-### Create TestEnvironment object
+## Run unit tests
 
-The environment can serve both the Zircon and Driver transport based protocols
-to the driver,
-[Driver FIDL test, lines 131-132](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc#131):
-
-```cpp
-async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
-    env_dispatcher(), std::in_place};
-```
-
-### Create custom FIDL server
-
-The custom FIDL server lives on the background environment dispatcher and has
-to be wrapped in a dispatcher bound,
-[Driver FIDL test, lines 121-124](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc#121):
-
-```
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc" region_tag="custom_server_classes" adjust_indentation="auto" %}
-```
-
-### Get custom FIDL server handler
-
-Get the instance handler for the driver protocol,
-[Driver FIDL test, lines 71-74](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc#71):
-
-```
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc" region_tag="get_server_handlers" adjust_indentation="auto" %}
-```
-
-### Move custom FIDL server handler
-
-Move the instance handler into our driver's incoming namespace,
-[Driver FIDL test, lines 76-87](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc#76):
-
-```
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc" region_tag="move_server_handlers" adjust_indentation="auto" %}
-```
-
-### Call CreateStartArgsAndServe
-
-Create and serve the `start_args table`,
-[Driver FIDL test, lines 59-60](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc#59):
-
-```c++
-zx::result start_args = node_server_.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
-ASSERT_EQ(ZX_OK, start_args.status_value());
-```
-
-### Initialize test environment
-
-Initialize the test environment,
-[Driver FIDL test, lines 65-68](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc#65):
-
-```
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc" region_tag="initialize_test_environment" adjust_indentation="auto" %}
-```
-
-## Run tests
-
-### Add the driver under test
-
-Add the driver under test which will use the foreground dispatcher,
-[Driver FIDL test, lines 167](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc#167):
-
-```cpp
-fdf_testing::DriverUnderTest<TestDriver> driver_;
-```
-
-### Start driver
-
-Start the driver,
-[Driver FIDL test, lines 237-238](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc#237):
-
-```cpp
-zx::result result = runtime().RunToCompletion(driver_.SyncCall(
-  &fdf_testing::DriverUnderTest<TestDriver>::Start, std::move(start_args())));
-```
-
-### Add tests
-
-Use the arrow operator on the `DriverUnderTest` to add tests for the driver.
-The arrow operator gives access to the driver type
-(specified in the `DriverUnderTest` template), for example,
-[Driver FIDL test, lines 384-287](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc#284):
-
-```cpp
-driver().SyncCall([](fdf_testing::DriverUnderTest<TestDriver>* driver) {
-  zx::result result = (*driver)->ServeDriverService();
-  ASSERT_EQ(ZX_OK, result.status_value());
-});
-```
-
-### Call PrepareStop
-
-`PrepareStop` has to be called manually by tests,
-[Driver FIDL test, line 159](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc#159):
-
-```cpp
-zx::result result = runtime().RunToCompletion(driver_.PrepareStop());
-```
-
-### Run unit tests
-
-Execute the following command to run the driver tests
-(for the iwlwifi driver):
+Driver unit tests are executed from within the test folder of the driver itself.
+For example, execute the following command to run the driver tests
+for the iwlwifi driver:
 
 ```posix-terminal
 tools/bazel test third_party/iwlwifi/test:iwlwifi_test_pkg
 ```
+
+## DriverTestFixture configuration arguments
+
+### DriverType
+
+The type of the driver under test. This must be an inheritor of `fdf::DriverBase`.
+
+Use `DriverType` to define the reference type for only the fixture's functions
+(for example, `driver()` and `RunInDriverContext()`).
+Use the driver registration symbol (created by the `FUCHSIA_DRIVER_EXPORT` macro)
+for the driver lifecycle management.
+When using a custom driver type,
+ensure the custom `DriverType` contains a public static function
+with the signature shown below:
+
+```cpp
+static DriverRegistration GetDriverRegistration()
+```
+
+The test uses this registration instead to manage the driver lifecycle.
+
+### EnvironmentType
+A class that contains custom dependencies for the driver under test.
+The environment will always live on a background dispatcher.
+
+It must be default constructible, derive from the `fdf_testing::Environment class`,
+and override the following function:
+`zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override;`
+
+The function is called automatically on the background environment dispatcher
+during initialization.
+It must add its components into the provided `fdf::OutgoingDirectory object`,
+generally done through the `AddService` method.
+The `OutgoingDirectory` backs the driver's incoming namespace, hence its name,
+`to_driver_vfs`.
+
+Example custom environment:
+
+```cpp
+class MyFidlServer : public fidl::WireServer<fuchsia_examples_gizmo::Proto> {...};
+
+class CustomEnvironment : public fdf_testing::Environment {
+ public:
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) {
+    device_server_.Init(component::kDefaultInstance, "root");
+    EXPECT_EQ(ZX_OK, device_server_.Serve(
+    fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
+
+    EXPECT_EQ(ZX_OK, to_driver_vfs.AddService<fuchsia_examples_gizmo::Service::Proto>(
+      custom_server_.CreateInstanceHandler()).status_value());
+
+    return zx::ok();
+  }
+
+ private:
+  compat::DeviceServer device_server_;
+ MyFidlServer custom_server_;
+};
+```
+
+### kDriverOnForeground (prefer = true)
+
+Whether to have the driver under test run on the foreground dispatcher,
+or to run it on a dedicated background dispatcher.
+
+When this is true, the test can access the driver under test
+using the `driver()` method and directly make calls into it,
+but sync client tasks must go through `RunInBackground()`.
+
+When this is false, the test can run tasks on the driver context
+using the `RunInDriverContext()` methods,
+but sync client tasks can be run directly.
+
+### kAutoStartDriver (prefer = true)
+
+If true, the test will automatically start the driver
+on construction of `DriverTestFixture`, and expect a successful start.
+
+### kAutoStopDriver (prefer = true)
+
+If true, the test will automatically stop the driver
+on destruction of `DriverTestFixture`, and expect a successful stop.
+
+## Methods available to the test under all configs
+
+The following methods are available to the test under all configurations.
+
+### runtime
+
+Access the driver runtime object.
+This can be used to create new background dispatchers or
+to run the foreground dispatcher.
+The user does not need to explicitly create dispatchers for the environment or
+the driver as the fixture has already done that.
+
+### Connect
+
+Connects to an instance of a service member that the driver under test provides.
+This can be either a driver transport or a zircon channel transport based service.
+
+### ConnectThroughDevfs
+
+Connects to a protocol that the driver has exported through `devfs`.
+This can be given the node_name of the `devfs` node,
+or a list of node names to traverse before reaching the `devfs` node.
+
+### RunInEnvironmentTypeContext
+
+Runs a task on the `EnvironmentType` instance that the test is using.
+
+### RunInNodeContext
+
+Runs a task on the `fdf_testing::TestNode` instance that the test is using.
+This can be used to validate the driver’s interactions with the driver framework node
+(like checking how many children have been added).
+
+## Methods Available to the Test With config-based restrictions
+
+The following methods are available to the test
+with certain config-based restrictions (in parentheses).
+
+### StartDriver and StartDriverCustomized (kAutoStartDriver = false)
+
+This can be used to manually start the driver under test.
+Should only be used if `kAutoStartDriver` is false.
+The customized variant can be used to modify the start arguments
+that the driver is given.
+
+### StopDriver (kAutoStopDriver = false)
+
+This can be used to manually stop the driver under test.
+Should only be used if `kAutoStopDriver` is false.
+
+### RunInDriverContext (kDriverOnForeground = false)
+
+This can be used to run a callback on the driver under test.
+The callback input will have a reference to the driver.
+All accesses to the driver must go through this as it is unsafe to touch the driver
+on the main test thread under this configuration.
+
+### driver (kDriverOnForeground = true)
+
+This can be used to access the driver directly from the test.
+Since the driver is on the foreground it is safe to access this
+on the main test thread.
+
+### RunInBackground (kDriverOnForeground = true)
+
+Runs a task on a background dispatcher, separate from the driver.
+This is done to avoid deadlocking with the driver when making sync client calls
+with the `kDriverOnForeground` configuration.
+
+### Run* functions warning
+
+Be careful when using the Run* functions
+(`RunInDriverContext`, `RunInBackground`, `RunInEnvironmentTypeContext`, `RunInNodeContext`).
+These tasks run on specific dispatchers, so it might be unsafe to:
+
+* Pass raw pointers into them from another context
+(main thread or a different Run* kind) to use in the function
+* Return a raw pointer (through a captured ref or return type) out of them
+to use on the main thread or to capture/use in another Run* function
+(except for a Run* function of the same kind).
+
+## Examples
+
+* [Simple driver unit test](https://cs.opensource.google/fuchsia/fuchsia/+/main:examples/drivers/simple/dfv2/tests/test.cc)
+* [fxr/997660](http://fxr/997660)
+* [fxr/1001356](http://fxr/1001356)
+* [fxr/996165](http://fxr/996165)

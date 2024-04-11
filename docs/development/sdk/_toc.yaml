@@ -19,10 +19,6 @@ toc:
     path: /docs/development/sdk/debug-driver-when-it-fails-to-load.md
 - title: "Driver testing"
   section:
-  - title: "Driver unit testing tutorial"
-    path: /docs/development/sdk/driver-testing/driver-unit-testing-tutorial.md
   - title: "Driver unit testing quick start"
     path: /docs/development/sdk/driver-testing/driver-unit-testing-quick-start.md
-  - title: "Driver testing reference"
-    path: /docs/development/sdk/driver-testing/driver-testing-reference.md
 - include: /docs/development/sdk/ffx/_toc.yaml
