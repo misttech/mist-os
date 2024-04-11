@@ -127,21 +127,22 @@ void Layer::ApplyChanges(const display_mode_t& mode) {
   current_layer_ = pending_layer_;
   config_change_ = false;
 
-  image_t* new_image_config = nullptr;
   if (current_layer_.type == LAYER_TYPE_PRIMARY) {
-    new_image_config = &current_layer_.cfg.primary.image;
-  } else if (current_layer_.type == LAYER_TYPE_COLOR) {
+    if (displayed_image_) {
+      current_layer_.cfg.primary.image.handle = ToBanjoDriverImageId(displayed_image_->driver_id());
+    }
+    return;
+  }
+
+  if (current_layer_.type == LAYER_TYPE_COLOR) {
     memcpy(current_color_bytes_, pending_color_bytes_, sizeof(current_color_bytes_));
     current_layer_.cfg.color.color_list = current_color_bytes_;
     current_layer_.cfg.color.color_count = 4;
-  } else {
-    // type is validated in ::CheckConfig, so something must be very wrong.
-    ZX_ASSERT(false);
+    return;
   }
 
-  if (new_image_config && displayed_image_) {
-    new_image_config->handle = ToBanjoDriverImageId(displayed_image_->driver_id());
-  }
+  ZX_DEBUG_ASSERT_MSG(false, "CheckConfig() failed to bounce invalid layer type %" PRIu32,
+                      current_layer_.type);
 }
 
 void Layer::DiscardChanges() {
