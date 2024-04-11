@@ -5048,7 +5048,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                FakeFrameCtx, FakeInstant, FakeInstantCtx, FakeLinkResolutionNotifier, FakeNetwork,
+                FakeFrameCtx, FakeInstantCtx, FakeLinkResolutionNotifier, FakeNetwork,
                 FakeNetworkContext, FakeTimerCtx, InstantAndData, PendingFrameData, StepResult,
                 WithFakeFrameContext, WithFakeTimerContext, WrappedFakeCoreCtx,
             },
@@ -5154,7 +5154,7 @@ mod tests {
         fn new_device_state(
             addrs: impl IntoIterator<Item = Self::Addr>,
             prefix: u8,
-        ) -> DualStackIpDeviceState<FakeInstant>;
+        ) -> DualStackIpDeviceState<TcpBindingsCtx<FakeDeviceId>>;
 
         fn converter() -> MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>;
     }
@@ -5221,7 +5221,7 @@ mod tests {
 
     type TcpCoreCtx<D, BT> = WrappedFakeCoreCtx<
         FakeDualStackTcpState<D, BT>,
-        FakeDualStackIpSocketCtx<D>,
+        FakeDualStackIpSocketCtx<D, BT>,
         DualStackSendIpPacketMeta<D>,
         D,
     >;
@@ -5439,9 +5439,9 @@ mod tests {
         I: TcpTestIpExt,
         D: FakeFilterDeviceId<BC::DeviceClass>,
         BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
-        FakeDualStackIpSocketCtx<D>: TransportIpContext<I, BC, DeviceId = Self::DeviceId>,
+        FakeDualStackIpSocketCtx<D, BC>: TransportIpContext<I, BC, DeviceId = Self::DeviceId>,
     {
-        type DevicesWithAddrIter<'a> = <FakeDualStackIpSocketCtx<D> as TransportIpContext<I, BC>>::DevicesWithAddrIter<'a>
+        type DevicesWithAddrIter<'a> = <FakeDualStackIpSocketCtx<D, BC> as TransportIpContext<I, BC>>::DevicesWithAddrIter<'a>
             where Self: 'a;
 
         fn get_devices_with_assigned_addr(
@@ -5847,7 +5847,7 @@ mod tests {
         fn new_device_state(
             addrs: impl IntoIterator<Item = Self::Addr>,
             prefix: u8,
-        ) -> DualStackIpDeviceState<FakeInstant> {
+        ) -> DualStackIpDeviceState<TcpBindingsCtx<FakeDeviceId>> {
             let ipv4 = Ipv4DeviceState::default();
             for addr in addrs {
                 let _addr_id = ipv4
@@ -5881,7 +5881,7 @@ mod tests {
         fn new_device_state(
             addrs: impl IntoIterator<Item = Self::Addr>,
             prefix: u8,
-        ) -> DualStackIpDeviceState<FakeInstant> {
+        ) -> DualStackIpDeviceState<TcpBindingsCtx<FakeDeviceId>> {
             let ipv6 = Ipv6DeviceState::default();
             for addr in addrs {
                 let _addr_id = ipv6
@@ -7551,7 +7551,7 @@ mod tests {
     {
         let addrs = [1, 2].map(|i| I::get_other_ip_address(i));
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::with_inner_and_outer_state(
-            FakeDualStackIpSocketCtx::<_>::with_devices_state(core::iter::once::<(
+            FakeDualStackIpSocketCtx::<_, _>::with_devices_state(core::iter::once::<(
                 _,
                 _,
                 Vec<SpecifiedAddr<IpAddr>>,

@@ -22,6 +22,7 @@ use net_types::{
 use packet_formats::utils::NonZeroDuration;
 
 use crate::{
+    context::InstantBindingsTypes,
     inspect::{Inspectable, InspectableValue, Inspector},
     ip::{
         device::{
@@ -139,14 +140,14 @@ pub struct IpDeviceState<Instant: crate::Instant, I: IpDeviceStateIpExt> {
     flags: Mutex<IpDeviceFlags>,
 }
 
-impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceAddresses<Ipv4>>
-    for DualStackIpDeviceState<I>
+impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::IpDeviceAddresses<Ipv4>>
+    for DualStackIpDeviceState<BT>
 {
-    type Data = IpDeviceAddresses<I, Ipv4>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, IpDeviceAddresses<I, Ipv4>>
+    type Data = IpDeviceAddresses<BT::Instant, Ipv4>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, IpDeviceAddresses<BT::Instant, Ipv4>>
         where
             Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, IpDeviceAddresses<I, Ipv4>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, IpDeviceAddresses<BT::Instant, Ipv4>>
         where
             Self: 'l;
     fn read_lock(&self) -> Self::ReadGuard<'_> {
@@ -157,12 +158,14 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceAddresses<Ipv4>>
     }
 }
 
-impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceGmp<Ipv4>> for DualStackIpDeviceState<I> {
-    type Data = MulticastGroupSet<Ipv4Addr, IgmpGroupState<I>>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, MulticastGroupSet<Ipv4Addr, IgmpGroupState<I>>>
+impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::IpDeviceGmp<Ipv4>>
+    for DualStackIpDeviceState<BT>
+{
+    type Data = MulticastGroupSet<Ipv4Addr, IgmpGroupState<BT::Instant>>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, MulticastGroupSet<Ipv4Addr, IgmpGroupState<BT::Instant>>>
         where
             Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, MulticastGroupSet<Ipv4Addr, IgmpGroupState<I>>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, MulticastGroupSet<Ipv4Addr, IgmpGroupState<BT::Instant>>>
         where
             Self: 'l;
     fn read_lock(&self) -> Self::ReadGuard<'_> {
@@ -173,8 +176,8 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceGmp<Ipv4>> for DualStac
     }
 }
 
-impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv4>>
-    for DualStackIpDeviceState<I>
+impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv4>>
+    for DualStackIpDeviceState<BT>
 {
     type Data = NonZeroU8;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, NonZeroU8>
@@ -191,7 +194,9 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv4>>
     }
 }
 
-impl<I: Instant> LockFor<crate::lock_ordering::IpDeviceFlags<Ipv4>> for DualStackIpDeviceState<I> {
+impl<BT: IpDeviceStateBindingsTypes> LockFor<crate::lock_ordering::IpDeviceFlags<Ipv4>>
+    for DualStackIpDeviceState<BT>
+{
     type Data = IpDeviceFlags;
     type Guard<'l> = crate::sync::LockGuard<'l, IpDeviceFlags>
         where
@@ -201,14 +206,14 @@ impl<I: Instant> LockFor<crate::lock_ordering::IpDeviceFlags<Ipv4>> for DualStac
     }
 }
 
-impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceAddresses<Ipv6>>
-    for DualStackIpDeviceState<I>
+impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::IpDeviceAddresses<Ipv6>>
+    for DualStackIpDeviceState<BT>
 {
-    type Data = IpDeviceAddresses<I, Ipv6>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, IpDeviceAddresses<I, Ipv6>>
+    type Data = IpDeviceAddresses<BT::Instant, Ipv6>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, IpDeviceAddresses<BT::Instant, Ipv6>>
         where
             Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, IpDeviceAddresses<I, Ipv6>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, IpDeviceAddresses<BT::Instant, Ipv6>>
         where
             Self: 'l;
     fn read_lock(&self) -> Self::ReadGuard<'_> {
@@ -219,12 +224,14 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceAddresses<Ipv6>>
     }
 }
 
-impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceGmp<Ipv6>> for DualStackIpDeviceState<I> {
-    type Data = MulticastGroupSet<Ipv6Addr, MldGroupState<I>>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, MulticastGroupSet<Ipv6Addr, MldGroupState<I>>>
+impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::IpDeviceGmp<Ipv6>>
+    for DualStackIpDeviceState<BT>
+{
+    type Data = MulticastGroupSet<Ipv6Addr, MldGroupState<BT::Instant>>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, MulticastGroupSet<Ipv6Addr, MldGroupState<BT::Instant>>>
         where
             Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, MulticastGroupSet<Ipv6Addr, MldGroupState<I>>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, MulticastGroupSet<Ipv6Addr, MldGroupState<BT::Instant>>>
         where
             Self: 'l;
     fn read_lock(&self) -> Self::ReadGuard<'_> {
@@ -235,8 +242,8 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceGmp<Ipv6>> for DualStac
     }
 }
 
-impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv6>>
-    for DualStackIpDeviceState<I>
+impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv6>>
+    for DualStackIpDeviceState<BT>
 {
     type Data = NonZeroU8;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, NonZeroU8>
@@ -253,7 +260,9 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv6>>
     }
 }
 
-impl<I: Instant> LockFor<crate::lock_ordering::IpDeviceFlags<Ipv6>> for DualStackIpDeviceState<I> {
+impl<BT: IpDeviceStateBindingsTypes> LockFor<crate::lock_ordering::IpDeviceFlags<Ipv6>>
+    for DualStackIpDeviceState<BT>
+{
     type Data = IpDeviceFlags;
     type Guard<'l> = crate::sync::LockGuard<'l, IpDeviceFlags>
         where
@@ -263,7 +272,9 @@ impl<I: Instant> LockFor<crate::lock_ordering::IpDeviceFlags<Ipv6>> for DualStac
     }
 }
 
-impl<I: Instant> UnlockedAccess<crate::lock_ordering::RoutingMetric> for DualStackIpDeviceState<I> {
+impl<BT: IpDeviceStateBindingsTypes> UnlockedAccess<crate::lock_ordering::RoutingMetric>
+    for DualStackIpDeviceState<BT>
+{
     type Data = RawMetric;
 
     type Guard<'l> = &'l RawMetric
@@ -346,8 +357,8 @@ pub struct Ipv4DeviceState<I: Instant> {
     pub(super) config: RwLock<Ipv4DeviceConfiguration>,
 }
 
-impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>
-    for DualStackIpDeviceState<I>
+impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>
+    for DualStackIpDeviceState<BT>
 {
     type Data = Ipv4DeviceConfiguration;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv4DeviceConfiguration>
@@ -548,8 +559,8 @@ impl AsMut<IpDeviceConfiguration> for Ipv6DeviceConfiguration {
     }
 }
 
-impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv6DeviceLearnedParams>
-    for DualStackIpDeviceState<I>
+impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::Ipv6DeviceLearnedParams>
+    for DualStackIpDeviceState<BT>
 {
     type Data = Ipv6NetworkLearnedParameters;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv6NetworkLearnedParameters>
@@ -566,8 +577,8 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv6DeviceLearnedParams>
     }
 }
 
-impl<I: Instant> LockFor<crate::lock_ordering::Ipv6DeviceRouteDiscovery>
-    for DualStackIpDeviceState<I>
+impl<BT: IpDeviceStateBindingsTypes> LockFor<crate::lock_ordering::Ipv6DeviceRouteDiscovery>
+    for DualStackIpDeviceState<BT>
 {
     type Data = Ipv6RouteDiscoveryState;
     type Guard<'l> = crate::sync::LockGuard<'l, Ipv6RouteDiscoveryState>
@@ -578,8 +589,8 @@ impl<I: Instant> LockFor<crate::lock_ordering::Ipv6DeviceRouteDiscovery>
     }
 }
 
-impl<I: Instant> LockFor<crate::lock_ordering::Ipv6DeviceRouterSolicitations>
-    for DualStackIpDeviceState<I>
+impl<BT: IpDeviceStateBindingsTypes> LockFor<crate::lock_ordering::Ipv6DeviceRouterSolicitations>
+    for DualStackIpDeviceState<BT>
 {
     type Data = Option<NonZeroU8>;
     type Guard<'l> = crate::sync::LockGuard<'l, Option<NonZeroU8>>
@@ -590,8 +601,8 @@ impl<I: Instant> LockFor<crate::lock_ordering::Ipv6DeviceRouterSolicitations>
     }
 }
 
-impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>
-    for DualStackIpDeviceState<I>
+impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>
+    for DualStackIpDeviceState<BT>
 {
     type Data = Ipv6DeviceConfiguration;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv6DeviceConfiguration>
@@ -661,19 +672,23 @@ impl<I: Instant> AsMut<IpDeviceState<I, Ipv6>> for Ipv6DeviceState<I> {
     }
 }
 
+/// Bindings types required for IP device state.
+pub trait IpDeviceStateBindingsTypes: InstantBindingsTypes {}
+impl<BT> IpDeviceStateBindingsTypes for BT where BT: InstantBindingsTypes {}
+
 /// IPv4 and IPv6 state combined.
-pub(crate) struct DualStackIpDeviceState<I: Instant> {
+pub(crate) struct DualStackIpDeviceState<BT: IpDeviceStateBindingsTypes> {
     /// IPv4 state.
-    pub ipv4: Ipv4DeviceState<I>,
+    pub ipv4: Ipv4DeviceState<BT::Instant>,
 
     /// IPv6 state.
-    pub ipv6: Ipv6DeviceState<I>,
+    pub ipv6: Ipv6DeviceState<BT::Instant>,
 
     /// The device's routing metric.
     pub metric: RawMetric,
 }
 
-impl<I: Instant> DualStackIpDeviceState<I> {
+impl<BT: InstantBindingsTypes> DualStackIpDeviceState<BT> {
     pub(crate) fn new(metric: RawMetric) -> Self {
         Self { ipv4: Default::default(), ipv6: Default::default(), metric }
     }
@@ -981,10 +996,10 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, Instant: crate::Instant> AsRef<IpDeviceState<Instant, I>>
-        for DualStackIpDeviceState<Instant>
+    impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> AsRef<IpDeviceState<BT::Instant, I>>
+        for DualStackIpDeviceState<BT>
     {
-        fn as_ref(&self) -> &IpDeviceState<Instant, I> {
+        fn as_ref(&self) -> &IpDeviceState<BT::Instant, I> {
             I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(dual_stack)| &dual_stack.ipv4.ip_state,
@@ -993,10 +1008,10 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, Instant: crate::Instant> AsMut<IpDeviceState<Instant, I>>
-        for DualStackIpDeviceState<Instant>
+    impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> AsMut<IpDeviceState<BT::Instant, I>>
+        for DualStackIpDeviceState<BT>
     {
-        fn as_mut(&mut self) -> &mut IpDeviceState<Instant, I> {
+        fn as_mut(&mut self) -> &mut IpDeviceState<BT::Instant, I> {
             I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(dual_stack)| &mut dual_stack.ipv4.ip_state,

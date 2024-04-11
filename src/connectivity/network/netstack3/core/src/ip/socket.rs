@@ -952,7 +952,10 @@ pub(crate) mod testutil {
         },
         device::testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
         ip::{
-            device::state::{AssignedAddress as _, DualStackIpDeviceState, IpDeviceState},
+            device::state::{
+                AssignedAddress as _, DualStackIpDeviceState, IpDeviceState,
+                IpDeviceStateBindingsTypes,
+            },
             forwarding::{
                 testutil::{DualStackForwardingTable, FakeIpForwardingCtx},
                 ForwardingTable,
@@ -1384,9 +1387,9 @@ pub(crate) mod testutil {
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
-    pub(crate) struct FakeDualStackIpSocketCtx<D> {
+    pub(crate) struct FakeDualStackIpSocketCtx<D, BT: IpDeviceStateBindingsTypes> {
         table: DualStackForwardingTable<D>,
-        device_state: HashMap<D, DualStackIpDeviceState<FakeInstant>>,
+        device_state: HashMap<D, DualStackIpDeviceState<BT>>,
         ip_forwarding_ctx: FakeIpForwardingCtx<D>,
         pub(crate) v4_common_counters: IpCounters<Ipv4>,
         pub(crate) v6_common_counters: IpCounters<Ipv6>,
@@ -1397,7 +1400,7 @@ pub(crate) mod testutil {
         pub(crate) ndp_counters: NdpCounters,
     }
 
-    impl<D: FakeStrongDeviceId> FakeDualStackIpSocketCtx<D> {
+    impl<D: FakeStrongDeviceId, BT: IpDeviceStateBindingsTypes> FakeDualStackIpSocketCtx<D, BT> {
         pub(crate) fn new<A: Into<SpecifiedAddr<IpAddr>>>(
             devices: impl IntoIterator<Item = FakeDeviceConfig<D, A>>,
         ) -> Self {
@@ -1436,7 +1439,7 @@ pub(crate) mod testutil {
             }
         }
 
-        pub(crate) fn get_device_state(&self, device: &D) -> &DualStackIpDeviceState<FakeInstant> {
+        pub(crate) fn get_device_state(&self, device: &D) -> &DualStackIpDeviceState<BT> {
             let Self {
                 device_state,
                 table: _,
@@ -1491,11 +1494,7 @@ pub(crate) mod testutil {
 
         pub(crate) fn with_devices_state(
             devices: impl IntoIterator<
-                Item = (
-                    D,
-                    DualStackIpDeviceState<FakeInstant>,
-                    Vec<impl Into<SpecifiedAddr<IpAddr>>>,
-                ),
+                Item = (D, DualStackIpDeviceState<BT>, Vec<impl Into<SpecifiedAddr<IpAddr>>>),
             >,
         ) -> Self {
             let mut table = DualStackForwardingTable::default();
@@ -1539,7 +1538,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<D> FakeDualStackIpSocketCtx<D> {
+    impl<D, BT: IpDeviceStateBindingsTypes> FakeDualStackIpSocketCtx<D, BT> {
         pub(crate) fn get_common_counters<I: IpLayerIpExt>(&self) -> &IpCounters<I> {
             I::map_ip(
                 IpInvariant(self),
@@ -1565,8 +1564,8 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpExt, D, BC: FilterBindingsTypes> FilterHandlerProvider<I, BC>
-        for FakeDualStackIpSocketCtx<D>
+    impl<I: IpExt, D, BC: FilterBindingsTypes + IpDeviceStateBindingsTypes>
+        FilterHandlerProvider<I, BC> for FakeDualStackIpSocketCtx<D, BC>
     {
         type Handler<'a> = crate::filter::NoopImpl where Self: 'a;
 
@@ -1575,34 +1574,40 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D> CounterContext<IpCounters<I>>
-        for FakeDualStackIpSocketCtx<D>
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D, BT: IpDeviceStateBindingsTypes>
+        CounterContext<IpCounters<I>> for FakeDualStackIpSocketCtx<D, BT>
     {
         fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
             cb(self.get_common_counters::<I>())
         }
     }
 
-    impl<D: FakeStrongDeviceId> AsRef<Self> for FakeDualStackIpSocketCtx<D> {
+    impl<D: FakeStrongDeviceId, BT: IpDeviceStateBindingsTypes> AsRef<Self>
+        for FakeDualStackIpSocketCtx<D, BT>
+    {
         fn as_ref(&self) -> &Self {
             self
         }
     }
 
-    impl<D: FakeStrongDeviceId> AsRef<FakeIpDeviceIdCtx<D>> for FakeDualStackIpSocketCtx<D> {
+    impl<D: FakeStrongDeviceId, BT: IpDeviceStateBindingsTypes> AsRef<FakeIpDeviceIdCtx<D>>
+        for FakeDualStackIpSocketCtx<D, BT>
+    {
         fn as_ref(&self) -> &FakeIpDeviceIdCtx<D> {
             self.ip_forwarding_ctx.get_ref().as_ref()
         }
     }
 
-    impl<D: FakeStrongDeviceId> AsMut<FakeIpDeviceIdCtx<D>> for FakeDualStackIpSocketCtx<D> {
+    impl<D: FakeStrongDeviceId, BT: IpDeviceStateBindingsTypes> AsMut<FakeIpDeviceIdCtx<D>>
+        for FakeDualStackIpSocketCtx<D, BT>
+    {
         fn as_mut(&mut self) -> &mut FakeIpDeviceIdCtx<D> {
             self.ip_forwarding_ctx.get_mut().as_mut()
         }
     }
 
-    impl<DeviceId: FakeStrongDeviceId> DeviceIdContext<AnyDevice>
-        for FakeDualStackIpSocketCtx<DeviceId>
+    impl<DeviceId: FakeStrongDeviceId, BT: IpDeviceStateBindingsTypes> DeviceIdContext<AnyDevice>
+        for FakeDualStackIpSocketCtx<DeviceId, BT>
     {
         type DeviceId = DeviceId;
         type WeakDeviceId = DeviceId::Weak;
@@ -1623,7 +1628,7 @@ pub(crate) mod testutil {
             I: IpDeviceStateIpExt + IpExt,
             DeviceId: FakeStrongDeviceId,
             BC: IpSocketBindingsContext,
-        > IpSocketContext<I, BC> for FakeDualStackIpSocketCtx<DeviceId>
+        > IpSocketContext<I, BC> for FakeDualStackIpSocketCtx<DeviceId, BC>
     {
         fn lookup_route(
             &mut self,
@@ -1673,9 +1678,17 @@ pub(crate) mod testutil {
             DeviceId: FakeStrongDeviceId,
             BindingsCtxState,
         > IpSocketContext<I, FakeBindingsCtx<Id, Event, BindingsCtxState, ()>>
-        for FakeCoreCtx<FakeDualStackIpSocketCtx<DeviceId>, Meta, DeviceId>
+        for FakeCoreCtx<
+            FakeDualStackIpSocketCtx<DeviceId, FakeBindingsCtx<Id, Event, BindingsCtxState, ()>>,
+            Meta,
+            DeviceId,
+        >
     where
-        FakeCoreCtx<FakeDualStackIpSocketCtx<DeviceId>, Meta, DeviceId>: SendFrameContext<
+        FakeCoreCtx<
+            FakeDualStackIpSocketCtx<DeviceId, FakeBindingsCtx<Id, Event, BindingsCtxState, ()>>,
+            Meta,
+            DeviceId,
+        >: SendFrameContext<
             FakeBindingsCtx<Id, Event, BindingsCtxState, ()>,
             SendIpPacketMeta<I, Self::DeviceId, SpecifiedAddr<I::Addr>>,
         >,
@@ -1718,7 +1731,7 @@ pub(crate) mod testutil {
             I: IpDeviceStateIpExt,
             D: FakeStrongDeviceId,
             BC: RngContext + InstantContext<Instant = FakeInstant>,
-        > MulticastMembershipHandler<I, BC> for FakeDualStackIpSocketCtx<D>
+        > MulticastMembershipHandler<I, BC> for FakeDualStackIpSocketCtx<D, BC>
     {
         fn join_multicast_group(
             &mut self,
@@ -1790,9 +1803,9 @@ pub(crate) mod testutil {
 
     impl<
             I: IpLayerIpExt + IpDeviceStateIpExt,
-            BC: InstantContext + TracingContext + FilterBindingsTypes,
+            BC: InstantContext + TracingContext + FilterBindingsTypes + 'static,
             DeviceId: FakeFilterDeviceId<BC::DeviceClass>,
-        > TransportIpContext<I, BC> for FakeDualStackIpSocketCtx<DeviceId>
+        > TransportIpContext<I, BC> for FakeDualStackIpSocketCtx<DeviceId, BC>
     {
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
             device.map_or(DEFAULT_HOP_LIMITS, |device| {

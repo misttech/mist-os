@@ -5362,7 +5362,7 @@ mod test {
     type FakeSocketsState<I, D> = DatagramSocketSet<I, FakeWeakDeviceId<D>, FakeStateSpec>;
 
     type FakeInnerCoreCtx<D> = crate::context::testutil::FakeCoreCtx<
-        FakeDualStackIpSocketCtx<D>,
+        FakeDualStackIpSocketCtx<D, FakeBindingsCtx<(), (), (), ()>>,
         DualStackSendIpPacketMeta<D>,
         D,
     >;

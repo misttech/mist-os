@@ -604,7 +604,7 @@ where
     >: IpDeviceStateContext<I, BC, DeviceId = Self::DeviceId>
         + GmpHandler<I, BC>
         + NudIpHandler<I, BC>,
-    DualStackIpDeviceState<BC::Instant>:
+    DualStackIpDeviceState<BC>:
         LockFor<crate::lock_ordering::IpDeviceFlags<I>, Data = IpDeviceFlags>,
     crate::lock_ordering::IpDeviceConfiguration<I>:
         LockBefore<crate::lock_ordering::IpDeviceFlags<I>>,

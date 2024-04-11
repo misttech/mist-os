@@ -1013,7 +1013,7 @@ pub(crate) fn with_device_state_and_core_ctx<
 pub(crate) fn with_ip_device_state<
     BC: BindingsContext,
     O,
-    F: FnOnce(Locked<&DualStackIpDeviceState<BC::Instant>, L>) -> O,
+    F: FnOnce(Locked<&DualStackIpDeviceState<BC>, L>) -> O,
     L,
 >(
     core_ctx: &mut CoreCtx<'_, BC, L>,
@@ -1030,7 +1030,7 @@ pub(crate) fn with_ip_device_state<
 pub(crate) fn with_ip_device_state_and_core_ctx<
     BC: BindingsContext,
     O,
-    F: FnOnce(CoreCtxAndResource<'_, BC, DualStackIpDeviceState<BC::Instant>, L>) -> O,
+    F: FnOnce(CoreCtxAndResource<'_, BC, DualStackIpDeviceState<BC>, L>) -> O,
     L,
 >(
     core_ctx: &mut CoreCtx<'_, BC, L>,

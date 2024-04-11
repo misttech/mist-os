@@ -3080,7 +3080,10 @@ mod tests {
             DeviceId,
         },
         ip::{
-            device::{state::IpDeviceStateIpExt, IpDeviceAddr},
+            device::{
+                state::{IpDeviceStateBindingsTypes, IpDeviceStateIpExt},
+                IpDeviceAddr,
+            },
             icmp::socket::{
                 IcmpEchoSocketApi, IcmpSocketId, IcmpSocketSet, IcmpSocketState, StateContext,
             },
@@ -3097,16 +3100,16 @@ mod tests {
 
     /// The FakeCoreCtx held as the inner state of the [`WrappedFakeCoreCtx`] that
     /// is [`FakeCoreCtx`].
-    type FakeBufferCoreCtx = FakeCoreCtx<
-        FakeDualStackIpSocketCtx<FakeDeviceId>,
+    type FakeBufferCoreCtx<BT> = FakeCoreCtx<
+        FakeDualStackIpSocketCtx<FakeDeviceId, BT>,
         DualStackSendIpPacketMeta<FakeDeviceId>,
         FakeDeviceId,
     >;
 
-    impl<Inner, I: IpLayerIpExt, D> CounterContext<IpCounters<I>>
+    impl<Inner, I: IpLayerIpExt, D, BT: IpDeviceStateBindingsTypes> CounterContext<IpCounters<I>>
         for Wrapped<
             Inner,
-            FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
+            FakeCoreCtx<FakeDualStackIpSocketCtx<D, BT>, DualStackSendIpPacketMeta<D>, D>,
         >
     {
         fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
@@ -3114,18 +3117,18 @@ mod tests {
         }
     }
 
-    impl<I: Ip, D> CounterContext<IcmpTxCounters<I>>
-        for FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
+    impl<I: Ip, D, BT: IpDeviceStateBindingsTypes> CounterContext<IcmpTxCounters<I>>
+        for FakeCoreCtx<FakeDualStackIpSocketCtx<D, BT>, DualStackSendIpPacketMeta<D>, D>
     {
         fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
             cb(self.get_ref().icmp_tx_counters::<I>())
         }
     }
 
-    impl<Inner, I: Ip, D> CounterContext<IcmpTxCounters<I>>
+    impl<Inner, I: Ip, D, BT: IpDeviceStateBindingsTypes> CounterContext<IcmpTxCounters<I>>
         for Wrapped<
             Inner,
-            FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
+            FakeCoreCtx<FakeDualStackIpSocketCtx<D, BT>, DualStackSendIpPacketMeta<D>, D>,
         >
     {
         fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
@@ -3133,18 +3136,18 @@ mod tests {
         }
     }
 
-    impl<I: Ip, D> CounterContext<IcmpRxCounters<I>>
-        for FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
+    impl<I: Ip, D, BT: IpDeviceStateBindingsTypes> CounterContext<IcmpRxCounters<I>>
+        for FakeCoreCtx<FakeDualStackIpSocketCtx<D, BT>, DualStackSendIpPacketMeta<D>, D>
     {
         fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
             cb(self.get_ref().icmp_rx_counters::<I>())
         }
     }
 
-    impl<Inner, I: Ip, D> CounterContext<IcmpRxCounters<I>>
+    impl<Inner, I: Ip, D, BT: IpDeviceStateBindingsTypes> CounterContext<IcmpRxCounters<I>>
         for Wrapped<
             Inner,
-            FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
+            FakeCoreCtx<FakeDualStackIpSocketCtx<D, BT>, DualStackSendIpPacketMeta<D>, D>,
         >
     {
         fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
@@ -3152,18 +3155,18 @@ mod tests {
         }
     }
 
-    impl<D> CounterContext<NdpCounters>
-        for FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
+    impl<D, BT: IpDeviceStateBindingsTypes> CounterContext<NdpCounters>
+        for FakeCoreCtx<FakeDualStackIpSocketCtx<D, BT>, DualStackSendIpPacketMeta<D>, D>
     {
         fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
             cb(&self.get_ref().ndp_counters)
         }
     }
 
-    impl<Inner, D> CounterContext<NdpCounters>
+    impl<Inner, D, BT: IpDeviceStateBindingsTypes> CounterContext<NdpCounters>
         for Wrapped<
             Inner,
-            FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
+            FakeCoreCtx<FakeDualStackIpSocketCtx<D, BT>, DualStackSendIpPacketMeta<D>, D>,
         >
     {
         fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
@@ -3177,8 +3180,10 @@ mod tests {
         FakeIcmpInnerCoreCtx<I>,
     >;
 
-    type FakeIcmpInnerCoreCtx<I> =
-        Wrapped<FakeIcmpInnerCoreCtxState<I, FakeWeakDeviceId<FakeDeviceId>>, FakeBufferCoreCtx>;
+    type FakeIcmpInnerCoreCtx<I> = Wrapped<
+        FakeIcmpInnerCoreCtxState<I, FakeWeakDeviceId<FakeDeviceId>>,
+        FakeBufferCoreCtx<FakeIcmpBindingsCtx<I>>,
+    >;
 
     /// `FakeBindingsCtx` specialized for ICMP.
     type FakeIcmpBindingsCtx<I> = FakeBindingsCtx<(), (), FakeIcmpBindingsCtxState<I>, ()>;
@@ -3219,7 +3224,7 @@ mod tests {
     }
 
     impl<I: datagram::IpExt> IcmpStateContext for FakeIcmpInnerCoreCtx<I> {}
-    impl IcmpStateContext for FakeBufferCoreCtx {}
+    impl<BT: IpDeviceStateBindingsTypes> IcmpStateContext for FakeBufferCoreCtx<BT> {}
     impl<I: datagram::IpExt> IcmpStateContext for FakeIcmpCoreCtx<I> {}
     impl IcmpStateContext for StackState<crate::testutil::FakeBindingsCtx> {}
 
@@ -3227,7 +3232,7 @@ mod tests {
         for FakeIcmpInnerCoreCtx<I>
     {
         type DualStackContext = UninstantiableWrapper<Self>;
-        type IpSocketsCtx<'a> = FakeBufferCoreCtx;
+        type IpSocketsCtx<'a> = FakeBufferCoreCtx<FakeIcmpBindingsCtx<I>>;
         fn receive_icmp_error(
             &mut self,
             _bindings_ctx: &mut FakeIcmpBindingsCtx<I>,

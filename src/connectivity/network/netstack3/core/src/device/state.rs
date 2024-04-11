@@ -76,7 +76,7 @@ pub(crate) type IpLinkDeviceState<T, BT> =
 ///
 /// `D` is the link-specific state.
 pub(crate) struct IpLinkDeviceStateInner<T, BT: DeviceLayerTypes> {
-    pub ip: DualStackIpDeviceState<BT::Instant>,
+    pub ip: DualStackIpDeviceState<BT>,
     pub link: T,
     pub(super) origin: OriginTracker,
     pub(super) sockets: RwLock<HeldDeviceSockets<BT>>,
@@ -96,10 +96,8 @@ impl<T, BT: DeviceLayerTypes> IpLinkDeviceStateInner<T, BT> {
     }
 }
 
-impl<T, BT: DeviceLayerTypes> AsRef<DualStackIpDeviceState<BT::Instant>>
-    for IpLinkDeviceStateInner<T, BT>
-{
-    fn as_ref(&self) -> &DualStackIpDeviceState<BT::Instant> {
+impl<T, BT: DeviceLayerTypes> AsRef<DualStackIpDeviceState<BT>> for IpLinkDeviceStateInner<T, BT> {
+    fn as_ref(&self) -> &DualStackIpDeviceState<BT> {
         &self.ip
     }
 }

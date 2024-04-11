@@ -2535,7 +2535,7 @@ mod tests {
     }
 
     impl<Outer: Default, D: FakeStrongDeviceId> Wrapped<Outer, FakeUdpInnerCoreCtx<D>> {
-        fn with_state(state: FakeDualStackIpSocketCtx<D>) -> Self {
+        fn with_state(state: FakeDualStackIpSocketCtx<D, FakeUdpBindingsCtx<D>>) -> Self {
             Wrapped {
                 outer: Outer::default(),
                 inner: WrappedFakeCoreCtx::with_inner_and_outer_state(state, Default::default()),
@@ -2584,8 +2584,11 @@ mod tests {
 
     /// The FakeCoreCtx held as the inner state of the [`WrappedFakeCoreCtx`] that
     /// is [`FakeUdpCoreCtx`].
-    type FakeBufferCoreCtx<D> =
-        FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>;
+    type FakeBufferCoreCtx<D> = FakeCoreCtx<
+        FakeDualStackIpSocketCtx<D, FakeUdpBindingsCtx<D>>,
+        DualStackSendIpPacketMeta<D>,
+        D,
+    >;
 
     type UdpFakeDeviceCtx = FakeUdpCtx<FakeDeviceId>;
     type UdpFakeDeviceCoreCtx = FakeUdpCoreCtx<FakeDeviceId>;
