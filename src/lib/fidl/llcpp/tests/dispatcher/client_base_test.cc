@@ -141,17 +141,16 @@ class MockResponseContext : public fidl::internal::ResponseContext {
 class ClientBaseTest : public zxtest::Test {
  public:
   ClientBaseTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {
-    zx::result endpoints = fidl::CreateEndpoints<TestProtocol>();
-    ZX_ASSERT(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<TestProtocol>::Create();
 
     fidl::internal::AnyIncomingEventDispatcher event_dispatcher;
     event_dispatcher.emplace<FakeWireEventDispatcher>();
-    controller_.Bind(fidl::internal::MakeAnyTransport(endpoints->client.TakeChannel()),
+    controller_.Bind(fidl::internal::MakeAnyTransport(endpoints.client.TakeChannel()),
                      loop_.dispatcher(), std::move(event_dispatcher), nullptr,
                      fidl::AnyTeardownObserver::Noop(),
                      fidl::internal::ThreadingPolicy::kCreateAndTeardownFromDispatcherThread);
 
-    impl_ = std::make_unique<FakeClientImpl>(&controller_.get(), std::move(endpoints->server));
+    impl_ = std::make_unique<FakeClientImpl>(&controller_.get(), std::move(endpoints.server));
   }
 
  protected:

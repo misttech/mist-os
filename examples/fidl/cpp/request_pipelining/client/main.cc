@@ -46,9 +46,7 @@ int main(int argc, const char** argv) {
                 });
       });
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_examples::Echo>();
-  ZX_ASSERT(endpoints.status_value() == ZX_OK);
-  auto [client_end, server_end] = *std::move(endpoints);
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_examples::Echo>::Create();
   // Make a pipelined request to get an instance of Echo
   ZX_ASSERT(launcher->GetEchoPipelined({"pipelined: ", std::move(server_end)}).is_ok());
   // A client can be initialized using the client end without waiting for a response

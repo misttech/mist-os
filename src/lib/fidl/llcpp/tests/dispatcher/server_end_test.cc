@@ -54,8 +54,7 @@ TEST(ServerEnd, Control) {
 
 TEST(ServerEnd, Close) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  auto endpoints = fidl::CreateEndpoints<llcpp_test::Frobinator>();
-  ASSERT_EQ(endpoints.status_value(), ZX_OK);
+  auto endpoints = fidl::Endpoints<llcpp_test::Frobinator>::Create();
 
   class EventHandler : public fidl::WireAsyncEventHandler<llcpp_test::Frobinator> {
    public:
@@ -72,9 +71,9 @@ TEST(ServerEnd, Close) {
   };
 
   EventHandler event_handler;
-  fidl::WireClient client(std::move(endpoints->client), loop.dispatcher(), &event_handler);
+  fidl::WireClient client(std::move(endpoints.client), loop.dispatcher(), &event_handler);
 
-  fidl::ServerEnd<llcpp_test::Frobinator> server_end(std::move(endpoints->server));
+  fidl::ServerEnd<llcpp_test::Frobinator> server_end(std::move(endpoints.server));
   EXPECT_TRUE(server_end.is_valid());
 
   constexpr zx_status_t kSysError = ZX_ERR_INVALID_ARGS;
@@ -96,9 +95,8 @@ TEST(ServerEnd, CloseTwice) {
 }
 
 TEST(UnownedServerEnd, Constructors) {
-  auto endpoints = fidl::CreateEndpoints<llcpp_test::Frobinator>();
-  ASSERT_EQ(ZX_OK, endpoints.status_value()) << endpoints.status_string();
-  fidl::ServerEnd<llcpp_test::Frobinator> server_end = std::move(endpoints->server);
+  auto endpoints = fidl::Endpoints<llcpp_test::Frobinator>::Create();
+  fidl::ServerEnd<llcpp_test::Frobinator> server_end = std::move(endpoints.server);
 
   {
     // Construct from a |fidl::ServerEnd|.
@@ -137,11 +135,10 @@ TEST(UnownedServerEnd, IsValid) {
 }
 
 TEST(UnownedServerEnd, BorrowFromServerEnd) {
-  auto endpoints = fidl::CreateEndpoints<llcpp_test::Frobinator>();
-  ASSERT_EQ(ZX_OK, endpoints.status_value()) << endpoints.status_string();
+  auto endpoints = fidl::Endpoints<llcpp_test::Frobinator>::Create();
 
-  auto unowned_server_end = endpoints->client.borrow();
+  auto unowned_server_end = endpoints.client.borrow();
   static_assert(std::is_same_v<decltype(unowned_server_end),
                                decltype(fidl::UnownedClientEnd<llcpp_test::Frobinator>(0))>);
-  ASSERT_EQ(unowned_server_end.channel(), endpoints->client.channel().get());
+  ASSERT_EQ(unowned_server_end.channel(), endpoints.client.channel().get());
 }

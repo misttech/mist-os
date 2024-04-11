@@ -27,8 +27,7 @@ bool SendEventBenchmark(perftest::RepeatState* state, BuilderFunc builder) {
   state->DeclareStep("SendEvent/WallTime");
   state->DeclareStep("Teardown/WallTime");
 
-  auto endpoints = fidl::CreateEndpoints<ProtocolType>();
-  ZX_ASSERT(endpoints.is_ok());
+  auto endpoints = fidl::Endpoints<ProtocolType>::Create();
 
   class EventHandler : public fidl::AsyncEventHandler<ProtocolType> {
    public:
@@ -54,7 +53,7 @@ bool SendEventBenchmark(perftest::RepeatState* state, BuilderFunc builder) {
   fidl::Client<ProtocolType> client;
   libsync::Completion bound;
   async::PostTask(loop.dispatcher(), [&]() {
-    client.Bind(std::move(endpoints->client), loop.dispatcher(), &event_handler);
+    client.Bind(std::move(endpoints.client), loop.dispatcher(), &event_handler);
     bound.Signal();
   });
   bound.Wait();
@@ -64,7 +63,7 @@ bool SendEventBenchmark(perftest::RepeatState* state, BuilderFunc builder) {
 
     state->NextStep();  // End: Setup. Begin: SendEvent.
 
-    auto result = fidl::SendEvent(std::move(endpoints->server))->Send(std::move(aligned_value));
+    auto result = fidl::SendEvent(std::move(endpoints.server))->Send(std::move(aligned_value));
     ZX_ASSERT(result.is_ok());
 
     event_handler.completion().Wait();

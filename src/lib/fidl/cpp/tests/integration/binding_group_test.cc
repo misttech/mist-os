@@ -92,11 +92,10 @@ void AddBindingTest() {
   for (size_t i = 0; i < NumImpls; i++) {
     impls.emplace_back(&loop);
     for (size_t j = i * NumBindingsPerImpl; j < (i + 1) * NumBindingsPerImpl; j++) {
-      zx::result<fidl::Endpoints<Testable>> endpoints = fidl::CreateEndpoints<Testable>();
-      ASSERT_OK(endpoints.status_value());
-      group.AddBinding(loop.dispatcher(), std::move(endpoints->server), &impls.back(),
+      auto endpoints = fidl::Endpoints<Testable>::Create();
+      group.AddBinding(loop.dispatcher(), std::move(endpoints.server), &impls.back(),
                        kCloseHandler);
-      clients.emplace_back(std::move(endpoints->client), loop.dispatcher());
+      clients.emplace_back(std::move(endpoints.client), loop.dispatcher());
     }
     unvisited_bindings_per_impl.insert({&impls.back(), NumBindingsPerImpl});
   }
@@ -175,10 +174,9 @@ void CreateHandlerTest() {
     impls.emplace_back(&loop);
     auto handler = group.CreateHandler(&impls.back(), loop.dispatcher(), kCloseHandler);
     for (size_t j = i * NumBindingsPerImpl; j < (i + 1) * NumBindingsPerImpl; j++) {
-      zx::result<fidl::Endpoints<Testable>> endpoints = fidl::CreateEndpoints<Testable>();
-      ASSERT_OK(endpoints.status_value());
-      handler(std::move(endpoints->server));
-      clients.emplace_back(std::move(endpoints->client), loop.dispatcher());
+      auto endpoints = fidl::Endpoints<Testable>::Create();
+      handler(std::move(endpoints.server));
+      clients.emplace_back(std::move(endpoints.client), loop.dispatcher());
     }
   }
   EXPECT_EQ(group.size(), TotalServerBindings);
@@ -236,11 +234,10 @@ void CloseHandlerTest() {
   for (size_t i = 0; i < NumImpls; i++) {
     impls.emplace_back(&loop);
     for (size_t j = i * NumBindingsPerImpl; j < (i + 1) * NumBindingsPerImpl; j++) {
-      zx::result<fidl::Endpoints<Testable>> endpoints = fidl::CreateEndpoints<Testable>();
-      ASSERT_OK(endpoints.status_value());
-      group.AddBinding(loop.dispatcher(), std::move(endpoints->server), &impls.back(),
+      auto endpoints = fidl::Endpoints<Testable>::Create();
+      group.AddBinding(loop.dispatcher(), std::move(endpoints.server), &impls.back(),
                        kCloseHandler);
-      clients.emplace_back(std::move(endpoints->client), loop.dispatcher());
+      clients.emplace_back(std::move(endpoints.client), loop.dispatcher());
     }
   }
   EXPECT_EQ(group.size(), TotalServerBindings);
@@ -330,13 +327,12 @@ void ExternalKillBindingTest(KillSomeBindings kill_some_bindings) {
   for (size_t i = 0; i < kTestNumImpls; i++) {
     impls.emplace_back(&loop);
     for (size_t j = i * kTestNumBindingsPerImpl; j < (i + 1) * kTestNumBindingsPerImpl; j++) {
-      zx::result<fidl::Endpoints<Testable>> endpoints = fidl::CreateEndpoints<Testable>();
-      ASSERT_OK(endpoints.status_value());
+      auto endpoints = fidl::Endpoints<Testable>::Create();
 
-      group.AddBinding(loop.dispatcher(), std::move(endpoints->server), &impls.back(),
+      group.AddBinding(loop.dispatcher(), std::move(endpoints.server), &impls.back(),
                        kCloseHandler);
       event_handlers.emplace_back();
-      clients.emplace_back(std::move(endpoints->client), loop.dispatcher(), &event_handlers.back());
+      clients.emplace_back(std::move(endpoints.client), loop.dispatcher(), &event_handlers.back());
       open_bindings.insert({j, &impls.back()});
     }
   }
@@ -575,11 +571,10 @@ TEST(BindingGroup, DisambiguateMultiProtocolImplementations) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   fidl::ServerBindingGroup<Testable> binding_group;
   MultiInheritanceServer impl;
-  zx::result endpoints = fidl::CreateEndpoints<Testable>();
-  ASSERT_OK(endpoints.status_value());
-  binding_group.AddBinding(loop.dispatcher(), std::move(endpoints->server), &impl,
+  auto endpoints = fidl::Endpoints<Testable>::Create();
+  binding_group.AddBinding(loop.dispatcher(), std::move(endpoints.server), &impl,
                            fidl::kIgnoreBindingClosure);
-  fidl::Client client(std::move(endpoints->client), loop.dispatcher());
+  fidl::Client client(std::move(endpoints.client), loop.dispatcher());
   client->Echo({"test"}).ThenExactlyOnce([&](fidl::Result<Testable::Echo>& result) {
     loop.Quit();
     ASSERT_TRUE(result.is_ok());

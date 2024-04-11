@@ -55,9 +55,7 @@ class Server : public fidl::WireServer<Values> {
 };
 
 TEST(GenAPITestCase, EchoAsyncManaged) {
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
@@ -100,9 +98,7 @@ TEST(GenAPITestCase, EchoAsyncResponseContext) {
     size_t size_;
   };
 
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
@@ -138,9 +134,7 @@ TEST(GenAPITestCase, EchoAsyncCallerAllocated) {
     size_t size_;
   };
 
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
@@ -160,9 +154,7 @@ TEST(GenAPITestCase, EchoAsyncCallerAllocated) {
 }
 
 TEST(GenAPITestCase, EchoSyncManaged) {
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
@@ -181,9 +173,7 @@ TEST(GenAPITestCase, EchoSyncManaged) {
 }
 
 TEST(GenAPITestCase, OneWaySyncManaged) {
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   fidl::WireClient<Values> client(std::move(local), loop.dispatcher());
@@ -218,9 +208,7 @@ TEST(GenAPITestCase, AsyncEventHandlerExhaustivenessNotRequired) {
 }
 
 TEST(GenAPITestCase, EventManaged) {
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
@@ -257,9 +245,7 @@ TEST(GenAPITestCase, EventManaged) {
 }
 
 TEST(GenAPITestCase, ConsumeEventsWhenEventHandlerIsAbsent) {
-  auto endpoints = fidl::CreateEndpoints<test_basic_protocol::ResourceEvent>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<test_basic_protocol::ResourceEvent>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
@@ -278,9 +264,7 @@ TEST(GenAPITestCase, ConsumeEventsWhenEventHandlerIsAbsent) {
 }
 
 TEST(GenAPITestCase, ConsumeEventsWhenEventHandlerMethodIsAbsent) {
-  auto endpoints = fidl::CreateEndpoints<test_basic_protocol::ResourceEvent>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<test_basic_protocol::ResourceEvent>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
@@ -306,9 +290,7 @@ TEST(GenAPITestCase, Epitaph) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<test_empty_protocol::Empty>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<test_empty_protocol::Empty>::Create();
 
   sync_completion_t unbound;
 
@@ -354,9 +336,7 @@ TEST(GenAPITestCase, UnbindInfoEncodeError) {
     void OneWay(OneWayRequestView, OneWayCompleter::Sync&) override {}
   };
 
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
@@ -383,9 +363,7 @@ TEST(GenAPITestCase, UnbindInfoEncodeError) {
 }
 
 TEST(GenAPITestCase, UnbindInfoDecodeError) {
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
@@ -469,12 +447,7 @@ TEST(GenAPITestCase, UnbindPreventsSubsequentCalls) {
 }
 
 fidl::Endpoints<Values> CreateEndpointsWithoutClientWriteRight() {
-  zx::result endpoints = fidl::CreateEndpoints<Values>();
-  EXPECT_OK(endpoints.status_value());
-  if (!endpoints.is_ok())
-    return {};
-
-  auto [client_end, server_end] = std::move(*endpoints);
+  auto [client_end, server_end] = fidl::Endpoints<Values>::Create();
   {
     zx::channel client_channel_non_writable;
     EXPECT_OK(
@@ -606,9 +579,7 @@ TEST(GenAPITestCase, SyncNotifyErrorIfDispatcherShutdown) {
 TEST(GenAPITestCase, ThenWithClientLifetime) {
   auto do_test = [](auto&& client_instance_indicator) {
     using ClientType = cpp20::remove_cvref_t<decltype(client_instance_indicator)>;
-    auto endpoints = fidl::CreateEndpoints<Values>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = std::move(*endpoints);
+    auto [local, remote] = fidl::Endpoints<Values>::Create();
     async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
 
     struct Receiver {
@@ -640,9 +611,7 @@ TEST(GenAPITestCase, ThenWithClientLifetime) {
 TEST(GenAPITestCase, ThenExactlyOnce) {
   auto do_test = [](auto&& client_instance_indicator) {
     using ClientType = cpp20::remove_cvref_t<decltype(client_instance_indicator)>;
-    auto endpoints = fidl::CreateEndpoints<Values>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = std::move(*endpoints);
+    auto [local, remote] = fidl::Endpoints<Values>::Create();
 
     async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
     ClientType client(std::move(local), loop.dispatcher());
@@ -676,9 +645,7 @@ TEST(WireSharedClient, TeardownCompletesAfterUserCallbackReturns) {
   // This invariant should hold regardless of how many threads are on the
   // dispatcher.
   for (int num_threads = 1; num_threads < 4; num_threads++) {
-    auto endpoints = fidl::CreateEndpoints<test_basic_protocol::ResourceEvent>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = std::move(*endpoints);
+    auto [local, remote] = fidl::Endpoints<test_basic_protocol::ResourceEvent>::Create();
 
     async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
     for (int i = 0; i < num_threads; i++) {
@@ -777,9 +744,7 @@ TEST(AllClients, SendErrorLeadsToBindingTeardown) {
 TEST(AllClients, DrainAllMessageInPeerClosedSendError) {
   auto do_test = [](auto&& client_instance_indicator) {
     using ClientType = cpp20::remove_cvref_t<decltype(client_instance_indicator)>;
-    zx::result endpoints = fidl::CreateEndpoints<Values>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = std::move(*endpoints);
+    auto [local, remote] = fidl::Endpoints<Values>::Create();
 
     static constexpr char data[] = "test";
     class EventHandler : public fidl::WireAsyncEventHandler<Values> {

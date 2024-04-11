@@ -384,10 +384,9 @@ TEST_F(FlexibleEnvelopeTest, ReceiveUnknownTableFieldWithMoreHandles) {
 class FlexibleEnvelopeEventTest : public ::testing::Test {
  public:
   void SetUp() final {
-    zx::result endpoints = fidl::CreateEndpoints<test::ReceiveFlexibleEnvelope>();
-    ASSERT_TRUE(endpoints.is_ok());
-    client_end_ = std::move(endpoints->client);
-    server_end_ = std::move(endpoints->server);
+    auto endpoints = fidl::Endpoints<test::ReceiveFlexibleEnvelope>::Create();
+    client_end_ = std::move(endpoints.client);
+    server_end_ = std::move(endpoints.server);
   }
 
   const fidl::ClientEnd<test::ReceiveFlexibleEnvelope>& client_end() const { return client_end_; }

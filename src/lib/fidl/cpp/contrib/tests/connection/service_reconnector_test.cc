@@ -135,9 +135,9 @@ class ServiceReconnectorTest : public gtest::TestLoopFixture {
                   .status_value());
 
     // Connect to /svc endpoint
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_EQ(ZX_OK, outgoing_directory_->Serve(std::move(endpoints->server)).status_value());
-    root_dir_ = std::move(endpoints->client);
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(ZX_OK, outgoing_directory_->Serve(std::move(endpoints.server)).status_value());
+    root_dir_ = std::move(endpoints.client);
 
     auto svc_dir = component::ConnectAt<fuchsia_io::Directory>(root_dir_, "svc");
     ASSERT_EQ(ZX_OK, svc_dir.status_value());

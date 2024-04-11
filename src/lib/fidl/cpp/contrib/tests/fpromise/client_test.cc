@@ -26,10 +26,9 @@ TEST(Client, Promisify) {
   auto server = std::make_unique<EchoServer>();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   async::Executor executor(loop.dispatcher());
-  zx::result endpoints = fidl::CreateEndpoints<test_basic_protocol::ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), server.get());
-  fidl::Client client(std::move(endpoints->client), loop.dispatcher());
+  auto endpoints = fidl::Endpoints<test_basic_protocol::ValueEcho>::Create();
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), server.get());
+  fidl::Client client(std::move(endpoints.client), loop.dispatcher());
 
   fpromise::promise<test_basic_protocol::ValueEchoEchoResponse, fidl::Error> p =
       fidl_fpromise::as_promise(client->Echo({kExpectedReply}));
@@ -49,10 +48,9 @@ TEST(Client, PromisifyChaining) {
   auto server = std::make_unique<EchoServer>();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   async::Executor executor(loop.dispatcher());
-  zx::result endpoints = fidl::CreateEndpoints<test_basic_protocol::ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), server.get());
-  fidl::Client client(std::move(endpoints->client), loop.dispatcher());
+  auto endpoints = fidl::Endpoints<test_basic_protocol::ValueEcho>::Create();
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), server.get());
+  fidl::Client client(std::move(endpoints.client), loop.dispatcher());
 
   // Chain another continuation which operates on the FIDL result.
   auto p = fidl_fpromise::as_promise(client->Echo({kExpectedReply}))
@@ -74,13 +72,12 @@ TEST(Client, PromisifyChaining) {
 TEST(Client, PromisifyTransportError) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   async::Executor executor(loop.dispatcher());
-  zx::result endpoints = fidl::CreateEndpoints<test_basic_protocol::ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::Client client(std::move(endpoints->client), loop.dispatcher());
+  auto endpoints = fidl::Endpoints<test_basic_protocol::ValueEcho>::Create();
+  fidl::Client client(std::move(endpoints.client), loop.dispatcher());
 
   fpromise::promise<test_basic_protocol::ValueEchoEchoResponse, fidl::Error> p =
       fidl_fpromise::as_promise(client->Echo({kExpectedReply}));
-  endpoints->server.reset();
+  endpoints.server.reset();
 
   auto task = p.then(
       [&](fpromise::result<test_basic_protocol::ValueEchoEchoResponse, fidl::Error>& result) {
@@ -108,14 +105,13 @@ TEST(Client, PromisifyApplicationErrorMethodCasePrimitiveError) {
   auto server = std::make_unique<ErrorServer>();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   async::Executor executor(loop.dispatcher());
-  zx::result endpoints = fidl::CreateEndpoints<test_error_methods::ErrorMethods>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), server.get());
-  fidl::Client client(std::move(endpoints->client), loop.dispatcher());
+  auto endpoints = fidl::Endpoints<test_error_methods::ErrorMethods>::Create();
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), server.get());
+  fidl::Client client(std::move(endpoints.client), loop.dispatcher());
 
   fpromise::promise<void, fidl::ErrorsIn<test_error_methods::ErrorMethods::NoArgsPrimitiveError>>
       p = fidl_fpromise::as_promise(client->NoArgsPrimitiveError({{.should_error = true}}));
-  endpoints->server.reset();
+  endpoints.server.reset();
 
   auto task = p.then(
       [&](fpromise::result<
@@ -134,10 +130,9 @@ TEST(Client, PromisifyApplicationErrorMethodCaseCustomError) {
   auto server = std::make_unique<ErrorServer>();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   async::Executor executor(loop.dispatcher());
-  zx::result endpoints = fidl::CreateEndpoints<test_error_methods::ErrorMethods>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), server.get());
-  fidl::Client client(std::move(endpoints->client), loop.dispatcher());
+  auto endpoints = fidl::Endpoints<test_error_methods::ErrorMethods>::Create();
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), server.get());
+  fidl::Client client(std::move(endpoints.client), loop.dispatcher());
 
   fpromise::promise<test_error_methods::ErrorMethodsManyArgsCustomErrorResponse,
                     fidl::ErrorsIn<test_error_methods::ErrorMethods::ManyArgsCustomError>>
@@ -173,10 +168,9 @@ TEST(Client, PromisifyApplicationErrorMethodCaseNoArgsSuccess) {
   auto server = std::make_unique<SuccessServer>();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   async::Executor executor(loop.dispatcher());
-  zx::result endpoints = fidl::CreateEndpoints<test_error_methods::ErrorMethods>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), server.get());
-  fidl::Client client(std::move(endpoints->client), loop.dispatcher());
+  auto endpoints = fidl::Endpoints<test_error_methods::ErrorMethods>::Create();
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), server.get());
+  fidl::Client client(std::move(endpoints.client), loop.dispatcher());
 
   fpromise::promise<void, fidl::ErrorsIn<test_error_methods::ErrorMethods::NoArgsPrimitiveError>>
       p = fidl_fpromise::as_promise(client->NoArgsPrimitiveError({{.should_error = false}}));
@@ -196,10 +190,9 @@ TEST(Client, PromisifyApplicationErrorMethodCaseManyArgsSuccess) {
   auto server = std::make_unique<SuccessServer>();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   async::Executor executor(loop.dispatcher());
-  zx::result endpoints = fidl::CreateEndpoints<test_error_methods::ErrorMethods>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), server.get());
-  fidl::Client client(std::move(endpoints->client), loop.dispatcher());
+  auto endpoints = fidl::Endpoints<test_error_methods::ErrorMethods>::Create();
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), server.get());
+  fidl::Client client(std::move(endpoints.client), loop.dispatcher());
 
   fpromise::promise<test_error_methods::ErrorMethodsManyArgsCustomErrorResponse,
                     fidl::ErrorsIn<test_error_methods::ErrorMethods::ManyArgsCustomError>>

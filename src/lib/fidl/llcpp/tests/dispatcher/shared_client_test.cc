@@ -78,9 +78,7 @@ TEST(WireSharedClient, Teardown) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<TestProtocol>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<TestProtocol>::Create();
 
   NormalTeardownObserver observer;
   WireSharedClient<TestProtocol> client(std::move(local), loop.dispatcher(),
@@ -95,9 +93,7 @@ TEST(WireSharedClient, TeardownOnDestroy) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<TestProtocol>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<TestProtocol>::Create();
 
   NormalTeardownObserver observer;
   auto* client = new WireSharedClient<TestProtocol>(std::move(local), loop.dispatcher(),
@@ -112,9 +108,7 @@ TEST(WireSharedClient, NotifyTeardownViaTeardownObserver) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<TestProtocol>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<TestProtocol>::Create();
 
   sync_completion_t torn_down_;
   WireSharedClient<TestProtocol> client(
@@ -130,8 +124,7 @@ TEST(WireSharedClient, Clone) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<TestProtocol>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<TestProtocol>::Create();
 
   sync_completion_t did_teardown;
   WireSharedClient<TestProtocol> client;
@@ -158,7 +151,7 @@ TEST(WireSharedClient, Clone) {
   };
 
   ClientBaseSpy spy;
-  client.Bind(std::move(endpoints->client), loop.dispatcher(),
+  client.Bind(std::move(endpoints.client), loop.dispatcher(),
               std::make_unique<EventHandler>(did_teardown, spy));
   spy.set_client(client);
 
@@ -177,12 +170,11 @@ TEST(WireSharedClient, Clone) {
     // Send a "response" message with the same txid from the remote end of the channel.
     fidl_message_header_t hdr;
     fidl::InitTxnHeader(&hdr, contexts.back()->Txid(), 0, fidl::MessageDynamicFlags::kStrictMethod);
-    ASSERT_OK(
-        endpoints->server.channel().write(0, &hdr, sizeof(fidl_message_header_t), nullptr, 0));
+    ASSERT_OK(endpoints.server.channel().write(0, &hdr, sizeof(fidl_message_header_t), nullptr, 0));
   }
 
   // Trigger teardown handler.
-  endpoints->server.channel().reset();
+  endpoints.server.channel().reset();
   EXPECT_OK(sync_completion_wait(&did_teardown, ZX_TIME_INFINITE));
 }
 
@@ -194,8 +186,7 @@ TEST(WireSharedClient, Clone) {
 TEST(WireSharedClient, CloneCanExtendClientLifetime) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
 
-  auto endpoints = fidl::CreateEndpoints<TestProtocol>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<TestProtocol>::Create();
 
   // We expect normal teardown because it should be triggered by |outer_clone|
   // going out of scope.
@@ -212,7 +203,7 @@ TEST(WireSharedClient, CloneCanExtendClientLifetime) {
       ASSERT_CLIENT_IMPL_NULL(inner_clone);
 
       {
-        fidl::WireSharedClient client(std::move(endpoints->client), loop.dispatcher(),
+        fidl::WireSharedClient client(std::move(endpoints.client), loop.dispatcher(),
                                       observer.GetEventHandler());
         ASSERT_CLIENT_IMPL_NOT_NULL(client);
         client_ptr = ClientChecker::GetClientBase(client);

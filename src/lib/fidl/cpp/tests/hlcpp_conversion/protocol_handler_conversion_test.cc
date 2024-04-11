@@ -24,11 +24,10 @@ TEST(ProtocolHandlerConversion, ToNatural) {
   fidl::ProtocolHandler<test_protocol_connector::SimpleProtocol> protocol_handler =
       fidl::HLCPPToNatural(std::move(interface_request_handler));
 
-  zx::result natural_endpoints = fidl::CreateEndpoints<test_protocol_connector::SimpleProtocol>();
-  ASSERT_TRUE(natural_endpoints.is_ok());
-  zx_handle_t natural_server_handle = natural_endpoints->server.channel().get();
+  auto natural_endpoints = fidl::Endpoints<test_protocol_connector::SimpleProtocol>::Create();
+  zx_handle_t natural_server_handle = natural_endpoints.server.channel().get();
 
-  protocol_handler(std::move(natural_endpoints->server));
+  protocol_handler(std::move(natural_endpoints.server));
 
   EXPECT_EQ(hlcpp_server_handle, natural_server_handle);
 }

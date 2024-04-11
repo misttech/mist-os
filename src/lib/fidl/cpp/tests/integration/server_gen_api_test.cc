@@ -35,13 +35,12 @@ TEST(Server, SyncReply) {
 
   auto server = std::make_unique<SyncServer>();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  zx::result endpoints = fidl::CreateEndpoints<ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<ValueEcho>::Create();
 
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), server.get());
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), server.get());
 
   std::thread call([&] {
-    fidl::WireResult result = fidl::WireCall(endpoints->client)->Echo(kExpectedReply);
+    fidl::WireResult result = fidl::WireCall(endpoints.client)->Echo(kExpectedReply);
     EXPECT_OK(result.status());
     EXPECT_EQ(result.value().s.get(), kExpectedReply);
     loop.Quit();
@@ -68,13 +67,12 @@ TEST(Server, AsyncReply) {
 
   auto server = std::make_unique<AsyncServer>();
   async::Loop main_loop(&kAsyncLoopConfigNeverAttachToThread);
-  auto endpoints = fidl::CreateEndpoints<ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<ValueEcho>::Create();
 
-  fidl::BindServer(main_loop.dispatcher(), std::move(endpoints->server), server.get());
+  fidl::BindServer(main_loop.dispatcher(), std::move(endpoints.server), server.get());
 
   std::thread call([&] {
-    auto result = fidl::WireCall(endpoints->client)->Echo(kExpectedReply);
+    auto result = fidl::WireCall(endpoints.client)->Echo(kExpectedReply);
     EXPECT_OK(result.status());
     EXPECT_EQ(result.value().s.get(), kExpectedReply);
     main_loop.Quit();
@@ -87,13 +85,12 @@ TEST(Server, EventSendingAfterPeerClosed) {
   struct Server : fidl::Server<ValueEvent> {};
   Server server;
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  zx::result endpoints = fidl::CreateEndpoints<ValueEvent>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::ServerBinding<ValueEvent> binding{loop.dispatcher(), std::move(endpoints->server), &server,
+  auto endpoints = fidl::Endpoints<ValueEvent>::Create();
+  fidl::ServerBinding<ValueEvent> binding{loop.dispatcher(), std::move(endpoints.server), &server,
                                           fidl::kIgnoreBindingClosure};
 
   // Close the peer endpoint.
-  endpoints->client.reset();
+  endpoints.client.reset();
 
   {
     fit::result<fidl::OneWayError> result =
@@ -114,14 +111,13 @@ TEST(Server, EventSendingAfterUnrelatedError) {
   struct Server : fidl::Server<ValueEvent> {};
   Server server;
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  zx::result endpoints = fidl::CreateEndpoints<ValueEvent>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::ServerBinding<ValueEvent> binding{loop.dispatcher(), std::move(endpoints->server), &server,
+  auto endpoints = fidl::Endpoints<ValueEvent>::Create();
+  fidl::ServerBinding<ValueEvent> binding{loop.dispatcher(), std::move(endpoints.server), &server,
                                           fidl::kIgnoreBindingClosure};
 
   // Send a 1 byte message which will cause the server binding to teardown.
   uint8_t byte = 0;
-  endpoints->client.channel().write(0, &byte, sizeof(byte), nullptr, 0);
+  endpoints.client.channel().write(0, &byte, sizeof(byte), nullptr, 0);
 
   {
     fit::result<fidl::OneWayError> result =

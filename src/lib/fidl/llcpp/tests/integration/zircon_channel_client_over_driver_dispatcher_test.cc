@@ -60,8 +60,7 @@ TEST(WireClient, CannotDestroyInDifferentDispatcherThanBound) {
 
   auto [dispatcher1, dispatcher1_shutdown] = CreateSyncDispatcher();
   auto [dispatcher2, dispatcher2_shutdown] = CreateSyncDispatcher();
-  zx::result endpoints = fidl::CreateEndpoints<test_empty_protocol::Empty>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<test_empty_protocol::Empty>::Create();
 
   std::unique_ptr<fidl::WireClient<test_empty_protocol::Empty>> client;
 
@@ -70,7 +69,7 @@ TEST(WireClient, CannotDestroyInDifferentDispatcherThanBound) {
   async::PostTask(dispatcher1.async_dispatcher(),
                   [&, async_dispatcher = dispatcher1.async_dispatcher()] {
                     client = std::make_unique<fidl::WireClient<test_empty_protocol::Empty>>();
-                    client->Bind(std::move(endpoints->client), async_dispatcher);
+                    client->Bind(std::move(endpoints.client), async_dispatcher);
                     created.Signal();
                   });
   created.Wait();
@@ -139,8 +138,7 @@ TEST_P(WireSharedClient, CanSendAcrossDispatcher) {
 
   auto [dispatcher1, dispatcher1_shutdown] = CreateSyncDispatcher();
   auto [dispatcher2, dispatcher2_shutdown] = CreateSyncDispatcher();
-  zx::result endpoints = fidl::CreateEndpoints<test_empty_protocol::Empty>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<test_empty_protocol::Empty>::Create();
 
   std::unique_ptr<fidl::WireSharedClient<test_empty_protocol::Empty>> client;
 
@@ -149,7 +147,7 @@ TEST_P(WireSharedClient, CanSendAcrossDispatcher) {
   async::PostTask(dispatcher1.async_dispatcher(),
                   [&, async_dispatcher = dispatcher1.async_dispatcher()] {
                     client = std::make_unique<fidl::WireSharedClient<test_empty_protocol::Empty>>();
-                    client->Bind(std::move(endpoints->client), async_dispatcher);
+                    client->Bind(std::move(endpoints.client), async_dispatcher);
                     created.Signal();
                   });
   created.Wait();
@@ -207,13 +205,12 @@ TEST(WireClient, CannotBindUnsynchronizedDispatcher) {
       {}, "", [&](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown.Signal(); });
   ASSERT_OK(dispatcher.status_value());
 
-  zx::result endpoints = fidl::CreateEndpoints<test_empty_protocol::Empty>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<test_empty_protocol::Empty>::Create();
 
   fidl::WireClient<test_empty_protocol::Empty> client;
   libsync::Completion created;
   async::PostTask(dispatcher->async_dispatcher(), [&] {
-    ASSERT_DEATH(client.Bind(std::move(endpoints->client), dispatcher->async_dispatcher()),
+    ASSERT_DEATH(client.Bind(std::move(endpoints.client), dispatcher->async_dispatcher()),
                  "The selected FIDL bindings is thread unsafe. A synchronized fdf_dispatcher_t is "
                  "required. Ensure the fdf_dispatcher_t does not have the "
                  "|FDF_DISPATCHER_OPTION_UNSYNCHRONIZED| option.");

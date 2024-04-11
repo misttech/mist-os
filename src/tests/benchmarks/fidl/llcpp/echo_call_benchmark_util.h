@@ -34,18 +34,17 @@ bool EchoCallBenchmark(perftest::RepeatState* state, BuilderFunc builder) {
   state->DeclareStep("EchoCall/WallTime");
   state->DeclareStep("Teardown/WallTime");
 
-  auto endpoints = fidl::CreateEndpoints<ProtocolType>();
-  ZX_ASSERT(endpoints.is_ok());
+  auto endpoints = fidl::Endpoints<ProtocolType>::Create();
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   EchoServerImpl<ProtocolType, FidlType> server;
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &server);
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), &server);
   loop.StartThread();
 
   fidl::WireClient<ProtocolType> client;
   libsync::Completion bound;
   async::PostTask(loop.dispatcher(), [&]() {
-    client.Bind(std::move(endpoints->client), loop.dispatcher());
+    client.Bind(std::move(endpoints.client), loop.dispatcher());
     bound.Signal();
   });
   bound.Wait();

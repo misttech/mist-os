@@ -59,9 +59,7 @@ class ResultTest : public ::zxtest::Test {
     loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigAttachToCurrentThread);
     ASSERT_EQ(loop_->StartThread("test_llcpp_result_server"), ZX_OK);
 
-    auto endpoints = fidl::CreateEndpoints<test_error_methods::ErrorMethods>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    auto [client_end, server_end] = std::move(endpoints.value());
+    auto [client_end, server_end] = fidl::Endpoints<test_error_methods::ErrorMethods>::Create();
     client_end_ = std::move(client_end);
 
     server_ = std::make_unique<ErrorServer>();
@@ -228,9 +226,7 @@ TEST(SyncClientTest, DefaultInitializationError) {
 }
 
 TEST(EventSenderTest, SendEvent) {
-  auto endpoints = fidl::CreateEndpoints<test::Frobinator>();
-  ASSERT_EQ(endpoints.status_value(), ZX_OK);
-  auto [client_end, server_end] = std::move(endpoints.value());
+  auto [client_end, server_end] = fidl::Endpoints<test::Frobinator>::Create();
   ASSERT_EQ(ZX_OK, fidl::WireSendEvent(server_end)->Hrob(fidl::StringView("foo")).status());
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -298,11 +294,10 @@ class HandleTest : public ::zxtest::Test {
     loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigAttachToCurrentThread);
     ASSERT_EQ(loop_->StartThread("test_llcpp_handle_server"), ZX_OK);
 
-    auto endpoints = fidl::CreateEndpoints<test::HandleProvider>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    client_end_ = std::move(endpoints->client);
+    auto endpoints = fidl::Endpoints<test::HandleProvider>::Create();
+    client_end_ = std::move(endpoints.client);
     server_ = std::make_unique<HandleProviderServer>();
-    fidl::BindServer(loop_->dispatcher(), std::move(endpoints->server), server_.get());
+    fidl::BindServer(loop_->dispatcher(), std::move(endpoints.server), server_.get());
   }
 
   fidl::WireSyncClient<test::HandleProvider> TakeClient() {

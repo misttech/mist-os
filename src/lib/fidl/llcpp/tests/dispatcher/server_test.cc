@@ -69,8 +69,7 @@ class TestServer : public fidl::WireServer<fidl_test::TestProtocol> {};
 //
 
 TEST(BindServerTestCase, DispatcherWasShutDown) {
-  zx::result endpoints = fidl::CreateEndpoints<fidl_test::TestProtocol>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fidl_test::TestProtocol>::Create();
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
@@ -78,7 +77,7 @@ TEST(BindServerTestCase, DispatcherWasShutDown) {
 
   ASSERT_DEATH(([&] {
     fidl_testing::RunWithLsanDisabled([&] {
-      fidl::BindServer(loop.dispatcher(), std::move(endpoints->server),
+      fidl::BindServer(loop.dispatcher(), std::move(endpoints.server),
                        std::make_unique<TestServer>());
     });
   }));
@@ -86,10 +85,8 @@ TEST(BindServerTestCase, DispatcherWasShutDown) {
 
 TEST(BindServerTestCase, InsufficientChannelRights) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  zx::result endpoints = fidl::CreateEndpoints<fidl_test::TestProtocol>();
-  ASSERT_OK(endpoints.status_value());
+  auto [client_end, server_end] = fidl::Endpoints<fidl_test::TestProtocol>::Create();
 
-  auto [client_end, server_end] = std::move(*endpoints);
   zx::channel server_channel_reduced_rights;
   ASSERT_OK(server_end.channel().replace(ZX_RIGHT_NONE, &server_channel_reduced_rights));
   server_end.channel() = std::move(server_channel_reduced_rights);

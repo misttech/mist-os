@@ -32,9 +32,7 @@ auto CreateEventPair() {
 }
 
 TEST(DispatcherHandleOwnership, ServerReceiveOneWay) {
-  zx::result endpoints = fidl::CreateEndpoints<test::Protocol>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<test::Protocol>::Create();
 
   class Server : public fidl::WireServer<test::Protocol> {
    public:
@@ -64,9 +62,7 @@ TEST(DispatcherHandleOwnership, ServerReceiveOneWay) {
 }
 
 TEST(DispatcherHandleOwnership, ClientReceiveTwoWay) {
-  zx::result endpoints = fidl::CreateEndpoints<test::Protocol>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<test::Protocol>::Create();
 
   class Server : public fidl::WireServer<test::Protocol> {
    public:
@@ -128,9 +124,7 @@ TEST(DispatcherHandleOwnership, ClientReceiveTwoWay) {
 }
 
 TEST(DispatcherHandleOwnership, ClientReceiveEvent) {
-  zx::result endpoints = fidl::CreateEndpoints<test::Protocol>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<test::Protocol>::Create();
 
   class Server : public fidl::testing::WireTestBase<test::Protocol> {
    public:

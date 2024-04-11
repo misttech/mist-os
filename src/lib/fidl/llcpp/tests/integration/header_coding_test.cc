@@ -26,9 +26,7 @@ constexpr size_t stringLen(const char (&s)[N]) {
 }
 
 TEST(HeaderCodingTest, OneWay) {
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [client_end, server_end] = std::move(*endpoints);
+  auto [client_end, server_end] = fidl::Endpoints<Values>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
@@ -61,9 +59,7 @@ TEST(HeaderCodingTest, OneWay) {
 }
 
 TEST(HeaderCodingTest, TwoWayAsync) {
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [client_end, server_end] = std::move(*endpoints);
+  auto [client_end, server_end] = fidl::Endpoints<Values>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
@@ -107,9 +103,7 @@ TEST(HeaderCodingTest, TwoWayAsync) {
 }
 
 TEST(HeaderCodingTest, TwoWaySync) {
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [client_end, server_end] = std::move(*endpoints);
+  auto [client_end, server_end] = fidl::Endpoints<Values>::Create();
 
   std::thread th([server_ch = server_end.TakeHandle()]() {
     server_ch.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite(), nullptr);

@@ -39,9 +39,7 @@ class EchoLauncherImpl final : public fidl::Server<fuchsia_examples::EchoLaunche
 
   void GetEcho(GetEchoRequest& request, GetEchoCompleter::Sync& completer) override {
     FX_LOGS(INFO) << "Got non-pipelined request";
-    auto endpoints = fidl::CreateEndpoints<fuchsia_examples::Echo>();
-    ZX_ASSERT(endpoints.is_ok());
-    auto [client_end, server_end] = *std::move(endpoints);
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_examples::Echo>::Create();
     fidl::BindServer(dispatcher_, std::move(server_end),
                      std::make_unique<EchoImpl>(request.echo_prefix()));
     completer.Reply(std::move(client_end));

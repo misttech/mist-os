@@ -124,10 +124,9 @@ class UnknownInteractions : public ::testing::Test {
   void SetUp() override {
     loop_.emplace(&kAsyncLoopConfigAttachToCurrentThread);
 
-    auto endpoints = fidl::CreateEndpoints<test::UnknownInteractionsProtocol>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    client_end_ = std::move(endpoints->client);
-    server_end_ = std::move(endpoints->server);
+    auto endpoints = fidl::Endpoints<test::UnknownInteractionsProtocol>::Create();
+    client_end_ = std::move(endpoints.client);
+    server_end_ = std::move(endpoints.server);
   }
 
   async::Loop& loop() { return loop_.value(); }

@@ -394,11 +394,10 @@ class HandleCloseTest : public ::testing::Test {
     loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigAttachToCurrentThread);
     ASSERT_EQ(loop_->StartThread("test_llcpp_handle_server"), ZX_OK);
 
-    auto endpoints = fidl::CreateEndpoints<test::HandleProvider>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    client_end_ = std::move(endpoints->client);
+    auto endpoints = fidl::Endpoints<test::HandleProvider>::Create();
+    client_end_ = std::move(endpoints.client);
     server_ = std::make_unique<HandleCloseProviderServer>();
-    fidl::BindServer(loop_->dispatcher(), std::move(endpoints->server), server_.get());
+    fidl::BindServer(loop_->dispatcher(), std::move(endpoints.server), server_.get());
   }
 
   fidl::WireSyncClient<test::HandleProvider> TakeClient() {

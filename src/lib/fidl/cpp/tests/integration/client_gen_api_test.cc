@@ -22,9 +22,7 @@ using ::test_basic_protocol::Values;
 // destroyed by the user (i.e. explicit cancellation) instead of due to errors.
 template <typename ClientType>
 void ThenWithClientLifetimeTest() {
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   ClientType client(std::move(local), loop.dispatcher());
   bool destroyed = false;
@@ -53,9 +51,7 @@ TEST(SharedClient, ThenWithClientLifetime) {
 // is torn down by the user (i.e. explicit cancellation).
 template <typename ClientType>
 void ThenExactlyOnceTest() {
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   ClientType client(std::move(local), loop.dispatcher());
   bool called = false;
@@ -84,9 +80,7 @@ TEST(SharedClient, ThenExactlyOnce) { ThenExactlyOnceTest<fidl::SharedClient<Val
 
 TEST(Client, PropagateEncodeError) {
   using ::fidl_cpp_constraint_protocol_test::Bits;
-  auto endpoints = fidl::CreateEndpoints<Constraint>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Constraint>::Create();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   fidl::Client client(std::move(local), loop.dispatcher());
 
@@ -110,9 +104,7 @@ TEST(Client, PropagateEncodeError) {
 
 TEST(Client, TwoWayRememberErrorAfterUnbinding) {
   using ::fidl_cpp_constraint_protocol_test::Bits;
-  auto endpoints = fidl::CreateEndpoints<Constraint>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Constraint>::Create();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
 
   struct EventHandler : public fidl::AsyncEventHandler<Constraint> {
@@ -151,9 +143,7 @@ TEST(Client, TwoWayRememberErrorAfterUnbinding) {
 }
 
 TEST(Client, OneWayRememberErrorAfterUnbinding) {
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
 
   struct EventHandler : public fidl::AsyncEventHandler<Values> {
@@ -189,10 +179,7 @@ TYPED_TEST_SUITE_P(ClientUnbindTest);
 TYPED_TEST_P(ClientUnbindTest, UnbindMaybeGetEndpoint) {
   using Client = TypeParam;
 
-  auto endpoints = fidl::CreateEndpoints<Constraint>();
-  ASSERT_OK(endpoints.status_value());
-
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Constraint>::Create();
   zx_handle_t handle_number = local.channel().get();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   Client client(std::move(local), loop.dispatcher());
@@ -206,13 +193,12 @@ TYPED_TEST_P(ClientUnbindTest, UnbindAfterFatalError) {
   using Client = TypeParam;
   using ::fidl_cpp_constraint_protocol_test::Bits;
 
-  auto endpoints = fidl::CreateEndpoints<Constraint>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<Constraint>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  Client client(std::move(endpoints->client), loop.dispatcher());
+  Client client(std::move(endpoints.client), loop.dispatcher());
 
-  endpoints->server.Close(ZX_ERR_IO);
+  endpoints.server.Close(ZX_ERR_IO);
   loop.RunUntilIdle();
 
   fit::result result = client.UnbindMaybeGetEndpoint();
@@ -224,10 +210,7 @@ TYPED_TEST_P(ClientUnbindTest, UnbindAfterFatalError) {
 TYPED_TEST_P(ClientUnbindTest, UnbindTwice) {
   using Client = TypeParam;
 
-  auto endpoints = fidl::CreateEndpoints<Constraint>();
-  ASSERT_OK(endpoints.status_value());
-
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Constraint>::Create();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   Client client(std::move(local), loop.dispatcher());
 
@@ -246,10 +229,7 @@ TYPED_TEST_P(ClientUnbindTest, UnbindTwice) {
 TYPED_TEST_P(ClientUnbindTest, UnbindWithPendingCallsShouldFail) {
   using Client = TypeParam;
 
-  auto endpoints = fidl::CreateEndpoints<Constraint>();
-  ASSERT_OK(endpoints.status_value());
-
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Constraint>::Create();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   Client client(std::move(local), loop.dispatcher());
 
@@ -271,10 +251,7 @@ TYPED_TEST_P(ClientUnbindTest, UnbindWithPendingCallsShouldFail) {
 TYPED_TEST_P(ClientUnbindTest, UnbindAfterACompletedTwoWayCall) {
   using Client = TypeParam;
 
-  auto endpoints = fidl::CreateEndpoints<Constraint>();
-  ASSERT_OK(endpoints.status_value());
-
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Constraint>::Create();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   zx_handle_t handle_number = local.channel().get();
   Client client(std::move(local), loop.dispatcher());

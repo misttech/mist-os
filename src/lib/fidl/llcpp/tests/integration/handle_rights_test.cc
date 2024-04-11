@@ -79,10 +79,9 @@ class HandleRightsTest : public ::testing::Test {
     loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigAttachToCurrentThread);
     ASSERT_EQ(loop_->StartThread("test_llcpp_handle_rights_server"), ZX_OK);
 
-    auto endpoints = fidl::CreateEndpoints<test::HandleRights>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    client_end_ = std::move(endpoints->client);
-    fidl::BindServer(loop_->dispatcher(), std::move(endpoints->server),
+    auto endpoints = fidl::Endpoints<test::HandleRights>::Create();
+    client_end_ = std::move(endpoints.client);
+    fidl::BindServer(loop_->dispatcher(), std::move(endpoints.server),
                      std::make_unique<HandleRightsServer>());
   }
 

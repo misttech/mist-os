@@ -46,9 +46,7 @@ TEST(BindServerTestCase, SyncReply) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<ValueEcho>::Create();
 
   sync_completion_t closed;
   fidl::OnUnboundFn<SyncServer> on_unbound = [&closed](SyncServer*, fidl::UnbindInfo info,
@@ -90,9 +88,7 @@ TEST(BindServerTestCase, AsyncReply) {
   async::Loop main(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(main.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<ValueEcho>::Create();
 
   sync_completion_t closed;
   fidl::OnUnboundFn<AsyncServer> on_unbound = [&closed](AsyncServer*, fidl::UnbindInfo info,
@@ -140,9 +136,7 @@ TEST(BindServerTestCase, MultipleAsyncReplies) {
   async::Loop main(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(main.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<ValueEcho>::Create();
 
   sync_completion_t closed;
   fidl::OnUnboundFn<AsyncDelayedServer> on_unbound =
@@ -222,9 +216,7 @@ TEST(BindServerTestCase, MultipleAsyncRepliesOnePeerClose) {
   async::Loop main(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(main.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<ValueEcho>::Create();
 
   sync_completion_t closed;
   fidl::OnUnboundFn<AsyncDelayedServer> on_unbound =
@@ -269,9 +261,7 @@ TEST(BindServerTestCase, CallbackDestroyOnClientClose) {
   auto server = std::make_unique<Server>();
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
 
-  auto endpoints = fidl::CreateEndpoints<Empty>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Empty>::Create();
 
   fidl::OnUnboundFn<Server> on_unbound = [&unbound](Server* server, fidl::UnbindInfo info,
                                                     fidl::ServerEnd<Empty> server_end) {
@@ -316,9 +306,7 @@ TEST(BindServerTestCase, CallbackErrorClientTriggered) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<ValueEcho>::Create();
 
   fidl::OnUnboundFn<ErrorServer> on_unbound = [&error](ErrorServer*, fidl::UnbindInfo info,
                                                        fidl::ServerEnd<ValueEcho> server_end) {
@@ -378,9 +366,7 @@ TEST(BindServerTestCase, DestroyBindingWithPendingCancel) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<ValueEcho>::Create();
 
   sync_completion_t closed;
   fidl::OnUnboundFn<WorkingServer> on_unbound = [&closed](WorkingServer*, fidl::UnbindInfo info,
@@ -458,9 +444,7 @@ TEST(BindServerTestCase, CallbackErrorServerTriggered) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<ValueEcho>::Create();
 
   fidl::OnUnboundFn<ErrorServer> on_unbound = [&closed](ErrorServer*, fidl::UnbindInfo info,
                                                         fidl::ServerEnd<ValueEcho> server_end) {
@@ -528,9 +512,7 @@ TEST(BindServerTestCase, CallbackDestroyOnServerClose) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<Closer>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Closer>::Create();
 
   fidl::OnUnboundFn<Server> on_unbound = [](Server* server, fidl::UnbindInfo info,
                                             fidl::ServerEnd<Closer> server_end) {
@@ -566,9 +548,7 @@ TEST(BindServerTestCase, ExplicitUnbind) {
   async::Loop main(&kAsyncLoopConfigNoAttachToCurrentThread);
   main.StartThread();
 
-  auto endpoints = fidl::CreateEndpoints<Empty>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Empty>::Create();
   auto remote_handle = remote.channel().get();
 
   fidl::OnUnboundFn<Server> on_unbound = [&, remote_handle](Server* server, fidl::UnbindInfo info,
@@ -605,9 +585,7 @@ TEST(BindServerTestCase, ExplicitUnbindWithPendingTransaction) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<ValueEcho>::Create();
   zx_handle_t remote_handle = remote.channel().get();
 
   // Client launches a thread so we can hold the transaction in progress.
@@ -660,9 +638,7 @@ TEST(BindServerTestCase, ConcurrentSendEventWhileUnbinding) {
 
   // Repeat the test until at least one failure is observed.
   for (;;) {
-    auto endpoints = fidl::CreateEndpoints<Values>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = std::move(*endpoints);
+    auto [local, remote] = fidl::Endpoints<Values>::Create();
 
     Server server;
 
@@ -759,9 +735,7 @@ TEST(BindServerTestCase, ConcurrentSyncReply) {
     std::atomic<int> req_cnt_ = 0;
   };
 
-  auto endpoints = fidl::CreateEndpoints<ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<ValueEcho>::Create();
 
   // Launch server with 10 threads.
   constexpr int kMaxReqs = 10;
@@ -802,9 +776,7 @@ TEST(BindServerTestCase, ConcurrentIdempotentClose) {
     }
   };
 
-  auto endpoints = fidl::CreateEndpoints<Closer>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Closer>::Create();
 
   // Launch server with 10 threads.
   constexpr int kMaxReqs = 10;
@@ -877,13 +849,12 @@ TEST(BindServerTestCase, UnbindSynchronouslyPassivatesSyncCompleter) {
   };
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  zx::result endpoints = fidl::CreateEndpoints<ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<ValueEcho>::Create();
 
   // Server owns itself.
-  (void)new ShutdownOnEchoRequestServer(&loop, std::move(endpoints->server));
+  (void)new ShutdownOnEchoRequestServer(&loop, std::move(endpoints.server));
 
-  std::thread call_thread([client_end = std::move(endpoints->client)] {
+  std::thread call_thread([client_end = std::move(endpoints.client)] {
     fidl::WireResult result = fidl::WireCall(client_end)->Echo("");
     ASSERT_STATUS(ZX_ERR_PEER_CLOSED, result.status());
   });
@@ -937,13 +908,12 @@ TEST(BindServerTestCase, UnbindSynchronouslyPassivatesAsyncCompleter) {
   };
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  zx::result endpoints = fidl::CreateEndpoints<ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<ValueEcho>::Create();
 
   // Server owns itself.
-  (void)new ShutdownOnEchoRequestServer(&loop, std::move(endpoints->server));
+  (void)new ShutdownOnEchoRequestServer(&loop, std::move(endpoints.server));
 
-  std::thread call_thread([client_end = std::move(endpoints->client)] {
+  std::thread call_thread([client_end = std::move(endpoints.client)] {
     fidl::WireResult result = fidl::WireCall(client_end)->Echo("");
     ASSERT_STATUS(ZX_ERR_PEER_CLOSED, result.status());
   });
@@ -980,9 +950,7 @@ TEST(BindServerTestCase, EnableNextDispatchInLongRunningHandler) {
     libsync::Completion* long_operation_;
   };
 
-  zx::result endpoints = fidl::CreateEndpoints<Closer>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Closer>::Create();
 
   // Launch server with 2 threads.
   libsync::Completion long_operation;
@@ -1022,9 +990,7 @@ TEST(BindServerTestCase, ServerUnbind) {
   ASSERT_OK(loop.StartThread());
 
   // Create and bind the channel.
-  auto endpoints = fidl::CreateEndpoints<test_empty_protocol::Empty>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<test_empty_protocol::Empty>::Create();
   auto remote_handle = remote.channel().get();
   fidl::OnUnboundFn<Server> on_unbound =
       [remote_handle, remote = &remote, &unbound](
@@ -1064,9 +1030,7 @@ TEST(BindServerTestCase, ServerClose) {
   ASSERT_OK(loop.StartThread());
 
   // Create and bind the channel.
-  auto endpoints = fidl::CreateEndpoints<test_empty_protocol::Empty>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<test_empty_protocol::Empty>::Create();
   fidl::OnUnboundFn<Server> on_unbound =
       [&unbound](Server* server, fidl::UnbindInfo info,
                  fidl::ServerEnd<test_empty_protocol::Empty> server_end) {
@@ -1095,12 +1059,7 @@ TEST(BindServerTestCase, ServerClose) {
 }
 
 fidl::Endpoints<Values> CreateEndpointsWithoutServerWriteRight() {
-  zx::result endpoints = fidl::CreateEndpoints<Values>();
-  EXPECT_OK(endpoints.status_value());
-  if (!endpoints.is_ok())
-    return {};
-
-  auto [client_end, server_end] = std::move(*endpoints);
+  auto [client_end, server_end] = fidl::Endpoints<Values>::Create();
   {
     zx::channel server_channel_non_writable;
     EXPECT_OK(
@@ -1158,9 +1117,7 @@ TEST(BindServerTestCase, UnbindInfoDecodeError) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  zx::result endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
 
   // Error message should contain the word "presence", because the presence
   // marker is invalid. Only checking for "presence" allows the error message to
@@ -1219,9 +1176,7 @@ TEST(BindServerTestCase, UnbindInfoDispatcherBeginsShutdownDuringMessageHandling
   ASSERT_OK(loop->StartThread());
   auto server = std::make_unique<WorkingServer>(loop);
 
-  zx::result endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
 
   UnbindObserver<Values> observer(fidl::Reason::kDispatcherError, ZX_ERR_CANCELED);
   fidl::BindServer(loop->dispatcher(), std::move(remote), server.get(), observer.GetCallback());
@@ -1308,9 +1263,7 @@ TEST(BindServerTestCase, DrainAllMessageInPeerClosedSendErrorEvent) {
   auto server = std::make_unique<MockServer>();
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
 
-  zx::result endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
 
   UnbindObserver<Values> observer(fidl::Reason::kPeerClosedWhileReading, ZX_ERR_PEER_CLOSED);
   fidl::ServerBindingRef<Values> binding =
@@ -1362,9 +1315,7 @@ TEST(BindServerTestCase, DrainAllMessageInPeerClosedSendErrorReply) {
   auto server = std::make_unique<MockServer>();
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
 
-  zx::result endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
 
   UnbindObserver<Values> observer(fidl::Reason::kPeerClosedWhileReading, ZX_ERR_PEER_CLOSED);
   fidl::ServerBindingRef<Values> binding =
@@ -1399,9 +1350,7 @@ TEST(BindServerTestCase, UnbindInfoDispatcherError) {
   ASSERT_OK(loop.StartThread());
 
   // Create and bind the channel.
-  auto endpoints = fidl::CreateEndpoints<test_empty_protocol::Empty>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<test_empty_protocol::Empty>::Create();
   auto remote_handle = remote.channel().get();
   fidl::OnUnboundFn<Server> on_unbound =
       [remote_handle, remote = &remote, &unbound](
@@ -1432,9 +1381,7 @@ TEST(BindServerTestCase, UnbindInfoUnknownMethod) {
   auto server = std::make_unique<NotImplementedServer>();
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
 
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Values>::Create();
 
   UnbindObserver<Values> observer(fidl::Reason::kUnexpectedMessage, ZX_ERR_NOT_SUPPORTED);
   fidl::BindServer(loop.dispatcher(), std::move(remote), std::move(server), observer.GetCallback());
@@ -1465,9 +1412,7 @@ TEST(BindServerTestCase, ReplyNotRequiredAfterUnbound) {
   ASSERT_OK(loop.StartThread());
 
   // Create the channel and bind it with the server and dispatcher.
-  auto endpoints = fidl::CreateEndpoints<ValueEcho>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<ValueEcho>::Create();
   sync_completion_t ready, unbound;
   std::optional<WorkingServer::EchoCompleter::Async> async_completer;
   auto server = std::make_unique<WorkingServer>(&async_completer, &ready);
@@ -1541,9 +1486,7 @@ TEST(BindServerTestCase, MultipleInheritanceServer) {
   // Launch a thread so we can make a blocking client call
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<Closer>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<Closer>::Create();
 
   fidl::OnUnboundFn<MultiInheritanceServer> on_unbound = [](MultiInheritanceServer* server,
                                                             fidl::UnbindInfo info,
@@ -1573,19 +1516,18 @@ TEST(BindServerTestCase, MultipleInheritanceServer) {
 }
 
 TEST(WireSendEvent, UnownedServerEnd) {
-  auto endpoints = fidl::CreateEndpoints<Values>();
-  ASSERT_EQ(endpoints.status_value(), ZX_OK);
+  auto endpoints = fidl::Endpoints<Values>::Create();
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  fidl::UnownedServerEnd<Values> server_end(endpoints->server);
+  fidl::UnownedServerEnd<Values> server_end(endpoints.server);
   auto result = fidl::WireSendEvent(server_end)->OnValueEvent("abcd");
   ASSERT_OK(result.status());
 
   // For simplicity, just ensure that *some* message was received on the other side.
   uint8_t bytes[ZX_CHANNEL_MAX_MSG_BYTES];
   uint32_t byte_actual, handle_actual;
-  ASSERT_OK(endpoints->client.channel().read(0, bytes, nullptr, ZX_CHANNEL_MAX_MSG_BYTES, 0,
-                                             &byte_actual, &handle_actual));
+  ASSERT_OK(endpoints.client.channel().read(0, bytes, nullptr, ZX_CHANNEL_MAX_MSG_BYTES, 0,
+                                            &byte_actual, &handle_actual));
 }
 
 }  // namespace

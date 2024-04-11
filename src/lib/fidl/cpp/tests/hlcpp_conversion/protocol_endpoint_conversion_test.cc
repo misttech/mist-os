@@ -35,23 +35,22 @@ TEST(ProtocolEndpointConversion, ToNatural) {
 }
 
 TEST(ProtocolEndpointConversion, ToHLCPP) {
-  zx::result unified_endpoints = fidl::CreateEndpoints<test_types::Baz>();
-  ASSERT_TRUE(unified_endpoints.is_ok());
+  auto unified_endpoints = fidl::Endpoints<test_types::Baz>::Create();
 
-  EXPECT_TRUE(unified_endpoints->client.is_valid());
-  EXPECT_TRUE(unified_endpoints->server.is_valid());
-  zx_handle_t unified_client_handle = unified_endpoints->client.handle()->get();
-  zx_handle_t unified_server_handle = unified_endpoints->server.handle()->get();
+  EXPECT_TRUE(unified_endpoints.client.is_valid());
+  EXPECT_TRUE(unified_endpoints.server.is_valid());
+  zx_handle_t unified_client_handle = unified_endpoints.client.handle()->get();
+  zx_handle_t unified_server_handle = unified_endpoints.server.handle()->get();
 
-  auto hlcpp_client = fidl::NaturalToHLCPP(std::move(unified_endpoints->client));
+  auto hlcpp_client = fidl::NaturalToHLCPP(std::move(unified_endpoints.client));
   static_assert(std::is_same_v<decltype(hlcpp_client), fidl::InterfaceHandle<test::types::Baz>>);
-  EXPECT_FALSE(unified_endpoints->client.is_valid());
+  EXPECT_FALSE(unified_endpoints.client.is_valid());
   EXPECT_TRUE(hlcpp_client.is_valid());
   EXPECT_EQ(unified_client_handle, hlcpp_client.channel().get());
 
-  auto hlcpp_server = fidl::NaturalToHLCPP(std::move(unified_endpoints->server));
+  auto hlcpp_server = fidl::NaturalToHLCPP(std::move(unified_endpoints.server));
   static_assert(std::is_same_v<decltype(hlcpp_server), fidl::InterfaceRequest<test::types::Baz>>);
-  EXPECT_FALSE(unified_endpoints->server.is_valid());
+  EXPECT_FALSE(unified_endpoints.server.is_valid());
   EXPECT_TRUE(hlcpp_server.is_valid());
   EXPECT_EQ(unified_server_handle, hlcpp_server.channel().get());
 }

@@ -54,9 +54,8 @@ TEST(ClientEnd, Control) {
 }
 
 TEST(ClientEnd, Comparisons) {
-  auto endpoints = fidl::CreateEndpoints<llcpp_test::Frobinator>();
-  ASSERT_EQ(ZX_OK, endpoints.status_value()) << endpoints.status_string();
-  fidl::ClientEnd<llcpp_test::Frobinator> client_end = std::move(endpoints->client);
+  auto endpoints = fidl::Endpoints<llcpp_test::Frobinator>::Create();
+  fidl::ClientEnd<llcpp_test::Frobinator> client_end = std::move(endpoints.client);
   const fidl::ClientEnd<llcpp_test::Frobinator>& client_end_reference = client_end;
   ASSERT_EQ(client_end, client_end);
   ASSERT_EQ(client_end, client_end_reference);
@@ -108,9 +107,8 @@ TEST(UnownedClientEnd, IsValid) {
   fidl::UnownedClientEnd<llcpp_test::Frobinator> unowned_client_end(invalid);
   ASSERT_FALSE(unowned_client_end.is_valid());
 
-  auto endpoints = fidl::CreateEndpoints<llcpp_test::Frobinator>();
-  ASSERT_EQ(ZX_OK, endpoints.status_value()) << endpoints.status_string();
-  fidl::UnownedClientEnd<llcpp_test::Frobinator> unowned_client_end_valid(endpoints->client);
+  auto endpoints = fidl::Endpoints<llcpp_test::Frobinator>::Create();
+  fidl::UnownedClientEnd<llcpp_test::Frobinator> unowned_client_end_valid(endpoints.client);
   ASSERT_TRUE(unowned_client_end_valid.is_valid());
 }
 

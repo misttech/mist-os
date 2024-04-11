@@ -41,9 +41,7 @@ TEST(ClientBindingTestCase, AsyncTxn) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<TestProtocol>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<TestProtocol>::Create();
 
   sync_completion_t unbound;
   WireSharedClient<TestProtocol> client;
@@ -88,9 +86,7 @@ TEST(ClientBindingTestCase, ParallelAsyncTxns) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<TestProtocol>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<TestProtocol>::Create();
 
   sync_completion_t unbound;
   WireSharedClient<TestProtocol> client;
@@ -143,9 +139,7 @@ TEST(ClientBindingTestCase, ForgetAsyncTxn) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<TestProtocol>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<TestProtocol>::Create();
 
   WireSharedClient<TestProtocol> client(std::move(local), loop.dispatcher());
 
@@ -164,9 +158,7 @@ TEST(ClientBindingTestCase, UnknownResponseTxid) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<TestProtocol>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<TestProtocol>::Create();
 
   sync_completion_t unbound;
   WireSharedClient<TestProtocol> client;
@@ -209,9 +201,7 @@ TEST(ClientBindingTestCase, Events) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<TestProtocol>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<TestProtocol>::Create();
 
   sync_completion_t unbound;
   WireSharedClient<TestProtocol> client;
@@ -255,9 +245,7 @@ TEST(ClientBindingTestCase, UnbindWhileActiveChannelRefs) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<TestProtocol>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<TestProtocol>::Create();
 
   sync_completion_t unbound;
 
@@ -318,9 +306,7 @@ TEST(ClientBindingTestCase, ReleaseOutstandingTxnsOnDestroy) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<TestProtocol>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<TestProtocol>::Create();
 
   auto* client = new WireSharedClient<TestProtocol>(std::move(local), loop.dispatcher());
   ClientBaseSpy spy{*client};
@@ -355,9 +341,7 @@ TEST(ClientBindingTestCase, ReleaseOutstandingTxnsOnPeerClosed) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  auto endpoints = fidl::CreateEndpoints<TestProtocol>();
-  ASSERT_OK(endpoints.status_value());
-  auto [local, remote] = std::move(*endpoints);
+  auto [local, remote] = fidl::Endpoints<TestProtocol>::Create();
 
   WireSharedClient<TestProtocol> client(std::move(local), loop.dispatcher());
 
