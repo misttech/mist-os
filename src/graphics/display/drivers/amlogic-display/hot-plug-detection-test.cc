@@ -24,6 +24,7 @@
 #include <gtest/gtest.h>
 
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/loop-backed-dispatcher.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -68,9 +69,17 @@ class HotPlugDetectionTest : public ::gtest::RealLoopFixture {
     ResetPinGpioInterrupt();
 
     GpioResources pin_gpio_resources = GetPinGpioResources();
+
+    zx::result<std::unique_ptr<display::Dispatcher>> create_dispatcher_result =
+        display::LoopBackedDispatcher::Create("hot-plug-detection-thread");
+    ZX_ASSERT(create_dispatcher_result.status_value() == ZX_OK);
+
+    std::unique_ptr<display::Dispatcher> dispatcher = std::move(create_dispatcher_result).value();
+
     auto hpd = std::make_unique<HotPlugDetection>(
         std::move(pin_gpio_resources.client), std::move(pin_gpio_resources.interrupt),
-        [this](HotPlugDetectionState state) { RecordHotPlugDetectionState(state); });
+        [this](HotPlugDetectionState state) { RecordHotPlugDetectionState(state); },
+        std::move(dispatcher));
 
     // HotPlugDetection::Init() sets up the GPIO using synchronous FIDL calls.
     // The fake GPIO FIDL server can only be bound on the test thread's default

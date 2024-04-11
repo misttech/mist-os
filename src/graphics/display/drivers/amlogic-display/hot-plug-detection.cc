@@ -19,7 +19,8 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
-#include "src/graphics/display/drivers/amlogic-display/irq-handler-loop-util.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
@@ -27,7 +28,8 @@ namespace amlogic_display {
 
 // static
 zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(
-    display::Namespace& incoming, HotPlugDetection::OnStateChangeHandler on_state_change) {
+    display::Namespace& incoming, display::DispatcherFactory& dispatcher_factory,
+    HotPlugDetection::OnStateChangeHandler on_state_change) {
   static const char kHpdGpioFragmentName[] = "gpio-hdmi-hotplug-detect";
   zx::result<fidl::ClientEnd<fuchsia_hardware_gpio::Gpio>> pin_gpio_result =
       incoming.Connect<fuchsia_hardware_gpio::Service::Device>(kHpdGpioFragmentName);
@@ -53,10 +55,20 @@ zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(
     return interrupt_response.take_error();
   }
 
+  static constexpr std::string_view kDispatcherName = "hot-plug-detection-interrupt-thread";
+  zx::result<std::unique_ptr<display::Dispatcher>> create_dispatcher_result =
+      dispatcher_factory.Create(kDispatcherName, /*scheduler_role=*/{});
+  if (create_dispatcher_result.is_error()) {
+    zxlogf(ERROR, "Failed to create hot plug detection interrupt dispatcher: %s",
+           create_dispatcher_result.status_string());
+    return create_dispatcher_result.take_error();
+  }
+  std::unique_ptr<display::Dispatcher> dispatcher = std::move(create_dispatcher_result).value();
+
   fbl::AllocChecker alloc_checker;
   std::unique_ptr<HotPlugDetection> hot_plug_detection = fbl::make_unique_checked<HotPlugDetection>(
       &alloc_checker, pin_gpio.TakeClientEnd(), std::move(interrupt_response->irq),
-      std::move(on_state_change));
+      std::move(on_state_change), std::move(dispatcher));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Out of memory while allocating HotPlugDetection");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -73,12 +85,12 @@ zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(
 
 HotPlugDetection::HotPlugDetection(fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> pin_gpio,
                                    zx::interrupt pin_gpio_interrupt,
-                                   HotPlugDetection::OnStateChangeHandler on_state_change)
+                                   HotPlugDetection::OnStateChangeHandler on_state_change,
+                                   std::unique_ptr<display::Dispatcher> irq_handler_dispatcher)
     : pin_gpio_(std::move(pin_gpio)),
       pin_gpio_irq_(std::move(pin_gpio_interrupt)),
       on_state_change_(std::move(on_state_change)),
-      irq_handler_loop_config_(CreateIrqHandlerAsyncLoopConfig()),
-      irq_handler_loop_(&irq_handler_loop_config_) {
+      irq_handler_dispatcher_(std::move(irq_handler_dispatcher)) {
   ZX_DEBUG_ASSERT(on_state_change_);
   pin_gpio_irq_handler_.set_object(pin_gpio_irq_.get());
 }
@@ -93,7 +105,7 @@ HotPlugDetection::~HotPlugDetection() {
     }
   }
 
-  irq_handler_loop_.Shutdown();
+  irq_handler_dispatcher_.reset();
 
   // After the interrupt handler loop is shut down, the interrupt is unused
   // and we can safely release the interrupt.
@@ -133,16 +145,9 @@ zx::result<> HotPlugDetection::Init() {
     return config_in_response.take_error();
   }
 
-  zx_status_t status = pin_gpio_irq_handler_.Begin(irq_handler_loop_.dispatcher());
+  zx_status_t status = pin_gpio_irq_handler_.Begin(irq_handler_dispatcher_->async_dispatcher());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to bind the GPIO IRQ to the loop dispatcher: %s",
-           zx_status_get_string(status));
-    return zx::error(status);
-  }
-
-  status = irq_handler_loop_.StartThread("hot-plug-detection-interrupt-thread");
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to start a thread for the hotplug detection loop: %s",
            zx_status_get_string(status));
     return zx::error(status);
   }

@@ -19,14 +19,14 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
-#include "src/graphics/display/drivers/amlogic-display/irq-handler-loop-util.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 
 // static
 zx::result<std::unique_ptr<VsyncReceiver>> VsyncReceiver::Create(
-    zx_device_t* parent,
+    display::DispatcherFactory& dispatcher_factory,
     fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
     VsyncHandler on_vsync) {
   ZX_DEBUG_ASSERT(platform_device.is_valid());
@@ -37,15 +37,27 @@ zx::result<std::unique_ptr<VsyncReceiver>> VsyncReceiver::Create(
     return vsync_irq_result.take_error();
   }
 
+  static constexpr std::string_view kRoleName =
+      "fuchsia.graphics.display.drivers.amlogic-display.vsync";
+  zx::result<std::unique_ptr<display::Dispatcher>> create_dispatcher_result =
+      dispatcher_factory.Create("vsync-interrupt-thread", kRoleName);
+  if (create_dispatcher_result.is_error()) {
+    zxlogf(ERROR, "Failed to create vsync Dispatcher: %s",
+           create_dispatcher_result.status_string());
+    return create_dispatcher_result.take_error();
+  }
+  std::unique_ptr<display::Dispatcher> dispatcher = std::move(create_dispatcher_result).value();
+
   fbl::AllocChecker alloc_checker;
-  auto vsync_receiver = fbl::make_unique_checked<VsyncReceiver>(
-      &alloc_checker, std::move(vsync_irq_result).value(), std::move(on_vsync));
+  auto vsync_receiver =
+      fbl::make_unique_checked<VsyncReceiver>(&alloc_checker, std::move(vsync_irq_result).value(),
+                                              std::move(on_vsync), std::move(dispatcher));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Out of memory while allocating VsyncReceiver");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx::result<> init_result = vsync_receiver->Init(parent);
+  zx::result<> init_result = vsync_receiver->Init();
   if (init_result.is_error()) {
     zxlogf(ERROR, "Failed to initalize VsyncReceiver: %s", init_result.status_string());
     return init_result.take_error();
@@ -54,11 +66,11 @@ zx::result<std::unique_ptr<VsyncReceiver>> VsyncReceiver::Create(
   return zx::ok(std::move(vsync_receiver));
 }
 
-VsyncReceiver::VsyncReceiver(zx::interrupt vsync_irq, VsyncHandler on_vsync)
+VsyncReceiver::VsyncReceiver(zx::interrupt vsync_irq, VsyncHandler on_vsync,
+                             std::unique_ptr<display::Dispatcher> irq_handler_dispatcher)
     : vsync_irq_(std::move(vsync_irq)),
       on_vsync_(std::move(on_vsync)),
-      irq_handler_loop_config_(CreateIrqHandlerAsyncLoopConfig()),
-      irq_handler_loop_(&irq_handler_loop_config_) {
+      irq_handler_dispatcher_(std::move(irq_handler_dispatcher)) {
   irq_handler_.set_object(vsync_irq_.get());
 }
 
@@ -73,27 +85,11 @@ VsyncReceiver::~VsyncReceiver() {
     }
   }
 
-  irq_handler_loop_.Shutdown();
+  irq_handler_dispatcher_.reset();
 }
 
-zx::result<> VsyncReceiver::Init(zx_device_t* parent) {
-  zx_status_t status =
-      irq_handler_loop_.StartThread("vsync-interrupt-thread", &irq_handler_thread_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to start a thread for the Vsync handler loop: %s",
-           zx_status_get_string(status));
-    return zx::error(status);
-  }
-
-  // Set scheduler role for the vsync interrupt handler thread.
-  static constexpr char kRoleName[] = "fuchsia.graphics.display.drivers.amlogic-display.vsync";
-  status = device_set_profile_by_role(parent, thrd_get_zx_handle(irq_handler_thread_), kRoleName,
-                                      strlen(kRoleName));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to apply role: %s", zx_status_get_string(status));
-  }
-
-  status = irq_handler_.Begin(irq_handler_loop_.dispatcher());
+zx::result<> VsyncReceiver::Init() {
+  zx_status_t status = irq_handler_.Begin(irq_handler_dispatcher_->async_dispatcher());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to bind the Vsync handler to the async loop: %s",
            zx_status_get_string(status));

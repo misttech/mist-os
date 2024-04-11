@@ -17,13 +17,14 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
-#include "src/graphics/display/drivers/amlogic-display/irq-handler-loop-util.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 
 // static
 zx::result<std::unique_ptr<Capture>> Capture::Create(
+    display::DispatcherFactory& dispatcher_factory,
     fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
     OnCaptureCompleteHandler on_capture_complete) {
   ZX_DEBUG_ASSERT(platform_device.is_valid());
@@ -34,9 +35,19 @@ zx::result<std::unique_ptr<Capture>> Capture::Create(
     return capture_interrupt_result.take_error();
   }
 
+  zx::result<std::unique_ptr<display::Dispatcher>> create_dispatcher_result =
+      dispatcher_factory.Create("capture-interrupt-thread", /*scheduler_role=*/{});
+  if (create_dispatcher_result.is_error()) {
+    zxlogf(ERROR, "Failed to create capture interrupt handler dispatcher: %s",
+           create_dispatcher_result.status_string());
+    return create_dispatcher_result.take_error();
+  }
+  std::unique_ptr<display::Dispatcher> dispatcher = std::move(create_dispatcher_result).value();
+
   fbl::AllocChecker alloc_checker;
-  auto capture = fbl::make_unique_checked<Capture>(
-      &alloc_checker, std::move(capture_interrupt_result).value(), std::move(on_capture_complete));
+  auto capture =
+      fbl::make_unique_checked<Capture>(&alloc_checker, std::move(capture_interrupt_result).value(),
+                                        std::move(on_capture_complete), std::move(dispatcher));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Out of memory while allocating Capture");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -52,11 +63,11 @@ zx::result<std::unique_ptr<Capture>> Capture::Create(
 }
 
 Capture::Capture(zx::interrupt capture_finished_interrupt,
-                 OnCaptureCompleteHandler on_capture_complete)
+                 OnCaptureCompleteHandler on_capture_complete,
+                 std::unique_ptr<display::Dispatcher> irq_handler_dispatcher)
     : capture_finished_irq_(std::move(capture_finished_interrupt)),
       on_capture_complete_(std::move(on_capture_complete)),
-      irq_handler_loop_config_(CreateIrqHandlerAsyncLoopConfig()),
-      irq_handler_loop_(&irq_handler_loop_config_) {
+      irq_handler_dispatcher_(std::move(irq_handler_dispatcher)) {
   irq_handler_.set_object(capture_finished_irq_.get());
 }
 
@@ -70,18 +81,11 @@ Capture::~Capture() {
     }
   }
 
-  irq_handler_loop_.Shutdown();
+  irq_handler_dispatcher_.reset();
 }
 
 zx::result<> Capture::Init() {
-  zx_status_t status = irq_handler_loop_.StartThread("capture-interrupt-thread");
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to start a thread for the capture interrupt handler loop: %s",
-           zx_status_get_string(status));
-    return zx::error(status);
-  }
-
-  status = irq_handler_.Begin(irq_handler_loop_.dispatcher());
+  zx_status_t status = irq_handler_.Begin(irq_handler_dispatcher_->async_dispatcher());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to bind the capture interrupt handler to the async loop: %s",
            zx_status_get_string(status));

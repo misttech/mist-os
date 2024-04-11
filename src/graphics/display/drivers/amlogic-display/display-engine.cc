@@ -10,7 +10,6 @@
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/component/incoming/cpp/constants.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/display-panel.h>
@@ -43,6 +42,7 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
@@ -1019,7 +1019,7 @@ zx_status_t DisplayEngine::SetupHotplugDisplayDetection() {
   ZX_DEBUG_ASSERT_MSG(!hot_plug_detection_, "HPD already set up");
 
   zx::result<std::unique_ptr<HotPlugDetection>> hot_plug_detection_result =
-      HotPlugDetection::Create(incoming_,
+      HotPlugDetection::Create(incoming_, dispatcher_factory_,
                                fit::bind_member<&DisplayEngine::OnHotPlugStateChange>(this));
 
   if (hot_plug_detection_result.is_error()) {
@@ -1177,7 +1177,7 @@ zx_status_t DisplayEngine::Initialize() {
 
   video_input_unit_node_ = root_node_.CreateChild("video_input_unit");
   zx::result<std::unique_ptr<VideoInputUnit>> video_input_unit_create_result =
-      VideoInputUnit::Create(pdev_.client_end(), &video_input_unit_node_);
+      VideoInputUnit::Create(dispatcher_factory_, pdev_.client_end(), &video_input_unit_node_);
   if (video_input_unit_create_result.is_error()) {
     zxlogf(ERROR, "Failed to create VideoInputUnit instance: %s",
            video_input_unit_create_result.status_string());
@@ -1224,7 +1224,7 @@ zx_status_t DisplayEngine::Initialize() {
 
   {
     zx::result<std::unique_ptr<VsyncReceiver>> vsync_receiver_result = VsyncReceiver::Create(
-        bus_device_, pdev_.client_end(), fit::bind_member<&DisplayEngine::OnVsync>(this));
+        dispatcher_factory_, pdev_.client_end(), fit::bind_member<&DisplayEngine::OnVsync>(this));
     if (vsync_receiver_result.is_error()) {
       // Create() already logged the error.
       return vsync_receiver_result.error_value();
@@ -1233,8 +1233,9 @@ zx_status_t DisplayEngine::Initialize() {
   }
 
   {
-    zx::result<std::unique_ptr<Capture>> capture_result = Capture::Create(
-        pdev_.client_end(), fit::bind_member<&DisplayEngine::OnCaptureComplete>(this));
+    zx::result<std::unique_ptr<Capture>> capture_result =
+        Capture::Create(dispatcher_factory_, pdev_.client_end(),
+                        fit::bind_member<&DisplayEngine::OnCaptureComplete>(this));
     if (capture_result.is_error()) {
       // Create() already logged the error.
       return capture_result.error_value();
@@ -1253,20 +1254,24 @@ zx_status_t DisplayEngine::Initialize() {
   return ZX_OK;
 }
 
-DisplayEngine::DisplayEngine(zx_device_t* bus_device, display::Namespace* incoming,
-                             display::MetadataGetter* metadata_getter)
-    : bus_device_(bus_device), incoming_(*incoming), metadata_getter_(*metadata_getter) {
+DisplayEngine::DisplayEngine(display::Namespace* incoming, display::MetadataGetter* metadata_getter,
+                             display::DispatcherFactory* dispatcher_factory)
+    : incoming_(*incoming),
+      metadata_getter_(*metadata_getter),
+      dispatcher_factory_(*dispatcher_factory) {
   ZX_DEBUG_ASSERT(incoming != nullptr);
   ZX_DEBUG_ASSERT(metadata_getter != nullptr);
+  ZX_DEBUG_ASSERT(dispatcher_factory != nullptr);
 }
 DisplayEngine::~DisplayEngine() {}
 
 // static
 zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
-    zx_device_t* parent, display::Namespace* incoming, display::MetadataGetter* metadata_getter) {
+    display::Namespace* incoming, display::MetadataGetter* metadata_getter,
+    display::DispatcherFactory* dispatcher_factory) {
   fbl::AllocChecker alloc_checker;
-  auto display_engine =
-      fbl::make_unique_checked<DisplayEngine>(&alloc_checker, parent, incoming, metadata_getter);
+  auto display_engine = fbl::make_unique_checked<DisplayEngine>(
+      &alloc_checker, incoming, metadata_getter, dispatcher_factory);
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);

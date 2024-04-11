@@ -6,8 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HOT_PLUG_DETECTION_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/loop.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/fit/function.h>
 #include <lib/zx/interrupt.h>
@@ -22,6 +20,8 @@
 
 #include <fbl/mutex.h>
 
+#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
@@ -47,8 +47,9 @@ class HotPlugDetection {
   // `on_state_change` is called when the HPD pin state changes. The initial
   // state is HPD not detected. The target call must outlive the newly created
   // HotPlugDetection instance. The target may be called on an arbitrary thread.
-  static zx::result<std::unique_ptr<HotPlugDetection>> Create(display::Namespace& incoming,
-                                                              OnStateChangeHandler on_state_change);
+  static zx::result<std::unique_ptr<HotPlugDetection>> Create(
+      display::Namespace& incoming, display::DispatcherFactory& dispatcher_factory,
+      OnStateChangeHandler on_state_change);
 
   // Production code should prefer the Create() factory method.
   //
@@ -60,7 +61,8 @@ class HotPlugDetection {
   // changes. The target call must outlive the newly created HotPlugDetection
   // instance. The target may be called on an arbitrary thread.
   HotPlugDetection(fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> pin_gpio,
-                   zx::interrupt pin_gpio_interrupt, OnStateChangeHandler on_state_change);
+                   zx::interrupt pin_gpio_interrupt, OnStateChangeHandler on_state_change,
+                   std::unique_ptr<display::Dispatcher> irq_handler_dispatcher);
 
   HotPlugDetection(const HotPlugDetection&) = delete;
   HotPlugDetection& operator=(const HotPlugDetection&) = delete;
@@ -104,8 +106,7 @@ class HotPlugDetection {
   // Guaranteed to have a target.
   const OnStateChangeHandler on_state_change_;
 
-  const async_loop_config_t irq_handler_loop_config_;
-  async::Loop irq_handler_loop_;
+  std::unique_ptr<display::Dispatcher> irq_handler_dispatcher_;
   async::IrqMethod<HotPlugDetection, &HotPlugDetection::InterruptHandler> pin_gpio_irq_handler_{
       this};
 

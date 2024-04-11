@@ -18,6 +18,7 @@
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/rdma.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
 
 namespace amlogic_display {
 
@@ -36,6 +37,7 @@ class VideoInputUnit {
   //
   // `video_input_unit_node` must outlive the `VideoInputUnit` instance.
   static zx::result<std::unique_ptr<VideoInputUnit>> Create(
+      display::DispatcherFactory& dispatcher_factory,
       fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
       inspect::Node* video_input_unit_node);
 

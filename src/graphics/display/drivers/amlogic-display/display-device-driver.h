@@ -13,6 +13,7 @@
 #include <ddktl/device.h>
 
 #include "src/graphics/display/drivers/amlogic-display/display-engine.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
@@ -33,8 +34,11 @@ class DisplayDeviceDriver final : public DeviceType {
   // method instead.
   //
   // `incoming` must outlive `display_engine`.
+  // `metadata_getter` must outlive `display_engine`.
+  // `dispatcher_factory` must outlive `display_engine`.
   explicit DisplayDeviceDriver(zx_device_t* parent, std::unique_ptr<display::Namespace> incoming,
                                std::unique_ptr<display::MetadataGetter> metadata_getter,
+                               std::unique_ptr<display::DispatcherFactory> dispatcher_factory,
                                std::unique_ptr<DisplayEngine> display_engine);
 
   DisplayDeviceDriver(const DisplayDeviceDriver&) = delete;
@@ -58,6 +62,8 @@ class DisplayDeviceDriver final : public DeviceType {
   std::unique_ptr<display::Namespace> incoming_;
   // `metadata_getter_` must outlive `display_engine_`.
   std::unique_ptr<display::MetadataGetter> metadata_getter_;
+  // `dispatcher_factory_` must outlive `display_engine_`.
+  std::unique_ptr<display::DispatcherFactory> dispatcher_factory_;
   std::unique_ptr<DisplayEngine> display_engine_;
 };
 

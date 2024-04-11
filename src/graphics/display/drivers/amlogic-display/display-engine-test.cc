@@ -20,6 +20,7 @@
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/loop-backed-dispatcher-factory.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter-dfv1.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace-dfv1.h"
@@ -362,8 +363,13 @@ class FakeSysmemTest : public testing::Test {
     ASSERT_OK(create_metadata_getter_result.status_value());
     metadata_getter_ = std::move(create_metadata_getter_result).value();
 
-    display_engine_ =
-        std::make_unique<DisplayEngine>(mock_root_.get(), incoming_.get(), metadata_getter_.get());
+    zx::result<std::unique_ptr<display::DispatcherFactory>> create_dispatcher_factory_result =
+        display::LoopBackedDispatcherFactory::Create(mock_root_.get());
+    ASSERT_OK(create_dispatcher_factory_result.status_value());
+    dispatcher_factory_ = std::move(create_dispatcher_factory_result).value();
+
+    display_engine_ = std::make_unique<DisplayEngine>(incoming_.get(), metadata_getter_.get(),
+                                                      dispatcher_factory_.get());
     display_engine_->SetFormatSupportCheck([](auto) { return true; });
     display_engine_->SetCanvasForTesting(std::move(endpoints.value().client));
 
@@ -418,6 +424,7 @@ class FakeSysmemTest : public testing::Test {
 
   std::unique_ptr<display::Namespace> incoming_;
   std::unique_ptr<display::MetadataGetter> metadata_getter_;
+  std::unique_ptr<display::DispatcherFactory> dispatcher_factory_;
 
   ddk_fake::FakeMmioRegRegion vpu_mmio_ =
       ddk_fake::FakeMmioRegRegion(/*reg_size=*/4, /*reg_count=*/0x10000);

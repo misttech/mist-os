@@ -6,8 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_RDMA_H_
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/loop.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio-buffer.h>
@@ -29,6 +27,8 @@
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher.h"
 
 namespace amlogic_display {
 
@@ -169,6 +169,7 @@ class RdmaEngine {
   //
   // `video_input_unit_node` must outlive the RdmaEngine instance.
   static zx::result<std::unique_ptr<RdmaEngine>> Create(
+      display::DispatcherFactory& dispatcher_factory,
       fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
       inspect::Node* video_input_unit_node);
 
@@ -183,9 +184,11 @@ class RdmaEngine {
   // Section 8.10.2 "Interrupt Source" of the AMLogic A311D datasheet. It must
   // be valid.
   //
+  // `irq_handler_dispatcher` must not be null.
+  //
   // `node` must outlive the RdmaEngine.
   RdmaEngine(fdf::MmioBuffer vpu_mmio, zx::bti dma_bti, zx::interrupt rdma_done_interrupt,
-             inspect::Node* node);
+             std::unique_ptr<display::Dispatcher> irq_handler_dispatcher, inspect::Node* node);
 
   // This must be called before any other methods.
   zx_status_t SetupRdma();
@@ -223,6 +226,7 @@ class RdmaEngine {
   void DumpRdmaState() __TA_REQUIRES(rdma_lock_);
 
  private:
+  zx::result<> InitializeIrqHandler();
   void InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
                         const zx_packet_interrupt_t* interrupt);
   void OnTransactionFinished();
@@ -233,8 +237,7 @@ class RdmaEngine {
   // RDMA IRQ handle used for diagnostic purposes.
   zx::interrupt rdma_irq_;
 
-  const async_loop_config_t rdma_irq_handler_loop_config_;
-  async::Loop rdma_irq_handler_loop_;
+  std::unique_ptr<display::Dispatcher> rdma_irq_handler_dispatcher_;
   async::IrqMethod<RdmaEngine, &RdmaEngine::InterruptHandler> rdma_irq_handler_{this};
 
   fbl::Mutex rdma_lock_;

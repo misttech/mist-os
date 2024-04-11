@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_CAPTURE_H_
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
@@ -14,6 +13,9 @@
 #include <memory>
 
 #include <fbl/mutex.h>
+
+#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher.h"
 
 namespace amlogic_display {
 
@@ -33,11 +35,13 @@ class Capture {
   // `on_state_change` is called when the display engine finishes writing a
   // captured image to DRAM.
   static zx::result<std::unique_ptr<Capture>> Create(
+      display::DispatcherFactory& dispatcher_factory,
       fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
       OnCaptureCompleteHandler on_capture_complete);
 
   explicit Capture(zx::interrupt capture_finished_interrupt,
-                   OnCaptureCompleteHandler on_capture_complete);
+                   OnCaptureCompleteHandler on_capture_complete,
+                   std::unique_ptr<display::Dispatcher> irq_handler_dispatcher);
 
   Capture(const Capture&) = delete;
   Capture& operator=(const Capture&) = delete;
@@ -60,12 +64,10 @@ class Capture {
   // Guaranteed to have a target.
   const OnCaptureCompleteHandler on_capture_complete_;
 
-  const async_loop_config_t irq_handler_loop_config_;
-
-  // The `irq_handler_loop_` and the `irq_handler_` are constant between Init()
-  // and instance destruction. Only accessed on the threads used for class
-  // initialization and destruction.
-  async::Loop irq_handler_loop_;
+  // The `irq_handler_dispatcher_` and the `irq_handler_` are constant between
+  // Init() and instance destruction. Only accessed on the threads used for
+  // class initialization and destruction.
+  std::unique_ptr<display::Dispatcher> irq_handler_dispatcher_;
   async::IrqMethod<Capture, &Capture::InterruptHandler> irq_handler_{this};
 };
 

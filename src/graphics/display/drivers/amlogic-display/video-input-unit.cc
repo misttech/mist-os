@@ -817,6 +817,7 @@ void VideoInputUnit::Release() {
 
 // static
 zx::result<std::unique_ptr<VideoInputUnit>> VideoInputUnit::Create(
+    display::DispatcherFactory& dispatcher_factory,
     fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
     inspect::Node* video_input_unit_node) {
   ZX_DEBUG_ASSERT(platform_device.is_valid());
@@ -827,7 +828,7 @@ zx::result<std::unique_ptr<VideoInputUnit>> VideoInputUnit::Create(
   }
 
   zx::result<std::unique_ptr<RdmaEngine>> rdma_result =
-      RdmaEngine::Create(platform_device, video_input_unit_node);
+      RdmaEngine::Create(dispatcher_factory, platform_device, video_input_unit_node);
   if (rdma_result.is_error()) {
     return rdma_result.take_error();
   }
