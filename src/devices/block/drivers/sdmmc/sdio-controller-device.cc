@@ -719,10 +719,10 @@ sdmmc_buffer_region_t GetBuffer(const fuchsia_hardware_sdmmc::wire::SdmmcBufferR
   sdmmc_buffer_region_t out{};
   if (buffer.buffer.is_vmo_id()) {
     out.type = SDMMC_BUFFER_TYPE_VMO_ID;
-    out.buffer.vmo = buffer.buffer.vmo().get();
+    out.buffer.vmo_id = buffer.buffer.vmo_id();
   } else if (buffer.buffer.is_vmo()) {
     out.type = SDMMC_BUFFER_TYPE_VMO_HANDLE;
-    out.buffer.vmo_id = buffer.buffer.vmo_id();
+    out.buffer.vmo = buffer.buffer.vmo().get();
   } else {
     out.type = 0;
   }
