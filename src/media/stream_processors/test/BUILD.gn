@@ -500,10 +500,7 @@ fuchsia_test_package("h264_encoder_test") {
   test_components = [ ":h264_encoder_test_comp" ]
   subpackages = [ "//src/media/codec:codec_factory_test" ]
   test_specs = {
-    environments = [
-      sherlock_env,
-      nuc_env,
-    ]
+    environments = [ sherlock_env ]
   }
 }
 

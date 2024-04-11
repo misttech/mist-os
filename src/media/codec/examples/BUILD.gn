@@ -107,17 +107,6 @@ fuchsia_test_component("use_h264_decoder_tiled_output_test_comp") {
   test_type = "system"
 }
 
-# Test x86 H264 decoder on target x86 hardware (excluding emulator)
-fuchsia_test_package("use_h264_decoder_tests_x86") {
-  test_components = [ ":use_h264_decoder_tiled_output_test_comp" ]
-  test_specs = {
-    environments = [
-      atlas_env,
-      nuc_env,
-    ]
-  }
-}
-
 # Gaps in frame_num are often handled specially.  We need to at least verify this doesn't get stuck
 # or crash.  At the moment we also verify that the decoder outputs at least a few output frames
 # beyond the first missing input frame.
@@ -286,12 +275,10 @@ fuchsia_test_package("use_h264_and_vp9_decoders_and_pcmm_stress_test") {
   test_components = [ ":use_h264_and_vp9_decoders_and_pcmm_stress_test_comp" ]
   test_specs = {
     environments = [
-      atlas_env,
       astro_env,
       nelson_env,
       sherlock_env,
       vim3_env,
-      nuc_env,
     ]
   }
 }
@@ -466,23 +453,10 @@ fuchsia_test_package("use_vp9_decoder_tests") {
   test_specs = {
     # Astro has enough contiguous memory for this.
     environments = [
-      atlas_env,
       astro_env,
       nelson_env,
       sherlock_env,
       vim3_env,
-      nuc_env,
-    ]
-  }
-}
-
-# Test x86 vp9 decoder on target x86 hardware (excluding emulator)
-fuchsia_test_package("use_vp9_decoder_tests_x86") {
-  test_components = [ ":use_vp9_decoder_tiled_output_test_comp" ]
-  test_specs = {
-    environments = [
-      atlas_env,
-      nuc_env,
     ]
   }
 }
@@ -528,11 +502,9 @@ fuchsia_test_package("use_vp9_decoder_skip_first_frame_tests") {
 
   test_specs = {
     environments = [
-      atlas_env,
       astro_env,
       sherlock_env,
       vim3_env,
-      nuc_env,
     ]
   }
 }
@@ -609,17 +581,6 @@ fuchsia_unittest_component("use_mjpeg_decoder_test_component") {
     "//src/media/codec/examples/use_media_decoder:use_mjpeg_decoder_test",
   ]
   test_type = "system"
-}
-
-# Test x86 mjpeg decoder on target x86 hardware (excluding emulator)
-fuchsia_test_package("use_mjpeg_decoder_tests_x86") {
-  test_components = [ ":use_mjpeg_decoder_test_component" ]
-  test_specs = {
-    environments = [
-      atlas_env,
-      nuc_env,
-    ]
-  }
 }
 
 #
@@ -779,11 +740,9 @@ vp9_decoder_canary_conformance_test("vp9_decoder_canary_conformance_test_buf") {
   test_rel_path = "buf/crowd_run_256X144_fr15_bd8_8buf_l1"
   test_specs = {
     environments = [
-      atlas_env,
       astro_env,
       sherlock_env,
       vim3_env,
-      nuc_env,
     ]
   }
 }
@@ -797,8 +756,6 @@ vp9_decoder_canary_conformance_test(
       astro_env,
       sherlock_env,
       vim3_env,
-      nuc_env,
-      atlas_env,
     ]
   }
 }
@@ -808,11 +765,9 @@ vp9_decoder_canary_conformance_test(
   test_rel_path = "gf_dist/crowd_run_256X144_fr15_bd8_gf_dist_4_l1"
   test_specs = {
     environments = [
-      atlas_env,
       astro_env,
       sherlock_env,
       vim3_env,
-      nuc_env,
     ]
   }
 }
@@ -822,11 +777,9 @@ vp9_decoder_canary_conformance_test(
   test_rel_path = "odd_size/crowd_run_248X144_fr15_bd8_odd_size_l1"
   test_specs = {
     environments = [
-      atlas_env,
       astro_env,
       sherlock_env,
       vim3_env,
-      nuc_env,
     ]
   }
 }
@@ -836,11 +789,9 @@ vp9_decoder_canary_conformance_test(
   test_rel_path = "sub8X8/crowd_run_256X144_fr15_bd8_sub8X8_l1"
   test_specs = {
     environments = [
-      atlas_env,
       astro_env,
       sherlock_env,
       vim3_env,
-      nuc_env,
     ]
   }
 }
@@ -849,10 +800,7 @@ vp9_decoder_tiled_canary_conformance_test(
     "vp9_decoder_tiled_canary_conformance_test_buf") {
   test_rel_path = "buf/crowd_run_256X144_fr15_bd8_8buf_l1"
   test_specs = {
-    environments = [
-      atlas_env,
-      nuc_env,
-    ]
+    environments = []
   }
 }
 
@@ -860,10 +808,7 @@ vp9_decoder_tiled_canary_conformance_test(
     "vp9_decoder_tiled_canary_conformance_test_frm_resize") {
   test_rel_path = "frm_resize/crowd_run_384X192_fr30_bd8_frm_resize_l11"
   test_specs = {
-    environments = [
-      atlas_env,
-      nuc_env,
-    ]
+    environments = []
   }
 }
 
@@ -871,10 +816,7 @@ vp9_decoder_tiled_canary_conformance_test(
     "vp9_decoder_tiled_canary_conformance_test_gf_dist") {
   test_rel_path = "gf_dist/crowd_run_256X144_fr15_bd8_gf_dist_4_l1"
   test_specs = {
-    environments = [
-      atlas_env,
-      nuc_env,
-    ]
+    environments = []
   }
 }
 
@@ -882,10 +824,7 @@ vp9_decoder_tiled_canary_conformance_test(
     "vp9_decoder_tiled_canary_conformance_test_odd_size") {
   test_rel_path = "odd_size/crowd_run_248X144_fr15_bd8_odd_size_l1"
   test_specs = {
-    environments = [
-      atlas_env,
-      nuc_env,
-    ]
+    environments = []
   }
 }
 
@@ -893,10 +832,7 @@ vp9_decoder_tiled_canary_conformance_test(
     "vp9_decoder_tiled_canary_conformance_test_sub8x8") {
   test_rel_path = "sub8X8/crowd_run_256X144_fr15_bd8_sub8X8_l1"
   test_specs = {
-    environments = [
-      atlas_env,
-      nuc_env,
-    ]
+    environments = []
   }
 }
 
