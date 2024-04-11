@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/amlogic-display/display-device-driver.h"
+#include "src/graphics/display/drivers/amlogic-display/display-device-driver-dfv1.h"
 
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
@@ -28,7 +28,7 @@
 namespace amlogic_display {
 
 // static
-zx_status_t DisplayDeviceDriver::Create(zx_device_t* parent) {
+zx_status_t DisplayDeviceDriverDfv1::Create(zx_device_t* parent) {
   zx::result<std::unique_ptr<display::Namespace>> create_incoming_result =
       display::NamespaceDfv1::Create(parent);
   if (create_incoming_result.is_error()) {
@@ -70,7 +70,7 @@ zx_status_t DisplayDeviceDriver::Create(zx_device_t* parent) {
       fit::defer([display_engine = display_engine.get()]() { display_engine->Deinitialize(); });
 
   fbl::AllocChecker alloc_checker;
-  auto display_device_driver = fbl::make_unique_checked<DisplayDeviceDriver>(
+  auto display_device_driver = fbl::make_unique_checked<DisplayDeviceDriverDfv1>(
       &alloc_checker, parent, std::move(incoming), std::move(metadata_getter),
       std::move(dispatcher_factory), std::move(display_engine));
   if (!alloc_checker.check()) {
@@ -84,13 +84,14 @@ zx_status_t DisplayDeviceDriver::Create(zx_device_t* parent) {
     return init_result.status_value();
   }
   // `display_device_driver` is managed by the device manager.
-  [[maybe_unused]] DisplayDeviceDriver* display_device_driver_ptr = display_device_driver.release();
+  [[maybe_unused]] DisplayDeviceDriverDfv1* display_device_driver_ptr =
+      display_device_driver.release();
 
   cleanup.cancel();
   return ZX_OK;
 }
 
-DisplayDeviceDriver::DisplayDeviceDriver(
+DisplayDeviceDriverDfv1::DisplayDeviceDriverDfv1(
     zx_device_t* parent, std::unique_ptr<display::Namespace> incoming,
     std::unique_ptr<display::MetadataGetter> metadata_getter,
     std::unique_ptr<display::DispatcherFactory> dispatcher_factory,
@@ -101,9 +102,9 @@ DisplayDeviceDriver::DisplayDeviceDriver(
       dispatcher_factory_(std::move(dispatcher_factory)),
       display_engine_(std::move(display_engine)) {}
 
-DisplayDeviceDriver::~DisplayDeviceDriver() = default;
+DisplayDeviceDriverDfv1::~DisplayDeviceDriverDfv1() = default;
 
-zx::result<> DisplayDeviceDriver::Init() {
+zx::result<> DisplayDeviceDriverDfv1::Init() {
   const ddk::DeviceAddArgs args = ddk::DeviceAddArgs("amlogic-display")
                                       .set_proto_id(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL)
                                       .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
@@ -111,12 +112,12 @@ zx::result<> DisplayDeviceDriver::Init() {
   return zx::make_result(DdkAdd(args));
 }
 
-void DisplayDeviceDriver::DdkRelease() {
+void DisplayDeviceDriverDfv1::DdkRelease() {
   display_engine_->Deinitialize();
   delete this;
 }
 
-zx_status_t DisplayDeviceDriver::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
+zx_status_t DisplayDeviceDriverDfv1::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
   ZX_DEBUG_ASSERT(display_engine_ != nullptr);
   auto* proto = static_cast<ddk::AnyProtocol*>(out_protocol);
   proto->ctx = display_engine_.get();
@@ -133,7 +134,7 @@ namespace {
 
 constexpr zx_driver_ops_t kDriverOps = {
     .version = DRIVER_OPS_VERSION,
-    .bind = [](void* ctx, zx_device_t* parent) { return DisplayDeviceDriver::Create(parent); },
+    .bind = [](void* ctx, zx_device_t* parent) { return DisplayDeviceDriverDfv1::Create(parent); },
 };
 
 }  // namespace

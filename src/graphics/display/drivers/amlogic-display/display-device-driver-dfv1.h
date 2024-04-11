@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_DEVICE_DRIVER_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_DEVICE_DRIVER_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_DEVICE_DRIVER_DFV1_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_DEVICE_DRIVER_DFV1_H_
 
 #include <lib/ddk/device.h>
 #include <zircon/types.h>
@@ -19,11 +19,11 @@
 
 namespace amlogic_display {
 
-class DisplayDeviceDriver;
-using DeviceType = ddk::Device<DisplayDeviceDriver, ddk::GetProtocolable>;
+class DisplayDeviceDriverDfv1;
+using DeviceType = ddk::Device<DisplayDeviceDriverDfv1, ddk::GetProtocolable>;
 
 // Integration between this driver and the Driver Framework (v1).
-class DisplayDeviceDriver final : public DeviceType {
+class DisplayDeviceDriverDfv1 final : public DeviceType {
  public:
   // Factory method used by the device manager glue code.
   //
@@ -36,17 +36,18 @@ class DisplayDeviceDriver final : public DeviceType {
   // `incoming` must outlive `display_engine`.
   // `metadata_getter` must outlive `display_engine`.
   // `dispatcher_factory` must outlive `display_engine`.
-  explicit DisplayDeviceDriver(zx_device_t* parent, std::unique_ptr<display::Namespace> incoming,
-                               std::unique_ptr<display::MetadataGetter> metadata_getter,
-                               std::unique_ptr<display::DispatcherFactory> dispatcher_factory,
-                               std::unique_ptr<DisplayEngine> display_engine);
+  explicit DisplayDeviceDriverDfv1(zx_device_t* parent,
+                                   std::unique_ptr<display::Namespace> incoming,
+                                   std::unique_ptr<display::MetadataGetter> metadata_getter,
+                                   std::unique_ptr<display::DispatcherFactory> dispatcher_factory,
+                                   std::unique_ptr<DisplayEngine> display_engine);
 
-  DisplayDeviceDriver(const DisplayDeviceDriver&) = delete;
-  DisplayDeviceDriver(DisplayDeviceDriver&&) = delete;
-  DisplayDeviceDriver& operator=(const DisplayDeviceDriver&) = delete;
-  DisplayDeviceDriver& operator=(DisplayDeviceDriver&&) = delete;
+  DisplayDeviceDriverDfv1(const DisplayDeviceDriverDfv1&) = delete;
+  DisplayDeviceDriverDfv1(DisplayDeviceDriverDfv1&&) = delete;
+  DisplayDeviceDriverDfv1& operator=(const DisplayDeviceDriverDfv1&) = delete;
+  DisplayDeviceDriverDfv1& operator=(DisplayDeviceDriverDfv1&&) = delete;
 
-  ~DisplayDeviceDriver();
+  ~DisplayDeviceDriverDfv1();
 
   // Resource initialization that is not suitable for the constructor.
   zx::result<> Init();
@@ -69,4 +70,4 @@ class DisplayDeviceDriver final : public DeviceType {
 
 }  // namespace amlogic_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_DEVICE_DRIVER_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_DEVICE_DRIVER_DFV1_H_
