@@ -8,6 +8,17 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 import("//build/zbi/kernel_cmdline.gni")
 
+declare_args() {
+  # If true, the driver component `fuchsia://fuchsia.com/amlogic-display#
+  # meta/amlogic-display.cm` will be the DFv2 version of the driver component
+  # (`:amlogic-display-dfv2`). Otherwise, it will be the DFv1 version of the
+  # driver component (`:amlogic-display-dfv1`).
+  #
+  # TODO(https://fxbug.dev/323061435): Enable the DFv2 amlogic-display driver
+  # by default.
+  amlogic_display_is_dfv2 = false
+}
+
 driver_bind_rules("amlogic_display_bind") {
   rules = "amlogic-display.bind"
   bind_output = "amlogic-display.bindbc"
@@ -146,16 +157,58 @@ fuchsia_driver("amlogic-display-dfv1-driver") {
   ]
 }
 
+fuchsia_driver("amlogic-display-dfv2-driver") {
+  output_name = "amlogic-display-dfv2"
+  sources = [
+    "display-device-driver-dfv2.cc",
+    "display-device-driver-dfv2.h",
+  ]
+  deps = [
+    ":amlogic_display_bind",
+    ":common_srcs",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/compat/cpp:logging",
+    "//sdk/lib/driver/component/cpp",
+    "//src/devices/bin/driver_runtime",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.display:fuchsia.display_cpp",
+    "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher:driver-runtime-backed-dispatcher",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
+    "//src/graphics/display/lib/driver-framework-migration-utils/metadata:metadata-getter-dfv2",
+    "//src/graphics/display/lib/driver-framework-migration-utils/namespace:namespace-dfv2",
+  ]
+}
+
 fuchsia_driver_component("amlogic-display-dfv1") {
-  component_name = "amlogic-display"
-  deps = [ ":amlogic-display-dfv1-driver" ]
+  if (amlogic_display_is_dfv2) {
+    component_name = "amlogic-display-dfv1-unused"
+  } else {
+    component_name = "amlogic-display"
+  }
   info = "amlogic-display-info.json"
+  deps = [ ":amlogic-display-dfv1-driver" ]
   manifest = "meta/amlogic-display-dfv1.cml"
+}
+
+fuchsia_driver_component("amlogic-display-dfv2") {
+  if (amlogic_display_is_dfv2) {
+    component_name = "amlogic-display"
+  } else {
+    component_name = "amlogic-display-dfv2-unused"
+  }
+  info = "amlogic-display-info.json"
+  deps = [ ":amlogic-display-dfv2-driver" ]
+  manifest = "meta/amlogic-display-dfv2.cml"
 }
 
 fuchsia_driver_package("package") {
   package_name = "amlogic-display"
-  driver_components = [ ":amlogic-display-dfv1" ]
+  if (amlogic_display_is_dfv2) {
+    driver_components = [ ":amlogic-display-dfv2" ]
+  } else {
+    driver_components = [ ":amlogic-display-dfv1" ]
+  }
 }
 
 test("amlogic-display-test") {

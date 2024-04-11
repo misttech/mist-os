@@ -1,0 +1,26 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "driver_component/driver.shard.cml",
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "driver",
+        binary: "driver/amlogic-display-dfv2.so",
+        bind: "meta/bind/amlogic-display.bindbc",
+        colocate: "false",
+        default_dispatcher_opts: [ "allow_sync_calls" ],
+    },
+    use: [
+        {
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
+        },
+        { service: "fuchsia.hardware.amlogiccanvas.Service" },
+        { service: "fuchsia.hardware.gpio.Service" },
+        { service: "fuchsia.hardware.platform.device.Service" },
+        { service: "fuchsia.hardware.sysmem.Service" },
+    ],
+}
