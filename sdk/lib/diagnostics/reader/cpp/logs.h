@@ -104,9 +104,8 @@ class LogsSubscription {
  public:
   using Promise = fpromise::promise<std::optional<LogsData>, std::string>;
 
-  explicit LogsSubscription(
-      fpromise::promise<fidl::Client<fuchsia_diagnostics::BatchIterator>> iterator,
-      async::Executor& executor);
+  explicit LogsSubscription(fidl::SharedClient<fuchsia_diagnostics::BatchIterator> iterator,
+                            async::Executor& executor);
 
   // Not movable nor copyable.
   LogsSubscription(const LogsSubscription&) = delete;
@@ -124,29 +123,19 @@ class LogsSubscription {
 
  private:
   LogsSubscription::Promise ReadBatch();
-  std::optional<LogsData> LoadJson(rapidjson::Document document);
-
-  void GetIterator(fit::function<void(fidl::Client<fuchsia_diagnostics::BatchIterator>&)> callback);
+  static std::optional<LogsData> LoadJson(rapidjson::Document document,
+                                          std::shared_ptr<std::queue<LogsData>> pending,
+                                          std::shared_ptr<bool> done);
 
   // Iterator connection.
-  std::optional<fpromise::promise<fidl::Client<fuchsia_diagnostics::BatchIterator>>>
-      iterator_promise_;
+  fidl::SharedClient<fuchsia_diagnostics::BatchIterator> iterator_;
 
-  // Callback to be invoked when the iterator becomes available.
-  std::optional<fit::function<void(fidl::Client<fuchsia_diagnostics::BatchIterator>&)>> callback_;
-
-  // Connection to BatchIterator which is empty while the FIDL connection is being established.
-  // It is set when the connection has been established.
-  std::optional<fidl::Client<fuchsia_diagnostics::BatchIterator>> maybe_client_;
   // Pending data to return before calling BatchIterator/GetNext again.
-  std::queue<LogsData> pending_;
+  std::shared_ptr<std::queue<LogsData>> pending_;
   // The scope to tie async task lifetimes to this object.
   fpromise::scope scope_;
   // Whether or not this subscription has completed and will return more data.
-  bool done_;
-
-  // Executor owned by the ArchiveReader.
-  async::Executor& executor_;
+  std::shared_ptr<bool> done_;
 };
 
 }  // namespace diagnostics::reader

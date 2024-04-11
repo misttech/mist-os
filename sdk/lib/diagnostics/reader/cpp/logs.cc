@@ -38,96 +38,65 @@ inline fuchsia_diagnostics::Severity StringToSeverity(const std::string& input) 
 
 }  // namespace
 
-LogsSubscription::LogsSubscription(
-    fpromise::promise<fidl::Client<fuchsia_diagnostics::BatchIterator>> iterator,
-    async::Executor& executor)
-    : iterator_promise_(std::move(iterator)), done_(false), executor_(executor) {}
+LogsSubscription::LogsSubscription(fidl::SharedClient<fuchsia_diagnostics::BatchIterator> iterator,
+                                   async::Executor& executor)
+    : iterator_(std::move(iterator)),
+      pending_(std::make_shared<std::queue<LogsData>>()),
+      done_(std::make_shared<bool>(false)) {}
 
-bool LogsSubscription::Done() { return done_; }
+bool LogsSubscription::Done() { return *done_; }
 
 LogsSubscription::Promise LogsSubscription::Next() {
   return fpromise::make_promise([this] { return ReadBatch(); }).wrap_with(scope_);
 }
 
-void LogsSubscription::GetIterator(
-    fit::function<void(fidl::Client<fuchsia_diagnostics::BatchIterator>&)> callback) {
-  if (maybe_client_.has_value()) {
-    callback(*maybe_client_);
-    return;
-  }
-  if (callback_.has_value()) {
-    // Chain callbacks
-    auto prev = std::move(*callback_);
-    callback_ = [prev = std::move(prev), next = std::move(callback)](
-                    fidl::Client<fuchsia_diagnostics::BatchIterator>& client) {
-      prev(client);
-      next(client);
-    };
-    return;
-  }
-  // Set first callback
-  callback_ = std::move(callback);
-
-  if (iterator_promise_.has_value()) {
-    auto promise = std::move(iterator_promise_);
-    executor_.schedule_task(
-        (*promise).and_then([this](fidl::Client<fuchsia_diagnostics::BatchIterator>& client) {
-          maybe_client_ = std::move(client);
-          if (callback_.has_value()) {
-            auto callback = std::move(callback_);
-            (*callback)(*maybe_client_);
-          }
-        }));
-  }
-}
-
 LogsSubscription::Promise LogsSubscription::ReadBatch() {
   fpromise::bridge<std::optional<LogsData>, std::string> bridge;
-  if (!pending_.empty()) {
-    auto result = std::make_optional(std::move(pending_.front()));
-    pending_.pop();
+  if (!pending_->empty()) {
+    auto result = std::make_optional(std::move(pending_->front()));
+    pending_->pop();
     return fpromise::make_result_promise<std::optional<LogsData>, std::string>(
         fpromise::ok(std::move(result)));
-  } else if (done_) {
+  } else if (*done_) {
     return fpromise::make_result_promise<std::optional<LogsData>, std::string>(
         fpromise::ok(std::nullopt));
   }
-  GetIterator([this, completer = std::move(bridge.completer)](
-                  fidl::Client<fuchsia_diagnostics::BatchIterator>& iterator) mutable {
-    iterator->GetNext().Then([this, completer = std::move(completer)](auto& result) mutable {
-      if (result.is_error()) {
-        completer.complete_error("Batch iterator returned error: " +
-                                 result.error_value().FormatDescription());
+  iterator_->GetNext().Then([completer = std::move(bridge.completer), done = done_,
+                             pending = pending_](auto& result) mutable {
+    if (result.is_error()) {
+      completer.complete_error("Batch iterator returned error: " +
+                               result.error_value().FormatDescription());
+      return;
+    }
+
+    if (result->batch().empty()) {
+      *done = true;
+      completer.complete_ok(std::nullopt);
+      return;
+    }
+
+    for (auto& content : result->batch()) {
+      if (content.Which() != fuchsia_diagnostics::FormattedContent::Tag::kJson) {
+        completer.complete_error("Received an unexpected content format");
         return;
       }
-
-      if (result->batch().empty()) {
-        done_ = true;
-        completer.complete_ok(std::nullopt);
+      std::string json;
+      fsl::SizedVmo vmo(std::move(content.json()->vmo()), content.json()->size());
+      if (!fsl::StringFromVmo(vmo, &json)) {
+        completer.complete_error("Failed to read returned VMO");
         return;
       }
-
-      for (auto& content : result->batch()) {
-        if (content.Which() != fuchsia_diagnostics::FormattedContent::Tag::kJson) {
-          completer.complete_error("Received an unexpected content format");
-          return;
-        }
-        std::string json;
-        fsl::SizedVmo vmo(std::move(content.json()->vmo()), content.json()->size());
-        if (!fsl::StringFromVmo(vmo, &json)) {
-          completer.complete_error("Failed to read returned VMO");
-          return;
-        }
-        rapidjson::Document document;
-        document.Parse(json);
-        completer.complete_ok(LoadJson(std::move(document)));
-      }
-    });
+      rapidjson::Document document;
+      document.Parse(json);
+      completer.complete_ok(LoadJson(std::move(document), pending, done));
+    }
   });
   return bridge.consumer.promise_or(fpromise::error("Failed to obtain consumer promise"));
 }
 
-std::optional<LogsData> LogsSubscription::LoadJson(rapidjson::Document document) {
+std::optional<LogsData> LogsSubscription::LoadJson(rapidjson::Document document,
+                                                   std::shared_ptr<std::queue<LogsData>> pending,
+                                                   std::shared_ptr<bool> done) {
   if (document.IsArray()) {
     for (auto& value : document.GetArray()) {
       // We need to ensure that the value is safely moved between documents, which may involve
@@ -138,16 +107,16 @@ std::optional<LogsData> LogsSubscription::LoadJson(rapidjson::Document document)
       rapidjson::Document value_document;
       rapidjson::Value temp(value.Move(), value_document.GetAllocator());
       value_document.Swap(temp);
-      pending_.push(LogsData(std::move(value_document)));
+      pending->push(LogsData(std::move(value_document)));
     }
   } else {
-    pending_.push(LogsData(std::move(document)));
+    pending->push(LogsData(std::move(document)));
   }
-  if (pending_.empty()) {
+  if (pending->empty()) {
     return std::nullopt;
   }
-  auto result = std::make_optional(std::move(pending_.front()));
-  pending_.pop();
+  auto result = std::make_optional(std::move(pending->front()));
+  pending->pop();
   return result;
 }
 

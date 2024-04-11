@@ -24,13 +24,6 @@
 
 namespace diagnostics::reader {
 
-// Shutdown task that runs on the async loop but not the executor.
-// This allows for the executor to be shutdown independently of the
-// async loop.
-struct ShutdownTask : async_task_t {
-  sync_completion_t completion;
-};
-
 // ArchiveReader supports reading Inspect data from an Archive.
 class ArchiveReader {
  public:
@@ -52,47 +45,27 @@ class ArchiveReader {
   // Subscribes to logs using the given `mode`.
   LogsSubscription GetLogs(fuchsia_diagnostics::StreamMode mode);
 
-  ~ArchiveReader();
-
  private:
   void InnerSnapshotInspectUntilPresent(
       fpromise::completer<std::vector<InspectData>, std::string> bridge,
       std::vector<std::string> component_names);
 
-  static void HandleShutdown(async_dispatcher_t* dispatcher, async_task_t* task,
-                             zx_status_t status);
-
-  fpromise::promise<fidl::Client<fuchsia_diagnostics::BatchIterator>> GetBatchIterator(
+  fidl::SharedClient<fuchsia_diagnostics::BatchIterator> GetBatchIterator(
       fuchsia_diagnostics::DataType data_type, fuchsia_diagnostics::StreamMode stream_mode);
 
-  fpromise::promise<fidl::Client<fuchsia_diagnostics::ArchiveAccessor>> Bind(
-      async_dispatcher_t* dispatcher);
-
-  std::optional<fit::function<void(fidl::Client<fuchsia_diagnostics::ArchiveAccessor>&)>> callback_;
-
-  bool creating_archive_ = false;
-
-  void GetArchive(
-      fit::function<void(fidl::Client<fuchsia_diagnostics::ArchiveAccessor>&)> callback);
+  fidl::SharedClient<fuchsia_diagnostics::ArchiveAccessor> Bind(async_dispatcher_t* dispatcher);
 
   // Resolved archive if present.
-  std::optional<fidl::Client<fuchsia_diagnostics::ArchiveAccessor>> maybe_archive_;
+  fidl::SharedClient<fuchsia_diagnostics::ArchiveAccessor> archive_;
 
   // The executor on which promise continuations run.
   async::Executor executor_;
-
-  // Thread ID that FIDL objects are bound to. Destruction
-  // must happen on this thread.
-  std::optional<std::thread::id> thread_id_;
 
   // The selectors used to filter data streamed from this reader.
   std::vector<std::string> selectors_;
 
   // The scope to tie async task lifetimes to this object.
   fpromise::scope scope_;
-
-  // Task used to shutdown FIDL objects associated with this object.
-  ShutdownTask shutdown_task_;
 };
 
 void EmplaceInspect(rapidjson::Document document, std::vector<InspectData>* out);

@@ -56,7 +56,7 @@ void EmplaceInspect(rapidjson::Document document, std::vector<InspectData>* out)
 
 namespace {
 
-void InnerReadBatches(fidl::Client<fuchsia_diagnostics::BatchIterator> ptr,
+void InnerReadBatches(fidl::SharedClient<fuchsia_diagnostics::BatchIterator> ptr,
                       fpromise::bridge<std::vector<InspectData>, std::string> done,
                       std::vector<InspectData> ret) {
   ptr->GetNext().Then(
@@ -94,7 +94,7 @@ void InnerReadBatches(fidl::Client<fuchsia_diagnostics::BatchIterator> ptr,
 }
 
 fpromise::promise<std::vector<InspectData>, std::string> ReadBatches(
-    fidl::Client<fuchsia_diagnostics::BatchIterator> ptr) {
+    fidl::SharedClient<fuchsia_diagnostics::BatchIterator> ptr) {
   fpromise::bridge<std::vector<InspectData>, std::string> result;
   auto consumer = std::move(result.consumer);
   InnerReadBatches(std::move(ptr), std::move(result), {});
@@ -106,63 +106,58 @@ fpromise::promise<std::vector<InspectData>, std::string> ReadBatches(
 // TODO(b/303304683): This must become the primary API. Currently it is delegating to the
 // deprecated FIDL system.
 ArchiveReader::ArchiveReader(async_dispatcher_t* dispatcher, std::vector<std::string> selectors)
-    : executor_(dispatcher), selectors_(std::move(selectors)) {
+    : archive_(Bind(dispatcher)), executor_(dispatcher), selectors_(std::move(selectors)) {
   ZX_ASSERT(dispatcher != nullptr);
 }
 
-fpromise::promise<fidl::Client<fuchsia_diagnostics::ArchiveAccessor>> ArchiveReader::Bind(
+fidl::SharedClient<fuchsia_diagnostics::ArchiveAccessor> ArchiveReader::Bind(
     async_dispatcher_t* dispatcher) {
-  return fpromise::make_promise([dispatcher] {
-    auto archive = component::Connect<fuchsia_diagnostics::ArchiveAccessor>();
-    ZX_ASSERT(archive.is_ok());
-    fidl::Client<fuchsia_diagnostics::ArchiveAccessor> old;
-    old.Bind(std::move(archive.value()), dispatcher);
-    return fpromise::ok(std::move(old));
-  });
+  auto archive = component::Connect<fuchsia_diagnostics::ArchiveAccessor>();
+  ZX_ASSERT(archive.is_ok());
+  fidl::SharedClient<fuchsia_diagnostics::ArchiveAccessor> old;
+  old.Bind(std::move(archive.value()), dispatcher);
+  return old;
 }
 
 fpromise::promise<std::vector<InspectData>, std::string> ArchiveReader::GetInspectSnapshot() {
   fpromise::bridge<std::vector<InspectData>, std::string> bridge;
-  GetArchive([this, completer = std::move(bridge.completer)](
-                 fidl::Client<fuchsia_diagnostics::ArchiveAccessor>& archive) mutable {
-    std::vector<fuchsia_diagnostics::SelectorArgument> selector_args;
-    for (const auto& selector : selectors_) {
-      auto arg = fuchsia_diagnostics::SelectorArgument::WithRawSelector(selector);
-      selector_args.emplace_back(std::move(arg));
-    }
 
-    fuchsia_diagnostics::StreamParameters params;
-    params.data_type(fuchsia_diagnostics::DataType::kInspect);
-    params.stream_mode(fuchsia_diagnostics::StreamMode::kSnapshot);
-    params.format(fuchsia_diagnostics::Format::kJson);
+  std::vector<fuchsia_diagnostics::SelectorArgument> selector_args;
+  for (const auto& selector : selectors_) {
+    auto arg = fuchsia_diagnostics::SelectorArgument::WithRawSelector(selector);
+    selector_args.emplace_back(std::move(arg));
+  }
 
-    if (!selector_args.empty()) {
-      params.client_selector_configuration(
-          fuchsia_diagnostics::ClientSelectorConfiguration::WithSelectors(
-              std::move(selector_args)));
-    } else {
-      params.client_selector_configuration(
-          fuchsia_diagnostics::ClientSelectorConfiguration::WithSelectAll(true));
-    }
+  fuchsia_diagnostics::StreamParameters params;
+  params.data_type(fuchsia_diagnostics::DataType::kInspect);
+  params.stream_mode(fuchsia_diagnostics::StreamMode::kSnapshot);
+  params.format(fuchsia_diagnostics::Format::kJson);
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_diagnostics::BatchIterator>();
-    fidl::Request<fuchsia_diagnostics::ArchiveAccessor::StreamDiagnostics> request;
-    request.result_stream(std::move(endpoints->server));
-    request.stream_parameters(std::move(params));
-    archive->StreamDiagnostics(std::move(request)).is_ok();
-    fidl::Client<fuchsia_diagnostics::BatchIterator> client;
-    client.Bind(std::move(endpoints->client), this->executor_.dispatcher());
-    executor_.schedule_task(
-        ReadBatches(std::move(client))
-            .then([completer = std::move(completer)](
-                      fpromise::result<std::vector<InspectData>, std::string>& result) mutable {
-              if (result.is_ok()) {
-                completer.complete_ok(result.take_value());
-              } else {
-                completer.complete_error(result.take_error());
-              }
-            }));
-  });
+  if (!selector_args.empty()) {
+    params.client_selector_configuration(
+        fuchsia_diagnostics::ClientSelectorConfiguration::WithSelectors(std::move(selector_args)));
+  } else {
+    params.client_selector_configuration(
+        fuchsia_diagnostics::ClientSelectorConfiguration::WithSelectAll(true));
+  }
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_diagnostics::BatchIterator>();
+  fidl::Request<fuchsia_diagnostics::ArchiveAccessor::StreamDiagnostics> request;
+  request.result_stream(std::move(endpoints->server));
+  request.stream_parameters(std::move(params));
+  archive_->StreamDiagnostics(std::move(request)).is_ok();
+  fidl::SharedClient<fuchsia_diagnostics::BatchIterator> client;
+  client.Bind(std::move(endpoints->client), this->executor_.dispatcher());
+  executor_.schedule_task(
+      ReadBatches(std::move(client))
+          .then([completer = std::move(bridge.completer)](
+                    fpromise::result<std::vector<InspectData>, std::string>& result) mutable {
+            if (result.is_ok()) {
+              completer.complete_ok(result.take_value());
+            } else {
+              completer.complete_error(result.take_error());
+            }
+          }));
   return bridge.consumer.promise_or(fpromise::error("Failed to obtain consumer promise"));
 }
 
@@ -173,71 +168,6 @@ fpromise::promise<std::vector<InspectData>, std::string> ArchiveReader::Snapshot
   InnerSnapshotInspectUntilPresent(std::move(bridge.completer), std::move(monikers));
 
   return bridge.consumer.promise_or(fpromise::error("Failed to create bridge promise"));
-}
-
-void ArchiveReader::GetArchive(
-    fit::function<void(fidl::Client<fuchsia_diagnostics::ArchiveAccessor>&)> callback) {
-  if (maybe_archive_.has_value()) {
-    executor_.schedule_task(fpromise::make_promise(
-        [callback = std::move(callback), this]() mutable { callback(*maybe_archive_); }));
-    return;
-  }
-  if (callback_.has_value()) {
-    // Chain callbacks
-    auto prev = std::move(*callback_);
-    callback_ = [prev = std::move(prev), next = std::move(callback)](
-                    fidl::Client<fuchsia_diagnostics::ArchiveAccessor>& client) {
-      prev(client);
-      next(client);
-    };
-    return;
-  }
-  // Set first callback
-  callback_ = std::move(callback);
-
-  if (!creating_archive_) {
-    creating_archive_ = true;
-    executor_.schedule_task(
-        Bind(executor_.dispatcher())
-            .and_then([this](fidl::Client<fuchsia_diagnostics::ArchiveAccessor>& client) {
-              thread_id_ = std::this_thread::get_id();
-              maybe_archive_ = std::move(client);
-              if (callback_.has_value()) {
-                auto callback = std::move(*callback_);
-                callback(*maybe_archive_);
-              }
-            }));
-  }
-}
-
-void ArchiveReader::HandleShutdown(async_dispatcher_t* dispatcher, async_task_t* task,
-                                   zx_status_t status) {
-  sync_completion_signal(&static_cast<ShutdownTask*>(task)->completion);
-}
-
-ArchiveReader::~ArchiveReader() {
-  if (!thread_id_.has_value()) {
-    // No FIDL resources were created, shutdown
-    // is safe to do on the current thread.
-    return;
-  }
-  if (*thread_id_ == std::this_thread::get_id()) {
-    // Thread IDs match, shutdown on the current thread is safe.
-    return;
-  }
-
-  // Thread IDs don't match, shutdown must happen on the dispatcher thread.
-  executor_.schedule_task(fpromise::make_promise([&]() {
-    // Ensure destructor is called
-    { auto client = std::move(maybe_archive_); }
-    shutdown_task_.deadline = async_now(executor_.dispatcher());
-    shutdown_task_.state = ASYNC_STATE_INIT;
-    shutdown_task_.handler = HandleShutdown;
-    // Post final shutdown task to wake the other thread. This task must have exited
-    // before the rest of the shutdown finishes.
-    async_post_task(executor_.dispatcher(), &shutdown_task_);
-  }));
-  sync_completion_wait(&shutdown_task_.completion, ZX_TIME_INFINITE);
 }
 
 void ArchiveReader::InnerSnapshotInspectUntilPresent(
@@ -283,41 +213,36 @@ LogsSubscription ArchiveReader::GetLogs(fuchsia_diagnostics::StreamMode mode) {
   return LogsSubscription(std::move(iterator), executor_);
 }
 
-fpromise::promise<fidl::Client<fuchsia_diagnostics::BatchIterator>> ArchiveReader::GetBatchIterator(
+fidl::SharedClient<fuchsia_diagnostics::BatchIterator> ArchiveReader::GetBatchIterator(
     fuchsia_diagnostics::DataType data_type, fuchsia_diagnostics::StreamMode stream_mode) {
-  fpromise::bridge<fidl::Client<fuchsia_diagnostics::BatchIterator>> bridge;
-  GetArchive([this, data_type, stream_mode, completer = std::move(bridge.completer)](
-                 fidl::Client<fuchsia_diagnostics::ArchiveAccessor>& archive) mutable {
-    std::vector<fuchsia_diagnostics::SelectorArgument> selector_args;
-    for (const auto& selector : selectors_) {
-      auto arg = fuchsia_diagnostics::SelectorArgument::WithRawSelector(selector);
-      selector_args.emplace_back(std::move(arg));
-    }
+  std::vector<fuchsia_diagnostics::SelectorArgument> selector_args;
+  for (const auto& selector : selectors_) {
+    auto arg = fuchsia_diagnostics::SelectorArgument::WithRawSelector(selector);
+    selector_args.emplace_back(std::move(arg));
+  }
 
-    fuchsia_diagnostics::StreamParameters params;
-    params.data_type(data_type);
-    params.stream_mode(stream_mode);
-    params.format(fuchsia_diagnostics::Format::kJson);
+  fuchsia_diagnostics::StreamParameters params;
+  params.data_type(data_type);
+  params.stream_mode(stream_mode);
+  params.format(fuchsia_diagnostics::Format::kJson);
 
-    if (!selector_args.empty()) {
-      auto client_selector_config =
-          fuchsia_diagnostics::ClientSelectorConfiguration::WithSelectors(std::move(selector_args));
-      params.client_selector_configuration(std::move(client_selector_config));
-    } else {
-      auto client_selector_config =
-          fuchsia_diagnostics::ClientSelectorConfiguration::WithSelectAll(true);
-      params.client_selector_configuration(std::move(client_selector_config));
-    }
-    auto endpoints = fidl::CreateEndpoints<fuchsia_diagnostics::BatchIterator>();
-    fidl::Request<fuchsia_diagnostics::ArchiveAccessor::StreamDiagnostics> request;
-    request.result_stream(std::move(endpoints->server));
-    request.stream_parameters(std::move(params));
-    archive->StreamDiagnostics(std::move(request)).is_ok();
-    fidl::Client<fuchsia_diagnostics::BatchIterator> client;
-    client.Bind(std::move(endpoints->client), this->executor_.dispatcher());
-    completer.complete_ok(std::move(client));
-  });
-  return bridge.consumer.promise();
+  if (!selector_args.empty()) {
+    auto client_selector_config =
+        fuchsia_diagnostics::ClientSelectorConfiguration::WithSelectors(std::move(selector_args));
+    params.client_selector_configuration(std::move(client_selector_config));
+  } else {
+    auto client_selector_config =
+        fuchsia_diagnostics::ClientSelectorConfiguration::WithSelectAll(true);
+    params.client_selector_configuration(std::move(client_selector_config));
+  }
+  auto endpoints = fidl::CreateEndpoints<fuchsia_diagnostics::BatchIterator>();
+  fidl::Request<fuchsia_diagnostics::ArchiveAccessor::StreamDiagnostics> request;
+  request.result_stream(std::move(endpoints->server));
+  request.stream_parameters(std::move(params));
+  archive_->StreamDiagnostics(std::move(request)).is_ok();
+  fidl::SharedClient<fuchsia_diagnostics::BatchIterator> client;
+  client.Bind(std::move(endpoints->client), this->executor_.dispatcher());
+  return client;
 }
 
 std::string SanitizeMonikerForSelectors(std::string_view moniker) {
