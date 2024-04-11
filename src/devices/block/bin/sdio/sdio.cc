@@ -250,7 +250,6 @@ int ReadStress(SdioClient client, uint32_t address, int argc, const char** argv)
     fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion buffers[1];
     buffers[0] = fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion{
         .buffer = fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmo(std::move(dup_dma_vmo)),
-        .type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle,
         .offset = 0,
         .size = size,
     };

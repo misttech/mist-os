@@ -504,20 +504,14 @@ void FakeSdmmcDevice::Request(RequestRequestView request, fdf::Arena& arena,
       sdmmc_buffer_region_t region;
 
       if (buffer.buffer.is_vmo_id()) {
-        if (buffer.type != fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoId) {
-          completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
-          return;
-        }
         region.buffer.vmo_id = buffer.buffer.vmo_id();
         region.type = SDMMC_BUFFER_TYPE_VMO_ID;
-      } else {
-        if (!buffer.buffer.is_vmo() ||
-            buffer.type != fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle) {
-          completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
-          return;
-        }
+      } else if (buffer.buffer.is_vmo()) {
         region.buffer.vmo = buffer.buffer.vmo().get();
         region.type = SDMMC_BUFFER_TYPE_VMO_HANDLE;
+      } else {
+        completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+        return;
       }
 
       region.offset = buffer.offset;

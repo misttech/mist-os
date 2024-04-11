@@ -50,15 +50,14 @@ zx::result<sdmmc_req_t> FidlToBanjoReq(const fuchsia_hardware_sdmmc::wire::Sdmmc
   };
 
   for (size_t i = 0; i < wire_req.buffers.count(); i++) {
-    if (wire_req.buffers[i].type == fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoId) {
+    if (wire_req.buffers[i].buffer.is_vmo_id()) {
       buffer_region_ptr->type = SDMMC_BUFFER_TYPE_VMO_ID;
       buffer_region_ptr->buffer.vmo_id = wire_req.buffers[i].buffer.vmo_id();
-    } else {
-      if (wire_req.buffers[i].type != fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle) {
-        return zx::error(ZX_ERR_INVALID_ARGS);
-      }
+    } else if (wire_req.buffers[i].buffer.is_vmo()) {
       buffer_region_ptr->type = SDMMC_BUFFER_TYPE_VMO_HANDLE;
       buffer_region_ptr->buffer.vmo = wire_req.buffers[i].buffer.vmo().get();
+    } else {
+      return zx::error(ZX_ERR_INVALID_ARGS);
     }
     buffer_region_ptr->offset = wire_req.buffers[i].offset;
     buffer_region_ptr->size = wire_req.buffers[i].size;
@@ -85,7 +84,6 @@ zx::result<fuchsia_hardware_sdmmc::wire::SdmmcReq> BanjoToFidlReq(const sdmmc_re
   wire_req.buffers.Allocate(*arena, banjo_req.buffers_count);
   for (size_t i = 0; i < banjo_req.buffers_count; i++) {
     if (banjo_req.buffers_list[i].type == SDMMC_BUFFER_TYPE_VMO_ID) {
-      wire_req.buffers[i].type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoId;
       wire_req.buffers[i].buffer = fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmoId(
           banjo_req.buffers_list[i].buffer.vmo_id);
     } else {
@@ -100,7 +98,6 @@ zx::result<fuchsia_hardware_sdmmc::wire::SdmmcReq> BanjoToFidlReq(const sdmmc_re
         FDF_LOGL(ERROR, logger, "Failed to duplicate vmo: %s", zx_status_get_string(status));
         return zx::error(status);
       }
-      wire_req.buffers[i].type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle;
       wire_req.buffers[i].buffer =
           fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmo(std::move(dup));
     }

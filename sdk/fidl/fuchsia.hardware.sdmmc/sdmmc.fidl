@@ -48,14 +48,8 @@ type SdmmcBuffer = strict resource union {
     2: vmo zx.Handle:VMO;
 };
 
-type SdmmcBufferType = strict enum : uint32 {
-    VMO_ID = 1;
-    VMO_HANDLE = 2;
-};
-
 type SdmmcBufferRegion = resource struct {
     buffer SdmmcBuffer;
-    type SdmmcBufferType;
     /// Offset into the VMO to start reading or writing. This is relative to the offset passed to
     /// RegisterVmo if type is VMO_ID.
     offset uint64;

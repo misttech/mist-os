@@ -43,7 +43,6 @@ zx::result<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion> GetBufferRegion(zx_h
 
   fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion buffer_region;
   buffer_region.buffer = fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmo(std::move(dup));
-  buffer_region.type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle;
   buffer_region.offset = offset;
   buffer_region.size = size;
   return zx::ok(std::move(buffer_region));

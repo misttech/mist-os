@@ -123,7 +123,7 @@ class SdioTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_s
     EXPECT_EQ(lhs.write, rhs.write);
     EXPECT_EQ(lhs.buffers.count(), rhs.buffers.count());
     EXPECT_EQ(lhs.buffers.count(), 1);
-    EXPECT_EQ(lhs.buffers.begin()->type, rhs.buffers.begin()->type);
+    EXPECT_EQ(lhs.buffers.begin()->buffer.Which(), rhs.buffers.begin()->buffer.Which());
     EXPECT_EQ(lhs.buffers.begin()->offset, rhs.buffers.begin()->offset);
     EXPECT_EQ(lhs.buffers.begin()->size, rhs.buffers.begin()->size);
   }
@@ -131,7 +131,7 @@ class SdioTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_s
   async::Loop loop_;
   fidl::ClientEnd<Device> client_;
   fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion kExpectedBuffer = {
-      .type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle,
+      .buffer = fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmo({}),
       .offset = 0,
       .size = 256,
   };

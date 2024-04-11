@@ -2483,7 +2483,6 @@ TEST_F(AmlSdmmcTest, WakeOnRequest) {
   ASSERT_OK(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
   fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion buffer_region{
       .buffer = fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmo(std::move(dup)),
-      .type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle,
       .offset = 0,
       .size = zx_system_get_page_size(),
   };
