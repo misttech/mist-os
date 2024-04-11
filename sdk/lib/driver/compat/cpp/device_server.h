@@ -73,7 +73,7 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
 
  public:
   struct GenericProtocol {
-    void* ops;
+    const void* ops;
     void* ctx;
   };
 

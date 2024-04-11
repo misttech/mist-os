@@ -14,7 +14,7 @@ namespace compat {
 
 class BanjoServer final {
  public:
-  BanjoServer(uint32_t proto_id, void* ctx, void* ops)
+  BanjoServer(uint32_t proto_id, void* ctx, const void* ops)
       : proto_id_(proto_id), ctx_(ctx), ops_(ops) {}
 
   fuchsia_driver_framework::NodeProperty property() const {
@@ -28,7 +28,7 @@ class BanjoServer final {
  private:
   uint32_t proto_id_;
   void* ctx_;
-  void* ops_;
+  const void* ops_;
 };
 
 }  // namespace compat
