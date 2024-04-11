@@ -8,11 +8,15 @@
 use alloc::collections::HashMap;
 use core::time::Duration;
 
-use derivative::Derivative;
-use net_types::ip::{Ip, IpAddress, IpVersionMarker, Mtu};
+use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker, Mtu};
 use tracing::trace;
 
-use crate::context::{TimerContext, TimerHandler};
+use crate::{
+    context::{
+        CoreTimerContext, InstantBindingsTypes, TimerBindingsTypes, TimerContext2, TimerHandler,
+    },
+    time::Instant,
+};
 
 /// Time between PMTU maintenance operations.
 ///
@@ -30,26 +34,23 @@ const MAINTENANCE_PERIOD: Duration = Duration::from_secs(3600);
 const PMTU_STALE_TIMEOUT: Duration = Duration::from_secs(10800);
 
 /// The timer ID for the path MTU cache.
-#[derive(Copy, Clone, Default, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, Eq, Hash, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 pub struct PmtuTimerId<I: Ip>(IpVersionMarker<I>);
 
-/// The state context for the path MTU cache.
-pub(super) trait PmtuStateContext<I: Ip, Instant> {
+/// The core context for the path MTU cache.
+pub(super) trait PmtuContext<I: Ip, BT: PmtuBindingsTypes> {
     /// Calls a function with a mutable reference to the PMTU cache.
-    fn with_state_mut<O, F: FnOnce(&mut PmtuCache<I, Instant>) -> O>(&mut self, cb: F) -> O;
+    fn with_state_mut<O, F: FnOnce(&mut PmtuCache<I, BT>) -> O>(&mut self, cb: F) -> O;
 }
+
+/// The bindings types for path MTU discovery.
+pub trait PmtuBindingsTypes: TimerBindingsTypes + InstantBindingsTypes {}
+impl<BT> PmtuBindingsTypes for BT where BT: TimerBindingsTypes + InstantBindingsTypes {}
 
 /// The bindings execution context for path MTU discovery.
-trait PmtuBindingsContext<I: Ip>: TimerContext<PmtuTimerId<I>> {}
-impl<I: Ip, BC: TimerContext<PmtuTimerId<I>>> PmtuBindingsContext<I> for BC {}
-
-/// The execution context for path MTU discovery.
-trait PmtuContext<I: Ip, BC: PmtuBindingsContext<I>>: PmtuStateContext<I, BC::Instant> {}
-
-impl<I: Ip, BC: PmtuBindingsContext<I>, CC: PmtuStateContext<I, BC::Instant>> PmtuContext<I, BC>
-    for CC
-{
-}
+trait PmtuBindingsContext: PmtuBindingsTypes + TimerContext2 {}
+impl<BC> PmtuBindingsContext for BC where BC: PmtuBindingsTypes + TimerContext2 {}
 
 /// A handler for incoming PMTU events.
 ///
@@ -80,8 +81,9 @@ pub(crate) trait PmtuHandler<I: Ip, BC> {
     );
 }
 
-fn maybe_schedule_timer<I: Ip, BC: PmtuBindingsContext<I>>(
+fn maybe_schedule_timer<BC: PmtuBindingsContext>(
     bindings_ctx: &mut BC,
+    timer: &mut BC::Timer,
     cache_is_empty: bool,
 ) {
     // Only attempt to create the next maintenance task if we still have
@@ -92,32 +94,32 @@ fn maybe_schedule_timer<I: Ip, BC: PmtuBindingsContext<I>>(
         return;
     }
 
-    let timer_id = PmtuTimerId::default();
-    match bindings_ctx.scheduled_instant(timer_id) {
+    match bindings_ctx.scheduled_instant2(timer) {
         Some(scheduled_at) => {
             let _: BC::Instant = scheduled_at;
             // Timer already set, nothing to do.
         }
         None => {
             // We only enter this match arm if a timer was not already set.
-            assert_eq!(bindings_ctx.schedule_timer(MAINTENANCE_PERIOD, timer_id), None)
+            assert_eq!(bindings_ctx.schedule_timer2(MAINTENANCE_PERIOD, timer), None)
         }
     }
 }
 
-fn handle_update_result<I: Ip, BC: PmtuBindingsContext<I>>(
+fn handle_update_result<BC: PmtuBindingsContext>(
     bindings_ctx: &mut BC,
+    timer: &mut BC::Timer,
     result: Result<Option<Mtu>, Option<Mtu>>,
     cache_is_empty: bool,
 ) {
     // TODO(https://fxbug.dev/42174290): Do something with this `Result`.
     let _: Result<_, _> = result.map(|ret| {
-        maybe_schedule_timer(bindings_ctx, cache_is_empty);
+        maybe_schedule_timer(bindings_ctx, timer, cache_is_empty);
         ret
     });
 }
 
-impl<I: Ip, BC: PmtuBindingsContext<I>, CC: PmtuContext<I, BC>> PmtuHandler<I, BC> for CC {
+impl<I: Ip, BC: PmtuBindingsContext, CC: PmtuContext<I, BC>> PmtuHandler<I, BC> for CC {
     fn update_pmtu_if_less(
         &mut self,
         bindings_ctx: &mut BC,
@@ -128,7 +130,8 @@ impl<I: Ip, BC: PmtuBindingsContext<I>, CC: PmtuContext<I, BC>> PmtuHandler<I, B
         self.with_state_mut(|cache| {
             let now = bindings_ctx.now();
             let res = cache.update_pmtu_if_less(src_ip, dst_ip, new_mtu, now);
-            handle_update_result(bindings_ctx, res, cache.is_empty());
+            let is_empty = cache.is_empty();
+            handle_update_result(bindings_ctx, &mut cache.timer, res, is_empty);
         })
     }
 
@@ -142,19 +145,21 @@ impl<I: Ip, BC: PmtuBindingsContext<I>, CC: PmtuContext<I, BC>> PmtuHandler<I, B
         self.with_state_mut(|cache| {
             let now = bindings_ctx.now();
             let res = cache.update_pmtu_next_lower(src_ip, dst_ip, from, now);
-            handle_update_result(bindings_ctx, res, cache.is_empty());
+            let is_empty = cache.is_empty();
+            handle_update_result(bindings_ctx, &mut cache.timer, res, is_empty);
         })
     }
 }
 
-impl<I: Ip, BC: PmtuBindingsContext<I>, CC: PmtuContext<I, BC>> TimerHandler<BC, PmtuTimerId<I>>
+impl<I: Ip, BC: PmtuBindingsContext, CC: PmtuContext<I, BC>> TimerHandler<BC, PmtuTimerId<I>>
     for CC
 {
     fn handle_timer(&mut self, bindings_ctx: &mut BC, _timer: PmtuTimerId<I>) {
         self.with_state_mut(|cache| {
             let now = bindings_ctx.now();
             cache.handle_timer(now);
-            maybe_schedule_timer(bindings_ctx, cache.is_empty());
+            let is_empty = cache.is_empty();
+            maybe_schedule_timer(bindings_ctx, &mut cache.timer, is_empty);
         })
     }
 }
@@ -180,7 +185,7 @@ pub(crate) struct PmtuCacheData<I> {
     last_updated: I,
 }
 
-impl<I: crate::Instant> PmtuCacheData<I> {
+impl<I: Instant> PmtuCacheData<I> {
     /// Construct a new `PmtuCacheData`.
     ///
     /// `last_updated` will be set to `now`.
@@ -190,13 +195,21 @@ impl<I: crate::Instant> PmtuCacheData<I> {
 }
 
 /// A path MTU cache.
-#[derive(Derivative)]
-#[derivative(Default(bound = ""))]
-pub struct PmtuCache<I: Ip, Instant> {
-    cache: HashMap<PmtuCacheKey<I::Addr>, PmtuCacheData<Instant>>,
+pub struct PmtuCache<I: Ip, BT: PmtuBindingsTypes> {
+    cache: HashMap<PmtuCacheKey<I::Addr>, PmtuCacheData<BT::Instant>>,
+    timer: BT::Timer,
 }
 
-impl<I: Ip, Instant: crate::Instant> PmtuCache<I, Instant> {
+impl<I: Ip, BC: PmtuBindingsTypes + TimerContext2> PmtuCache<I, BC> {
+    pub(crate) fn new<CC: CoreTimerContext<PmtuTimerId<I>, BC>>(bindings_ctx: &mut BC) -> Self {
+        Self {
+            cache: Default::default(),
+            timer: CC::new_timer(bindings_ctx, PmtuTimerId::default()),
+        }
+    }
+}
+
+impl<I: Ip, BT: PmtuBindingsTypes> PmtuCache<I, BT> {
     /// Gets the PMTU between `src_ip` and `dst_ip`.
     pub(crate) fn get_pmtu(&self, src_ip: I::Addr, dst_ip: I::Addr) -> Option<Mtu> {
         self.cache.get(&PmtuCacheKey::new(src_ip, dst_ip)).map(|x| x.pmtu)
@@ -210,7 +223,7 @@ impl<I: Ip, Instant: crate::Instant> PmtuCache<I, Instant> {
         src_ip: I::Addr,
         dst_ip: I::Addr,
         new_mtu: Mtu,
-        now: Instant,
+        now: BT::Instant,
     ) -> Result<Option<Mtu>, Option<Mtu>> {
         match self.get_pmtu(src_ip, dst_ip) {
             // No PMTU exists so update.
@@ -238,7 +251,7 @@ impl<I: Ip, Instant: crate::Instant> PmtuCache<I, Instant> {
         src_ip: I::Addr,
         dst_ip: I::Addr,
         from: Mtu,
-        now: Instant,
+        now: BT::Instant,
     ) -> Result<Option<Mtu>, Option<Mtu>> {
         if let Some(next_pmtu) = next_lower_pmtu_plateau(from) {
             trace!(
@@ -270,7 +283,7 @@ impl<I: Ip, Instant: crate::Instant> PmtuCache<I, Instant> {
         src_ip: I::Addr,
         dst_ip: I::Addr,
         new_mtu: Mtu,
-        now: Instant,
+        now: BT::Instant,
     ) -> Result<Option<Mtu>, Option<Mtu>> {
         // New MTU must not be smaller than the minimum MTU for an IP.
         if new_mtu < I::MINIMUM_LINK_MTU {
@@ -283,7 +296,7 @@ impl<I: Ip, Instant: crate::Instant> PmtuCache<I, Instant> {
             .map(|PmtuCacheData { pmtu, last_updated: _ }| pmtu))
     }
 
-    fn handle_timer(&mut self, now: Instant) {
+    fn handle_timer(&mut self, now: BT::Instant) {
         // Make sure we expected this timer to fire.
         assert!(!self.cache.is_empty());
 
@@ -402,31 +415,40 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_types::ip::{Ipv4, Ipv6};
     use net_types::{SpecifiedAddr, Witness};
+    use netstack3_base::IntoCoreTimerCtx;
     use test_case::test_case;
 
     use crate::{
         context::{
-            testutil::{FakeCoreCtx, FakeCtx, FakeInstant, FakeTimerCtxExt},
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt},
             InstantContext,
         },
         testutil::{assert_empty, TestIpExt},
     };
 
-    #[derive(Default)]
     struct FakePmtuContext<I: Ip> {
-        cache: PmtuCache<I, FakeInstant>,
+        cache: PmtuCache<I, FakeBindingsCtxImpl<I>>,
     }
 
-    type FakeCtxImpl<I> = FakeCtx<FakePmtuContext<I>, PmtuTimerId<I>, (), (), (), ()>;
+    type FakeCtxImpl<I> = crate::testutil::ContextPair<FakeCoreCtxImpl<I>, FakeBindingsCtxImpl<I>>;
     type FakeCoreCtxImpl<I> = FakeCoreCtx<FakePmtuContext<I>, (), ()>;
+    type FakeBindingsCtxImpl<I> = FakeBindingsCtx<PmtuTimerId<I>, (), (), ()>;
 
-    impl<I: Ip> PmtuStateContext<I, FakeInstant> for FakeCoreCtxImpl<I> {
-        fn with_state_mut<O, F: FnOnce(&mut PmtuCache<I, FakeInstant>) -> O>(
+    impl<I: Ip> PmtuContext<I, FakeBindingsCtxImpl<I>> for FakeCoreCtxImpl<I> {
+        fn with_state_mut<O, F: FnOnce(&mut PmtuCache<I, FakeBindingsCtxImpl<I>>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
             cb(&mut self.get_mut().cache)
         }
+    }
+
+    fn new_context<I: Ip>() -> FakeCtxImpl<I> {
+        FakeCtxImpl::with_default_bindings_ctx(|bindings_ctx| {
+            FakeCoreCtxImpl::with_state(FakePmtuContext {
+                cache: PmtuCache::new::<IntoCoreTimerCtx>(bindings_ctx),
+            })
+        })
     }
 
     /// Get an IPv4 or IPv6 address within the same subnet as that of
@@ -435,12 +457,12 @@ mod tests {
         I::get_other_ip_address(3)
     }
 
-    impl<I: Ip, Instant: Clone> PmtuCache<I, Instant> {
+    impl<I: Ip, BT: PmtuBindingsTypes> PmtuCache<I, BT> {
         /// Gets the last updated [`Instant`] when the PMTU between `src_ip` and
         /// `dst_ip` was updated.
         ///
-        /// [`Instant`]: crate::Instant
-        fn get_last_updated(&self, src_ip: I::Addr, dst_ip: I::Addr) -> Option<Instant> {
+        /// [`Instant`]: Instant
+        fn get_last_updated(&self, src_ip: I::Addr, dst_ip: I::Addr) -> Option<BT::Instant> {
             self.cache.get(&PmtuCacheKey::new(src_ip, dst_ip)).map(|x| x.last_updated.clone())
         }
     }
@@ -480,7 +502,7 @@ mod tests {
     #[ip_test]
     fn test_ip_path_mtu_cache_ctx<I: Ip + TestIpExt>() {
         let fake_config = I::FAKE_CONFIG;
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = FakeCtxImpl::<I>::default();
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Nothing in the cache yet
         assert_eq!(
@@ -653,7 +675,7 @@ mod tests {
     #[ip_test]
     fn test_ip_pmtu_task<I: Ip + TestIpExt>() {
         let fake_config = I::FAKE_CONFIG;
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = FakeCtxImpl::<I>::default();
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Make sure there are no timers.
         bindings_ctx.timer_ctx().assert_no_timers_installed();

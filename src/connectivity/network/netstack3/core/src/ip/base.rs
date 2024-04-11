@@ -42,8 +42,8 @@ use tracing::{debug, trace};
 
 use crate::{
     context::{
-        CoreTimerContext, CounterContext, EventContext, InstantBindingsTypes, InstantContext,
-        NonTestCtxMarker, TimerBindingsTypes, TimerContext2, TimerHandler, TracingContext,
+        CoreTimerContext, CounterContext, EventContext, InstantContext, NonTestCtxMarker,
+        TimerBindingsTypes, TimerContext2, TimerHandler, TracingContext,
     },
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
@@ -69,7 +69,7 @@ use crate::{
         },
         ipv6,
         ipv6::Ipv6PacketAction,
-        path_mtu::{PmtuCache, PmtuTimerId},
+        path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId},
         reassembly::{
             FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
             IpPacketFragmentCache,
@@ -1291,8 +1291,8 @@ where
     I: IpLayerIpExt,
     BT: BindingsTypes,
 {
-    type Data = PmtuCache<I, BT::Instant>;
-    type Guard<'l> = LockGuard<'l, PmtuCache<I, BT::Instant>> where Self: 'l;
+    type Data = PmtuCache<I, BT>;
+    type Guard<'l> = LockGuard<'l, PmtuCache<I, BT>> where Self: 'l;
 
     fn lock(&self) -> Self::Guard<'_> {
         self.inner_ip_state().pmtu_cache.lock()
@@ -1508,16 +1508,15 @@ impl<BC: BindingsContext, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::
 }
 
 /// Marker trait for the bindings types required by the IP layer's inner state.
-pub trait IpStateBindingsTypes: FragmentBindingsTypes + InstantBindingsTypes {}
-
-impl<BT> IpStateBindingsTypes for BT where BT: FragmentBindingsTypes + InstantBindingsTypes {}
+pub trait IpStateBindingsTypes: PmtuBindingsTypes + FragmentBindingsTypes {}
+impl<BT> IpStateBindingsTypes for BT where BT: PmtuBindingsTypes + FragmentBindingsTypes {}
 
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub struct IpStateInner<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> {
     table: RwLock<ForwardingTable<I, DeviceId>>,
     fragment_cache: Mutex<IpPacketFragmentCache<I, BT>>,
-    pmtu_cache: Mutex<PmtuCache<I, BT::Instant>>,
+    pmtu_cache: Mutex<PmtuCache<I, BT>>,
     counters: IpCounters<I>,
 }
 
@@ -1536,7 +1535,7 @@ impl<I: IpLayerIpExt, DeviceId, BC: TimerContext2 + IpStateBindingsTypes>
             fragment_cache: Mutex::new(IpPacketFragmentCache::new::<IpLayerTimerCtx<CC>>(
                 bindings_ctx,
             )),
-            pmtu_cache: Default::default(),
+            pmtu_cache: Mutex::new(PmtuCache::new::<IpLayerTimerCtx<CC>>(bindings_ctx)),
             counters: Default::default(),
         }
     }
@@ -1562,20 +1561,11 @@ impl<I: Ip> From<FragmentTimerId<I>> for IpLayerTimerId {
     }
 }
 
-impl From<PmtuTimerId<Ipv4>> for IpLayerTimerId {
-    fn from(timer: PmtuTimerId<Ipv4>) -> IpLayerTimerId {
-        IpLayerTimerId::PmtuTimeoutv4(timer)
+impl<I: Ip> From<PmtuTimerId<I>> for IpLayerTimerId {
+    fn from(timer: PmtuTimerId<I>) -> IpLayerTimerId {
+        I::map_ip(timer, IpLayerTimerId::PmtuTimeoutv4, IpLayerTimerId::PmtuTimeoutv6)
     }
 }
-
-impl From<PmtuTimerId<Ipv6>> for IpLayerTimerId {
-    fn from(timer: PmtuTimerId<Ipv6>) -> IpLayerTimerId {
-        IpLayerTimerId::PmtuTimeoutv6(timer)
-    }
-}
-
-impl_timer_context!(IpLayerTimerId, PmtuTimerId<Ipv4>, IpLayerTimerId::PmtuTimeoutv4(id), id);
-impl_timer_context!(IpLayerTimerId, PmtuTimerId<Ipv6>, IpLayerTimerId::PmtuTimeoutv6(id), id);
 
 /// An uninstantiable type providing timer ID conversion for the IP layer.
 struct IpLayerTimerCtx<CC>(Never, PhantomData<CC>);
@@ -1587,6 +1577,17 @@ where
     BT: TimerBindingsTypes,
 {
     fn convert_timer(timer: FragmentTimerId<I>) -> BT::DispatchId {
+        CC::convert_timer(IpLayerTimerId::from(timer))
+    }
+}
+
+impl<I, CC, BT> CoreTimerContext<PmtuTimerId<I>, BT> for IpLayerTimerCtx<CC>
+where
+    BT: TimerBindingsTypes,
+    I: Ip,
+    CC: CoreTimerContext<IpLayerTimerId, BT>,
+{
+    fn convert_timer(timer: PmtuTimerId<I>) -> BT::DispatchId {
         CC::convert_timer(IpLayerTimerId::from(timer))
     }
 }

@@ -13,7 +13,7 @@ use net_types::{
 use crate::{
     ip::{
         device::{self, IpDeviceBindingsContext, IpDeviceIpExt},
-        path_mtu::{PmtuCache, PmtuStateContext},
+        path_mtu::{PmtuCache, PmtuContext},
         reassembly::{FragmentContext, IpPacketFragmentCache},
         IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, MulticastMembershipHandler,
         ResolveRouteError,
@@ -36,18 +36,18 @@ where
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ipv4>>>
-    PmtuStateContext<Ipv4, BC::Instant> for CoreCtx<'_, BC, L>
+    PmtuContext<Ipv4, BC> for CoreCtx<'_, BC, L>
 {
-    fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv4, BC::Instant>) -> O>(&mut self, cb: F) -> O {
+    fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv4, BC>) -> O>(&mut self, cb: F) -> O {
         let mut cache = self.lock::<crate::lock_ordering::IpStatePmtuCache<Ipv4>>();
         cb(&mut cache)
     }
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ipv6>>>
-    PmtuStateContext<Ipv6, BC::Instant> for CoreCtx<'_, BC, L>
+    PmtuContext<Ipv6, BC> for CoreCtx<'_, BC, L>
 {
-    fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv6, BC::Instant>) -> O>(&mut self, cb: F) -> O {
+    fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv6, BC>) -> O>(&mut self, cb: F) -> O {
         let mut cache = self.lock::<crate::lock_ordering::IpStatePmtuCache<Ipv6>>();
         cb(&mut cache)
     }
