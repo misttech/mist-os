@@ -16,7 +16,6 @@ source_set("dsi-host-controller") {
     "//zircon/system/ulib/zircon-internal",
   ]
   deps = [
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
     "//zircon/system/ulib/hwreg",
   ]

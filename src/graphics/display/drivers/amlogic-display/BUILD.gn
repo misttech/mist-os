@@ -37,8 +37,6 @@ source_set("common_srcs") {
     "clock.cc",
     "clock.h",
     "common.h",
-    "display-device-driver-dfv1.cc",
-    "display-device-driver-dfv1.h",
     "display-engine.cc",
     "display-engine.h",
     "dsi-host.cc",
@@ -101,23 +99,16 @@ source_set("common_srcs") {
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
-    "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/graphics/display/lib/api-types-cpp",
     "//src/graphics/display/lib/designware-dsi:dsi-host-controller",
     "//src/graphics/display/lib/designware-hdmi:hdmi-transmitter-controller-impl",
     "//src/graphics/display/lib/device-protocol-display",
     "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher",
-    "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher:loop-backed-dispatcher",
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
     "//src/graphics/display/lib/driver-framework-migration-utils/metadata:metadata-getter",
-    "//src/graphics/display/lib/driver-framework-migration-utils/metadata:metadata-getter-dfv1",
     "//src/graphics/display/lib/driver-framework-migration-utils/namespace",
-    "//src/graphics/display/lib/driver-framework-migration-utils/namespace:namespace-dfv1",
     "//src/graphics/display/lib/mipi-dsi",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//src/lib/fxl",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/fbl",
@@ -138,9 +129,20 @@ source_set("common_srcs") {
 
 fuchsia_driver("amlogic-display-driver") {
   output_name = "amlogic-display"
+  sources = [
+    "display-device-driver-dfv1.cc",
+    "display-device-driver-dfv1.h",
+  ]
   deps = [
     ":amlogic_display_bind",
     ":common_srcs",
+    "//src/devices/lib/driver",
+    "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher:loop-backed-dispatcher",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
+    "//src/graphics/display/lib/driver-framework-migration-utils/metadata:metadata-getter-dfv1",
+    "//src/graphics/display/lib/driver-framework-migration-utils/namespace:namespace-dfv1",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
   ]
 }
 
@@ -171,7 +173,7 @@ test("amlogic-display-test") {
     "power-regs-test.cc",
     "video-input-regs-test.cc",
   ]
-  public_deps = [
+  deps = [
     ":common_srcs",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_testing",
     "//sdk/lib/async_patterns/testing/cpp",
@@ -179,6 +181,12 @@ test("amlogic-display-test") {
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
     "//src/devices/testing/mock-mmio-range",
+    "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher:loop-backed-dispatcher",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
+    "//src/graphics/display/lib/driver-framework-migration-utils/metadata:metadata-getter-dfv1",
+    "//src/graphics/display/lib/driver-framework-migration-utils/namespace:namespace-dfv1",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
