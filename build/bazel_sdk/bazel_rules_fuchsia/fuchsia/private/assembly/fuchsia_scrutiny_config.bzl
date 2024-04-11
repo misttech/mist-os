@@ -24,6 +24,7 @@ def _fuchsia_scrutiny_config_impl(ctx):
             static_packages = static_packages,
             structured_config_policy = ctx.file.structured_config_policy,
             pre_signing_policy = ctx.file.pre_signing_policy,
+            pre_signing_goldens_dir = ctx.file.pre_signing_goldens_dir,
         ),
     ]
 
@@ -74,6 +75,10 @@ fuchsia_scrutiny_config = rule(
         ),
         "pre_signing_policy": attr.label(
             doc = "File describing the policy of checks required before signing.",
+            allow_single_file = True,
+        ),
+        "pre_signing_goldens_dir": attr.label(
+            doc = "Directory containing golden files for pre-signing checks.",
             allow_single_file = True,
         ),
     },

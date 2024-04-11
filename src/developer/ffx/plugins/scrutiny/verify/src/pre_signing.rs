@@ -13,8 +13,15 @@ pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
     let mut deps = HashSet::new();
     let policy_path =
         &cmd.policy.to_str().context("failed to convert policy PathBuf to string")?.to_owned();
-    let command =
-        CommandBuilder::new("verify.pre_signing").param("policy_path", policy_path.clone()).build();
+    let golden_files_dir = &cmd
+        .golden_files_dir
+        .to_str()
+        .context("failed to convert golden_files_dir PathBuf to string")?
+        .to_owned();
+    let command = CommandBuilder::new("verify.pre_signing")
+        .param("policy_path", policy_path.clone())
+        .param("golden_files_dir", golden_files_dir.clone())
+        .build();
     let plugins = vec![
         "ZbiPlugin".to_string(),
         "AdditionalBootConfigPlugin".to_string(),

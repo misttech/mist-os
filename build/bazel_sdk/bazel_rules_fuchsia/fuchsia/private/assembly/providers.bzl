@@ -146,6 +146,7 @@ FuchsiaScrutinyConfigInfo = provider(
         "static_packages": "Set of base and cache packages expected in the fvm",
         "structured_config_policy": "File describing the policy of structured config",
         "pre_signing_policy": "File describing the policy of checks required before signing",
+        "pre_signing_goldens_dir": "Path to directory containing golden files for pre-signing checks",
     },
 )
 

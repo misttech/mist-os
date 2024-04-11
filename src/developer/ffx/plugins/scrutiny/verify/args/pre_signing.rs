@@ -16,7 +16,8 @@ use std::path::PathBuf;
 
     $ ffx scrutiny verify pre-signing \
         --product-bundle $(fx get-build-dir)/obj/build/images/fuchsia/product_bundle \
-        --policy path/to/policy_file"#
+        --policy path/to/policy_file \
+        --golden_files_dir path/to/goldens/dir"#
 )]
 pub struct Command {
     /// path to a signing validation policy file
@@ -26,4 +27,8 @@ pub struct Command {
     /// path to the product bundle for the build to validate
     #[argh(option)]
     pub product_bundle: PathBuf,
+
+    /// path to the directory containing golden files for pre_signing
+    #[argh(option)]
+    pub golden_files_dir: PathBuf,
 }

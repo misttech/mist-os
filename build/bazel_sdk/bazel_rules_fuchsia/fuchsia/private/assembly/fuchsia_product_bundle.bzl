@@ -168,6 +168,7 @@ def _scrutiny_validation(
         ffx_tool,
         pb_out_dir,
         platform_scrutiny_config.pre_signing_policy,
+        platform_scrutiny_config.pre_signing_goldens_dir,
     ))
     if not is_recovery:
         deps += _verify_route_sources(
@@ -450,7 +451,8 @@ def _verify_pre_signing(
         ffx_invocation,
         ffx_tool,
         pb_out_dir,
-        pre_signing_policy_file):
+        pre_signing_policy_file,
+        pre_signing_goldens_dir):
     stamp_file = ctx.actions.declare_file(label_name + "_pre_signing.stamp")
     ffx_isolate_dir = ctx.actions.declare_directory(label_name + "_pre_signing.ffx")
     _ffx_invocation = []
@@ -463,6 +465,8 @@ def _verify_pre_signing(
         pb_out_dir.path,
         "--policy",
         pre_signing_policy_file.path,
+        "--golden-files-dir",
+        pre_signing_goldens_dir.path,
     ]
     script_lines = [
         "set -e",

@@ -24,6 +24,8 @@ use {
 pub struct PreSigningRequest {
     /// Path to policy file with contents deserializable into build_checks::BuildCheckSpec.
     pub policy_path: String,
+    /// Path to directory containing golden files for policy to consume.
+    pub golden_files_dir: String,
 }
 
 /// The output of the PreSigningController is a set of errors found if any of the checks fail.
@@ -82,6 +84,7 @@ impl DataController for PreSigningController {
             boot_args_data,
             static_pkgs_map,
             &mut blobs_artifact_reader,
+            &pre_signing_request.golden_files_dir,
         )
         .context("Failed to run validation checks")?;
 

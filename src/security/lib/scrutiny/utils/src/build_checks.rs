@@ -249,7 +249,7 @@ pub struct ContentCheckSpec {
     pub must_contain: Option<Vec<ContentType>>,
     /// Set of items that must not be present in the target content.
     pub must_not_contain: Option<Vec<ContentType>>,
-    /// The path to a golden file.
+    /// The name of a golden file. The directory path it resides in is provided elsewhere.
     /// The contents of the golden file must match target content as a string.
     pub matches_golden: Option<String>,
 }
@@ -262,11 +262,13 @@ pub struct ContentCheckSpec {
 /// * `boot_args_data` - Mapping of arg name to vector of values delimited by `+`
 /// * `static_pkgs` - Mapping of pkg name to merkle hash string
 /// * `blobs_artifact_reader` - ArtifactReader backed by a build's blob set
+/// * 'golden_files_dir` - Directory containing golden files for matching
 pub fn validate_build_checks(
     validation_policy: BuildCheckSpec,
     boot_args_data: HashMap<String, Vec<String>>,
     static_pkgs: HashMap<String, String>,
     blobs_artifact_reader: &mut Box<dyn ArtifactReader>,
+    golden_files_dir: &str,
 ) -> Result<Vec<ValidationError>, Error> {
     let mut errors_found = Vec::new();
 
@@ -301,6 +303,7 @@ pub fn validate_build_checks(
             &package_check,
             &pkg_merkle_string,
             blobs_artifact_reader,
+            golden_files_dir,
         ) {
             errors_found.push(error);
         }
@@ -391,6 +394,7 @@ fn validate_package<FV: FileValidator>(
     check: &PackageCheckSpec,
     pkg_merkle_string: &String,
     blobs_artifact_reader: &mut Box<dyn ArtifactReader>,
+    golden_files_dir: &str,
 ) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
@@ -420,9 +424,14 @@ fn validate_package<FV: FileValidator>(
 
     for file_check in &check.file_checks {
         errors.extend(
-            FV::validate_file(&file_check, &mut package_far_reader, blobs_artifact_reader)
-                .iter()
-                .map(|error| error.to_owned().with_package_name(check.source.to_string())),
+            FV::validate_file(
+                &file_check,
+                &mut package_far_reader,
+                blobs_artifact_reader,
+                golden_files_dir,
+            )
+            .iter()
+            .map(|error| error.to_owned().with_package_name(check.source.to_string())),
         );
     }
 
@@ -435,6 +444,7 @@ trait FileValidator {
         check: &FileCheckSpec,
         package_far_reader: &mut FarReader<Box<dyn ReadSeek>>,
         blobs_artifact_reader: &mut Box<dyn ArtifactReader>,
+        golden_files_dir: &str,
     ) -> Vec<ValidationError>
     where
         Self: Sized;
@@ -506,6 +516,7 @@ fn validate_file_contents(
     checks: &ContentCheckSpec,
     content_bytes: Vec<u8>,
     content_source: &str,
+    golden_files_dir: &str,
 ) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
@@ -524,7 +535,12 @@ fn validate_file_contents(
 
     errors.extend(file_contents_must_contain(checks, content_str, content_source));
     errors.extend(file_contents_must_not_contain(checks, content_str, content_source));
-    errors.extend(file_contents_match_golden(checks, content_str, content_source));
+    errors.extend(file_contents_match_golden(
+        checks,
+        content_str,
+        content_source,
+        golden_files_dir,
+    ));
 
     errors
 }
@@ -678,11 +694,12 @@ fn file_contents_match_golden(
     checks: &ContentCheckSpec,
     content_str: &str,
     content_source: &str,
+    golden_files_dir: &str,
 ) -> Vec<ValidationError> {
     let mut errors = Vec::new();
-    if let Some(golden_file_path_string) = &checks.matches_golden {
-        let golden_path = Path::new(golden_file_path_string);
-        match read_to_string(golden_path) {
+    if let Some(golden_file_name) = &checks.matches_golden {
+        let golden_path = Path::new(golden_files_dir).join(golden_file_name);
+        match read_to_string(&golden_path) {
             Ok(golden_contents) => {
                 // Diffs are calculated and reported relative to the golden file.
                 let Changeset { diffs, distance, .. } =
@@ -701,7 +718,7 @@ fn file_contents_match_golden(
                         }
                     }
                     errors.push(ValidationError::ContentGoldenFileMismatch {
-                        golden_path: golden_file_path_string.to_string(),
+                        golden_path: golden_path.to_string_lossy().to_string(),
                         content_source: content_source.to_string(),
                         diffs: reported_diffs,
                     });
@@ -709,7 +726,7 @@ fn file_contents_match_golden(
             }
             Err(e) => {
                 errors.push(ValidationError::FailedToOpenGoldenFile {
-                    golden_path: golden_file_path_string.to_string(),
+                    golden_path: golden_path.to_string_lossy().to_string(),
                     error: e.to_string(),
                 });
             }
@@ -813,6 +830,7 @@ impl FileValidator for PackageFileValidator {
         check: &FileCheckSpec,
         package_far_reader: &mut FarReader<Box<dyn ReadSeek>>,
         blobs_artifact_reader: &mut Box<dyn ArtifactReader>,
+        golden_files_dir: &str,
     ) -> Vec<ValidationError> {
         let mut errors = Vec::new();
         // First, find the file and read its contents if it is present.
@@ -846,9 +864,12 @@ impl FileValidator for PackageFileValidator {
 
                 // If we have content checks beyond just the file being there, run them.
                 if let Some(content_checks) = &check.content_checks {
-                    for error_found in
-                        validate_file_contents(content_checks, bytes, &file_path_found)
-                    {
+                    for error_found in validate_file_contents(
+                        content_checks,
+                        bytes,
+                        &file_path_found,
+                        golden_files_dir,
+                    ) {
                         errors.push(error_found);
                     }
                 }
@@ -934,6 +955,7 @@ mod tests {
             _check: &FileCheckSpec,
             _package_far_reader: &mut FarReader<Box<dyn ReadSeek>>,
             _blobs_artifact_reader: &mut Box<dyn ArtifactReader>,
+            _golden_files_dir: &str,
         ) -> Vec<ValidationError>
         where
             Self: Sized,
@@ -979,7 +1001,7 @@ mod tests {
         let mut artifact_reader: Box<dyn ArtifactReader> =
             Box::new(TestArtifactReader::new(HashMap::new()));
         let errors =
-            validate_build_checks(policy, boot_args_data, HashMap::new(), &mut artifact_reader)
+            validate_build_checks(policy, boot_args_data, HashMap::new(), &mut artifact_reader, "")
                 .unwrap();
 
         assert_eq!(errors.len(), 0);
@@ -998,7 +1020,7 @@ mod tests {
         let mut artifact_reader: Box<dyn ArtifactReader> =
             Box::new(TestArtifactReader::new(HashMap::new()));
         let errors =
-            validate_build_checks(policy, boot_args_data, HashMap::new(), &mut artifact_reader)
+            validate_build_checks(policy, boot_args_data, HashMap::new(), &mut artifact_reader, "")
                 .unwrap();
 
         assert_eq!(errors.len(), 0);
@@ -1167,6 +1189,7 @@ mod tests {
             &check,
             &pkg_merkle_string,
             &mut blobs_artifact_reader,
+            "",
         );
 
         assert_eq!(validation_errors.len(), 1);
@@ -1192,6 +1215,7 @@ mod tests {
             &check,
             &pkg_merkle_string,
             &mut blobs_artifact_reader,
+            "",
         );
 
         assert_eq!(validation_errors.len(), 1);
@@ -1231,6 +1255,7 @@ mod tests {
                 check: &FileCheckSpec,
                 _package_far_reader: &mut FarReader<Box<dyn ReadSeek>>,
                 _blobs_artifact_reader: &mut Box<dyn ArtifactReader>,
+                _golden_files_dir: &str,
             ) -> Vec<ValidationError>
             where
                 Self: Sized,
@@ -1258,6 +1283,7 @@ mod tests {
             &check,
             &pkg_merkle_string,
             &mut blobs_artifact_reader,
+            "",
         );
 
         // Check that the errors returned by validate_package are the ones we constructed for the mock FileValidator.
@@ -1320,6 +1346,7 @@ mod tests {
             &check,
             &pkg_merkle_string,
             &mut blobs_artifact_reader,
+            "",
         );
 
         assert!(validation_errors.is_empty());
@@ -1343,6 +1370,7 @@ mod tests {
             &check,
             &pkg_merkle_string,
             &mut blobs_artifact_reader,
+            "",
         );
 
         assert!(validation_errors.is_empty());
@@ -1486,7 +1514,7 @@ mod tests {
         let content_bytes = vec![0, 159, 146, 150];
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
         assert_eq!(errors.len(), 1);
         match &errors[0] {
@@ -1514,7 +1542,7 @@ mod tests {
         let content_bytes = content_string.as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
         assert_eq!(errors.len(), 1);
         match &errors[0] {
@@ -1546,7 +1574,7 @@ mod tests {
             let content_bytes = content_string.as_bytes().to_vec();
             let content_source = "content_source".to_string();
 
-            let errors = validate_file_contents(&checks, content_bytes, &content_source);
+            let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
             assert_eq!(errors.len(), 0);
         }
@@ -1570,7 +1598,7 @@ mod tests {
         let content_bytes = content_string.as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
         assert_eq!(errors.len(), 1);
         match &errors[0] {
@@ -1603,7 +1631,7 @@ mod tests {
         let content_bytes = content_string.as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
         assert_eq!(errors.len(), 0);
     }
@@ -1625,7 +1653,7 @@ mod tests {
         let content_bytes = content_string.as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
         assert_eq!(errors.len(), 1);
         match &errors[0] {
@@ -1658,7 +1686,7 @@ mod tests {
         let content_bytes = "something not a key value pair".as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
         assert_eq!(errors.len(), 1);
         match &errors[0] {
@@ -1684,7 +1712,7 @@ mod tests {
         let content_bytes = content_string.as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
         assert_eq!(errors.len(), 0);
     }
@@ -1701,7 +1729,7 @@ mod tests {
             "some other text, not the magic string though, more text".as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
         assert_eq!(errors.len(), 1);
         match &errors[0] {
@@ -1735,7 +1763,7 @@ mod tests {
         let content_bytes = content_string.as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
         assert_eq!(errors.len(), 0);
     }
@@ -1760,7 +1788,7 @@ mod tests {
         let content_bytes = content_string.as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
         assert_eq!(errors.len(), 1);
         match &errors[0] {
@@ -1793,7 +1821,7 @@ mod tests {
         let content_bytes = content_string.as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
         assert_eq!(errors.len(), 0);
     }
@@ -1814,7 +1842,7 @@ mod tests {
         let content_bytes = content_string.as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
         assert_eq!(errors.len(), 1);
         match &errors[0] {
@@ -1847,7 +1875,7 @@ mod tests {
         let content_bytes = "something not a key value pair".as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
         assert_eq!(errors.len(), 1);
         match &errors[0] {
@@ -1873,7 +1901,7 @@ mod tests {
             "some other text, not the expected string, more text".as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
         assert_eq!(errors.len(), 0);
     }
@@ -1890,7 +1918,7 @@ mod tests {
         let content_bytes = content_string.as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(&checks, content_bytes, &content_source, "");
 
         assert_eq!(errors.len(), 1);
         match &errors[0] {
@@ -1923,7 +1951,12 @@ mod tests {
         let content_bytes = content_string.as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(
+            &checks,
+            content_bytes,
+            &content_source,
+            std::env::temp_dir().to_str().unwrap(),
+        );
 
         assert_eq!(errors.len(), 0);
     }
@@ -1948,7 +1981,12 @@ mod tests {
         let content_bytes = content_string.as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(
+            &checks,
+            content_bytes,
+            &content_source,
+            std::env::temp_dir().to_str().unwrap(),
+        );
 
         assert_eq!(errors.len(), 1);
         match &errors[0] {
@@ -1971,22 +2009,30 @@ mod tests {
         another line of stuff
         third line";
 
-        let golden_file_path = "non_existent_file_path";
+        let golden_file_name = "non_existent_file_path";
         let checks = ContentCheckSpec {
             must_contain: None,
             must_not_contain: None,
-            matches_golden: Some(golden_file_path.to_string()),
+            matches_golden: Some(golden_file_name.to_string()),
         };
 
         let content_bytes = content_string.as_bytes().to_vec();
         let content_source = "content_source".to_string();
 
-        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+        let errors = validate_file_contents(
+            &checks,
+            content_bytes,
+            &content_source,
+            std::env::temp_dir().to_str().unwrap(),
+        );
 
         assert_eq!(errors.len(), 1);
+        // Verify the golden file directory and file name were combined.
+        let path_searched =
+            std::env::temp_dir().join(golden_file_name).to_string_lossy().to_string();
         match &errors[0] {
             ValidationError::FailedToOpenGoldenFile { golden_path, error: _ } => {
-                assert_eq!(golden_file_path, golden_path);
+                assert_eq!(&path_searched, golden_path);
             }
             e => assert!(false, "Unexpected error from failure or error case test: {}", e),
         }
@@ -2224,6 +2270,7 @@ mod tests {
             &file_check,
             &mut pkg_far_reader,
             &mut blobs_artifact_reader,
+            "",
         );
 
         assert_eq!(errors.len(), 1);
@@ -2256,6 +2303,7 @@ mod tests {
             &file_check,
             &mut pkg_far_reader,
             &mut blobs_artifact_reader,
+            "",
         );
 
         assert_eq!(errors.len(), 0);
@@ -2279,6 +2327,7 @@ mod tests {
             &file_check,
             &mut pkg_far_reader,
             &mut blobs_artifact_reader,
+            "",
         );
 
         assert_eq!(errors.len(), 1);
@@ -2310,6 +2359,7 @@ mod tests {
             &file_check,
             &mut pkg_far_reader,
             &mut blobs_artifact_reader,
+            "",
         );
 
         assert_eq!(errors.len(), 0);
@@ -2334,6 +2384,7 @@ mod tests {
             &file_check,
             &mut pkg_far_reader,
             &mut blobs_artifact_reader,
+            "",
         );
 
         assert_eq!(errors.len(), 1);
@@ -2364,6 +2415,7 @@ mod tests {
             &file_check,
             &mut pkg_far_reader,
             &mut blobs_artifact_reader,
+            "",
         );
 
         assert_eq!(errors.len(), 0);
@@ -2387,6 +2439,7 @@ mod tests {
             &file_check,
             &mut pkg_far_reader,
             &mut blobs_artifact_reader,
+            "",
         );
 
         assert_eq!(errors.len(), 1);
