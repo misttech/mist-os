@@ -157,3 +157,132 @@ fn test_struct_with_option() {
         FileRelativePathBuf::Resolved("some//foo/file_1.json".into())
     );
 }
+
+#[derive(SupportsFileRelativePaths, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(untagged, deny_unknown_fields)]
+enum TestEnum {
+    UnitVariant,
+    UnnamedInt(i64),
+    UnnamedFile(FileRelativePathBuf),
+    UnnamedFields(i64, FileRelativePathBuf),
+    UnnamedSimple(#[file_relative_paths] SimpleStruct),
+    NamedInt {
+        i: i64,
+    },
+    NamedFile {
+        file: FileRelativePathBuf,
+    },
+    NamedFields {
+        n: i64,
+        file: FileRelativePathBuf,
+    },
+    NamedSimple {
+        #[file_relative_paths]
+        simple: SimpleStruct,
+    },
+}
+
+#[test]
+fn test_enum_variants_without_paths() {
+    let parsed = TestEnum::UnitVariant;
+    let resolved = parsed.resolve_paths_from_file("foo").unwrap();
+    assert_eq!(resolved, TestEnum::UnitVariant);
+
+    let parsed = TestEnum::UnnamedInt(42);
+    let resolved = parsed.resolve_paths_from_file("foo").unwrap();
+    assert_eq!(resolved, TestEnum::UnnamedInt(42));
+
+    let parsed = TestEnum::NamedInt { i: 2 };
+    let resolved = parsed.resolve_paths_from_file("foo").unwrap();
+    assert_eq!(resolved, TestEnum::NamedInt { i: 2 });
+}
+
+#[test]
+fn test_enum_unnamed_file() {
+    let json = serde_json::json!("foo/file_1.json");
+    let parsed: TestEnum = serde_json::from_value(json).unwrap();
+    let resolved = parsed.resolve_paths_from_file("some/file").unwrap();
+    assert_eq!(
+        resolved,
+        TestEnum::UnnamedFile(FileRelativePathBuf::Resolved("some/foo/file_1.json".into()))
+    )
+}
+
+#[test]
+fn test_enum_unnamed_fields() {
+    let json = serde_json::json!([42, "foo/file_1.json"]);
+    let parsed: TestEnum = serde_json::from_value(json).unwrap();
+    let resolved = parsed.resolve_paths_from_file("some/file").unwrap();
+    assert_eq!(
+        resolved,
+        TestEnum::UnnamedFields(42, FileRelativePathBuf::Resolved("some/foo/file_1.json".into()))
+    )
+}
+
+#[test]
+fn test_enum_unnamed_simple() {
+    let json = serde_json::json!({
+        "flag": true,
+        "path": "foo/file_2.json"
+    });
+    let parsed: TestEnum = serde_json::from_value(json).unwrap();
+    let resolved = parsed.resolve_paths_from_file("some/file").unwrap();
+    assert_eq!(
+        resolved,
+        TestEnum::UnnamedSimple(SimpleStruct {
+            flag: true,
+            path: FileRelativePathBuf::Resolved("some/foo/file_2.json".into())
+        })
+    )
+}
+
+#[test]
+fn test_enum_named_file() {
+    let json = serde_json::json!({
+        "file": "foo/file_1.json"
+    });
+    let parsed: TestEnum = serde_json::from_value(json).unwrap();
+    let resolved = parsed.resolve_paths_from_file("some/file").unwrap();
+    assert_eq!(
+        resolved,
+        TestEnum::NamedFile { file: FileRelativePathBuf::Resolved("some/foo/file_1.json".into()) }
+    )
+}
+
+#[test]
+fn test_enum_named_fields() {
+    let json = serde_json::json!({
+        "n": 4,
+        "file": "foo/file_1.json"
+    });
+    let parsed: TestEnum = serde_json::from_value(json).unwrap();
+    let resolved = parsed.resolve_paths_from_file("some/file").unwrap();
+    assert_eq!(
+        resolved,
+        TestEnum::NamedFields {
+            n: 4,
+            file: FileRelativePathBuf::Resolved("some/foo/file_1.json".into())
+        }
+    )
+}
+
+#[test]
+fn test_enum_named_simple() {
+    let json = serde_json::json!({
+        "simple": {
+            "flag": true,
+            "path": "foo/file_2.json"
+        }
+    });
+    let parsed: TestEnum = serde_json::from_value(json).unwrap();
+    let resolved = parsed.resolve_paths_from_file("some/file").unwrap();
+    assert_eq!(
+        resolved,
+        TestEnum::NamedSimple {
+            simple: SimpleStruct {
+                flag: true,
+                path: FileRelativePathBuf::Resolved("some/foo/file_2.json".into())
+            }
+        }
+    )
+}
