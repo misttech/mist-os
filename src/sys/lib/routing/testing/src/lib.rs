@@ -343,6 +343,9 @@ macro_rules! instantiate_common_routing_tests {
             test_use_runner_from_child,
             test_use_runner_from_parent,
             test_use_runner_from_parent_environment,
+            test_use_config_from_self,
+            test_use_config_from_parent,
+            test_use_config_from_void,
         }
     };
     ($builder_impl:path, $test:ident, $($remaining:ident),+ $(,)?) => {
@@ -4212,5 +4215,170 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             }
             _ => panic!("bad capability source"),
         };
+    }
+
+    ///  a
+    ///   \
+    ///    b
+    ///
+    /// b: declares "fuchsia.MyConfig" capability
+    /// b: uses "fuchsia.MyConfig" from self
+    pub async fn test_use_config_from_self(&self) {
+        let good_value = cm_rust::ConfigSingleValue::Int8(12);
+        let use_config = UseBuilder::config()
+            .source(cm_rust::UseSource::Self_)
+            .name("fuchsia.MyConfig")
+            .target_name("my_config")
+            .config_type(cm_rust::ConfigValueType::Int8)
+            .build();
+        let components = vec![
+            ("a", ComponentDeclBuilder::new().child_default("b").build()),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .capability(
+                        CapabilityBuilder::config()
+                            .name("fuchsia.MyConfig")
+                            .value(good_value.clone().into()),
+                    )
+                    .use_(use_config.clone())
+                    .config(cm_rust::ConfigDecl {
+                        fields: vec![cm_rust::ConfigField {
+                            key: "my_config".into(),
+                            type_: cm_rust::ConfigValueType::Int8,
+                            mutability: Default::default(),
+                        }],
+                        checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
+                        value_source: cm_rust::ConfigValueSource::Capabilities(Default::default()),
+                    })
+                    .build(),
+            ),
+        ];
+
+        let model = T::new("a", components).build().await;
+        let child_component = model.look_up_instance(&vec!["b"].try_into().unwrap()).await.unwrap();
+
+        let cm_rust::UseDecl::Config(use_config) = use_config else { panic!() };
+        let value =
+            routing::config::route_config_value(&use_config, &child_component).await.unwrap();
+        assert_eq!(value, Some(cm_rust::ConfigValue::Single(good_value)));
+    }
+
+    ///  a
+    ///   \
+    ///    b
+    ///
+    /// a: declares "fuchsia.MyConfig" capability
+    /// b: uses "fuchsia.MyConfig" from parent
+    pub async fn test_use_config_from_parent(&self) {
+        let good_value = cm_rust::ConfigSingleValue::Int8(12);
+        let use_config = UseBuilder::config()
+            .source(cm_rust::UseSource::Parent)
+            .name("fuchsia.MyConfig")
+            .target_name("my_config")
+            .config_type(cm_rust::ConfigValueType::Int8)
+            .build();
+        let components = vec![
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .capability(
+                        CapabilityBuilder::config()
+                            .name("fuchsia.MyConfig")
+                            .value(good_value.clone().into()),
+                    )
+                    .offer(
+                        OfferBuilder::config()
+                            .name("fuchsia.MyConfig")
+                            .source(cm_rust::OfferSource::Self_)
+                            .target(cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                                name: "b".into(),
+                                collection: None,
+                            })),
+                    )
+                    .child_default("b")
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .use_(use_config.clone())
+                    .config(cm_rust::ConfigDecl {
+                        fields: vec![cm_rust::ConfigField {
+                            key: "my_config".into(),
+                            type_: cm_rust::ConfigValueType::Int8,
+                            mutability: Default::default(),
+                        }],
+                        checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
+                        value_source: cm_rust::ConfigValueSource::Capabilities(Default::default()),
+                    })
+                    .build(),
+            ),
+        ];
+
+        let model = T::new("a", components).build().await;
+        let child_component = model.look_up_instance(&vec!["b"].try_into().unwrap()).await.unwrap();
+
+        let cm_rust::UseDecl::Config(use_config) = use_config else { panic!() };
+        let value =
+            routing::config::route_config_value(&use_config, &child_component).await.unwrap();
+        assert_eq!(value, Some(cm_rust::ConfigValue::Single(good_value)));
+    }
+
+    ///  a
+    ///   \
+    ///    b
+    ///
+    /// a: routes "fuchsia.MyConfig" from void
+    /// b: uses "fuchsia.MyConfig" from parent
+    pub async fn test_use_config_from_void(&self) {
+        let use_config = UseBuilder::config()
+            .source(cm_rust::UseSource::Parent)
+            .name("fuchsia.MyConfig")
+            .target_name("my_config")
+            .availability(cm_rust::Availability::Optional)
+            .config_type(cm_rust::ConfigValueType::Int8)
+            .build();
+        let components = vec![
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .offer(
+                        OfferBuilder::config()
+                            .name("fuchsia.MyConfig")
+                            .source(cm_rust::OfferSource::Void)
+                            .availability(cm_rust::Availability::Optional)
+                            .target(cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                                name: "b".into(),
+                                collection: None,
+                            })),
+                    )
+                    .child_default("b")
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .use_(use_config.clone())
+                    .config(cm_rust::ConfigDecl {
+                        fields: vec![cm_rust::ConfigField {
+                            key: "my_config".into(),
+                            type_: cm_rust::ConfigValueType::Int8,
+                            mutability: Default::default(),
+                        }],
+                        checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
+                        value_source: cm_rust::ConfigValueSource::Capabilities(Default::default()),
+                    })
+                    .build(),
+            ),
+        ];
+
+        let model = T::new("a", components).build().await;
+        let child_component = model.look_up_instance(&vec!["b"].try_into().unwrap()).await.unwrap();
+
+        let cm_rust::UseDecl::Config(use_config) = use_config else { panic!() };
+        let value =
+            routing::config::route_config_value(&use_config, &child_component).await.unwrap();
+        assert_eq!(value, None);
     }
 }
