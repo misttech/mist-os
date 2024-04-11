@@ -387,6 +387,9 @@ fn inspect_tcp_counters<I: Ip>(inspector: &mut impl Inspector, counters: &TcpCou
         slow_start_retransmits,
         fast_retransmits,
         fast_recovery,
+        established_closed,
+        established_resets,
+        established_timedout,
     } = counters.as_ref();
     inspector.record_child("Rx", |inspector| {
         inspector.record_counter("ValidSegmentsReceived", valid_segments_received);
@@ -420,6 +423,9 @@ fn inspect_tcp_counters<I: Ip>(inspector: &mut impl Inspector, counters: &TcpCou
     inspector.record_counter("PassiveConnectionOpenings", passive_connection_openings);
     inspector.record_counter("ActiveConnectionOpenings", active_connection_openings);
     inspector.record_counter("FastRecovery", fast_recovery);
+    inspector.record_counter("EstablishedClosed", established_closed);
+    inspector.record_counter("EstablishedResets", established_resets);
+    inspector.record_counter("EstablishedTimedout", established_timedout);
     inspector.record_child("Errors", |inspector| {
         inspector.record_counter("FailedConnectionOpenings", failed_connection_attempts);
         inspector.record_counter("FailedPortReservations", failed_port_reservations);

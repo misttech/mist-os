@@ -428,8 +428,14 @@ pub struct TcpCountersInner {
     pub fast_retransmits: Counter,
     /// Count of times fast recovery was initiated to recover from packet loss.
     pub fast_recovery: Counter,
-    // TODO(https://fxbug.dev/42052879): Add additional counters to achieve
-    // parity with Netstack2.
+    /// Count of times an established TCP connection transitioned to CLOSED.
+    pub established_closed: Counter,
+    /// Count of times an established TCP connection transitioned to CLOSED due
+    /// to a RST segment.
+    pub established_resets: Counter,
+    /// Count of times an established TCP connection transitioned to CLOSED due
+    /// to a timeout (e.g. a keep-alive or retransmit timeout).
+    pub established_timedout: Counter,
 }
 
 #[cfg(test)]

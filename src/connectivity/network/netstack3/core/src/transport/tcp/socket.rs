@@ -1623,6 +1623,25 @@ pub struct Connection<
     handshake_status: HandshakeStatus,
 }
 
+impl<SockI: DualStackIpExt, WireI: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>
+    Connection<SockI, WireI, D, BT>
+{
+    /// Updates this connection's state to reflect the error.
+    ///
+    /// The connection's soft error, if previously unoccupied, holds the error.
+    fn on_icmp_error<CC: CounterContext<TcpCounters<SockI>>>(
+        &mut self,
+        core_ctx: &mut CC,
+        seq: SeqNum,
+        error: IcmpErrorCode,
+    ) {
+        let Connection { soft_error, state, .. } = self;
+        let new_soft_error =
+            core_ctx.with_counters(|counters| state.on_icmp_error(counters, error, seq));
+        *soft_error = soft_error.or(new_soft_error);
+    }
+}
+
 /// The Listener state.
 ///
 /// State for sockets that participate in the passive open. Contrary to
@@ -2956,10 +2975,13 @@ where
                                 + CounterContext<TcpCounters<SockI>>,
                         {
                             conn.defunct = true;
-                            let already_closed = match conn.state.close(
-                                CloseReason::Close { now: bindings_ctx.now() },
-                                &conn.socket_options,
-                            ) {
+                            let already_closed = match core_ctx.with_counters(|counters| {
+                                conn.state.close(
+                                    counters,
+                                    CloseReason::Close { now: bindings_ctx.now() },
+                                    &conn.socket_options,
+                                )
+                            }) {
                                 Err(CloseError::NoConnection) => true,
                                 Err(CloseError::Closing) | Ok(()) => false,
                             };
@@ -3101,7 +3123,13 @@ where
                                 + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
                                 + CounterContext<TcpCounters<SockI>>,
                         {
-                            match conn.state.close(CloseReason::Shutdown, &conn.socket_options) {
+                            match core_ctx.with_counters(|counters| {
+                                conn.state.close(
+                                    counters,
+                                    CloseReason::Shutdown,
+                                    &conn.socket_options,
+                                )
+                            }) {
                                 Ok(()) => {
                                     do_send_inner(id, conn, addr, timer, core_ctx, bindings_ctx);
                                     Ok(())
@@ -3907,6 +3935,7 @@ where
                 match core_ctx {
                     MaybeDualStack::NotDualStack((core_ctx, converter)) => {
                         let (conn, addr) = converter.convert(conn_and_addr);
+                        conn.on_icmp_error(core_ctx, seq, error);
                         (
                             &mut conn.accept_queue,
                             &mut conn.state,
@@ -3921,18 +3950,22 @@ where
                     }
                     MaybeDualStack::DualStack((core_ctx, converter)) => {
                         match converter.convert(conn_and_addr) {
-                            EitherStack::ThisStack((conn, addr)) => (
-                                &mut conn.accept_queue,
-                                &mut conn.state,
-                                &mut conn.soft_error,
-                                &mut conn.handshake_status,
-                                EitherStack::ThisStack((
-                                    core_ctx.as_this_stack(),
-                                    I::into_demux_socket_id(id.clone()),
-                                    addr,
-                                )),
-                            ),
+                            EitherStack::ThisStack((conn, addr)) => {
+                                conn.on_icmp_error(core_ctx, seq, error);
+                                (
+                                    &mut conn.accept_queue,
+                                    &mut conn.state,
+                                    &mut conn.soft_error,
+                                    &mut conn.handshake_status,
+                                    EitherStack::ThisStack((
+                                        core_ctx.as_this_stack(),
+                                        I::into_demux_socket_id(id.clone()),
+                                        addr,
+                                    )),
+                                )
+                            }
                             EitherStack::OtherStack((conn, addr)) => {
+                                conn.on_icmp_error(core_ctx, seq, error);
                                 let demux_id = core_ctx.into_other_demux_socket_id(id.clone());
                                 (
                                     &mut conn.accept_queue,
@@ -3945,7 +3978,6 @@ where
                         }
                     }
                 };
-            *soft_error = soft_error.or(state.on_icmp_error(error, seq));
 
             if let State::Closed(Closed { reason }) = state {
                 debug!("handshake_status: {handshake_status:?}");
@@ -4382,7 +4414,7 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
         let _: Option<_> = bindings_ctx.cancel_timer2(timer);
     }
 
-    if let Some(reset) = state.abort() {
+    if let Some(reset) = core_ctx.with_counters(|counters| state.abort(counters)) {
         let ConnAddr { ip, device: _ } = conn_addr;
         send_tcp_segment(core_ctx, bindings_ctx, Some(sock_id), Some(ip_sock), *ip, reset.into());
     }

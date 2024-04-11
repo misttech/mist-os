@@ -1647,6 +1647,40 @@ impl<T: Default> Takeable for T {
 impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
     State<I, R, S, ActiveOpen>
 {
+    /// Updates this state to the provided new state.
+    fn transition_to_state(
+        &mut self,
+        counters: &TcpCountersInner,
+        new_state: State<I, R, S, ActiveOpen>,
+    ) {
+        if let State::Closed(Closed { reason }) = &new_state {
+            let was_established = match self {
+                State::Closed(_) | State::Listen(_) | State::SynRcvd(_) | State::SynSent(_) => {
+                    false
+                }
+                State::Established(_)
+                | State::CloseWait(_)
+                | State::LastAck(_)
+                | State::FinWait1(_)
+                | State::FinWait2(_)
+                | State::Closing(_)
+                | State::TimeWait(_) => true,
+            };
+            if was_established {
+                counters.established_closed.increment();
+                match reason {
+                    Some(ConnectionError::ConnectionReset) => {
+                        counters.established_resets.increment();
+                    }
+                    Some(ConnectionError::TimedOut) => {
+                        counters.established_timedout.increment();
+                    }
+                    _ => {}
+                }
+            }
+        }
+        *self = new_state
+    }
     /// Processes an incoming segment and advances the state machine.
     ///
     /// Returns a segment if one needs to be sent; if a passive open connection
@@ -1695,17 +1729,20 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         ) => {
                             match simultaneous_open {
                                 None => {
-                                    *self = State::SynRcvd(SynRcvd {
-                                        iss,
-                                        irs,
-                                        timestamp,
-                                        retrans_timer,
-                                        simultaneous_open: None,
-                                        buffer_sizes,
-                                        smss,
-                                        rcv_wnd_scale,
-                                        snd_wnd_scale,
-                                    });
+                                    self.transition_to_state(
+                                        counters,
+                                        State::SynRcvd(SynRcvd {
+                                            iss,
+                                            irs,
+                                            timestamp,
+                                            retrans_timer,
+                                            simultaneous_open: None,
+                                            buffer_sizes,
+                                            smss,
+                                            rcv_wnd_scale,
+                                            snd_wnd_scale,
+                                        }),
+                                    );
                                 }
                                 Some(infallible) => match infallible {},
                             }
@@ -1757,7 +1794,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         }
                         SynSentOnSegmentDisposition::SendRst(rst) => Some(rst),
                         SynSentOnSegmentDisposition::EnterClosed(closed) => {
-                            *self = State::Closed(closed);
+                            self.transition_to_state(counters, State::Closed(closed));
                             None
                         }
                         SynSentOnSegmentDisposition::Ignore => None,
@@ -1844,7 +1881,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             //   "connection reset" signal.  Enter the CLOSED state, delete the
             //   TCB, and return.
             if contents.control() == Some(Control::RST) {
-                *self = State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) });
+                self.transition_to_state(
+                    counters,
+                    State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }),
+                );
                 return None;
             }
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-70):
@@ -1858,7 +1898,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             //   and an ack would have been sent in the first step (sequence
             //   number check).
             if contents.control() == Some(Control::SYN) {
-                *self = State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) });
+                self.transition_to_state(
+                    counters,
+                    State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }),
+                );
                 return Some(Segment::rst(snd_nxt));
             }
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-72):
@@ -1911,7 +1954,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             let (snd_wnd_scale, rcv_wnd_scale) = snd_wnd_scale
                                 .map(|snd_wnd_scale| (snd_wnd_scale, *rcv_wnd_scale))
                                 .unwrap_or_default();
-                            *self = State::Established(Established {
+                            let established = Established {
                                 snd: Send {
                                     nxt: *iss + 1,
                                     max: *iss + 1,
@@ -1935,7 +1978,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                     wnd_scale: rcv_wnd_scale,
                                     last_window_update: (*irs + 1, buffer_sizes.rwnd()),
                                 },
-                            });
+                            };
+                            self.transition_to_state(counters, State::Established(established));
                         }
                         // Unreachable note(2): Because we either return early or
                         // transition to Established for the ack processing, it is
@@ -1963,7 +2007,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         if let Some(ack) = ack {
                             return Some(ack);
                         } else if seg_ack == fin_seq {
-                            *self = State::Closed(Closed { reason: None });
+                            self.transition_to_state(
+                                counters,
+                                State::Closed(Closed { reason: None }),
+                            );
                             return None;
                         }
                     }
@@ -1984,7 +2031,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             //   enter FIN-WAIT-2 and continue processing in that
                             //   state
                             let last_seq = snd.nxt;
-                            *self = State::FinWait2(FinWait2 {
+                            let finwait2 = FinWait2 {
                                 last_seq,
                                 rcv: rcv.take(),
                                 // If the connection is already defunct, we set
@@ -1992,7 +2039,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                 // `close` call should set the timer.
                                 timeout_at: fin_wait2_timeout
                                     .and_then(|timeout| defunct.then_some(now.add(timeout))),
-                            });
+                            };
+                            self.transition_to_state(counters, State::FinWait2(finwait2));
                         }
                     }
                     State::Closing(Closing { snd, last_ack, last_wnd, last_wnd_scale }) => {
@@ -2011,13 +2059,14 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             //   In addition to the processing for the ESTABLISHED state, if
                             //   the ACK acknowledges our FIN then enter the TIME-WAIT state,
                             //   otherwise ignore the segment.
-                            *self = State::TimeWait(TimeWait {
+                            let timewait = TimeWait {
                                 last_seq: snd.nxt,
                                 last_ack: *last_ack,
                                 last_wnd: *last_wnd,
                                 expiry: new_time_wait_expiry(now),
                                 last_wnd_scale: *last_wnd_scale,
-                            });
+                            };
+                            self.transition_to_state(counters, State::TimeWait(timewait));
                         }
                     }
                     State::FinWait2(_) | State::TimeWait(_) => {}
@@ -2143,7 +2192,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         let last_wnd =
                             rcv.select_window().checked_sub(1).unwrap_or(WindowSize::ZERO);
                         let scaled_wnd = last_wnd >> rcv.wnd_scale;
-                        *self = State::CloseWait(CloseWait { snd: snd.take(), last_ack, last_wnd });
+                        let closewait = CloseWait { snd: snd.take(), last_ack, last_wnd };
+                        self.transition_to_state(counters, State::CloseWait(closewait));
                         Some(Segment::ack(snd_nxt, last_ack, scaled_wnd))
                     }
                     State::CloseWait(_) | State::LastAck(_) | State::Closing(_) => {
@@ -2161,12 +2211,13 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         let last_wnd =
                             rcv.select_window().checked_sub(1).unwrap_or(WindowSize::ZERO);
                         let scaled_wnd = last_wnd >> rcv.wnd_scale;
-                        *self = State::Closing(Closing {
+                        let closing = Closing {
                             snd: snd.take(),
                             last_ack,
                             last_wnd,
                             last_wnd_scale: rcv.wnd_scale,
-                        });
+                        };
+                        self.transition_to_state(counters, State::Closing(closing));
                         Some(Segment::ack(snd_nxt, last_ack, scaled_wnd))
                     }
                     State::FinWait2(FinWait2 { last_seq, rcv, timeout_at: _ }) => {
@@ -2174,13 +2225,14 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         let last_wnd =
                             rcv.select_window().checked_sub(1).unwrap_or(WindowSize::ZERO);
                         let scaled_window = last_wnd >> rcv.wnd_scale;
-                        *self = State::TimeWait(TimeWait {
+                        let timewait = TimeWait {
                             last_seq: *last_seq,
                             last_ack,
                             last_wnd,
                             expiry: new_time_wait_expiry(now),
                             last_wnd_scale: rcv.wnd_scale,
-                        });
+                        };
+                        self.transition_to_state(counters, State::TimeWait(timewait));
                         Some(Segment::ack(snd_nxt, last_ack, scaled_window))
                     }
                     State::TimeWait(TimeWait {
@@ -2219,7 +2271,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
         now: I,
         socket_options: &SocketOptions,
     ) -> Option<Segment<SendPayload<'_>>> {
-        if self.poll_close(now, socket_options) {
+        if self.poll_close(counters, now, socket_options) {
             return None;
         }
         fn poll_rcv_then_snd<
@@ -2322,6 +2374,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
     /// Returns whether the connection has been closed.
     fn poll_close(
         &mut self,
+        counters: &TcpCountersInner,
         now: I,
         SocketOptions {
             keep_alive,
@@ -2370,10 +2423,13 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             }
         };
         if timed_out {
-            *self = State::Closed(Closed { reason: Some(ConnectionError::TimedOut) });
+            self.transition_to_state(
+                counters,
+                State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }),
+            );
         } else if let State::TimeWait(tw) = self {
             if tw.expiry <= now {
-                *self = State::Closed(Closed { reason: None });
+                self.transition_to_state(counters, State::Closed(Closed { reason: None }));
             }
         }
         matches!(self, State::Closed(_))
@@ -2444,6 +2500,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
     /// on timeouts.
     pub(super) fn close(
         &mut self,
+        counters: &TcpCountersInner,
         close_reason: CloseReason<I>,
         socket_options: &SocketOptions,
     ) -> Result<(), CloseError>
@@ -2453,7 +2510,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
         match self {
             State::Closed(_) => Err(CloseError::NoConnection),
             State::Listen(_) | State::SynSent(_) => {
-                *self = State::Closed(Closed { reason: None });
+                self.transition_to_state(counters, State::Closed(Closed { reason: None }));
                 Ok(())
             }
             State::SynRcvd(SynRcvd {
@@ -2499,7 +2556,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 let (snd_wnd_scale, rcv_wnd_scale) = snd_wnd_scale
                     .map(|snd_wnd_scale| (snd_wnd_scale, *rcv_wnd_scale))
                     .unwrap_or_default();
-                *self = State::FinWait1(FinWait1 {
+                let finwait1 = FinWait1 {
                     snd: Send {
                         nxt: *iss + 1,
                         max: *iss + 1,
@@ -2523,7 +2580,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         wnd_scale: rcv_wnd_scale,
                         last_window_update: (*irs + 1, buffer_sizes.rwnd()),
                     },
-                });
+                };
+                self.transition_to_state(counters, State::FinWait1(finwait1));
                 Ok(())
             }
             State::Established(Established { snd, rcv }) => {
@@ -2532,15 +2590,17 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 //     Queue this until all preceding SENDs have been segmentized,
                 //     then form a FIN segment and send it.  In any case, enter
                 //     FIN-WAIT-1 state.
-                *self = State::FinWait1(FinWait1 { snd: snd.take().queue_fin(), rcv: rcv.take() });
+                let finwait1 = FinWait1 { snd: snd.take().queue_fin(), rcv: rcv.take() };
+                self.transition_to_state(counters, State::FinWait1(finwait1));
                 Ok(())
             }
             State::CloseWait(CloseWait { snd, last_ack, last_wnd }) => {
-                *self = State::LastAck(LastAck {
+                let lastack = LastAck {
                     snd: snd.take().queue_fin(),
                     last_ack: *last_ack,
                     last_wnd: *last_wnd,
-                });
+                };
+                self.transition_to_state(counters, State::LastAck(lastack));
                 Ok(())
             }
             State::LastAck(_) | State::FinWait1(_) | State::Closing(_) | State::TimeWait(_) => {
@@ -2559,7 +2619,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
 
     /// Corresponds to [ABORT](https://tools.ietf.org/html/rfc9293#section-3.10.5)
     /// user call.
-    pub(crate) fn abort(&mut self) -> Option<Segment<()>> {
+    pub(crate) fn abort(&mut self, counters: &TcpCountersInner) -> Option<Segment<()>> {
         let reply = match self {
             //   LISTEN STATE
             //      *  Any outstanding RECEIVEs should be returned with "error:
@@ -2612,7 +2672,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 Some(Segment::rst_ack(snd.nxt, *last_ack))
             }
         };
-        *self = State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) });
+        self.transition_to_state(
+            counters,
+            State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }),
+        );
         reply
     }
 
@@ -2756,6 +2819,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
     /// recorded in the containing socket.
     pub(super) fn on_icmp_error(
         &mut self,
+        counters: &TcpCountersInner,
         err: IcmpErrorCode,
         seq: SeqNum,
     ) -> Option<ConnectionError> {
@@ -2808,7 +2872,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 rcv_wnd_scale: _,
             }) => {
                 if *iss == seq {
-                    *self = State::Closed(Closed { reason: Some(err) });
+                    self.transition_to_state(counters, State::Closed(Closed { reason: Some(err) }));
                 }
                 None
             }
@@ -4417,7 +4481,10 @@ mod test {
             )
         );
         // Then call CLOSE to transition the state machine to LastAck.
-        assert_eq!(state.close(CloseReason::Shutdown, &SocketOptions::default()), Ok(()));
+        assert_eq!(
+            state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
+            Ok(())
+        );
         assert_eq!(
             state,
             State::LastAck(LastAck {
@@ -4506,6 +4573,9 @@ mod test {
         );
         // The connection is closed.
         assert_eq!(state, State::Closed(Closed { reason: None }));
+        assert_eq!(counters.established_closed.get(), 1);
+        assert_eq!(counters.established_timedout.get(), 0);
+        assert_eq!(counters.established_resets.get(), 0);
     }
 
     #[test]
@@ -4527,7 +4597,10 @@ mod test {
             rcv_wnd_scale: WindowScale::default(),
             snd_wnd_scale: Some(WindowScale::default()),
         });
-        assert_eq!(state.close(CloseReason::Shutdown, &SocketOptions::default()), Ok(()));
+        assert_eq!(
+            state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
+            Ok(())
+        );
         assert_matches!(state, State::FinWait1(_));
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, FakeInstant::default(), &counters),
@@ -4569,10 +4642,13 @@ mod test {
                 last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
             },
         });
-        assert_eq!(state.close(CloseReason::Shutdown, &SocketOptions::default()), Ok(()));
+        assert_eq!(
+            state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
+            Ok(())
+        );
         assert_matches!(state, State::FinWait1(_));
         assert_eq!(
-            state.close(CloseReason::Shutdown, &SocketOptions::default()),
+            state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
             Err(CloseError::Closing)
         );
 
@@ -4723,6 +4799,9 @@ mod test {
         // The state should become closed.
         assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now(), &counters), None);
         assert_eq!(state, State::Closed(Closed { reason: None }));
+        assert_eq!(counters.established_closed.get(), 1);
+        assert_eq!(counters.established_timedout.get(), 0);
+        assert_eq!(counters.established_resets.get(), 0);
     }
 
     #[test]
@@ -4809,10 +4888,13 @@ mod test {
                 last_window_update: (ISS_1 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
             },
         });
-        assert_eq!(state.close(CloseReason::Shutdown, &SocketOptions::default()), Ok(()));
+        assert_eq!(
+            state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
+            Ok(())
+        );
         assert_matches!(state, State::FinWait1(_));
         assert_eq!(
-            state.close(CloseReason::Shutdown, &SocketOptions::default()),
+            state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
             Err(CloseError::Closing)
         );
 
@@ -4877,6 +4959,9 @@ mod test {
         // The state should become closed.
         assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now(), &counters), None);
         assert_eq!(state, State::Closed(Closed { reason: None }));
+        assert_eq!(counters.established_closed.get(), 1);
+        assert_eq!(counters.established_timedout.get(), 0);
+        assert_eq!(counters.established_resets.get(), 0);
     }
 
     #[test]
@@ -5190,6 +5275,9 @@ mod test {
             None,
         );
         assert_eq!(state, State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }));
+        assert_eq!(counters.established_closed.get(), 1);
+        assert_eq!(counters.established_timedout.get(), 1);
+        assert_eq!(counters.established_resets.get(), 0);
     }
 
     /// A `SendBuffer` that doesn't allow peeking some number of bytes.
@@ -5598,7 +5686,10 @@ mod test {
         } else {
             assert!(times < DEFAULT_MAX_RETRIES.get());
         }
-        assert_eq!(state, State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }))
+        assert_eq!(state, State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }));
+        assert_eq!(counters.established_closed.get(), 1);
+        assert_eq!(counters.established_timedout.get(), 1);
+        assert_eq!(counters.established_resets.get(), 0);
     }
 
     #[test]
@@ -5923,13 +6014,20 @@ mod test {
             timeout_at: None,
         });
         assert_eq!(
-            state.close(CloseReason::Close { now: clock.now() }, &SocketOptions::default()),
+            state.close(
+                &counters,
+                CloseReason::Close { now: clock.now() },
+                &SocketOptions::default()
+            ),
             Err(CloseError::Closing)
         );
         assert_eq!(state.poll_send_at(), Some(clock.now().add(DEFAULT_FIN_WAIT2_TIMEOUT)));
         clock.sleep(DEFAULT_FIN_WAIT2_TIMEOUT);
         assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now(), &counters), None);
         assert_eq!(state, State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }));
+        assert_eq!(counters.established_closed.get(), 1);
+        assert_eq!(counters.established_timedout.get(), 1);
+        assert_eq!(counters.established_resets.get(), 0);
     }
 
     #[test_case(RetransTimer {
@@ -6008,6 +6106,9 @@ mod test {
             retransmissions += 1;
         }
         assert_eq!(state, State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }));
+        assert_eq!(counters.established_closed.get(), 0);
+        assert_eq!(counters.established_timedout.get(), 0);
+        assert_eq!(counters.established_resets.get(), 0);
         retransmissions
     }
 

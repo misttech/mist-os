@@ -823,6 +823,9 @@ async fn inspect_counters(name: &str) {
                     PassiveConnectionOpenings: 0u64,
                     ActiveConnectionOpenings: 0u64,
                     FastRecovery: 0u64,
+                    EstablishedClosed: 0u64,
+                    EstablishedResets: 0u64,
+                    EstablishedTimedout: 0u64,
                     "Rx": {
                         ValidSegmentsReceived: 0u64,
                         ReceivedSegmentsDispatched: 0u64,
@@ -861,6 +864,9 @@ async fn inspect_counters(name: &str) {
                     PassiveConnectionOpenings: 0u64,
                     ActiveConnectionOpenings: 0u64,
                     FastRecovery: 0u64,
+                    EstablishedClosed: 0u64,
+                    EstablishedResets: 0u64,
+                    EstablishedTimedout: 0u64,
                     "Rx": {
                         ValidSegmentsReceived: 0u64,
                         ReceivedSegmentsDispatched: 0u64,
