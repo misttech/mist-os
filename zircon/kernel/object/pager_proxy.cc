@@ -283,6 +283,12 @@ void PagerProxy::Free(PortPacket* packet) {
       self_src = ktl::move(page_source_);
     }
   }
+  // At this point it is possible that self_ref and self_src are nullptrs, and we have set
+  // complete_pending_ to false if we were freeing the complete_request_. In this case the moment
+  // guard is dropped it is possible for some other thread to take the lock, observe this, and then
+  // delete this object. This is fine as we do not reference `this` after the lock is dropped, with
+  // this->mtx_ defined (by the Mutex implementation) as not being referenced once another thread is
+  // able to acquire the lock.
 }
 
 void PagerProxy::OnPacketFreedLocked() {
