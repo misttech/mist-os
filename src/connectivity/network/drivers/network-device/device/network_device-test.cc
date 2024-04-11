@@ -190,9 +190,7 @@ class NetworkDeviceTest : public ::testing::Test {
   fdf::Dispatcher& dispatcher() { return impl_dispatcher_; }
 
   fidl::WireSyncClient<netdev::Device> OpenConnection() {
-    zx::result endpoints = fidl::CreateEndpoints<netdev::Device>();
-    EXPECT_OK(endpoints.status_value());
-    auto [client_end, server_end] = std::move(*endpoints);
+    auto [client_end, server_end] = fidl::Endpoints<netdev::Device>::Create();
     EXPECT_OK(device_->Bind(std::move(server_end)));
     return fidl::WireSyncClient(std::move(client_end));
   }
@@ -217,12 +215,7 @@ class NetworkDeviceTest : public ::testing::Test {
   }
 
   zx::result<fidl::WireSyncClient<netdev::Port>> OpenPort(netdev::wire::PortId port_id) {
-    zx::result endpoints = fidl::CreateEndpoints<netdev::Port>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-    endpoints.status_value();
-    auto [client_end, server_end] = std::move(*endpoints);
+    auto [client_end, server_end] = fidl::Endpoints<netdev::Port>::Create();
     fidl::Status result = OpenConnection()->GetPort(port_id, std::move(server_end));
     if (result.status() != ZX_OK) {
       return zx::error(result.status());
@@ -1314,9 +1307,7 @@ TEST_F(NetworkDeviceTest, RxFrameTypeFilter) {
 TEST_F(NetworkDeviceTest, ObserveStatus) {
   using netdev::wire::StatusFlags;
   ASSERT_OK(CreateDeviceWithPort13());
-  zx::result endpoints = fidl::CreateEndpoints<netdev::StatusWatcher>();
-  ASSERT_OK(endpoints.status_value());
-  auto [client_end, server_end] = std::move(*endpoints);
+  auto [client_end, server_end] = fidl::Endpoints<netdev::StatusWatcher>::Create();
   fidl::WireSyncClient watcher{std::move(client_end)};
 
   zx::result port = OpenPort(kPort13);
@@ -2131,9 +2122,7 @@ TEST_F(NetworkDeviceTest, PortGetMac) {
   ASSERT_OK(CreateDeviceWithPort13());
   zx::result port = OpenPort(kPort13);
   ASSERT_OK(port.status_value());
-  zx::result endpoints = fidl::CreateEndpoints<netdev::MacAddressing>();
-  ASSERT_OK(endpoints.status_value());
-  auto [client_end, server_end] = std::move(*endpoints);
+  auto [client_end, server_end] = fidl::Endpoints<netdev::MacAddressing>::Create();
   ASSERT_OK(port->GetMac(std::move(server_end)).status());
   fidl::WireSyncClient mac{std::move(client_end)};
   fidl::WireResult result = mac->GetUnicastAddress();
@@ -2149,9 +2138,7 @@ TEST_F(NetworkDeviceTest, PortGetMacFails) {
   ASSERT_OK(CreateDeviceWithPort13());
   zx::result port = OpenPort(kPort13);
   ASSERT_OK(port.status_value());
-  zx::result endpoints = fidl::CreateEndpoints<netdev::MacAddressing>();
-  ASSERT_OK(endpoints.status_value());
-  auto [client_end, server_end] = std::move(*endpoints);
+  auto [client_end, server_end] = fidl::Endpoints<netdev::MacAddressing>::Create();
   ASSERT_OK(port->GetMac(std::move(server_end)).status());
   zx::result epitaph = WaitClosedAndReadEpitaph(client_end.channel());
   ASSERT_OK(epitaph.status_value());
@@ -2362,15 +2349,14 @@ TEST_F(NetworkDeviceTest, ListenSessionPortFiltering) {
 
 TEST_F(NetworkDeviceTest, PortWatcher) {
   // Test Port Watchers.
-  zx::result endpoints = fidl::CreateEndpoints<netdev::PortWatcher>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<netdev::PortWatcher>::Create();
 
   struct PortEvent {
     netdev::wire::DevicePortEvent::Tag which;
     std::optional<netdev::wire::PortId> port_id;
   };
 
-  auto watch_next = [watcher = fidl::WireSyncClient(std::move(endpoints->client))]() mutable {
+  auto watch_next = [watcher = fidl::WireSyncClient(std::move(endpoints.client))]() mutable {
     return std::async([&watcher]() -> zx::result<PortEvent> {
       fidl::WireResult watch = watcher->Watch();
       if (!watch.ok()) {
@@ -2418,7 +2404,7 @@ TEST_F(NetworkDeviceTest, PortWatcher) {
   ASSERT_OK(CreateDeviceWithPort13());
   netdev::wire::PortId salted_id = GetSaltedPortId(kPort13);
   fidl::WireSyncClient device = OpenConnection();
-  ASSERT_OK(device->GetPortWatcher(std::move(endpoints->server)).status());
+  ASSERT_OK(device->GetPortWatcher(std::move(endpoints.server)).status());
 
   // Should list port 13 on creation.
   ASSERT_NO_FATAL_FAILURE(
@@ -2494,11 +2480,10 @@ TEST_F(NetworkDeviceTest, PortWatcher) {
 TEST_F(NetworkDeviceTest, PortWatcherEnforcesQueueLimit) {
   // Tests that port watchers close the channel when too many events are enqueued.
   ASSERT_OK(CreateDevice());
-  zx::result endpoints = fidl::CreateEndpoints<netdev::PortWatcher>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<netdev::PortWatcher>::Create();
   fidl::WireSyncClient device = OpenConnection();
-  ASSERT_OK(device->GetPortWatcher(std::move(endpoints->server)).status());
-  fidl::ClientEnd watcher = std::move(endpoints->client);
+  ASSERT_OK(device->GetPortWatcher(std::move(endpoints.server)).status());
+  fidl::ClientEnd watcher = std::move(endpoints.client);
   // Call watch once to observe the idle event and ensure no races between watcher binding and
   // adding ports will happen.
   fidl::WireResult result = fidl::WireCall(watcher)->Watch();

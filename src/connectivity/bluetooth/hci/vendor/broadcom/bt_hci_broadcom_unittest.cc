@@ -187,16 +187,15 @@ class TestEnvironment : fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
     firmware_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
-    auto dir_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(dir_endpoints.is_ok());
+    auto dir_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     firmware_server_.SetDispatcher(fdf::Dispatcher::GetCurrent()->async_dispatcher());
     // Serve our firmware directory (will start serving FIDL requests on dir_endpoints with
     // dispatcher on previous line)
-    ZX_ASSERT(firmware_server_.ServeDirectory(firmware_dir_, std::move(dir_endpoints->server)) ==
+    ZX_ASSERT(firmware_server_.ServeDirectory(firmware_dir_, std::move(dir_endpoints.server)) ==
               ZX_OK);
     // Attach the firmware directory endpoint to "pkg/lib"
     ZX_ASSERT(to_driver_vfs.component()
-                  .AddDirectoryAt(std::move(dir_endpoints->client), "pkg/lib", "firmware")
+                  .AddDirectoryAt(std::move(dir_endpoints.client), "pkg/lib", "firmware")
                   .is_ok());
 
     // Add the services that the fake parent driver exposes to the incoming directory of the driver

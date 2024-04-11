@@ -238,13 +238,12 @@ class WlanphyDeviceTest : public ::testing::Test {
     phy_connector_.Bind(std::move(client_end));
     ASSERT_TRUE(phy_connector_.is_valid());
     // Create an endpoint
-    auto endpoints_phy = fidl::CreateEndpoints<fuchsia_wlan_device::Phy>();
-    ASSERT_FALSE(endpoints_phy.is_error());
+    auto endpoints_phy = fidl::Endpoints<fuchsia_wlan_device::Phy>::Create();
     // Send the server end to the driver
-    auto conn_result = phy_connector_->Connect(std::move(endpoints_phy->server));
+    auto conn_result = phy_connector_->Connect(std::move(endpoints_phy.server));
     ASSERT_TRUE(conn_result.ok());
     // Bind to the client end.
-    client_phy_ = fidl::WireSyncClient<fuchsia_wlan_device::Phy>(std::move(endpoints_phy->client));
+    client_phy_ = fidl::WireSyncClient<fuchsia_wlan_device::Phy>(std::move(endpoints_phy.client));
     ASSERT_TRUE(client_phy_.is_valid());
   }
 

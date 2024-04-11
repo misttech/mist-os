@@ -247,11 +247,9 @@ class TestController : public fdf::DriverBase,
                                                .devfs_args = fuchsia_driver_framework::DevfsAddArgs(
                                                    {.connector = std::move(connector.value())})});
 
-    zx::result controller_endpoints =
-        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-    ZX_ASSERT(controller_endpoints.is_ok());
+    auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
-    auto result = node_->AddChild({std::move(args), std::move(controller_endpoints->server), {}});
+    auto result = node_->AddChild({std::move(args), std::move(controller_endpoints.server), {}});
     if (result.is_error()) {
       auto& error = result.error_value();
       FDF_SLOG(ERROR, "Failed to add child", KV("status", error.FormatDescription()));

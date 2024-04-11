@@ -42,11 +42,10 @@ class BootstrapThreadImplTest : public gtest::TestLoopFixture {
   void SetUp() override {
     TestLoopFixture::SetUp();
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_lowpan_bootstrap::Thread>();
-    ASSERT_FALSE(endpoints.is_error());
+    auto endpoints = fidl::Endpoints<fuchsia_lowpan_bootstrap::Thread>::Create();
 
-    ResetServerImpl(/* ShouldServe */ true, std::move(endpoints->server));
-    ReconnectClient(std::move(endpoints->client));
+    ResetServerImpl(/* ShouldServe */ true, std::move(endpoints.server));
+    ReconnectClient(std::move(endpoints.client));
   }
 
  protected:
@@ -101,15 +100,14 @@ class BootstrapThreadImplTest : public gtest::TestLoopFixture {
 TEST_F(BootstrapThreadImplTest, NoServe) {
   EXPECT_TRUE(client_bound());
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_lowpan_bootstrap::Thread>();
-  EXPECT_FALSE(endpoints.is_error());
+  auto endpoints = fidl::Endpoints<fuchsia_lowpan_bootstrap::Thread>::Create();
 
-  ResetServerImpl(/*should_serve*/ false, std::move(endpoints->server));
+  ResetServerImpl(/*should_serve*/ false, std::move(endpoints.server));
 
   EXPECT_FALSE(client_bound());
   EXPECT_EQ(ZX_ERR_PEER_CLOSED, client_unbind_status());
 
-  ReconnectClient(std::move(endpoints->client));
+  ReconnectClient(std::move(endpoints.client));
 
   EXPECT_FALSE(client_bound());
   EXPECT_EQ(ZX_ERR_PEER_CLOSED, client_unbind_status());

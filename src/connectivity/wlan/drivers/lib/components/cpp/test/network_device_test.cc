@@ -116,22 +116,21 @@ TEST(NetworkDeviceTest, InitReleaseDFv2) {
 
   // Env dispatcher runs in the background because we need to make sync calls into it.
   fdf::UnownedSynchronizedDispatcher dispatcher = runtime.StartBackgroundDispatcher();
-  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
   std::unique_ptr<TestNetworkDevice> device;
 
   libsync::Completion initialized;
   async::PostTask(dispatcher->async_dispatcher(), [&] {
     device = std::make_unique<TestNetworkDevice>();
-    device->network_device_.Init(std::move(endpoints->client), dispatcher->async_dispatcher());
+    device->network_device_.Init(std::move(endpoints.client), dispatcher->async_dispatcher());
     initialized.Signal();
   });
   initialized.Wait();
 
   // Closing the node server channel should shut everything down.
   device->release_.ExpectCall();
-  endpoints->server.Close(ZX_OK);
+  endpoints.server.Close(ZX_OK);
   // In DFv2 the call to release is asynchronous, wait for it to happen.
   device->release_called_.Wait();
   device->release_.VerifyAndClear();

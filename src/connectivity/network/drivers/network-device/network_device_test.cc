@@ -63,11 +63,7 @@ class NetDeviceDriverTest : public ::testing::Test {
       return endpoints.take_error();
     }
     zx::result client = [this]() -> zx::result<fidl::WireSyncClient<netdev::DeviceInstance>> {
-      zx::result endpoints = fidl::CreateEndpoints<netdev::DeviceInstance>();
-      if (endpoints.is_error()) {
-        return endpoints.take_error();
-      }
-      auto [client_end, server_end] = std::move(*endpoints);
+      auto [client_end, server_end] = fidl::Endpoints<netdev::DeviceInstance>::Create();
       fidl::BindServer(loop_.dispatcher(), std::move(server_end),
                        parent_->GetLatestChild()->GetDeviceContext<NetworkDevice>());
       return zx::ok(fidl::WireSyncClient(std::move(client_end)));
@@ -179,15 +175,11 @@ TEST_F(NetDeviceDriverTest, TestWatcherDestruction) {
   ASSERT_OK(maybe_port_id.status_value());
   const netdev::wire::PortId& port_id = maybe_port_id.value();
 
-  zx::result port_endpoints = fidl::CreateEndpoints<netdev::Port>();
-  ASSERT_OK(port_endpoints.status_value());
-  auto [port_client_end, port_server_end] = std::move(*port_endpoints);
+  auto [port_client_end, port_server_end] = fidl::Endpoints<netdev::Port>::Create();
   ASSERT_OK(netdevice->GetPort(port_id, std::move(port_server_end)).status());
   fidl::WireSyncClient port{std::move(port_client_end)};
 
-  zx::result endpoints = fidl::CreateEndpoints<netdev::StatusWatcher>();
-  ASSERT_OK(endpoints.status_value());
-  auto [client_end, server_end] = std::move(*endpoints);
+  auto [client_end, server_end] = fidl::Endpoints<netdev::StatusWatcher>::Create();
   ASSERT_OK(port->GetStatusWatcher(std::move(server_end), 1).status());
   fidl::WireSyncClient watcher{std::move(client_end)};
   ASSERT_OK(watcher->WatchStatus().status());

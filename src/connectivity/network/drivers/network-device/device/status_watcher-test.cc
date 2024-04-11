@@ -198,9 +198,7 @@ class StatusWatcherTest : public ::testing::Test {
 };
 
 TEST_F(StatusWatcherTest, HangsForStatus) {
-  zx::result endpoints = fidl::CreateEndpoints<netdev::StatusWatcher>();
-  ASSERT_OK(endpoints.status_value());
-  auto [ch, req] = std::move(*endpoints);
+  auto [ch, req] = fidl::Endpoints<netdev::StatusWatcher>::Create();
   zx::result watch_client_creation = WatchClient::Create(loop_.dispatcher(), std::move(ch));
   ASSERT_OK(watch_client_creation.status_value());
   WatchClient& cli = *watch_client_creation.value();
@@ -212,9 +210,7 @@ TEST_F(StatusWatcherTest, HangsForStatus) {
 }
 
 TEST_F(StatusWatcherTest, SingleStatus) {
-  zx::result endpoints = fidl::CreateEndpoints<netdev::StatusWatcher>();
-  ASSERT_OK(endpoints.status_value());
-  auto [ch, req] = std::move(*endpoints);
+  auto [ch, req] = fidl::Endpoints<netdev::StatusWatcher>::Create();
   zx::result watch_client_creation = WatchClient::Create(loop_.dispatcher(), std::move(ch));
   ASSERT_OK(watch_client_creation.status_value());
   WatchClient& cli = *watch_client_creation.value();
@@ -231,9 +227,7 @@ TEST_F(StatusWatcherTest, SingleStatus) {
 }
 
 TEST_F(StatusWatcherTest, QueuesStatus) {
-  zx::result endpoints = fidl::CreateEndpoints<netdev::StatusWatcher>();
-  ASSERT_OK(endpoints.status_value());
-  auto [ch, req] = std::move(*endpoints);
+  auto [ch, req] = fidl::Endpoints<netdev::StatusWatcher>::Create();
   zx::result watcher_creation = MakeWatcher(std::move(req), 3);
   ASSERT_OK(watcher_creation.status_value());
   StatusWatcher* watcher = watcher_creation.value();
@@ -268,9 +262,7 @@ TEST_F(StatusWatcherTest, QueuesStatus) {
 }
 
 TEST_F(StatusWatcherTest, DropsOldestStatus) {
-  zx::result endpoints = fidl::CreateEndpoints<netdev::StatusWatcher>();
-  ASSERT_OK(endpoints.status_value());
-  auto [ch, req] = std::move(*endpoints);
+  auto [ch, req] = fidl::Endpoints<netdev::StatusWatcher>::Create();
   zx::result watcher_creation = MakeWatcher(std::move(req), 2);
   ASSERT_OK(watcher_creation.status_value());
   StatusWatcher* watcher = watcher_creation.value();
@@ -299,9 +291,7 @@ TEST_F(StatusWatcherTest, DropsOldestStatus) {
 }
 
 TEST_F(StatusWatcherTest, CallsOnClosedCallback) {
-  zx::result endpoints = fidl::CreateEndpoints<netdev::StatusWatcher>();
-  ASSERT_OK(endpoints.status_value());
-  auto [ch, req] = std::move(*endpoints);
+  auto [ch, req] = fidl::Endpoints<netdev::StatusWatcher>::Create();
 
   sync_completion_t completion;
   zx::result watcher_creation =
@@ -317,9 +307,7 @@ TEST_F(StatusWatcherTest, CallsOnClosedCallback) {
 TEST_F(StatusWatcherTest, LockStepWatch) {
   // Tests that if everytime a status is pushed a waiter is already registered (no queuing ever
   // happens), StatusWatcher behaves appropriately.
-  zx::result endpoints = fidl::CreateEndpoints<netdev::StatusWatcher>();
-  ASSERT_OK(endpoints.status_value());
-  auto [ch, req] = std::move(*endpoints);
+  auto [ch, req] = fidl::Endpoints<netdev::StatusWatcher>::Create();
   zx::result watcher_creation = MakeWatcher(std::move(req), 2);
   ASSERT_OK(watcher_creation.status_value());
   StatusWatcher* watcher = watcher_creation.value();
@@ -357,9 +345,7 @@ TEST_F(StatusWatcherTest, LockStepWatch) {
 
 TEST_F(StatusWatcherTest, IgnoresDuplicateStatus) {
   // Tests that if PushStatus is called twice with the same status, only one event is generated.
-  zx::result endpoints = fidl::CreateEndpoints<netdev::StatusWatcher>();
-  ASSERT_OK(endpoints.status_value());
-  auto [ch, req] = std::move(*endpoints);
+  auto [ch, req] = fidl::Endpoints<netdev::StatusWatcher>::Create();
   zx::result watcher_creation = MakeWatcher(std::move(req), 2);
   ASSERT_OK(watcher_creation.status_value());
   StatusWatcher* watcher = watcher_creation.value();

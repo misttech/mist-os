@@ -60,35 +60,24 @@ zx::result<fidl::ClientEnd<fuchsia_hardware_network::StatusWatcher>> GetStatusWa
 zx::result<fidl::ClientEnd<fuchsia_hardware_network::MacAddressing>> GetMacAddressing(
     fidl::WireSyncClient<fuchsia_net_tun::Device>& tun,
     fuchsia_hardware_network::wire::PortId port_id) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::MacAddressing>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
+  auto [mac_client, mac_server] =
+      fidl::Endpoints<fuchsia_hardware_network::MacAddressing>::Create();
+  auto [device_client, device_server] = fidl::Endpoints<fuchsia_hardware_network::Device>::Create();
+  auto [port_client, port_server] = fidl::Endpoints<fuchsia_hardware_network::Port>::Create();
 
-  zx::result device = fidl::CreateEndpoints<fuchsia_hardware_network::Device>();
-  if (device.is_error()) {
-    return device.take_error();
-  }
-
-  zx::result port = fidl::CreateEndpoints<fuchsia_hardware_network::Port>();
-  if (port.is_error()) {
-    return port.take_error();
-  }
-  if (zx_status_t status = tun->GetDevice(std::move(device->server)).status(); status != ZX_OK) {
+  if (zx_status_t status = tun->GetDevice(std::move(device_server)).status(); status != ZX_OK) {
     return zx::error(status);
   }
   if (zx_status_t status =
-          fidl::WireCall(device->client)->GetPort(port_id, std::move(port->server)).status();
+          fidl::WireCall(device_client)->GetPort(port_id, std::move(port_server)).status();
       status != ZX_OK) {
     return zx::error(status);
   }
-  if (zx_status_t status =
-          fidl::WireCall(port->client)->GetMac(std::move(endpoints->server)).status();
+  if (zx_status_t status = fidl::WireCall(port_client)->GetMac(std::move(mac_server)).status();
       status != ZX_OK) {
     return zx::error(status);
   }
-
-  return zx::ok(std::move(endpoints->client));
+  return zx::ok(std::move(mac_client));
 }
 
 zx::result<fidl::ClientEnd<fuchsia_hardware_network::PortWatcher>> GetPortWatcher(
@@ -163,11 +152,7 @@ zx::result<OwnedPortEvent> WatchPorts(
 
 zx::result<fuchsia_hardware_network::wire::PortId> GetPortId(
     fit::function<zx_status_t(fidl::ServerEnd<fuchsia_hardware_network::Port>)> get_port) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Port>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto [client, server] = std::move(endpoints.value());
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_network::Port>::Create();
   if (zx_status_t status = get_port(std::move(server)); status != ZX_OK) {
     return zx::error(status);
   }
@@ -725,22 +710,20 @@ TEST_F(TunTest, InvalidPortConfigs) {
 }
 
 TEST_F(TunTest, ConnectNetworkDevice) {
-  zx::result device_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Device>();
-  ASSERT_OK(device_endpoints.status_value());
+  auto device_endpoints = fidl::Endpoints<fuchsia_hardware_network::Device>::Create();
 
   zx::result client_end = CreateDevice(DefaultDeviceConfig());
   ASSERT_OK(client_end.status_value());
   fidl::WireSyncClient tun{std::move(client_end.value())};
-  ASSERT_OK(tun->GetDevice(std::move(device_endpoints->server)).status());
+  ASSERT_OK(tun->GetDevice(std::move(device_endpoints.server)).status());
 
-  fidl::WireSyncClient device{std::move(device_endpoints->client)};
+  fidl::WireSyncClient device{std::move(device_endpoints.client)};
   fidl::WireResult info_result = device->GetInfo();
   ASSERT_OK(info_result.status());
 }
 
 TEST_F(TunTest, Teardown) {
-  zx::result device_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Device>();
-  ASSERT_OK(device_endpoints.status_value());
+  auto device_endpoints = fidl::Endpoints<fuchsia_hardware_network::Device>::Create();
   zx::result port_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Port>();
   ASSERT_OK(port_endpoints.status_value());
   zx::result mac_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::MacAddressing>();
@@ -752,11 +735,11 @@ TEST_F(TunTest, Teardown) {
   auto& [device_client_end, port_client_end] = *device_and_port;
   fidl::WireSyncClient tun{std::move(device_client_end)};
 
-  ASSERT_OK(tun->GetDevice(std::move(device_endpoints->server)).status());
+  ASSERT_OK(tun->GetDevice(std::move(device_endpoints.server)).status());
 
   zx::result port_id = GetPortId(port_client_end);
   ASSERT_OK(port_id.status_value());
-  ASSERT_OK(fidl::WireCall(device_endpoints->client)
+  ASSERT_OK(fidl::WireCall(device_endpoints.client)
                 ->GetPort(port_id.value(), std::move(port_endpoints->server))
                 .status());
   ASSERT_OK(
@@ -768,7 +751,7 @@ TEST_F(TunTest, Teardown) {
   CapturingEventHandler<fuchsia_hardware_network::Port> port_handler;
   CapturingEventHandler<fuchsia_hardware_network::MacAddressing> mac_handler;
 
-  fidl::WireClient device(std::move(device_endpoints->client), dispatcher(), &device_handler);
+  fidl::WireClient device(std::move(device_endpoints.client), dispatcher(), &device_handler);
   fidl::WireClient port(std::move(port_endpoints->client), dispatcher(), &port_handler);
   fidl::WireClient mac(std::move(mac_endpoints->client), dispatcher(), &mac_handler);
 
@@ -789,8 +772,7 @@ TEST_F(TunTest, Teardown) {
 }
 
 TEST_F(TunTest, Status) {
-  zx::result device_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Device>();
-  ASSERT_OK(device_endpoints.status_value());
+  auto device_endpoints = fidl::Endpoints<fuchsia_hardware_network::Device>::Create();
 
   zx::result device_and_port =
       CreateDeviceAndPort(DefaultDeviceConfig(), DefaultDevicePortConfig());
@@ -804,16 +786,15 @@ TEST_F(TunTest, Status) {
   fidl::WireSyncClient tun{std::move(device_client_end)};
   fidl::WireSyncClient tun_port{std::move(port_client_end)};
 
-  ASSERT_OK(tun->GetDevice(std::move(device_endpoints->server)).status());
-  fidl::WireSyncClient device{std::move(device_endpoints->client)};
+  ASSERT_OK(tun->GetDevice(std::move(device_endpoints.server)).status());
+  fidl::WireSyncClient device{std::move(device_endpoints.client)};
 
-  zx::result port_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Port>();
-  ASSERT_OK(port_endpoints.status_value());
+  auto port_endpoints = fidl::Endpoints<fuchsia_hardware_network::Port>::Create();
   {
-    fidl::Status result = device->GetPort(port_id, std::move(port_endpoints->server));
+    fidl::Status result = device->GetPort(port_id, std::move(port_endpoints.server));
     ASSERT_OK(result.status());
   }
-  fidl::WireSyncClient port{std::move(port_endpoints->client)};
+  fidl::WireSyncClient port{std::move(port_endpoints.client)};
 
   fidl::WireResult status_result = port->GetStatus();
   ASSERT_OK(status_result.status());

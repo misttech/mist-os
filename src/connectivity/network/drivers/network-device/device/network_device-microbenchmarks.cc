@@ -224,16 +224,13 @@ bool LatencyTest(perftest::RepeatState* state, const uint16_t buffer_count) {
   ZX_ASSERT_OK(device_status.status_value(), "failed to create device");
   std::unique_ptr device = std::move(device_status.value());
 
-  zx::result device_endpoints = fidl::CreateEndpoints<network::netdev::Device>();
-  ZX_ASSERT_OK(device_endpoints.status_value(), "failed to create device endpoints");
-  ZX_ASSERT_OK(device->Bind(std::move(device_endpoints->server)), "failed to bind to device");
+  auto device_endpoints = fidl::Endpoints<network::netdev::Device>::Create();
+  ZX_ASSERT_OK(device->Bind(std::move(device_endpoints.server)), "failed to bind to device");
 
-  zx::result port_endpoints = fidl::CreateEndpoints<network::netdev::Port>();
-  ZX_ASSERT_OK(port_endpoints.status_value(), "failed to create port endpoints");
-  ZX_ASSERT_OK(
-      device->BindPort(network::FakeDeviceImpl::kPortId, std::move(port_endpoints->server)),
-      "failed to bind port");
-  fidl::WireSyncClient port{(std::move(port_endpoints->client))};
+  auto port_endpoints = fidl::Endpoints<network::netdev::Port>::Create();
+  ZX_ASSERT_OK(device->BindPort(network::FakeDeviceImpl::kPortId, std::move(port_endpoints.server)),
+               "failed to bind port");
+  fidl::WireSyncClient port{(std::move(port_endpoints.client))};
   fidl::WireResult port_info_result = port->GetInfo();
   ZX_ASSERT_OK(port_info_result.status(), "failed to get port info");
   const network::netdev::wire::PortInfo& port_info = port_info_result->info;
@@ -241,7 +238,7 @@ bool LatencyTest(perftest::RepeatState* state, const uint16_t buffer_count) {
   const network::netdev::wire::PortId& port_id = port_info.id();
 
   Session session;
-  fidl::WireSyncClient client{std::move(device_endpoints->client)};
+  fidl::WireSyncClient client{std::move(device_endpoints.client)};
   zx_status_t status =
       session.Open(client, "session", network::netdev::wire::SessionFlags::kPrimary, buffer_count);
   ZX_ASSERT_OK(status, "failed to open session");

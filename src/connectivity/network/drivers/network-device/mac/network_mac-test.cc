@@ -51,9 +51,7 @@ class MacDeviceTest : public ::testing::Test {
   }
 
   fidl::WireSyncClient<netdev::MacAddressing> OpenInstance() {
-    zx::result endpoints = fidl::CreateEndpoints<netdev::MacAddressing>();
-    EXPECT_OK(endpoints.status_value());
-    auto [client_end, server_end] = std::move(*endpoints);
+    auto [client_end, server_end] = fidl::Endpoints<netdev::MacAddressing>::Create();
     if (!loop_) {
       loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigNeverAttachToThread);
       EXPECT_OK(loop_->StartThread("test-thread"));

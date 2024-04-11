@@ -235,11 +235,10 @@ class OvernetUsbTest : public zxtest::Test {
     device_->Bind();
     ASSERT_EQ(fake_parent_->child_count(), 1);
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_overnet::Device>();
-    ASSERT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_overnet::Device>::Create();
     ASSERT_OK(fidl_loop_.StartThread("usb-adb-test-loop"));
-    fidl::BindServer(fidl_loop_.dispatcher(), std::move(endpoints->server), device_.get());
-    client_ = fidl::WireSyncClient<fuchsia_hardware_overnet::Device>(std::move(endpoints->client));
+    fidl::BindServer(fidl_loop_.dispatcher(), std::move(endpoints.server), device_.get());
+    client_ = fidl::WireSyncClient<fuchsia_hardware_overnet::Device>(std::move(endpoints.client));
   }
 
   std::unique_ptr<TestCallback> SetTestCallback() const {

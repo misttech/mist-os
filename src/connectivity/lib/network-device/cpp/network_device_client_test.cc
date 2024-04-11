@@ -234,15 +234,14 @@ class NetDeviceTest : public gtest::RealLoopFixture {
 
   fidl::ServerEnd<fuchsia_hardware_network::Device> CreateClientRequest(
       std::unique_ptr<NetworkDeviceClient>* out_client) {
-    zx::result device_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Device>();
-    EXPECT_OK(device_endpoints.status_value());
+    auto device_endpoints = fidl::Endpoints<fuchsia_hardware_network::Device>::Create();
     std::unique_ptr client =
-        std::make_unique<NetworkDeviceClient>(std::move(device_endpoints->client));
+        std::make_unique<NetworkDeviceClient>(std::move(device_endpoints.client));
     client->SetErrorCallback([](zx_status_t error) {
       FAIL() << "Client experienced error " << zx_status_get_string(error);
     });
     *out_client = std::move(client);
-    return std::move(device_endpoints->server);
+    return std::move(device_endpoints.server);
   }
 
   zx_status_t StartSession(NetworkDeviceClient& client) {

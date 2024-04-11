@@ -50,13 +50,12 @@ class LoopbackTest : public ::testing::Test {
     ASSERT_TRUE(dut());
 
     // Connect to the DUT's Vendor protocol server.
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Hci>();
-    ASSERT_FALSE(endpoints.is_error());
-    hci_client_.Bind(std::move(endpoints->client));
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_bluetooth::Hci>::Create();
+    hci_client_.Bind(std::move(endpoints.client));
 
     libsync::Completion bind;
     async::PostTask(hci_dispatcher_->async_dispatcher(), [&]() {
-      fidl::BindServer(hci_dispatcher_->async_dispatcher(), std::move(endpoints->server),
+      fidl::BindServer(hci_dispatcher_->async_dispatcher(), std::move(endpoints.server),
                        dut()->GetDeviceContext<bt_hci_virtual::LoopbackDevice>());
       bind.Signal();
     });
@@ -293,15 +292,14 @@ class LoopbackHciProtocolTest : public LoopbackTest {
 TEST_F(LoopbackTest, Lifecycle) {}
 
 TEST_F(LoopbackTest, VendorProtocolSmokeTest) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Vendor>();
-  ASSERT_FALSE(endpoints.is_error());
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_bluetooth::Vendor>::Create();
 
   // Bind client end
-  fidl::WireSyncClient vendor_client(std::move(endpoints->client));
+  fidl::WireSyncClient vendor_client(std::move(endpoints.client));
 
   // Bind server end
   auto server_dispatcher = mock_ddk::GetDriverRuntime()->StartBackgroundDispatcher();
-  fidl::BindServer(server_dispatcher->async_dispatcher(), std::move(endpoints->server),
+  fidl::BindServer(server_dispatcher->async_dispatcher(), std::move(endpoints.server),
                    dut()->GetDeviceContext<bt_hci_virtual::LoopbackDevice>());
 
   auto result = vendor_client->GetFeatures();
