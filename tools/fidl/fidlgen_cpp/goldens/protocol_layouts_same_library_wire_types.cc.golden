@@ -37,34 +37,16 @@ void ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequ
   static_assert(offsetof(ComposedProtocolOnAnonComposedRequest, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
-void ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(ComposedProtocolOnAnonComposedWithErrorResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(ComposedProtocolOnAnonComposedWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(ComposedProtocolOnAnonComposedWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
 void ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult::SizeAndOffsetAssertionHelper() {
   static_assert(sizeof(ComposedProtocolTwoWayNamedComposedWithErrorResult) == sizeof(fidl_union_t));
   static_assert(offsetof(ComposedProtocolTwoWayNamedComposedWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
   static_assert(offsetof(ComposedProtocolTwoWayNamedComposedWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
-void ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(ComposedProtocolOnNamedComposedWithErrorResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(ComposedProtocolOnNamedComposedWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(ComposedProtocolOnNamedComposedWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
 void ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult::SizeAndOffsetAssertionHelper() {
   static_assert(sizeof(MainProtocolTwoWayLocalWithErrorResult) == sizeof(fidl_union_t));
   static_assert(offsetof(MainProtocolTwoWayLocalWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
   static_assert(offsetof(MainProtocolTwoWayLocalWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(MainProtocolOnLocalWithErrorResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(MainProtocolOnLocalWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(MainProtocolOnLocalWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonRequest::Which() const -> ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonRequest::Tag {
@@ -119,12 +101,6 @@ void ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest::SizeAnd
   static_assert(sizeof(MainProtocolOnAnonRequest) == sizeof(fidl_union_t));
   static_assert(offsetof(MainProtocolOnAnonRequest, ordinal_) == offsetof(fidl_union_t, tag));
   static_assert(offsetof(MainProtocolOnAnonRequest, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(MainProtocolOnAnonWithErrorResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(MainProtocolOnAnonWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(MainProtocolOnAnonWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 bool ::fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::TablePayload>::HasUnknownData() const {
@@ -215,28 +191,6 @@ bool ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposed
   return frame_ptr_->HasUnknownData();
 }
 
-bool ::fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse>::HasUnknownData() const {
-  return false;
-}
-
-uint64_t fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse>::ComputeMaxOrdinal() const {
-  uint64_t max_ordinal = 0;
-  if (!a_.has_data()) {
-    max_ordinal = 1;
-  }
-  return max_ordinal;
-}
-
-bool ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse::HasUnknownData() const {
-  if (max_ordinal_ > 1) {
-    return true;
-  }
-  if (frame_ptr_ == nullptr) {
-    return false;
-  }
-  return frame_ptr_->HasUnknownData();
-}
-
 bool ::fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest>::HasUnknownData() const {
   return false;
 }
@@ -294,28 +248,6 @@ uint64_t fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::MainProto
 }
 
 bool ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorRequest::HasUnknownData() const {
-  if (max_ordinal_ > 1) {
-    return true;
-  }
-  if (frame_ptr_ == nullptr) {
-    return false;
-  }
-  return frame_ptr_->HasUnknownData();
-}
-
-bool ::fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse>::HasUnknownData() const {
-  return false;
-}
-
-uint64_t fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse>::ComputeMaxOrdinal() const {
-  uint64_t max_ordinal = 0;
-  if (!a_.has_data()) {
-    max_ordinal = 1;
-  }
-  return max_ordinal;
-}
-
-bool ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse::HasUnknownData() const {
   if (max_ordinal_ > 1) {
     return true;
   }

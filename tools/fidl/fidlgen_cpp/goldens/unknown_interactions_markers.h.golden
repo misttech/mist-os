@@ -325,62 +325,6 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
   };
-  class StrictEventErr final {
-    StrictEventErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = false;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class StrictEventFieldsErr final {
-    StrictEventFieldsErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class StrictEventUnionErr final {
-    StrictEventUnionErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class StrictEventTableErr final {
-    StrictEventTableErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
   class FlexibleEvent final {
     FlexibleEvent() = delete;
 
@@ -435,62 +379,6 @@ class UnknownInteractionsProtocol final {
 
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class FlexibleEventErr final {
-    FlexibleEventErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = false;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class FlexibleEventFieldsErr final {
-    FlexibleEventFieldsErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class FlexibleEventUnionErr final {
-    FlexibleEventUnionErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class FlexibleEventTableErr final {
-    FlexibleEventTableErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
   };
 };
@@ -699,62 +587,6 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
   };
-  class StrictEventErr final {
-    StrictEventErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsAjarProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = false;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class StrictEventFieldsErr final {
-    StrictEventFieldsErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsAjarProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class StrictEventUnionErr final {
-    StrictEventUnionErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsAjarProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class StrictEventTableErr final {
-    StrictEventTableErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsAjarProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
   class FlexibleEvent final {
     FlexibleEvent() = delete;
 
@@ -809,62 +641,6 @@ class UnknownInteractionsAjarProtocol final {
 
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class FlexibleEventErr final {
-    FlexibleEventErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsAjarProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = false;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class FlexibleEventFieldsErr final {
-    FlexibleEventFieldsErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsAjarProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class FlexibleEventUnionErr final {
-    FlexibleEventUnionErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsAjarProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class FlexibleEventTableErr final {
-    FlexibleEventTableErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsAjarProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
   };
 };
@@ -1057,62 +833,6 @@ class UnknownInteractionsClosedProtocol final {
 
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class StrictEventErr final {
-    StrictEventErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsClosedProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = false;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class StrictEventFieldsErr final {
-    StrictEventFieldsErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsClosedProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class StrictEventUnionErr final {
-    StrictEventUnionErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsClosedProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class StrictEventTableErr final {
-    StrictEventTableErr() = delete;
-
-   public:
-    using Protocol = ::test_unknowninteractions::UnknownInteractionsClosedProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
   };
 };

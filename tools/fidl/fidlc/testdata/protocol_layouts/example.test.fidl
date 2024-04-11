@@ -19,14 +19,12 @@ closed protocol MainProtocol {
     strict TwoWayImport(imp.ImportUnionPayload) -> (imp.ImportTablePayload);
     strict TwoWayImportWithError(imp.ImportTablePayload) -> (imp.ImportUnionPayload) error uint32;
     strict -> OnImport(imp.ImportUnionPayload);
-    strict -> OnImportWithError(imp.ImportTablePayload) error uint32;
 
     // Tests union/table payloads imported from another library.
     strict OneWayLocal(LocalTablePayload);
     strict TwoWayLocal(LocalUnionPayload) -> (LocalTablePayload);
     strict TwoWayLocalWithError(LocalTablePayload) -> (LocalUnionPayload) error uint32;
     strict -> OnLocal(LocalUnionPayload);
-    strict -> OnLocalWithError(LocalTablePayload) error uint32;
 
     // Tests anonymous union/table payloads.
     strict OneWayAnon(table {
@@ -45,9 +43,6 @@ closed protocol MainProtocol {
     strict -> OnAnon(flexible union {
         1: b bool;
     });
-    strict -> OnAnonWithError(table {
-        1: a uint16;
-    }) error uint32;
 };
 
 open protocol OpenProtocol {

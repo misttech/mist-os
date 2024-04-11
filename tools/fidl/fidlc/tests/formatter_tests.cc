@@ -1627,7 +1627,6 @@ protocol Populated_Abcdefghijklmnopqrs {
 
     -> Event_Abcdefghijklmnopqrstuvwx();
     -> EventNull_Abcdefghijk(struct {});
-    -> EventError() error abcdefghijklm;
 };
 )FIDL";
 
@@ -1660,7 +1659,6 @@ protocol Populated_Abcdefghijklmnopqrst {
 
     -> Event_Abcdefghijklmnopqrstuvwxy();
     -> EventNull_Abcdefghijkl(struct {});
-    -> EventError() error abcdefghijklmn;
 };
 )FIDL";
 
@@ -1693,9 +1691,7 @@ uint32;
     compose Empty_Abcdefghijklmnopqrstu   ;
 
     ->Event_Abcdefghijklmnopqrstuvwx() ;
-    -> EventNull_Abcdefghijk(  struct {  });
-    ->  EventError()
-error   abcdefghijklm;};
+    -> EventNull_Abcdefghijk(  struct {  });};
 )FIDL";
 
   // ---------------40---------------- |
@@ -1721,7 +1717,6 @@ protocol Populated_Abcdefghijklmnopqrs {
 
     -> Event_Abcdefghijklmnopqrstuvwx();
     -> EventNull_Abcdefghijk(struct {});
-    -> EventError() error abcdefghijklm;
 };
 )FIDL";
 
@@ -1775,7 +1770,6 @@ protocol Populated_Abcdefghijklmnopqrs {
 @abc
     -> Event_Abcdefghijklmnopqrstuvwx();
     -> EventNull_Abcdefghijk(struct {});
-    -> EventError() error abcdefghijklm;
 };
 )FIDL";
 
@@ -1820,7 +1814,6 @@ protocol Populated_Abcdefghijklmnopqrs {
     @abc
     -> Event_Abcdefghijklmnopqrstuvwx();
     -> EventNull_Abcdefghijk(struct {});
-    -> EventError() error abcdefghijklm;
 };
 )FIDL";
 
@@ -1832,7 +1825,7 @@ protocol Populated_Abcdefghijklmnopqrs {
 TEST(FormatterTests, ProtocolNoArgumentsMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted =
-      R"FIDL(library foo.bar;protocol Empty_Abcdefghijklmnopqrstu{};protocol Composed_Abcdefghijklmnopqrst{compose Empty_Abcdefghijklmnopqrstu;};protocol Populated_Abcdefghijklmnopqrs{compose Composed_Abcdefghijklmnopqr;OneWay_Abcdefghijklmnopqrstuvwxyz();OneWayNull_Abcdefghijklm(struct{});TwoWay_Abcdefghijklmnopqrst()->();TwoWayNil(struct{})->(struct{});TwoWayError_Ab()->()error uint32;compose Empty_Abcdefghijklmnopqrstu;->Event_Abcdefghijklmnopqrstuvwx();->EventNull_Abcdefghijk(struct{});->EventError()error abcdefghijklm;};)FIDL";
+      R"FIDL(library foo.bar;protocol Empty_Abcdefghijklmnopqrstu{};protocol Composed_Abcdefghijklmnopqrst{compose Empty_Abcdefghijklmnopqrstu;};protocol Populated_Abcdefghijklmnopqrs{compose Composed_Abcdefghijklmnopqr;OneWay_Abcdefghijklmnopqrstuvwxyz();OneWayNull_Abcdefghijklm(struct{});TwoWay_Abcdefghijklmnopqrst()->();TwoWayNil(struct{})->(struct{});TwoWayError_Ab()->()error uint32;compose Empty_Abcdefghijklmnopqrstu;->Event_Abcdefghijklmnopqrstuvwx();->EventNull_Abcdefghijk(struct{});};)FIDL";
 
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
@@ -1851,7 +1844,6 @@ protocol Populated_Abcdefghijklmnopqrs {
     compose Empty_Abcdefghijklmnopqrstu;
     -> Event_Abcdefghijklmnopqrstuvwx();
     -> EventNull_Abcdefghijk(struct {});
-    -> EventError() error abcdefghijklm;
 };
 )FIDL";
 
@@ -1945,13 +1937,6 @@ struct
 }
 )
 ;
-->
-EventError
-(
-)
-error
-abcdefghijklm
-;
 }
 ;
 )FIDL";
@@ -1979,7 +1964,6 @@ protocol Populated_Abcdefghijklmnopqrs {
 
     -> Event_Abcdefghijklmnopqrstuvwx();
     -> EventNull_Abcdefghijk(struct {});
-    -> EventError() error abcdefghijklm;
 };
 )FIDL";
 
@@ -2022,12 +2006,6 @@ protocol Populated_Abcdefghijklmnopqrs {
     -> Event_Abcdefghijklmnopqr(struct {
         res7_abcdefghijklmnopqrstu bool;
     });
-    -> EventError_Abcdefghijklm(struct {
-        res8_abcdefghijklmnopqrs union {
-            1: inner2_abcdefghijkl bool;
-        };
-        res9_abcdefghijklmnopqrstu bool;
-    }) error noop_abcdefghijklmnopqrstu;
 };
 )FIDL";
 
@@ -2070,12 +2048,6 @@ protocol Populated_Abcdefghijklmnopqrst {
     -> Event_Abcdefghijklmnopqrs(struct {
         res7_abcdefghijklmnopqrstuv bool;
     });
-    -> EventError_Abcdefghijklmo(struct {
-        res8_abcdefghijklmnopqrst union {
-            1: inner2_abcdefghijklm bool;
-        };
-        res9_abcdefghijklmnopqrstuv bool;
-    }) error noop_abcdefghijklmnopqrstuv;
 };
 )FIDL";
 
@@ -2123,15 +2095,6 @@ protocol Populated_Abcdefghijklmnopqrst {
         res7_abcdefghijklmnopqrstuv
                 bool;
     });
-    -> EventError_Abcdefghijklmo(struct {
-        res8_abcdefghijklmnopqrst
-                union {
-            1: inner2_abcdefghijklm
-                    bool;
-        };
-        res9_abcdefghijklmnopqrstuv
-                bool;
-    }) error noop_abcdefghijklmnopqrstuv;
 };
 )FIDL";
 
@@ -2174,14 +2137,7 @@ error uint32;
 
  compose Empty_Abcdefghijklmnopqrstu;
 
-    ->Event_Abcdefghijklmnopqr(  struct { res7_abcdefghijklmnopqrstu bool;});
-    -> EventError_Abcdefghijklm(struct {
-        res8_abcdefghijklmnopqrs union {
-1: inner2_abcdefghijkl bool;
-        };
-        res9_abcdefghijklmnopqrstu bool
-;
-    }  ) error noop_abcdefghijklmnopqrstu;};
+    ->Event_Abcdefghijklmnopqr(  struct { res7_abcdefghijklmnopqrstu bool;});};
 )FIDL";
 
   // ---------------40---------------- |
@@ -2219,12 +2175,6 @@ protocol Populated_Abcdefghijklmnopqrs {
     -> Event_Abcdefghijklmnopqr(struct {
         res7_abcdefghijklmnopqrstu bool;
     });
-    -> EventError_Abcdefghijklm(struct {
-        res8_abcdefghijklmnopqrs union {
-            1: inner2_abcdefghijkl bool;
-        };
-        res9_abcdefghijklmnopqrstu bool;
-    }) error noop_abcdefghijklmnopqrstu;
 };
 )FIDL";
 
@@ -2290,12 +2240,6 @@ protocol Populated_Abcdefghijklmnopqrs {
     -> Event_Abcdefghijklmnopqr(struct {
         res7_abcdefghijklmnopqrstu bool;
     });
-    -> EventError_Abcdefghijklm(struct {
-        res8_abcdefghijklmnopqrs union {
-            1: inner2_abcdefghijkl bool;
-        };
-        res9_abcdefghijklmnopqrstu bool;
-    }) error noop_abcdefghijklmnopqrstu;
 };
 )FIDL";
 
@@ -2352,12 +2296,6 @@ protocol Populated_Abcdefghijklmnopqrs {
     -> Event_Abcdefghijklmnopqr(struct {
         res7_abcdefghijklmnopqrstu bool;
     });
-    -> EventError_Abcdefghijklm(struct {
-        res8_abcdefghijklmnopqrs union {
-            1: inner2_abcdefghijkl bool;
-        };
-        res9_abcdefghijklmnopqrstu bool;
-    }) error noop_abcdefghijklmnopqrstu;
 };
 )FIDL";
 
@@ -2369,7 +2307,7 @@ protocol Populated_Abcdefghijklmnopqrs {
 TEST(FormatterTests, ProtocolWithArgumentsMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted =
-      R"FIDL(library foo.bar;protocol Empty_Abcdefghijklmnopqrstu{};protocol Composed_Abcdefghijklmnopqrst{compose Empty_Abcdefghijklmnopqrstu;};protocol Populated_Abcdefghijklmnopqrs{compose Composed_Abcdefghijklmnopqr;OneWay_Abcdefghijklmnopqrst(struct{req1_abcdefghijklmnopqrstu bool;});TwoWay_Abcdefghijklmnopqrst(struct{req2_abcdefghijklmnopqrstu bool;})->(struct{res3_abcdefghijklmnopqrstu bool;});TwoWayError_Abcdefghijklmno(struct{req4_abcdefghijklm bool=false;req5_abcdefghijklmnopqr struct{inner1_abcdefghijklmno int8;};})->(struct{res6_abcdefghijklmnopqrstu bool;})error uint32;compose Empty_Abcdefghijklmnopqrstu;->Event_Abcdefghijklmnopqr(struct{res7_abcdefghijklmnopqrstu bool;});->EventError_Abcdefghijklm(struct{res8_abcdefghijklmnopqrs union{1:inner2_abcdefghijkl bool;};res9_abcdefghijklmnopqrstu bool;})error noop_abcdefghijklmnopqrstu;};)FIDL";
+      R"FIDL(library foo.bar;protocol Empty_Abcdefghijklmnopqrstu{};protocol Composed_Abcdefghijklmnopqrst{compose Empty_Abcdefghijklmnopqrstu;};protocol Populated_Abcdefghijklmnopqrs{compose Composed_Abcdefghijklmnopqr;OneWay_Abcdefghijklmnopqrst(struct{req1_abcdefghijklmnopqrstu bool;});TwoWay_Abcdefghijklmnopqrst(struct{req2_abcdefghijklmnopqrstu bool;})->(struct{res3_abcdefghijklmnopqrstu bool;});TwoWayError_Abcdefghijklmno(struct{req4_abcdefghijklm bool=false;req5_abcdefghijklmnopqr struct{inner1_abcdefghijklmno int8;};})->(struct{res6_abcdefghijklmnopqrstu bool;})error uint32;compose Empty_Abcdefghijklmnopqrstu;->Event_Abcdefghijklmnopqr(struct{res7_abcdefghijklmnopqrstu bool;});};)FIDL";
 
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
@@ -2400,12 +2338,6 @@ protocol Populated_Abcdefghijklmnopqrs {
     -> Event_Abcdefghijklmnopqr(struct {
         res7_abcdefghijklmnopqrstu bool;
     });
-    -> EventError_Abcdefghijklm(struct {
-        res8_abcdefghijklmnopqrs union {
-            1: inner2_abcdefghijkl bool;
-        };
-        res9_abcdefghijklmnopqrstu bool;
-    }) error noop_abcdefghijklmnopqrstu;
 };
 )FIDL";
 
@@ -2515,26 +2447,6 @@ bool
 }
 )
 ;
-->
-EventError_Abcdefghijklm(struct
-{
-res8_abcdefghijklmnopqrs
-union
-{
-1:
-inner2_abcdefghijkl
-bool
-;
-}
-;
-res9_abcdefghijklmnopqrstu
-bool
-;
-}
-)
-error
-noop_abcdefghijklmnopqrstu
-;
 };
 )FIDL";
 
@@ -2573,12 +2485,6 @@ protocol Populated_Abcdefghijklmnopqrs {
     -> Event_Abcdefghijklmnopqr(struct {
         res7_abcdefghijklmnopqrstu bool;
     });
-    -> EventError_Abcdefghijklm(struct {
-        res8_abcdefghijklmnopqrs union {
-            1: inner2_abcdefghijkl bool;
-        };
-        res9_abcdefghijklmnopqrstu bool;
-    }) error noop_abcdefghijklmnopqrstu;
 };
 )FIDL";
 

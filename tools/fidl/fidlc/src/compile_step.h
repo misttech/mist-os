@@ -90,7 +90,6 @@ class CompileStep : public Compiler::Step {
   bool ValidateSelectorAndCalcOrdinal(const Name& protocol_name, Protocol::Method* method);
   void ValidatePayload(const TypeConstructor* type_ctor);
   void ValidateDomainError(const TypeConstructor* type_ctor);
-  void ValidateEventErrorSyntax(const Protocol::Method& event);
   template <typename DeclType>
   void ValidateResourceness(const DeclType* decl, const typename DeclType::Member& member);
 

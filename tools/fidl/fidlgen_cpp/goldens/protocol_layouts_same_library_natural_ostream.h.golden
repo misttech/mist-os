@@ -49,28 +49,12 @@ struct fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProto
   static std::ostream& Format(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse& value);
-};
-template <>
-struct fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult& value);
-};
-template <>
 struct fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult> {
   static std::ostream& Format(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult& value);
-};
-template <>
 struct fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult> {
   static std::ostream& Format(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult& value);
-};
-template <>
-struct fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult& value);
 };
 template <>
 struct fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest> {
@@ -100,14 +84,6 @@ template <>
 struct fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest& value);
 };
-template <>
-struct fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse& value);
-};
-template <>
-struct fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult& value);
-};
 
 namespace test_protocollayoutssamelibrary {
 
@@ -129,17 +105,9 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibra
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult& value);
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult& value);
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest& value);
 
@@ -154,10 +122,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibra
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResult& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult& value);
 
 }  // namespace test_protocollayoutssamelibrary
 

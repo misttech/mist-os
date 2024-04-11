@@ -159,46 +159,6 @@ void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUni
   static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionRequest, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
-void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictEventErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictEventFieldsErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse::Tag {
-  ZX_ASSERT(!has_invalid_tag());
-  switch (ordinal_) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse::Ordinal::kSomeField:
-      return static_cast<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse::Tag>(ordinal_);
-    default:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
-  }
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictEventUnionErrResponse) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictEventUnionErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictEventTableErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
 auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest::Tag {
   ZX_ASSERT(!has_invalid_tag());
   switch (ordinal_) {
@@ -213,46 +173,6 @@ void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventU
   static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventUnionRequest) == sizeof(fidl_union_t));
   static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionRequest, ordinal_) == offsetof(fidl_union_t, tag));
   static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionRequest, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventFieldsErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::Tag {
-  ZX_ASSERT(!has_invalid_tag());
-  switch (ordinal_) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::Ordinal::kSomeField:
-      return static_cast<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::Tag>(ordinal_);
-    default:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
-  }
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventUnionErrResponse) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventUnionErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventTableErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::Tag {
@@ -327,46 +247,6 @@ void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEven
   static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionRequest, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
-void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventFieldsErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::Tag {
-  ZX_ASSERT(!has_invalid_tag());
-  switch (ordinal_) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::Ordinal::kSomeField:
-      return static_cast<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::Tag>(ordinal_);
-    default:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
-  }
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventUnionErrResponse) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventUnionErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventTableErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
 auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Tag {
   ZX_ASSERT(!has_invalid_tag());
   switch (ordinal_) {
@@ -381,46 +261,6 @@ void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEv
   static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventUnionRequest) == sizeof(fidl_union_t));
   static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionRequest, ordinal_) == offsetof(fidl_union_t, tag));
   static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionRequest, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::Tag {
-  ZX_ASSERT(!has_invalid_tag());
-  switch (ordinal_) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::Ordinal::kSomeField:
-      return static_cast<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::Tag>(ordinal_);
-    default:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
-  }
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventTableErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::Tag {
@@ -493,46 +333,6 @@ void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEv
   static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventUnionRequest) == sizeof(fidl_union_t));
   static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionRequest, ordinal_) == offsetof(fidl_union_t, tag));
   static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionRequest, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventFieldsErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-auto ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::Tag {
-  ZX_ASSERT(!has_invalid_tag());
-  switch (ordinal_) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::Ordinal::kSomeField:
-      return static_cast<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::Tag>(ordinal_);
-    default:
-      return ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
-  }
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventUnionErrResponse) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventUnionErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventTableErrResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::Tag {
@@ -893,28 +693,6 @@ bool ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTab
   return frame_ptr_->HasUnknownData();
 }
 
-bool ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse>::HasUnknownData() const {
-  return false;
-}
-
-uint64_t fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse>::ComputeMaxOrdinal() const {
-  uint64_t max_ordinal = 0;
-  if (!some_field_.has_data()) {
-    max_ordinal = 1;
-  }
-  return max_ordinal;
-}
-
-bool ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse::HasUnknownData() const {
-  if (max_ordinal_ > 1) {
-    return true;
-  }
-  if (frame_ptr_ == nullptr) {
-    return false;
-  }
-  return frame_ptr_->HasUnknownData();
-}
-
 bool ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest>::HasUnknownData() const {
   return false;
 }
@@ -928,28 +706,6 @@ uint64_t fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 }
 
 bool ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest::HasUnknownData() const {
-  if (max_ordinal_ > 1) {
-    return true;
-  }
-  if (frame_ptr_ == nullptr) {
-    return false;
-  }
-  return frame_ptr_->HasUnknownData();
-}
-
-bool ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse>::HasUnknownData() const {
-  return false;
-}
-
-uint64_t fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse>::ComputeMaxOrdinal() const {
-  uint64_t max_ordinal = 0;
-  if (!some_field_.has_data()) {
-    max_ordinal = 1;
-  }
-  return max_ordinal;
-}
-
-bool ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse::HasUnknownData() const {
   if (max_ordinal_ > 1) {
     return true;
   }
@@ -1025,28 +781,6 @@ bool ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEven
   return frame_ptr_->HasUnknownData();
 }
 
-bool ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse>::HasUnknownData() const {
-  return false;
-}
-
-uint64_t fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse>::ComputeMaxOrdinal() const {
-  uint64_t max_ordinal = 0;
-  if (!some_field_.has_data()) {
-    max_ordinal = 1;
-  }
-  return max_ordinal;
-}
-
-bool ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse::HasUnknownData() const {
-  if (max_ordinal_ > 1) {
-    return true;
-  }
-  if (frame_ptr_ == nullptr) {
-    return false;
-  }
-  return frame_ptr_->HasUnknownData();
-}
-
 bool ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest>::HasUnknownData() const {
   return false;
 }
@@ -1060,28 +794,6 @@ uint64_t fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 }
 
 bool ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest::HasUnknownData() const {
-  if (max_ordinal_ > 1) {
-    return true;
-  }
-  if (frame_ptr_ == nullptr) {
-    return false;
-  }
-  return frame_ptr_->HasUnknownData();
-}
-
-bool ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse>::HasUnknownData() const {
-  return false;
-}
-
-uint64_t fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse>::ComputeMaxOrdinal() const {
-  uint64_t max_ordinal = 0;
-  if (!some_field_.has_data()) {
-    max_ordinal = 1;
-  }
-  return max_ordinal;
-}
-
-bool ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse::HasUnknownData() const {
   if (max_ordinal_ > 1) {
     return true;
   }
@@ -1148,28 +860,6 @@ uint64_t fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 }
 
 bool ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest::HasUnknownData() const {
-  if (max_ordinal_ > 1) {
-    return true;
-  }
-  if (frame_ptr_ == nullptr) {
-    return false;
-  }
-  return frame_ptr_->HasUnknownData();
-}
-
-bool ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse>::HasUnknownData() const {
-  return false;
-}
-
-uint64_t fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse>::ComputeMaxOrdinal() const {
-  uint64_t max_ordinal = 0;
-  if (!some_field_.has_data()) {
-    max_ordinal = 1;
-  }
-  return max_ordinal;
-}
-
-bool ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse::HasUnknownData() const {
   if (max_ordinal_ > 1) {
     return true;
   }

@@ -101,19 +101,6 @@ namespace internal {
   };
 }
 
-::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResponse, ::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse>::ToNatural(::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResponse src) {
-  return ::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse{{
-      .a = WireNaturalConversionTraits<uint32_t, uint32_t>::ToNatural(std::move(src.a)),
-      .b = WireNaturalConversionTraits<uint32_t, uint32_t>::ToNatural(std::move(src.b)),
-  }};
-}
-::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResponse WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResponse, ::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse>::ToWire(fidl::AnyArena& arena, ::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse src) {
-  return ::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResponse{
-      .a = WireNaturalConversionTraits<uint32_t, uint32_t>::ToWire(arena, std::move(src.a())),
-      .b = WireNaturalConversionTraits<uint32_t, uint32_t>::ToWire(arena, std::move(src.b())),
-  };
-}
-
 ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolTwoWayLocalWithErrorResult, ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult>::ToNatural(::test_protocolpayloads::wire::MainProtocolTwoWayLocalWithErrorResult src) {
   switch (src.Which()) {
     case ::test_protocolpayloads::wire::MainProtocolTwoWayLocalWithErrorResult::Tag::kResponse:
@@ -133,29 +120,6 @@ namespace internal {
                                                                                                  WireNaturalConversionTraits<::test_protocolpayloads::wire::LocalStructPayload, ::test_protocolpayloads::LocalStructPayload>::ToWire(arena, std::move(src.response().value())));
     case ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult::Tag::kErr:
       return ::test_protocolpayloads::wire::MainProtocolTwoWayLocalWithErrorResult::WithErr(
-          WireNaturalConversionTraits<uint32_t, uint32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-::test_protocolpayloads::MainProtocolOnLocalWithErrorResult WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult, ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult>::ToNatural(::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult src) {
-  switch (src.Which()) {
-    case ::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult::Tag::kResponse:
-      return ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult::WithResponse(
-          WireNaturalConversionTraits<::test_protocolpayloads::wire::LocalStructPayload, ::test_protocolpayloads::LocalStructPayload>::ToNatural(std::move(src.response())));
-    case ::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult::Tag::kErr:
-      return ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult::WithErr(
-          WireNaturalConversionTraits<uint32_t, uint32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult, ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult>::ToWire(fidl::AnyArena& arena, ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult src) {
-  switch (src.Which()) {
-    case ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult::Tag::kResponse:
-      return ::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult::WithResponse(arena,
-                                                                                             WireNaturalConversionTraits<::test_protocolpayloads::wire::LocalStructPayload, ::test_protocolpayloads::LocalStructPayload>::ToWire(arena, std::move(src.response().value())));
-    case ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult::Tag::kErr:
-      return ::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult::WithErr(
           WireNaturalConversionTraits<uint32_t, uint32_t>::ToWire(arena, std::move(src.err().value())));
   }
 }
@@ -183,29 +147,6 @@ namespace internal {
   }
 }
 
-::test_protocolpayloads::MainProtocolOnAnonWithErrorResult WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult, ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult>::ToNatural(::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult src) {
-  switch (src.Which()) {
-    case ::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult::Tag::kResponse:
-      return ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult::WithResponse(
-          WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResponse, ::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse>::ToNatural(std::move(src.response())));
-    case ::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult::Tag::kErr:
-      return ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult::WithErr(
-          WireNaturalConversionTraits<uint32_t, uint32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult, ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult>::ToWire(fidl::AnyArena& arena, ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult src) {
-  switch (src.Which()) {
-    case ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult::Tag::kResponse:
-      return ::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult::WithResponse(arena,
-                                                                                            WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResponse, ::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult::Tag::kErr:
-      return ::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult::WithErr(
-          WireNaturalConversionTraits<uint32_t, uint32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
 ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolTwoWayImportWithErrorResult, ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult>::ToNatural(::test_protocolpayloads::wire::MainProtocolTwoWayImportWithErrorResult src) {
   switch (src.Which()) {
     case ::test_protocolpayloads::wire::MainProtocolTwoWayImportWithErrorResult::Tag::kResponse:
@@ -225,29 +166,6 @@ namespace internal {
           WireNaturalConversionTraits<::test_protocolpayloads_imported::wire::ImportStructPayload, ::test_protocolpayloads_imported::ImportStructPayload>::ToWire(arena, std::move(src.response().value())));
     case ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult::Tag::kErr:
       return ::test_protocolpayloads::wire::MainProtocolTwoWayImportWithErrorResult::WithErr(
-          WireNaturalConversionTraits<uint32_t, uint32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-::test_protocolpayloads::MainProtocolOnImportWithErrorResult WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult, ::test_protocolpayloads::MainProtocolOnImportWithErrorResult>::ToNatural(::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult src) {
-  switch (src.Which()) {
-    case ::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult::Tag::kResponse:
-      return ::test_protocolpayloads::MainProtocolOnImportWithErrorResult::WithResponse(
-          WireNaturalConversionTraits<::test_protocolpayloads_imported::wire::ImportStructPayload, ::test_protocolpayloads_imported::ImportStructPayload>::ToNatural(std::move(src.response())));
-    case ::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult::Tag::kErr:
-      return ::test_protocolpayloads::MainProtocolOnImportWithErrorResult::WithErr(
-          WireNaturalConversionTraits<uint32_t, uint32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult, ::test_protocolpayloads::MainProtocolOnImportWithErrorResult>::ToWire(fidl::AnyArena& arena, ::test_protocolpayloads::MainProtocolOnImportWithErrorResult src) {
-  switch (src.Which()) {
-    case ::test_protocolpayloads::MainProtocolOnImportWithErrorResult::Tag::kResponse:
-      return ::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult::WithResponse(
-          WireNaturalConversionTraits<::test_protocolpayloads_imported::wire::ImportStructPayload, ::test_protocolpayloads_imported::ImportStructPayload>::ToWire(arena, std::move(src.response().value())));
-    case ::test_protocolpayloads::MainProtocolOnImportWithErrorResult::Tag::kErr:
-      return ::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult::WithErr(
           WireNaturalConversionTraits<uint32_t, uint32_t>::ToWire(arena, std::move(src.err().value())));
   }
 }

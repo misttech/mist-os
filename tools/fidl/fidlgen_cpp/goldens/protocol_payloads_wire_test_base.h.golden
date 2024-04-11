@@ -87,26 +87,14 @@ class WireSyncEventHandlerTestBase<::test_protocolpayloads::MainProtocol> : publ
   void OnComposed(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnComposed>* event) override {
     NotImplemented_("OnComposed");
   }
-  void OnComposedWithError(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnComposedWithError>* event) override {
-    NotImplemented_("OnComposedWithError");
-  }
   void OnLocal(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnLocal>* event) override {
     NotImplemented_("OnLocal");
-  }
-  void OnLocalWithError(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnLocalWithError>* event) override {
-    NotImplemented_("OnLocalWithError");
   }
   void OnImport(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnImport>* event) override {
     NotImplemented_("OnImport");
   }
-  void OnImportWithError(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnImportWithError>* event) override {
-    NotImplemented_("OnImportWithError");
-  }
   void OnAnon(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnAnon>* event) override {
     NotImplemented_("OnAnon");
-  }
-  void OnAnonWithError(::fidl::WireEvent<::test_protocolpayloads::MainProtocol::OnAnonWithError>* event) override {
-    NotImplemented_("OnAnonWithError");
   }
 };
 #pragma clang diagnostic pop

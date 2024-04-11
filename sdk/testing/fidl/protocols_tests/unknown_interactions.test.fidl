@@ -28,18 +28,10 @@ open protocol UnknownInteractionsProtocol {
     strict -> StrictEventFields(struct {
         some_field int32;
     });
-    strict -> StrictEventErr() error int32;
-    strict -> StrictEventFieldsErr(struct {
-        some_field int32;
-    }) error int32;
     flexible -> FlexibleEvent();
     flexible -> FlexibleEventFields(struct {
         some_field int32;
     });
-    flexible -> FlexibleEventErr() error int32;
-    flexible -> FlexibleEventFieldsErr(struct {
-        some_field int32;
-    }) error int32;
 };
 
 ajar protocol UnknownInteractionsAjarProtocol {};

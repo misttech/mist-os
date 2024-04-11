@@ -29,24 +29,6 @@
         </tr>
 </table>
 
-### OnAnonComposedWithError {#ComposedProtocol.OnAnonComposedWithError}
-
-
-
-
-
-#### Response {#ComposedProtocol.OnAnonComposedWithError_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#ComposedProtocol_OnAnonComposedWithError_Result'>ComposedProtocol_OnAnonComposedWithError_Result</a></code>
-            </td>
-        </tr>
-</table>
-
 ### OnNamedComposed {#ComposedProtocol.OnNamedComposed}
 
 
@@ -61,24 +43,6 @@
             <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#UnionPayload'>UnionPayload</a></code>
-            </td>
-        </tr>
-</table>
-
-### OnNamedComposedWithError {#ComposedProtocol.OnNamedComposedWithError}
-
-
-
-
-
-#### Response {#ComposedProtocol.OnNamedComposedWithError_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#ComposedProtocol_OnNamedComposedWithError_Result'>ComposedProtocol_OnNamedComposedWithError_Result</a></code>
             </td>
         </tr>
 </table>
@@ -240,7 +204,7 @@
 </table>
 
 ## MainProtocol {#MainProtocol}
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=40)*
+*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=36)*
 
 
 ### OnAnon {#MainProtocol.OnAnon}
@@ -279,42 +243,6 @@
         </tr>
 </table>
 
-### OnAnonComposedWithError {#MainProtocol.OnAnonComposedWithError}
-
-
-
-
-
-#### Response {#MainProtocol.OnAnonComposedWithError_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#ComposedProtocol_OnAnonComposedWithError_Result'>ComposedProtocol_OnAnonComposedWithError_Result</a></code>
-            </td>
-        </tr>
-</table>
-
-### OnAnonWithError {#MainProtocol.OnAnonWithError}
-
-
-
-
-
-#### Response {#MainProtocol.OnAnonWithError_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#MainProtocol_OnAnonWithError_Result'>MainProtocol_OnAnonWithError_Result</a></code>
-            </td>
-        </tr>
-</table>
-
 ### OnLocal {#MainProtocol.OnLocal}
 
 
@@ -333,24 +261,6 @@
         </tr>
 </table>
 
-### OnLocalWithError {#MainProtocol.OnLocalWithError}
-
-
-
-
-
-#### Response {#MainProtocol.OnLocalWithError_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#MainProtocol_OnLocalWithError_Result'>MainProtocol_OnLocalWithError_Result</a></code>
-            </td>
-        </tr>
-</table>
-
 ### OnNamedComposed {#MainProtocol.OnNamedComposed}
 
 
@@ -365,24 +275,6 @@
             <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#UnionPayload'>UnionPayload</a></code>
-            </td>
-        </tr>
-</table>
-
-### OnNamedComposedWithError {#MainProtocol.OnNamedComposedWithError}
-
-
-
-
-
-#### Response {#MainProtocol.OnNamedComposedWithError_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#ComposedProtocol_OnNamedComposedWithError_Result'>ComposedProtocol_OnNamedComposedWithError_Result</a></code>
             </td>
         </tr>
 </table>
@@ -755,27 +647,10 @@
         </tr>
 </table>
 
-### ComposedProtocol_OnAnonComposedWithError_Response  {#ComposedProtocol_OnAnonComposedWithError_Response data-text="ComposedProtocol_OnAnonComposedWithError_Response"}
-
-
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=28)*
-
-<table>
-    <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr id="ComposedProtocol_OnAnonComposedWithError_Response.a">
-<td><h3 id="ComposedProtocol_OnAnonComposedWithError_Response.a" class="add-link hide-from-toc">1</h3></td>
-            <td><code>a</code></td>
-            <td>
-                <code>uint16</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
 ### MainProtocolOneWayAnonRequest  {#MainProtocolOneWayAnonRequest data-text="MainProtocolOneWayAnonRequest"}
 
 
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=52)*
+*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=47)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -792,7 +667,7 @@
 ### MainProtocolTwoWayAnonResponse  {#MainProtocolTwoWayAnonResponse data-text="MainProtocolTwoWayAnonResponse"}
 
 
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=57)*
+*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=52)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -809,29 +684,12 @@
 ### MainProtocolTwoWayAnonWithErrorRequest  {#MainProtocolTwoWayAnonWithErrorRequest data-text="MainProtocolTwoWayAnonWithErrorRequest"}
 
 
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=60)*
+*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=55)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
         <tr id="MainProtocolTwoWayAnonWithErrorRequest.a">
 <td><h3 id="MainProtocolTwoWayAnonWithErrorRequest.a" class="add-link hide-from-toc">1</h3></td>
-            <td><code>a</code></td>
-            <td>
-                <code>uint16</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### MainProtocol_OnAnonWithError_Response  {#MainProtocol_OnAnonWithError_Response data-text="MainProtocol_OnAnonWithError_Response"}
-
-
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=68)*
-
-<table>
-    <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr id="MainProtocol_OnAnonWithError_Response.a">
-<td><h3 id="MainProtocol_OnAnonWithError_Response.a" class="add-link hide-from-toc">1</h3></td>
             <td><code>a</code></td>
             <td>
                 <code>uint16</code>
@@ -888,50 +746,6 @@
         </tr>
 </table>
 
-### ComposedProtocol_OnAnonComposedWithError_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#ComposedProtocol_OnAnonComposedWithError_Result data-text="ComposedProtocol_OnAnonComposedWithError_Result"}
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=28)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="ComposedProtocol_OnAnonComposedWithError_Result.response">
-<td><h3 id="ComposedProtocol_OnAnonComposedWithError_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#ComposedProtocol_OnAnonComposedWithError_Response'>ComposedProtocol_OnAnonComposedWithError_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="ComposedProtocol_OnAnonComposedWithError_Result.err">
-<td><h3 id="ComposedProtocol_OnAnonComposedWithError_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>uint32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### ComposedProtocol_OnNamedComposedWithError_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#ComposedProtocol_OnNamedComposedWithError_Result data-text="ComposedProtocol_OnNamedComposedWithError_Result"}
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=36)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="ComposedProtocol_OnNamedComposedWithError_Result.response">
-<td><h3 id="ComposedProtocol_OnNamedComposedWithError_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#TablePayload'>TablePayload</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="ComposedProtocol_OnNamedComposedWithError_Result.err">
-<td><h3 id="ComposedProtocol_OnNamedComposedWithError_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>uint32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
 ### ComposedProtocol_TwoWayAnonComposedWithError_Response [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#ComposedProtocol_TwoWayAnonComposedWithError_Response data-text="ComposedProtocol_TwoWayAnonComposedWithError_Response"}
 *Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=22)*
 <table>
@@ -969,7 +783,7 @@
 </table>
 
 ### ComposedProtocol_TwoWayNamedComposedWithError_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#ComposedProtocol_TwoWayNamedComposedWithError_Result data-text="ComposedProtocol_TwoWayNamedComposedWithError_Result"}
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=34)*
+*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=31)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="ComposedProtocol_TwoWayNamedComposedWithError_Result.response">
@@ -991,7 +805,7 @@
 </table>
 
 ### MainProtocolOnAnonRequest [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#MainProtocolOnAnonRequest data-text="MainProtocolOnAnonRequest"}
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=65)*
+*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=60)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="MainProtocolOnAnonRequest.b">
@@ -1005,7 +819,7 @@
 </table>
 
 ### MainProtocolTwoWayAnonRequest [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#MainProtocolTwoWayAnonRequest data-text="MainProtocolTwoWayAnonRequest"}
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=55)*
+*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=50)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="MainProtocolTwoWayAnonRequest.b">
@@ -1018,52 +832,8 @@
         </tr>
 </table>
 
-### MainProtocol_OnAnonWithError_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#MainProtocol_OnAnonWithError_Result data-text="MainProtocol_OnAnonWithError_Result"}
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=68)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="MainProtocol_OnAnonWithError_Result.response">
-<td><h3 id="MainProtocol_OnAnonWithError_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#MainProtocol_OnAnonWithError_Response'>MainProtocol_OnAnonWithError_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="MainProtocol_OnAnonWithError_Result.err">
-<td><h3 id="MainProtocol_OnAnonWithError_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>uint32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### MainProtocol_OnLocalWithError_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#MainProtocol_OnLocalWithError_Result data-text="MainProtocol_OnLocalWithError_Result"}
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=49)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="MainProtocol_OnLocalWithError_Result.response">
-<td><h3 id="MainProtocol_OnLocalWithError_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#TablePayload'>TablePayload</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="MainProtocol_OnLocalWithError_Result.err">
-<td><h3 id="MainProtocol_OnLocalWithError_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>uint32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
 ### MainProtocol_TwoWayAnonWithError_Response [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#MainProtocol_TwoWayAnonWithError_Response data-text="MainProtocol_TwoWayAnonWithError_Response"}
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=62)*
+*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=57)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="MainProtocol_TwoWayAnonWithError_Response.b">
@@ -1077,7 +847,7 @@
 </table>
 
 ### MainProtocol_TwoWayAnonWithError_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#MainProtocol_TwoWayAnonWithError_Result data-text="MainProtocol_TwoWayAnonWithError_Result"}
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=62)*
+*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=57)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="MainProtocol_TwoWayAnonWithError_Result.response">
@@ -1099,7 +869,7 @@
 </table>
 
 ### MainProtocol_TwoWayLocalWithError_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#MainProtocol_TwoWayLocalWithError_Result data-text="MainProtocol_TwoWayLocalWithError_Result"}
-*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=47)*
+*Defined in [test.protocollayoutssamelibrary/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl;l=43)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="MainProtocol_TwoWayLocalWithError_Result.response">

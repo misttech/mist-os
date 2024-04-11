@@ -4,62 +4,37 @@
 
 #pragma once
 
-#include "lib/fidl/cpp/internal/header.h"
-
 #include <test/protocollayouts/imported/cpp/fidl.h>
+
+#include "lib/fidl/cpp/internal/header.h"
 namespace test {
 namespace protocollayouts {
-
 
 //
 // Domain objects declarations
 //
 
-
 class LocalTablePayload;
-
 
 class LocalUnionPayload;
 
-
 class MainProtocol_TwoWayImportWithError_Result;
-
-
-class MainProtocol_OnImportWithError_Result;
-
 
 class MainProtocol_TwoWayLocalWithError_Result;
 
-
-class MainProtocol_OnLocalWithError_Result;
-
-
 class MainProtocolOneWayAnonRequest;
-
 
 class MainProtocolTwoWayAnonRequest;
 
-
 class MainProtocolTwoWayAnonResponse;
-
 
 class MainProtocolTwoWayAnonWithErrorRequest;
 
-
 class MainProtocol_TwoWayAnonWithError_Response;
-
 
 class MainProtocol_TwoWayAnonWithError_Result;
 
-
 class MainProtocolOnAnonRequest;
-
-
-class MainProtocol_OnAnonWithError_Response;
-
-
-class MainProtocol_OnAnonWithError_Result;
-
 
 #ifdef __Fuchsia__
 
@@ -68,8 +43,6 @@ using MainProtocolHandle = ::fidl::InterfaceHandle<MainProtocol>;
 
 #endif  // __Fuchsia__
 
-
-
 #ifdef __Fuchsia__
 
 class OpenProtocol;
@@ -77,15 +50,12 @@ using OpenProtocolHandle = ::fidl::InterfaceHandle<OpenProtocol>;
 
 #endif  // __Fuchsia__
 
-
-
-
 class LocalTablePayload final {
  public:
   static const fidl_type_t* FidlType;
   /// Returns whether no field is set.
   bool IsEmpty() const;
-  
+
   const uint16_t& a() const {
     ZX_ASSERT(field_presence_.IsSet<0>());
     return a_value_.value;
@@ -93,7 +63,7 @@ class LocalTablePayload final {
   bool has_a() const {
     return field_presence_.IsSet<0>();
   }
-  
+
   uint16_t* mutable_a() {
     if (!field_presence_.IsSet<0>()) {
       field_presence_.Set<0>();
@@ -121,6 +91,7 @@ class LocalTablePayload final {
               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
   static void Decode(::fidl::Decoder* _decoder, LocalTablePayload* _value, size_t _offset);
   zx_status_t Clone(LocalTablePayload* _result) const;
+
  private:
   template <class T, class... Args>
   void Construct(T* p, Args&&... args) {
@@ -138,10 +109,10 @@ class LocalTablePayload final {
 
   static bool IsOrdinalKnown(uint64_t ordinal) {
     switch (ordinal) {
-    case 1:
-      return true;
-    default:
-      return false;
+      case 1:
+        return true;
+      default:
+        return false;
     }
   }
 
@@ -157,8 +128,6 @@ class LocalTablePayload final {
 
 using LocalTablePayloadPtr = ::std::unique_ptr<LocalTablePayload>;
 
-
-
 class LocalUnionPayload final {
  public:
   static const fidl_type_t* FidlType;
@@ -169,12 +138,11 @@ class LocalUnionPayload final {
   LocalUnionPayload(LocalUnionPayload&&);
   LocalUnionPayload& operator=(LocalUnionPayload&&);
 
-  
   static LocalUnionPayload WithB(bool&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  kUnknown = 0,
-  
+    kUnknown = 0,
+
     kB = 1,  // 0x1
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
@@ -191,12 +159,12 @@ class LocalUnionPayload final {
   }
 
   bool is_b() const { return tag_ == ::test::protocollayouts::LocalUnionPayload::Tag::kB; }
-  
+
   bool& b() {
     EnsureStorageInitialized(::test::protocollayouts::LocalUnionPayload::Tag::kB);
     return b_;
   }
-  
+
   const bool& b() const {
     ZX_ASSERT(is_b());
     return b_;
@@ -205,7 +173,6 @@ class LocalUnionPayload final {
   LocalUnionPayload& SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes);
 
   ::test::protocollayouts::LocalUnionPayload::Tag Which() const {
-    
     switch (tag_) {
       case ::test::protocollayouts::LocalUnionPayload::Tag::Invalid:
       case ::test::protocollayouts::LocalUnionPayload::Tag::kB:
@@ -213,7 +180,6 @@ class LocalUnionPayload final {
       default:
         return ::test::protocollayouts::LocalUnionPayload::Tag::kUnknown;
     }
-    
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -248,8 +214,6 @@ inline zx_status_t Clone(const ::test::protocollayouts::LocalUnionPayload& value
 
 using LocalUnionPayloadPtr = ::std::unique_ptr<LocalUnionPayload>;
 
-
-
 class MainProtocol_TwoWayImportWithError_Result final {
  public:
   static const fidl_type_t* FidlType;
@@ -260,14 +224,13 @@ class MainProtocol_TwoWayImportWithError_Result final {
   MainProtocol_TwoWayImportWithError_Result(MainProtocol_TwoWayImportWithError_Result&&);
   MainProtocol_TwoWayImportWithError_Result& operator=(MainProtocol_TwoWayImportWithError_Result&&);
 
-  
   static MainProtocol_TwoWayImportWithError_Result WithResponse(::test::protocollayouts::imported::ImportUnionPayload&&);
   static MainProtocol_TwoWayImportWithError_Result WithErr(uint32_t&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  
+
     kResponse = 1,  // 0x1
-    kErr = 2,  // 0x2
+    kErr = 2,       // 0x2
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
 
@@ -283,12 +246,12 @@ class MainProtocol_TwoWayImportWithError_Result final {
   }
 
   bool is_response() const { return tag_ == ::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result::Tag::kResponse; }
-  
+
   ::test::protocollayouts::imported::ImportUnionPayload& response() {
     EnsureStorageInitialized(::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result::Tag::kResponse);
     return response_;
   }
-  
+
   const ::test::protocollayouts::imported::ImportUnionPayload& response() const {
     ZX_ASSERT(is_response());
     return response_;
@@ -296,12 +259,12 @@ class MainProtocol_TwoWayImportWithError_Result final {
   MainProtocol_TwoWayImportWithError_Result& set_response(::test::protocollayouts::imported::ImportUnionPayload value);
 
   bool is_err() const { return tag_ == ::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result::Tag::kErr; }
-  
+
   uint32_t& err() {
     EnsureStorageInitialized(::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result::Tag::kErr);
     return err_;
   }
-  
+
   const uint32_t& err() const {
     ZX_ASSERT(is_err());
     return err_;
@@ -309,9 +272,7 @@ class MainProtocol_TwoWayImportWithError_Result final {
   MainProtocol_TwoWayImportWithError_Result& set_err(uint32_t value);
 
   ::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result::Tag Which() const {
-    
     return ::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result::Tag(tag_);
-    
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -340,100 +301,6 @@ inline zx_status_t Clone(const ::test::protocollayouts::MainProtocol_TwoWayImpor
 
 using MainProtocol_TwoWayImportWithError_ResultPtr = ::std::unique_ptr<MainProtocol_TwoWayImportWithError_Result>;
 
-
-
-class MainProtocol_OnImportWithError_Result final {
- public:
-  static const fidl_type_t* FidlType;
-
-  MainProtocol_OnImportWithError_Result();
-  ~MainProtocol_OnImportWithError_Result();
-
-  MainProtocol_OnImportWithError_Result(MainProtocol_OnImportWithError_Result&&);
-  MainProtocol_OnImportWithError_Result& operator=(MainProtocol_OnImportWithError_Result&&);
-
-  
-  static MainProtocol_OnImportWithError_Result WithResponse(::test::protocollayouts::imported::ImportTablePayload&&);
-  static MainProtocol_OnImportWithError_Result WithErr(uint32_t&&);
-
-  enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  
-    kResponse = 1,  // 0x1
-    kErr = 2,  // 0x2
-    Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
-  };
-
-  static inline ::std::unique_ptr<MainProtocol_OnImportWithError_Result> New() { return ::std::make_unique<MainProtocol_OnImportWithError_Result>(); }
-
-  void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, MainProtocol_OnImportWithError_Result* value, size_t offset);
-  zx_status_t Clone(MainProtocol_OnImportWithError_Result* result) const;
-
-  bool has_invalid_tag() const {
-    return tag_ == Invalid;
-  }
-
-  bool is_response() const { return tag_ == ::test::protocollayouts::MainProtocol_OnImportWithError_Result::Tag::kResponse; }
-  
-  ::test::protocollayouts::imported::ImportTablePayload& response() {
-    EnsureStorageInitialized(::test::protocollayouts::MainProtocol_OnImportWithError_Result::Tag::kResponse);
-    return response_;
-  }
-  
-  const ::test::protocollayouts::imported::ImportTablePayload& response() const {
-    ZX_ASSERT(is_response());
-    return response_;
-  }
-  MainProtocol_OnImportWithError_Result& set_response(::test::protocollayouts::imported::ImportTablePayload value);
-
-  bool is_err() const { return tag_ == ::test::protocollayouts::MainProtocol_OnImportWithError_Result::Tag::kErr; }
-  
-  uint32_t& err() {
-    EnsureStorageInitialized(::test::protocollayouts::MainProtocol_OnImportWithError_Result::Tag::kErr);
-    return err_;
-  }
-  
-  const uint32_t& err() const {
-    ZX_ASSERT(is_err());
-    return err_;
-  }
-  MainProtocol_OnImportWithError_Result& set_err(uint32_t value);
-
-  ::test::protocollayouts::MainProtocol_OnImportWithError_Result::Tag Which() const {
-    
-    return ::test::protocollayouts::MainProtocol_OnImportWithError_Result::Tag(tag_);
-    
-  }
-
-  // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
-  // access to the raw integral ordinal value.
-  fidl_xunion_tag_t Ordinal() const {
-    return tag_;
-  }
-
-  friend ::fidl::Equality<::test::protocollayouts::MainProtocol_OnImportWithError_Result>;
-
- private:
-  void Destroy();
-  void EnsureStorageInitialized(::fidl_xunion_tag_t tag);
-
-  ::fidl_xunion_tag_t tag_ = static_cast<fidl_xunion_tag_t>(::test::protocollayouts::MainProtocol_OnImportWithError_Result::Tag::Invalid);
-  union {
-    ::test::protocollayouts::imported::ImportTablePayload response_;
-    uint32_t err_;
-  };
-};
-
-inline zx_status_t Clone(const ::test::protocollayouts::MainProtocol_OnImportWithError_Result& value,
-                         ::test::protocollayouts::MainProtocol_OnImportWithError_Result* result) {
-  return value.Clone(result);
-}
-
-using MainProtocol_OnImportWithError_ResultPtr = ::std::unique_ptr<MainProtocol_OnImportWithError_Result>;
-
-
-
 class MainProtocol_TwoWayLocalWithError_Result final {
  public:
   static const fidl_type_t* FidlType;
@@ -444,14 +311,13 @@ class MainProtocol_TwoWayLocalWithError_Result final {
   MainProtocol_TwoWayLocalWithError_Result(MainProtocol_TwoWayLocalWithError_Result&&);
   MainProtocol_TwoWayLocalWithError_Result& operator=(MainProtocol_TwoWayLocalWithError_Result&&);
 
-  
   static MainProtocol_TwoWayLocalWithError_Result WithResponse(::test::protocollayouts::LocalUnionPayload&&);
   static MainProtocol_TwoWayLocalWithError_Result WithErr(uint32_t&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  
+
     kResponse = 1,  // 0x1
-    kErr = 2,  // 0x2
+    kErr = 2,       // 0x2
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
 
@@ -467,12 +333,12 @@ class MainProtocol_TwoWayLocalWithError_Result final {
   }
 
   bool is_response() const { return tag_ == ::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result::Tag::kResponse; }
-  
+
   ::test::protocollayouts::LocalUnionPayload& response() {
     EnsureStorageInitialized(::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result::Tag::kResponse);
     return response_;
   }
-  
+
   const ::test::protocollayouts::LocalUnionPayload& response() const {
     ZX_ASSERT(is_response());
     return response_;
@@ -480,12 +346,12 @@ class MainProtocol_TwoWayLocalWithError_Result final {
   MainProtocol_TwoWayLocalWithError_Result& set_response(::test::protocollayouts::LocalUnionPayload value);
 
   bool is_err() const { return tag_ == ::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result::Tag::kErr; }
-  
+
   uint32_t& err() {
     EnsureStorageInitialized(::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result::Tag::kErr);
     return err_;
   }
-  
+
   const uint32_t& err() const {
     ZX_ASSERT(is_err());
     return err_;
@@ -493,9 +359,7 @@ class MainProtocol_TwoWayLocalWithError_Result final {
   MainProtocol_TwoWayLocalWithError_Result& set_err(uint32_t value);
 
   ::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result::Tag Which() const {
-    
     return ::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result::Tag(tag_);
-    
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -509,7 +373,7 @@ class MainProtocol_TwoWayLocalWithError_Result final {
     set_response(::test::protocollayouts::LocalUnionPayload{std::move(result.value)});
   }
   MainProtocol_TwoWayLocalWithError_Result(fpromise::error_result<uint32_t>&& result) {
-      set_err(std::move(result.error));
+    set_err(std::move(result.error));
   }
   MainProtocol_TwoWayLocalWithError_Result(fpromise::result<::test::protocollayouts::LocalUnionPayload, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
@@ -545,127 +409,12 @@ inline zx_status_t Clone(const ::test::protocollayouts::MainProtocol_TwoWayLocal
 
 using MainProtocol_TwoWayLocalWithError_ResultPtr = ::std::unique_ptr<MainProtocol_TwoWayLocalWithError_Result>;
 
-
-
-class MainProtocol_OnLocalWithError_Result final {
- public:
-  static const fidl_type_t* FidlType;
-
-  MainProtocol_OnLocalWithError_Result();
-  ~MainProtocol_OnLocalWithError_Result();
-
-  MainProtocol_OnLocalWithError_Result(MainProtocol_OnLocalWithError_Result&&);
-  MainProtocol_OnLocalWithError_Result& operator=(MainProtocol_OnLocalWithError_Result&&);
-
-  
-  static MainProtocol_OnLocalWithError_Result WithResponse(::test::protocollayouts::LocalTablePayload&&);
-  static MainProtocol_OnLocalWithError_Result WithErr(uint32_t&&);
-
-  enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  
-    kResponse = 1,  // 0x1
-    kErr = 2,  // 0x2
-    Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
-  };
-
-  static inline ::std::unique_ptr<MainProtocol_OnLocalWithError_Result> New() { return ::std::make_unique<MainProtocol_OnLocalWithError_Result>(); }
-
-  void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, MainProtocol_OnLocalWithError_Result* value, size_t offset);
-  zx_status_t Clone(MainProtocol_OnLocalWithError_Result* result) const;
-
-  bool has_invalid_tag() const {
-    return tag_ == Invalid;
-  }
-
-  bool is_response() const { return tag_ == ::test::protocollayouts::MainProtocol_OnLocalWithError_Result::Tag::kResponse; }
-  
-  ::test::protocollayouts::LocalTablePayload& response() {
-    EnsureStorageInitialized(::test::protocollayouts::MainProtocol_OnLocalWithError_Result::Tag::kResponse);
-    return response_;
-  }
-  
-  const ::test::protocollayouts::LocalTablePayload& response() const {
-    ZX_ASSERT(is_response());
-    return response_;
-  }
-  MainProtocol_OnLocalWithError_Result& set_response(::test::protocollayouts::LocalTablePayload value);
-
-  bool is_err() const { return tag_ == ::test::protocollayouts::MainProtocol_OnLocalWithError_Result::Tag::kErr; }
-  
-  uint32_t& err() {
-    EnsureStorageInitialized(::test::protocollayouts::MainProtocol_OnLocalWithError_Result::Tag::kErr);
-    return err_;
-  }
-  
-  const uint32_t& err() const {
-    ZX_ASSERT(is_err());
-    return err_;
-  }
-  MainProtocol_OnLocalWithError_Result& set_err(uint32_t value);
-
-  ::test::protocollayouts::MainProtocol_OnLocalWithError_Result::Tag Which() const {
-    
-    return ::test::protocollayouts::MainProtocol_OnLocalWithError_Result::Tag(tag_);
-    
-  }
-
-  // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
-  // access to the raw integral ordinal value.
-  fidl_xunion_tag_t Ordinal() const {
-    return tag_;
-  }
-
-  friend ::fidl::Equality<::test::protocollayouts::MainProtocol_OnLocalWithError_Result>;
-  MainProtocol_OnLocalWithError_Result(fpromise::ok_result<::test::protocollayouts::LocalTablePayload>&& result) {
-    set_response(::test::protocollayouts::LocalTablePayload{std::move(result.value)});
-  }
-  MainProtocol_OnLocalWithError_Result(fpromise::error_result<uint32_t>&& result) {
-      set_err(std::move(result.error));
-  }
-  MainProtocol_OnLocalWithError_Result(fpromise::result<::test::protocollayouts::LocalTablePayload, uint32_t>&& result) {
-    ZX_ASSERT(!result.is_pending());
-    if (result.is_ok()) {
-      set_response(::test::protocollayouts::LocalTablePayload{result.take_value()});
-    } else {
-      set_err(result.take_error());
-    }
-  }
-  operator fpromise::result<::test::protocollayouts::LocalTablePayload, uint32_t>() && {
-    if (is_err()) {
-      return fpromise::error(err());
-    }
-    ::std::tuple<::test::protocollayouts::LocalTablePayload> value_tuple = std::move(response());
-    return fpromise::ok(std::move(std::get<0>(value_tuple)));
-  }
-
- private:
-  void Destroy();
-  void EnsureStorageInitialized(::fidl_xunion_tag_t tag);
-
-  ::fidl_xunion_tag_t tag_ = static_cast<fidl_xunion_tag_t>(::test::protocollayouts::MainProtocol_OnLocalWithError_Result::Tag::Invalid);
-  union {
-    ::test::protocollayouts::LocalTablePayload response_;
-    uint32_t err_;
-  };
-};
-
-inline zx_status_t Clone(const ::test::protocollayouts::MainProtocol_OnLocalWithError_Result& value,
-                         ::test::protocollayouts::MainProtocol_OnLocalWithError_Result* result) {
-  return value.Clone(result);
-}
-
-using MainProtocol_OnLocalWithError_ResultPtr = ::std::unique_ptr<MainProtocol_OnLocalWithError_Result>;
-
-
-
 class MainProtocolOneWayAnonRequest final {
  public:
   static const fidl_type_t* FidlType;
   /// Returns whether no field is set.
   bool IsEmpty() const;
-  
+
   const uint16_t& a() const {
     ZX_ASSERT(field_presence_.IsSet<0>());
     return a_value_.value;
@@ -673,7 +422,7 @@ class MainProtocolOneWayAnonRequest final {
   bool has_a() const {
     return field_presence_.IsSet<0>();
   }
-  
+
   uint16_t* mutable_a() {
     if (!field_presence_.IsSet<0>()) {
       field_presence_.Set<0>();
@@ -701,6 +450,7 @@ class MainProtocolOneWayAnonRequest final {
               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocolOneWayAnonRequest* _value, size_t _offset);
   zx_status_t Clone(MainProtocolOneWayAnonRequest* _result) const;
+
  private:
   template <class T, class... Args>
   void Construct(T* p, Args&&... args) {
@@ -718,10 +468,10 @@ class MainProtocolOneWayAnonRequest final {
 
   static bool IsOrdinalKnown(uint64_t ordinal) {
     switch (ordinal) {
-    case 1:
-      return true;
-    default:
-      return false;
+      case 1:
+        return true;
+      default:
+        return false;
     }
   }
 
@@ -737,8 +487,6 @@ class MainProtocolOneWayAnonRequest final {
 
 using MainProtocolOneWayAnonRequestPtr = ::std::unique_ptr<MainProtocolOneWayAnonRequest>;
 
-
-
 class MainProtocolTwoWayAnonRequest final {
  public:
   static const fidl_type_t* FidlType;
@@ -749,12 +497,11 @@ class MainProtocolTwoWayAnonRequest final {
   MainProtocolTwoWayAnonRequest(MainProtocolTwoWayAnonRequest&&);
   MainProtocolTwoWayAnonRequest& operator=(MainProtocolTwoWayAnonRequest&&);
 
-  
   static MainProtocolTwoWayAnonRequest WithB(bool&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  kUnknown = 0,
-  
+    kUnknown = 0,
+
     kB = 1,  // 0x1
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
@@ -771,12 +518,12 @@ class MainProtocolTwoWayAnonRequest final {
   }
 
   bool is_b() const { return tag_ == ::test::protocollayouts::MainProtocolTwoWayAnonRequest::Tag::kB; }
-  
+
   bool& b() {
     EnsureStorageInitialized(::test::protocollayouts::MainProtocolTwoWayAnonRequest::Tag::kB);
     return b_;
   }
-  
+
   const bool& b() const {
     ZX_ASSERT(is_b());
     return b_;
@@ -785,7 +532,6 @@ class MainProtocolTwoWayAnonRequest final {
   MainProtocolTwoWayAnonRequest& SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes);
 
   ::test::protocollayouts::MainProtocolTwoWayAnonRequest::Tag Which() const {
-    
     switch (tag_) {
       case ::test::protocollayouts::MainProtocolTwoWayAnonRequest::Tag::Invalid:
       case ::test::protocollayouts::MainProtocolTwoWayAnonRequest::Tag::kB:
@@ -793,7 +539,6 @@ class MainProtocolTwoWayAnonRequest final {
       default:
         return ::test::protocollayouts::MainProtocolTwoWayAnonRequest::Tag::kUnknown;
     }
-    
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -828,14 +573,12 @@ inline zx_status_t Clone(const ::test::protocollayouts::MainProtocolTwoWayAnonRe
 
 using MainProtocolTwoWayAnonRequestPtr = ::std::unique_ptr<MainProtocolTwoWayAnonRequest>;
 
-
-
 class MainProtocolTwoWayAnonResponse final {
  public:
   static const fidl_type_t* FidlType;
   /// Returns whether no field is set.
   bool IsEmpty() const;
-  
+
   const uint16_t& a() const {
     ZX_ASSERT(field_presence_.IsSet<0>());
     return a_value_.value;
@@ -843,7 +586,7 @@ class MainProtocolTwoWayAnonResponse final {
   bool has_a() const {
     return field_presence_.IsSet<0>();
   }
-  
+
   uint16_t* mutable_a() {
     if (!field_presence_.IsSet<0>()) {
       field_presence_.Set<0>();
@@ -871,6 +614,7 @@ class MainProtocolTwoWayAnonResponse final {
               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocolTwoWayAnonResponse* _value, size_t _offset);
   zx_status_t Clone(MainProtocolTwoWayAnonResponse* _result) const;
+
  private:
   template <class T, class... Args>
   void Construct(T* p, Args&&... args) {
@@ -888,10 +632,10 @@ class MainProtocolTwoWayAnonResponse final {
 
   static bool IsOrdinalKnown(uint64_t ordinal) {
     switch (ordinal) {
-    case 1:
-      return true;
-    default:
-      return false;
+      case 1:
+        return true;
+      default:
+        return false;
     }
   }
 
@@ -907,14 +651,12 @@ class MainProtocolTwoWayAnonResponse final {
 
 using MainProtocolTwoWayAnonResponsePtr = ::std::unique_ptr<MainProtocolTwoWayAnonResponse>;
 
-
-
 class MainProtocolTwoWayAnonWithErrorRequest final {
  public:
   static const fidl_type_t* FidlType;
   /// Returns whether no field is set.
   bool IsEmpty() const;
-  
+
   const uint16_t& a() const {
     ZX_ASSERT(field_presence_.IsSet<0>());
     return a_value_.value;
@@ -922,7 +664,7 @@ class MainProtocolTwoWayAnonWithErrorRequest final {
   bool has_a() const {
     return field_presence_.IsSet<0>();
   }
-  
+
   uint16_t* mutable_a() {
     if (!field_presence_.IsSet<0>()) {
       field_presence_.Set<0>();
@@ -950,6 +692,7 @@ class MainProtocolTwoWayAnonWithErrorRequest final {
               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
   static void Decode(::fidl::Decoder* _decoder, MainProtocolTwoWayAnonWithErrorRequest* _value, size_t _offset);
   zx_status_t Clone(MainProtocolTwoWayAnonWithErrorRequest* _result) const;
+
  private:
   template <class T, class... Args>
   void Construct(T* p, Args&&... args) {
@@ -967,10 +710,10 @@ class MainProtocolTwoWayAnonWithErrorRequest final {
 
   static bool IsOrdinalKnown(uint64_t ordinal) {
     switch (ordinal) {
-    case 1:
-      return true;
-    default:
-      return false;
+      case 1:
+        return true;
+      default:
+        return false;
     }
   }
 
@@ -986,8 +729,6 @@ class MainProtocolTwoWayAnonWithErrorRequest final {
 
 using MainProtocolTwoWayAnonWithErrorRequestPtr = ::std::unique_ptr<MainProtocolTwoWayAnonWithErrorRequest>;
 
-
-
 class MainProtocol_TwoWayAnonWithError_Response final {
  public:
   static const fidl_type_t* FidlType;
@@ -998,12 +739,11 @@ class MainProtocol_TwoWayAnonWithError_Response final {
   MainProtocol_TwoWayAnonWithError_Response(MainProtocol_TwoWayAnonWithError_Response&&);
   MainProtocol_TwoWayAnonWithError_Response& operator=(MainProtocol_TwoWayAnonWithError_Response&&);
 
-  
   static MainProtocol_TwoWayAnonWithError_Response WithB(bool&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  kUnknown = 0,
-  
+    kUnknown = 0,
+
     kB = 1,  // 0x1
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
@@ -1020,12 +760,12 @@ class MainProtocol_TwoWayAnonWithError_Response final {
   }
 
   bool is_b() const { return tag_ == ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response::Tag::kB; }
-  
+
   bool& b() {
     EnsureStorageInitialized(::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response::Tag::kB);
     return b_;
   }
-  
+
   const bool& b() const {
     ZX_ASSERT(is_b());
     return b_;
@@ -1034,7 +774,6 @@ class MainProtocol_TwoWayAnonWithError_Response final {
   MainProtocol_TwoWayAnonWithError_Response& SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes);
 
   ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response::Tag Which() const {
-    
     switch (tag_) {
       case ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response::Tag::Invalid:
       case ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response::Tag::kB:
@@ -1042,7 +781,6 @@ class MainProtocol_TwoWayAnonWithError_Response final {
       default:
         return ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response::Tag::kUnknown;
     }
-    
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -1077,8 +815,6 @@ inline zx_status_t Clone(const ::test::protocollayouts::MainProtocol_TwoWayAnonW
 
 using MainProtocol_TwoWayAnonWithError_ResponsePtr = ::std::unique_ptr<MainProtocol_TwoWayAnonWithError_Response>;
 
-
-
 class MainProtocol_TwoWayAnonWithError_Result final {
  public:
   static const fidl_type_t* FidlType;
@@ -1089,14 +825,13 @@ class MainProtocol_TwoWayAnonWithError_Result final {
   MainProtocol_TwoWayAnonWithError_Result(MainProtocol_TwoWayAnonWithError_Result&&);
   MainProtocol_TwoWayAnonWithError_Result& operator=(MainProtocol_TwoWayAnonWithError_Result&&);
 
-  
   static MainProtocol_TwoWayAnonWithError_Result WithResponse(::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response&&);
   static MainProtocol_TwoWayAnonWithError_Result WithErr(uint32_t&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  
+
     kResponse = 1,  // 0x1
-    kErr = 2,  // 0x2
+    kErr = 2,       // 0x2
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
 
@@ -1112,12 +847,12 @@ class MainProtocol_TwoWayAnonWithError_Result final {
   }
 
   bool is_response() const { return tag_ == ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result::Tag::kResponse; }
-  
+
   ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response& response() {
     EnsureStorageInitialized(::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result::Tag::kResponse);
     return response_;
   }
-  
+
   const ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response& response() const {
     ZX_ASSERT(is_response());
     return response_;
@@ -1125,12 +860,12 @@ class MainProtocol_TwoWayAnonWithError_Result final {
   MainProtocol_TwoWayAnonWithError_Result& set_response(::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response value);
 
   bool is_err() const { return tag_ == ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result::Tag::kErr; }
-  
+
   uint32_t& err() {
     EnsureStorageInitialized(::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result::Tag::kErr);
     return err_;
   }
-  
+
   const uint32_t& err() const {
     ZX_ASSERT(is_err());
     return err_;
@@ -1138,9 +873,7 @@ class MainProtocol_TwoWayAnonWithError_Result final {
   MainProtocol_TwoWayAnonWithError_Result& set_err(uint32_t value);
 
   ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result::Tag Which() const {
-    
     return ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result::Tag(tag_);
-    
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -1154,7 +887,7 @@ class MainProtocol_TwoWayAnonWithError_Result final {
     set_response(::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response{std::move(result.value)});
   }
   MainProtocol_TwoWayAnonWithError_Result(fpromise::error_result<uint32_t>&& result) {
-      set_err(std::move(result.error));
+    set_err(std::move(result.error));
   }
   MainProtocol_TwoWayAnonWithError_Result(fpromise::result<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
@@ -1190,8 +923,6 @@ inline zx_status_t Clone(const ::test::protocollayouts::MainProtocol_TwoWayAnonW
 
 using MainProtocol_TwoWayAnonWithError_ResultPtr = ::std::unique_ptr<MainProtocol_TwoWayAnonWithError_Result>;
 
-
-
 class MainProtocolOnAnonRequest final {
  public:
   static const fidl_type_t* FidlType;
@@ -1202,12 +933,11 @@ class MainProtocolOnAnonRequest final {
   MainProtocolOnAnonRequest(MainProtocolOnAnonRequest&&);
   MainProtocolOnAnonRequest& operator=(MainProtocolOnAnonRequest&&);
 
-  
   static MainProtocolOnAnonRequest WithB(bool&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  kUnknown = 0,
-  
+    kUnknown = 0,
+
     kB = 1,  // 0x1
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
@@ -1224,12 +954,12 @@ class MainProtocolOnAnonRequest final {
   }
 
   bool is_b() const { return tag_ == ::test::protocollayouts::MainProtocolOnAnonRequest::Tag::kB; }
-  
+
   bool& b() {
     EnsureStorageInitialized(::test::protocollayouts::MainProtocolOnAnonRequest::Tag::kB);
     return b_;
   }
-  
+
   const bool& b() const {
     ZX_ASSERT(is_b());
     return b_;
@@ -1238,7 +968,6 @@ class MainProtocolOnAnonRequest final {
   MainProtocolOnAnonRequest& SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes);
 
   ::test::protocollayouts::MainProtocolOnAnonRequest::Tag Which() const {
-    
     switch (tag_) {
       case ::test::protocollayouts::MainProtocolOnAnonRequest::Tag::Invalid:
       case ::test::protocollayouts::MainProtocolOnAnonRequest::Tag::kB:
@@ -1246,7 +975,6 @@ class MainProtocolOnAnonRequest final {
       default:
         return ::test::protocollayouts::MainProtocolOnAnonRequest::Tag::kUnknown;
     }
-    
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -1281,236 +1009,28 @@ inline zx_status_t Clone(const ::test::protocollayouts::MainProtocolOnAnonReques
 
 using MainProtocolOnAnonRequestPtr = ::std::unique_ptr<MainProtocolOnAnonRequest>;
 
-
-
-class MainProtocol_OnAnonWithError_Response final {
- public:
-  static const fidl_type_t* FidlType;
-  /// Returns whether no field is set.
-  bool IsEmpty() const;
-  
-  const uint16_t& a() const {
-    ZX_ASSERT(field_presence_.IsSet<0>());
-    return a_value_.value;
-  }
-  bool has_a() const {
-    return field_presence_.IsSet<0>();
-  }
-  
-  uint16_t* mutable_a() {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&a_value_.value);
-    }
-    return &a_value_.value;
-  }
-  MainProtocol_OnAnonWithError_Response& set_a(uint16_t _value);
-  void clear_a() {
-    if (!field_presence_.IsSet<0>()) {
-      return;
-    }
-    field_presence_.Clear<0>();
-    Destruct(&a_value_.value);
-  }
-
-  MainProtocol_OnAnonWithError_Response();
-  MainProtocol_OnAnonWithError_Response(MainProtocol_OnAnonWithError_Response&& other);
-  ~MainProtocol_OnAnonWithError_Response();
-  MainProtocol_OnAnonWithError_Response& operator=(MainProtocol_OnAnonWithError_Response&& other);
-
-  static inline ::std::unique_ptr<MainProtocol_OnAnonWithError_Response> New() { return ::std::make_unique<MainProtocol_OnAnonWithError_Response>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, MainProtocol_OnAnonWithError_Response* _value, size_t _offset);
-  zx_status_t Clone(MainProtocol_OnAnonWithError_Response* _result) const;
- private:
-  template <class T, class... Args>
-  void Construct(T* p, Args&&... args) {
-    new (p) T(std::forward<Args>(args)...);
-  }
-
-  template <class T>
-  void Destruct(T* p) {
-    p->~T();
-  }
-
-  size_t MaxOrdinal() const {
-    return static_cast<size_t>(field_presence_.MaxSetIndex()) + std::size_t{1};
-  }
-
-  static bool IsOrdinalKnown(uint64_t ordinal) {
-    switch (ordinal) {
-    case 1:
-      return true;
-    default:
-      return false;
-    }
-  }
-
-  ::fidl::internal::BitSet<1> field_presence_;
-  union ValueUnion_a {
-    ValueUnion_a() {}
-    ~ValueUnion_a() {}
-
-    uint16_t value;
-  };
-  ValueUnion_a a_value_;
-};
-
-using MainProtocol_OnAnonWithError_ResponsePtr = ::std::unique_ptr<MainProtocol_OnAnonWithError_Response>;
-
-
-
-class MainProtocol_OnAnonWithError_Result final {
- public:
-  static const fidl_type_t* FidlType;
-
-  MainProtocol_OnAnonWithError_Result();
-  ~MainProtocol_OnAnonWithError_Result();
-
-  MainProtocol_OnAnonWithError_Result(MainProtocol_OnAnonWithError_Result&&);
-  MainProtocol_OnAnonWithError_Result& operator=(MainProtocol_OnAnonWithError_Result&&);
-
-  
-  static MainProtocol_OnAnonWithError_Result WithResponse(::test::protocollayouts::MainProtocol_OnAnonWithError_Response&&);
-  static MainProtocol_OnAnonWithError_Result WithErr(uint32_t&&);
-
-  enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  
-    kResponse = 1,  // 0x1
-    kErr = 2,  // 0x2
-    Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
-  };
-
-  static inline ::std::unique_ptr<MainProtocol_OnAnonWithError_Result> New() { return ::std::make_unique<MainProtocol_OnAnonWithError_Result>(); }
-
-  void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, MainProtocol_OnAnonWithError_Result* value, size_t offset);
-  zx_status_t Clone(MainProtocol_OnAnonWithError_Result* result) const;
-
-  bool has_invalid_tag() const {
-    return tag_ == Invalid;
-  }
-
-  bool is_response() const { return tag_ == ::test::protocollayouts::MainProtocol_OnAnonWithError_Result::Tag::kResponse; }
-  
-  ::test::protocollayouts::MainProtocol_OnAnonWithError_Response& response() {
-    EnsureStorageInitialized(::test::protocollayouts::MainProtocol_OnAnonWithError_Result::Tag::kResponse);
-    return response_;
-  }
-  
-  const ::test::protocollayouts::MainProtocol_OnAnonWithError_Response& response() const {
-    ZX_ASSERT(is_response());
-    return response_;
-  }
-  MainProtocol_OnAnonWithError_Result& set_response(::test::protocollayouts::MainProtocol_OnAnonWithError_Response value);
-
-  bool is_err() const { return tag_ == ::test::protocollayouts::MainProtocol_OnAnonWithError_Result::Tag::kErr; }
-  
-  uint32_t& err() {
-    EnsureStorageInitialized(::test::protocollayouts::MainProtocol_OnAnonWithError_Result::Tag::kErr);
-    return err_;
-  }
-  
-  const uint32_t& err() const {
-    ZX_ASSERT(is_err());
-    return err_;
-  }
-  MainProtocol_OnAnonWithError_Result& set_err(uint32_t value);
-
-  ::test::protocollayouts::MainProtocol_OnAnonWithError_Result::Tag Which() const {
-    
-    return ::test::protocollayouts::MainProtocol_OnAnonWithError_Result::Tag(tag_);
-    
-  }
-
-  // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
-  // access to the raw integral ordinal value.
-  fidl_xunion_tag_t Ordinal() const {
-    return tag_;
-  }
-
-  friend ::fidl::Equality<::test::protocollayouts::MainProtocol_OnAnonWithError_Result>;
-  MainProtocol_OnAnonWithError_Result(fpromise::ok_result<::test::protocollayouts::MainProtocol_OnAnonWithError_Response>&& result) {
-    set_response(::test::protocollayouts::MainProtocol_OnAnonWithError_Response{std::move(result.value)});
-  }
-  MainProtocol_OnAnonWithError_Result(fpromise::error_result<uint32_t>&& result) {
-      set_err(std::move(result.error));
-  }
-  MainProtocol_OnAnonWithError_Result(fpromise::result<::test::protocollayouts::MainProtocol_OnAnonWithError_Response, uint32_t>&& result) {
-    ZX_ASSERT(!result.is_pending());
-    if (result.is_ok()) {
-      set_response(::test::protocollayouts::MainProtocol_OnAnonWithError_Response{result.take_value()});
-    } else {
-      set_err(result.take_error());
-    }
-  }
-  operator fpromise::result<::test::protocollayouts::MainProtocol_OnAnonWithError_Response, uint32_t>() && {
-    if (is_err()) {
-      return fpromise::error(err());
-    }
-    ::std::tuple<::test::protocollayouts::MainProtocol_OnAnonWithError_Response> value_tuple = std::move(response());
-    return fpromise::ok(std::move(std::get<0>(value_tuple)));
-  }
-
- private:
-  void Destroy();
-  void EnsureStorageInitialized(::fidl_xunion_tag_t tag);
-
-  ::fidl_xunion_tag_t tag_ = static_cast<fidl_xunion_tag_t>(::test::protocollayouts::MainProtocol_OnAnonWithError_Result::Tag::Invalid);
-  union {
-    ::test::protocollayouts::MainProtocol_OnAnonWithError_Response response_;
-    uint32_t err_;
-  };
-};
-
-inline zx_status_t Clone(const ::test::protocollayouts::MainProtocol_OnAnonWithError_Result& value,
-                         ::test::protocollayouts::MainProtocol_OnAnonWithError_Result* result) {
-  return value.Clone(result);
-}
-
-using MainProtocol_OnAnonWithError_ResultPtr = ::std::unique_ptr<MainProtocol_OnAnonWithError_Result>;
-
-
 #ifdef __Fuchsia__
 
-  namespace _internal {
+namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolOneWayAnonComposedRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolTwoWayAnonComposedRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ImportTablePayloadTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ImportUnionPayloadTable;
-  
-  
-  
-  
-  
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_LocalTablePayloadTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_LocalUnionPayloadTable;
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolOneWayAnonRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayAnonRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayAnonWithErrorRequestTable;
-  
-  
 
 }  // namespace _internal
 
@@ -1519,148 +1039,113 @@ class MainProtocol_RequestEncoder {
   static ::fidl::HLCPPOutgoingMessage OneWayAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ComposedProtocolOneWayAnonComposedRequest* ComposedProtocolOneWayAnonComposedRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolOneWayAnonComposedRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ComposedProtocolTwoWayAnonComposedRequest* ComposedProtocolTwoWayAnonComposedRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolTwoWayAnonComposedRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest* ComposedProtocolTwoWayAnonComposedWithErrorRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolTwoWayAnonComposedWithErrorRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ImportTablePayload* ImportTablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ImportTablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ImportUnionPayload* ImportUnionPayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ImportUnionPayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ImportTablePayload* ImportTablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ImportTablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayImport(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ImportTablePayload* ImportTablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ImportTablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayImport(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ImportUnionPayload* ImportUnionPayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ImportUnionPayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayImportWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ImportTablePayload* ImportTablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ImportTablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayLocal(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::LocalTablePayload* LocalTablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, LocalTablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayLocal(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::LocalUnionPayload* LocalUnionPayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, LocalUnionPayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayLocalWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::LocalTablePayload* LocalTablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, LocalTablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayAnon(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::MainProtocolOneWayAnonRequest* MainProtocolOneWayAnonRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocolOneWayAnonRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnon(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::MainProtocolTwoWayAnonRequest* MainProtocolTwoWayAnonRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocolTwoWayAnonRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::MainProtocolTwoWayAnonWithErrorRequest* MainProtocolTwoWayAnonWithErrorRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocolTwoWayAnonWithErrorRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
 };
-  
-  namespace _internal {
+
+namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolTwoWayAnonComposedResponseTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolOnAnonComposedRequestTable;
-  
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocol_OnAnonComposedWithError_ResultTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
-  
-  
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocol_OnNamedComposedWithError_ResultTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_TwoWayImportWithError_ResultTable;
-  
-  
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_OnImportWithError_ResultTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_TwoWayLocalWithError_ResultTable;
-  
-  
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_OnLocalWithError_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayAnonResponseTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_TwoWayAnonWithError_ResultTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnAnonRequestTable;
-  
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_OnAnonWithError_ResultTable;
 
 }  // namespace _internal
 
@@ -1669,140 +1154,90 @@ class MainProtocol_ResponseEncoder {
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ComposedProtocolTwoWayAnonComposedResponse* ComposedProtocolTwoWayAnonComposedResponse) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolTwoWayAnonComposedResponse, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ComposedProtocol_TwoWayAnonComposedWithError_Result* ComposedProtocol_TwoWayAnonComposedWithError_Result) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocol_TwoWayAnonComposedWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ComposedProtocolOnAnonComposedRequest* ComposedProtocolOnAnonComposedRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolOnAnonComposedRequest, 0 + sizeof(fidl_message_header_t));
-    
-
-    return _encoder->GetMessage();
-  }
-  static ::fidl::HLCPPOutgoingMessage OnAnonComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ComposedProtocol_OnAnonComposedWithError_Result* ComposedProtocol_OnAnonComposedWithError_Result) {
-    _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, ComposedProtocol_OnAnonComposedWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ImportTablePayload* ImportTablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ImportTablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ComposedProtocol_TwoWayNamedComposedWithError_Result* ComposedProtocol_TwoWayNamedComposedWithError_Result) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocol_TwoWayNamedComposedWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ImportUnionPayload* ImportUnionPayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ImportUnionPayload, 0 + sizeof(fidl_message_header_t));
-    
-
-    return _encoder->GetMessage();
-  }
-  static ::fidl::HLCPPOutgoingMessage OnNamedComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ComposedProtocol_OnNamedComposedWithError_Result* ComposedProtocol_OnNamedComposedWithError_Result) {
-    _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, ComposedProtocol_OnNamedComposedWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayImport(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ImportTablePayload* ImportTablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ImportTablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayImportWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result* MainProtocol_TwoWayImportWithError_Result) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocol_TwoWayImportWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnImport(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ImportUnionPayload* ImportUnionPayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ImportUnionPayload, 0 + sizeof(fidl_message_header_t));
-    
-
-    return _encoder->GetMessage();
-  }
-  static ::fidl::HLCPPOutgoingMessage OnImportWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::MainProtocol_OnImportWithError_Result* MainProtocol_OnImportWithError_Result) {
-    _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, MainProtocol_OnImportWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayLocal(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::LocalTablePayload* LocalTablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, LocalTablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayLocalWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result* MainProtocol_TwoWayLocalWithError_Result) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocol_TwoWayLocalWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnLocal(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::LocalUnionPayload* LocalUnionPayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, LocalUnionPayload, 0 + sizeof(fidl_message_header_t));
-    
-
-    return _encoder->GetMessage();
-  }
-  static ::fidl::HLCPPOutgoingMessage OnLocalWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::MainProtocol_OnLocalWithError_Result* MainProtocol_OnLocalWithError_Result) {
-    _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, MainProtocol_OnLocalWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnon(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::MainProtocolTwoWayAnonResponse* MainProtocolTwoWayAnonResponse) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocolTwoWayAnonResponse, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result* MainProtocol_TwoWayAnonWithError_Result) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocol_TwoWayAnonWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnAnon(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::MainProtocolOnAnonRequest* MainProtocolOnAnonRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocolOnAnonRequest, 0 + sizeof(fidl_message_header_t));
-    
-
-    return _encoder->GetMessage();
-  }
-  static ::fidl::HLCPPOutgoingMessage OnAnonWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::MainProtocol_OnAnonWithError_Result* MainProtocol_OnAnonWithError_Result) {
-    _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, MainProtocol_OnAnonWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
@@ -1810,25 +1245,21 @@ class MainProtocol_ResponseEncoder {
 
 #endif  // __Fuchsia__
 
-
-
 #ifdef __Fuchsia__
 
-  namespace _internal {
+namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolFlexibleOneWayRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolFlexibleTwoWayNoErrorRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolFlexibleTwoWayWithErrorRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolStrictOneWayRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayNoErrorRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayWithErrorRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ImportStructPayloadTable;
 
 }  // namespace _internal
@@ -1838,68 +1269,59 @@ class OpenProtocol_RequestEncoder {
   static ::fidl::HLCPPOutgoingMessage FlexibleOneWay(::fidl::MessageEncoder* _encoder, int32_t* value) {
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, value, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleTwoWayNoError(::fidl::MessageEncoder* _encoder, int32_t* value) {
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, value, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleTwoWayWithError(::fidl::MessageEncoder* _encoder, int32_t* value) {
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, value, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictOneWay(::fidl::MessageEncoder* _encoder, int32_t* value) {
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, value, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayNoError(::fidl::MessageEncoder* _encoder, int32_t* value) {
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, value, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayWithError(::fidl::MessageEncoder* _encoder, int32_t* value) {
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, value, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleOneWayNamedPayload(::fidl::MessageEncoder* _encoder, int32_t* value) {
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, value, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
 };
-  
-  namespace _internal {
+
+namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayNoError_ResultTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayWithError_ResultTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolFlexibleEventRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayNoErrorResponseTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocol_StrictTwoWayWithError_ResultTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolStrictEventRequestTable;
-  
 
 }  // namespace _internal
 
@@ -1908,50 +1330,42 @@ class OpenProtocol_ResponseEncoder {
   static ::fidl::HLCPPOutgoingMessage FlexibleTwoWayNoError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ComposedOpenProtocol_FlexibleTwoWayNoError_Result* ComposedOpenProtocol_FlexibleTwoWayNoError_Result) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedOpenProtocol_FlexibleTwoWayNoError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleTwoWayWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ComposedOpenProtocol_FlexibleTwoWayWithError_Result* ComposedOpenProtocol_FlexibleTwoWayWithError_Result) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedOpenProtocol_FlexibleTwoWayWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage FlexibleEvent(::fidl::MessageEncoder* _encoder, int32_t* value) {
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, value, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayNoError(::fidl::MessageEncoder* _encoder, int32_t* value) {
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, value, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictTwoWayWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayouts::imported::ComposedOpenProtocol_StrictTwoWayWithError_Result* ComposedOpenProtocol_StrictTwoWayWithError_Result) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedOpenProtocol_StrictTwoWayWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage StrictEvent(::fidl::MessageEncoder* _encoder, int32_t* value) {
     _encoder->Alloc(4);
     ::fidl::Encode(_encoder, value, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
 };
 
 #endif  // __Fuchsia__
-
-
 
 }  // namespace protocollayouts
 }  // namespace test
@@ -1965,7 +1379,7 @@ inline zx_status_t Clone(const ::test::protocollayouts::LocalTablePayload& _valu
                          ::test::protocollayouts::LocalTablePayload* result) {
   return _value.Clone(result);
 }
-template<>
+template <>
 struct Equality<::test::protocollayouts::LocalTablePayload> {
   bool operator()(const ::test::protocollayouts::LocalTablePayload& _lhs, const ::test::protocollayouts::LocalTablePayload& _rhs) const {
     if (_lhs.has_a()) {
@@ -2018,7 +1432,7 @@ inline zx_status_t Clone(const ::test::protocollayouts::LocalUnionPayload& value
   return ::test::protocollayouts::Clone(value, result);
 }
 
-template<>
+template <>
 struct Equality<::test::protocollayouts::LocalUnionPayload> {
   bool operator()(const ::test::protocollayouts::LocalUnionPayload& _lhs, const ::test::protocollayouts::LocalUnionPayload& _rhs) const {
     if (_lhs.Ordinal() != _rhs.Ordinal()) {
@@ -2032,8 +1446,8 @@ struct Equality<::test::protocollayouts::LocalUnionPayload> {
         return ::fidl::Equals(_lhs.b_, _rhs.b_);
       default:
         return ::fidl::Equals(_lhs.unknown_data_, _rhs.unknown_data_);
-      }
     }
+  }
 };
 template <>
 struct IsFidlXUnion<::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result> : public std::true_type {};
@@ -2072,7 +1486,7 @@ inline zx_status_t Clone(const ::test::protocollayouts::MainProtocol_TwoWayImpor
   return ::test::protocollayouts::Clone(value, result);
 }
 
-template<>
+template <>
 struct Equality<::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result> {
   bool operator()(const ::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result& _lhs, const ::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result& _rhs) const {
     if (_lhs.Ordinal() != _rhs.Ordinal()) {
@@ -2086,68 +1500,11 @@ struct Equality<::test::protocollayouts::MainProtocol_TwoWayImportWithError_Resu
         return ::fidl::Equals(_lhs.response_, _rhs.response_);
       case ::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result::Tag::kErr:
         return ::fidl::Equals(_lhs.err_, _rhs.err_);
-      
+
       default:
         return false;
-      }
-    }
-};
-template <>
-struct IsFidlXUnion<::test::protocollayouts::MainProtocol_OnImportWithError_Result> : public std::true_type {};
-
-template <>
-struct CodingTraits<::test::protocollayouts::MainProtocol_OnImportWithError_Result>
-    : public EncodableCodingTraits<::test::protocollayouts::MainProtocol_OnImportWithError_Result, 16> {};
-
-template <>
-struct CodingTraits<std::unique_ptr<::test::protocollayouts::MainProtocol_OnImportWithError_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
-
-  static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::MainProtocol_OnImportWithError_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
-    auto&& p_xunion = *value;
-    if (p_xunion) {
-      p_xunion->Encode(encoder, offset);
     }
   }
-
-  static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayouts::MainProtocol_OnImportWithError_Result>* value, size_t offset) {
-    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
-    if (encoded->tag == 0) {
-      value->reset(nullptr);
-      return;
-    }
-
-    value->reset(new ::test::protocollayouts::MainProtocol_OnImportWithError_Result);
-
-    ::test::protocollayouts::MainProtocol_OnImportWithError_Result::Decode(_decoder, value->get(), offset);
-  }
-};
-
-inline zx_status_t Clone(const ::test::protocollayouts::MainProtocol_OnImportWithError_Result& value,
-                         ::test::protocollayouts::MainProtocol_OnImportWithError_Result* result) {
-  return ::test::protocollayouts::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::protocollayouts::MainProtocol_OnImportWithError_Result> {
-  bool operator()(const ::test::protocollayouts::MainProtocol_OnImportWithError_Result& _lhs, const ::test::protocollayouts::MainProtocol_OnImportWithError_Result& _rhs) const {
-    if (_lhs.Ordinal() != _rhs.Ordinal()) {
-      return false;
-    }
-
-    switch (_lhs.Ordinal()) {
-      case static_cast<fidl_xunion_tag_t>(::test::protocollayouts::MainProtocol_OnImportWithError_Result::Tag::Invalid):
-        return true;
-      case ::test::protocollayouts::MainProtocol_OnImportWithError_Result::Tag::kResponse:
-        return ::fidl::Equals(_lhs.response_, _rhs.response_);
-      case ::test::protocollayouts::MainProtocol_OnImportWithError_Result::Tag::kErr:
-        return ::fidl::Equals(_lhs.err_, _rhs.err_);
-      
-      default:
-        return false;
-      }
-    }
 };
 template <>
 struct IsFidlXUnion<::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result> : public std::true_type {};
@@ -2186,7 +1543,7 @@ inline zx_status_t Clone(const ::test::protocollayouts::MainProtocol_TwoWayLocal
   return ::test::protocollayouts::Clone(value, result);
 }
 
-template<>
+template <>
 struct Equality<::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result> {
   bool operator()(const ::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result& _lhs, const ::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result& _rhs) const {
     if (_lhs.Ordinal() != _rhs.Ordinal()) {
@@ -2200,68 +1557,11 @@ struct Equality<::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Resul
         return ::fidl::Equals(_lhs.response_, _rhs.response_);
       case ::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result::Tag::kErr:
         return ::fidl::Equals(_lhs.err_, _rhs.err_);
-      
+
       default:
         return false;
-      }
-    }
-};
-template <>
-struct IsFidlXUnion<::test::protocollayouts::MainProtocol_OnLocalWithError_Result> : public std::true_type {};
-
-template <>
-struct CodingTraits<::test::protocollayouts::MainProtocol_OnLocalWithError_Result>
-    : public EncodableCodingTraits<::test::protocollayouts::MainProtocol_OnLocalWithError_Result, 16> {};
-
-template <>
-struct CodingTraits<std::unique_ptr<::test::protocollayouts::MainProtocol_OnLocalWithError_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
-
-  static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::MainProtocol_OnLocalWithError_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
-    auto&& p_xunion = *value;
-    if (p_xunion) {
-      p_xunion->Encode(encoder, offset);
     }
   }
-
-  static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayouts::MainProtocol_OnLocalWithError_Result>* value, size_t offset) {
-    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
-    if (encoded->tag == 0) {
-      value->reset(nullptr);
-      return;
-    }
-
-    value->reset(new ::test::protocollayouts::MainProtocol_OnLocalWithError_Result);
-
-    ::test::protocollayouts::MainProtocol_OnLocalWithError_Result::Decode(_decoder, value->get(), offset);
-  }
-};
-
-inline zx_status_t Clone(const ::test::protocollayouts::MainProtocol_OnLocalWithError_Result& value,
-                         ::test::protocollayouts::MainProtocol_OnLocalWithError_Result* result) {
-  return ::test::protocollayouts::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::protocollayouts::MainProtocol_OnLocalWithError_Result> {
-  bool operator()(const ::test::protocollayouts::MainProtocol_OnLocalWithError_Result& _lhs, const ::test::protocollayouts::MainProtocol_OnLocalWithError_Result& _rhs) const {
-    if (_lhs.Ordinal() != _rhs.Ordinal()) {
-      return false;
-    }
-
-    switch (_lhs.Ordinal()) {
-      case static_cast<fidl_xunion_tag_t>(::test::protocollayouts::MainProtocol_OnLocalWithError_Result::Tag::Invalid):
-        return true;
-      case ::test::protocollayouts::MainProtocol_OnLocalWithError_Result::Tag::kResponse:
-        return ::fidl::Equals(_lhs.response_, _rhs.response_);
-      case ::test::protocollayouts::MainProtocol_OnLocalWithError_Result::Tag::kErr:
-        return ::fidl::Equals(_lhs.err_, _rhs.err_);
-      
-      default:
-        return false;
-      }
-    }
 };
 template <>
 struct CodingTraits<::test::protocollayouts::MainProtocolOneWayAnonRequest>
@@ -2271,7 +1571,7 @@ inline zx_status_t Clone(const ::test::protocollayouts::MainProtocolOneWayAnonRe
                          ::test::protocollayouts::MainProtocolOneWayAnonRequest* result) {
   return _value.Clone(result);
 }
-template<>
+template <>
 struct Equality<::test::protocollayouts::MainProtocolOneWayAnonRequest> {
   bool operator()(const ::test::protocollayouts::MainProtocolOneWayAnonRequest& _lhs, const ::test::protocollayouts::MainProtocolOneWayAnonRequest& _rhs) const {
     if (_lhs.has_a()) {
@@ -2324,7 +1624,7 @@ inline zx_status_t Clone(const ::test::protocollayouts::MainProtocolTwoWayAnonRe
   return ::test::protocollayouts::Clone(value, result);
 }
 
-template<>
+template <>
 struct Equality<::test::protocollayouts::MainProtocolTwoWayAnonRequest> {
   bool operator()(const ::test::protocollayouts::MainProtocolTwoWayAnonRequest& _lhs, const ::test::protocollayouts::MainProtocolTwoWayAnonRequest& _rhs) const {
     if (_lhs.Ordinal() != _rhs.Ordinal()) {
@@ -2338,8 +1638,8 @@ struct Equality<::test::protocollayouts::MainProtocolTwoWayAnonRequest> {
         return ::fidl::Equals(_lhs.b_, _rhs.b_);
       default:
         return ::fidl::Equals(_lhs.unknown_data_, _rhs.unknown_data_);
-      }
     }
+  }
 };
 template <>
 struct CodingTraits<::test::protocollayouts::MainProtocolTwoWayAnonResponse>
@@ -2349,7 +1649,7 @@ inline zx_status_t Clone(const ::test::protocollayouts::MainProtocolTwoWayAnonRe
                          ::test::protocollayouts::MainProtocolTwoWayAnonResponse* result) {
   return _value.Clone(result);
 }
-template<>
+template <>
 struct Equality<::test::protocollayouts::MainProtocolTwoWayAnonResponse> {
   bool operator()(const ::test::protocollayouts::MainProtocolTwoWayAnonResponse& _lhs, const ::test::protocollayouts::MainProtocolTwoWayAnonResponse& _rhs) const {
     if (_lhs.has_a()) {
@@ -2373,7 +1673,7 @@ inline zx_status_t Clone(const ::test::protocollayouts::MainProtocolTwoWayAnonWi
                          ::test::protocollayouts::MainProtocolTwoWayAnonWithErrorRequest* result) {
   return _value.Clone(result);
 }
-template<>
+template <>
 struct Equality<::test::protocollayouts::MainProtocolTwoWayAnonWithErrorRequest> {
   bool operator()(const ::test::protocollayouts::MainProtocolTwoWayAnonWithErrorRequest& _lhs, const ::test::protocollayouts::MainProtocolTwoWayAnonWithErrorRequest& _rhs) const {
     if (_lhs.has_a()) {
@@ -2426,7 +1726,7 @@ inline zx_status_t Clone(const ::test::protocollayouts::MainProtocol_TwoWayAnonW
   return ::test::protocollayouts::Clone(value, result);
 }
 
-template<>
+template <>
 struct Equality<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response> {
   bool operator()(const ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response& _lhs, const ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response& _rhs) const {
     if (_lhs.Ordinal() != _rhs.Ordinal()) {
@@ -2440,8 +1740,8 @@ struct Equality<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Respon
         return ::fidl::Equals(_lhs.b_, _rhs.b_);
       default:
         return ::fidl::Equals(_lhs.unknown_data_, _rhs.unknown_data_);
-      }
     }
+  }
 };
 template <>
 struct IsFidlXUnion<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result> : public std::true_type {};
@@ -2480,7 +1780,7 @@ inline zx_status_t Clone(const ::test::protocollayouts::MainProtocol_TwoWayAnonW
   return ::test::protocollayouts::Clone(value, result);
 }
 
-template<>
+template <>
 struct Equality<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result> {
   bool operator()(const ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result& _lhs, const ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result& _rhs) const {
     if (_lhs.Ordinal() != _rhs.Ordinal()) {
@@ -2494,11 +1794,11 @@ struct Equality<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result
         return ::fidl::Equals(_lhs.response_, _rhs.response_);
       case ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result::Tag::kErr:
         return ::fidl::Equals(_lhs.err_, _rhs.err_);
-      
+
       default:
         return false;
-      }
     }
+  }
 };
 template <>
 struct IsFidlXUnion<::test::protocollayouts::MainProtocolOnAnonRequest> : public std::true_type {};
@@ -2537,7 +1837,7 @@ inline zx_status_t Clone(const ::test::protocollayouts::MainProtocolOnAnonReques
   return ::test::protocollayouts::Clone(value, result);
 }
 
-template<>
+template <>
 struct Equality<::test::protocollayouts::MainProtocolOnAnonRequest> {
   bool operator()(const ::test::protocollayouts::MainProtocolOnAnonRequest& _lhs, const ::test::protocollayouts::MainProtocolOnAnonRequest& _rhs) const {
     if (_lhs.Ordinal() != _rhs.Ordinal()) {
@@ -2551,89 +1851,8 @@ struct Equality<::test::protocollayouts::MainProtocolOnAnonRequest> {
         return ::fidl::Equals(_lhs.b_, _rhs.b_);
       default:
         return ::fidl::Equals(_lhs.unknown_data_, _rhs.unknown_data_);
-      }
-    }
-};
-template <>
-struct CodingTraits<::test::protocollayouts::MainProtocol_OnAnonWithError_Response>
-    : public EncodableCodingTraits<::test::protocollayouts::MainProtocol_OnAnonWithError_Response, 16> {};
-
-inline zx_status_t Clone(const ::test::protocollayouts::MainProtocol_OnAnonWithError_Response& _value,
-                         ::test::protocollayouts::MainProtocol_OnAnonWithError_Response* result) {
-  return _value.Clone(result);
-}
-template<>
-struct Equality<::test::protocollayouts::MainProtocol_OnAnonWithError_Response> {
-  bool operator()(const ::test::protocollayouts::MainProtocol_OnAnonWithError_Response& _lhs, const ::test::protocollayouts::MainProtocol_OnAnonWithError_Response& _rhs) const {
-    if (_lhs.has_a()) {
-      if (!_rhs.has_a()) {
-        return false;
-      }
-      if (!::fidl::Equals(_lhs.a(), _rhs.a())) {
-        return false;
-      }
-    } else if (_rhs.has_a()) {
-      return false;
-    }
-    return true;
-  }
-};
-template <>
-struct IsFidlXUnion<::test::protocollayouts::MainProtocol_OnAnonWithError_Result> : public std::true_type {};
-
-template <>
-struct CodingTraits<::test::protocollayouts::MainProtocol_OnAnonWithError_Result>
-    : public EncodableCodingTraits<::test::protocollayouts::MainProtocol_OnAnonWithError_Result, 16> {};
-
-template <>
-struct CodingTraits<std::unique_ptr<::test::protocollayouts::MainProtocol_OnAnonWithError_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
-
-  static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::MainProtocol_OnAnonWithError_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
-    auto&& p_xunion = *value;
-    if (p_xunion) {
-      p_xunion->Encode(encoder, offset);
     }
   }
-
-  static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayouts::MainProtocol_OnAnonWithError_Result>* value, size_t offset) {
-    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
-    if (encoded->tag == 0) {
-      value->reset(nullptr);
-      return;
-    }
-
-    value->reset(new ::test::protocollayouts::MainProtocol_OnAnonWithError_Result);
-
-    ::test::protocollayouts::MainProtocol_OnAnonWithError_Result::Decode(_decoder, value->get(), offset);
-  }
-};
-
-inline zx_status_t Clone(const ::test::protocollayouts::MainProtocol_OnAnonWithError_Result& value,
-                         ::test::protocollayouts::MainProtocol_OnAnonWithError_Result* result) {
-  return ::test::protocollayouts::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::protocollayouts::MainProtocol_OnAnonWithError_Result> {
-  bool operator()(const ::test::protocollayouts::MainProtocol_OnAnonWithError_Result& _lhs, const ::test::protocollayouts::MainProtocol_OnAnonWithError_Result& _rhs) const {
-    if (_lhs.Ordinal() != _rhs.Ordinal()) {
-      return false;
-    }
-
-    switch (_lhs.Ordinal()) {
-      case static_cast<fidl_xunion_tag_t>(::test::protocollayouts::MainProtocol_OnAnonWithError_Result::Tag::Invalid):
-        return true;
-      case ::test::protocollayouts::MainProtocol_OnAnonWithError_Result::Tag::kResponse:
-        return ::fidl::Equals(_lhs.response_, _rhs.response_);
-      case ::test::protocollayouts::MainProtocol_OnAnonWithError_Result::Tag::kErr:
-        return ::fidl::Equals(_lhs.err_, _rhs.err_);
-      
-      default:
-        return false;
-      }
-    }
 };
 
 //
@@ -2671,10 +1890,6 @@ constexpr uint64_t kMainProtocol_OnAnonComposed_Ordinal = 0x7fa8a0bf08128a0blu;
 
 constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnonComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-constexpr uint64_t kMainProtocol_OnAnonComposedWithError_Ordinal = 0x9e24af9a2790a3blu;
-
-constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnonComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
 constexpr uint64_t kMainProtocol_OneWayNamedComposed_Ordinal = 0x5d78ce13958eee58lu;
 
 constexpr ::fidl::MessageDynamicFlags kMainProtocol_OneWayNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -2690,10 +1905,6 @@ constexpr ::fidl::MessageDynamicFlags kMainProtocol_TwoWayNamedComposedWithError
 constexpr uint64_t kMainProtocol_OnNamedComposed_Ordinal = 0x5e68f92a5b28cdealu;
 
 constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-constexpr uint64_t kMainProtocol_OnNamedComposedWithError_Ordinal = 0x67eb74dad2a05c0blu;
-
-constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnNamedComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 constexpr uint64_t kMainProtocol_OneWayImport_Ordinal = 0x530db65f2691d3blu;
 
@@ -2711,10 +1922,6 @@ constexpr uint64_t kMainProtocol_OnImport_Ordinal = 0x5b61e3156b09acd0lu;
 
 constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnImport_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-constexpr uint64_t kMainProtocol_OnImportWithError_Ordinal = 0xf988d72f8ee4fd7lu;
-
-constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnImportWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
 constexpr uint64_t kMainProtocol_OneWayLocal_Ordinal = 0x54759b55efd60f43lu;
 
 constexpr ::fidl::MessageDynamicFlags kMainProtocol_OneWayLocal_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -2731,10 +1938,6 @@ constexpr uint64_t kMainProtocol_OnLocal_Ordinal = 0x3a46c48153f0437clu;
 
 constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnLocal_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-constexpr uint64_t kMainProtocol_OnLocalWithError_Ordinal = 0x79ac5bbdc7114e24lu;
-
-constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnLocalWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
 constexpr uint64_t kMainProtocol_OneWayAnon_Ordinal = 0x3a552f30c77c76eclu;
 
 constexpr ::fidl::MessageDynamicFlags kMainProtocol_OneWayAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -2750,14 +1953,9 @@ constexpr ::fidl::MessageDynamicFlags kMainProtocol_TwoWayAnonWithError_DynamicF
 constexpr uint64_t kMainProtocol_OnAnon_Ordinal = 0x64f7b1ec1ba0810blu;
 
 constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-constexpr uint64_t kMainProtocol_OnAnonWithError_Ordinal = 0x32f63a6e25a83699lu;
-
-constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnonWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;}  // namespace internal
+}  // namespace internal
 
 #endif  // __Fuchsia__
-
-
 
 #ifdef __Fuchsia__
 
@@ -2805,7 +2003,8 @@ constexpr ::fidl::MessageDynamicFlags kOpenProtocol_StrictEvent_DynamicFlags = :
 
 constexpr uint64_t kOpenProtocol_FlexibleOneWayNamedPayload_Ordinal = 0x152c0b4acb5c0570lu;
 
-constexpr ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleOneWayNamedPayload_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;}  // namespace internal
+constexpr ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleOneWayNamedPayload_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
+}  // namespace internal
 
 #endif  // __Fuchsia__
 
@@ -2818,78 +2017,66 @@ class MainProtocol {
   using EventSender_ = ::test::protocollayouts::MainProtocol_EventSender;
   using Sync_ = ::test::protocollayouts::MainProtocol_Sync;
   virtual ~MainProtocol();
-      
+
   virtual void OneWayAnonComposed(::test::protocollayouts::imported::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest) = 0;
   using TwoWayAnonComposedCallback =
       fit::function<void(::test::protocollayouts::imported::ComposedProtocolTwoWayAnonComposedResponse)>;
-      
+
   virtual void TwoWayAnonComposed(::test::protocollayouts::imported::ComposedProtocolTwoWayAnonComposedRequest ComposedProtocolTwoWayAnonComposedRequest, TwoWayAnonComposedCallback callback) = 0;
   using TwoWayAnonComposedWithErrorCallback =
       fit::function<void(::test::protocollayouts::imported::ComposedProtocol_TwoWayAnonComposedWithError_Result)>;
-      
+
   virtual void TwoWayAnonComposedWithError(::test::protocollayouts::imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest ComposedProtocolTwoWayAnonComposedWithErrorRequest, TwoWayAnonComposedWithErrorCallback callback) = 0;
   using OnAnonComposedCallback =
       fit::function<void(::test::protocollayouts::imported::ComposedProtocolOnAnonComposedRequest)>;
-  using OnAnonComposedWithErrorCallback =
-      fit::function<void(::test::protocollayouts::imported::ComposedProtocol_OnAnonComposedWithError_Result)>;
-      
+
   virtual void OneWayNamedComposed(::test::protocollayouts::imported::ImportTablePayload ImportTablePayload) = 0;
   using TwoWayNamedComposedCallback =
       fit::function<void(::test::protocollayouts::imported::ImportTablePayload)>;
-      
+
   virtual void TwoWayNamedComposed(::test::protocollayouts::imported::ImportUnionPayload ImportUnionPayload, TwoWayNamedComposedCallback callback) = 0;
   using TwoWayNamedComposedWithErrorCallback =
       fit::function<void(::test::protocollayouts::imported::ComposedProtocol_TwoWayNamedComposedWithError_Result)>;
-      
+
   virtual void TwoWayNamedComposedWithError(::test::protocollayouts::imported::ImportTablePayload ImportTablePayload, TwoWayNamedComposedWithErrorCallback callback) = 0;
   using OnNamedComposedCallback =
       fit::function<void(::test::protocollayouts::imported::ImportUnionPayload)>;
-  using OnNamedComposedWithErrorCallback =
-      fit::function<void(::test::protocollayouts::imported::ComposedProtocol_OnNamedComposedWithError_Result)>;
-      
+
   virtual void OneWayImport(::test::protocollayouts::imported::ImportTablePayload ImportTablePayload) = 0;
   using TwoWayImportCallback =
       fit::function<void(::test::protocollayouts::imported::ImportTablePayload)>;
-      
+
   virtual void TwoWayImport(::test::protocollayouts::imported::ImportUnionPayload ImportUnionPayload, TwoWayImportCallback callback) = 0;
   using TwoWayImportWithErrorCallback =
       fit::function<void(::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result)>;
-      
+
   virtual void TwoWayImportWithError(::test::protocollayouts::imported::ImportTablePayload ImportTablePayload, TwoWayImportWithErrorCallback callback) = 0;
   using OnImportCallback =
       fit::function<void(::test::protocollayouts::imported::ImportUnionPayload)>;
-  using OnImportWithErrorCallback =
-      fit::function<void(::test::protocollayouts::MainProtocol_OnImportWithError_Result)>;
-      
+
   virtual void OneWayLocal(::test::protocollayouts::LocalTablePayload LocalTablePayload) = 0;
   using TwoWayLocalCallback =
       fit::function<void(::test::protocollayouts::LocalTablePayload)>;
-      
+
   virtual void TwoWayLocal(::test::protocollayouts::LocalUnionPayload LocalUnionPayload, TwoWayLocalCallback callback) = 0;
   using TwoWayLocalWithErrorCallback =
       fit::function<void(::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result)>;
-      
+
   virtual void TwoWayLocalWithError(::test::protocollayouts::LocalTablePayload LocalTablePayload, TwoWayLocalWithErrorCallback callback) = 0;
   using OnLocalCallback =
       fit::function<void(::test::protocollayouts::LocalUnionPayload)>;
-  using OnLocalWithErrorCallback =
-      fit::function<void(::test::protocollayouts::MainProtocol_OnLocalWithError_Result)>;
-      
+
   virtual void OneWayAnon(::test::protocollayouts::MainProtocolOneWayAnonRequest MainProtocolOneWayAnonRequest) = 0;
   using TwoWayAnonCallback =
       fit::function<void(::test::protocollayouts::MainProtocolTwoWayAnonResponse)>;
-      
+
   virtual void TwoWayAnon(::test::protocollayouts::MainProtocolTwoWayAnonRequest MainProtocolTwoWayAnonRequest, TwoWayAnonCallback callback) = 0;
   using TwoWayAnonWithErrorCallback =
       fit::function<void(::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result)>;
-      
+
   virtual void TwoWayAnonWithError(::test::protocollayouts::MainProtocolTwoWayAnonWithErrorRequest MainProtocolTwoWayAnonWithErrorRequest, TwoWayAnonWithErrorCallback callback) = 0;
   using OnAnonCallback =
       fit::function<void(::test::protocollayouts::MainProtocolOnAnonRequest)>;
-  using OnAnonWithErrorCallback =
-      fit::function<void(::test::protocollayouts::MainProtocol_OnAnonWithError_Result)>;
-
-  
 };
 
 class MainProtocol_RequestDecoder {
@@ -2922,38 +2109,28 @@ class MainProtocol_ResponseDecoder {
   virtual void TwoWayAnonComposed(::test::protocollayouts::imported::ComposedProtocolTwoWayAnonComposedResponse ComposedProtocolTwoWayAnonComposedResponse) = 0;
   virtual void TwoWayAnonComposedWithError(::test::protocollayouts::imported::ComposedProtocol_TwoWayAnonComposedWithError_Result ComposedProtocol_TwoWayAnonComposedWithError_Result) = 0;
   virtual void OnAnonComposed(::test::protocollayouts::imported::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest) = 0;
-  virtual void OnAnonComposedWithError(::test::protocollayouts::imported::ComposedProtocol_OnAnonComposedWithError_Result ComposedProtocol_OnAnonComposedWithError_Result) = 0;
   virtual void TwoWayNamedComposed(::test::protocollayouts::imported::ImportTablePayload ImportTablePayload) = 0;
   virtual void TwoWayNamedComposedWithError(::test::protocollayouts::imported::ComposedProtocol_TwoWayNamedComposedWithError_Result ComposedProtocol_TwoWayNamedComposedWithError_Result) = 0;
   virtual void OnNamedComposed(::test::protocollayouts::imported::ImportUnionPayload ImportUnionPayload) = 0;
-  virtual void OnNamedComposedWithError(::test::protocollayouts::imported::ComposedProtocol_OnNamedComposedWithError_Result ComposedProtocol_OnNamedComposedWithError_Result) = 0;
   virtual void TwoWayImport(::test::protocollayouts::imported::ImportTablePayload ImportTablePayload) = 0;
   virtual void TwoWayImportWithError(::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result MainProtocol_TwoWayImportWithError_Result) = 0;
   virtual void OnImport(::test::protocollayouts::imported::ImportUnionPayload ImportUnionPayload) = 0;
-  virtual void OnImportWithError(::test::protocollayouts::MainProtocol_OnImportWithError_Result MainProtocol_OnImportWithError_Result) = 0;
   virtual void TwoWayLocal(::test::protocollayouts::LocalTablePayload LocalTablePayload) = 0;
   virtual void TwoWayLocalWithError(::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result MainProtocol_TwoWayLocalWithError_Result) = 0;
   virtual void OnLocal(::test::protocollayouts::LocalUnionPayload LocalUnionPayload) = 0;
-  virtual void OnLocalWithError(::test::protocollayouts::MainProtocol_OnLocalWithError_Result MainProtocol_OnLocalWithError_Result) = 0;
   virtual void TwoWayAnon(::test::protocollayouts::MainProtocolTwoWayAnonResponse MainProtocolTwoWayAnonResponse) = 0;
   virtual void TwoWayAnonWithError(::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result MainProtocol_TwoWayAnonWithError_Result) = 0;
   virtual void OnAnon(::test::protocollayouts::MainProtocolOnAnonRequest MainProtocolOnAnonRequest) = 0;
-  virtual void OnAnonWithError(::test::protocollayouts::MainProtocol_OnAnonWithError_Result MainProtocol_OnAnonWithError_Result) = 0;
 };
 
 class MainProtocol_EventSender {
  public:
   virtual ~MainProtocol_EventSender();
   virtual void OnAnonComposed(::test::protocollayouts::imported::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest) = 0;
-  virtual void OnAnonComposedWithError(::test::protocollayouts::imported::ComposedProtocol_OnAnonComposedWithError_Result ComposedProtocol_OnAnonComposedWithError_Result) = 0;
   virtual void OnNamedComposed(::test::protocollayouts::imported::ImportUnionPayload ImportUnionPayload) = 0;
-  virtual void OnNamedComposedWithError(::test::protocollayouts::imported::ComposedProtocol_OnNamedComposedWithError_Result ComposedProtocol_OnNamedComposedWithError_Result) = 0;
   virtual void OnImport(::test::protocollayouts::imported::ImportUnionPayload ImportUnionPayload) = 0;
-  virtual void OnImportWithError(::test::protocollayouts::MainProtocol_OnImportWithError_Result MainProtocol_OnImportWithError_Result) = 0;
   virtual void OnLocal(::test::protocollayouts::LocalUnionPayload LocalUnionPayload) = 0;
-  virtual void OnLocalWithError(::test::protocollayouts::MainProtocol_OnLocalWithError_Result MainProtocol_OnLocalWithError_Result) = 0;
   virtual void OnAnon(::test::protocollayouts::MainProtocolOnAnonRequest MainProtocolOnAnonRequest) = 0;
-  virtual void OnAnonWithError(::test::protocollayouts::MainProtocol_OnAnonWithError_Result MainProtocol_OnAnonWithError_Result) = 0;
 };
 
 class MainProtocol_Sync {
@@ -2990,7 +2167,6 @@ class MainProtocol_Proxy final : public ::fidl::internal::Proxy, public MainProt
   // cts-coverage-fidl-name:test.protocollayouts/MainProtocol.TwoWayAnonComposedWithError
   void TwoWayAnonComposedWithError(::test::protocollayouts::imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest ComposedProtocolTwoWayAnonComposedWithErrorRequest, TwoWayAnonComposedWithErrorCallback callback) override;
   OnAnonComposedCallback OnAnonComposed;
-  OnAnonComposedWithErrorCallback OnAnonComposedWithError;
   // cts-coverage-fidl-name:test.protocollayouts/MainProtocol.OneWayNamedComposed
   void OneWayNamedComposed(::test::protocollayouts::imported::ImportTablePayload ImportTablePayload) override;
   // cts-coverage-fidl-name:test.protocollayouts/MainProtocol.TwoWayNamedComposed
@@ -2998,7 +2174,6 @@ class MainProtocol_Proxy final : public ::fidl::internal::Proxy, public MainProt
   // cts-coverage-fidl-name:test.protocollayouts/MainProtocol.TwoWayNamedComposedWithError
   void TwoWayNamedComposedWithError(::test::protocollayouts::imported::ImportTablePayload ImportTablePayload, TwoWayNamedComposedWithErrorCallback callback) override;
   OnNamedComposedCallback OnNamedComposed;
-  OnNamedComposedWithErrorCallback OnNamedComposedWithError;
   // cts-coverage-fidl-name:test.protocollayouts/MainProtocol.OneWayImport
   void OneWayImport(::test::protocollayouts::imported::ImportTablePayload ImportTablePayload) override;
   // cts-coverage-fidl-name:test.protocollayouts/MainProtocol.TwoWayImport
@@ -3006,7 +2181,6 @@ class MainProtocol_Proxy final : public ::fidl::internal::Proxy, public MainProt
   // cts-coverage-fidl-name:test.protocollayouts/MainProtocol.TwoWayImportWithError
   void TwoWayImportWithError(::test::protocollayouts::imported::ImportTablePayload ImportTablePayload, TwoWayImportWithErrorCallback callback) override;
   OnImportCallback OnImport;
-  OnImportWithErrorCallback OnImportWithError;
   // cts-coverage-fidl-name:test.protocollayouts/MainProtocol.OneWayLocal
   void OneWayLocal(::test::protocollayouts::LocalTablePayload LocalTablePayload) override;
   // cts-coverage-fidl-name:test.protocollayouts/MainProtocol.TwoWayLocal
@@ -3014,7 +2188,6 @@ class MainProtocol_Proxy final : public ::fidl::internal::Proxy, public MainProt
   // cts-coverage-fidl-name:test.protocollayouts/MainProtocol.TwoWayLocalWithError
   void TwoWayLocalWithError(::test::protocollayouts::LocalTablePayload LocalTablePayload, TwoWayLocalWithErrorCallback callback) override;
   OnLocalCallback OnLocal;
-  OnLocalWithErrorCallback OnLocalWithError;
   // cts-coverage-fidl-name:test.protocollayouts/MainProtocol.OneWayAnon
   void OneWayAnon(::test::protocollayouts::MainProtocolOneWayAnonRequest MainProtocolOneWayAnonRequest) override;
   // cts-coverage-fidl-name:test.protocollayouts/MainProtocol.TwoWayAnon
@@ -3022,10 +2195,6 @@ class MainProtocol_Proxy final : public ::fidl::internal::Proxy, public MainProt
   // cts-coverage-fidl-name:test.protocollayouts/MainProtocol.TwoWayAnonWithError
   void TwoWayAnonWithError(::test::protocollayouts::MainProtocolTwoWayAnonWithErrorRequest MainProtocolTwoWayAnonWithErrorRequest, TwoWayAnonWithErrorCallback callback) override;
   OnAnonCallback OnAnon;
-  OnAnonWithErrorCallback OnAnonWithError;
-
-  
-
 
  private:
   MainProtocol_Proxy(const ::test::protocollayouts::MainProtocol_Proxy&) = delete;
@@ -3043,15 +2212,10 @@ class MainProtocol_Stub final : public ::fidl::internal::Stub, public ::test::pr
   zx_status_t Dispatch_(::fidl::HLCPPIncomingMessage message,
                         ::fidl::internal::PendingResponse response) override;
   void OnAnonComposed(::test::protocollayouts::imported::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest) override;
-  void OnAnonComposedWithError(::test::protocollayouts::imported::ComposedProtocol_OnAnonComposedWithError_Result ComposedProtocol_OnAnonComposedWithError_Result) override;
   void OnNamedComposed(::test::protocollayouts::imported::ImportUnionPayload ImportUnionPayload) override;
-  void OnNamedComposedWithError(::test::protocollayouts::imported::ComposedProtocol_OnNamedComposedWithError_Result ComposedProtocol_OnNamedComposedWithError_Result) override;
   void OnImport(::test::protocollayouts::imported::ImportUnionPayload ImportUnionPayload) override;
-  void OnImportWithError(::test::protocollayouts::MainProtocol_OnImportWithError_Result MainProtocol_OnImportWithError_Result) override;
   void OnLocal(::test::protocollayouts::LocalUnionPayload LocalUnionPayload) override;
-  void OnLocalWithError(::test::protocollayouts::MainProtocol_OnLocalWithError_Result MainProtocol_OnLocalWithError_Result) override;
   void OnAnon(::test::protocollayouts::MainProtocolOnAnonRequest MainProtocolOnAnonRequest) override;
-  void OnAnonWithError(::test::protocollayouts::MainProtocol_OnAnonWithError_Result MainProtocol_OnAnonWithError_Result) override;
 
  private:
   ::test::protocollayouts::MainProtocol_Stub::MainProtocol_clazz* impl_;
@@ -3092,7 +2256,7 @@ class MainProtocol_SyncProxy : public ::test::protocollayouts::MainProtocol_Sync
   // cts-coverage-fidl-name:test.protocollayouts/MainProtocol.TwoWayAnonWithError
   zx_status_t TwoWayAnonWithError(::test::protocollayouts::MainProtocolTwoWayAnonWithErrorRequest MainProtocolTwoWayAnonWithErrorRequest, ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result* out_MainProtocol_TwoWayAnonWithError_Result) override;
 
-  private:
+ private:
   ::fidl::internal::SynchronousProxy proxy_;
   friend class ::fidl::SynchronousInterfacePtr<MainProtocol>;
 };
@@ -3108,39 +2272,38 @@ class OpenProtocol {
   using EventSender_ = ::test::protocollayouts::OpenProtocol_EventSender;
   using Sync_ = ::test::protocollayouts::OpenProtocol_Sync;
   virtual ~OpenProtocol();
-      
+
   virtual void FlexibleOneWay(int32_t value) = 0;
   using FlexibleTwoWayNoErrorCallback =
       fit::function<void(::test::protocollayouts::imported::ComposedOpenProtocol_FlexibleTwoWayNoError_Result)>;
-      
+
   virtual void FlexibleTwoWayNoError(int32_t value, FlexibleTwoWayNoErrorCallback callback) = 0;
   using FlexibleTwoWayWithErrorCallback =
       fit::function<void(::test::protocollayouts::imported::ComposedOpenProtocol_FlexibleTwoWayWithError_Result)>;
-      
+
   virtual void FlexibleTwoWayWithError(int32_t value, FlexibleTwoWayWithErrorCallback callback) = 0;
   using FlexibleEventCallback =
       fit::function<void(int32_t)>;
-      
+
   virtual void StrictOneWay(int32_t value) = 0;
   using StrictTwoWayNoErrorCallback =
       fit::function<void(int32_t)>;
-      
+
   virtual void StrictTwoWayNoError(int32_t value, StrictTwoWayNoErrorCallback callback) = 0;
   using StrictTwoWayWithErrorCallback =
       fit::function<void(::test::protocollayouts::imported::ComposedOpenProtocol_StrictTwoWayWithError_Result)>;
-      
+
   virtual void StrictTwoWayWithError(int32_t value, StrictTwoWayWithErrorCallback callback) = 0;
   using StrictEventCallback =
       fit::function<void(int32_t)>;
-      
+
   virtual void FlexibleOneWayNamedPayload(int32_t value) = 0;
 
-  protected:
+ protected:
   // Allow the stub to access the handle_unknown_method method.
   friend class OpenProtocol_Stub;
 
   virtual void handle_unknown_method(uint64_t ordinal, bool method_has_response) = 0;
-  
 };
 
 class OpenProtocol_RequestDecoder {
@@ -3222,8 +2385,6 @@ class OpenProtocol_Proxy final : public ::fidl::internal::Proxy, public OpenProt
     // side, so it should never be called.
     ZX_PANIC("Unreachable: OpenProtocol_Proxy::handle_unknown_method should not be callable");
   }
-  
-
 
  private:
   OpenProtocol_Proxy(const ::test::protocollayouts::OpenProtocol_Proxy&) = delete;
@@ -3266,7 +2427,7 @@ class OpenProtocol_SyncProxy : public ::test::protocollayouts::OpenProtocol_Sync
   // cts-coverage-fidl-name:test.protocollayouts/OpenProtocol.FlexibleOneWayNamedPayload
   zx_status_t FlexibleOneWayNamedPayload(int32_t value) override;
 
-  private:
+ private:
   ::fidl::internal::SynchronousProxy proxy_;
   friend class ::fidl::SynchronousInterfacePtr<OpenProtocol>;
 };
@@ -3275,5 +2436,3 @@ class OpenProtocol_SyncProxy : public ::test::protocollayouts::OpenProtocol_Sync
 
 }  // namespace protocollayouts
 }  // namespace test
-
-

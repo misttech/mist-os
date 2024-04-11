@@ -1030,8 +1030,6 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
     if (auto* type_ctor = method.result_domain_error_type_ctor)
       ValidateDomainError(type_ctor);
     auto kind = method.kind();
-    if (kind == Protocol::Method::Kind::kEvent)
-      ValidateEventErrorSyntax(method);
     bool flexible = method.strictness == Strictness::kFlexible;
     bool two_way = kind == Protocol::Method::Kind::kTwoWay;
     if (flexible && two_way && openness != Openness::kOpen) {
@@ -1122,26 +1120,6 @@ void CompileStep::ValidateDomainError(const TypeConstructor* type_ctor) {
                            error_primitive->subtype != PrimitiveSubtype::kUint32)) {
     reporter()->Fail(ErrInvalidErrorType, type_ctor->span);
   }
-}
-
-void CompileStep::ValidateEventErrorSyntax(const Protocol::Method& event) {
-  if (!event.has_error)
-    return;
-  const auto& protocol = *event.owning_protocol;
-  const Library& library = *protocol.name.library();
-  // TODO(https://fxbug.dev/42180639): Migrate test libraries.
-  ZX_ASSERT(!library.name.empty());
-  if (library.name[0] == "test" || library.name[0] == "fidl") {
-    return;
-  }
-  // TODO(https://fxbug.dev/42182418): Migrate fuchsia.hardware.radar.
-  if (library.name.size() == 3) {
-    if (library.name[0] == "fuchsia" && library.name[1] == "hardware" &&
-        library.name[2] == "radar") {
-      return;
-    }
-  }
-  reporter()->Fail(ErrEventErrorSyntaxDeprecated, event.name, event.name.data());
 }
 
 void CompileStep::CompileService(Service* service_decl) {

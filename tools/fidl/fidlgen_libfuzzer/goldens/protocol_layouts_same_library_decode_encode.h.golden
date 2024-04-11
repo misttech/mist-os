@@ -11,7 +11,7 @@
 
 namespace fuzzing {
 
-inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 18>
+inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 14>
     test_protocollayoutssamelibrary_decoder_encoders = {
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_protocollayoutssamelibrary::wire::TablePayload",
@@ -62,18 +62,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 18>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest",
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = false,
@@ -108,18 +96,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 18>
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse, true>,
         },
 };
 

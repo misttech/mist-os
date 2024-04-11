@@ -50,9 +50,6 @@ template<>
 struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed> final { static constexpr uint64_t value = 5307191872315199016lu; };
 
 template<>
-struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError> final { static constexpr uint64_t value = 2988860281596185184lu; };
-
-template<>
 struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed> final { static constexpr uint64_t value = 1159174053475281336lu; };
 
 template<>
@@ -63,9 +60,6 @@ struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::Composed
 
 template<>
 struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed> final { static constexpr uint64_t value = 1712755118419701115lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError> final { static constexpr uint64_t value = 4609236429730196431lu; };
 
 #ifdef __Fuchsia__
 
@@ -173,24 +167,6 @@ struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::Comp
 
 
 template<>
-struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult;
-  using DomainError = uint32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed> {
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayoutssamelibrary::wire::TablePayload;
@@ -278,24 +254,6 @@ struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::Comp
     
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayoutssamelibrary::wire::UnionPayload;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult;
-  using DomainError = uint32_t;
 };
 
 
@@ -624,49 +582,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
 
 #ifdef __Fuchsia__
 template<>
-struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError> body;
-
-    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult)
-    : body{ ComposedProtocolOnAnonComposedWithErrorResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
 struct ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed> final {
   FIDL_ALIGNDECL
   fidl_message_header_t header;
@@ -949,49 +864,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
 #endif  // __Fuchsia__
 
 
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError> body;
-
-    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult)
-    : body{ ComposedProtocolOnNamedComposedWithErrorResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
 namespace fidl {
 
 
@@ -1187,32 +1059,6 @@ static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayou
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 3;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>> : public std::true_type {};
 template <>
 struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>> : public std::true_type {};
@@ -1402,32 +1248,6 @@ static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayou
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 3;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 }  // namespace fidl
 
     template<>
@@ -1498,7 +1318,7 @@ static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayou
   struct ::fidl::internal::IncomingEventsHandleStorage<::test_protocollayoutssamelibrary::ComposedProtocol> final :
       public ::fidl::internal::ChannelHandleStorageBase<::fidl::internal::IncomingEventsHandleStorage<::test_protocollayoutssamelibrary::ComposedProtocol>> {
    public:
-    static constexpr uint32_t kNumHandles = 64;
+    static constexpr uint32_t kNumHandles = 0;
 
     ::std::array<zx_handle_t, kNumHandles> handles_;
     ::std::array<fidl_channel_handle_metadata_t, kNumHandles> handle_metadata_;
@@ -1508,7 +1328,7 @@ static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayou
   struct ::fidl::internal::IncomingEventsStorage<::test_protocollayoutssamelibrary::ComposedProtocol> final :
       public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_protocollayoutssamelibrary::ComposedProtocol>> {
    public:
-    ::fidl::internal::BoxedMessageBuffer<ZX_CHANNEL_MAX_MSG_BYTES> bytes_;
+    ::fidl::internal::InlineMessageBuffer<32> bytes_;
     ::fidl::internal::IncomingEventsHandleStorage<::test_protocollayoutssamelibrary::ComposedProtocol> handles_storage_;
   };
 
@@ -1821,9 +1641,7 @@ public:
   WireEventHandlerInterface() = default;
   virtual ~WireEventHandlerInterface() = default;
     virtual void OnAnonComposed(::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>* event) = 0;
-    virtual void OnAnonComposedWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>* event) = 0;
     virtual void OnNamedComposed(::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed>* event) = 0;
-    virtual void OnNamedComposedWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>* event) = 0;
 };
 
 template<>
@@ -1832,9 +1650,7 @@ class ::fidl::WireAsyncEventHandler<::test_protocollayoutssamelibrary::ComposedP
  public:
   WireAsyncEventHandler() = default;
     void OnAnonComposed(::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>* event) override {}
-    void OnAnonComposedWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>* event) override {}
     void OnNamedComposed(::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed>* event) override {}
-    void OnNamedComposedWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>* event) override {}
 };
 
 
@@ -2239,9 +2055,6 @@ template<>
 struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed> final { static constexpr uint64_t value = 5307191872315199016lu; };
 
 template<>
-struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError> final { static constexpr uint64_t value = 2988860281596185184lu; };
-
-template<>
 struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed> final { static constexpr uint64_t value = 1159174053475281336lu; };
 
 template<>
@@ -2252,9 +2065,6 @@ struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::MainProt
 
 template<>
 struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed> final { static constexpr uint64_t value = 1712755118419701115lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError> final { static constexpr uint64_t value = 4609236429730196431lu; };
 
 template<>
 struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal> final { static constexpr uint64_t value = 4131125523789731521lu; };
@@ -2269,9 +2079,6 @@ template<>
 struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::MainProtocol::OnLocal> final { static constexpr uint64_t value = 8208103053879750285lu; };
 
 template<>
-struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError> final { static constexpr uint64_t value = 3291144184088828891lu; };
-
-template<>
 struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon> final { static constexpr uint64_t value = 8596232895075765804lu; };
 
 template<>
@@ -2282,9 +2089,6 @@ struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::MainProt
 
 template<>
 struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::MainProtocol::OnAnon> final { static constexpr uint64_t value = 977183060572945300lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError> final { static constexpr uint64_t value = 7374872280336235010lu; };
 
 #ifdef __Fuchsia__
 
@@ -2379,24 +2183,6 @@ struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::Main
     
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult;
-  using DomainError = uint32_t;
 };
 
 
@@ -2510,24 +2296,6 @@ struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::Main
 
 
 template<>
-struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult;
-  using DomainError = uint32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal> {
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayoutssamelibrary::wire::TablePayload;
@@ -2628,24 +2396,6 @@ struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::Main
 
 
 template<>
-struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult;
-  using DomainError = uint32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon> {
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest;
@@ -2733,24 +2483,6 @@ struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::Main
     
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult;
-  using DomainError = uint32_t;
 };
 
 
@@ -3079,49 +2811,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
 
 #ifdef __Fuchsia__
 template<>
-struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError> body;
-
-    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult)
-    : body{ ComposedProtocolOnAnonComposedWithErrorResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
 struct ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed> final {
   FIDL_ALIGNDECL
   fidl_message_header_t header;
@@ -3397,49 +3086,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     WireCodingTraits<::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError> body;
-
-    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult)
-    : body{ ComposedProtocolOnNamedComposedWithErrorResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>, WireCodingConstraintEmpty, IsRecursive>::Decode(
         decoder, position + sizeof(fidl_message_header_t), recursion_depth);
   }
 };
@@ -3733,49 +3379,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
 
 #ifdef __Fuchsia__
 template<>
-struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError> body;
-
-    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult)
-    : body{ MainProtocolOnLocalWithErrorResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
 struct ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon> final {
   FIDL_ALIGNDECL
   fidl_message_header_t header;
@@ -4058,49 +3661,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
 #endif  // __Fuchsia__
 
 
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError> body;
-
-    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult)
-    : body{ MainProtocolOnAnonWithErrorResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
 namespace fidl {
 
 
@@ -4296,32 +3856,6 @@ static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayou
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 3;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>> : public std::true_type {};
 template <>
 struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>> : public std::true_type {};
@@ -4507,32 +4041,6 @@ static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_protocollayouts
     == TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>>::kPrimarySize);
 static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>, header) == 0);
 static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 3;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>, body) == sizeof(fidl_message_header_t));
 
 #endif  // __Fuchsia__
 
@@ -4728,32 +4236,6 @@ static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayou
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 3;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>> : public std::true_type {};
 template <>
 struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>> : public std::true_type {};
@@ -4939,32 +4421,6 @@ static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_protocollayouts
     == TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>>::kPrimarySize);
 static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>, header) == 0);
 static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 3;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>, body) == sizeof(fidl_message_header_t));
 
 #endif  // __Fuchsia__
 
@@ -5728,13 +5184,9 @@ public:
   WireEventHandlerInterface() = default;
   virtual ~WireEventHandlerInterface() = default;
     virtual void OnAnonComposed(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>* event) = 0;
-    virtual void OnAnonComposedWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>* event) = 0;
     virtual void OnNamedComposed(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>* event) = 0;
-    virtual void OnNamedComposedWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>* event) = 0;
     virtual void OnLocal(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>* event) = 0;
-    virtual void OnLocalWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>* event) = 0;
     virtual void OnAnon(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>* event) = 0;
-    virtual void OnAnonWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>* event) = 0;
 };
 
 template<>
@@ -5743,13 +5195,9 @@ class ::fidl::WireAsyncEventHandler<::test_protocollayoutssamelibrary::MainProto
  public:
   WireAsyncEventHandler() = default;
     void OnAnonComposed(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>* event) override {}
-    void OnAnonComposedWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>* event) override {}
     void OnNamedComposed(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>* event) override {}
-    void OnNamedComposedWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>* event) override {}
     void OnLocal(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>* event) override {}
-    void OnLocalWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>* event) override {}
     void OnAnon(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>* event) override {}
-    void OnAnonWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>* event) override {}
 };
 
 
@@ -6530,13 +5978,7 @@ class ::fidl::internal::WireWeakEventSender<::test_protocollayoutssamelibrary::C
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
-
-
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
-
-
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
 };
@@ -6549,13 +5991,7 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_protocollayoutssamelibr
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
-
-
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
-
-
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
 };
@@ -6569,13 +6005,7 @@ class ::fidl::internal::WireEventSender<::test_protocollayoutssamelibrary::Compo
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
-
-
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
-
-
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
 };
@@ -6589,13 +6019,7 @@ class ::fidl::internal::WireBufferEventSender<::test_protocollayoutssamelibrary:
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
-
-
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
-
-
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
 };
@@ -6750,25 +6174,13 @@ class ::fidl::internal::WireWeakEventSender<::test_protocollayoutssamelibrary::M
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
-
-
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
-
-
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnLocal(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnLocalWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult);
-
-
     fidl::OneWayStatus OnAnon(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
-
-
-    fidl::OneWayStatus OnAnonWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult);
 
 
 };
@@ -6781,25 +6193,13 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_protocollayoutssamelibr
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
-
-
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
-
-
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnLocal(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnLocalWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult);
-
-
     fidl::OneWayStatus OnAnon(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
-
-
-    fidl::OneWayStatus OnAnonWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult);
 
 
 };
@@ -6813,25 +6213,13 @@ class ::fidl::internal::WireEventSender<::test_protocollayoutssamelibrary::MainP
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
-
-
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
-
-
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnLocal(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnLocalWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult);
-
-
     fidl::OneWayStatus OnAnon(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
-
-
-    fidl::OneWayStatus OnAnonWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult);
 
 
 };
@@ -6845,25 +6233,13 @@ class ::fidl::internal::WireBufferEventSender<::test_protocollayoutssamelibrary:
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
-
-
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
-
-
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnLocal(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnLocalWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult);
-
-
     fidl::OneWayStatus OnAnon(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
-
-
-    fidl::OneWayStatus OnAnonWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult);
 
 
 };

@@ -25,15 +25,11 @@ closed protocol ComposedProtocol {
     strict -> OnAnonComposed(strict union {
         1: b bool;
     });
-    strict -> OnAnonComposedWithError(table {
-        1: a uint16;
-    }) error uint32;
 
     strict OneWayNamedComposed(ImportTablePayload);
     strict TwoWayNamedComposed(ImportUnionPayload) -> (ImportTablePayload);
     strict TwoWayNamedComposedWithError(ImportTablePayload) -> (ImportUnionPayload) error uint32;
     strict -> OnNamedComposed(ImportUnionPayload);
-    strict -> OnNamedComposedWithError(ImportTablePayload) error uint32;
 };
 
 type ImportStructPayload = struct {

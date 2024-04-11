@@ -117,7 +117,6 @@ fi-0115.test.fidl
 fi-0116.test.fidl
 fi-0117.test.fidl
 fi-0118.test.fidl
-fi-0119.test.fidl
 fi-0120-a.test.fidl
 fi-0120-b.test.fidl
 fi-0121.test.fidl

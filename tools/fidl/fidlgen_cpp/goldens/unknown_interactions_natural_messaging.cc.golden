@@ -213,42 +213,6 @@ constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_Strict
 
 
 [[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsProtocol_StrictEventErr_Ordinal = 4437558874343717997lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictEventErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsProtocol_StrictEventFieldsErr_Ordinal = 8268703922238340235lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictEventFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsProtocol_StrictEventUnionErr_Ordinal = 4681887988605004475lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictEventUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsProtocol_StrictEventTableErr_Ordinal = 7827903484869638218lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictEventTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
 constexpr inline uint64_t kUnknownInteractionsProtocol_FlexibleEvent_Ordinal = 7042257263728687206lu;
 
 
@@ -282,42 +246,6 @@ constexpr inline uint64_t kUnknownInteractionsProtocol_FlexibleEventTable_Ordina
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleEventTable_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsProtocol_FlexibleEventErr_Ordinal = 5465749747219019177lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleEventErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsProtocol_FlexibleEventFieldsErr_Ordinal = 1096356983683709514lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleEventFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsProtocol_FlexibleEventUnionErr_Ordinal = 906517230981154796lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleEventUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsProtocol_FlexibleEventTableErr_Ordinal = 5605294921124359491lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleEventTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 #ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
@@ -919,54 +847,6 @@ namespace test_unknowninteractions {
         }
         return ::fidl::Status::Ok();
       }
-      case ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr> event = std::move(decoded.value());
-          event_handler()->StrictEventErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventFieldsErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr> event = std::move(decoded.value());
-          event_handler()->StrictEventFieldsErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventUnionErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr> event = std::move(decoded.value());
-          event_handler()->StrictEventUnionErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventTableErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr> event = std::move(decoded.value());
-          event_handler()->StrictEventTableErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
       case ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEvent_Ordinal:
       {
         ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage(std::move(msg));
@@ -1011,54 +891,6 @@ namespace test_unknowninteractions {
         if (event_handler()) {
             ::fidl::Event<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTable> event = std::move(decoded.value());
           event_handler()->FlexibleEventTable(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr> event = std::move(decoded.value());
-          event_handler()->FlexibleEventErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventFieldsErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr> event = std::move(decoded.value());
-          event_handler()->FlexibleEventFieldsErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventUnionErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr> event = std::move(decoded.value());
-          event_handler()->FlexibleEventUnionErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventTableErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr> event = std::move(decoded.value());
-          event_handler()->FlexibleEventTableErr(event);
         }
         return ::fidl::Status::Ok();
       }
@@ -1165,82 +997,6 @@ namespace test_unknowninteractions {
 
   
 
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventFieldsErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventFieldsErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventFieldsErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventFieldsErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventUnionErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventUnionErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventUnionErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventUnionErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventTableErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventTableErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventTableErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictEventTableErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::FlexibleEvent() {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEvent_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEvent_DynamicFlags };
@@ -1307,82 +1063,6 @@ namespace test_unknowninteractions {
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::FlexibleEventTable(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest& payload) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventTable_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventTable_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::FlexibleEventErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::FlexibleEventErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::FlexibleEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventFieldsErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventFieldsErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::FlexibleEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventFieldsErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventFieldsErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::FlexibleEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventUnionErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventUnionErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::FlexibleEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventUnionErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventUnionErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::FlexibleEventTableErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventTableErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventTableErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsProtocol>::FlexibleEventTableErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventTableErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsProtocol_FlexibleEventTableErr_DynamicFlags };
   _encoder.EncodeBody(payload);
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   _encoded_message.Write(_transport());
@@ -1993,42 +1673,6 @@ constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_St
 
 
 [[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsAjarProtocol_StrictEventErr_Ordinal = 8168400161206646253lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictEventErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsAjarProtocol_StrictEventFieldsErr_Ordinal = 4242995963205975993lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictEventFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsAjarProtocol_StrictEventUnionErr_Ordinal = 48232470144455723lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictEventUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsAjarProtocol_StrictEventTableErr_Ordinal = 7812263497101509638lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictEventTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
 constexpr inline uint64_t kUnknownInteractionsAjarProtocol_FlexibleEvent_Ordinal = 1281760452005010931lu;
 
 
@@ -2062,42 +1706,6 @@ constexpr inline uint64_t kUnknownInteractionsAjarProtocol_FlexibleEventTable_Or
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_FlexibleEventTable_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsAjarProtocol_FlexibleEventErr_Ordinal = 5746044819880601020lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_FlexibleEventErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Ordinal = 2496089713358680516lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Ordinal = 870945044986422912lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_FlexibleEventUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsAjarProtocol_FlexibleEventTableErr_Ordinal = 7956124159916849703lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_FlexibleEventTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 #ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
@@ -2459,54 +2067,6 @@ namespace test_unknowninteractions {
         }
         return ::fidl::Status::Ok();
       }
-      case ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr> event = std::move(decoded.value());
-          event_handler()->StrictEventErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventFieldsErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr> event = std::move(decoded.value());
-          event_handler()->StrictEventFieldsErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventUnionErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr> event = std::move(decoded.value());
-          event_handler()->StrictEventUnionErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventTableErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr> event = std::move(decoded.value());
-          event_handler()->StrictEventTableErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
       case ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEvent_Ordinal:
       {
         ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage(std::move(msg));
@@ -2551,54 +2111,6 @@ namespace test_unknowninteractions {
         if (event_handler()) {
             ::fidl::Event<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTable> event = std::move(decoded.value());
           event_handler()->FlexibleEventTable(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr> event = std::move(decoded.value());
-          event_handler()->FlexibleEventErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr> event = std::move(decoded.value());
-          event_handler()->FlexibleEventFieldsErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr> event = std::move(decoded.value());
-          event_handler()->FlexibleEventUnionErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventTableErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr> event = std::move(decoded.value());
-          event_handler()->FlexibleEventTableErr(event);
         }
         return ::fidl::Status::Ok();
       }
@@ -2705,82 +2217,6 @@ namespace test_unknowninteractions {
 
   
 
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventFieldsErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventFieldsErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventFieldsErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventFieldsErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventUnionErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventUnionErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventUnionErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventUnionErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventTableErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventTableErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventTableErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictEventTableErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::FlexibleEvent() {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEvent_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEvent_DynamicFlags };
@@ -2847,82 +2283,6 @@ namespace test_unknowninteractions {
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::FlexibleEventTable(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest& payload) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventTable_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventTable_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::FlexibleEventErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::FlexibleEventErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::FlexibleEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::FlexibleEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::FlexibleEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventUnionErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::FlexibleEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventUnionErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::FlexibleEventTableErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventTableErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventTableErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::FlexibleEventTableErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventTableErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_FlexibleEventTableErr_DynamicFlags };
   _encoder.EncodeBody(payload);
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   _encoded_message.Write(_transport());
@@ -3321,42 +2681,6 @@ constexpr inline uint64_t kUnknownInteractionsClosedProtocol_StrictEventTable_Or
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictEventTable_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsClosedProtocol_StrictEventErr_Ordinal = 1346864022452572673lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictEventErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsClosedProtocol_StrictEventFieldsErr_Ordinal = 3248847528447859862lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictEventFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsClosedProtocol_StrictEventUnionErr_Ordinal = 7912657362107850804lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictEventUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
-constexpr inline uint64_t kUnknownInteractionsClosedProtocol_StrictEventTableErr_Ordinal = 5661281118329630458lu;
-
-
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictEventTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
 #ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
 
@@ -3697,54 +3021,6 @@ namespace test_unknowninteractions {
         }
         return ::fidl::Status::Ok();
       }
-      case ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr> event = std::move(decoded.value());
-          event_handler()->StrictEventErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventFieldsErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr> event = std::move(decoded.value());
-          event_handler()->StrictEventFieldsErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventUnionErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr> event = std::move(decoded.value());
-          event_handler()->StrictEventUnionErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventTableErr_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult>(std::move(msg));
-        if (decoded.is_error()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            ::fidl::Event<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr> event = std::move(decoded.value());
-          event_handler()->StrictEventTableErr(event);
-        }
-        return ::fidl::Status::Ok();
-      }
       default:
         std::move(msg).CloseHandles();
         return ::fidl::Status::UnknownOrdinal();
@@ -3825,82 +3101,6 @@ namespace test_unknowninteractions {
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsClosedProtocol>::StrictEventTable(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest& payload) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventTable_Ordinal, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventTable_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsClosedProtocol>::StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsClosedProtocol>::StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsClosedProtocol>::StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventFieldsErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventFieldsErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsClosedProtocol>::StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventFieldsErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventFieldsErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsClosedProtocol>::StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventUnionErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventUnionErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsClosedProtocol>::StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventUnionErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventUnionErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-  
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsClosedProtocol>::StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventTableErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventTableErr_DynamicFlags };
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownInteractionsClosedProtocol>::StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventTableErr_Ordinal, ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictEventTableErr_DynamicFlags };
   _encoder.EncodeBody(payload);
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   _encoded_message.Write(_transport());

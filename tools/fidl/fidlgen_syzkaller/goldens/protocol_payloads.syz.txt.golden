@@ -66,16 +66,6 @@ test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestOutOfLine {
 test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestHandles {
     void void
 } [packed]
-test_protocolpayloads_MainProtocol_OnAnonWithError_ResponseInLine {
-    a int32
-    b int32
-} [packed]
-test_protocolpayloads_MainProtocol_OnAnonWithError_ResponseOutOfLine {
-    void void
-} [packed]
-test_protocolpayloads_MainProtocol_OnAnonWithError_ResponseHandles {
-    void void
-} [packed]
 test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResponseInLine {
     a int32
     b int32
@@ -86,36 +76,6 @@ test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResponseOutOfLine {
 test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResponseHandles {
     void void
 } [packed]
-test_protocolpayloads_MainProtocol_OnAnonWithError_ResultInLine [
-    responseInLine fidl_union_member[1, test_protocolpayloads_MainProtocol_OnAnonWithError_ResponseInLine]
-    err fidl_union_member[2, int32]
-]
-test_protocolpayloads_MainProtocol_OnAnonWithError_ResultOutOfLine [
-    responseOutOfLine test_protocolpayloads_MainProtocol_OnAnonWithError_ResponseOutOfLine
-][varlen]
-test_protocolpayloads_MainProtocol_OnAnonWithError_ResultHandles [
-    response test_protocolpayloads_MainProtocol_OnAnonWithError_ResponseHandles
-][varlen]
-test_protocolpayloads_MainProtocol_OnImportWithError_ResultInLine [
-    responseInLine fidl_union_member[1, test_protocolpayloads_imported_ImportStructPayloadInLine]
-    err fidl_union_member[2, int32]
-]
-test_protocolpayloads_MainProtocol_OnImportWithError_ResultOutOfLine [
-    responseOutOfLine test_protocolpayloads_imported_ImportStructPayloadOutOfLine
-][varlen]
-test_protocolpayloads_MainProtocol_OnImportWithError_ResultHandles [
-    response test_protocolpayloads_imported_ImportStructPayloadHandles
-][varlen]
-test_protocolpayloads_MainProtocol_OnLocalWithError_ResultInLine [
-    responseInLine fidl_union_member[1, test_protocolpayloads_LocalStructPayloadInLine]
-    err fidl_union_member[2, int32]
-]
-test_protocolpayloads_MainProtocol_OnLocalWithError_ResultOutOfLine [
-    responseOutOfLine test_protocolpayloads_LocalStructPayloadOutOfLine
-][varlen]
-test_protocolpayloads_MainProtocol_OnLocalWithError_ResultHandles [
-    response test_protocolpayloads_LocalStructPayloadHandles
-][varlen]
 test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResultInLine [
     responseInLine fidl_union_member[1, test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResponseInLine]
     err fidl_union_member[2, int32]
@@ -189,12 +149,6 @@ test_protocolpayloads_MainProtocolOnComposedEvent {
 test_protocolpayloads_MainProtocolOnComposedEventHandles {
     void void
 } [packed]
-test_protocolpayloads_MainProtocolOnComposedWithErrorEvent {
-    hdr fidl_message_header[7167282778061495960]
-} [packed]
-test_protocolpayloads_MainProtocolOnComposedWithErrorEventHandles {
-    void void
-} [packed]
 test_protocolpayloads_MainProtocolOneWayLocalRequest {
     hdr fidl_message_header[7755175439334311701]
     a int32
@@ -241,12 +195,6 @@ test_protocolpayloads_MainProtocolOnLocalEvent {
 test_protocolpayloads_MainProtocolOnLocalEventHandles {
     void void
 } [packed]
-test_protocolpayloads_MainProtocolOnLocalWithErrorEvent {
-    hdr fidl_message_header[5678277415565140399]
-} [packed]
-test_protocolpayloads_MainProtocolOnLocalWithErrorEventHandles {
-    void void
-} [packed]
 test_protocolpayloads_MainProtocolOneWayImportRequest {
     hdr fidl_message_header[3344777159365288972]
     a int32
@@ -286,12 +234,6 @@ test_protocolpayloads_MainProtocolOnImportEvent {
     a int32
 } [packed]
 test_protocolpayloads_MainProtocolOnImportEventHandles {
-    void void
-} [packed]
-test_protocolpayloads_MainProtocolOnImportWithErrorEvent {
-    hdr fidl_message_header[7102941407914553861]
-} [packed]
-test_protocolpayloads_MainProtocolOnImportWithErrorEventHandles {
     void void
 } [packed]
 test_protocolpayloads_MainProtocolOneWayAnonRequest {
@@ -340,12 +282,6 @@ test_protocolpayloads_MainProtocolOnAnonEvent {
 test_protocolpayloads_MainProtocolOnAnonEventHandles {
     void void
 } [packed]
-test_protocolpayloads_MainProtocolOnAnonWithErrorEvent {
-    hdr fidl_message_header[5024931894357412354]
-} [packed]
-test_protocolpayloads_MainProtocolOnAnonWithErrorEventHandles {
-    void void
-} [packed]
 
 resource zx_chan_test_protocolpayloads_MainProtocol_client[zx_chan]
 resource zx_chan_test_protocolpayloads_MainProtocol_server[zx_chan]
@@ -356,20 +292,16 @@ zx_channel_write$test_protocolpayloads_MainProtocolOneWayComposed(handle zx_chan
 zx_channel_call$test_protocolpayloads_MainProtocolTwoWayComposed(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_protocolpayloads_MainProtocolTwoWayComposedRequest, test_protocolpayloads_MainProtocolTwoWayComposedRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_protocolpayloads_MainProtocolTwoWayComposedResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_call$test_protocolpayloads_MainProtocolTwoWayComposedWithError(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_protocolpayloads_MainProtocolTwoWayComposedWithErrorRequest, test_protocolpayloads_MainProtocolTwoWayComposedWithErrorRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_protocolpayloads_MainProtocolTwoWayComposedWithErrorResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_read$test_protocolpayloads_MainProtocolOnComposed(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], bytes ptr[out, array[int8, ZX_CHANNEL_MAX_MSG_BYTES]], num_bytes bytesize[bytes], handles ptr[out, test_protocolpayloads_MainProtocolOnComposedEventHandles], num_handles bytesize[handles], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
-zx_channel_read$test_protocolpayloads_MainProtocolOnComposedWithError(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], bytes ptr[out, array[int8, ZX_CHANNEL_MAX_MSG_BYTES]], num_bytes bytesize[bytes], handles ptr[out, test_protocolpayloads_MainProtocolOnComposedWithErrorEventHandles], num_handles bytesize[handles], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_write$test_protocolpayloads_MainProtocolOneWayLocal(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], bytes ptr[in, test_protocolpayloads_MainProtocolOneWayLocalRequest], num_bytes bytesize[bytes], handles ptr[in, test_protocolpayloads_MainProtocolOneWayLocalRequestHandles], num_handles bytesize[handles])
 zx_channel_call$test_protocolpayloads_MainProtocolTwoWayLocal(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_protocolpayloads_MainProtocolTwoWayLocalRequest, test_protocolpayloads_MainProtocolTwoWayLocalRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_protocolpayloads_MainProtocolTwoWayLocalResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_call$test_protocolpayloads_MainProtocolTwoWayLocalWithError(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_protocolpayloads_MainProtocolTwoWayLocalWithErrorRequest, test_protocolpayloads_MainProtocolTwoWayLocalWithErrorRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_protocolpayloads_MainProtocolTwoWayLocalWithErrorResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_read$test_protocolpayloads_MainProtocolOnLocal(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], bytes ptr[out, array[int8, ZX_CHANNEL_MAX_MSG_BYTES]], num_bytes bytesize[bytes], handles ptr[out, test_protocolpayloads_MainProtocolOnLocalEventHandles], num_handles bytesize[handles], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
-zx_channel_read$test_protocolpayloads_MainProtocolOnLocalWithError(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], bytes ptr[out, array[int8, ZX_CHANNEL_MAX_MSG_BYTES]], num_bytes bytesize[bytes], handles ptr[out, test_protocolpayloads_MainProtocolOnLocalWithErrorEventHandles], num_handles bytesize[handles], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_write$test_protocolpayloads_MainProtocolOneWayImport(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], bytes ptr[in, test_protocolpayloads_MainProtocolOneWayImportRequest], num_bytes bytesize[bytes], handles ptr[in, test_protocolpayloads_MainProtocolOneWayImportRequestHandles], num_handles bytesize[handles])
 zx_channel_call$test_protocolpayloads_MainProtocolTwoWayImport(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_protocolpayloads_MainProtocolTwoWayImportRequest, test_protocolpayloads_MainProtocolTwoWayImportRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_protocolpayloads_MainProtocolTwoWayImportResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_call$test_protocolpayloads_MainProtocolTwoWayImportWithError(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_protocolpayloads_MainProtocolTwoWayImportWithErrorRequest, test_protocolpayloads_MainProtocolTwoWayImportWithErrorRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_protocolpayloads_MainProtocolTwoWayImportWithErrorResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_read$test_protocolpayloads_MainProtocolOnImport(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], bytes ptr[out, array[int8, ZX_CHANNEL_MAX_MSG_BYTES]], num_bytes bytesize[bytes], handles ptr[out, test_protocolpayloads_MainProtocolOnImportEventHandles], num_handles bytesize[handles], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
-zx_channel_read$test_protocolpayloads_MainProtocolOnImportWithError(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], bytes ptr[out, array[int8, ZX_CHANNEL_MAX_MSG_BYTES]], num_bytes bytesize[bytes], handles ptr[out, test_protocolpayloads_MainProtocolOnImportWithErrorEventHandles], num_handles bytesize[handles], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_write$test_protocolpayloads_MainProtocolOneWayAnon(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], bytes ptr[in, test_protocolpayloads_MainProtocolOneWayAnonRequest], num_bytes bytesize[bytes], handles ptr[in, test_protocolpayloads_MainProtocolOneWayAnonRequestHandles], num_handles bytesize[handles])
 zx_channel_call$test_protocolpayloads_MainProtocolTwoWayAnon(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_protocolpayloads_MainProtocolTwoWayAnonRequest, test_protocolpayloads_MainProtocolTwoWayAnonRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_protocolpayloads_MainProtocolTwoWayAnonResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_call$test_protocolpayloads_MainProtocolTwoWayAnonWithError(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequest, test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_protocolpayloads_MainProtocolTwoWayAnonWithErrorResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_read$test_protocolpayloads_MainProtocolOnAnon(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], bytes ptr[out, array[int8, ZX_CHANNEL_MAX_MSG_BYTES]], num_bytes bytesize[bytes], handles ptr[out, test_protocolpayloads_MainProtocolOnAnonEventHandles], num_handles bytesize[handles], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
-zx_channel_read$test_protocolpayloads_MainProtocolOnAnonWithError(handle zx_chan_test_protocolpayloads_MainProtocol_client, options const[0], bytes ptr[out, array[int8, ZX_CHANNEL_MAX_MSG_BYTES]], num_bytes bytesize[bytes], handles ptr[out, test_protocolpayloads_MainProtocolOnAnonWithErrorEventHandles], num_handles bytesize[handles], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 

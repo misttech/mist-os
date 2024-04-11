@@ -22,10 +22,6 @@ struct fidl::ostream::Formatter<::test_protocolpayloads::MainProtocolTwoWayLocal
   static std::ostream& Format(std::ostream& os, const ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_protocolpayloads::MainProtocolOnLocalWithErrorResult> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult& value);
-};
-template <>
 struct fidl::ostream::Formatter<::test_protocolpayloads::MainProtocolOneWayAnonRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocolpayloads::MainProtocolOneWayAnonRequest& value);
 };
@@ -54,20 +50,8 @@ struct fidl::ostream::Formatter<::test_protocolpayloads::MainProtocolOnAnonReque
   static std::ostream& Format(std::ostream& os, const ::test_protocolpayloads::MainProtocolOnAnonRequest& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse& value);
-};
-template <>
-struct fidl::ostream::Formatter<::test_protocolpayloads::MainProtocolOnAnonWithErrorResult> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult& value);
-};
-template <>
 struct fidl::ostream::Formatter<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult> {
   static std::ostream& Format(std::ostream& os, const ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult& value);
-};
-template <>
-struct fidl::ostream::Formatter<::test_protocolpayloads::MainProtocolOnImportWithErrorResult> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocolpayloads::MainProtocolOnImportWithErrorResult& value);
 };
 
 namespace test_protocolpayloads {
@@ -75,8 +59,6 @@ namespace test_protocolpayloads {
 std::ostream& operator<<(std::ostream& os, const ::test_protocolpayloads::LocalStructPayload& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocolpayloads::MainProtocolOneWayAnonRequest& value);
 
@@ -92,13 +74,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocolpayloads::MainPr
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocolpayloads::MainProtocolOnAnonRequest& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult& value);
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocolpayloads::MainProtocolOnImportWithErrorResult& value);
 
 }  // namespace test_protocolpayloads
 

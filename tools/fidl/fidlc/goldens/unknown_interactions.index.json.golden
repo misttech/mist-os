@@ -25,8 +25,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 7838,
-            "end_offset": 7848
+            "start_offset": 6221,
+            "end_offset": 6231
           },
           "type": {
             "kind": "primitive"
@@ -122,8 +122,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 8144,
-            "end_offset": 8154
+            "start_offset": 6527,
+            "end_offset": 6537
           },
           "type": {
             "kind": "primitive"
@@ -167,8 +167,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 4303,
-            "end_offset": 4313
+            "start_offset": 3336,
+            "end_offset": 3346
           },
           "type": {
             "kind": "primitive"
@@ -186,8 +186,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 3717,
-            "end_offset": 3727
+            "start_offset": 3067,
+            "end_offset": 3077
           },
           "type": {
             "kind": "primitive"
@@ -205,131 +205,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 3109,
-            "end_offset": 3119
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
-            "start_offset": 4609,
-            "end_offset": 4619
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
+            "start_offset": 2459,
+            "end_offset": 2469
           },
           "type": {
             "kind": "primitive"
@@ -425,8 +302,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 4007,
-            "end_offset": 4017
+            "start_offset": 2765,
+            "end_offset": 2775
           },
           "type": {
             "kind": "primitive"
@@ -453,6 +330,25 @@
           "name": "err",
           "location": {
             "is_virtual": true
+          },
+          "type": {
+            "kind": "primitive"
+          }
+        }
+      ]
+    },
+    {
+      "is_anonymous": true,
+      "members": [
+        {
+          "is_reserved": false,
+          "name": "some_field",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
+            "data": "some_field",
+            "start_offset": 6983,
+            "end_offset": 6993
           },
           "type": {
             "kind": "primitive"
@@ -548,8 +444,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 3415,
-            "end_offset": 3425
+            "start_offset": 7289,
+            "end_offset": 7299
           },
           "type": {
             "kind": "primitive"
@@ -593,86 +489,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 8600,
-            "end_offset": 8610
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
+            "start_offset": 4346,
+            "end_offset": 4356
           },
           "type": {
             "kind": "primitive"
@@ -690,72 +508,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 8906,
-            "end_offset": 8916
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
-            "start_offset": 5646,
-            "end_offset": 5656
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
-            "start_offset": 5038,
-            "end_offset": 5048
+            "start_offset": 3738,
+            "end_offset": 3748
           },
           "type": {
             "kind": "primitive"
@@ -851,86 +605,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 5936,
-            "end_offset": 5946
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
+            "start_offset": 4044,
+            "end_offset": 4054
           },
           "type": {
             "kind": "primitive"
@@ -974,53 +650,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 5344,
-            "end_offset": 5354
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
-            "start_offset": 6411,
-            "end_offset": 6421
+            "start_offset": 4794,
+            "end_offset": 4804
           },
           "type": {
             "kind": "primitive"
@@ -1198,8 +829,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 7351,
-            "end_offset": 7361
+            "start_offset": 5734,
+            "end_offset": 5744
           },
           "type": {
             "kind": "primitive"
@@ -1253,8 +884,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 7029,
-            "end_offset": 7039
+            "start_offset": 5412,
+            "end_offset": 5422
           },
           "type": {
             "kind": "primitive"
@@ -1402,8 +1033,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 6717,
-            "end_offset": 6727
+            "start_offset": 5100,
+            "end_offset": 5110
           },
           "type": {
             "kind": "primitive"
@@ -1447,8 +1078,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 2347,
-            "end_offset": 2357
+            "start_offset": 2030,
+            "end_offset": 2040
           },
           "type": {
             "kind": "primitive"
@@ -1487,129 +1118,6 @@
             "data": "some_field",
             "start_offset": 515,
             "end_offset": 525
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
-            "start_offset": 2653,
-            "end_offset": 2663
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
           },
           "type": {
             "kind": "primitive"
@@ -1991,129 +1499,6 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 2051,
-            "end_offset": 2061
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "response",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "is_reserved": false,
-          "name": "err",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
             "start_offset": 821,
             "end_offset": 831
           },
@@ -2161,8 +1546,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 7918,
-            "end_offset": 7928
+            "start_offset": 6301,
+            "end_offset": 6311
           },
           "type": {
             "kind": "primitive"
@@ -2180,8 +1565,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 8239,
-            "end_offset": 8249
+            "start_offset": 6622,
+            "end_offset": 6632
           },
           "type": {
             "kind": "primitive"
@@ -2199,8 +1584,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 4383,
-            "end_offset": 4393
+            "start_offset": 3416,
+            "end_offset": 3426
           },
           "type": {
             "kind": "primitive"
@@ -2218,8 +1603,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 3793,
-            "end_offset": 3803
+            "start_offset": 3143,
+            "end_offset": 3153
           },
           "type": {
             "kind": "primitive"
@@ -2237,8 +1622,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 3189,
-            "end_offset": 3199
+            "start_offset": 2539,
+            "end_offset": 2549
           },
           "type": {
             "kind": "primitive"
@@ -2256,8 +1641,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 4704,
-            "end_offset": 4714
+            "start_offset": 2860,
+            "end_offset": 2870
           },
           "type": {
             "kind": "primitive"
@@ -2275,8 +1660,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 4098,
-            "end_offset": 4108
+            "start_offset": 7063,
+            "end_offset": 7073
           },
           "type": {
             "kind": "primitive"
@@ -2294,8 +1679,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 3510,
-            "end_offset": 3520
+            "start_offset": 7384,
+            "end_offset": 7394
           },
           "type": {
             "kind": "primitive"
@@ -2313,8 +1698,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 8680,
-            "end_offset": 8690
+            "start_offset": 4422,
+            "end_offset": 4432
           },
           "type": {
             "kind": "primitive"
@@ -2332,8 +1717,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 9001,
-            "end_offset": 9011
+            "start_offset": 3818,
+            "end_offset": 3828
           },
           "type": {
             "kind": "primitive"
@@ -2351,8 +1736,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 5722,
-            "end_offset": 5732
+            "start_offset": 4139,
+            "end_offset": 4149
           },
           "type": {
             "kind": "primitive"
@@ -2370,8 +1755,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 5118,
-            "end_offset": 5128
+            "start_offset": 4874,
+            "end_offset": 4884
           },
           "type": {
             "kind": "primitive"
@@ -2389,8 +1774,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 6027,
-            "end_offset": 6037
+            "start_offset": 5833,
+            "end_offset": 5843
           },
           "type": {
             "kind": "primitive"
@@ -2408,8 +1793,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 5439,
-            "end_offset": 5449
+            "start_offset": 5496,
+            "end_offset": 5506
           },
           "type": {
             "kind": "primitive"
@@ -2427,8 +1812,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 6491,
-            "end_offset": 6501
+            "start_offset": 5195,
+            "end_offset": 5205
           },
           "type": {
             "kind": "primitive"
@@ -2446,65 +1831,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 7450,
-            "end_offset": 7460
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
-            "start_offset": 7113,
-            "end_offset": 7123
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
-            "start_offset": 6812,
-            "end_offset": 6822
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
-            "start_offset": 2427,
-            "end_offset": 2437
+            "start_offset": 2110,
+            "end_offset": 2120
           },
           "type": {
             "kind": "primitive"
@@ -2560,25 +1888,6 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 2748,
-            "end_offset": 2758
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
             "start_offset": 1554,
             "end_offset": 1564
           },
@@ -2617,25 +1926,6 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 2142,
-            "end_offset": 2152
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
             "start_offset": 916,
             "end_offset": 926
           },
@@ -2657,8 +1947,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 7758,
-            "end_offset": 7768
+            "start_offset": 6141,
+            "end_offset": 6151
           },
           "type": {
             "kind": "primitive"
@@ -2681,8 +1971,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 8049,
-            "end_offset": 8059
+            "start_offset": 6432,
+            "end_offset": 6442
           },
           "type": {
             "kind": "primitive"
@@ -2700,8 +1990,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 4223,
-            "end_offset": 4233
+            "start_offset": 3256,
+            "end_offset": 3266
           },
           "type": {
             "kind": "primitive"
@@ -2719,8 +2009,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 3641,
-            "end_offset": 3651
+            "start_offset": 2991,
+            "end_offset": 3001
           },
           "type": {
             "kind": "primitive"
@@ -2738,56 +2028,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 3029,
-            "end_offset": 3039
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_FlexibleEventErr_Response",
-      "members": []
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response",
-      "members": [
-        {
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
-            "start_offset": 4514,
-            "end_offset": 4524
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictEventErr_Response",
-      "members": []
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response",
-      "members": [
-        {
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
-            "start_offset": 3916,
-            "end_offset": 3926
+            "start_offset": 2379,
+            "end_offset": 2389
           },
           "type": {
             "kind": "primitive"
@@ -2810,8 +2052,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 3320,
-            "end_offset": 3330
+            "start_offset": 2670,
+            "end_offset": 2680
           },
           "type": {
             "kind": "primitive"
@@ -2829,8 +2071,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 8520,
-            "end_offset": 8530
+            "start_offset": 6903,
+            "end_offset": 6913
           },
           "type": {
             "kind": "primitive"
@@ -2853,8 +2095,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 8811,
-            "end_offset": 8821
+            "start_offset": 7194,
+            "end_offset": 7204
           },
           "type": {
             "kind": "primitive"
@@ -2872,8 +2114,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 5570,
-            "end_offset": 5580
+            "start_offset": 4270,
+            "end_offset": 4280
           },
           "type": {
             "kind": "primitive"
@@ -2891,32 +2133,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 4958,
-            "end_offset": 4968
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictEventErr_Response",
-      "members": []
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response",
-      "members": [
-        {
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
-            "start_offset": 5845,
-            "end_offset": 5855
+            "start_offset": 3658,
+            "end_offset": 3668
           },
           "type": {
             "kind": "primitive"
@@ -2939,8 +2157,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 5249,
-            "end_offset": 5259
+            "start_offset": 3949,
+            "end_offset": 3959
           },
           "type": {
             "kind": "primitive"
@@ -2958,8 +2176,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 6331,
-            "end_offset": 6341
+            "start_offset": 4714,
+            "end_offset": 4724
           },
           "type": {
             "kind": "primitive"
@@ -2982,8 +2200,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 7252,
-            "end_offset": 7262
+            "start_offset": 5635,
+            "end_offset": 5645
           },
           "type": {
             "kind": "primitive"
@@ -3001,8 +2219,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 6945,
-            "end_offset": 6955
+            "start_offset": 5328,
+            "end_offset": 5338
           },
           "type": {
             "kind": "primitive"
@@ -3030,8 +2248,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 6622,
-            "end_offset": 6632
+            "start_offset": 5005,
+            "end_offset": 5015
           },
           "type": {
             "kind": "primitive"
@@ -3049,8 +2267,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "some_field",
-            "start_offset": 2267,
-            "end_offset": 2277
+            "start_offset": 1950,
+            "end_offset": 1960
           },
           "type": {
             "kind": "primitive"
@@ -3089,30 +2307,6 @@
             "data": "some_field",
             "start_offset": 435,
             "end_offset": 445
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleEventErr_Response",
-      "members": []
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response",
-      "members": [
-        {
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
-            "start_offset": 2558,
-            "end_offset": 2568
           },
           "type": {
             "kind": "primitive"
@@ -3170,30 +2364,6 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_StrictEventErr_Response",
-      "members": []
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_StrictEventFieldsErr_Response",
-      "members": [
-        {
-          "name": "some_field",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "some_field",
-            "start_offset": 1960,
-            "end_offset": 1970
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayErr_Response",
       "members": []
     },
@@ -3224,8 +2394,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
         "data": "UnknownInteractionsAjarDriverProtocol",
-        "start_offset": 7527,
-        "end_offset": 7564
+        "start_offset": 5910,
+        "end_offset": 5947
       },
       "methods": [
         {
@@ -3234,8 +2404,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictOneWay",
-            "start_offset": 7601,
-            "end_offset": 7613
+            "start_offset": 5984,
+            "end_offset": 5996
           }
         },
         {
@@ -3244,8 +2414,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleOneWay",
-            "start_offset": 7630,
-            "end_offset": 7644
+            "start_offset": 6013,
+            "end_offset": 6027
           }
         },
         {
@@ -3254,8 +2424,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWay",
-            "start_offset": 7683,
-            "end_offset": 7695
+            "start_offset": 6066,
+            "end_offset": 6078
           }
         },
         {
@@ -3264,8 +2434,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayFields",
-            "start_offset": 7716,
-            "end_offset": 7734
+            "start_offset": 6099,
+            "end_offset": 6117
           },
           "response_type": {
             "kind": "identifier",
@@ -3278,8 +2448,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayUnion",
-            "start_offset": 7795,
-            "end_offset": 7812
+            "start_offset": 6178,
+            "end_offset": 6195
           },
           "response_type": {
             "kind": "identifier",
@@ -3292,8 +2462,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayTable",
-            "start_offset": 7875,
-            "end_offset": 7892
+            "start_offset": 6258,
+            "end_offset": 6275
           },
           "response_type": {
             "kind": "identifier",
@@ -3306,8 +2476,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayErr",
-            "start_offset": 7956,
-            "end_offset": 7971
+            "start_offset": 6339,
+            "end_offset": 6354
           },
           "response_type": {
             "kind": "identifier",
@@ -3320,8 +2490,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayFieldsErr",
-            "start_offset": 8004,
-            "end_offset": 8025
+            "start_offset": 6387,
+            "end_offset": 6408
           },
           "response_type": {
             "kind": "identifier",
@@ -3334,8 +2504,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayUnionErr",
-            "start_offset": 8098,
-            "end_offset": 8118
+            "start_offset": 6481,
+            "end_offset": 6501
           },
           "response_type": {
             "kind": "identifier",
@@ -3348,8 +2518,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayTableErr",
-            "start_offset": 8193,
-            "end_offset": 8213
+            "start_offset": 6576,
+            "end_offset": 6596
           },
           "response_type": {
             "kind": "identifier",
@@ -3365,8 +2535,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
         "data": "UnknownInteractionsAjarProtocol",
-        "start_offset": 2804,
-        "end_offset": 2835
+        "start_offset": 2154,
+        "end_offset": 2185
       },
       "methods": [
         {
@@ -3375,8 +2545,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictOneWay",
-            "start_offset": 2872,
-            "end_offset": 2884
+            "start_offset": 2222,
+            "end_offset": 2234
           }
         },
         {
@@ -3385,8 +2555,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleOneWay",
-            "start_offset": 2901,
-            "end_offset": 2915
+            "start_offset": 2251,
+            "end_offset": 2265
           }
         },
         {
@@ -3395,8 +2565,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWay",
-            "start_offset": 2954,
-            "end_offset": 2966
+            "start_offset": 2304,
+            "end_offset": 2316
           }
         },
         {
@@ -3405,8 +2575,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayFields",
-            "start_offset": 2987,
-            "end_offset": 3005
+            "start_offset": 2337,
+            "end_offset": 2355
           },
           "response_type": {
             "kind": "identifier",
@@ -3419,8 +2589,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayUnion",
-            "start_offset": 3066,
-            "end_offset": 3083
+            "start_offset": 2416,
+            "end_offset": 2433
           },
           "response_type": {
             "kind": "identifier",
@@ -3433,8 +2603,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayTable",
-            "start_offset": 3146,
-            "end_offset": 3163
+            "start_offset": 2496,
+            "end_offset": 2513
           },
           "response_type": {
             "kind": "identifier",
@@ -3447,8 +2617,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayErr",
-            "start_offset": 3227,
-            "end_offset": 3242
+            "start_offset": 2577,
+            "end_offset": 2592
           },
           "response_type": {
             "kind": "identifier",
@@ -3461,8 +2631,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayFieldsErr",
-            "start_offset": 3275,
-            "end_offset": 3296
+            "start_offset": 2625,
+            "end_offset": 2646
           },
           "response_type": {
             "kind": "identifier",
@@ -3475,8 +2645,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayUnionErr",
-            "start_offset": 3369,
-            "end_offset": 3389
+            "start_offset": 2719,
+            "end_offset": 2739
           },
           "response_type": {
             "kind": "identifier",
@@ -3489,8 +2659,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayTableErr",
-            "start_offset": 3464,
-            "end_offset": 3484
+            "start_offset": 2814,
+            "end_offset": 2834
           },
           "response_type": {
             "kind": "identifier",
@@ -3503,8 +2673,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictEvent",
-            "start_offset": 3577,
-            "end_offset": 3588
+            "start_offset": 2927,
+            "end_offset": 2938
           }
         },
         {
@@ -3513,8 +2683,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictEventFields",
-            "start_offset": 3606,
-            "end_offset": 3623
+            "start_offset": 2956,
+            "end_offset": 2973
           },
           "response_type": {
             "kind": "identifier",
@@ -3527,8 +2697,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictEventUnion",
-            "start_offset": 3681,
-            "end_offset": 3697
+            "start_offset": 3031,
+            "end_offset": 3047
           },
           "response_type": {
             "kind": "identifier",
@@ -3541,64 +2711,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictEventTable",
-            "start_offset": 3757,
-            "end_offset": 3773
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "StrictEventErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "StrictEventErr",
-            "start_offset": 3834,
-            "end_offset": 3848
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "StrictEventFieldsErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "StrictEventFieldsErr",
-            "start_offset": 3878,
-            "end_offset": 3898
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "StrictEventUnionErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "StrictEventUnionErr",
-            "start_offset": 3968,
-            "end_offset": 3987
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "StrictEventTableErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "StrictEventTableErr",
-            "start_offset": 4059,
-            "end_offset": 4078
+            "start_offset": 3107,
+            "end_offset": 3123
           },
           "response_type": {
             "kind": "identifier",
@@ -3611,8 +2725,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleEvent",
-            "start_offset": 4153,
-            "end_offset": 4166
+            "start_offset": 3186,
+            "end_offset": 3199
           }
         },
         {
@@ -3621,8 +2735,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleEventFields",
-            "start_offset": 4186,
-            "end_offset": 4205
+            "start_offset": 3219,
+            "end_offset": 3238
           },
           "response_type": {
             "kind": "identifier",
@@ -3635,8 +2749,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleEventUnion",
-            "start_offset": 4265,
-            "end_offset": 4283
+            "start_offset": 3298,
+            "end_offset": 3316
           },
           "response_type": {
             "kind": "identifier",
@@ -3649,64 +2763,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleEventTable",
-            "start_offset": 4345,
-            "end_offset": 4363
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "FlexibleEventErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "FlexibleEventErr",
-            "start_offset": 4426,
-            "end_offset": 4442
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "FlexibleEventFieldsErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "FlexibleEventFieldsErr",
-            "start_offset": 4474,
-            "end_offset": 4496
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "FlexibleEventUnionErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "FlexibleEventUnionErr",
-            "start_offset": 4568,
-            "end_offset": 4589
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "FlexibleEventTableErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "FlexibleEventTableErr",
-            "start_offset": 4663,
-            "end_offset": 4684
+            "start_offset": 3378,
+            "end_offset": 3396
           },
           "response_type": {
             "kind": "identifier",
@@ -3722,8 +2780,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
         "data": "UnknownInteractionsClosedDriverProtocol",
-        "start_offset": 8318,
-        "end_offset": 8357
+        "start_offset": 6701,
+        "end_offset": 6740
       },
       "methods": [
         {
@@ -3732,8 +2790,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictOneWay",
-            "start_offset": 8394,
-            "end_offset": 8406
+            "start_offset": 6777,
+            "end_offset": 6789
           }
         },
         {
@@ -3742,8 +2800,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWay",
-            "start_offset": 8445,
-            "end_offset": 8457
+            "start_offset": 6828,
+            "end_offset": 6840
           }
         },
         {
@@ -3752,8 +2810,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayFields",
-            "start_offset": 8478,
-            "end_offset": 8496
+            "start_offset": 6861,
+            "end_offset": 6879
           },
           "response_type": {
             "kind": "identifier",
@@ -3766,8 +2824,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayUnion",
-            "start_offset": 8557,
-            "end_offset": 8574
+            "start_offset": 6940,
+            "end_offset": 6957
           },
           "response_type": {
             "kind": "identifier",
@@ -3780,8 +2838,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayTable",
-            "start_offset": 8637,
-            "end_offset": 8654
+            "start_offset": 7020,
+            "end_offset": 7037
           },
           "response_type": {
             "kind": "identifier",
@@ -3794,8 +2852,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayErr",
-            "start_offset": 8718,
-            "end_offset": 8733
+            "start_offset": 7101,
+            "end_offset": 7116
           },
           "response_type": {
             "kind": "identifier",
@@ -3808,8 +2866,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayFieldsErr",
-            "start_offset": 8766,
-            "end_offset": 8787
+            "start_offset": 7149,
+            "end_offset": 7170
           },
           "response_type": {
             "kind": "identifier",
@@ -3822,8 +2880,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayUnionErr",
-            "start_offset": 8860,
-            "end_offset": 8880
+            "start_offset": 7243,
+            "end_offset": 7263
           },
           "response_type": {
             "kind": "identifier",
@@ -3836,8 +2894,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayTableErr",
-            "start_offset": 8955,
-            "end_offset": 8975
+            "start_offset": 7338,
+            "end_offset": 7358
           },
           "response_type": {
             "kind": "identifier",
@@ -3853,8 +2911,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
         "data": "UnknownInteractionsClosedProtocol",
-        "start_offset": 4762,
-        "end_offset": 4795
+        "start_offset": 3462,
+        "end_offset": 3495
       },
       "methods": [
         {
@@ -3863,8 +2921,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictOneWay",
-            "start_offset": 4832,
-            "end_offset": 4844
+            "start_offset": 3532,
+            "end_offset": 3544
           }
         },
         {
@@ -3873,8 +2931,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWay",
-            "start_offset": 4883,
-            "end_offset": 4895
+            "start_offset": 3583,
+            "end_offset": 3595
           }
         },
         {
@@ -3883,8 +2941,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayFields",
-            "start_offset": 4916,
-            "end_offset": 4934
+            "start_offset": 3616,
+            "end_offset": 3634
           },
           "response_type": {
             "kind": "identifier",
@@ -3897,8 +2955,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayUnion",
-            "start_offset": 4995,
-            "end_offset": 5012
+            "start_offset": 3695,
+            "end_offset": 3712
           },
           "response_type": {
             "kind": "identifier",
@@ -3911,8 +2969,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayTable",
-            "start_offset": 5075,
-            "end_offset": 5092
+            "start_offset": 3775,
+            "end_offset": 3792
           },
           "response_type": {
             "kind": "identifier",
@@ -3925,8 +2983,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayErr",
-            "start_offset": 5156,
-            "end_offset": 5171
+            "start_offset": 3856,
+            "end_offset": 3871
           },
           "response_type": {
             "kind": "identifier",
@@ -3939,8 +2997,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayFieldsErr",
-            "start_offset": 5204,
-            "end_offset": 5225
+            "start_offset": 3904,
+            "end_offset": 3925
           },
           "response_type": {
             "kind": "identifier",
@@ -3953,8 +3011,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayUnionErr",
-            "start_offset": 5298,
-            "end_offset": 5318
+            "start_offset": 3998,
+            "end_offset": 4018
           },
           "response_type": {
             "kind": "identifier",
@@ -3967,8 +3025,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayTableErr",
-            "start_offset": 5393,
-            "end_offset": 5413
+            "start_offset": 4093,
+            "end_offset": 4113
           },
           "response_type": {
             "kind": "identifier",
@@ -3981,8 +3039,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictEvent",
-            "start_offset": 5506,
-            "end_offset": 5517
+            "start_offset": 4206,
+            "end_offset": 4217
           }
         },
         {
@@ -3991,8 +3049,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictEventFields",
-            "start_offset": 5535,
-            "end_offset": 5552
+            "start_offset": 4235,
+            "end_offset": 4252
           },
           "response_type": {
             "kind": "identifier",
@@ -4005,8 +3063,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictEventUnion",
-            "start_offset": 5610,
-            "end_offset": 5626
+            "start_offset": 4310,
+            "end_offset": 4326
           },
           "response_type": {
             "kind": "identifier",
@@ -4019,64 +3077,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictEventTable",
-            "start_offset": 5686,
-            "end_offset": 5702
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "StrictEventErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "StrictEventErr",
-            "start_offset": 5763,
-            "end_offset": 5777
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "StrictEventFieldsErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "StrictEventFieldsErr",
-            "start_offset": 5807,
-            "end_offset": 5827
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "StrictEventUnionErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "StrictEventUnionErr",
-            "start_offset": 5897,
-            "end_offset": 5916
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "StrictEventTableErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "StrictEventTableErr",
-            "start_offset": 5988,
-            "end_offset": 6007
+            "start_offset": 4386,
+            "end_offset": 4402
           },
           "response_type": {
             "kind": "identifier",
@@ -4092,8 +3094,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
         "data": "UnknownInteractionsDriverProtocol",
-        "start_offset": 6104,
-        "end_offset": 6137
+        "start_offset": 4487,
+        "end_offset": 4520
       },
       "methods": [
         {
@@ -4102,8 +3104,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictOneWay",
-            "start_offset": 6174,
-            "end_offset": 6186
+            "start_offset": 4557,
+            "end_offset": 4569
           }
         },
         {
@@ -4112,8 +3114,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleOneWay",
-            "start_offset": 6203,
-            "end_offset": 6217
+            "start_offset": 4586,
+            "end_offset": 4600
           }
         },
         {
@@ -4122,8 +3124,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWay",
-            "start_offset": 6256,
-            "end_offset": 6268
+            "start_offset": 4639,
+            "end_offset": 4651
           }
         },
         {
@@ -4132,8 +3134,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayFields",
-            "start_offset": 6289,
-            "end_offset": 6307
+            "start_offset": 4672,
+            "end_offset": 4690
           },
           "response_type": {
             "kind": "identifier",
@@ -4146,8 +3148,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayUnion",
-            "start_offset": 6368,
-            "end_offset": 6385
+            "start_offset": 4751,
+            "end_offset": 4768
           },
           "response_type": {
             "kind": "identifier",
@@ -4160,8 +3162,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayTable",
-            "start_offset": 6448,
-            "end_offset": 6465
+            "start_offset": 4831,
+            "end_offset": 4848
           },
           "response_type": {
             "kind": "identifier",
@@ -4174,8 +3176,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayErr",
-            "start_offset": 6529,
-            "end_offset": 6544
+            "start_offset": 4912,
+            "end_offset": 4927
           },
           "response_type": {
             "kind": "identifier",
@@ -4188,8 +3190,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayFieldsErr",
-            "start_offset": 6577,
-            "end_offset": 6598
+            "start_offset": 4960,
+            "end_offset": 4981
           },
           "response_type": {
             "kind": "identifier",
@@ -4202,8 +3204,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayUnionErr",
-            "start_offset": 6671,
-            "end_offset": 6691
+            "start_offset": 5054,
+            "end_offset": 5074
           },
           "response_type": {
             "kind": "identifier",
@@ -4216,8 +3218,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "StrictTwoWayTableErr",
-            "start_offset": 6766,
-            "end_offset": 6786
+            "start_offset": 5149,
+            "end_offset": 5169
           },
           "response_type": {
             "kind": "identifier",
@@ -4230,8 +3232,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleTwoWay",
-            "start_offset": 6864,
-            "end_offset": 6878
+            "start_offset": 5247,
+            "end_offset": 5261
           },
           "response_type": {
             "kind": "identifier",
@@ -4244,8 +3246,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleTwoWayFields",
-            "start_offset": 6901,
-            "end_offset": 6921
+            "start_offset": 5284,
+            "end_offset": 5304
           },
           "response_type": {
             "kind": "identifier",
@@ -4258,8 +3260,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleTwoWayUnion",
-            "start_offset": 6984,
-            "end_offset": 7003
+            "start_offset": 5367,
+            "end_offset": 5386
           },
           "response_type": {
             "kind": "identifier",
@@ -4272,8 +3274,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleTwoWayTable",
-            "start_offset": 7068,
-            "end_offset": 7087
+            "start_offset": 5451,
+            "end_offset": 5470
           },
           "response_type": {
             "kind": "identifier",
@@ -4286,8 +3288,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleTwoWayErr",
-            "start_offset": 7153,
-            "end_offset": 7170
+            "start_offset": 5536,
+            "end_offset": 5553
           },
           "response_type": {
             "kind": "identifier",
@@ -4300,8 +3302,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleTwoWayFieldsErr",
-            "start_offset": 7205,
-            "end_offset": 7228
+            "start_offset": 5588,
+            "end_offset": 5611
           },
           "response_type": {
             "kind": "identifier",
@@ -4314,8 +3316,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleTwoWayUnionErr",
-            "start_offset": 7303,
-            "end_offset": 7325
+            "start_offset": 5686,
+            "end_offset": 5708
           },
           "response_type": {
             "kind": "identifier",
@@ -4328,8 +3330,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleTwoWayTableErr",
-            "start_offset": 7402,
-            "end_offset": 7424
+            "start_offset": 5785,
+            "end_offset": 5807
           },
           "response_type": {
             "kind": "identifier",
@@ -4642,69 +3644,13 @@
           }
         },
         {
-          "identifier": "StrictEventErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "StrictEventErr",
-            "start_offset": 1878,
-            "end_offset": 1892
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "StrictEventFieldsErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "StrictEventFieldsErr",
-            "start_offset": 1922,
-            "end_offset": 1942
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "StrictEventUnionErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "StrictEventUnionErr",
-            "start_offset": 2012,
-            "end_offset": 2031
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "StrictEventTableErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "StrictEventTableErr",
-            "start_offset": 2103,
-            "end_offset": 2122
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
           "identifier": "FlexibleEvent",
           "location": {
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleEvent",
-            "start_offset": 2197,
-            "end_offset": 2210
+            "start_offset": 1880,
+            "end_offset": 1893
           }
         },
         {
@@ -4713,8 +3659,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleEventFields",
-            "start_offset": 2230,
-            "end_offset": 2249
+            "start_offset": 1913,
+            "end_offset": 1932
           },
           "response_type": {
             "kind": "identifier",
@@ -4727,8 +3673,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleEventUnion",
-            "start_offset": 2309,
-            "end_offset": 2327
+            "start_offset": 1992,
+            "end_offset": 2010
           },
           "response_type": {
             "kind": "identifier",
@@ -4741,64 +3687,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
             "data": "FlexibleEventTable",
-            "start_offset": 2389,
-            "end_offset": 2407
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "FlexibleEventErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "FlexibleEventErr",
-            "start_offset": 2470,
-            "end_offset": 2486
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "FlexibleEventFieldsErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "FlexibleEventFieldsErr",
-            "start_offset": 2518,
-            "end_offset": 2540
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "FlexibleEventUnionErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "FlexibleEventUnionErr",
-            "start_offset": 2612,
-            "end_offset": 2633
-          },
-          "response_type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        },
-        {
-          "identifier": "FlexibleEventTableErr",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/unknown_interactions.test.fidl",
-            "data": "FlexibleEventTableErr",
-            "start_offset": 2707,
-            "end_offset": 2728
+            "start_offset": 2072,
+            "end_offset": 2090
           },
           "response_type": {
             "kind": "identifier",

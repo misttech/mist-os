@@ -27,11 +27,6 @@
       ::fidl::internal::NaturalClone(storage_.a)};
 }
 
-::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse::Storage_ test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.a)};
-}
-
 ::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest::Storage_ test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.a)};
@@ -43,11 +38,6 @@
 }
 
 ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest::Storage_ test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.a)};
-}
-
-::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse::Storage_ test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.a)};
 }
@@ -116,22 +106,6 @@ std::shared_ptr<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonCompose
   }
 }
 
-std::shared_ptr<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult::Storage_> test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
 std::shared_ptr<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult::Storage_> test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult::CloneStorage_() const {
   const Storage_& storage = *storage_;
   switch (storage_->index()) {
@@ -148,39 +122,7 @@ std::shared_ptr<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedCo
   }
 }
 
-std::shared_ptr<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult::Storage_> test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
 std::shared_ptr<::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult::Storage_> test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult::Storage_> test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult::CloneStorage_() const {
   const Storage_& storage = *storage_;
   switch (storage_->index()) {
     case 1:
@@ -243,22 +185,6 @@ std::shared_ptr<::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest::St
       return std::make_shared<Storage_>(
           std::in_place_index<1>,
           ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult::Storage_> test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
     default:
       return std::make_shared<Storage_>();
   }

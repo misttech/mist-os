@@ -123,27 +123,6 @@ TEST(Event, InheritFromDomainObject) {
                 "Message wrapper must not add any state");
 }
 
-TEST(Event, DefaultConstructionErrorSyntax) {
-  static_assert(
-      !std::is_default_constructible_v<fidl::Event<test_types::ErrorSyntax::EventEmptyPayload>>);
-  static_assert(
-      !std::is_default_constructible_v<fidl::Event<test_types::ErrorSyntax::EventFooPayload>>);
-}
-
-TEST(Event, InheritFromDomainObjectErrorSyntax) {
-  static_assert(cpp17::is_base_of_v<test_types::ErrorSyntaxEventFooPayloadResult,
-                                    fidl::Event<test_types::ErrorSyntax::EventFooPayload>>);
-  static_assert(sizeof(test_types::ErrorSyntaxEventFooPayloadResult) ==
-                    sizeof(fidl::Event<test_types::ErrorSyntax::EventFooPayload>),
-                "Message wrapper must not add any state");
-
-  static_assert(cpp17::is_base_of_v<test_types::ErrorSyntaxEventEmptyPayloadResult,
-                                    fidl::Event<test_types::ErrorSyntax::EventEmptyPayload>>);
-  static_assert(sizeof(test_types::ErrorSyntaxEventEmptyPayloadResult) ==
-                    sizeof(fidl::Event<test_types::ErrorSyntax::EventEmptyPayload>),
-                "Message wrapper must not add any state");
-}
-
 TEST(Result, DefaultConstruction) {
   static_assert(
       !cpp17::is_default_constructible_v<fidl::Result<test_types::ErrorSyntax::EmptyPayload>>,

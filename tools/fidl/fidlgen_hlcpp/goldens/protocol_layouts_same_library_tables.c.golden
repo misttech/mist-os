@@ -4,11 +4,8 @@
 
 #include <lib/fidl/internal.h>
 
-const struct FidlCodedTable test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResponseTable;
-const struct FidlCodedTable test_protocollayoutssamelibrary_TablePayloadTable;
 const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResponseTable;
 const struct FidlCodedUnion test_protocollayoutssamelibrary_UnionPayloadTable;
-const struct FidlCodedTable test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResponseTable;
 const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResponseTable;
 
 static const struct FidlTableField Fields73test_protocollayoutssamelibrary_ComposedProtocolOneWayAnonComposedRequest[] = {
@@ -44,17 +41,6 @@ const struct FidlCodedTable test_protocollayoutssamelibrary_ComposedProtocolTwoW
     .field_count = 1,
 };
 
-static const struct FidlTableField Fields81test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_Response[] = {
-    {.ordinal = 1, .type = (const fidl_type_t*)&fidl_internal_kUint16Table},
-};
-const struct FidlCodedTable test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResponseTable = {
-    .tag = kFidlTypeTable,
-    .name = "test.protocollayoutssamelibrary/ComposedProtocol_OnAnonComposedWithError_Response",
-    .is_resource = kFidlIsResource_NotResource,
-    .fields = Fields81test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_Response,
-    .field_count = 1,
-};
-
 static const struct FidlTableField Fields61test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequest[] = {
     {.ordinal = 1, .type = (const fidl_type_t*)&fidl_internal_kUint16Table},
 };
@@ -85,17 +71,6 @@ const struct FidlCodedTable test_protocollayoutssamelibrary_MainProtocolTwoWayAn
     .name = "test.protocollayoutssamelibrary/MainProtocolTwoWayAnonWithErrorRequest",
     .is_resource = kFidlIsResource_NotResource,
     .fields = Fields70test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequest,
-    .field_count = 1,
-};
-
-static const struct FidlTableField Fields69test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_Response[] = {
-    {.ordinal = 1, .type = (const fidl_type_t*)&fidl_internal_kUint16Table},
-};
-const struct FidlCodedTable test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResponseTable = {
-    .tag = kFidlTypeTable,
-    .name = "test.protocollayoutssamelibrary/MainProtocol_OnAnonWithError_Response",
-    .is_resource = kFidlIsResource_NotResource,
-    .fields = Fields69test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_Response,
     .field_count = 1,
 };
 
@@ -152,52 +127,6 @@ const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocolTwoW
     .nullable = kFidlNullability_Nullable,
     .fields = Fields73test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequest,
     .field_count = 1,
-};
-
-static const struct FidlUnionField Fields79test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_Result[] = {
-    {.type = (const fidl_type_t*)&test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResponseTable},
-    {.type = (const fidl_type_t*)&fidl_internal_kUint32Table},
-};
-const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.protocollayoutssamelibrary/ComposedProtocol_OnAnonComposedWithError_Result",
-    .strictness = kFidlStrictness_Strict,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nonnullable,
-    .fields = Fields79test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_Result,
-    .field_count = 2,
-};
-const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultNullableRefTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.protocollayoutssamelibrary/ComposedProtocol_OnAnonComposedWithError_Result",
-    .strictness = kFidlStrictness_Strict,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nullable,
-    .fields = Fields79test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_Result,
-    .field_count = 2,
-};
-
-static const struct FidlUnionField Fields80test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_Result[] = {
-    {.type = (const fidl_type_t*)&test_protocollayoutssamelibrary_TablePayloadTable},
-    {.type = (const fidl_type_t*)&fidl_internal_kUint32Table},
-};
-const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.protocollayoutssamelibrary/ComposedProtocol_OnNamedComposedWithError_Result",
-    .strictness = kFidlStrictness_Strict,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nonnullable,
-    .fields = Fields80test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_Result,
-    .field_count = 2,
-};
-const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultNullableRefTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.protocollayoutssamelibrary/ComposedProtocol_OnNamedComposedWithError_Result",
-    .strictness = kFidlStrictness_Strict,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nullable,
-    .fields = Fields80test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_Result,
-    .field_count = 2,
 };
 
 static const struct FidlUnionField Fields85test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_Response[] = {
@@ -310,52 +239,6 @@ const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolTwoWayAn
     .nullable = kFidlNullability_Nullable,
     .fields = Fields61test_protocollayoutssamelibrary_MainProtocolTwoWayAnonRequest,
     .field_count = 1,
-};
-
-static const struct FidlUnionField Fields67test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_Result[] = {
-    {.type = (const fidl_type_t*)&test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResponseTable},
-    {.type = (const fidl_type_t*)&fidl_internal_kUint32Table},
-};
-const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.protocollayoutssamelibrary/MainProtocol_OnAnonWithError_Result",
-    .strictness = kFidlStrictness_Strict,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nonnullable,
-    .fields = Fields67test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_Result,
-    .field_count = 2,
-};
-const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultNullableRefTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.protocollayoutssamelibrary/MainProtocol_OnAnonWithError_Result",
-    .strictness = kFidlStrictness_Strict,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nullable,
-    .fields = Fields67test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_Result,
-    .field_count = 2,
-};
-
-static const struct FidlUnionField Fields68test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_Result[] = {
-    {.type = (const fidl_type_t*)&test_protocollayoutssamelibrary_TablePayloadTable},
-    {.type = (const fidl_type_t*)&fidl_internal_kUint32Table},
-};
-const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.protocollayoutssamelibrary/MainProtocol_OnLocalWithError_Result",
-    .strictness = kFidlStrictness_Strict,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nonnullable,
-    .fields = Fields68test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_Result,
-    .field_count = 2,
-};
-const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultNullableRefTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.protocollayoutssamelibrary/MainProtocol_OnLocalWithError_Result",
-    .strictness = kFidlStrictness_Strict,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nullable,
-    .fields = Fields68test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_Result,
-    .field_count = 2,
 };
 
 static const struct FidlUnionField Fields73test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_Response[] = {

@@ -256,26 +256,6 @@ namespace internal {
       static inline ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest Convert(::test::unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest&&);
     };
     template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Response Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Response&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Response Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Response&&);
-    };
-    template<>
     struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest> {
       using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest;
       static inline ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest&&);
@@ -284,26 +264,6 @@ namespace internal {
     struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest> {
       using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest;
       static inline ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest Convert(::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Response Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Response&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response&&);
     };
     template<>
     struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse> {
@@ -346,26 +306,6 @@ namespace internal {
       static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest&&);
     };
     template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Response Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Response&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response&&);
-    };
-    template<>
     struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest> {
       using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest;
       static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest&&);
@@ -374,26 +314,6 @@ namespace internal {
     struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest> {
       using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest;
       static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Response Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Response&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response&&);
     };
     template<>
     struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse> {
@@ -434,26 +354,6 @@ namespace internal {
     struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest> {
       using NaturalType = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest;
       static inline ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Response Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Response&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response&&);
     };
     template<>
     struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse> {
@@ -636,16 +536,6 @@ namespace internal {
       static inline ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest Convert(::test::unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest&&);
     };
     template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Response Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Response&&);
-    };
-    template<>
     struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest> {
       using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest;
       static inline ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest&&);
@@ -654,16 +544,6 @@ namespace internal {
     struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest> {
       using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest;
       static inline ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest Convert(::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Response Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Response&&);
     };
     template<>
     struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse> {
@@ -696,16 +576,6 @@ namespace internal {
       static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest&&);
     };
     template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Response Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Response&&);
-    };
-    template<>
     struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest> {
       using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest;
       static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest&&);
@@ -714,16 +584,6 @@ namespace internal {
     struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest> {
       using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest;
       static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response&&);
     };
     template<>
     struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse> {
@@ -754,16 +614,6 @@ namespace internal {
     struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest> {
       using NaturalType = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest;
       static inline ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Response Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Response&&);
     };
     template<>
     struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse> {
@@ -1016,56 +866,6 @@ namespace internal {
       static inline ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest Convert(::test::unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest&&);
     };
     template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Response Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Response&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result&&);
-    };
-    template<>
     struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest> {
       using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest;
       static inline ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest&&);
@@ -1074,56 +874,6 @@ namespace internal {
     struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest> {
       using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest;
       static inline ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest Convert(::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Response Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Response&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result&&);
     };
     template<>
     struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse> {
@@ -1196,56 +946,6 @@ namespace internal {
       static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest&&);
     };
     template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result&&);
-    };
-    template<>
     struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest> {
       using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest;
       static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest&&);
@@ -1254,56 +954,6 @@ namespace internal {
     struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest> {
       using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest;
       static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result&&);
     };
     template<>
     struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse> {
@@ -1374,56 +1024,6 @@ namespace internal {
     struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest> {
       using NaturalType = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest;
       static inline ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response;
-      static inline ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse;
-      static inline ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result&&);
-    };
-    template<>
-    struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult> {
-      using HLCPPType = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result;
-      static inline ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult&&);
-    };
-    template<>
-    struct HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result> {
-      using NaturalType = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult;
-      static inline ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result&&);
     };
     template<>
     struct NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse> {
@@ -1795,28 +1395,6 @@ namespace internal {
           .some_field = ::fidl::HLCPPToNatural(std::move(value.some_field)),
       } };
     }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Response hlcpp;
-        hlcpp.__reserved = ::fidl::NaturalToHLCPP(std::move(value.__reserved()));
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Response&& value) {
-      return ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse{ {
-          .__reserved = ::fidl::HLCPPToNatural(std::move(value.__reserved)),
-      } };
-    }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Response hlcpp;
-        hlcpp.some_field = ::fidl::NaturalToHLCPP(std::move(value.some_field()));
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Response&& value) {
-      return ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse{ {
-          .some_field = ::fidl::HLCPPToNatural(std::move(value.some_field)),
-      } };
-    }
     ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest&& value) {
       ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest hlcpp;
         hlcpp.some_field = ::fidl::NaturalToHLCPP(std::move(value.some_field()));
@@ -1825,28 +1403,6 @@ namespace internal {
 
     ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest>::Convert(::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest&& value) {
       return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest{ {
-          .some_field = ::fidl::HLCPPToNatural(std::move(value.some_field)),
-      } };
-    }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Response hlcpp;
-        hlcpp.__reserved = ::fidl::NaturalToHLCPP(std::move(value.__reserved()));
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Response&& value) {
-      return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse{ {
-          .__reserved = ::fidl::HLCPPToNatural(std::move(value.__reserved)),
-      } };
-    }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response hlcpp;
-        hlcpp.some_field = ::fidl::NaturalToHLCPP(std::move(value.some_field()));
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response&& value) {
-      return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse{ {
           .some_field = ::fidl::HLCPPToNatural(std::move(value.some_field)),
       } };
     }
@@ -1894,28 +1450,6 @@ namespace internal {
           .some_field = ::fidl::HLCPPToNatural(std::move(value.some_field)),
       } };
     }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Response hlcpp;
-        hlcpp.__reserved = ::fidl::NaturalToHLCPP(std::move(value.__reserved()));
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Response&& value) {
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse{ {
-          .__reserved = ::fidl::HLCPPToNatural(std::move(value.__reserved)),
-      } };
-    }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response hlcpp;
-        hlcpp.some_field = ::fidl::NaturalToHLCPP(std::move(value.some_field()));
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response&& value) {
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse{ {
-          .some_field = ::fidl::HLCPPToNatural(std::move(value.some_field)),
-      } };
-    }
     ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest&& value) {
       ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest hlcpp;
         hlcpp.some_field = ::fidl::NaturalToHLCPP(std::move(value.some_field()));
@@ -1924,28 +1458,6 @@ namespace internal {
 
     ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest&& value) {
       return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest{ {
-          .some_field = ::fidl::HLCPPToNatural(std::move(value.some_field)),
-      } };
-    }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Response hlcpp;
-        hlcpp.__reserved = ::fidl::NaturalToHLCPP(std::move(value.__reserved()));
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Response&& value) {
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse{ {
-          .__reserved = ::fidl::HLCPPToNatural(std::move(value.__reserved)),
-      } };
-    }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response hlcpp;
-        hlcpp.some_field = ::fidl::NaturalToHLCPP(std::move(value.some_field()));
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response&& value) {
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse{ {
           .some_field = ::fidl::HLCPPToNatural(std::move(value.some_field)),
       } };
     }
@@ -1990,28 +1502,6 @@ namespace internal {
 
     ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest>::Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest&& value) {
       return ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest{ {
-          .some_field = ::fidl::HLCPPToNatural(std::move(value.some_field)),
-      } };
-    }
-    ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Response hlcpp;
-        hlcpp.__reserved = ::fidl::NaturalToHLCPP(std::move(value.__reserved()));
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Response&& value) {
-      return ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse{ {
-          .__reserved = ::fidl::HLCPPToNatural(std::move(value.__reserved)),
-      } };
-    }
-    ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response hlcpp;
-        hlcpp.some_field = ::fidl::NaturalToHLCPP(std::move(value.some_field()));
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response&& value) {
-      return ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse{ {
           .some_field = ::fidl::HLCPPToNatural(std::move(value.some_field)),
       } };
     }
@@ -2233,21 +1723,6 @@ namespace internal {
         }
       return natural;
     }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Response hlcpp;
-        if (value.some_field().has_value()) {
-          hlcpp.set_some_field(::fidl::NaturalToHLCPP(std::move(value.some_field().value())));
-        }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Response&& value) {
-      ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse natural;
-        if (value.has_some_field()) {
-          natural.some_field() = ::fidl::HLCPPToNatural(std::move(*value.mutable_some_field()));
-        }
-      return natural;
-    }
     ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest&& value) {
       ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest hlcpp;
         if (value.some_field().has_value()) {
@@ -2258,21 +1733,6 @@ namespace internal {
 
     ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest>::Convert(::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest&& value) {
       ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest natural;
-        if (value.has_some_field()) {
-          natural.some_field() = ::fidl::HLCPPToNatural(std::move(*value.mutable_some_field()));
-        }
-      return natural;
-    }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Response hlcpp;
-        if (value.some_field().has_value()) {
-          hlcpp.set_some_field(::fidl::NaturalToHLCPP(std::move(value.some_field().value())));
-        }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Response&& value) {
-      ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse natural;
         if (value.has_some_field()) {
           natural.some_field() = ::fidl::HLCPPToNatural(std::move(*value.mutable_some_field()));
         }
@@ -2323,21 +1783,6 @@ namespace internal {
         }
       return natural;
     }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Response hlcpp;
-        if (value.some_field().has_value()) {
-          hlcpp.set_some_field(::fidl::NaturalToHLCPP(std::move(value.some_field().value())));
-        }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Response&& value) {
-      ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse natural;
-        if (value.has_some_field()) {
-          natural.some_field() = ::fidl::HLCPPToNatural(std::move(*value.mutable_some_field()));
-        }
-      return natural;
-    }
     ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest&& value) {
       ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest hlcpp;
         if (value.some_field().has_value()) {
@@ -2348,21 +1793,6 @@ namespace internal {
 
     ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest&& value) {
       ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest natural;
-        if (value.has_some_field()) {
-          natural.some_field() = ::fidl::HLCPPToNatural(std::move(*value.mutable_some_field()));
-        }
-      return natural;
-    }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response hlcpp;
-        if (value.some_field().has_value()) {
-          hlcpp.set_some_field(::fidl::NaturalToHLCPP(std::move(value.some_field().value())));
-        }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response&& value) {
-      ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse natural;
         if (value.has_some_field()) {
           natural.some_field() = ::fidl::HLCPPToNatural(std::move(*value.mutable_some_field()));
         }
@@ -2408,21 +1838,6 @@ namespace internal {
 
     ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest>::Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest&& value) {
       ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest natural;
-        if (value.has_some_field()) {
-          natural.some_field() = ::fidl::HLCPPToNatural(std::move(*value.mutable_some_field()));
-        }
-      return natural;
-    }
-    ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Response hlcpp;
-        if (value.some_field().has_value()) {
-          hlcpp.set_some_field(::fidl::NaturalToHLCPP(std::move(value.some_field().value())));
-        }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Response&& value) {
-      ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse natural;
         if (value.has_some_field()) {
           natural.some_field() = ::fidl::HLCPPToNatural(std::move(*value.mutable_some_field()));
         }
@@ -3020,140 +2435,6 @@ namespace internal {
             return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
       }
     }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result");
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result");
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Response hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse::Tag::kSomeField:
-            hlcpp.set_some_field(::fidl::NaturalToHLCPP(std::move(value.some_field().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Response&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Response::Tag::kSomeField:
-            return _NaturalUnion::WithSomeField(
-                  ::fidl::HLCPPToNatural(std::move(value.some_field())));
-          default:
-            return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result");
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result");
-      }
-    }
     ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest&& value) {
       ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest hlcpp;
       switch (value.Which()) {
@@ -3174,140 +2455,6 @@ namespace internal {
                   ::fidl::HLCPPToNatural(std::move(value.some_field())));
           default:
             return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result");
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result");
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Response hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::Tag::kSomeField:
-            hlcpp.set_some_field(::fidl::NaturalToHLCPP(std::move(value.some_field().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Response&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Response::Tag::kSomeField:
-            return _NaturalUnion::WithSomeField(
-                  ::fidl::HLCPPToNatural(std::move(value.some_field())));
-          default:
-            return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result");
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result");
       }
     }
     ::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse&& value) {
@@ -3488,140 +2635,6 @@ namespace internal {
             return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
       }
     }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result");
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result");
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::Tag::kSomeField:
-            hlcpp.set_some_field(::fidl::NaturalToHLCPP(std::move(value.some_field().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response::Tag::kSomeField:
-            return _NaturalUnion::WithSomeField(
-                  ::fidl::HLCPPToNatural(std::move(value.some_field())));
-          default:
-            return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result");
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result");
-      }
-    }
     ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest&& value) {
       ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest hlcpp;
       switch (value.Which()) {
@@ -3642,140 +2655,6 @@ namespace internal {
                   ::fidl::HLCPPToNatural(std::move(value.some_field())));
           default:
             return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result");
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result");
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::Tag::kSomeField:
-            hlcpp.set_some_field(::fidl::NaturalToHLCPP(std::move(value.some_field().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response::Tag::kSomeField:
-            return _NaturalUnion::WithSomeField(
-                  ::fidl::HLCPPToNatural(std::move(value.some_field())));
-          default:
-            return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result");
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result");
       }
     }
     ::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>::Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse&& value) {
@@ -3954,140 +2833,6 @@ namespace internal {
                   ::fidl::HLCPPToNatural(std::move(value.some_field())));
           default:
             return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result");
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result");
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse>::Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse&& value) {
-      ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::Tag::kSomeField:
-            hlcpp.set_some_field(::fidl::NaturalToHLCPP(std::move(value.some_field().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response>::Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response::Tag::kSomeField:
-            return _NaturalUnion::WithSomeField(
-                  ::fidl::HLCPPToNatural(std::move(value.some_field())));
-          default:
-            return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result");
-      }
-    }
-    ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult>::Convert(::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult&& value) {
-      ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result hlcpp;
-      switch (value.Which()) {
-          case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult::Tag::kResponse:
-            hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-            break;
-          case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult::Tag::kErr:
-            hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-            break;
-        default:
-          break;
-      }
-      return hlcpp;
-    }
-
-    ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult HLCPPToNaturalTraits<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result>::Convert(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result&& value) {
-      using _NaturalUnion = ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult;
-      switch (value.Which()) {
-          case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result::Tag::kResponse:
-            return _NaturalUnion::WithResponse(
-                  ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result::Tag::kErr:
-            return _NaturalUnion::WithErr(
-                  ::fidl::HLCPPToNatural(std::move(value.err())));
-          default:
-            ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result");
       }
     }
     ::test::unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse NaturalToHLCPPTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse>::Convert(::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse&& value) {

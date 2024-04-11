@@ -46,15 +46,6 @@ pub struct ComposedProtocolTwoWayAnonComposedWithErrorRequest {
 impl fidl::Persistable for ComposedProtocolTwoWayAnonComposedWithErrorRequest {}
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct ComposedProtocolOnAnonComposedWithErrorResponse {
-    pub a: Option<u16>,
-    #[doc(hidden)]
-    pub __source_breaking: fidl::marker::SourceBreaking,
-}
-
-impl fidl::Persistable for ComposedProtocolOnAnonComposedWithErrorResponse {}
-
-#[derive(Clone, Debug, Default, PartialEq)]
 pub struct MainProtocolOneWayAnonRequest {
     pub a: Option<u16>,
     #[doc(hidden)]
@@ -80,15 +71,6 @@ pub struct MainProtocolTwoWayAnonWithErrorRequest {
 }
 
 impl fidl::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct MainProtocolOnAnonWithErrorResponse {
-    pub a: Option<u16>,
-    #[doc(hidden)]
-    pub __source_breaking: fidl::marker::SourceBreaking,
-}
-
-impl fidl::Persistable for MainProtocolOnAnonWithErrorResponse {}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TablePayload {
@@ -357,10 +339,7 @@ impl fidl::endpoints::ProtocolMarker for ComposedProtocolMarker {
 }
 pub type ComposedProtocolTwoWayAnonComposedWithErrorResult =
     Result<ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>;
-pub type ComposedProtocolOnAnonComposedWithErrorResult =
-    Result<ComposedProtocolOnAnonComposedWithErrorResponse, u32>;
 pub type ComposedProtocolTwoWayNamedComposedWithErrorResult = Result<UnionPayload, u32>;
-pub type ComposedProtocolOnNamedComposedWithErrorResult = Result<TablePayload, u32>;
 
 pub trait ComposedProtocolProxyInterface: Send + Sync {
     fn r#one_way_anon_composed(
@@ -752,9 +731,7 @@ impl futures::Stream for ComposedProtocolEventStream {
 #[derive(Debug)]
 pub enum ComposedProtocolEvent {
     OnAnonComposed { payload: ComposedProtocolOnAnonComposedRequest },
-    OnAnonComposedWithError { result: ComposedProtocolOnAnonComposedWithErrorResult },
     OnNamedComposed { payload: UnionPayload },
-    OnNamedComposedWithError { result: ComposedProtocolOnNamedComposedWithErrorResult },
 }
 
 impl ComposedProtocolEvent {
@@ -767,29 +744,9 @@ impl ComposedProtocolEvent {
         }
     }
     #[allow(irrefutable_let_patterns)]
-    pub fn into_on_anon_composed_with_error(
-        self,
-    ) -> Option<ComposedProtocolOnAnonComposedWithErrorResult> {
-        if let ComposedProtocolEvent::OnAnonComposedWithError { result } = self {
-            Some((result))
-        } else {
-            None
-        }
-    }
-    #[allow(irrefutable_let_patterns)]
     pub fn into_on_named_composed(self) -> Option<UnionPayload> {
         if let ComposedProtocolEvent::OnNamedComposed { payload } = self {
             Some((payload))
-        } else {
-            None
-        }
-    }
-    #[allow(irrefutable_let_patterns)]
-    pub fn into_on_named_composed_with_error(
-        self,
-    ) -> Option<ComposedProtocolOnNamedComposedWithErrorResult> {
-        if let ComposedProtocolEvent::OnNamedComposedWithError { result } = self {
-            Some((result))
         } else {
             None
         }
@@ -811,16 +768,6 @@ impl ComposedProtocolEvent {
                 )?;
                 Ok((ComposedProtocolEvent::OnAnonComposed { payload: out }))
             }
-            0x297a909727d08a60 => {
-                let mut out = fidl::new_empty!(fidl::encoding::ResultType<ComposedProtocolOnAnonComposedWithErrorResponse, u32>);
-                fidl::encoding::Decoder::decode_into::<
-                    fidl::encoding::ResultType<
-                        ComposedProtocolOnAnonComposedWithErrorResponse,
-                        u32,
-                    >,
-                >(&tx_header, _body_bytes, _handles, &mut out)?;
-                Ok((ComposedProtocolEvent::OnAnonComposedWithError { result: out.map(|x| x) }))
-            }
             0x17c4edb4a4a36d7b => {
                 let mut out = fidl::new_empty!(UnionPayload);
                 fidl::encoding::Decoder::decode_into::<UnionPayload>(
@@ -830,13 +777,6 @@ impl ComposedProtocolEvent {
                     &mut out,
                 )?;
                 Ok((ComposedProtocolEvent::OnNamedComposed { payload: out }))
-            }
-            0x3ff74c1cafdbabcf => {
-                let mut out = fidl::new_empty!(fidl::encoding::ResultType<TablePayload, u32>);
-                fidl::encoding::Decoder::decode_into::<
-                    fidl::encoding::ResultType<TablePayload, u32>,
-                >(&tx_header, _body_bytes, _handles, &mut out)?;
-                Ok((ComposedProtocolEvent::OnNamedComposedWithError { result: out.map(|x| x) }))
             }
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal,
@@ -1175,35 +1115,11 @@ impl ComposedProtocolControlHandle {
         )
     }
 
-    pub fn send_on_anon_composed_with_error(
-        &self,
-        mut result: Result<&ComposedProtocolOnAnonComposedWithErrorResponse, u32>,
-    ) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::ResultType<ComposedProtocolOnAnonComposedWithErrorResponse, u32>>(
-            result,
-            0,
-            0x297a909727d08a60,
-            fidl::encoding::DynamicFlags::empty()
-        )
-    }
-
     pub fn send_on_named_composed(&self, mut payload: &UnionPayload) -> Result<(), fidl::Error> {
         self.inner.send::<UnionPayload>(
             payload,
             0,
             0x17c4edb4a4a36d7b,
-            fidl::encoding::DynamicFlags::empty(),
-        )
-    }
-
-    pub fn send_on_named_composed_with_error(
-        &self,
-        mut result: Result<&TablePayload, u32>,
-    ) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::ResultType<TablePayload, u32>>(
-            result,
-            0,
-            0x3ff74c1cafdbabcf,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -1498,10 +1414,8 @@ impl fidl::endpoints::ProtocolMarker for MainProtocolMarker {
     const DEBUG_NAME: &'static str = "(anonymous) MainProtocol";
 }
 pub type MainProtocolTwoWayLocalWithErrorResult = Result<UnionPayload, u32>;
-pub type MainProtocolOnLocalWithErrorResult = Result<TablePayload, u32>;
 pub type MainProtocolTwoWayAnonWithErrorResult =
     Result<MainProtocolTwoWayAnonWithErrorResponse, u32>;
-pub type MainProtocolOnAnonWithErrorResult = Result<MainProtocolOnAnonWithErrorResponse, u32>;
 
 pub trait MainProtocolProxyInterface: Send + Sync {
     fn r#one_way_anon_composed(
@@ -2144,13 +2058,9 @@ impl futures::Stream for MainProtocolEventStream {
 #[derive(Debug)]
 pub enum MainProtocolEvent {
     OnAnonComposed { payload: ComposedProtocolOnAnonComposedRequest },
-    OnAnonComposedWithError { result: ComposedProtocolOnAnonComposedWithErrorResult },
     OnNamedComposed { payload: UnionPayload },
-    OnNamedComposedWithError { result: ComposedProtocolOnNamedComposedWithErrorResult },
     OnLocal { payload: UnionPayload },
-    OnLocalWithError { result: MainProtocolOnLocalWithErrorResult },
     OnAnon { payload: MainProtocolOnAnonRequest },
-    OnAnonWithError { result: MainProtocolOnAnonWithErrorResult },
 }
 
 impl MainProtocolEvent {
@@ -2158,16 +2068,6 @@ impl MainProtocolEvent {
     pub fn into_on_anon_composed(self) -> Option<ComposedProtocolOnAnonComposedRequest> {
         if let MainProtocolEvent::OnAnonComposed { payload } = self {
             Some((payload))
-        } else {
-            None
-        }
-    }
-    #[allow(irrefutable_let_patterns)]
-    pub fn into_on_anon_composed_with_error(
-        self,
-    ) -> Option<ComposedProtocolOnAnonComposedWithErrorResult> {
-        if let MainProtocolEvent::OnAnonComposedWithError { result } = self {
-            Some((result))
         } else {
             None
         }
@@ -2181,16 +2081,6 @@ impl MainProtocolEvent {
         }
     }
     #[allow(irrefutable_let_patterns)]
-    pub fn into_on_named_composed_with_error(
-        self,
-    ) -> Option<ComposedProtocolOnNamedComposedWithErrorResult> {
-        if let MainProtocolEvent::OnNamedComposedWithError { result } = self {
-            Some((result))
-        } else {
-            None
-        }
-    }
-    #[allow(irrefutable_let_patterns)]
     pub fn into_on_local(self) -> Option<UnionPayload> {
         if let MainProtocolEvent::OnLocal { payload } = self {
             Some((payload))
@@ -2199,25 +2089,9 @@ impl MainProtocolEvent {
         }
     }
     #[allow(irrefutable_let_patterns)]
-    pub fn into_on_local_with_error(self) -> Option<MainProtocolOnLocalWithErrorResult> {
-        if let MainProtocolEvent::OnLocalWithError { result } = self {
-            Some((result))
-        } else {
-            None
-        }
-    }
-    #[allow(irrefutable_let_patterns)]
     pub fn into_on_anon(self) -> Option<MainProtocolOnAnonRequest> {
         if let MainProtocolEvent::OnAnon { payload } = self {
             Some((payload))
-        } else {
-            None
-        }
-    }
-    #[allow(irrefutable_let_patterns)]
-    pub fn into_on_anon_with_error(self) -> Option<MainProtocolOnAnonWithErrorResult> {
-        if let MainProtocolEvent::OnAnonWithError { result } = self {
-            Some((result))
         } else {
             None
         }
@@ -2239,16 +2113,6 @@ impl MainProtocolEvent {
                 )?;
                 Ok((MainProtocolEvent::OnAnonComposed { payload: out }))
             }
-            0x297a909727d08a60 => {
-                let mut out = fidl::new_empty!(fidl::encoding::ResultType<ComposedProtocolOnAnonComposedWithErrorResponse, u32>);
-                fidl::encoding::Decoder::decode_into::<
-                    fidl::encoding::ResultType<
-                        ComposedProtocolOnAnonComposedWithErrorResponse,
-                        u32,
-                    >,
-                >(&tx_header, _body_bytes, _handles, &mut out)?;
-                Ok((MainProtocolEvent::OnAnonComposedWithError { result: out.map(|x| x) }))
-            }
             0x17c4edb4a4a36d7b => {
                 let mut out = fidl::new_empty!(UnionPayload);
                 fidl::encoding::Decoder::decode_into::<UnionPayload>(
@@ -2258,13 +2122,6 @@ impl MainProtocolEvent {
                     &mut out,
                 )?;
                 Ok((MainProtocolEvent::OnNamedComposed { payload: out }))
-            }
-            0x3ff74c1cafdbabcf => {
-                let mut out = fidl::new_empty!(fidl::encoding::ResultType<TablePayload, u32>);
-                fidl::encoding::Decoder::decode_into::<
-                    fidl::encoding::ResultType<TablePayload, u32>,
-                >(&tx_header, _body_bytes, _handles, &mut out)?;
-                Ok((MainProtocolEvent::OnNamedComposedWithError { result: out.map(|x| x) }))
             }
             0x71e90a3d364d2e8d => {
                 let mut out = fidl::new_empty!(UnionPayload);
@@ -2276,13 +2133,6 @@ impl MainProtocolEvent {
                 )?;
                 Ok((MainProtocolEvent::OnLocal { payload: out }))
             }
-            0x2dac7e32bd351bdb => {
-                let mut out = fidl::new_empty!(fidl::encoding::ResultType<TablePayload, u32>);
-                fidl::encoding::Decoder::decode_into::<
-                    fidl::encoding::ResultType<TablePayload, u32>,
-                >(&tx_header, _body_bytes, _handles, &mut out)?;
-                Ok((MainProtocolEvent::OnLocalWithError { result: out.map(|x| x) }))
-            }
             0xd8fa6d0f5fabb94 => {
                 let mut out = fidl::new_empty!(MainProtocolOnAnonRequest);
                 fidl::encoding::Decoder::decode_into::<MainProtocolOnAnonRequest>(
@@ -2292,13 +2142,6 @@ impl MainProtocolEvent {
                     &mut out,
                 )?;
                 Ok((MainProtocolEvent::OnAnon { payload: out }))
-            }
-            0x6658cf43e550fa02 => {
-                let mut out = fidl::new_empty!(fidl::encoding::ResultType<MainProtocolOnAnonWithErrorResponse, u32>);
-                fidl::encoding::Decoder::decode_into::<
-                    fidl::encoding::ResultType<MainProtocolOnAnonWithErrorResponse, u32>,
-                >(&tx_header, _body_bytes, _handles, &mut out)?;
-                Ok((MainProtocolEvent::OnAnonWithError { result: out.map(|x| x) }))
             }
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal,
@@ -2812,35 +2655,11 @@ impl MainProtocolControlHandle {
         )
     }
 
-    pub fn send_on_anon_composed_with_error(
-        &self,
-        mut result: Result<&ComposedProtocolOnAnonComposedWithErrorResponse, u32>,
-    ) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::ResultType<ComposedProtocolOnAnonComposedWithErrorResponse, u32>>(
-            result,
-            0,
-            0x297a909727d08a60,
-            fidl::encoding::DynamicFlags::empty()
-        )
-    }
-
     pub fn send_on_named_composed(&self, mut payload: &UnionPayload) -> Result<(), fidl::Error> {
         self.inner.send::<UnionPayload>(
             payload,
             0,
             0x17c4edb4a4a36d7b,
-            fidl::encoding::DynamicFlags::empty(),
-        )
-    }
-
-    pub fn send_on_named_composed_with_error(
-        &self,
-        mut result: Result<&TablePayload, u32>,
-    ) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::ResultType<TablePayload, u32>>(
-            result,
-            0,
-            0x3ff74c1cafdbabcf,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -2854,35 +2673,11 @@ impl MainProtocolControlHandle {
         )
     }
 
-    pub fn send_on_local_with_error(
-        &self,
-        mut result: Result<&TablePayload, u32>,
-    ) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::ResultType<TablePayload, u32>>(
-            result,
-            0,
-            0x2dac7e32bd351bdb,
-            fidl::encoding::DynamicFlags::empty(),
-        )
-    }
-
     pub fn send_on_anon(&self, mut payload: &MainProtocolOnAnonRequest) -> Result<(), fidl::Error> {
         self.inner.send::<MainProtocolOnAnonRequest>(
             payload,
             0,
             0xd8fa6d0f5fabb94,
-            fidl::encoding::DynamicFlags::empty(),
-        )
-    }
-
-    pub fn send_on_anon_with_error(
-        &self,
-        mut result: Result<&MainProtocolOnAnonWithErrorResponse, u32>,
-    ) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::ResultType<MainProtocolOnAnonWithErrorResponse, u32>>(
-            result,
-            0,
-            0x6658cf43e550fa02,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -3942,174 +3737,6 @@ mod internal {
         }
     }
 
-    impl ComposedProtocolOnAnonComposedWithErrorResponse {
-        #[inline(always)]
-        fn max_ordinal_present(&self) -> u64 {
-            if let Some(_) = self.a {
-                return 1;
-            }
-            0
-        }
-    }
-
-    unsafe impl fidl::encoding::TypeMarker for ComposedProtocolOnAnonComposedWithErrorResponse {
-        type Owned = Self;
-
-        #[inline(always)]
-        fn inline_align(_context: fidl::encoding::Context) -> usize {
-            8
-        }
-
-        #[inline(always)]
-        fn inline_size(_context: fidl::encoding::Context) -> usize {
-            16
-        }
-    }
-    impl fidl::encoding::ValueTypeMarker for ComposedProtocolOnAnonComposedWithErrorResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
-
-    unsafe impl fidl::encoding::Encode<ComposedProtocolOnAnonComposedWithErrorResponse>
-        for &ComposedProtocolOnAnonComposedWithErrorResponse
-    {
-        unsafe fn encode(
-            self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
-            offset: usize,
-            mut depth: fidl::encoding::Depth,
-        ) -> fidl::Result<()> {
-            encoder.debug_check_bounds::<ComposedProtocolOnAnonComposedWithErrorResponse>(offset);
-            // Vector header
-            let max_ordinal: u64 = self.max_ordinal_present();
-            encoder.write_num(max_ordinal, offset);
-            encoder.write_num(fidl::encoding::ALLOC_PRESENT_U64, offset + 8);
-            // Calling encoder.out_of_line_offset(0) is not allowed.
-            if max_ordinal == 0 {
-                return Ok(());
-            }
-            depth.increment()?;
-            let envelope_size = 8;
-            let bytes_len = max_ordinal as usize * envelope_size;
-            #[allow(unused_variables)]
-            let offset = encoder.out_of_line_offset(bytes_len);
-            let mut _prev_end_offset: usize = 0;
-            if 1 > max_ordinal {
-                return Ok(());
-            }
-
-            // Write at offset+(ordinal-1)*envelope_size, since ordinals are one-based and envelopes
-            // are envelope_size bytes.
-            let cur_offset: usize = (1 - 1) * envelope_size;
-
-            // Zero reserved fields.
-            encoder.padding(offset + _prev_end_offset, cur_offset - _prev_end_offset);
-
-            // Safety:
-            // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
-            // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
-            //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<u16>(
-                self.a.as_ref().map(<u16 as fidl::encoding::ValueTypeMarker>::borrow),
-                encoder,
-                offset + cur_offset,
-                depth,
-            )?;
-
-            _prev_end_offset = cur_offset + envelope_size;
-
-            Ok(())
-        }
-    }
-
-    impl fidl::encoding::Decode<Self> for ComposedProtocolOnAnonComposedWithErrorResponse {
-        #[inline(always)]
-        fn new_empty() -> Self {
-            Self::default()
-        }
-
-        unsafe fn decode(
-            &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
-            offset: usize,
-            mut depth: fidl::encoding::Depth,
-        ) -> fidl::Result<()> {
-            decoder.debug_check_bounds::<Self>(offset);
-            let len = match fidl::encoding::decode_vector_header(decoder, offset)? {
-                None => return Err(fidl::Error::NotNullable),
-                Some(len) => len,
-            };
-            // Calling decoder.out_of_line_offset(0) is not allowed.
-            if len == 0 {
-                return Ok(());
-            };
-            depth.increment()?;
-            let envelope_size = 8;
-            let bytes_len = len * envelope_size;
-            let offset = decoder.out_of_line_offset(bytes_len)?;
-            // Decode the envelope for each type.
-            let mut _next_ordinal_to_read = 0;
-            let mut next_offset = offset;
-            let end_offset = offset + bytes_len;
-            _next_ordinal_to_read += 1;
-            if next_offset >= end_offset {
-                return Ok(());
-            }
-
-            // Decode unknown envelopes for gaps in ordinals.
-            while _next_ordinal_to_read < 1 {
-                fidl::encoding::decode_unknown_envelope(decoder, next_offset, depth)?;
-                _next_ordinal_to_read += 1;
-                next_offset += envelope_size;
-            }
-
-            let next_out_of_line = decoder.next_out_of_line();
-            let handles_before = decoder.remaining_handles();
-            if let Some((inlined, num_bytes, num_handles)) =
-                fidl::encoding::decode_envelope_header(decoder, next_offset)?
-            {
-                let member_inline_size =
-                    <u16 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if inlined != (member_inline_size <= 4) {
-                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                }
-                let inner_offset;
-                let mut inner_depth = depth.clone();
-                if inlined {
-                    decoder.check_inline_envelope_padding(next_offset, member_inline_size)?;
-                    inner_offset = next_offset;
-                } else {
-                    inner_offset = decoder.out_of_line_offset(member_inline_size)?;
-                    inner_depth.increment()?;
-                }
-                let val_ref = self.a.get_or_insert_with(|| fidl::new_empty!(u16));
-                fidl::decode!(u16, val_ref, decoder, inner_offset, inner_depth)?;
-                if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
-                {
-                    return Err(fidl::Error::InvalidNumBytesInEnvelope);
-                }
-                if handles_before != decoder.remaining_handles() + (num_handles as usize) {
-                    return Err(fidl::Error::InvalidNumHandlesInEnvelope);
-                }
-            }
-
-            next_offset += envelope_size;
-
-            // Decode the remaining unknown envelopes.
-            while next_offset < end_offset {
-                _next_ordinal_to_read += 1;
-                fidl::encoding::decode_unknown_envelope(decoder, next_offset, depth)?;
-                next_offset += envelope_size;
-            }
-
-            Ok(())
-        }
-    }
-
     impl MainProtocolOneWayAnonRequest {
         #[inline(always)]
         fn max_ordinal_present(&self) -> u64 {
@@ -4531,174 +4158,6 @@ mod internal {
     }
 
     impl fidl::encoding::Decode<Self> for MainProtocolTwoWayAnonWithErrorRequest {
-        #[inline(always)]
-        fn new_empty() -> Self {
-            Self::default()
-        }
-
-        unsafe fn decode(
-            &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
-            offset: usize,
-            mut depth: fidl::encoding::Depth,
-        ) -> fidl::Result<()> {
-            decoder.debug_check_bounds::<Self>(offset);
-            let len = match fidl::encoding::decode_vector_header(decoder, offset)? {
-                None => return Err(fidl::Error::NotNullable),
-                Some(len) => len,
-            };
-            // Calling decoder.out_of_line_offset(0) is not allowed.
-            if len == 0 {
-                return Ok(());
-            };
-            depth.increment()?;
-            let envelope_size = 8;
-            let bytes_len = len * envelope_size;
-            let offset = decoder.out_of_line_offset(bytes_len)?;
-            // Decode the envelope for each type.
-            let mut _next_ordinal_to_read = 0;
-            let mut next_offset = offset;
-            let end_offset = offset + bytes_len;
-            _next_ordinal_to_read += 1;
-            if next_offset >= end_offset {
-                return Ok(());
-            }
-
-            // Decode unknown envelopes for gaps in ordinals.
-            while _next_ordinal_to_read < 1 {
-                fidl::encoding::decode_unknown_envelope(decoder, next_offset, depth)?;
-                _next_ordinal_to_read += 1;
-                next_offset += envelope_size;
-            }
-
-            let next_out_of_line = decoder.next_out_of_line();
-            let handles_before = decoder.remaining_handles();
-            if let Some((inlined, num_bytes, num_handles)) =
-                fidl::encoding::decode_envelope_header(decoder, next_offset)?
-            {
-                let member_inline_size =
-                    <u16 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if inlined != (member_inline_size <= 4) {
-                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                }
-                let inner_offset;
-                let mut inner_depth = depth.clone();
-                if inlined {
-                    decoder.check_inline_envelope_padding(next_offset, member_inline_size)?;
-                    inner_offset = next_offset;
-                } else {
-                    inner_offset = decoder.out_of_line_offset(member_inline_size)?;
-                    inner_depth.increment()?;
-                }
-                let val_ref = self.a.get_or_insert_with(|| fidl::new_empty!(u16));
-                fidl::decode!(u16, val_ref, decoder, inner_offset, inner_depth)?;
-                if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
-                {
-                    return Err(fidl::Error::InvalidNumBytesInEnvelope);
-                }
-                if handles_before != decoder.remaining_handles() + (num_handles as usize) {
-                    return Err(fidl::Error::InvalidNumHandlesInEnvelope);
-                }
-            }
-
-            next_offset += envelope_size;
-
-            // Decode the remaining unknown envelopes.
-            while next_offset < end_offset {
-                _next_ordinal_to_read += 1;
-                fidl::encoding::decode_unknown_envelope(decoder, next_offset, depth)?;
-                next_offset += envelope_size;
-            }
-
-            Ok(())
-        }
-    }
-
-    impl MainProtocolOnAnonWithErrorResponse {
-        #[inline(always)]
-        fn max_ordinal_present(&self) -> u64 {
-            if let Some(_) = self.a {
-                return 1;
-            }
-            0
-        }
-    }
-
-    unsafe impl fidl::encoding::TypeMarker for MainProtocolOnAnonWithErrorResponse {
-        type Owned = Self;
-
-        #[inline(always)]
-        fn inline_align(_context: fidl::encoding::Context) -> usize {
-            8
-        }
-
-        #[inline(always)]
-        fn inline_size(_context: fidl::encoding::Context) -> usize {
-            16
-        }
-    }
-    impl fidl::encoding::ValueTypeMarker for MainProtocolOnAnonWithErrorResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
-
-    unsafe impl fidl::encoding::Encode<MainProtocolOnAnonWithErrorResponse>
-        for &MainProtocolOnAnonWithErrorResponse
-    {
-        unsafe fn encode(
-            self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
-            offset: usize,
-            mut depth: fidl::encoding::Depth,
-        ) -> fidl::Result<()> {
-            encoder.debug_check_bounds::<MainProtocolOnAnonWithErrorResponse>(offset);
-            // Vector header
-            let max_ordinal: u64 = self.max_ordinal_present();
-            encoder.write_num(max_ordinal, offset);
-            encoder.write_num(fidl::encoding::ALLOC_PRESENT_U64, offset + 8);
-            // Calling encoder.out_of_line_offset(0) is not allowed.
-            if max_ordinal == 0 {
-                return Ok(());
-            }
-            depth.increment()?;
-            let envelope_size = 8;
-            let bytes_len = max_ordinal as usize * envelope_size;
-            #[allow(unused_variables)]
-            let offset = encoder.out_of_line_offset(bytes_len);
-            let mut _prev_end_offset: usize = 0;
-            if 1 > max_ordinal {
-                return Ok(());
-            }
-
-            // Write at offset+(ordinal-1)*envelope_size, since ordinals are one-based and envelopes
-            // are envelope_size bytes.
-            let cur_offset: usize = (1 - 1) * envelope_size;
-
-            // Zero reserved fields.
-            encoder.padding(offset + _prev_end_offset, cur_offset - _prev_end_offset);
-
-            // Safety:
-            // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
-            // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
-            //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<u16>(
-                self.a.as_ref().map(<u16 as fidl::encoding::ValueTypeMarker>::borrow),
-                encoder,
-                offset + cur_offset,
-                depth,
-            )?;
-
-            _prev_end_offset = cur_offset + envelope_size;
-
-            Ok(())
-        }
-    }
-
-    impl fidl::encoding::Decode<Self> for MainProtocolOnAnonWithErrorResponse {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()

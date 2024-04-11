@@ -1101,10 +1101,31 @@ protocol MyProtocol {
   ASSERT_COMPILED(library);
 }
 
+TEST(ProtocolTests, BadOneWayErrorSyntax) {
+  TestLibrary library(R"FIDL(
+library example;
+
+protocol MyProtocol {
+    MyOneWay() error int32;
+};
+)FIDL");
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Subkind::kError),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
+  library.ExpectFail(ErrInvalidProtocolMember);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
 TEST(ProtocolTests, BadEventErrorSyntax) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0119.test.fidl");
-  library.ExpectFail(ErrEventErrorSyntaxDeprecated, "OnMyEvent");
+  TestLibrary library(R"FIDL(
+library example;
+
+protocol MyProtocol {
+    -> OnMyEvent() error int32;
+};
+)FIDL");
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Subkind::kError),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
+  library.ExpectFail(ErrInvalidProtocolMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

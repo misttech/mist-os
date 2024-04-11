@@ -25,15 +25,11 @@ closed protocol ComposedProtocol {
     strict -> OnAnonComposed(strict union {
         1: b bool;
     });
-    strict -> OnAnonComposedWithError(table {
-        1: a uint16;
-    }) error uint32;
 
     strict OneWayNamedComposed(TablePayload);
     strict TwoWayNamedComposed(UnionPayload) -> (TablePayload);
     strict TwoWayNamedComposedWithError(TablePayload) -> (UnionPayload) error uint32;
     strict -> OnNamedComposed(UnionPayload);
-    strict -> OnNamedComposedWithError(TablePayload) error uint32;
 };
 
 
@@ -46,7 +42,6 @@ closed protocol MainProtocol {
     strict TwoWayLocal(UnionPayload) -> (TablePayload);
     strict TwoWayLocalWithError(TablePayload) -> (UnionPayload) error uint32;
     strict -> OnLocal(UnionPayload);
-    strict -> OnLocalWithError(TablePayload) error uint32;
 
     // Tests anonymous union/table payloads.
     strict OneWayAnon(table {
@@ -65,7 +60,4 @@ closed protocol MainProtocol {
     strict -> OnAnon(flexible union {
         1: b bool;
     });
-    strict -> OnAnonWithError(table {
-        1: a uint16;
-    }) error uint32;
 };

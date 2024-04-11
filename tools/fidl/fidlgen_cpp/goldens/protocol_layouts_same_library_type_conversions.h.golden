@@ -81,21 +81,6 @@ struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::ComposedProtoco
 };
 
 template <>
-struct WireNaturalConversionTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse, ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse> {
-  static ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse ToNatural(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse src);
-  static ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse ToWire(fidl::AnyArena& arena, ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse> {
-  using type = ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse> {
-  using type = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse;
-};
-
-template <>
 struct WireNaturalConversionTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest, ::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest> {
   static ::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest ToNatural(::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest src);
   static ::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest ToWire(fidl::AnyArena& arena, ::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest src);
@@ -138,21 +123,6 @@ struct NaturalTypeForWireType<::test_protocollayoutssamelibrary::wire::MainProto
 template <>
 struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest> {
   using type = ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorRequest;
-};
-
-template <>
-struct WireNaturalConversionTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse, ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse> {
-  static ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse ToNatural(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse src);
-  static ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse ToWire(fidl::AnyArena& arena, ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse> {
-  using type = ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse> {
-  using type = ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse;
 };
 
 template <>
@@ -261,27 +231,6 @@ struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::ComposedProtoco
 };
 
 template <>
-struct WireNaturalConversionTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult, ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult> {
-  static ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult ToNatural(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult src);
-  static ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ToWire(fidl::AnyArena& arena, ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult src);
-};
-
-template <>
-struct WireNaturalConversionTraits<::fidl::WireOptional<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult>, std::unique_ptr<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult>> {
-  static std::unique_ptr<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult> ToNatural(::fidl::WireOptional<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult> src);
-  static ::fidl::WireOptional<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult> ToWire(fidl::AnyArena& arena, std::unique_ptr<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult> src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult> {
-  using type = ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult> {
-  using type = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult;
-};
-
-template <>
 struct WireNaturalConversionTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult, ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult> {
   static ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult ToNatural(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult src);
   static ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ToWire(fidl::AnyArena& arena, ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult src);
@@ -303,27 +252,6 @@ struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::ComposedProtoco
 };
 
 template <>
-struct WireNaturalConversionTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult, ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult> {
-  static ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult ToNatural(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult src);
-  static ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ToWire(fidl::AnyArena& arena, ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult src);
-};
-
-template <>
-struct WireNaturalConversionTraits<::fidl::WireOptional<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult>, std::unique_ptr<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult>> {
-  static std::unique_ptr<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult> ToNatural(::fidl::WireOptional<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult> src);
-  static ::fidl::WireOptional<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult> ToWire(fidl::AnyArena& arena, std::unique_ptr<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult> src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult> {
-  using type = ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult> {
-  using type = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult;
-};
-
-template <>
 struct WireNaturalConversionTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult, ::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult> {
   static ::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult ToNatural(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult src);
   static ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult ToWire(fidl::AnyArena& arena, ::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult src);
@@ -342,27 +270,6 @@ struct NaturalTypeForWireType<::test_protocollayoutssamelibrary::wire::MainProto
 template <>
 struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult> {
   using type = ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult;
-};
-
-template <>
-struct WireNaturalConversionTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult, ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult> {
-  static ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult ToNatural(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult src);
-  static ::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult ToWire(fidl::AnyArena& arena, ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult src);
-};
-
-template <>
-struct WireNaturalConversionTraits<::fidl::WireOptional<::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult>, std::unique_ptr<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult>> {
-  static std::unique_ptr<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult> ToNatural(::fidl::WireOptional<::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult> src);
-  static ::fidl::WireOptional<::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult> ToWire(fidl::AnyArena& arena, std::unique_ptr<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult> src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult> {
-  using type = ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult> {
-  using type = ::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult;
 };
 
 template <>
@@ -447,27 +354,6 @@ struct NaturalTypeForWireType<::test_protocollayoutssamelibrary::wire::MainProto
 template <>
 struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest> {
   using type = ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest;
-};
-
-template <>
-struct WireNaturalConversionTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult, ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult> {
-  static ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult ToNatural(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult src);
-  static ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult ToWire(fidl::AnyArena& arena, ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult src);
-};
-
-template <>
-struct WireNaturalConversionTraits<::fidl::WireOptional<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult>, std::unique_ptr<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult>> {
-  static std::unique_ptr<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult> ToNatural(::fidl::WireOptional<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult> src);
-  static ::fidl::WireOptional<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult> ToWire(fidl::AnyArena& arena, std::unique_ptr<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult> src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult> {
-  using type = ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult> {
-  using type = ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult;
 };
 
 #ifdef __Fuchsia__

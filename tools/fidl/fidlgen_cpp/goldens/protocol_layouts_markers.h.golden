@@ -73,20 +73,6 @@ class MainProtocol final {
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
   };
-  class OnAnonComposedWithError final {
-    OnAnonComposedWithError() = delete;
-
-   public:
-    using Protocol = ::test_protocollayouts::MainProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
   class OneWayNamedComposed final {
     OneWayNamedComposed() = delete;
 
@@ -141,20 +127,6 @@ class MainProtocol final {
 
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class OnNamedComposedWithError final {
-    OnNamedComposedWithError() = delete;
-
-   public:
-    using Protocol = ::test_protocollayouts::MainProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
   };
   class OneWayImport final {
@@ -213,20 +185,6 @@ class MainProtocol final {
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
   };
-  class OnImportWithError final {
-    OnImportWithError() = delete;
-
-   public:
-    using Protocol = ::test_protocollayouts::MainProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
   class OneWayLocal final {
     OneWayLocal() = delete;
 
@@ -283,20 +241,6 @@ class MainProtocol final {
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
   };
-  class OnLocalWithError final {
-    OnLocalWithError() = delete;
-
-   public:
-    using Protocol = ::test_protocollayouts::MainProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-  };
   class OneWayAnon final {
     OneWayAnon() = delete;
 
@@ -351,20 +295,6 @@ class MainProtocol final {
 
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
-    static constexpr bool kHasFrameworkError = false;
-  };
-  class OnAnonWithError final {
-    OnAnonWithError() = delete;
-
-   public:
-    using Protocol = ::test_protocollayouts::MainProtocol;
-    static constexpr bool kHasClientToServer = false;
-    static constexpr bool kHasClientToServerBody = false;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
   };
 };

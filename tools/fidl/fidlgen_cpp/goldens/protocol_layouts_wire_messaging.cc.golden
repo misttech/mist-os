@@ -47,14 +47,6 @@ constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnonComposed_DynamicFlags 
 
 
 [[maybe_unused]]
-constexpr uint64_t kMainProtocol_OnAnonComposedWithError_Ordinal = 712214127111113275lu;
-
-
-[[maybe_unused]]
-constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnonComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
 constexpr uint64_t kMainProtocol_OneWayNamedComposed_Ordinal = 6735359826241449560lu;
 
 
@@ -84,14 +76,6 @@ constexpr uint64_t kMainProtocol_OnNamedComposed_Ordinal = 6802961197456477674lu
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
-constexpr uint64_t kMainProtocol_OnNamedComposedWithError_Ordinal = 7488207288618998795lu;
-
-
-[[maybe_unused]]
-constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnNamedComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
 [[maybe_unused]]
@@ -127,14 +111,6 @@ constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnImport_DynamicFlags = ::fi
 
 
 [[maybe_unused]]
-constexpr uint64_t kMainProtocol_OnImportWithError_Ordinal = 1123803631971094487lu;
-
-
-[[maybe_unused]]
-constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnImportWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
 constexpr uint64_t kMainProtocol_OneWayLocal_Ordinal = 6085941264859402051lu;
 
 
@@ -167,14 +143,6 @@ constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnLocal_DynamicFlags = ::fid
 
 
 [[maybe_unused]]
-constexpr uint64_t kMainProtocol_OnLocalWithError_Ordinal = 8767483445230259748lu;
-
-
-[[maybe_unused]]
-constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnLocalWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
 constexpr uint64_t kMainProtocol_OneWayAnon_Ordinal = 4203317713771984620lu;
 
 
@@ -204,14 +172,6 @@ constexpr uint64_t kMainProtocol_OnAnon_Ordinal = 7275479350674227467lu;
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-[[maybe_unused]]
-constexpr uint64_t kMainProtocol_OnAnonWithError_Ordinal = 3672186790919812761lu;
-
-
-[[maybe_unused]]
-constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnonWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 #ifdef __Fuchsia__
 }  // namespace test_protocollayouts
 
@@ -1412,19 +1372,6 @@ constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnonWithError_DynamicFlags
         }
         return ::fidl::Status::Ok();
       }
-      case ::test_protocollayouts::kMainProtocol_OnAnonComposedWithError_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::InplaceDecodeTransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError>(
-            std::move(msg));
-        if (!decoded.is_ok()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            auto* primary = decoded.value().pointer();
-          event_handler()->OnAnonComposedWithError(primary);
-        }
-        return ::fidl::Status::Ok();
-      }
       case ::test_protocollayouts::kMainProtocol_OnNamedComposed_Ordinal:
       {
         ::fit::result decoded = ::fidl::internal::InplaceDecodeTransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposed>(
@@ -1435,19 +1382,6 @@ constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnonWithError_DynamicFlags
         if (event_handler()) {
             auto* primary = decoded.value().pointer();
           event_handler()->OnNamedComposed(primary);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_protocollayouts::kMainProtocol_OnNamedComposedWithError_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::InplaceDecodeTransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError>(
-            std::move(msg));
-        if (!decoded.is_ok()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            auto* primary = decoded.value().pointer();
-          event_handler()->OnNamedComposedWithError(primary);
         }
         return ::fidl::Status::Ok();
       }
@@ -1464,19 +1398,6 @@ constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnonWithError_DynamicFlags
         }
         return ::fidl::Status::Ok();
       }
-      case ::test_protocollayouts::kMainProtocol_OnImportWithError_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::InplaceDecodeTransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError>(
-            std::move(msg));
-        if (!decoded.is_ok()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            auto* primary = decoded.value().pointer();
-          event_handler()->OnImportWithError(primary);
-        }
-        return ::fidl::Status::Ok();
-      }
       case ::test_protocollayouts::kMainProtocol_OnLocal_Ordinal:
       {
         ::fit::result decoded = ::fidl::internal::InplaceDecodeTransactionalEvent<::test_protocollayouts::MainProtocol::OnLocal>(
@@ -1490,19 +1411,6 @@ constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnonWithError_DynamicFlags
         }
         return ::fidl::Status::Ok();
       }
-      case ::test_protocollayouts::kMainProtocol_OnLocalWithError_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::InplaceDecodeTransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError>(
-            std::move(msg));
-        if (!decoded.is_ok()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            auto* primary = decoded.value().pointer();
-          event_handler()->OnLocalWithError(primary);
-        }
-        return ::fidl::Status::Ok();
-      }
       case ::test_protocollayouts::kMainProtocol_OnAnon_Ordinal:
       {
         ::fit::result decoded = ::fidl::internal::InplaceDecodeTransactionalEvent<::test_protocollayouts::MainProtocol::OnAnon>(
@@ -1513,19 +1421,6 @@ constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnonWithError_DynamicFlags
         if (event_handler()) {
             auto* primary = decoded.value().pointer();
           event_handler()->OnAnon(primary);
-        }
-        return ::fidl::Status::Ok();
-      }
-      case ::test_protocollayouts::kMainProtocol_OnAnonWithError_Ordinal:
-      {
-        ::fit::result decoded = ::fidl::internal::InplaceDecodeTransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError>(
-            std::move(msg));
-        if (!decoded.is_ok()) {
-          return decoded.error_value();
-        }
-        if (event_handler()) {
-            auto* primary = decoded.value().pointer();
-          event_handler()->OnAnonWithError(primary);
         }
         return ::fidl::Status::Ok();
       }
@@ -2435,18 +2330,6 @@ void ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::
 
     
     
-    
-    
-
-#ifdef __Fuchsia__
-void ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError>::_InitHeader() {
-    ::fidl::InitTxnHeader(&header, 0, ::test_protocollayouts::kMainProtocol_OnAnonComposedWithError_Ordinal, ::test_protocollayouts::kMainProtocol_OnAnonComposedWithError_DynamicFlags);
-  }
-
-#endif  // __Fuchsia__
-
-    
-    
 
 #ifdef __Fuchsia__
 void ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayNamedComposed>::_InitHeader() {
@@ -2495,18 +2378,6 @@ void ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol
 #ifdef __Fuchsia__
 void ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposed>::_InitHeader() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayouts::kMainProtocol_OnNamedComposed_Ordinal, ::test_protocollayouts::kMainProtocol_OnNamedComposed_DynamicFlags);
-  }
-
-#endif  // __Fuchsia__
-
-    
-    
-    
-    
-
-#ifdef __Fuchsia__
-void ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError>::_InitHeader() {
-    ::fidl::InitTxnHeader(&header, 0, ::test_protocollayouts::kMainProtocol_OnNamedComposedWithError_Ordinal, ::test_protocollayouts::kMainProtocol_OnNamedComposedWithError_DynamicFlags);
   }
 
 #endif  // __Fuchsia__
@@ -2567,18 +2438,6 @@ void ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::
 
     
     
-    
-    
-
-#ifdef __Fuchsia__
-void ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError>::_InitHeader() {
-    ::fidl::InitTxnHeader(&header, 0, ::test_protocollayouts::kMainProtocol_OnImportWithError_Ordinal, ::test_protocollayouts::kMainProtocol_OnImportWithError_DynamicFlags);
-  }
-
-#endif  // __Fuchsia__
-
-    
-    
 
 #ifdef __Fuchsia__
 void ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayLocal>::_InitHeader() {
@@ -2633,18 +2492,6 @@ void ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::
 
     
     
-    
-    
-
-#ifdef __Fuchsia__
-void ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError>::_InitHeader() {
-    ::fidl::InitTxnHeader(&header, 0, ::test_protocollayouts::kMainProtocol_OnLocalWithError_Ordinal, ::test_protocollayouts::kMainProtocol_OnLocalWithError_DynamicFlags);
-  }
-
-#endif  // __Fuchsia__
-
-    
-    
 
 #ifdef __Fuchsia__
 void ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayAnon>::_InitHeader() {
@@ -2693,18 +2540,6 @@ void ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol
 #ifdef __Fuchsia__
 void ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnon>::_InitHeader() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayouts::kMainProtocol_OnAnon_Ordinal, ::test_protocollayouts::kMainProtocol_OnAnon_DynamicFlags);
-  }
-
-#endif  // __Fuchsia__
-
-    
-    
-    
-    
-
-#ifdef __Fuchsia__
-void ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError>::_InitHeader() {
-    ::fidl::InitTxnHeader(&header, 0, ::test_protocollayouts::kMainProtocol_OnAnonWithError_Ordinal, ::test_protocollayouts::kMainProtocol_OnAnonWithError_DynamicFlags);
   }
 
 #endif  // __Fuchsia__
@@ -2767,57 +2602,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts:
   return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult) {
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError> _response{ComposedProtocolOnAnonComposedWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
-  ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError>, ::fidl::internal::ChannelTransport> _response_message{
-      ::fidl::internal::AllowUnownedInputRef{}, &_response
-  };
-  return _inner().SendEvent(_response_message.GetOutgoingMessage());
-}
-
-fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult) {
-  constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnAnonComposedWithError>();
-  ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
-      _allocator().TryAllocate(_buffer_size);
-  if (!_allocation.is_ok()) {
-    _inner().HandleSendError(_allocation.error_value());
-    return fidl::OneWayStatus{_allocation.error_value()};
-  }
-
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError> _response{ComposedProtocolOnAnonComposedWithErrorResult };
-  ::fidl::internal::UnownedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError>, ::fidl::internal::ChannelTransport> _response_message(
-      _allocation->data, _buffer_size, &_response);
-  return _inner().SendEvent(_response_message.GetOutgoingMessage());
-}
-
-fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult) {
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError> _response{ComposedProtocolOnAnonComposedWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
-  ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError>, ::fidl::internal::ChannelTransport> _response_message{
-      ::fidl::internal::AllowUnownedInputRef{}, &_response
-  };
-  auto& _message = _response_message.GetOutgoingMessage();
-  _message.Write(_transport());
-  return ::fidl::OneWayStatus{::fidl::Status{_message}};
-}
-
-fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult) {
-  constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnAnonComposedWithError>();
-  ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
-      _allocator().TryAllocate(_buffer_size);
-  if (!_allocation.is_ok()) {
-    return fidl::OneWayStatus{_allocation.error_value()};
-  }
-
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError> _response{ComposedProtocolOnAnonComposedWithErrorResult };
-  ::fidl::internal::UnownedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError>, ::fidl::internal::ChannelTransport> _response_message(
-        _allocation->data, _buffer_size, &_response);
-  auto& _message = _response_message.GetOutgoingMessage();
-  _message.Write(_transport());
-  return ::fidl::OneWayStatus{::fidl::Status{_message}};
-}
-
 ::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposed> _response{ImportUnionPayload };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
@@ -2863,57 +2647,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts:
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposed> _response{ImportUnionPayload };
   ::fidl::internal::UnownedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposed>, ::fidl::internal::ChannelTransport> _response_message(
-        _allocation->data, _buffer_size, &_response);
-  auto& _message = _response_message.GetOutgoingMessage();
-  _message.Write(_transport());
-  return ::fidl::OneWayStatus{::fidl::Status{_message}};
-}
-
-::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult) {
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError> _response{ComposedProtocolOnNamedComposedWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
-  ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError>, ::fidl::internal::ChannelTransport> _response_message{
-      ::fidl::internal::AllowUnownedInputRef{}, &_response
-  };
-  return _inner().SendEvent(_response_message.GetOutgoingMessage());
-}
-
-fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult) {
-  constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnNamedComposedWithError>();
-  ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
-      _allocator().TryAllocate(_buffer_size);
-  if (!_allocation.is_ok()) {
-    _inner().HandleSendError(_allocation.error_value());
-    return fidl::OneWayStatus{_allocation.error_value()};
-  }
-
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError> _response{ComposedProtocolOnNamedComposedWithErrorResult };
-  ::fidl::internal::UnownedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError>, ::fidl::internal::ChannelTransport> _response_message(
-      _allocation->data, _buffer_size, &_response);
-  return _inner().SendEvent(_response_message.GetOutgoingMessage());
-}
-
-fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult) {
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError> _response{ComposedProtocolOnNamedComposedWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
-  ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError>, ::fidl::internal::ChannelTransport> _response_message{
-      ::fidl::internal::AllowUnownedInputRef{}, &_response
-  };
-  auto& _message = _response_message.GetOutgoingMessage();
-  _message.Write(_transport());
-  return ::fidl::OneWayStatus{::fidl::Status{_message}};
-}
-
-fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult) {
-  constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnNamedComposedWithError>();
-  ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
-      _allocator().TryAllocate(_buffer_size);
-  if (!_allocation.is_ok()) {
-    return fidl::OneWayStatus{_allocation.error_value()};
-  }
-
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError> _response{ComposedProtocolOnNamedComposedWithErrorResult };
-  ::fidl::internal::UnownedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError>, ::fidl::internal::ChannelTransport> _response_message(
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
@@ -2971,57 +2704,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts:
   return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult MainProtocolOnImportWithErrorResult) {
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError> _response{MainProtocolOnImportWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
-  ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError>, ::fidl::internal::ChannelTransport> _response_message{
-      ::fidl::internal::AllowUnownedInputRef{}, &_response
-  };
-  return _inner().SendEvent(_response_message.GetOutgoingMessage());
-}
-
-fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult MainProtocolOnImportWithErrorResult) {
-  constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnImportWithError>();
-  ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
-      _allocator().TryAllocate(_buffer_size);
-  if (!_allocation.is_ok()) {
-    _inner().HandleSendError(_allocation.error_value());
-    return fidl::OneWayStatus{_allocation.error_value()};
-  }
-
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError> _response{MainProtocolOnImportWithErrorResult };
-  ::fidl::internal::UnownedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError>, ::fidl::internal::ChannelTransport> _response_message(
-      _allocation->data, _buffer_size, &_response);
-  return _inner().SendEvent(_response_message.GetOutgoingMessage());
-}
-
-fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult MainProtocolOnImportWithErrorResult) {
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError> _response{MainProtocolOnImportWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
-  ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError>, ::fidl::internal::ChannelTransport> _response_message{
-      ::fidl::internal::AllowUnownedInputRef{}, &_response
-  };
-  auto& _message = _response_message.GetOutgoingMessage();
-  _message.Write(_transport());
-  return ::fidl::OneWayStatus{::fidl::Status{_message}};
-}
-
-fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult MainProtocolOnImportWithErrorResult) {
-  constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnImportWithError>();
-  ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
-      _allocator().TryAllocate(_buffer_size);
-  if (!_allocation.is_ok()) {
-    return fidl::OneWayStatus{_allocation.error_value()};
-  }
-
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError> _response{MainProtocolOnImportWithErrorResult };
-  ::fidl::internal::UnownedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError>, ::fidl::internal::ChannelTransport> _response_message(
-        _allocation->data, _buffer_size, &_response);
-  auto& _message = _response_message.GetOutgoingMessage();
-  _message.Write(_transport());
-  return ::fidl::OneWayStatus{::fidl::Status{_message}};
-}
-
 ::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocal> _response{LocalUnionPayload };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
@@ -3073,57 +2755,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts:
   return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult) {
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError> _response{MainProtocolOnLocalWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
-  ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError>, ::fidl::internal::ChannelTransport> _response_message{
-      ::fidl::internal::AllowUnownedInputRef{}, &_response
-  };
-  return _inner().SendEvent(_response_message.GetOutgoingMessage());
-}
-
-fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult) {
-  constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnLocalWithError>();
-  ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
-      _allocator().TryAllocate(_buffer_size);
-  if (!_allocation.is_ok()) {
-    _inner().HandleSendError(_allocation.error_value());
-    return fidl::OneWayStatus{_allocation.error_value()};
-  }
-
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError> _response{MainProtocolOnLocalWithErrorResult };
-  ::fidl::internal::UnownedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError>, ::fidl::internal::ChannelTransport> _response_message(
-      _allocation->data, _buffer_size, &_response);
-  return _inner().SendEvent(_response_message.GetOutgoingMessage());
-}
-
-fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult) {
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError> _response{MainProtocolOnLocalWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
-  ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError>, ::fidl::internal::ChannelTransport> _response_message{
-      ::fidl::internal::AllowUnownedInputRef{}, &_response
-  };
-  auto& _message = _response_message.GetOutgoingMessage();
-  _message.Write(_transport());
-  return ::fidl::OneWayStatus{::fidl::Status{_message}};
-}
-
-fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult) {
-  constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnLocalWithError>();
-  ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
-      _allocator().TryAllocate(_buffer_size);
-  if (!_allocation.is_ok()) {
-    return fidl::OneWayStatus{_allocation.error_value()};
-  }
-
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError> _response{MainProtocolOnLocalWithErrorResult };
-  ::fidl::internal::UnownedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError>, ::fidl::internal::ChannelTransport> _response_message(
-        _allocation->data, _buffer_size, &_response);
-  auto& _message = _response_message.GetOutgoingMessage();
-  _message.Write(_transport());
-  return ::fidl::OneWayStatus{::fidl::Status{_message}};
-}
-
 ::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnon> _response{MainProtocolOnAnonRequest };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
@@ -3169,57 +2800,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts:
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnon> _response{MainProtocolOnAnonRequest };
   ::fidl::internal::UnownedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnon>, ::fidl::internal::ChannelTransport> _response_message(
-        _allocation->data, _buffer_size, &_response);
-  auto& _message = _response_message.GetOutgoingMessage();
-  _message.Write(_transport());
-  return ::fidl::OneWayStatus{::fidl::Status{_message}};
-}
-
-::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult) {
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError> _response{MainProtocolOnAnonWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
-  ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError>, ::fidl::internal::ChannelTransport> _response_message{
-      ::fidl::internal::AllowUnownedInputRef{}, &_response
-  };
-  return _inner().SendEvent(_response_message.GetOutgoingMessage());
-}
-
-fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult) {
-  constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnAnonWithError>();
-  ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
-      _allocator().TryAllocate(_buffer_size);
-  if (!_allocation.is_ok()) {
-    _inner().HandleSendError(_allocation.error_value());
-    return fidl::OneWayStatus{_allocation.error_value()};
-  }
-
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError> _response{MainProtocolOnAnonWithErrorResult };
-  ::fidl::internal::UnownedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError>, ::fidl::internal::ChannelTransport> _response_message(
-      _allocation->data, _buffer_size, &_response);
-  return _inner().SendEvent(_response_message.GetOutgoingMessage());
-}
-
-fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult) {
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError> _response{MainProtocolOnAnonWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
-  ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError>, ::fidl::internal::ChannelTransport> _response_message{
-      ::fidl::internal::AllowUnownedInputRef{}, &_response
-  };
-  auto& _message = _response_message.GetOutgoingMessage();
-  _message.Write(_transport());
-  return ::fidl::OneWayStatus{::fidl::Status{_message}};
-}
-
-fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult) {
-  constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnAnonWithError>();
-  ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
-      _allocator().TryAllocate(_buffer_size);
-  if (!_allocation.is_ok()) {
-    return fidl::OneWayStatus{_allocation.error_value()};
-  }
-
-  ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError> _response{MainProtocolOnAnonWithErrorResult };
-  ::fidl::internal::UnownedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError>, ::fidl::internal::ChannelTransport> _response_message(
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());

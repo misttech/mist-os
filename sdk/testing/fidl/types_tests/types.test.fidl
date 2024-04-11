@@ -239,8 +239,6 @@ closed protocol UsesAnonymous {
 closed protocol ErrorSyntax {
     strict EmptyPayload() -> () error int32;
     strict FooPayload() -> (FooResponse) error int32;
-    strict -> EventEmptyPayload() error int32;
-    strict -> EventFooPayload(FooEvent) error int32;
 };
 
 type StructOfOptionals = struct {

@@ -57,14 +57,8 @@ class WireSyncEventHandlerTestBase<::test_protocollayoutssamelibrary::ComposedPr
   void OnAnonComposed(::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>* event) override {
     NotImplemented_("OnAnonComposed");
   }
-  void OnAnonComposedWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>* event) override {
-    NotImplemented_("OnAnonComposedWithError");
-  }
   void OnNamedComposed(::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed>* event) override {
     NotImplemented_("OnNamedComposed");
-  }
-  void OnNamedComposedWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>* event) override {
-    NotImplemented_("OnNamedComposedWithError");
   }
 };
 
@@ -143,26 +137,14 @@ class WireSyncEventHandlerTestBase<::test_protocollayoutssamelibrary::MainProtoc
   void OnAnonComposed(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>* event) override {
     NotImplemented_("OnAnonComposed");
   }
-  void OnAnonComposedWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>* event) override {
-    NotImplemented_("OnAnonComposedWithError");
-  }
   void OnNamedComposed(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>* event) override {
     NotImplemented_("OnNamedComposed");
-  }
-  void OnNamedComposedWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>* event) override {
-    NotImplemented_("OnNamedComposedWithError");
   }
   void OnLocal(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>* event) override {
     NotImplemented_("OnLocal");
   }
-  void OnLocalWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>* event) override {
-    NotImplemented_("OnLocalWithError");
-  }
   void OnAnon(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>* event) override {
     NotImplemented_("OnAnon");
-  }
-  void OnAnonWithError(::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>* event) override {
-    NotImplemented_("OnAnonWithError");
   }
 };
 #pragma clang diagnostic pop

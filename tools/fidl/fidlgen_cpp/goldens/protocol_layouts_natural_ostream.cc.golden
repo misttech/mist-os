@@ -47,16 +47,6 @@ std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWa
   os << "}";
   return os;
 }
-std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnAnonWithErrorResponse>::Format(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonWithErrorResponse& value) {
-  os << "test_protocollayouts::MainProtocolOnAnonWithErrorResponse";
-  os << "{ ";
-  if (value.a().has_value()) {
-    os << "a";
-    os << " = " << fidl::ostream::Formatted<uint16_t>(value.a().value()) << ", ";
-  }
-  os << "}";
-  return os;
-}
 std::ostream& fidl::ostream::Formatter<::test_protocollayouts::LocalUnionPayload>::Format(std::ostream& os, const ::test_protocollayouts::LocalUnionPayload& value) {
   os << "test_protocollayouts::LocalUnionPayload::";
   switch (value.Which()) {
@@ -82,20 +72,6 @@ std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWa
   }
   return os;
 }
-std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnImportWithErrorResult>::Format(std::ostream& os, const ::test_protocollayouts::MainProtocolOnImportWithErrorResult& value) {
-  os << "test_protocollayouts::MainProtocolOnImportWithErrorResult::";
-  switch (value.Which()) {
-    case ::test_protocollayouts::MainProtocolOnImportWithErrorResult::Tag::kResponse:
-      os << "response(" << fidl::ostream::Formatted<::test_protocollayouts_imported::ImportTablePayload>(value.response().value()) << ")";
-      break;
-    case ::test_protocollayouts::MainProtocolOnImportWithErrorResult::Tag::kErr:
-      os << "err(" << fidl::ostream::Formatted<uint32_t>(value.err().value()) << ")";
-      break;
-    default:
-      os << "Unknown";
-  }
-  return os;
-}
 std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult>::Format(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult& value) {
   os << "test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult::";
   switch (value.Which()) {
@@ -103,20 +79,6 @@ std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWa
       os << "response(" << fidl::ostream::Formatted<::test_protocollayouts::LocalUnionPayload>(value.response().value()) << ")";
       break;
     case ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult::Tag::kErr:
-      os << "err(" << fidl::ostream::Formatted<uint32_t>(value.err().value()) << ")";
-      break;
-    default:
-      os << "Unknown";
-  }
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnLocalWithErrorResult>::Format(std::ostream& os, const ::test_protocollayouts::MainProtocolOnLocalWithErrorResult& value) {
-  os << "test_protocollayouts::MainProtocolOnLocalWithErrorResult::";
-  switch (value.Which()) {
-    case ::test_protocollayouts::MainProtocolOnLocalWithErrorResult::Tag::kResponse:
-      os << "response(" << fidl::ostream::Formatted<::test_protocollayouts::LocalTablePayload>(value.response().value()) << ")";
-      break;
-    case ::test_protocollayouts::MainProtocolOnLocalWithErrorResult::Tag::kErr:
       os << "err(" << fidl::ostream::Formatted<uint32_t>(value.err().value()) << ")";
       break;
     default:
@@ -171,20 +133,6 @@ std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnAno
   }
   return os;
 }
-std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnAnonWithErrorResult>::Format(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonWithErrorResult& value) {
-  os << "test_protocollayouts::MainProtocolOnAnonWithErrorResult::";
-  switch (value.Which()) {
-    case ::test_protocollayouts::MainProtocolOnAnonWithErrorResult::Tag::kResponse:
-      os << "response(" << fidl::ostream::Formatted<::test_protocollayouts::MainProtocolOnAnonWithErrorResponse>(value.response().value()) << ")";
-      break;
-    case ::test_protocollayouts::MainProtocolOnAnonWithErrorResult::Tag::kErr:
-      os << "err(" << fidl::ostream::Formatted<uint32_t>(value.err().value()) << ")";
-      break;
-    default:
-      os << "Unknown";
-  }
-  return os;
-}
 
 namespace test_protocollayouts {
 
@@ -200,16 +148,8 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainPro
   return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult>::Format(os, value);
 }
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnImportWithErrorResult& value) {
-  return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnImportWithErrorResult>::Format(os, value);
-}
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult& value) {
   return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnLocalWithErrorResult& value) {
-  return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnLocalWithErrorResult>::Format(os, value);
 }
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOneWayAnonRequest& value) {
@@ -238,14 +178,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainPro
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonRequest& value) {
   return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnAnonRequest>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonWithErrorResponse& value) {
-  return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnAnonWithErrorResponse>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonWithErrorResult& value) {
-  return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnAnonWithErrorResult>::Format(os, value);
 }
 
 #pragma clang diagnostic pop

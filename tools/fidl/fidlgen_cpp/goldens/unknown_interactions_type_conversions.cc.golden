@@ -109,59 +109,11 @@ namespace internal {
 
 
 
-::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResponse src) {
-  return ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse(WireNaturalConversionTraits<uint8_t, uint8_t>::ToNatural(std::move(src.__reserved)));
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse src) {
-  return ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResponse{
-      .__reserved = WireNaturalConversionTraits<uint8_t, uint8_t>::ToWire(arena, std::move(src.__reserved())),
-  };
-}
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse src) {
-  return ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse(WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field)));
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse src) {
-  return ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse{
-      .some_field = WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field())),
-  };
-}
-
-
-
-
 ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsRequest, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsRequest src) {
   return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest(WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field)));
 }
 ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsRequest WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsRequest, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest src) {
   return ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsRequest{
-      .some_field = WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field())),
-  };
-}
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResponse src) {
-  return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse(WireNaturalConversionTraits<uint8_t, uint8_t>::ToNatural(std::move(src.__reserved)));
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse src) {
-  return ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResponse{
-      .__reserved = WireNaturalConversionTraits<uint8_t, uint8_t>::ToWire(arena, std::move(src.__reserved())),
-  };
-}
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse src) {
-  return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse(WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field)));
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse src) {
-  return ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse{
       .some_field = WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field())),
   };
 }
@@ -217,59 +169,11 @@ namespace internal {
 
 
 
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResponse src) {
-  return ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse(WireNaturalConversionTraits<uint8_t, uint8_t>::ToNatural(std::move(src.__reserved)));
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse src) {
-  return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResponse{
-      .__reserved = WireNaturalConversionTraits<uint8_t, uint8_t>::ToWire(arena, std::move(src.__reserved())),
-  };
-}
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse src) {
-  return ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse(WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field)));
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse src) {
-  return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse{
-      .some_field = WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field())),
-  };
-}
-
-
-
-
 ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest src) {
   return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest(WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field)));
 }
 ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest src) {
   return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest{
-      .some_field = WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field())),
-  };
-}
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResponse src) {
-  return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse(WireNaturalConversionTraits<uint8_t, uint8_t>::ToNatural(std::move(src.__reserved)));
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse src) {
-  return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResponse{
-      .__reserved = WireNaturalConversionTraits<uint8_t, uint8_t>::ToWire(arena, std::move(src.__reserved())),
-  };
-}
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse src) {
-  return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse(WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field)));
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse src) {
-  return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse{
       .some_field = WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field())),
   };
 }
@@ -318,30 +222,6 @@ namespace internal {
 }
 ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsRequest WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsRequest, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest src) {
   return ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsRequest{
-      .some_field = WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field())),
-  };
-}
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResponse src) {
-  return ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse(WireNaturalConversionTraits<uint8_t, uint8_t>::ToNatural(std::move(src.__reserved)));
-}
-::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse src) {
-  return ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResponse{
-      .__reserved = WireNaturalConversionTraits<uint8_t, uint8_t>::ToWire(arena, std::move(src.__reserved())),
-  };
-}
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse src) {
-  return ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse(WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field)));
-}
-::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse src) {
-  return ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse{
       .some_field = WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field())),
   };
 }
@@ -611,27 +491,6 @@ namespace internal {
 
 
 
-::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse src) {
-  ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse dst;
-  if (src.has_some_field()) {
-    dst.some_field() =
-      WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field()));
-  }
-
-  return dst;
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse src) {
-  auto builder = ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse::Builder(arena);
-  if (src.some_field().has_value()) {
-    builder.some_field(
-      WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
-  }
-  return builder.Build();
-}
-
-
-
-
 ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest src) {
   ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest dst;
   if (src.has_some_field()) {
@@ -643,27 +502,6 @@ namespace internal {
 }
 ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest src) {
   auto builder = ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest::Builder(arena);
-  if (src.some_field().has_value()) {
-    builder.some_field(
-      WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
-  }
-  return builder.Build();
-}
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse src) {
-  ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse dst;
-  if (src.has_some_field()) {
-    dst.some_field() =
-      WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field()));
-  }
-
-  return dst;
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse src) {
-  auto builder = ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse::Builder(arena);
   if (src.some_field().has_value()) {
     builder.some_field(
       WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
@@ -737,27 +575,6 @@ namespace internal {
 
 
 
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse src) {
-  ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse dst;
-  if (src.has_some_field()) {
-    dst.some_field() =
-      WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field()));
-  }
-
-  return dst;
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse src) {
-  auto builder = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse::Builder(arena);
-  if (src.some_field().has_value()) {
-    builder.some_field(
-      WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
-  }
-  return builder.Build();
-}
-
-
-
-
 ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest src) {
   ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest dst;
   if (src.has_some_field()) {
@@ -769,27 +586,6 @@ namespace internal {
 }
 ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest src) {
   auto builder = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest::Builder(arena);
-  if (src.some_field().has_value()) {
-    builder.some_field(
-      WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
-  }
-  return builder.Build();
-}
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse src) {
-  ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse dst;
-  if (src.has_some_field()) {
-    dst.some_field() =
-      WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field()));
-  }
-
-  return dst;
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse src) {
-  auto builder = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse::Builder(arena);
   if (src.some_field().has_value()) {
     builder.some_field(
       WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
@@ -853,27 +649,6 @@ namespace internal {
 }
 ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest src) {
   auto builder = ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest::Builder(arena);
-  if (src.some_field().has_value()) {
-    builder.some_field(
-      WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
-  }
-  return builder.Build();
-}
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse src) {
-  ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse dst;
-  if (src.has_some_field()) {
-    dst.some_field() =
-      WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field()));
-  }
-
-  return dst;
-}
-::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse src) {
-  auto builder = ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse::Builder(arena);
   if (src.some_field().has_value()) {
     builder.some_field(
       WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
@@ -1535,142 +1310,6 @@ namespace internal {
 
 
 
-::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse::Tag::kSomeField:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse::WithSomeField(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field())));
-    default:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse::Tag::kSomeField:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse::WithSomeField(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
-    default:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse();
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult::WithResponse(arena,
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult::WithResponse(arena,
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
 ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest src) {
   switch (src.Which()) {
     case ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest::Tag::kSomeField:
@@ -1687,142 +1326,6 @@ namespace internal {
         WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
     default:
       return ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest();
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::Tag::kSomeField:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::WithSomeField(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field())));
-    default:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::Tag::kSomeField:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::WithSomeField(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
-    default:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse();
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult::WithResponse(arena,
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult::WithResponse(arena,
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
   }
 }
 
@@ -2015,142 +1518,6 @@ namespace internal {
 
 
 
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::Tag::kSomeField:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::WithSomeField(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field())));
-    default:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::Tag::kSomeField:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::WithSomeField(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
-    default:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse();
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult::WithResponse(arena,
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult::WithResponse(arena,
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
 ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest src) {
   switch (src.Which()) {
     case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Tag::kSomeField:
@@ -2167,142 +1534,6 @@ namespace internal {
         WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
     default:
       return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest();
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::Tag::kSomeField:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::WithSomeField(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field())));
-    default:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::Tag::kSomeField:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::WithSomeField(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
-    default:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse();
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult::WithResponse(arena,
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult::WithResponse(arena,
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
   }
 }
 
@@ -2487,142 +1718,6 @@ namespace internal {
         WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
     default:
       return ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest();
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::Tag::kSomeField:
-      return ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::WithSomeField(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.some_field())));
-    default:
-      return ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::Tag::kSomeField:
-      return ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::WithSomeField(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.some_field().value())));
-    default:
-      return ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse();
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult::WithResponse(arena,
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
-  }
-}
-
-
-
-
-
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult>::ToNatural(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult::WithResponse(
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse>::ToNatural(std::move(src.response())));
-    case ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult::Tag::kErr:
-      return ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.err())));
-    default:
-      ZX_PANIC("unknown union tag in strict union");
-  }
-}
-::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult>::ToWire(fidl::AnyArena& arena, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult src) {
-  switch (src.Which()) {
-    case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult::Tag::kResponse:
-      return ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult::WithResponse(arena,
-        WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse>::ToWire(arena, std::move(src.response().value())));
-    case ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult::Tag::kErr:
-      return ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult::WithErr(
-        WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.err().value())));
   }
 }
 
@@ -3517,14 +2612,6 @@ namespace internal {
 
 
 
-
-
-
-
-
-
-
-
 ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFields>  WireNaturalConversionTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFields>, ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFields>>::ToNatural(::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFields> src) {
   return ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFields>(
     WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse, ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse>::ToNatural(std::move(src)));
@@ -3606,14 +2693,6 @@ namespace internal {
 
 
 
-
-
-
-
-
-
-
-
 ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFields>  WireNaturalConversionTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFields>, ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFields>>::ToNatural(::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFields> src) {
   return ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFields>(
     WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>::ToNatural(std::move(src)));
@@ -3676,10 +2755,6 @@ namespace internal {
   return ::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTableErr>(
     WireNaturalConversionTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult, ::fit::result<int32_t, ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse>>::ToWire(arena, std::move(src)));
 }
-
-
-
-
 
 
 

@@ -47,27 +47,7 @@
       ::fidl::internal::NaturalClone(storage_.some_field)};
 }
 
-::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.__reserved)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.__reserved)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
 }
@@ -92,27 +72,7 @@
       ::fidl::internal::NaturalClone(storage_.some_field)};
 }
 
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.__reserved)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.__reserved)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
 }
@@ -133,16 +93,6 @@
 }
 
 ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.__reserved)};
-}
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
 }
@@ -237,17 +187,7 @@
       ::fidl::internal::NaturalClone(storage_.some_field)};
 }
 
-::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
 }
@@ -267,17 +207,7 @@
       ::fidl::internal::NaturalClone(storage_.some_field)};
 }
 
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
 }
@@ -293,11 +223,6 @@
 }
 
 ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
 }
@@ -610,82 +535,6 @@ std::shared_ptr<::test_unknowninteractions::UnknownInteractionsProtocolStrictEve
   }
 }
 
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult::Storage_> test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult::Storage_> test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse::Storage_> test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResponse::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult::Storage_> test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult::Storage_> test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
 std::shared_ptr<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest::Storage_> test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest::CloneStorage_() const {
   const Storage_& storage = *storage_;
   switch (storage_->index()) {
@@ -693,82 +542,6 @@ std::shared_ptr<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleE
       return std::make_shared<Storage_>(
           std::in_place_index<1>,
           ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult::Storage_> test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult::Storage_> test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::Storage_> test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult::Storage_> test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult::Storage_> test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
     default:
       return std::make_shared<Storage_>();
   }
@@ -874,82 +647,6 @@ std::shared_ptr<::test_unknowninteractions::UnknownInteractionsAjarProtocolStric
   }
 }
 
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult::Storage_> test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult::Storage_> test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::Storage_> test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult::Storage_> test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult::Storage_> test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
 std::shared_ptr<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Storage_> test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::CloneStorage_() const {
   const Storage_& storage = *storage_;
   switch (storage_->index()) {
@@ -957,82 +654,6 @@ std::shared_ptr<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexi
       return std::make_shared<Storage_>(
           std::in_place_index<1>,
           ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult::Storage_> test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult::Storage_> test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::Storage_> test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult::Storage_> test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult::Storage_> test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
     default:
       return std::make_shared<Storage_>();
   }
@@ -1133,82 +754,6 @@ std::shared_ptr<::test_unknowninteractions::UnknownInteractionsClosedProtocolStr
       return std::make_shared<Storage_>(
           std::in_place_index<1>,
           ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult::Storage_> test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult::Storage_> test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::Storage_> test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult::Storage_> test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult::Storage_> test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
     default:
       return std::make_shared<Storage_>();
   }

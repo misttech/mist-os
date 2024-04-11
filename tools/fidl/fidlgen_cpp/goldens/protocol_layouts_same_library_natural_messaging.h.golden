@@ -56,11 +56,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::C
 };
 
 template <>
-struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError> {
-  using Request = ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult;
-};
-
-template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed> {
   using Request = ::test_protocollayoutssamelibrary::TablePayload;
 
@@ -92,11 +87,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::C
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed> {
   using Request = ::test_protocollayoutssamelibrary::UnionPayload;
-};
-
-template <>
-struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError> {
-  using Request = ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult;
 };
 
 #ifdef __Fuchsia__
@@ -247,9 +237,7 @@ class ::fidl::internal::NaturalEventHandlerInterface<::test_protocollayoutssamel
   NaturalEventHandlerInterface() = default;
   virtual ~NaturalEventHandlerInterface() = default;
   virtual void OnAnonComposed(::fidl::Event<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>&) = 0;
-  virtual void OnAnonComposedWithError(::fidl::Event<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>&) = 0;
   virtual void OnNamedComposed(::fidl::Event<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed>&) = 0;
-  virtual void OnNamedComposedWithError(::fidl::Event<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>&) = 0;
 };
 
 template <>
@@ -258,9 +246,7 @@ class ::fidl::AsyncEventHandler<::test_protocollayoutssamelibrary::ComposedProto
  public:
   AsyncEventHandler() = default;
   void OnAnonComposed(::fidl::Event<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>&) override {}
-  void OnAnonComposedWithError(::fidl::Event<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>&) override {}
   void OnNamedComposed(::fidl::Event<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed>&) override {}
-  void OnNamedComposedWithError(::fidl::Event<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>&) override {}
 };
 
 template <>
@@ -296,11 +282,7 @@ class ::fidl::internal::NaturalWeakEventSender<::test_protocollayoutssamelibrary
 
   ::fit::result<::fidl::OneWayError> OnAnonComposed(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& payload);
 
-  ::fit::result<::fidl::OneWayError> OnAnonComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult& payload);
-
   ::fit::result<::fidl::OneWayError> OnNamedComposed(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
-
-  ::fit::result<::fidl::OneWayError> OnNamedComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult& payload);
 };
 
 template <>
@@ -311,11 +293,7 @@ class ::fidl::internal::NaturalEventSender<::test_protocollayoutssamelibrary::Co
 
   ::fit::result<::fidl::OneWayError> OnAnonComposed(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& payload);
 
-  ::fit::result<::fidl::OneWayError> OnAnonComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult& payload);
-
   ::fit::result<::fidl::OneWayError> OnNamedComposed(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
-
-  ::fit::result<::fidl::OneWayError> OnNamedComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult& payload);
 };
 
 #endif  // __Fuchsia__
@@ -475,11 +453,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::M
 };
 
 template <>
-struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError> {
-  using Request = ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult;
-};
-
-template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed> {
   using Request = ::test_protocollayoutssamelibrary::TablePayload;
 
@@ -511,11 +484,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::M
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed> {
   using Request = ::test_protocollayoutssamelibrary::UnionPayload;
-};
-
-template <>
-struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError> {
-  using Request = ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult;
 };
 
 template <>
@@ -553,11 +521,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::M
 };
 
 template <>
-struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError> {
-  using Request = ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult;
-};
-
-template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon> {
   using Request = ::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest;
 
@@ -589,11 +552,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::M
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OnAnon> {
   using Request = ::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest;
-};
-
-template <>
-struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError> {
-  using Request = ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult;
 };
 
 #ifdef __Fuchsia__
@@ -860,13 +818,9 @@ class ::fidl::internal::NaturalEventHandlerInterface<::test_protocollayoutssamel
   NaturalEventHandlerInterface() = default;
   virtual ~NaturalEventHandlerInterface() = default;
   virtual void OnAnonComposed(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>&) = 0;
-  virtual void OnAnonComposedWithError(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>&) = 0;
   virtual void OnNamedComposed(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>&) = 0;
-  virtual void OnNamedComposedWithError(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>&) = 0;
   virtual void OnLocal(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>&) = 0;
-  virtual void OnLocalWithError(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>&) = 0;
   virtual void OnAnon(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>&) = 0;
-  virtual void OnAnonWithError(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>&) = 0;
 };
 
 template <>
@@ -875,13 +829,9 @@ class ::fidl::AsyncEventHandler<::test_protocollayoutssamelibrary::MainProtocol>
  public:
   AsyncEventHandler() = default;
   void OnAnonComposed(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>&) override {}
-  void OnAnonComposedWithError(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>&) override {}
   void OnNamedComposed(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>&) override {}
-  void OnNamedComposedWithError(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>&) override {}
   void OnLocal(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>&) override {}
-  void OnLocalWithError(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>&) override {}
   void OnAnon(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>&) override {}
-  void OnAnonWithError(::fidl::Event<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>&) override {}
 };
 
 template <>
@@ -917,19 +867,11 @@ class ::fidl::internal::NaturalWeakEventSender<::test_protocollayoutssamelibrary
 
   ::fit::result<::fidl::OneWayError> OnAnonComposed(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& payload);
 
-  ::fit::result<::fidl::OneWayError> OnAnonComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult& payload);
-
   ::fit::result<::fidl::OneWayError> OnNamedComposed(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
-
-  ::fit::result<::fidl::OneWayError> OnNamedComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult& payload);
 
   ::fit::result<::fidl::OneWayError> OnLocal(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
 
-  ::fit::result<::fidl::OneWayError> OnLocalWithError(const ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult& payload);
-
   ::fit::result<::fidl::OneWayError> OnAnon(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest& payload);
-
-  ::fit::result<::fidl::OneWayError> OnAnonWithError(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult& payload);
 };
 
 template <>
@@ -940,19 +882,11 @@ class ::fidl::internal::NaturalEventSender<::test_protocollayoutssamelibrary::Ma
 
   ::fit::result<::fidl::OneWayError> OnAnonComposed(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& payload);
 
-  ::fit::result<::fidl::OneWayError> OnAnonComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult& payload);
-
   ::fit::result<::fidl::OneWayError> OnNamedComposed(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
-
-  ::fit::result<::fidl::OneWayError> OnNamedComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult& payload);
 
   ::fit::result<::fidl::OneWayError> OnLocal(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
 
-  ::fit::result<::fidl::OneWayError> OnLocalWithError(const ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult& payload);
-
   ::fit::result<::fidl::OneWayError> OnAnon(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest& payload);
-
-  ::fit::result<::fidl::OneWayError> OnAnonWithError(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult& payload);
 };
 
 #endif  // __Fuchsia__

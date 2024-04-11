@@ -57,11 +57,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtoco
 };
 
 template <>
-struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtocol::OnComposedWithError> {
-  using Request = ::test_protocolpayloads_imported::ComposedProtocolOnComposedWithErrorResult;
-};
-
-template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtocol::OneWayLocal> {
   using Request = ::test_protocolpayloads::LocalStructPayload;
 
@@ -93,11 +88,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtoco
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtocol::OnLocal> {
   using Request = ::test_protocolpayloads::LocalStructPayload;
-};
-
-template <>
-struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtocol::OnLocalWithError> {
-  using Request = ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult;
 };
 
 template <>
@@ -135,11 +125,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtoco
 };
 
 template <>
-struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtocol::OnImportWithError> {
-  using Request = ::test_protocolpayloads::MainProtocolOnImportWithErrorResult;
-};
-
-template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtocol::OneWayAnon> {
   using Request = ::test_protocolpayloads::MainProtocolOneWayAnonRequest;
 
@@ -171,11 +156,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtoco
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtocol::OnAnon> {
   using Request = ::test_protocolpayloads::MainProtocolOnAnonRequest;
-};
-
-template <>
-struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtocol::OnAnonWithError> {
-  using Request = ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult;
 };
 
 #ifdef __Fuchsia__
@@ -442,13 +422,9 @@ class ::fidl::internal::NaturalEventHandlerInterface<::test_protocolpayloads::Ma
   NaturalEventHandlerInterface() = default;
   virtual ~NaturalEventHandlerInterface() = default;
   virtual void OnComposed(::fidl::Event<::test_protocolpayloads::MainProtocol::OnComposed>&) = 0;
-  virtual void OnComposedWithError(::fidl::Event<::test_protocolpayloads::MainProtocol::OnComposedWithError>&) = 0;
   virtual void OnLocal(::fidl::Event<::test_protocolpayloads::MainProtocol::OnLocal>&) = 0;
-  virtual void OnLocalWithError(::fidl::Event<::test_protocolpayloads::MainProtocol::OnLocalWithError>&) = 0;
   virtual void OnImport(::fidl::Event<::test_protocolpayloads::MainProtocol::OnImport>&) = 0;
-  virtual void OnImportWithError(::fidl::Event<::test_protocolpayloads::MainProtocol::OnImportWithError>&) = 0;
   virtual void OnAnon(::fidl::Event<::test_protocolpayloads::MainProtocol::OnAnon>&) = 0;
-  virtual void OnAnonWithError(::fidl::Event<::test_protocolpayloads::MainProtocol::OnAnonWithError>&) = 0;
 };
 
 template <>
@@ -457,13 +433,9 @@ class ::fidl::AsyncEventHandler<::test_protocolpayloads::MainProtocol>
  public:
   AsyncEventHandler() = default;
   void OnComposed(::fidl::Event<::test_protocolpayloads::MainProtocol::OnComposed>&) override {}
-  void OnComposedWithError(::fidl::Event<::test_protocolpayloads::MainProtocol::OnComposedWithError>&) override {}
   void OnLocal(::fidl::Event<::test_protocolpayloads::MainProtocol::OnLocal>&) override {}
-  void OnLocalWithError(::fidl::Event<::test_protocolpayloads::MainProtocol::OnLocalWithError>&) override {}
   void OnImport(::fidl::Event<::test_protocolpayloads::MainProtocol::OnImport>&) override {}
-  void OnImportWithError(::fidl::Event<::test_protocolpayloads::MainProtocol::OnImportWithError>&) override {}
   void OnAnon(::fidl::Event<::test_protocolpayloads::MainProtocol::OnAnon>&) override {}
-  void OnAnonWithError(::fidl::Event<::test_protocolpayloads::MainProtocol::OnAnonWithError>&) override {}
 };
 
 template <>
@@ -499,19 +471,11 @@ class ::fidl::internal::NaturalWeakEventSender<::test_protocolpayloads::MainProt
 
   ::fit::result<::fidl::OneWayError> OnComposed(const ::test_protocolpayloads_imported::ImportStructPayload& payload);
 
-  ::fit::result<::fidl::OneWayError> OnComposedWithError(const ::test_protocolpayloads_imported::ComposedProtocolOnComposedWithErrorResult& payload);
-
   ::fit::result<::fidl::OneWayError> OnLocal(const ::test_protocolpayloads::LocalStructPayload& payload);
-
-  ::fit::result<::fidl::OneWayError> OnLocalWithError(const ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult& payload);
 
   ::fit::result<::fidl::OneWayError> OnImport(const ::test_protocolpayloads_imported::ImportStructPayload& payload);
 
-  ::fit::result<::fidl::OneWayError> OnImportWithError(const ::test_protocolpayloads::MainProtocolOnImportWithErrorResult& payload);
-
   ::fit::result<::fidl::OneWayError> OnAnon(const ::test_protocolpayloads::MainProtocolOnAnonRequest& payload);
-
-  ::fit::result<::fidl::OneWayError> OnAnonWithError(const ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult& payload);
 };
 
 template <>
@@ -522,19 +486,11 @@ class ::fidl::internal::NaturalEventSender<::test_protocolpayloads::MainProtocol
 
   ::fit::result<::fidl::OneWayError> OnComposed(const ::test_protocolpayloads_imported::ImportStructPayload& payload);
 
-  ::fit::result<::fidl::OneWayError> OnComposedWithError(const ::test_protocolpayloads_imported::ComposedProtocolOnComposedWithErrorResult& payload);
-
   ::fit::result<::fidl::OneWayError> OnLocal(const ::test_protocolpayloads::LocalStructPayload& payload);
-
-  ::fit::result<::fidl::OneWayError> OnLocalWithError(const ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult& payload);
 
   ::fit::result<::fidl::OneWayError> OnImport(const ::test_protocolpayloads_imported::ImportStructPayload& payload);
 
-  ::fit::result<::fidl::OneWayError> OnImportWithError(const ::test_protocolpayloads::MainProtocolOnImportWithErrorResult& payload);
-
   ::fit::result<::fidl::OneWayError> OnAnon(const ::test_protocolpayloads::MainProtocolOnAnonRequest& payload);
-
-  ::fit::result<::fidl::OneWayError> OnAnonWithError(const ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult& payload);
 };
 
 #endif  // __Fuchsia__

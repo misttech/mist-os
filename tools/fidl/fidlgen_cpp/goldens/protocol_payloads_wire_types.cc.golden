@@ -13,34 +13,16 @@ void ::test_protocolpayloads::wire::MainProtocolTwoWayLocalWithErrorResult::Size
   static_assert(offsetof(MainProtocolTwoWayLocalWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
-void ::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(MainProtocolOnLocalWithErrorResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(MainProtocolOnLocalWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(MainProtocolOnLocalWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
 void ::test_protocolpayloads::wire::MainProtocolTwoWayAnonWithErrorResult::SizeAndOffsetAssertionHelper() {
   static_assert(sizeof(MainProtocolTwoWayAnonWithErrorResult) == sizeof(fidl_union_t));
   static_assert(offsetof(MainProtocolTwoWayAnonWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
   static_assert(offsetof(MainProtocolTwoWayAnonWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
-void ::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(MainProtocolOnAnonWithErrorResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(MainProtocolOnAnonWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(MainProtocolOnAnonWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
 void ::test_protocolpayloads::wire::MainProtocolTwoWayImportWithErrorResult::SizeAndOffsetAssertionHelper() {
   static_assert(sizeof(MainProtocolTwoWayImportWithErrorResult) == sizeof(fidl_union_t));
   static_assert(offsetof(MainProtocolTwoWayImportWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
   static_assert(offsetof(MainProtocolTwoWayImportWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
-}
-
-void ::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(MainProtocolOnImportWithErrorResult) == sizeof(fidl_union_t));
-  static_assert(offsetof(MainProtocolOnImportWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
-  static_assert(offsetof(MainProtocolOnImportWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 #pragma clang diagnostic pop

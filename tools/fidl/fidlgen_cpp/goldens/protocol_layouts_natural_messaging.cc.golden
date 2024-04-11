@@ -35,12 +35,6 @@ constexpr inline uint64_t kMainProtocol_OnAnonComposed_Ordinal = 919877898123886
 constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnAnonComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 [[maybe_unused]]
-constexpr inline uint64_t kMainProtocol_OnAnonComposedWithError_Ordinal = 712214127111113275lu;
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnAnonComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-[[maybe_unused]]
 constexpr inline uint64_t kMainProtocol_OneWayNamedComposed_Ordinal = 6735359826241449560lu;
 
 [[maybe_unused]]
@@ -63,12 +57,6 @@ constexpr inline uint64_t kMainProtocol_OnNamedComposed_Ordinal = 68029611974564
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-[[maybe_unused]]
-constexpr inline uint64_t kMainProtocol_OnNamedComposedWithError_Ordinal = 7488207288618998795lu;
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnNamedComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 [[maybe_unused]]
 constexpr inline uint64_t kMainProtocol_OneWayImport_Ordinal = 374039999976906043lu;
@@ -95,12 +83,6 @@ constexpr inline uint64_t kMainProtocol_OnImport_Ordinal = 6584793811321990352lu
 constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnImport_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 [[maybe_unused]]
-constexpr inline uint64_t kMainProtocol_OnImportWithError_Ordinal = 1123803631971094487lu;
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnImportWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-[[maybe_unused]]
 constexpr inline uint64_t kMainProtocol_OneWayLocal_Ordinal = 6085941264859402051lu;
 
 [[maybe_unused]]
@@ -125,12 +107,6 @@ constexpr inline uint64_t kMainProtocol_OnLocal_Ordinal = 4199259762307646332lu;
 constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnLocal_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 [[maybe_unused]]
-constexpr inline uint64_t kMainProtocol_OnLocalWithError_Ordinal = 8767483445230259748lu;
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnLocalWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-[[maybe_unused]]
 constexpr inline uint64_t kMainProtocol_OneWayAnon_Ordinal = 4203317713771984620lu;
 
 [[maybe_unused]]
@@ -153,12 +129,6 @@ constexpr inline uint64_t kMainProtocol_OnAnon_Ordinal = 7275479350674227467lu;
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-[[maybe_unused]]
-constexpr inline uint64_t kMainProtocol_OnAnonWithError_Ordinal = 3672186790919812761lu;
-
-[[maybe_unused]]
-constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnAnonWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 #ifdef __Fuchsia__
 }  // namespace test_protocollayouts
@@ -581,17 +551,6 @@ fidl::internal::NaturalEventDispatcher<::test_protocollayouts::MainProtocol>::Di
       }
       return ::fidl::Status::Ok();
     }
-    case ::test_protocollayouts::kMainProtocol_OnAnonComposedWithError_Ordinal: {
-      ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorResult>(std::move(msg));
-      if (decoded.is_error()) {
-        return decoded.error_value();
-      }
-      if (event_handler()) {
-        ::fidl::Event<::test_protocollayouts::MainProtocol::OnAnonComposedWithError> event = std::move(decoded.value());
-        event_handler()->OnAnonComposedWithError(event);
-      }
-      return ::fidl::Status::Ok();
-    }
     case ::test_protocollayouts::kMainProtocol_OnNamedComposed_Ordinal: {
       ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_protocollayouts_imported::ImportUnionPayload>(std::move(msg));
       if (decoded.is_error()) {
@@ -600,17 +559,6 @@ fidl::internal::NaturalEventDispatcher<::test_protocollayouts::MainProtocol>::Di
       if (event_handler()) {
         ::fidl::Event<::test_protocollayouts::MainProtocol::OnNamedComposed> event = std::move(decoded.value());
         event_handler()->OnNamedComposed(event);
-      }
-      return ::fidl::Status::Ok();
-    }
-    case ::test_protocollayouts::kMainProtocol_OnNamedComposedWithError_Ordinal: {
-      ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_protocollayouts_imported::ComposedProtocolOnNamedComposedWithErrorResult>(std::move(msg));
-      if (decoded.is_error()) {
-        return decoded.error_value();
-      }
-      if (event_handler()) {
-        ::fidl::Event<::test_protocollayouts::MainProtocol::OnNamedComposedWithError> event = std::move(decoded.value());
-        event_handler()->OnNamedComposedWithError(event);
       }
       return ::fidl::Status::Ok();
     }
@@ -625,17 +573,6 @@ fidl::internal::NaturalEventDispatcher<::test_protocollayouts::MainProtocol>::Di
       }
       return ::fidl::Status::Ok();
     }
-    case ::test_protocollayouts::kMainProtocol_OnImportWithError_Ordinal: {
-      ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_protocollayouts::MainProtocolOnImportWithErrorResult>(std::move(msg));
-      if (decoded.is_error()) {
-        return decoded.error_value();
-      }
-      if (event_handler()) {
-        ::fidl::Event<::test_protocollayouts::MainProtocol::OnImportWithError> event = std::move(decoded.value());
-        event_handler()->OnImportWithError(event);
-      }
-      return ::fidl::Status::Ok();
-    }
     case ::test_protocollayouts::kMainProtocol_OnLocal_Ordinal: {
       ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_protocollayouts::LocalUnionPayload>(std::move(msg));
       if (decoded.is_error()) {
@@ -647,17 +584,6 @@ fidl::internal::NaturalEventDispatcher<::test_protocollayouts::MainProtocol>::Di
       }
       return ::fidl::Status::Ok();
     }
-    case ::test_protocollayouts::kMainProtocol_OnLocalWithError_Ordinal: {
-      ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_protocollayouts::MainProtocolOnLocalWithErrorResult>(std::move(msg));
-      if (decoded.is_error()) {
-        return decoded.error_value();
-      }
-      if (event_handler()) {
-        ::fidl::Event<::test_protocollayouts::MainProtocol::OnLocalWithError> event = std::move(decoded.value());
-        event_handler()->OnLocalWithError(event);
-      }
-      return ::fidl::Status::Ok();
-    }
     case ::test_protocollayouts::kMainProtocol_OnAnon_Ordinal: {
       ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_protocollayouts::MainProtocolOnAnonRequest>(std::move(msg));
       if (decoded.is_error()) {
@@ -666,17 +592,6 @@ fidl::internal::NaturalEventDispatcher<::test_protocollayouts::MainProtocol>::Di
       if (event_handler()) {
         ::fidl::Event<::test_protocollayouts::MainProtocol::OnAnon> event = std::move(decoded.value());
         event_handler()->OnAnon(event);
-      }
-      return ::fidl::Status::Ok();
-    }
-    case ::test_protocollayouts::kMainProtocol_OnAnonWithError_Ordinal: {
-      ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_protocollayouts::MainProtocolOnAnonWithErrorResult>(std::move(msg));
-      if (decoded.is_error()) {
-        return decoded.error_value();
-      }
-      if (event_handler()) {
-        ::fidl::Event<::test_protocollayouts::MainProtocol::OnAnonWithError> event = std::move(decoded.value());
-        event_handler()->OnAnonWithError(event);
       }
       return ::fidl::Status::Ok();
     }
@@ -707,23 +622,6 @@ fidl::internal::NaturalEventDispatcher<::test_protocollayouts::MainProtocol>::Di
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
 }
 
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_OnAnonComposedWithError_Ordinal, ::test_protocollayouts::kMainProtocol_OnAnonComposedWithError_DynamicFlags};
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_OnAnonComposedWithError_Ordinal, ::test_protocollayouts::kMainProtocol_OnAnonComposedWithError_DynamicFlags};
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposed(const ::test_protocollayouts_imported::ImportUnionPayload& payload) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_OnNamedComposed_Ordinal, ::test_protocollayouts::kMainProtocol_OnNamedComposed_DynamicFlags};
@@ -735,23 +633,6 @@ fidl::internal::NaturalEventDispatcher<::test_protocollayouts::MainProtocol>::Di
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposed(const ::test_protocollayouts_imported::ImportUnionPayload& payload) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_OnNamedComposed_Ordinal, ::test_protocollayouts::kMainProtocol_OnNamedComposed_DynamicFlags};
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnNamedComposedWithErrorResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_OnNamedComposedWithError_Ordinal, ::test_protocollayouts::kMainProtocol_OnNamedComposedWithError_DynamicFlags};
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnNamedComposedWithErrorResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_OnNamedComposedWithError_Ordinal, ::test_protocollayouts::kMainProtocol_OnNamedComposedWithError_DynamicFlags};
   _encoder.EncodeBody(payload);
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   _encoded_message.Write(_transport());
@@ -775,23 +656,6 @@ fidl::internal::NaturalEventDispatcher<::test_protocollayouts::MainProtocol>::Di
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
 }
 
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocollayouts::MainProtocol>::OnImportWithError(const ::test_protocollayouts::MainProtocolOnImportWithErrorResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_OnImportWithError_Ordinal, ::test_protocollayouts::kMainProtocol_OnImportWithError_DynamicFlags};
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_protocollayouts::MainProtocol>::OnImportWithError(const ::test_protocollayouts::MainProtocolOnImportWithErrorResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_OnImportWithError_Ordinal, ::test_protocollayouts::kMainProtocol_OnImportWithError_DynamicFlags};
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocollayouts::MainProtocol>::OnLocal(const ::test_protocollayouts::LocalUnionPayload& payload) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_OnLocal_Ordinal, ::test_protocollayouts::kMainProtocol_OnLocal_DynamicFlags};
@@ -809,23 +673,6 @@ fidl::internal::NaturalEventDispatcher<::test_protocollayouts::MainProtocol>::Di
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
 }
 
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocollayouts::MainProtocol>::OnLocalWithError(const ::test_protocollayouts::MainProtocolOnLocalWithErrorResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_OnLocalWithError_Ordinal, ::test_protocollayouts::kMainProtocol_OnLocalWithError_DynamicFlags};
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_protocollayouts::MainProtocol>::OnLocalWithError(const ::test_protocollayouts::MainProtocolOnLocalWithErrorResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_OnLocalWithError_Ordinal, ::test_protocollayouts::kMainProtocol_OnLocalWithError_DynamicFlags};
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocollayouts::MainProtocol>::OnAnon(const ::test_protocollayouts::MainProtocolOnAnonRequest& payload) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_OnAnon_Ordinal, ::test_protocollayouts::kMainProtocol_OnAnon_DynamicFlags};
@@ -837,23 +684,6 @@ fidl::internal::NaturalEventDispatcher<::test_protocollayouts::MainProtocol>::Di
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_protocollayouts::MainProtocol>::OnAnon(const ::test_protocollayouts::MainProtocolOnAnonRequest& payload) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_OnAnon_Ordinal, ::test_protocollayouts::kMainProtocol_OnAnon_DynamicFlags};
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocollayouts::MainProtocol>::OnAnonWithError(const ::test_protocollayouts::MainProtocolOnAnonWithErrorResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_OnAnonWithError_Ordinal, ::test_protocollayouts::kMainProtocol_OnAnonWithError_DynamicFlags};
-  _encoder.EncodeBody(payload);
-  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
-}
-
-::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_protocollayouts::MainProtocol>::OnAnonWithError(const ::test_protocollayouts::MainProtocolOnAnonWithErrorResult& payload) {
-  ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kMainProtocol_OnAnonWithError_Ordinal, ::test_protocollayouts::kMainProtocol_OnAnonWithError_DynamicFlags};
   _encoder.EncodeBody(payload);
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   _encoded_message.Write(_transport());

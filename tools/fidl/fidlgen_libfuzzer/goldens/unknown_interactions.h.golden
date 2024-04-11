@@ -4,16 +4,16 @@
 
 #pragma once
 
+#include <test/unknowninteractions/cpp/fidl.h>
+
 #include "lib/fidl/cpp/fuzzing/traits.h"
 #include "lib/fidl/cpp/internal/header.h"
-#include <test/unknowninteractions/cpp/fidl.h>
 // For ::std::max_element().
 #include <algorithm>
 // For uint64_t.
 #include <stdint.h>
 
 namespace fuzzing {
-
 
 using UnknownInteractionsProtocolStrictTwoWayFieldsResponse = ::test::unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsResponse;
 using UnknownInteractionsProtocolStrictTwoWayUnionResponse = ::test::unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse;
@@ -45,25 +45,9 @@ using UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result = ::test::unknow
 using UnknownInteractionsProtocolStrictEventFieldsRequest = ::test::unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest;
 using UnknownInteractionsProtocolStrictEventUnionRequest = ::test::unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest;
 using UnknownInteractionsProtocolStrictEventTableRequest = ::test::unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest;
-using UnknownInteractionsProtocol_StrictEventErr_Response = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Response;
-using UnknownInteractionsProtocol_StrictEventErr_Result = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result;
-using UnknownInteractionsProtocol_StrictEventFieldsErr_Response = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Response;
-using UnknownInteractionsProtocol_StrictEventFieldsErr_Result = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result;
-using UnknownInteractionsProtocol_StrictEventUnionErr_Response = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Response;
-using UnknownInteractionsProtocol_StrictEventUnionErr_Result = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result;
-using UnknownInteractionsProtocol_StrictEventTableErr_Response = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Response;
-using UnknownInteractionsProtocol_StrictEventTableErr_Result = ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result;
 using UnknownInteractionsProtocolFlexibleEventFieldsRequest = ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest;
 using UnknownInteractionsProtocolFlexibleEventUnionRequest = ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest;
 using UnknownInteractionsProtocolFlexibleEventTableRequest = ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest;
-using UnknownInteractionsProtocol_FlexibleEventErr_Response = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Response;
-using UnknownInteractionsProtocol_FlexibleEventErr_Result = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result;
-using UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response;
-using UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result;
-using UnknownInteractionsProtocol_FlexibleEventUnionErr_Response = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Response;
-using UnknownInteractionsProtocol_FlexibleEventUnionErr_Result = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result;
-using UnknownInteractionsProtocol_FlexibleEventTableErr_Response = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Response;
-using UnknownInteractionsProtocol_FlexibleEventTableErr_Result = ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result;
 using UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse = ::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse;
 using UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse = ::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse;
 using UnknownInteractionsAjarProtocolStrictTwoWayTableResponse = ::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse;
@@ -78,25 +62,9 @@ using UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result = ::test::unkn
 using UnknownInteractionsAjarProtocolStrictEventFieldsRequest = ::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest;
 using UnknownInteractionsAjarProtocolStrictEventUnionRequest = ::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest;
 using UnknownInteractionsAjarProtocolStrictEventTableRequest = ::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest;
-using UnknownInteractionsAjarProtocol_StrictEventErr_Response = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Response;
-using UnknownInteractionsAjarProtocol_StrictEventErr_Result = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result;
-using UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response;
-using UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result;
-using UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response;
-using UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result;
-using UnknownInteractionsAjarProtocol_StrictEventTableErr_Response = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Response;
-using UnknownInteractionsAjarProtocol_StrictEventTableErr_Result = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result;
 using UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest = ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest;
 using UnknownInteractionsAjarProtocolFlexibleEventUnionRequest = ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest;
 using UnknownInteractionsAjarProtocolFlexibleEventTableRequest = ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest;
-using UnknownInteractionsAjarProtocol_FlexibleEventErr_Response = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Response;
-using UnknownInteractionsAjarProtocol_FlexibleEventErr_Result = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result;
-using UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response;
-using UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result;
-using UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response;
-using UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result;
-using UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response;
-using UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result = ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result;
 using UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse = ::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse;
 using UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse = ::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse;
 using UnknownInteractionsClosedProtocolStrictTwoWayTableResponse = ::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse;
@@ -111,14 +79,6 @@ using UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result = ::test::un
 using UnknownInteractionsClosedProtocolStrictEventFieldsRequest = ::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest;
 using UnknownInteractionsClosedProtocolStrictEventUnionRequest = ::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest;
 using UnknownInteractionsClosedProtocolStrictEventTableRequest = ::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest;
-using UnknownInteractionsClosedProtocol_StrictEventErr_Response = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Response;
-using UnknownInteractionsClosedProtocol_StrictEventErr_Result = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result;
-using UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response;
-using UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result;
-using UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response;
-using UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result;
-using UnknownInteractionsClosedProtocol_StrictEventTableErr_Response = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Response;
-using UnknownInteractionsClosedProtocol_StrictEventTableErr_Result = ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result;
 using UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse = ::test::unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse;
 using UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse = ::test::unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse;
 using UnknownInteractionsDriverProtocolStrictTwoWayTableResponse = ::test::unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse;
@@ -169,14 +129,13 @@ using UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result = ::te
 using UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response = ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response;
 using UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result = ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result;
 
-
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocolStrictTwoWayFieldsResponse> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocolStrictTwoWayFieldsResponse> {
   UnknownInteractionsProtocolStrictTwoWayFieldsResponse operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocolStrictTwoWayFieldsResponse>());
@@ -188,14 +147,14 @@ struct Allocate<UnknownInteractionsProtocolStrictTwoWayFieldsResponse> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocolStrictTwoWayUnionResponse> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocolStrictTwoWayUnionResponse> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -217,13 +176,13 @@ struct Allocate<UnknownInteractionsProtocolStrictTwoWayUnionResponse> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocolStrictTwoWayTableResponse> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocolStrictTwoWayTableResponse> {
   UnknownInteractionsProtocolStrictTwoWayTableResponse operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocolStrictTwoWayTableResponse>());
@@ -235,13 +194,13 @@ struct Allocate<UnknownInteractionsProtocolStrictTwoWayTableResponse> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_StrictTwoWayErr_Response> {
   operator size_t() {
     return MinSize<uint8_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_StrictTwoWayErr_Response> {
   UnknownInteractionsProtocol_StrictTwoWayErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_StrictTwoWayErr_Response>());
@@ -253,14 +212,14 @@ struct Allocate<UnknownInteractionsProtocol_StrictTwoWayErr_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_StrictTwoWayErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_StrictTwoWayErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -286,13 +245,13 @@ struct Allocate<UnknownInteractionsProtocol_StrictTwoWayErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response> {
   UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response>());
@@ -304,14 +263,14 @@ struct Allocate<UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -337,14 +296,14 @@ struct Allocate<UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -366,14 +325,14 @@ struct Allocate<UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -399,13 +358,13 @@ struct Allocate<UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_StrictTwoWayTableErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_StrictTwoWayTableErr_Response> {
   UnknownInteractionsProtocol_StrictTwoWayTableErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_StrictTwoWayTableErr_Response>());
@@ -417,14 +376,14 @@ struct Allocate<UnknownInteractionsProtocol_StrictTwoWayTableErr_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_StrictTwoWayTableErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayTableErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_StrictTwoWayTableErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -450,13 +409,13 @@ struct Allocate<UnknownInteractionsProtocol_StrictTwoWayTableErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWay_Response> {
   operator size_t() {
     return MinSize<uint8_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWay_Response> {
   UnknownInteractionsProtocol_FlexibleTwoWay_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_FlexibleTwoWay_Response>());
@@ -468,14 +427,14 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWay_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWay_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Response>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWay_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -501,13 +460,13 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWay_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWayFields_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayFields_Response> {
   UnknownInteractionsProtocol_FlexibleTwoWayFields_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_FlexibleTwoWayFields_Response>());
@@ -519,14 +478,14 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayFields_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWayFields_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Response>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayFields_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -552,14 +511,14 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayFields_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -581,14 +540,14 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -614,13 +573,13 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWayTable_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayTable_Response> {
   UnknownInteractionsProtocol_FlexibleTwoWayTable_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_FlexibleTwoWayTable_Response>());
@@ -632,14 +591,14 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayTable_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWayTable_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Response>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayTable_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -665,13 +624,13 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayTable_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWayErr_Response> {
   operator size_t() {
     return MinSize<uint8_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayErr_Response> {
   UnknownInteractionsProtocol_FlexibleTwoWayErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_FlexibleTwoWayErr_Response>());
@@ -683,14 +642,14 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayErr_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWayErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Response>(), MinSize<int32_t>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 3 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayErr_Result> {
   static_assert(3 > 0, "xunion must have at least one member");
 
@@ -720,13 +679,13 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response> {
   UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response>());
@@ -738,14 +697,14 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response>(), MinSize<int32_t>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 3 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result> {
   static_assert(3 > 0, "xunion must have at least one member");
 
@@ -775,14 +734,14 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -804,14 +763,14 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response>(), MinSize<int32_t>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 3 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result> {
   static_assert(3 > 0, "xunion must have at least one member");
 
@@ -841,13 +800,13 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response> {
   UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response>());
@@ -859,14 +818,14 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response>(), MinSize<int32_t>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 3 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result> {
   static_assert(3 > 0, "xunion must have at least one member");
 
@@ -896,13 +855,13 @@ struct Allocate<UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocolStrictEventFieldsRequest> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocolStrictEventFieldsRequest> {
   UnknownInteractionsProtocolStrictEventFieldsRequest operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocolStrictEventFieldsRequest>());
@@ -914,14 +873,14 @@ struct Allocate<UnknownInteractionsProtocolStrictEventFieldsRequest> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocolStrictEventUnionRequest> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocolStrictEventUnionRequest> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -943,13 +902,13 @@ struct Allocate<UnknownInteractionsProtocolStrictEventUnionRequest> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocolStrictEventTableRequest> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocolStrictEventTableRequest> {
   UnknownInteractionsProtocolStrictEventTableRequest operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocolStrictEventTableRequest>());
@@ -961,228 +920,13 @@ struct Allocate<UnknownInteractionsProtocolStrictEventTableRequest> {
     return out;
   }
 };
-template<>
-struct MinSize<UnknownInteractionsProtocol_StrictEventErr_Response> {
-  operator size_t() {
-    return MinSize<uint8_t>();
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_StrictEventErr_Response> {
-  UnknownInteractionsProtocol_StrictEventErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_StrictEventErr_Response>());
-    UnknownInteractionsProtocol_StrictEventErr_Response out;
-    const size_t slack_per_member = (*size - MinSize<UnknownInteractionsProtocol_StrictEventErr_Response>()) / 1;
-    size_t out_size;
-    out_size = MinSize<uint8_t>() + slack_per_member;
-    out.__reserved = Allocate<uint8_t>{}(src, &out_size);
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsProtocol_StrictEventErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_StrictEventErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsProtocol_StrictEventErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_StrictEventErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsProtocol_StrictEventErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsProtocol_StrictEventFieldsErr_Response> {
-  operator size_t() {
-    return MinSize<int32_t>();
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_StrictEventFieldsErr_Response> {
-  UnknownInteractionsProtocol_StrictEventFieldsErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_StrictEventFieldsErr_Response>());
-    UnknownInteractionsProtocol_StrictEventFieldsErr_Response out;
-    const size_t slack_per_member = (*size - MinSize<UnknownInteractionsProtocol_StrictEventFieldsErr_Response>()) / 1;
-    size_t out_size;
-    out_size = MinSize<int32_t>() + slack_per_member;
-    out.some_field = Allocate<int32_t>{}(src, &out_size);
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsProtocol_StrictEventFieldsErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_StrictEventFieldsErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsProtocol_StrictEventFieldsErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_StrictEventFieldsErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsProtocol_StrictEventFieldsErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsProtocol_StrictEventUnionErr_Response> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 1 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_StrictEventUnionErr_Response> {
-  static_assert(1 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsProtocol_StrictEventUnionErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_StrictEventUnionErr_Response>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsProtocol_StrictEventUnionErr_Response out;
-    switch (selector % 1) {
-      case 0: {
-        out.set_some_field(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsProtocol_StrictEventUnionErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_StrictEventUnionErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsProtocol_StrictEventUnionErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_StrictEventUnionErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsProtocol_StrictEventUnionErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsProtocol_StrictEventTableErr_Response> {
-  operator size_t() {
-    return MinSize<int32_t>();
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_StrictEventTableErr_Response> {
-  UnknownInteractionsProtocol_StrictEventTableErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_StrictEventTableErr_Response>());
-    UnknownInteractionsProtocol_StrictEventTableErr_Response out;
-    const size_t slack_per_member = (*size - MinSize<UnknownInteractionsProtocol_StrictEventTableErr_Response>()) / 1;
-    size_t out_size;
-    out_size = MinSize<int32_t>() + slack_per_member;
-    out.set_some_field(Allocate<int32_t>{}(src, &out_size));
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsProtocol_StrictEventTableErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_StrictEventTableErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsProtocol_StrictEventTableErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_StrictEventTableErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsProtocol_StrictEventTableErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocolFlexibleEventFieldsRequest> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocolFlexibleEventFieldsRequest> {
   UnknownInteractionsProtocolFlexibleEventFieldsRequest operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocolFlexibleEventFieldsRequest>());
@@ -1194,14 +938,14 @@ struct Allocate<UnknownInteractionsProtocolFlexibleEventFieldsRequest> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocolFlexibleEventUnionRequest> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocolFlexibleEventUnionRequest> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -1223,13 +967,13 @@ struct Allocate<UnknownInteractionsProtocolFlexibleEventUnionRequest> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsProtocolFlexibleEventTableRequest> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsProtocolFlexibleEventTableRequest> {
   UnknownInteractionsProtocolFlexibleEventTableRequest operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocolFlexibleEventTableRequest>());
@@ -1241,228 +985,13 @@ struct Allocate<UnknownInteractionsProtocolFlexibleEventTableRequest> {
     return out;
   }
 };
-template<>
-struct MinSize<UnknownInteractionsProtocol_FlexibleEventErr_Response> {
-  operator size_t() {
-    return MinSize<uint8_t>();
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_FlexibleEventErr_Response> {
-  UnknownInteractionsProtocol_FlexibleEventErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_FlexibleEventErr_Response>());
-    UnknownInteractionsProtocol_FlexibleEventErr_Response out;
-    const size_t slack_per_member = (*size - MinSize<UnknownInteractionsProtocol_FlexibleEventErr_Response>()) / 1;
-    size_t out_size;
-    out_size = MinSize<uint8_t>() + slack_per_member;
-    out.__reserved = Allocate<uint8_t>{}(src, &out_size);
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsProtocol_FlexibleEventErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_FlexibleEventErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsProtocol_FlexibleEventErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_FlexibleEventErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsProtocol_FlexibleEventErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response> {
-  operator size_t() {
-    return MinSize<int32_t>();
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response> {
-  UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response>());
-    UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response out;
-    const size_t slack_per_member = (*size - MinSize<UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response>()) / 1;
-    size_t out_size;
-    out_size = MinSize<int32_t>() + slack_per_member;
-    out.some_field = Allocate<int32_t>{}(src, &out_size);
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsProtocol_FlexibleEventUnionErr_Response> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 1 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_FlexibleEventUnionErr_Response> {
-  static_assert(1 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsProtocol_FlexibleEventUnionErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_FlexibleEventUnionErr_Response>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsProtocol_FlexibleEventUnionErr_Response out;
-    switch (selector % 1) {
-      case 0: {
-        out.set_some_field(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsProtocol_FlexibleEventUnionErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_FlexibleEventUnionErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsProtocol_FlexibleEventUnionErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_FlexibleEventUnionErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsProtocol_FlexibleEventUnionErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsProtocol_FlexibleEventTableErr_Response> {
-  operator size_t() {
-    return MinSize<int32_t>();
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_FlexibleEventTableErr_Response> {
-  UnknownInteractionsProtocol_FlexibleEventTableErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_FlexibleEventTableErr_Response>());
-    UnknownInteractionsProtocol_FlexibleEventTableErr_Response out;
-    const size_t slack_per_member = (*size - MinSize<UnknownInteractionsProtocol_FlexibleEventTableErr_Response>()) / 1;
-    size_t out_size;
-    out_size = MinSize<int32_t>() + slack_per_member;
-    out.set_some_field(Allocate<int32_t>{}(src, &out_size));
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsProtocol_FlexibleEventTableErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsProtocol_FlexibleEventTableErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsProtocol_FlexibleEventTableErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsProtocol_FlexibleEventTableErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsProtocol_FlexibleEventTableErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse> {
   UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse>());
@@ -1474,14 +1003,14 @@ struct Allocate<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -1503,13 +1032,13 @@ struct Allocate<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse> {
   UnknownInteractionsAjarProtocolStrictTwoWayTableResponse operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse>());
@@ -1521,13 +1050,13 @@ struct Allocate<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response> {
   operator size_t() {
     return MinSize<uint8_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response> {
   UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response>());
@@ -1539,14 +1068,14 @@ struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -1572,13 +1101,13 @@ struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response> {
   UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response>());
@@ -1590,14 +1119,14 @@ struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response> 
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -1623,14 +1152,14 @@ struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -1652,14 +1181,14 @@ struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -1685,13 +1214,13 @@ struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response> {
   UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response>());
@@ -1703,14 +1232,14 @@ struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -1736,13 +1265,13 @@ struct Allocate<UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocolStrictEventFieldsRequest> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocolStrictEventFieldsRequest> {
   UnknownInteractionsAjarProtocolStrictEventFieldsRequest operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocolStrictEventFieldsRequest>());
@@ -1754,14 +1283,14 @@ struct Allocate<UnknownInteractionsAjarProtocolStrictEventFieldsRequest> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocolStrictEventUnionRequest> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocolStrictEventUnionRequest> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -1783,13 +1312,13 @@ struct Allocate<UnknownInteractionsAjarProtocolStrictEventUnionRequest> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocolStrictEventTableRequest> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocolStrictEventTableRequest> {
   UnknownInteractionsAjarProtocolStrictEventTableRequest operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocolStrictEventTableRequest>());
@@ -1801,228 +1330,13 @@ struct Allocate<UnknownInteractionsAjarProtocolStrictEventTableRequest> {
     return out;
   }
 };
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_StrictEventErr_Response> {
-  operator size_t() {
-    return MinSize<uint8_t>();
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_StrictEventErr_Response> {
-  UnknownInteractionsAjarProtocol_StrictEventErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_StrictEventErr_Response>());
-    UnknownInteractionsAjarProtocol_StrictEventErr_Response out;
-    const size_t slack_per_member = (*size - MinSize<UnknownInteractionsAjarProtocol_StrictEventErr_Response>()) / 1;
-    size_t out_size;
-    out_size = MinSize<uint8_t>() + slack_per_member;
-    out.__reserved = Allocate<uint8_t>{}(src, &out_size);
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_StrictEventErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_StrictEventErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsAjarProtocol_StrictEventErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_StrictEventErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsAjarProtocol_StrictEventErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response> {
-  operator size_t() {
-    return MinSize<int32_t>();
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response> {
-  UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response>());
-    UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response out;
-    const size_t slack_per_member = (*size - MinSize<UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response>()) / 1;
-    size_t out_size;
-    out_size = MinSize<int32_t>() + slack_per_member;
-    out.some_field = Allocate<int32_t>{}(src, &out_size);
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 1 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response> {
-  static_assert(1 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response out;
-    switch (selector % 1) {
-      case 0: {
-        out.set_some_field(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_StrictEventTableErr_Response> {
-  operator size_t() {
-    return MinSize<int32_t>();
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_StrictEventTableErr_Response> {
-  UnknownInteractionsAjarProtocol_StrictEventTableErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_StrictEventTableErr_Response>());
-    UnknownInteractionsAjarProtocol_StrictEventTableErr_Response out;
-    const size_t slack_per_member = (*size - MinSize<UnknownInteractionsAjarProtocol_StrictEventTableErr_Response>()) / 1;
-    size_t out_size;
-    out_size = MinSize<int32_t>() + slack_per_member;
-    out.set_some_field(Allocate<int32_t>{}(src, &out_size));
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_StrictEventTableErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_StrictEventTableErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsAjarProtocol_StrictEventTableErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_StrictEventTableErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsAjarProtocol_StrictEventTableErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest> {
   UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>());
@@ -2034,14 +1348,14 @@ struct Allocate<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocolFlexibleEventUnionRequest> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocolFlexibleEventUnionRequest> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -2063,13 +1377,13 @@ struct Allocate<UnknownInteractionsAjarProtocolFlexibleEventUnionRequest> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarProtocolFlexibleEventTableRequest> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarProtocolFlexibleEventTableRequest> {
   UnknownInteractionsAjarProtocolFlexibleEventTableRequest operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocolFlexibleEventTableRequest>());
@@ -2081,228 +1395,13 @@ struct Allocate<UnknownInteractionsAjarProtocolFlexibleEventTableRequest> {
     return out;
   }
 };
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_FlexibleEventErr_Response> {
-  operator size_t() {
-    return MinSize<uint8_t>();
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_FlexibleEventErr_Response> {
-  UnknownInteractionsAjarProtocol_FlexibleEventErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_FlexibleEventErr_Response>());
-    UnknownInteractionsAjarProtocol_FlexibleEventErr_Response out;
-    const size_t slack_per_member = (*size - MinSize<UnknownInteractionsAjarProtocol_FlexibleEventErr_Response>()) / 1;
-    size_t out_size;
-    out_size = MinSize<uint8_t>() + slack_per_member;
-    out.__reserved = Allocate<uint8_t>{}(src, &out_size);
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_FlexibleEventErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_FlexibleEventErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsAjarProtocol_FlexibleEventErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_FlexibleEventErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsAjarProtocol_FlexibleEventErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response> {
-  operator size_t() {
-    return MinSize<int32_t>();
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response> {
-  UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response>());
-    UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response out;
-    const size_t slack_per_member = (*size - MinSize<UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response>()) / 1;
-    size_t out_size;
-    out_size = MinSize<int32_t>() + slack_per_member;
-    out.some_field = Allocate<int32_t>{}(src, &out_size);
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 1 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response> {
-  static_assert(1 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response out;
-    switch (selector % 1) {
-      case 0: {
-        out.set_some_field(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response> {
-  operator size_t() {
-    return MinSize<int32_t>();
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response> {
-  UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response>());
-    UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response out;
-    const size_t slack_per_member = (*size - MinSize<UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response>()) / 1;
-    size_t out_size;
-    out_size = MinSize<int32_t>() + slack_per_member;
-    out.set_some_field(Allocate<int32_t>{}(src, &out_size));
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse> {
   UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>());
@@ -2314,14 +1413,14 @@ struct Allocate<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -2343,13 +1442,13 @@ struct Allocate<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse> {
   UnknownInteractionsClosedProtocolStrictTwoWayTableResponse operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse>());
@@ -2361,13 +1460,13 @@ struct Allocate<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response> {
   operator size_t() {
     return MinSize<uint8_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response> {
   UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response>());
@@ -2379,14 +1478,14 @@ struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -2412,13 +1511,13 @@ struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response> {
   UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response>());
@@ -2430,14 +1529,14 @@ struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -2463,14 +1562,14 @@ struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result> 
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -2492,14 +1591,14 @@ struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response>
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -2525,13 +1624,13 @@ struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response> {
   UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response>());
@@ -2543,14 +1642,14 @@ struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response>
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -2576,13 +1675,13 @@ struct Allocate<UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedProtocolStrictEventFieldsRequest> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedProtocolStrictEventFieldsRequest> {
   UnknownInteractionsClosedProtocolStrictEventFieldsRequest operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedProtocolStrictEventFieldsRequest>());
@@ -2594,14 +1693,14 @@ struct Allocate<UnknownInteractionsClosedProtocolStrictEventFieldsRequest> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedProtocolStrictEventUnionRequest> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedProtocolStrictEventUnionRequest> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -2623,13 +1722,13 @@ struct Allocate<UnknownInteractionsClosedProtocolStrictEventUnionRequest> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedProtocolStrictEventTableRequest> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedProtocolStrictEventTableRequest> {
   UnknownInteractionsClosedProtocolStrictEventTableRequest operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedProtocolStrictEventTableRequest>());
@@ -2641,228 +1740,13 @@ struct Allocate<UnknownInteractionsClosedProtocolStrictEventTableRequest> {
     return out;
   }
 };
-template<>
-struct MinSize<UnknownInteractionsClosedProtocol_StrictEventErr_Response> {
-  operator size_t() {
-    return MinSize<uint8_t>();
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsClosedProtocol_StrictEventErr_Response> {
-  UnknownInteractionsClosedProtocol_StrictEventErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedProtocol_StrictEventErr_Response>());
-    UnknownInteractionsClosedProtocol_StrictEventErr_Response out;
-    const size_t slack_per_member = (*size - MinSize<UnknownInteractionsClosedProtocol_StrictEventErr_Response>()) / 1;
-    size_t out_size;
-    out_size = MinSize<uint8_t>() + slack_per_member;
-    out.__reserved = Allocate<uint8_t>{}(src, &out_size);
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsClosedProtocol_StrictEventErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsClosedProtocol_StrictEventErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsClosedProtocol_StrictEventErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedProtocol_StrictEventErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsClosedProtocol_StrictEventErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response> {
-  operator size_t() {
-    return MinSize<int32_t>();
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response> {
-  UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response>());
-    UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response out;
-    const size_t slack_per_member = (*size - MinSize<UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response>()) / 1;
-    size_t out_size;
-    out_size = MinSize<int32_t>() + slack_per_member;
-    out.some_field = Allocate<int32_t>{}(src, &out_size);
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 1 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response> {
-  static_assert(1 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response out;
-    switch (selector % 1) {
-      case 0: {
-        out.set_some_field(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsClosedProtocol_StrictEventTableErr_Response> {
-  operator size_t() {
-    return MinSize<int32_t>();
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsClosedProtocol_StrictEventTableErr_Response> {
-  UnknownInteractionsClosedProtocol_StrictEventTableErr_Response operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedProtocol_StrictEventTableErr_Response>());
-    UnknownInteractionsClosedProtocol_StrictEventTableErr_Response out;
-    const size_t slack_per_member = (*size - MinSize<UnknownInteractionsClosedProtocol_StrictEventTableErr_Response>()) / 1;
-    size_t out_size;
-    out_size = MinSize<int32_t>() + slack_per_member;
-    out.set_some_field(Allocate<int32_t>{}(src, &out_size));
-    return out;
-  }
-};
-template<>
-struct MinSize<UnknownInteractionsClosedProtocol_StrictEventTableErr_Result> {
-  operator size_t() {
-    size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Response>(), MinSize<int32_t>()};
-    return 1 + *std::max_element(sizes, sizes + 2 + 1);
-  }
-};
-template<>
-struct Allocate<UnknownInteractionsClosedProtocol_StrictEventTableErr_Result> {
-  static_assert(2 > 0, "xunion must have at least one member");
-
-  UnknownInteractionsClosedProtocol_StrictEventTableErr_Result operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedProtocol_StrictEventTableErr_Result>());
-
-    uint8_t selector;
-    ZX_ASSERT(src->CopyBytes(&selector, 1));
-    (*size)++;
-
-    UnknownInteractionsClosedProtocol_StrictEventTableErr_Result out;
-    switch (selector % 2) {
-      case 0: {
-        out.set_response(Allocate<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Response>{}(src, size));
-        break;
-      }
-      case 1: {
-        out.set_err(Allocate<int32_t>{}(src, size));
-        break;
-      }
-    }
-
-    return out;
-  }
-};
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse> {
   UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse>());
@@ -2874,14 +1758,14 @@ struct Allocate<UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -2903,13 +1787,13 @@ struct Allocate<UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocolStrictTwoWayTableResponse> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocolStrictTwoWayTableResponse> {
   UnknownInteractionsDriverProtocolStrictTwoWayTableResponse operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsDriverProtocolStrictTwoWayTableResponse>());
@@ -2921,13 +1805,13 @@ struct Allocate<UnknownInteractionsDriverProtocolStrictTwoWayTableResponse> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response> {
   operator size_t() {
     return MinSize<uint8_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response> {
   UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response>());
@@ -2939,14 +1823,14 @@ struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -2972,13 +1856,13 @@ struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response> {
   UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response>());
@@ -2990,14 +1874,14 @@ struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -3023,14 +1907,14 @@ struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result> 
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -3052,14 +1936,14 @@ struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response>
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -3085,13 +1969,13 @@ struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response> {
   UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response>());
@@ -3103,14 +1987,14 @@ struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response>
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -3136,13 +2020,13 @@ struct Allocate<UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response> {
   operator size_t() {
     return MinSize<uint8_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response> {
   UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response>());
@@ -3154,14 +2038,14 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -3187,13 +2071,13 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response> {
   UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response>());
@@ -3205,14 +2089,14 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response>
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -3238,14 +2122,14 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -3267,14 +2151,14 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response> 
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -3300,13 +2184,13 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response> {
   UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response>());
@@ -3318,14 +2202,14 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response> 
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -3351,13 +2235,13 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response> {
   operator size_t() {
     return MinSize<uint8_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response> {
   UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response>());
@@ -3369,14 +2253,14 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response>(), MinSize<int32_t>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 3 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result> {
   static_assert(3 > 0, "xunion must have at least one member");
 
@@ -3406,13 +2290,13 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response> {
   UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response>());
@@ -3424,14 +2308,14 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Respon
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response>(), MinSize<int32_t>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 3 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result> {
   static_assert(3 > 0, "xunion must have at least one member");
 
@@ -3461,14 +2345,14 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -3490,14 +2374,14 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Respons
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response>(), MinSize<int32_t>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 3 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result> {
   static_assert(3 > 0, "xunion must have at least one member");
 
@@ -3527,13 +2411,13 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result>
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response> {
   UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response>());
@@ -3545,14 +2429,14 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Respons
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response>(), MinSize<int32_t>(), MinSize<::fidl::FrameworkErr>()};
     return 1 + *std::max_element(sizes, sizes + 3 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result> {
   static_assert(3 > 0, "xunion must have at least one member");
 
@@ -3582,13 +2466,13 @@ struct Allocate<UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result>
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse> {
   UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse>());
@@ -3600,14 +2484,14 @@ struct Allocate<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse>
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -3629,13 +2513,13 @@ struct Allocate<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse> 
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse> {
   UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse>());
@@ -3647,13 +2531,13 @@ struct Allocate<UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse> 
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response> {
   operator size_t() {
     return MinSize<uint8_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response> {
   UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response>());
@@ -3665,14 +2549,14 @@ struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response> 
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -3698,13 +2582,13 @@ struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result> {
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response> {
   UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response>());
@@ -3716,14 +2600,14 @@ struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Resp
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -3749,14 +2633,14 @@ struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Resu
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -3778,14 +2662,14 @@ struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Respo
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -3811,13 +2695,13 @@ struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Resul
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response> {
   UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response>());
@@ -3829,14 +2713,14 @@ struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Respo
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -3862,13 +2746,13 @@ struct Allocate<UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Resul
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse> {
   UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse>());
@@ -3880,14 +2764,14 @@ struct Allocate<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsRespons
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -3909,13 +2793,13 @@ struct Allocate<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse> {
   UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse>());
@@ -3927,13 +2811,13 @@ struct Allocate<UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response> {
   operator size_t() {
     return MinSize<uint8_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response> {
   UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response>());
@@ -3945,14 +2829,14 @@ struct Allocate<UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -3978,13 +2862,13 @@ struct Allocate<UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result> 
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response> {
   UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response>());
@@ -3996,14 +2880,14 @@ struct Allocate<UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Re
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -4029,14 +2913,14 @@ struct Allocate<UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Re
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response> {
   static_assert(1 > 0, "xunion must have at least one member");
 
@@ -4058,14 +2942,14 @@ struct Allocate<UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Res
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 
@@ -4091,13 +2975,13 @@ struct Allocate<UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Res
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response> {
   operator size_t() {
     return MinSize<int32_t>();
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response> {
   UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response operator()(FuzzInput* src, size_t* size) {
     ZX_ASSERT(*size >= MinSize<UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response>());
@@ -4109,14 +2993,14 @@ struct Allocate<UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Res
     return out;
   }
 };
-template<>
+template <>
 struct MinSize<UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response>(), MinSize<int32_t>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
-template<>
+template <>
 struct Allocate<UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result> {
   static_assert(2 > 0, "xunion must have at least one member");
 

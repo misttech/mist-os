@@ -239,8 +239,7 @@ constexpr ErrorDef<118, std::string_view, std::string_view, const Decl *>
     ErrTransportEndUsedInIncompatibleTransport(
         "client_end / server_end of transport type {0} may not be sent over "
         "transport {1} used by {2}");
-constexpr ErrorDef<119, std::string_view> ErrEventErrorSyntaxDeprecated(
-    "Event '{0}' uses the error syntax. This is deprecated (see https://fxbug.dev/42182418)");
+constexpr RetiredDef<119> ErrEventErrorSyntax;
 constexpr ErrorDef<120, const Attribute *> ErrInvalidAttributePlacement(
     "placement of attribute '{0}' disallowed here");
 constexpr ErrorDef<121, const Attribute *> ErrDeprecatedAttribute("attribute '{0}' is deprecated");
@@ -549,7 +548,7 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0116 */ &ErrFlexibleOneWayMethodInClosedProtocol,
     /* fi-0117 */ &ErrHandleUsedInIncompatibleTransport,
     /* fi-0118 */ &ErrTransportEndUsedInIncompatibleTransport,
-    /* fi-0119 */ &ErrEventErrorSyntaxDeprecated,
+    /* fi-0119 */ &ErrEventErrorSyntax,
     /* fi-0120 */ &ErrInvalidAttributePlacement,
     /* fi-0121 */ &ErrDeprecatedAttribute,
     /* fi-0122 */ &ErrDuplicateAttribute,

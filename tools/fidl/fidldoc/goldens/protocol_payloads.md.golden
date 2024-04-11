@@ -35,24 +35,6 @@
         </tr>
 </table>
 
-### OnAnonWithError {#MainProtocol.OnAnonWithError}
-
-
-
-
-
-#### Response {#MainProtocol.OnAnonWithError_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#MainProtocol_OnAnonWithError_Result'>MainProtocol_OnAnonWithError_Result</a></code>
-            </td>
-        </tr>
-</table>
-
 ### OnComposed {#MainProtocol.OnComposed}
 
 
@@ -71,24 +53,6 @@
         </tr>
 </table>
 
-### OnComposedWithError {#MainProtocol.OnComposedWithError}
-
-
-
-
-
-#### Response {#MainProtocol.OnComposedWithError_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='../test.protocolpayloads.imported/'>test.protocolpayloads.imported</a>/<a class='link' href='../test.protocolpayloads.imported/#ComposedProtocol_OnComposedWithError_Result'>ComposedProtocol_OnComposedWithError_Result</a></code>
-            </td>
-        </tr>
-</table>
-
 ### OnImport {#MainProtocol.OnImport}
 
 
@@ -103,24 +67,6 @@
             <td><code>a</code></td>
             <td>
                 <code>int32</code>
-            </td>
-        </tr>
-</table>
-
-### OnImportWithError {#MainProtocol.OnImportWithError}
-
-
-
-
-
-#### Response {#MainProtocol.OnImportWithError_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#MainProtocol_OnImportWithError_Result'>MainProtocol_OnImportWithError_Result</a></code>
             </td>
         </tr>
 </table>
@@ -145,24 +91,6 @@
             <td><code>b</code></td>
             <td>
                 <code>uint32</code>
-            </td>
-        </tr>
-</table>
-
-### OnLocalWithError {#MainProtocol.OnLocalWithError}
-
-
-
-
-
-#### Response {#MainProtocol.OnLocalWithError_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#MainProtocol_OnLocalWithError_Result'>MainProtocol_OnLocalWithError_Result</a></code>
             </td>
         </tr>
 </table>
@@ -553,31 +481,8 @@
         </tr>
 </table>
 
-### MainProtocol_OnAnonWithError_Response  {#MainProtocol_OnAnonWithError_Response data-text="MainProtocol_OnAnonWithError_Response"}
-*Defined in [test.protocolpayloads/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl;l=52)*
-
-<table>
-    <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
-        <tr id="MainProtocol_OnAnonWithError_Response.a">
-            <td><code>a</code></td>
-            <td>
-                <code>uint32</code>
-            </td>
-            <td></td>
-            <td>No default</td>
-        </tr>
-        <tr id="MainProtocol_OnAnonWithError_Response.b">
-            <td><code>b</code></td>
-            <td>
-                <code>uint32</code>
-            </td>
-            <td></td>
-            <td>No default</td>
-        </tr>
-</table>
-
 ### MainProtocol_TwoWayAnonWithError_Response  {#MainProtocol_TwoWayAnonWithError_Response data-text="MainProtocol_TwoWayAnonWithError_Response"}
-*Defined in [test.protocolpayloads/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl;l=44)*
+*Defined in [test.protocolpayloads/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl;l=42)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -604,74 +509,8 @@
 
 ## **UNIONS**
 
-### MainProtocol_OnAnonWithError_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#MainProtocol_OnAnonWithError_Result data-text="MainProtocol_OnAnonWithError_Result"}
-*Defined in [test.protocolpayloads/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl;l=52)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="MainProtocol_OnAnonWithError_Result.response">
-<td><h3 id="MainProtocol_OnAnonWithError_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#MainProtocol_OnAnonWithError_Response'>MainProtocol_OnAnonWithError_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="MainProtocol_OnAnonWithError_Result.err">
-<td><h3 id="MainProtocol_OnAnonWithError_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>uint32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### MainProtocol_OnImportWithError_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#MainProtocol_OnImportWithError_Result data-text="MainProtocol_OnImportWithError_Result"}
-*Defined in [test.protocolpayloads/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl;l=26)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="MainProtocol_OnImportWithError_Result.response">
-<td><h3 id="MainProtocol_OnImportWithError_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='../test.protocolpayloads.imported/'>test.protocolpayloads.imported</a>/<a class='link' href='../test.protocolpayloads.imported/#ImportStructPayload'>ImportStructPayload</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="MainProtocol_OnImportWithError_Result.err">
-<td><h3 id="MainProtocol_OnImportWithError_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>uint32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### MainProtocol_OnLocalWithError_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#MainProtocol_OnLocalWithError_Result data-text="MainProtocol_OnLocalWithError_Result"}
-*Defined in [test.protocolpayloads/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl;l=19)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="MainProtocol_OnLocalWithError_Result.response">
-<td><h3 id="MainProtocol_OnLocalWithError_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#LocalStructPayload'>LocalStructPayload</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="MainProtocol_OnLocalWithError_Result.err">
-<td><h3 id="MainProtocol_OnLocalWithError_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>uint32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
 ### MainProtocol_TwoWayAnonWithError_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#MainProtocol_TwoWayAnonWithError_Result data-text="MainProtocol_TwoWayAnonWithError_Result"}
-*Defined in [test.protocolpayloads/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl;l=44)*
+*Defined in [test.protocolpayloads/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl;l=42)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="MainProtocol_TwoWayAnonWithError_Result.response">
@@ -693,7 +532,7 @@
 </table>
 
 ### MainProtocol_TwoWayImportWithError_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#MainProtocol_TwoWayImportWithError_Result data-text="MainProtocol_TwoWayImportWithError_Result"}
-*Defined in [test.protocolpayloads/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl;l=24)*
+*Defined in [test.protocolpayloads/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl;l=23)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="MainProtocol_TwoWayImportWithError_Result.response">

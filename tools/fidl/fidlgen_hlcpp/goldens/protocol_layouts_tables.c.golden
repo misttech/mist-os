@@ -4,9 +4,6 @@
 
 #include <lib/fidl/internal.h>
 
-const struct FidlCodedTable test_protocollayouts_MainProtocol_OnAnonWithError_ResponseTable;
-extern const struct FidlCodedTable test_protocollayouts_imported_ImportTablePayloadTable;
-const struct FidlCodedTable test_protocollayouts_LocalTablePayloadTable;
 const struct FidlCodedUnion test_protocollayouts_MainProtocol_TwoWayAnonWithError_ResponseTable;
 extern const struct FidlCodedUnion test_protocollayouts_imported_ImportUnionPayloadTable;
 const struct FidlCodedUnion test_protocollayouts_LocalUnionPayloadTable;
@@ -52,17 +49,6 @@ const struct FidlCodedTable test_protocollayouts_MainProtocolTwoWayAnonWithError
     .name = "test.protocollayouts/MainProtocolTwoWayAnonWithErrorRequest",
     .is_resource = kFidlIsResource_NotResource,
     .fields = Fields59test_protocollayouts_MainProtocolTwoWayAnonWithErrorRequest,
-    .field_count = 1,
-};
-
-static const struct FidlTableField Fields58test_protocollayouts_MainProtocol_OnAnonWithError_Response[] = {
-    {.ordinal = 1, .type = (const fidl_type_t*)&fidl_internal_kUint16Table},
-};
-const struct FidlCodedTable test_protocollayouts_MainProtocol_OnAnonWithError_ResponseTable = {
-    .tag = kFidlTypeTable,
-    .name = "test.protocollayouts/MainProtocol_OnAnonWithError_Response",
-    .is_resource = kFidlIsResource_NotResource,
-    .fields = Fields58test_protocollayouts_MainProtocol_OnAnonWithError_Response,
     .field_count = 1,
 };
 
@@ -130,75 +116,6 @@ const struct FidlCodedUnion test_protocollayouts_MainProtocolTwoWayAnonRequestNu
     .nullable = kFidlNullability_Nullable,
     .fields = Fields50test_protocollayouts_MainProtocolTwoWayAnonRequest,
     .field_count = 1,
-};
-
-static const struct FidlUnionField Fields56test_protocollayouts_MainProtocol_OnAnonWithError_Result[] = {
-    {.type = (const fidl_type_t*)&test_protocollayouts_MainProtocol_OnAnonWithError_ResponseTable},
-    {.type = (const fidl_type_t*)&fidl_internal_kUint32Table},
-};
-const struct FidlCodedUnion test_protocollayouts_MainProtocol_OnAnonWithError_ResultTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.protocollayouts/MainProtocol_OnAnonWithError_Result",
-    .strictness = kFidlStrictness_Strict,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nonnullable,
-    .fields = Fields56test_protocollayouts_MainProtocol_OnAnonWithError_Result,
-    .field_count = 2,
-};
-const struct FidlCodedUnion test_protocollayouts_MainProtocol_OnAnonWithError_ResultNullableRefTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.protocollayouts/MainProtocol_OnAnonWithError_Result",
-    .strictness = kFidlStrictness_Strict,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nullable,
-    .fields = Fields56test_protocollayouts_MainProtocol_OnAnonWithError_Result,
-    .field_count = 2,
-};
-
-static const struct FidlUnionField Fields58test_protocollayouts_MainProtocol_OnImportWithError_Result[] = {
-    {.type = (const fidl_type_t*)&test_protocollayouts_imported_ImportTablePayloadTable},
-    {.type = (const fidl_type_t*)&fidl_internal_kUint32Table},
-};
-const struct FidlCodedUnion test_protocollayouts_MainProtocol_OnImportWithError_ResultTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.protocollayouts/MainProtocol_OnImportWithError_Result",
-    .strictness = kFidlStrictness_Strict,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nonnullable,
-    .fields = Fields58test_protocollayouts_MainProtocol_OnImportWithError_Result,
-    .field_count = 2,
-};
-const struct FidlCodedUnion test_protocollayouts_MainProtocol_OnImportWithError_ResultNullableRefTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.protocollayouts/MainProtocol_OnImportWithError_Result",
-    .strictness = kFidlStrictness_Strict,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nullable,
-    .fields = Fields58test_protocollayouts_MainProtocol_OnImportWithError_Result,
-    .field_count = 2,
-};
-
-static const struct FidlUnionField Fields57test_protocollayouts_MainProtocol_OnLocalWithError_Result[] = {
-    {.type = (const fidl_type_t*)&test_protocollayouts_LocalTablePayloadTable},
-    {.type = (const fidl_type_t*)&fidl_internal_kUint32Table},
-};
-const struct FidlCodedUnion test_protocollayouts_MainProtocol_OnLocalWithError_ResultTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.protocollayouts/MainProtocol_OnLocalWithError_Result",
-    .strictness = kFidlStrictness_Strict,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nonnullable,
-    .fields = Fields57test_protocollayouts_MainProtocol_OnLocalWithError_Result,
-    .field_count = 2,
-};
-const struct FidlCodedUnion test_protocollayouts_MainProtocol_OnLocalWithError_ResultNullableRefTable = {
-    .tag = kFidlTypeUnion,
-    .name = "test.protocollayouts/MainProtocol_OnLocalWithError_Result",
-    .strictness = kFidlStrictness_Strict,
-    .is_resource = kFidlIsResource_NotResource,
-    .nullable = kFidlNullability_Nullable,
-    .fields = Fields57test_protocollayouts_MainProtocol_OnLocalWithError_Result,
-    .field_count = 2,
 };
 
 static const struct FidlUnionField Fields62test_protocollayouts_MainProtocol_TwoWayAnonWithError_Response[] = {

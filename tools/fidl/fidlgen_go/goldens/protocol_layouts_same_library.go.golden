@@ -98,130 +98,6 @@ func ComposedProtocolTwoWayAnonComposedRequestWithB(b bool) ComposedProtocolTwoW
 	return _u
 }
 
-type I_composedProtocolOnAnonComposedWithErrorResultTag uint64
-
-const (
-	ComposedProtocolOnAnonComposedWithErrorResultResponse = 1 // 0x00000001
-	ComposedProtocolOnAnonComposedWithErrorResultErr      = 2 // 0x00000002
-)
-
-type ComposedProtocolOnAnonComposedWithErrorResult struct {
-	I_composedProtocolOnAnonComposedWithErrorResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	Response                                           ComposedProtocolOnAnonComposedWithErrorResponse `fidl_ordinal:"1"`
-	Err                                                uint32                                          `fidl_ordinal:"2"`
-}
-
-var _mComposedProtocolOnAnonComposedWithErrorResult = _bindings.CreateLazyMarshaler(ComposedProtocolOnAnonComposedWithErrorResult{})
-
-func (msg *ComposedProtocolOnAnonComposedWithErrorResult) Marshaler() _bindings.Marshaler {
-	return _mComposedProtocolOnAnonComposedWithErrorResult
-}
-
-func (_m *ComposedProtocolOnAnonComposedWithErrorResult) reset() {
-	switch _m.I_composedProtocolOnAnonComposedWithErrorResultTag {
-	case 1:
-		var _zeroed ComposedProtocolOnAnonComposedWithErrorResponse
-		_m.Response = _zeroed
-	case 2:
-		var _zeroed uint32
-		_m.Err = _zeroed
-	}
-}
-
-func (_m *ComposedProtocolOnAnonComposedWithErrorResult) Which() I_composedProtocolOnAnonComposedWithErrorResultTag {
-	return _m.I_composedProtocolOnAnonComposedWithErrorResultTag
-}
-
-func (_m *ComposedProtocolOnAnonComposedWithErrorResult) Ordinal() uint64 {
-	return uint64(_m.I_composedProtocolOnAnonComposedWithErrorResultTag)
-}
-
-func (_m *ComposedProtocolOnAnonComposedWithErrorResult) SetResponse(response ComposedProtocolOnAnonComposedWithErrorResponse) {
-	_m.reset()
-	_m.I_composedProtocolOnAnonComposedWithErrorResultTag = ComposedProtocolOnAnonComposedWithErrorResultResponse
-	_m.Response = response
-}
-
-func ComposedProtocolOnAnonComposedWithErrorResultWithResponse(response ComposedProtocolOnAnonComposedWithErrorResponse) ComposedProtocolOnAnonComposedWithErrorResult {
-	var _u ComposedProtocolOnAnonComposedWithErrorResult
-	_u.SetResponse(response)
-	return _u
-}
-
-func (_m *ComposedProtocolOnAnonComposedWithErrorResult) SetErr(err uint32) {
-	_m.reset()
-	_m.I_composedProtocolOnAnonComposedWithErrorResultTag = ComposedProtocolOnAnonComposedWithErrorResultErr
-	_m.Err = err
-}
-
-func ComposedProtocolOnAnonComposedWithErrorResultWithErr(err uint32) ComposedProtocolOnAnonComposedWithErrorResult {
-	var _u ComposedProtocolOnAnonComposedWithErrorResult
-	_u.SetErr(err)
-	return _u
-}
-
-type I_composedProtocolOnNamedComposedWithErrorResultTag uint64
-
-const (
-	ComposedProtocolOnNamedComposedWithErrorResultResponse = 1 // 0x00000001
-	ComposedProtocolOnNamedComposedWithErrorResultErr      = 2 // 0x00000002
-)
-
-type ComposedProtocolOnNamedComposedWithErrorResult struct {
-	I_composedProtocolOnNamedComposedWithErrorResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	Response                                            TablePayload `fidl_ordinal:"1"`
-	Err                                                 uint32       `fidl_ordinal:"2"`
-}
-
-var _mComposedProtocolOnNamedComposedWithErrorResult = _bindings.CreateLazyMarshaler(ComposedProtocolOnNamedComposedWithErrorResult{})
-
-func (msg *ComposedProtocolOnNamedComposedWithErrorResult) Marshaler() _bindings.Marshaler {
-	return _mComposedProtocolOnNamedComposedWithErrorResult
-}
-
-func (_m *ComposedProtocolOnNamedComposedWithErrorResult) reset() {
-	switch _m.I_composedProtocolOnNamedComposedWithErrorResultTag {
-	case 1:
-		var _zeroed TablePayload
-		_m.Response = _zeroed
-	case 2:
-		var _zeroed uint32
-		_m.Err = _zeroed
-	}
-}
-
-func (_m *ComposedProtocolOnNamedComposedWithErrorResult) Which() I_composedProtocolOnNamedComposedWithErrorResultTag {
-	return _m.I_composedProtocolOnNamedComposedWithErrorResultTag
-}
-
-func (_m *ComposedProtocolOnNamedComposedWithErrorResult) Ordinal() uint64 {
-	return uint64(_m.I_composedProtocolOnNamedComposedWithErrorResultTag)
-}
-
-func (_m *ComposedProtocolOnNamedComposedWithErrorResult) SetResponse(response TablePayload) {
-	_m.reset()
-	_m.I_composedProtocolOnNamedComposedWithErrorResultTag = ComposedProtocolOnNamedComposedWithErrorResultResponse
-	_m.Response = response
-}
-
-func ComposedProtocolOnNamedComposedWithErrorResultWithResponse(response TablePayload) ComposedProtocolOnNamedComposedWithErrorResult {
-	var _u ComposedProtocolOnNamedComposedWithErrorResult
-	_u.SetResponse(response)
-	return _u
-}
-
-func (_m *ComposedProtocolOnNamedComposedWithErrorResult) SetErr(err uint32) {
-	_m.reset()
-	_m.I_composedProtocolOnNamedComposedWithErrorResultTag = ComposedProtocolOnNamedComposedWithErrorResultErr
-	_m.Err = err
-}
-
-func ComposedProtocolOnNamedComposedWithErrorResultWithErr(err uint32) ComposedProtocolOnNamedComposedWithErrorResult {
-	var _u ComposedProtocolOnNamedComposedWithErrorResult
-	_u.SetErr(err)
-	return _u
-}
-
 type I_composedProtocolTwoWayAnonComposedWithErrorResponseTag uint64
 
 const (
@@ -505,130 +381,6 @@ func MainProtocolTwoWayAnonRequestWithB(b bool) MainProtocolTwoWayAnonRequest {
 }
 func (_m *MainProtocolTwoWayAnonRequest) GetUnknownData() _bindings.UnknownData {
 	return _m.I_unknownData.(_bindings.UnknownData)
-}
-
-type I_mainProtocolOnAnonWithErrorResultTag uint64
-
-const (
-	MainProtocolOnAnonWithErrorResultResponse = 1 // 0x00000001
-	MainProtocolOnAnonWithErrorResultErr      = 2 // 0x00000002
-)
-
-type MainProtocolOnAnonWithErrorResult struct {
-	I_mainProtocolOnAnonWithErrorResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	Response                               MainProtocolOnAnonWithErrorResponse `fidl_ordinal:"1"`
-	Err                                    uint32                              `fidl_ordinal:"2"`
-}
-
-var _mMainProtocolOnAnonWithErrorResult = _bindings.CreateLazyMarshaler(MainProtocolOnAnonWithErrorResult{})
-
-func (msg *MainProtocolOnAnonWithErrorResult) Marshaler() _bindings.Marshaler {
-	return _mMainProtocolOnAnonWithErrorResult
-}
-
-func (_m *MainProtocolOnAnonWithErrorResult) reset() {
-	switch _m.I_mainProtocolOnAnonWithErrorResultTag {
-	case 1:
-		var _zeroed MainProtocolOnAnonWithErrorResponse
-		_m.Response = _zeroed
-	case 2:
-		var _zeroed uint32
-		_m.Err = _zeroed
-	}
-}
-
-func (_m *MainProtocolOnAnonWithErrorResult) Which() I_mainProtocolOnAnonWithErrorResultTag {
-	return _m.I_mainProtocolOnAnonWithErrorResultTag
-}
-
-func (_m *MainProtocolOnAnonWithErrorResult) Ordinal() uint64 {
-	return uint64(_m.I_mainProtocolOnAnonWithErrorResultTag)
-}
-
-func (_m *MainProtocolOnAnonWithErrorResult) SetResponse(response MainProtocolOnAnonWithErrorResponse) {
-	_m.reset()
-	_m.I_mainProtocolOnAnonWithErrorResultTag = MainProtocolOnAnonWithErrorResultResponse
-	_m.Response = response
-}
-
-func MainProtocolOnAnonWithErrorResultWithResponse(response MainProtocolOnAnonWithErrorResponse) MainProtocolOnAnonWithErrorResult {
-	var _u MainProtocolOnAnonWithErrorResult
-	_u.SetResponse(response)
-	return _u
-}
-
-func (_m *MainProtocolOnAnonWithErrorResult) SetErr(err uint32) {
-	_m.reset()
-	_m.I_mainProtocolOnAnonWithErrorResultTag = MainProtocolOnAnonWithErrorResultErr
-	_m.Err = err
-}
-
-func MainProtocolOnAnonWithErrorResultWithErr(err uint32) MainProtocolOnAnonWithErrorResult {
-	var _u MainProtocolOnAnonWithErrorResult
-	_u.SetErr(err)
-	return _u
-}
-
-type I_mainProtocolOnLocalWithErrorResultTag uint64
-
-const (
-	MainProtocolOnLocalWithErrorResultResponse = 1 // 0x00000001
-	MainProtocolOnLocalWithErrorResultErr      = 2 // 0x00000002
-)
-
-type MainProtocolOnLocalWithErrorResult struct {
-	I_mainProtocolOnLocalWithErrorResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	Response                                TablePayload `fidl_ordinal:"1"`
-	Err                                     uint32       `fidl_ordinal:"2"`
-}
-
-var _mMainProtocolOnLocalWithErrorResult = _bindings.CreateLazyMarshaler(MainProtocolOnLocalWithErrorResult{})
-
-func (msg *MainProtocolOnLocalWithErrorResult) Marshaler() _bindings.Marshaler {
-	return _mMainProtocolOnLocalWithErrorResult
-}
-
-func (_m *MainProtocolOnLocalWithErrorResult) reset() {
-	switch _m.I_mainProtocolOnLocalWithErrorResultTag {
-	case 1:
-		var _zeroed TablePayload
-		_m.Response = _zeroed
-	case 2:
-		var _zeroed uint32
-		_m.Err = _zeroed
-	}
-}
-
-func (_m *MainProtocolOnLocalWithErrorResult) Which() I_mainProtocolOnLocalWithErrorResultTag {
-	return _m.I_mainProtocolOnLocalWithErrorResultTag
-}
-
-func (_m *MainProtocolOnLocalWithErrorResult) Ordinal() uint64 {
-	return uint64(_m.I_mainProtocolOnLocalWithErrorResultTag)
-}
-
-func (_m *MainProtocolOnLocalWithErrorResult) SetResponse(response TablePayload) {
-	_m.reset()
-	_m.I_mainProtocolOnLocalWithErrorResultTag = MainProtocolOnLocalWithErrorResultResponse
-	_m.Response = response
-}
-
-func MainProtocolOnLocalWithErrorResultWithResponse(response TablePayload) MainProtocolOnLocalWithErrorResult {
-	var _u MainProtocolOnLocalWithErrorResult
-	_u.SetResponse(response)
-	return _u
-}
-
-func (_m *MainProtocolOnLocalWithErrorResult) SetErr(err uint32) {
-	_m.reset()
-	_m.I_mainProtocolOnLocalWithErrorResultTag = MainProtocolOnLocalWithErrorResultErr
-	_m.Err = err
-}
-
-func MainProtocolOnLocalWithErrorResultWithErr(err uint32) MainProtocolOnLocalWithErrorResult {
-	var _u MainProtocolOnLocalWithErrorResult
-	_u.SetErr(err)
-	return _u
 }
 
 type I_mainProtocolTwoWayAnonWithErrorResponseTag uint64
@@ -993,51 +745,6 @@ func (u *ComposedProtocolTwoWayAnonComposedWithErrorRequest) GetUnknownData() ma
 	return u.I_unknownData.(map[uint64]_bindings.UnknownData)
 }
 
-type ComposedProtocolOnAnonComposedWithErrorResponse struct {
-	_             struct{} `fidl:"t" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	I_unknownData interface{}
-	A             uint16 `fidl_ordinal:"1"`
-	APresent      bool
-}
-
-var _mComposedProtocolOnAnonComposedWithErrorResponse = _bindings.CreateLazyMarshaler(ComposedProtocolOnAnonComposedWithErrorResponse{})
-
-func (msg *ComposedProtocolOnAnonComposedWithErrorResponse) Marshaler() _bindings.Marshaler {
-	return _mComposedProtocolOnAnonComposedWithErrorResponse
-}
-
-func (u *ComposedProtocolOnAnonComposedWithErrorResponse) SetA(a uint16) {
-	u.A = a
-	u.APresent = true
-}
-
-func (u *ComposedProtocolOnAnonComposedWithErrorResponse) GetA() uint16 {
-	return u.A
-}
-
-func (u *ComposedProtocolOnAnonComposedWithErrorResponse) GetAWithDefault(_default uint16) uint16 {
-	if !u.HasA() {
-		return _default
-	}
-	return u.A
-}
-
-func (u *ComposedProtocolOnAnonComposedWithErrorResponse) HasA() bool {
-	return u.APresent
-}
-
-func (u *ComposedProtocolOnAnonComposedWithErrorResponse) ClearA() {
-	u.APresent = false
-}
-
-func (u *ComposedProtocolOnAnonComposedWithErrorResponse) HasUnknownData() bool {
-	return u.I_unknownData != nil
-}
-
-func (u *ComposedProtocolOnAnonComposedWithErrorResponse) GetUnknownData() map[uint64]_bindings.UnknownData {
-	return u.I_unknownData.(map[uint64]_bindings.UnknownData)
-}
-
 type MainProtocolOneWayAnonRequest struct {
 	_             struct{} `fidl:"t" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
 	I_unknownData interface{}
@@ -1173,51 +880,6 @@ func (u *MainProtocolTwoWayAnonWithErrorRequest) GetUnknownData() map[uint64]_bi
 	return u.I_unknownData.(map[uint64]_bindings.UnknownData)
 }
 
-type MainProtocolOnAnonWithErrorResponse struct {
-	_             struct{} `fidl:"t" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	I_unknownData interface{}
-	A             uint16 `fidl_ordinal:"1"`
-	APresent      bool
-}
-
-var _mMainProtocolOnAnonWithErrorResponse = _bindings.CreateLazyMarshaler(MainProtocolOnAnonWithErrorResponse{})
-
-func (msg *MainProtocolOnAnonWithErrorResponse) Marshaler() _bindings.Marshaler {
-	return _mMainProtocolOnAnonWithErrorResponse
-}
-
-func (u *MainProtocolOnAnonWithErrorResponse) SetA(a uint16) {
-	u.A = a
-	u.APresent = true
-}
-
-func (u *MainProtocolOnAnonWithErrorResponse) GetA() uint16 {
-	return u.A
-}
-
-func (u *MainProtocolOnAnonWithErrorResponse) GetAWithDefault(_default uint16) uint16 {
-	if !u.HasA() {
-		return _default
-	}
-	return u.A
-}
-
-func (u *MainProtocolOnAnonWithErrorResponse) HasA() bool {
-	return u.APresent
-}
-
-func (u *MainProtocolOnAnonWithErrorResponse) ClearA() {
-	u.APresent = false
-}
-
-func (u *MainProtocolOnAnonWithErrorResponse) HasUnknownData() bool {
-	return u.I_unknownData != nil
-}
-
-func (u *MainProtocolOnAnonWithErrorResponse) GetUnknownData() map[uint64]_bindings.UnknownData {
-	return u.I_unknownData.(map[uint64]_bindings.UnknownData)
-}
-
 type TablePayload struct {
 	_             struct{} `fidl:"t" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
 	I_unknownData interface{}
@@ -1268,12 +930,10 @@ const (
 	ComposedProtocolTwoWayAnonComposedOrdinal           uint64 = 0x7083713dee9435f4
 	ComposedProtocolTwoWayAnonComposedWithErrorOrdinal  uint64 = 0x4fd32c5e2ffa6828
 	ComposedProtocolOnAnonComposedOrdinal               uint64 = 0x49a6eee3a0300e28
-	ComposedProtocolOnAnonComposedWithErrorOrdinal      uint64 = 0x297a909727d08a60
 	ComposedProtocolOneWayNamedComposedOrdinal          uint64 = 0x101636a8fa3e69b8
 	ComposedProtocolTwoWayNamedComposedOrdinal          uint64 = 0x45b4d3d31b374054
 	ComposedProtocolTwoWayNamedComposedWithErrorOrdinal uint64 = 0x450531e2d20c52ef
 	ComposedProtocolOnNamedComposedOrdinal              uint64 = 0x17c4edb4a4a36d7b
-	ComposedProtocolOnNamedComposedWithErrorOrdinal     uint64 = 0x3ff74c1cafdbabcf
 )
 
 type ComposedProtocolWithCtxInterface _bindings.ChannelProxy
@@ -1304,12 +964,6 @@ func (p *ComposedProtocolWithCtxInterface) ExpectOnAnonComposed(ctx_ _bindings.C
 	return (*resp_), err_
 }
 
-func (p *ComposedProtocolWithCtxInterface) ExpectOnAnonComposedWithError(ctx_ _bindings.Context) (ComposedProtocolOnAnonComposedWithErrorResult, error) {
-	resp_ := &ComposedProtocolOnAnonComposedWithErrorResult{}
-	err_ := ((*_bindings.ChannelProxy)(p)).Recv(ComposedProtocolOnAnonComposedWithErrorOrdinal, resp_)
-	return (*resp_), err_
-}
-
 func (p *ComposedProtocolWithCtxInterface) OneWayNamedComposed(ctx_ _bindings.Context, payload TablePayload) error {
 	req_ := &payload
 	err_ := ((*_bindings.ChannelProxy)(p)).Send(ComposedProtocolOneWayNamedComposedOrdinal, req_)
@@ -1333,12 +987,6 @@ func (p *ComposedProtocolWithCtxInterface) TwoWayNamedComposedWithError(ctx_ _bi
 func (p *ComposedProtocolWithCtxInterface) ExpectOnNamedComposed(ctx_ _bindings.Context) (UnionPayload, error) {
 	resp_ := &UnionPayload{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Recv(ComposedProtocolOnNamedComposedOrdinal, resp_)
-	return (*resp_), err_
-}
-
-func (p *ComposedProtocolWithCtxInterface) ExpectOnNamedComposedWithError(ctx_ _bindings.Context) (ComposedProtocolOnNamedComposedWithErrorResult, error) {
-	resp_ := &ComposedProtocolOnNamedComposedWithErrorResult{}
-	err_ := ((*_bindings.ChannelProxy)(p)).Recv(ComposedProtocolOnNamedComposedWithErrorOrdinal, resp_)
 	return (*resp_), err_
 }
 
@@ -1443,17 +1091,9 @@ func (p *ComposedProtocolEventProxy) OnAnonComposed(payload ComposedProtocolOnAn
 	event_ := &payload
 	return ((*_bindings.ChannelProxy)(p)).Send(ComposedProtocolOnAnonComposedOrdinal, event_)
 }
-func (p *ComposedProtocolEventProxy) OnAnonComposedWithError(payload ComposedProtocolOnAnonComposedWithErrorResult) error {
-	event_ := &payload
-	return ((*_bindings.ChannelProxy)(p)).Send(ComposedProtocolOnAnonComposedWithErrorOrdinal, event_)
-}
 func (p *ComposedProtocolEventProxy) OnNamedComposed(payload UnionPayload) error {
 	event_ := &payload
 	return ((*_bindings.ChannelProxy)(p)).Send(ComposedProtocolOnNamedComposedOrdinal, event_)
-}
-func (p *ComposedProtocolEventProxy) OnNamedComposedWithError(payload ComposedProtocolOnNamedComposedWithErrorResult) error {
-	event_ := &payload
-	return ((*_bindings.ChannelProxy)(p)).Send(ComposedProtocolOnNamedComposedWithErrorOrdinal, event_)
 }
 
 const (
@@ -1461,22 +1101,18 @@ const (
 	MainProtocolTwoWayAnonComposedOrdinal           uint64 = 0x7083713dee9435f4
 	MainProtocolTwoWayAnonComposedWithErrorOrdinal  uint64 = 0x4fd32c5e2ffa6828
 	MainProtocolOnAnonComposedOrdinal               uint64 = 0x49a6eee3a0300e28
-	MainProtocolOnAnonComposedWithErrorOrdinal      uint64 = 0x297a909727d08a60
 	MainProtocolOneWayNamedComposedOrdinal          uint64 = 0x101636a8fa3e69b8
 	MainProtocolTwoWayNamedComposedOrdinal          uint64 = 0x45b4d3d31b374054
 	MainProtocolTwoWayNamedComposedWithErrorOrdinal uint64 = 0x450531e2d20c52ef
 	MainProtocolOnNamedComposedOrdinal              uint64 = 0x17c4edb4a4a36d7b
-	MainProtocolOnNamedComposedWithErrorOrdinal     uint64 = 0x3ff74c1cafdbabcf
 	MainProtocolOneWayLocalOrdinal                  uint64 = 0x3954b4c6b80956c1
 	MainProtocolTwoWayLocalOrdinal                  uint64 = 0x26998b4c1e8a9a57
 	MainProtocolTwoWayLocalWithErrorOrdinal         uint64 = 0x4a7bf9ce881afde7
 	MainProtocolOnLocalOrdinal                      uint64 = 0x71e90a3d364d2e8d
-	MainProtocolOnLocalWithErrorOrdinal             uint64 = 0x2dac7e32bd351bdb
 	MainProtocolOneWayAnonOrdinal                   uint64 = 0x774bf445f584ce2c
 	MainProtocolTwoWayAnonOrdinal                   uint64 = 0x3fd7ad8e52b07e2e
 	MainProtocolTwoWayAnonWithErrorOrdinal          uint64 = 0x1d33061a424eb245
 	MainProtocolOnAnonOrdinal                       uint64 = 0xd8fa6d0f5fabb94
-	MainProtocolOnAnonWithErrorOrdinal              uint64 = 0x6658cf43e550fa02
 )
 
 type MainProtocolWithCtxInterface _bindings.ChannelProxy
@@ -1507,12 +1143,6 @@ func (p *MainProtocolWithCtxInterface) ExpectOnAnonComposed(ctx_ _bindings.Conte
 	return (*resp_), err_
 }
 
-func (p *MainProtocolWithCtxInterface) ExpectOnAnonComposedWithError(ctx_ _bindings.Context) (ComposedProtocolOnAnonComposedWithErrorResult, error) {
-	resp_ := &ComposedProtocolOnAnonComposedWithErrorResult{}
-	err_ := ((*_bindings.ChannelProxy)(p)).Recv(MainProtocolOnAnonComposedWithErrorOrdinal, resp_)
-	return (*resp_), err_
-}
-
 func (p *MainProtocolWithCtxInterface) OneWayNamedComposed(ctx_ _bindings.Context, payload TablePayload) error {
 	req_ := &payload
 	err_ := ((*_bindings.ChannelProxy)(p)).Send(MainProtocolOneWayNamedComposedOrdinal, req_)
@@ -1536,12 +1166,6 @@ func (p *MainProtocolWithCtxInterface) TwoWayNamedComposedWithError(ctx_ _bindin
 func (p *MainProtocolWithCtxInterface) ExpectOnNamedComposed(ctx_ _bindings.Context) (UnionPayload, error) {
 	resp_ := &UnionPayload{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Recv(MainProtocolOnNamedComposedOrdinal, resp_)
-	return (*resp_), err_
-}
-
-func (p *MainProtocolWithCtxInterface) ExpectOnNamedComposedWithError(ctx_ _bindings.Context) (ComposedProtocolOnNamedComposedWithErrorResult, error) {
-	resp_ := &ComposedProtocolOnNamedComposedWithErrorResult{}
-	err_ := ((*_bindings.ChannelProxy)(p)).Recv(MainProtocolOnNamedComposedWithErrorOrdinal, resp_)
 	return (*resp_), err_
 }
 
@@ -1571,12 +1195,6 @@ func (p *MainProtocolWithCtxInterface) ExpectOnLocal(ctx_ _bindings.Context) (Un
 	return (*resp_), err_
 }
 
-func (p *MainProtocolWithCtxInterface) ExpectOnLocalWithError(ctx_ _bindings.Context) (MainProtocolOnLocalWithErrorResult, error) {
-	resp_ := &MainProtocolOnLocalWithErrorResult{}
-	err_ := ((*_bindings.ChannelProxy)(p)).Recv(MainProtocolOnLocalWithErrorOrdinal, resp_)
-	return (*resp_), err_
-}
-
 func (p *MainProtocolWithCtxInterface) OneWayAnon(ctx_ _bindings.Context, payload MainProtocolOneWayAnonRequest) error {
 	req_ := &payload
 	err_ := ((*_bindings.ChannelProxy)(p)).Send(MainProtocolOneWayAnonOrdinal, req_)
@@ -1600,12 +1218,6 @@ func (p *MainProtocolWithCtxInterface) TwoWayAnonWithError(ctx_ _bindings.Contex
 func (p *MainProtocolWithCtxInterface) ExpectOnAnon(ctx_ _bindings.Context) (MainProtocolOnAnonRequest, error) {
 	resp_ := &MainProtocolOnAnonRequest{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Recv(MainProtocolOnAnonOrdinal, resp_)
-	return (*resp_), err_
-}
-
-func (p *MainProtocolWithCtxInterface) ExpectOnAnonWithError(ctx_ _bindings.Context) (MainProtocolOnAnonWithErrorResult, error) {
-	resp_ := &MainProtocolOnAnonWithErrorResult{}
-	err_ := ((*_bindings.ChannelProxy)(p)).Recv(MainProtocolOnAnonWithErrorOrdinal, resp_)
 	return (*resp_), err_
 }
 
@@ -1786,31 +1398,15 @@ func (p *MainProtocolEventProxy) OnAnonComposed(payload ComposedProtocolOnAnonCo
 	event_ := &payload
 	return ((*_bindings.ChannelProxy)(p)).Send(MainProtocolOnAnonComposedOrdinal, event_)
 }
-func (p *MainProtocolEventProxy) OnAnonComposedWithError(payload ComposedProtocolOnAnonComposedWithErrorResult) error {
-	event_ := &payload
-	return ((*_bindings.ChannelProxy)(p)).Send(MainProtocolOnAnonComposedWithErrorOrdinal, event_)
-}
 func (p *MainProtocolEventProxy) OnNamedComposed(payload UnionPayload) error {
 	event_ := &payload
 	return ((*_bindings.ChannelProxy)(p)).Send(MainProtocolOnNamedComposedOrdinal, event_)
-}
-func (p *MainProtocolEventProxy) OnNamedComposedWithError(payload ComposedProtocolOnNamedComposedWithErrorResult) error {
-	event_ := &payload
-	return ((*_bindings.ChannelProxy)(p)).Send(MainProtocolOnNamedComposedWithErrorOrdinal, event_)
 }
 func (p *MainProtocolEventProxy) OnLocal(payload UnionPayload) error {
 	event_ := &payload
 	return ((*_bindings.ChannelProxy)(p)).Send(MainProtocolOnLocalOrdinal, event_)
 }
-func (p *MainProtocolEventProxy) OnLocalWithError(payload MainProtocolOnLocalWithErrorResult) error {
-	event_ := &payload
-	return ((*_bindings.ChannelProxy)(p)).Send(MainProtocolOnLocalWithErrorOrdinal, event_)
-}
 func (p *MainProtocolEventProxy) OnAnon(payload MainProtocolOnAnonRequest) error {
 	event_ := &payload
 	return ((*_bindings.ChannelProxy)(p)).Send(MainProtocolOnAnonOrdinal, event_)
-}
-func (p *MainProtocolEventProxy) OnAnonWithError(payload MainProtocolOnAnonWithErrorResult) error {
-	event_ := &payload
-	return ((*_bindings.ChannelProxy)(p)).Send(MainProtocolOnAnonWithErrorOrdinal, event_)
 }

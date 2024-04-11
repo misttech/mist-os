@@ -9,5 +9,4 @@ closed protocol ComposedProtocol {
     strict TwoWayComposed(ImportStructPayload) -> (ImportStructPayload);
     strict TwoWayComposedWithError(ImportStructPayload) -> (ImportStructPayload) error uint32;
     strict -> OnComposed(ImportStructPayload);
-    strict -> OnComposedWithError(ImportStructPayload) error uint32;
 };

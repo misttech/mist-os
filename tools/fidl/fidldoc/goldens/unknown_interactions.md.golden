@@ -8,7 +8,7 @@
 ## **PROTOCOLS**
 
 ## UnknownInteractionsAjarDriverProtocol {#UnknownInteractionsAjarDriverProtocol}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=281)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=226)*
 
 
 ### FlexibleOneWay {#UnknownInteractionsAjarDriverProtocol.FlexibleOneWay}
@@ -200,7 +200,7 @@
 </table>
 
 ## UnknownInteractionsAjarProtocol {#UnknownInteractionsAjarProtocol}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=103)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=81)*
 
 
 ### FlexibleEvent {#UnknownInteractionsAjarProtocol.FlexibleEvent}
@@ -212,24 +212,6 @@
 #### Response {#UnknownInteractionsAjarProtocol.FlexibleEvent_Response}
 
 &lt;EMPTY&gt;
-
-### FlexibleEventErr {#UnknownInteractionsAjarProtocol.FlexibleEventErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsAjarProtocol.FlexibleEventErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_FlexibleEventErr_Result'>UnknownInteractionsAjarProtocol_FlexibleEventErr_Result</a></code>
-            </td>
-        </tr>
-</table>
 
 ### FlexibleEventFields {#UnknownInteractionsAjarProtocol.FlexibleEventFields}
 
@@ -245,24 +227,6 @@
             <td><code>some_field</code></td>
             <td>
                 <code>int32</code>
-            </td>
-        </tr>
-</table>
-
-### FlexibleEventFieldsErr {#UnknownInteractionsAjarProtocol.FlexibleEventFieldsErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsAjarProtocol.FlexibleEventFieldsErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result'>UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result</a></code>
             </td>
         </tr>
 </table>
@@ -285,24 +249,6 @@
         </tr>
 </table>
 
-### FlexibleEventTableErr {#UnknownInteractionsAjarProtocol.FlexibleEventTableErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsAjarProtocol.FlexibleEventTableErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result'>UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result</a></code>
-            </td>
-        </tr>
-</table>
-
 ### FlexibleEventUnion {#UnknownInteractionsAjarProtocol.FlexibleEventUnion}
 
 
@@ -317,24 +263,6 @@
             <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#UnknownInteractionsAjarProtocolFlexibleEventUnionRequest'>UnknownInteractionsAjarProtocolFlexibleEventUnionRequest</a></code>
-            </td>
-        </tr>
-</table>
-
-### FlexibleEventUnionErr {#UnknownInteractionsAjarProtocol.FlexibleEventUnionErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsAjarProtocol.FlexibleEventUnionErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result'>UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result</a></code>
             </td>
         </tr>
 </table>
@@ -359,24 +287,6 @@
 
 &lt;EMPTY&gt;
 
-### StrictEventErr {#UnknownInteractionsAjarProtocol.StrictEventErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsAjarProtocol.StrictEventErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_StrictEventErr_Result'>UnknownInteractionsAjarProtocol_StrictEventErr_Result</a></code>
-            </td>
-        </tr>
-</table>
-
 ### StrictEventFields {#UnknownInteractionsAjarProtocol.StrictEventFields}
 
 
@@ -391,24 +301,6 @@
             <td><code>some_field</code></td>
             <td>
                 <code>int32</code>
-            </td>
-        </tr>
-</table>
-
-### StrictEventFieldsErr {#UnknownInteractionsAjarProtocol.StrictEventFieldsErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsAjarProtocol.StrictEventFieldsErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result'>UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result</a></code>
             </td>
         </tr>
 </table>
@@ -431,24 +323,6 @@
         </tr>
 </table>
 
-### StrictEventTableErr {#UnknownInteractionsAjarProtocol.StrictEventTableErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsAjarProtocol.StrictEventTableErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_StrictEventTableErr_Result'>UnknownInteractionsAjarProtocol_StrictEventTableErr_Result</a></code>
-            </td>
-        </tr>
-</table>
-
 ### StrictEventUnion {#UnknownInteractionsAjarProtocol.StrictEventUnion}
 
 
@@ -463,24 +337,6 @@
             <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#UnknownInteractionsAjarProtocolStrictEventUnionRequest'>UnknownInteractionsAjarProtocolStrictEventUnionRequest</a></code>
-            </td>
-        </tr>
-</table>
-
-### StrictEventUnionErr {#UnknownInteractionsAjarProtocol.StrictEventUnionErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsAjarProtocol.StrictEventUnionErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result'>UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result</a></code>
             </td>
         </tr>
 </table>
@@ -664,7 +520,7 @@
 </table>
 
 ## UnknownInteractionsClosedDriverProtocol {#UnknownInteractionsClosedDriverProtocol}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=311)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=256)*
 
 
 ### StrictOneWay {#UnknownInteractionsClosedDriverProtocol.StrictOneWay}
@@ -846,7 +702,7 @@
 </table>
 
 ## UnknownInteractionsClosedProtocol {#UnknownInteractionsClosedProtocol}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=177)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=133)*
 
 
 ### StrictEvent {#UnknownInteractionsClosedProtocol.StrictEvent}
@@ -858,24 +714,6 @@
 #### Response {#UnknownInteractionsClosedProtocol.StrictEvent_Response}
 
 &lt;EMPTY&gt;
-
-### StrictEventErr {#UnknownInteractionsClosedProtocol.StrictEventErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsClosedProtocol.StrictEventErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsClosedProtocol_StrictEventErr_Result'>UnknownInteractionsClosedProtocol_StrictEventErr_Result</a></code>
-            </td>
-        </tr>
-</table>
 
 ### StrictEventFields {#UnknownInteractionsClosedProtocol.StrictEventFields}
 
@@ -891,24 +729,6 @@
             <td><code>some_field</code></td>
             <td>
                 <code>int32</code>
-            </td>
-        </tr>
-</table>
-
-### StrictEventFieldsErr {#UnknownInteractionsClosedProtocol.StrictEventFieldsErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsClosedProtocol.StrictEventFieldsErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result'>UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result</a></code>
             </td>
         </tr>
 </table>
@@ -931,24 +751,6 @@
         </tr>
 </table>
 
-### StrictEventTableErr {#UnknownInteractionsClosedProtocol.StrictEventTableErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsClosedProtocol.StrictEventTableErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsClosedProtocol_StrictEventTableErr_Result'>UnknownInteractionsClosedProtocol_StrictEventTableErr_Result</a></code>
-            </td>
-        </tr>
-</table>
-
 ### StrictEventUnion {#UnknownInteractionsClosedProtocol.StrictEventUnion}
 
 
@@ -963,24 +765,6 @@
             <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#UnknownInteractionsClosedProtocolStrictEventUnionRequest'>UnknownInteractionsClosedProtocolStrictEventUnionRequest</a></code>
-            </td>
-        </tr>
-</table>
-
-### StrictEventUnionErr {#UnknownInteractionsClosedProtocol.StrictEventUnionErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsClosedProtocol.StrictEventUnionErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result'>UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result</a></code>
             </td>
         </tr>
 </table>
@@ -1164,7 +948,7 @@
 </table>
 
 ## UnknownInteractionsDriverProtocol {#UnknownInteractionsDriverProtocol}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=229)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=174)*
 
 
 ### FlexibleOneWay {#UnknownInteractionsDriverProtocol.FlexibleOneWay}
@@ -1545,24 +1329,6 @@
 
 &lt;EMPTY&gt;
 
-### FlexibleEventErr {#UnknownInteractionsProtocol.FlexibleEventErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsProtocol.FlexibleEventErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_FlexibleEventErr_Result'>UnknownInteractionsProtocol_FlexibleEventErr_Result</a></code>
-            </td>
-        </tr>
-</table>
-
 ### FlexibleEventFields {#UnknownInteractionsProtocol.FlexibleEventFields}
 
 
@@ -1577,24 +1343,6 @@
             <td><code>some_field</code></td>
             <td>
                 <code>int32</code>
-            </td>
-        </tr>
-</table>
-
-### FlexibleEventFieldsErr {#UnknownInteractionsProtocol.FlexibleEventFieldsErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsProtocol.FlexibleEventFieldsErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result'>UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result</a></code>
             </td>
         </tr>
 </table>
@@ -1617,24 +1365,6 @@
         </tr>
 </table>
 
-### FlexibleEventTableErr {#UnknownInteractionsProtocol.FlexibleEventTableErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsProtocol.FlexibleEventTableErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_FlexibleEventTableErr_Result'>UnknownInteractionsProtocol_FlexibleEventTableErr_Result</a></code>
-            </td>
-        </tr>
-</table>
-
 ### FlexibleEventUnion {#UnknownInteractionsProtocol.FlexibleEventUnion}
 
 
@@ -1649,24 +1379,6 @@
             <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#UnknownInteractionsProtocolFlexibleEventUnionRequest'>UnknownInteractionsProtocolFlexibleEventUnionRequest</a></code>
-            </td>
-        </tr>
-</table>
-
-### FlexibleEventUnionErr {#UnknownInteractionsProtocol.FlexibleEventUnionErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsProtocol.FlexibleEventUnionErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_FlexibleEventUnionErr_Result'>UnknownInteractionsProtocol_FlexibleEventUnionErr_Result</a></code>
             </td>
         </tr>
 </table>
@@ -1867,24 +1579,6 @@
 
 &lt;EMPTY&gt;
 
-### StrictEventErr {#UnknownInteractionsProtocol.StrictEventErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsProtocol.StrictEventErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_StrictEventErr_Result'>UnknownInteractionsProtocol_StrictEventErr_Result</a></code>
-            </td>
-        </tr>
-</table>
-
 ### StrictEventFields {#UnknownInteractionsProtocol.StrictEventFields}
 
 
@@ -1899,24 +1593,6 @@
             <td><code>some_field</code></td>
             <td>
                 <code>int32</code>
-            </td>
-        </tr>
-</table>
-
-### StrictEventFieldsErr {#UnknownInteractionsProtocol.StrictEventFieldsErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsProtocol.StrictEventFieldsErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_StrictEventFieldsErr_Result'>UnknownInteractionsProtocol_StrictEventFieldsErr_Result</a></code>
             </td>
         </tr>
 </table>
@@ -1939,24 +1615,6 @@
         </tr>
 </table>
 
-### StrictEventTableErr {#UnknownInteractionsProtocol.StrictEventTableErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsProtocol.StrictEventTableErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_StrictEventTableErr_Result'>UnknownInteractionsProtocol_StrictEventTableErr_Result</a></code>
-            </td>
-        </tr>
-</table>
-
 ### StrictEventUnion {#UnknownInteractionsProtocol.StrictEventUnion}
 
 
@@ -1971,24 +1629,6 @@
             <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#UnknownInteractionsProtocolStrictEventUnionRequest'>UnknownInteractionsProtocolStrictEventUnionRequest</a></code>
-            </td>
-        </tr>
-</table>
-
-### StrictEventUnionErr {#UnknownInteractionsProtocol.StrictEventUnionErr}
-
-
-
-
-
-#### Response {#UnknownInteractionsProtocol.StrictEventUnionErr_Response}
-
-<table>
-    <tr><th>Name</th><th>Type</th></tr>
-        <tr>
-            <td><code>payload</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_StrictEventUnionErr_Result'>UnknownInteractionsProtocol_StrictEventUnionErr_Result</a></code>
             </td>
         </tr>
 </table>
@@ -2175,12 +1815,12 @@
 ## **STRUCTS**
 
 ### UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response  {#UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response data-text="UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=298)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=243)*
 
 &lt;EMPTY&gt;
 
 ### UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response  {#UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response data-text="UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=299)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=244)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -2194,53 +1834,13 @@
         </tr>
 </table>
 
-### UnknownInteractionsAjarProtocol_FlexibleEventErr_Response  {#UnknownInteractionsAjarProtocol_FlexibleEventErr_Response data-text="UnknownInteractionsAjarProtocol_FlexibleEventErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=165)*
-
-&lt;EMPTY&gt;
-
-### UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response  {#UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response data-text="UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=166)*
-
-<table>
-    <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
-        <tr id="UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response.some_field">
-            <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-            <td>No default</td>
-        </tr>
-</table>
-
-### UnknownInteractionsAjarProtocol_StrictEventErr_Response  {#UnknownInteractionsAjarProtocol_StrictEventErr_Response data-text="UnknownInteractionsAjarProtocol_StrictEventErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=143)*
-
-&lt;EMPTY&gt;
-
-### UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response  {#UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response data-text="UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=144)*
-
-<table>
-    <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
-        <tr id="UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response.some_field">
-            <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-            <td>No default</td>
-        </tr>
-</table>
-
 ### UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response  {#UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response data-text="UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=120)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=98)*
 
 &lt;EMPTY&gt;
 
 ### UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response  {#UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response data-text="UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=121)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=99)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -2255,12 +1855,12 @@
 </table>
 
 ### UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response  {#UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response data-text="UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=327)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=272)*
 
 &lt;EMPTY&gt;
 
 ### UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response  {#UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response data-text="UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=328)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=273)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -2274,33 +1874,13 @@
         </tr>
 </table>
 
-### UnknownInteractionsClosedProtocol_StrictEventErr_Response  {#UnknownInteractionsClosedProtocol_StrictEventErr_Response data-text="UnknownInteractionsClosedProtocol_StrictEventErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=216)*
-
-&lt;EMPTY&gt;
-
-### UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response  {#UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response data-text="UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=217)*
-
-<table>
-    <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
-        <tr id="UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response.some_field">
-            <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-            <td>No default</td>
-        </tr>
-</table>
-
 ### UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response  {#UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response data-text="UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=193)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=149)*
 
 &lt;EMPTY&gt;
 
 ### UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response  {#UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response data-text="UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=194)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=150)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -2315,12 +1895,12 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response  {#UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=268)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=213)*
 
 &lt;EMPTY&gt;
 
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response  {#UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=269)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=214)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -2335,7 +1915,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response  {#UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=258)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=203)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -2350,41 +1930,21 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response  {#UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=257)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=202)*
 
 &lt;EMPTY&gt;
 
 ### UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response  {#UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response data-text="UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=246)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=191)*
 
 &lt;EMPTY&gt;
 
 ### UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response  {#UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response data-text="UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=247)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=192)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response.some_field">
-            <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-            <td>No default</td>
-        </tr>
-</table>
-
-### UnknownInteractionsProtocol_FlexibleEventErr_Response  {#UnknownInteractionsProtocol_FlexibleEventErr_Response data-text="UnknownInteractionsProtocol_FlexibleEventErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=91)*
-
-&lt;EMPTY&gt;
-
-### UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response  {#UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response data-text="UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=92)*
-
-<table>
-    <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
-        <tr id="UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response.some_field">
             <td><code>some_field</code></td>
             <td>
                 <code>int32</code>
@@ -2434,26 +1994,6 @@
 
 &lt;EMPTY&gt;
 
-### UnknownInteractionsProtocol_StrictEventErr_Response  {#UnknownInteractionsProtocol_StrictEventErr_Response data-text="UnknownInteractionsProtocol_StrictEventErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=69)*
-
-&lt;EMPTY&gt;
-
-### UnknownInteractionsProtocol_StrictEventFieldsErr_Response  {#UnknownInteractionsProtocol_StrictEventFieldsErr_Response data-text="UnknownInteractionsProtocol_StrictEventFieldsErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=70)*
-
-<table>
-    <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
-        <tr id="UnknownInteractionsProtocol_StrictEventFieldsErr_Response.some_field">
-            <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-            <td>No default</td>
-        </tr>
-</table>
-
 ### UnknownInteractionsProtocol_StrictTwoWayErr_Response  {#UnknownInteractionsProtocol_StrictTwoWayErr_Response data-text="UnknownInteractionsProtocol_StrictTwoWayErr_Response"}
 *Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=24)*
 
@@ -2481,7 +2021,7 @@
 ### UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse  {#UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse data-text="UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=294)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=239)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2498,7 +2038,7 @@
 ### UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response  {#UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response data-text="UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=305)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=250)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2515,7 +2055,7 @@
 ### UnknownInteractionsAjarProtocolFlexibleEventTableRequest  {#UnknownInteractionsAjarProtocolFlexibleEventTableRequest data-text="UnknownInteractionsAjarProtocolFlexibleEventTableRequest"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=161)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=128)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2532,7 +2072,7 @@
 ### UnknownInteractionsAjarProtocolStrictEventTableRequest  {#UnknownInteractionsAjarProtocolStrictEventTableRequest data-text="UnknownInteractionsAjarProtocolStrictEventTableRequest"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=139)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=117)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2549,7 +2089,7 @@
 ### UnknownInteractionsAjarProtocolStrictTwoWayTableResponse  {#UnknownInteractionsAjarProtocolStrictTwoWayTableResponse data-text="UnknownInteractionsAjarProtocolStrictTwoWayTableResponse"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=116)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=94)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2563,44 +2103,10 @@
         </tr>
 </table>
 
-### UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response  {#UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response data-text="UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response"}
-
-
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=172)*
-
-<table>
-    <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response.some_field">
-<td><h3 id="UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response.some_field" class="add-link hide-from-toc">1</h3></td>
-            <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsAjarProtocol_StrictEventTableErr_Response  {#UnknownInteractionsAjarProtocol_StrictEventTableErr_Response data-text="UnknownInteractionsAjarProtocol_StrictEventTableErr_Response"}
-
-
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=150)*
-
-<table>
-    <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsAjarProtocol_StrictEventTableErr_Response.some_field">
-<td><h3 id="UnknownInteractionsAjarProtocol_StrictEventTableErr_Response.some_field" class="add-link hide-from-toc">1</h3></td>
-            <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
 ### UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response  {#UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response data-text="UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=127)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=105)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2617,7 +2123,7 @@
 ### UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse  {#UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse data-text="UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=323)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=268)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2634,7 +2140,7 @@
 ### UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response  {#UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response data-text="UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=334)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=279)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2651,7 +2157,7 @@
 ### UnknownInteractionsClosedProtocolStrictEventTableRequest  {#UnknownInteractionsClosedProtocolStrictEventTableRequest data-text="UnknownInteractionsClosedProtocolStrictEventTableRequest"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=212)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=168)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2668,7 +2174,7 @@
 ### UnknownInteractionsClosedProtocolStrictTwoWayTableResponse  {#UnknownInteractionsClosedProtocolStrictTwoWayTableResponse data-text="UnknownInteractionsClosedProtocolStrictTwoWayTableResponse"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=189)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=145)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2682,27 +2188,10 @@
         </tr>
 </table>
 
-### UnknownInteractionsClosedProtocol_StrictEventTableErr_Response  {#UnknownInteractionsClosedProtocol_StrictEventTableErr_Response data-text="UnknownInteractionsClosedProtocol_StrictEventTableErr_Response"}
-
-
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=223)*
-
-<table>
-    <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsClosedProtocol_StrictEventTableErr_Response.some_field">
-<td><h3 id="UnknownInteractionsClosedProtocol_StrictEventTableErr_Response.some_field" class="add-link hide-from-toc">1</h3></td>
-            <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
 ### UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response  {#UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response data-text="UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=200)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=156)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2719,7 +2208,7 @@
 ### UnknownInteractionsDriverProtocolStrictTwoWayTableResponse  {#UnknownInteractionsDriverProtocolStrictTwoWayTableResponse data-text="UnknownInteractionsDriverProtocolStrictTwoWayTableResponse"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=242)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=187)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2736,7 +2225,7 @@
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response  {#UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=275)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=220)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2753,7 +2242,7 @@
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response  {#UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=264)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=209)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2770,7 +2259,7 @@
 ### UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response  {#UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response data-text="UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=253)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=198)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2787,7 +2276,7 @@
 ### UnknownInteractionsProtocolFlexibleEventTableRequest  {#UnknownInteractionsProtocolFlexibleEventTableRequest data-text="UnknownInteractionsProtocolFlexibleEventTableRequest"}
 
 
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=87)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=76)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2835,23 +2324,6 @@
         </tr>
 </table>
 
-### UnknownInteractionsProtocol_FlexibleEventTableErr_Response  {#UnknownInteractionsProtocol_FlexibleEventTableErr_Response data-text="UnknownInteractionsProtocol_FlexibleEventTableErr_Response"}
-
-
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=98)*
-
-<table>
-    <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsProtocol_FlexibleEventTableErr_Response.some_field">
-<td><h3 id="UnknownInteractionsProtocol_FlexibleEventTableErr_Response.some_field" class="add-link hide-from-toc">1</h3></td>
-            <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
 ### UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response  {#UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response data-text="UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response"}
 
 
@@ -2886,23 +2358,6 @@
         </tr>
 </table>
 
-### UnknownInteractionsProtocol_StrictEventTableErr_Response  {#UnknownInteractionsProtocol_StrictEventTableErr_Response data-text="UnknownInteractionsProtocol_StrictEventTableErr_Response"}
-
-
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=76)*
-
-<table>
-    <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsProtocol_StrictEventTableErr_Response.some_field">
-<td><h3 id="UnknownInteractionsProtocol_StrictEventTableErr_Response.some_field" class="add-link hide-from-toc">1</h3></td>
-            <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
 ### UnknownInteractionsProtocol_StrictTwoWayTableErr_Response  {#UnknownInteractionsProtocol_StrictTwoWayTableErr_Response data-text="UnknownInteractionsProtocol_StrictTwoWayTableErr_Response"}
 
 
@@ -2924,7 +2379,7 @@
 ## **UNIONS**
 
 ### UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse data-text="UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=291)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=236)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse.some_field">
@@ -2938,7 +2393,7 @@
 </table>
 
 ### UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result data-text="UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=298)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=243)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result.response">
@@ -2960,7 +2415,7 @@
 </table>
 
 ### UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result data-text="UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=299)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=244)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result.response">
@@ -2982,7 +2437,7 @@
 </table>
 
 ### UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result data-text="UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=305)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=250)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result.response">
@@ -3004,7 +2459,7 @@
 </table>
 
 ### UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response data-text="UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=302)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=247)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response.some_field">
@@ -3018,7 +2473,7 @@
 </table>
 
 ### UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result data-text="UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=302)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=247)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result.response">
@@ -3040,7 +2495,7 @@
 </table>
 
 ### UnknownInteractionsAjarProtocolFlexibleEventUnionRequest [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocolFlexibleEventUnionRequest data-text="UnknownInteractionsAjarProtocolFlexibleEventUnionRequest"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=158)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=125)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsAjarProtocolFlexibleEventUnionRequest.some_field">
@@ -3054,7 +2509,7 @@
 </table>
 
 ### UnknownInteractionsAjarProtocolStrictEventUnionRequest [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocolStrictEventUnionRequest data-text="UnknownInteractionsAjarProtocolStrictEventUnionRequest"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=136)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=114)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsAjarProtocolStrictEventUnionRequest.some_field">
@@ -3068,7 +2523,7 @@
 </table>
 
 ### UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse data-text="UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=113)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=91)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse.some_field">
@@ -3081,212 +2536,8 @@
         </tr>
 </table>
 
-### UnknownInteractionsAjarProtocol_FlexibleEventErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocol_FlexibleEventErr_Result data-text="UnknownInteractionsAjarProtocol_FlexibleEventErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=165)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsAjarProtocol_FlexibleEventErr_Result.response">
-<td><h3 id="UnknownInteractionsAjarProtocol_FlexibleEventErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_FlexibleEventErr_Response'>UnknownInteractionsAjarProtocol_FlexibleEventErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsAjarProtocol_FlexibleEventErr_Result.err">
-<td><h3 id="UnknownInteractionsAjarProtocol_FlexibleEventErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result data-text="UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=166)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result.response">
-<td><h3 id="UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response'>UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result.err">
-<td><h3 id="UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result data-text="UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=172)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result.response">
-<td><h3 id="UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response'>UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result.err">
-<td><h3 id="UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response data-text="UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=169)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response.some_field">
-<td><h3 id="UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response.some_field" class="add-link hide-from-toc">1</h3></td>
-            <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result data-text="UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=169)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result.response">
-<td><h3 id="UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response'>UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result.err">
-<td><h3 id="UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsAjarProtocol_StrictEventErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocol_StrictEventErr_Result data-text="UnknownInteractionsAjarProtocol_StrictEventErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=143)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsAjarProtocol_StrictEventErr_Result.response">
-<td><h3 id="UnknownInteractionsAjarProtocol_StrictEventErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_StrictEventErr_Response'>UnknownInteractionsAjarProtocol_StrictEventErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsAjarProtocol_StrictEventErr_Result.err">
-<td><h3 id="UnknownInteractionsAjarProtocol_StrictEventErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result data-text="UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=144)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result.response">
-<td><h3 id="UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response'>UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result.err">
-<td><h3 id="UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsAjarProtocol_StrictEventTableErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocol_StrictEventTableErr_Result data-text="UnknownInteractionsAjarProtocol_StrictEventTableErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=150)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsAjarProtocol_StrictEventTableErr_Result.response">
-<td><h3 id="UnknownInteractionsAjarProtocol_StrictEventTableErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_StrictEventTableErr_Response'>UnknownInteractionsAjarProtocol_StrictEventTableErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsAjarProtocol_StrictEventTableErr_Result.err">
-<td><h3 id="UnknownInteractionsAjarProtocol_StrictEventTableErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response data-text="UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=147)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response.some_field">
-<td><h3 id="UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response.some_field" class="add-link hide-from-toc">1</h3></td>
-            <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result data-text="UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=147)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result.response">
-<td><h3 id="UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response'>UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result.err">
-<td><h3 id="UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
 ### UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result data-text="UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=120)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=98)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result.response">
@@ -3308,7 +2559,7 @@
 </table>
 
 ### UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result data-text="UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=121)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=99)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result.response">
@@ -3330,7 +2581,7 @@
 </table>
 
 ### UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result data-text="UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=127)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=105)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result.response">
@@ -3352,7 +2603,7 @@
 </table>
 
 ### UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response data-text="UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=124)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=102)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response.some_field">
@@ -3366,7 +2617,7 @@
 </table>
 
 ### UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result data-text="UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=124)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=102)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result.response">
@@ -3388,7 +2639,7 @@
 </table>
 
 ### UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse data-text="UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=320)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=265)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse.some_field">
@@ -3402,7 +2653,7 @@
 </table>
 
 ### UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result data-text="UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=327)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=272)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result.response">
@@ -3424,7 +2675,7 @@
 </table>
 
 ### UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result data-text="UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=328)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=273)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result.response">
@@ -3446,7 +2697,7 @@
 </table>
 
 ### UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result data-text="UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=334)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=279)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result.response">
@@ -3468,7 +2719,7 @@
 </table>
 
 ### UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response data-text="UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=331)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=276)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response.some_field">
@@ -3482,7 +2733,7 @@
 </table>
 
 ### UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result data-text="UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=331)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=276)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result.response">
@@ -3504,7 +2755,7 @@
 </table>
 
 ### UnknownInteractionsClosedProtocolStrictEventUnionRequest [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedProtocolStrictEventUnionRequest data-text="UnknownInteractionsClosedProtocolStrictEventUnionRequest"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=209)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=165)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsClosedProtocolStrictEventUnionRequest.some_field">
@@ -3518,7 +2769,7 @@
 </table>
 
 ### UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse data-text="UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=186)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=142)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse.some_field">
@@ -3531,110 +2782,8 @@
         </tr>
 </table>
 
-### UnknownInteractionsClosedProtocol_StrictEventErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedProtocol_StrictEventErr_Result data-text="UnknownInteractionsClosedProtocol_StrictEventErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=216)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsClosedProtocol_StrictEventErr_Result.response">
-<td><h3 id="UnknownInteractionsClosedProtocol_StrictEventErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsClosedProtocol_StrictEventErr_Response'>UnknownInteractionsClosedProtocol_StrictEventErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsClosedProtocol_StrictEventErr_Result.err">
-<td><h3 id="UnknownInteractionsClosedProtocol_StrictEventErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result data-text="UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=217)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result.response">
-<td><h3 id="UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response'>UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result.err">
-<td><h3 id="UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsClosedProtocol_StrictEventTableErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedProtocol_StrictEventTableErr_Result data-text="UnknownInteractionsClosedProtocol_StrictEventTableErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=223)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsClosedProtocol_StrictEventTableErr_Result.response">
-<td><h3 id="UnknownInteractionsClosedProtocol_StrictEventTableErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsClosedProtocol_StrictEventTableErr_Response'>UnknownInteractionsClosedProtocol_StrictEventTableErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsClosedProtocol_StrictEventTableErr_Result.err">
-<td><h3 id="UnknownInteractionsClosedProtocol_StrictEventTableErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response data-text="UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=220)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response.some_field">
-<td><h3 id="UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response.some_field" class="add-link hide-from-toc">1</h3></td>
-            <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result data-text="UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=220)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result.response">
-<td><h3 id="UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response'>UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result.err">
-<td><h3 id="UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
 ### UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result data-text="UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=193)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=149)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result.response">
@@ -3656,7 +2805,7 @@
 </table>
 
 ### UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result data-text="UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=194)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=150)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result.response">
@@ -3678,7 +2827,7 @@
 </table>
 
 ### UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result data-text="UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=200)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=156)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result.response">
@@ -3700,7 +2849,7 @@
 </table>
 
 ### UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response data-text="UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=197)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=153)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response.some_field">
@@ -3714,7 +2863,7 @@
 </table>
 
 ### UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result data-text="UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=197)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=153)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result.response">
@@ -3736,7 +2885,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse data-text="UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=239)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=184)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse.some_field">
@@ -3750,7 +2899,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=268)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=213)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result.response">
@@ -3780,7 +2929,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=269)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=214)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result.response">
@@ -3810,7 +2959,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=258)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=203)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result.response">
@@ -3832,7 +2981,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=275)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=220)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result.response">
@@ -3862,7 +3011,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=264)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=209)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result.response">
@@ -3884,7 +3033,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=272)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=217)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response.some_field">
@@ -3898,7 +3047,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=272)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=217)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result.response">
@@ -3928,7 +3077,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=261)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=206)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response.some_field">
@@ -3942,7 +3091,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=261)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=206)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result.response">
@@ -3964,7 +3113,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result data-text="UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=257)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=202)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result.response">
@@ -3986,7 +3135,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result data-text="UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=246)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=191)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result.response">
@@ -4008,7 +3157,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result data-text="UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=247)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=192)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result.response">
@@ -4030,7 +3179,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result data-text="UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=253)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=198)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result.response">
@@ -4052,7 +3201,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response data-text="UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=250)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=195)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response.some_field">
@@ -4066,7 +3215,7 @@
 </table>
 
 ### UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result data-text="UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=250)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=195)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result.response">
@@ -4088,7 +3237,7 @@
 </table>
 
 ### UnknownInteractionsProtocolFlexibleEventUnionRequest [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsProtocolFlexibleEventUnionRequest data-text="UnknownInteractionsProtocolFlexibleEventUnionRequest"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=84)*
+*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=73)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="UnknownInteractionsProtocolFlexibleEventUnionRequest.some_field">
@@ -4122,108 +3271,6 @@
         <tr id="UnknownInteractionsProtocolStrictTwoWayUnionResponse.some_field">
 <td><h3 id="UnknownInteractionsProtocolStrictTwoWayUnionResponse.some_field" class="add-link hide-from-toc">1</h3></td>
             <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsProtocol_FlexibleEventErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsProtocol_FlexibleEventErr_Result data-text="UnknownInteractionsProtocol_FlexibleEventErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=91)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsProtocol_FlexibleEventErr_Result.response">
-<td><h3 id="UnknownInteractionsProtocol_FlexibleEventErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_FlexibleEventErr_Response'>UnknownInteractionsProtocol_FlexibleEventErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsProtocol_FlexibleEventErr_Result.err">
-<td><h3 id="UnknownInteractionsProtocol_FlexibleEventErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result data-text="UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=92)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result.response">
-<td><h3 id="UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response'>UnknownInteractionsProtocol_FlexibleEventFieldsErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result.err">
-<td><h3 id="UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsProtocol_FlexibleEventTableErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsProtocol_FlexibleEventTableErr_Result data-text="UnknownInteractionsProtocol_FlexibleEventTableErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=98)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsProtocol_FlexibleEventTableErr_Result.response">
-<td><h3 id="UnknownInteractionsProtocol_FlexibleEventTableErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_FlexibleEventTableErr_Response'>UnknownInteractionsProtocol_FlexibleEventTableErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsProtocol_FlexibleEventTableErr_Result.err">
-<td><h3 id="UnknownInteractionsProtocol_FlexibleEventTableErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsProtocol_FlexibleEventUnionErr_Response [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsProtocol_FlexibleEventUnionErr_Response data-text="UnknownInteractionsProtocol_FlexibleEventUnionErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=95)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsProtocol_FlexibleEventUnionErr_Response.some_field">
-<td><h3 id="UnknownInteractionsProtocol_FlexibleEventUnionErr_Response.some_field" class="add-link hide-from-toc">1</h3></td>
-            <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsProtocol_FlexibleEventUnionErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsProtocol_FlexibleEventUnionErr_Result data-text="UnknownInteractionsProtocol_FlexibleEventUnionErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=95)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsProtocol_FlexibleEventUnionErr_Result.response">
-<td><h3 id="UnknownInteractionsProtocol_FlexibleEventUnionErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_FlexibleEventUnionErr_Response'>UnknownInteractionsProtocol_FlexibleEventUnionErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsProtocol_FlexibleEventUnionErr_Result.err">
-<td><h3 id="UnknownInteractionsProtocol_FlexibleEventUnionErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
             <td>
                 <code>int32</code>
             </td>
@@ -4462,108 +3509,6 @@
             <td><code>framework_err</code></td>
             <td>
                 <code>internal</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsProtocol_StrictEventErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsProtocol_StrictEventErr_Result data-text="UnknownInteractionsProtocol_StrictEventErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=69)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsProtocol_StrictEventErr_Result.response">
-<td><h3 id="UnknownInteractionsProtocol_StrictEventErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_StrictEventErr_Response'>UnknownInteractionsProtocol_StrictEventErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsProtocol_StrictEventErr_Result.err">
-<td><h3 id="UnknownInteractionsProtocol_StrictEventErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsProtocol_StrictEventFieldsErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsProtocol_StrictEventFieldsErr_Result data-text="UnknownInteractionsProtocol_StrictEventFieldsErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=70)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsProtocol_StrictEventFieldsErr_Result.response">
-<td><h3 id="UnknownInteractionsProtocol_StrictEventFieldsErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_StrictEventFieldsErr_Response'>UnknownInteractionsProtocol_StrictEventFieldsErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsProtocol_StrictEventFieldsErr_Result.err">
-<td><h3 id="UnknownInteractionsProtocol_StrictEventFieldsErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsProtocol_StrictEventTableErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsProtocol_StrictEventTableErr_Result data-text="UnknownInteractionsProtocol_StrictEventTableErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=76)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsProtocol_StrictEventTableErr_Result.response">
-<td><h3 id="UnknownInteractionsProtocol_StrictEventTableErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_StrictEventTableErr_Response'>UnknownInteractionsProtocol_StrictEventTableErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsProtocol_StrictEventTableErr_Result.err">
-<td><h3 id="UnknownInteractionsProtocol_StrictEventTableErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsProtocol_StrictEventUnionErr_Response [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsProtocol_StrictEventUnionErr_Response data-text="UnknownInteractionsProtocol_StrictEventUnionErr_Response"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=73)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsProtocol_StrictEventUnionErr_Response.some_field">
-<td><h3 id="UnknownInteractionsProtocol_StrictEventUnionErr_Response.some_field" class="add-link hide-from-toc">1</h3></td>
-            <td><code>some_field</code></td>
-            <td>
-                <code>int32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### UnknownInteractionsProtocol_StrictEventUnionErr_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnknownInteractionsProtocol_StrictEventUnionErr_Result data-text="UnknownInteractionsProtocol_StrictEventUnionErr_Result"}
-*Defined in [test.unknowninteractions/unknown_interactions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/unknown_interactions.test.fidl;l=73)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="UnknownInteractionsProtocol_StrictEventUnionErr_Result.response">
-<td><h3 id="UnknownInteractionsProtocol_StrictEventUnionErr_Result.response" class="add-link hide-from-toc">1</h3></td>
-            <td><code>response</code></td>
-            <td>
-                <code><a class='link' href='#UnknownInteractionsProtocol_StrictEventUnionErr_Response'>UnknownInteractionsProtocol_StrictEventUnionErr_Response</a></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="UnknownInteractionsProtocol_StrictEventUnionErr_Result.err">
-<td><h3 id="UnknownInteractionsProtocol_StrictEventUnionErr_Result.err" class="add-link hide-from-toc">2</h3></td>
-            <td><code>err</code></td>
-            <td>
-                <code>int32</code>
             </td>
             <td></td>
         </tr>

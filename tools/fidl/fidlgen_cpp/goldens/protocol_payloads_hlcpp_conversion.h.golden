@@ -139,16 +139,6 @@ struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocolOnAnonRequest>
   static inline ::test_protocolpayloads::MainProtocolOnAnonRequest Convert(::test::protocolpayloads::MainProtocolOnAnonRequest&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse> {
-  using HLCPPType = ::test::protocolpayloads::MainProtocol_OnAnonWithError_Response;
-  static inline ::test::protocolpayloads::MainProtocol_OnAnonWithError_Response Convert(::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnAnonWithError_Response> {
-  using NaturalType = ::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse;
-  static inline ::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse Convert(::test::protocolpayloads::MainProtocol_OnAnonWithError_Response&&);
-};
-template <>
 struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult> {
   using HLCPPType = ::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result;
   static inline ::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result Convert(::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult&&);
@@ -157,16 +147,6 @@ template <>
 struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result> {
   using NaturalType = ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult;
   static inline ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult Convert(::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result&&);
-};
-template <>
-struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnLocalWithErrorResult> {
-  using HLCPPType = ::test::protocolpayloads::MainProtocol_OnLocalWithError_Result;
-  static inline ::test::protocolpayloads::MainProtocol_OnLocalWithError_Result Convert(::test_protocolpayloads::MainProtocolOnLocalWithErrorResult&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnLocalWithError_Result> {
-  using NaturalType = ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult;
-  static inline ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult Convert(::test::protocolpayloads::MainProtocol_OnLocalWithError_Result&&);
 };
 template <>
 struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult> {
@@ -179,16 +159,6 @@ struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_TwoWayAnonWit
   static inline ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult Convert(::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorResult> {
-  using HLCPPType = ::test::protocolpayloads::MainProtocol_OnAnonWithError_Result;
-  static inline ::test::protocolpayloads::MainProtocol_OnAnonWithError_Result Convert(::test_protocolpayloads::MainProtocolOnAnonWithErrorResult&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnAnonWithError_Result> {
-  using NaturalType = ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult;
-  static inline ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult Convert(::test::protocolpayloads::MainProtocol_OnAnonWithError_Result&&);
-};
-template <>
 struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult> {
   using HLCPPType = ::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result;
   static inline ::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result Convert(::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult&&);
@@ -197,16 +167,6 @@ template <>
 struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result> {
   using NaturalType = ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult;
   static inline ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult Convert(::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result&&);
-};
-template <>
-struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnImportWithErrorResult> {
-  using HLCPPType = ::test::protocolpayloads::MainProtocol_OnImportWithError_Result;
-  static inline ::test::protocolpayloads::MainProtocol_OnImportWithError_Result Convert(::test_protocolpayloads::MainProtocolOnImportWithErrorResult&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnImportWithError_Result> {
-  using NaturalType = ::test_protocolpayloads::MainProtocolOnImportWithErrorResult;
-  static inline ::test_protocolpayloads::MainProtocolOnImportWithErrorResult Convert(::test::protocolpayloads::MainProtocol_OnImportWithError_Result&&);
 };
 
 ::test::protocolpayloads::LocalStructPayload NaturalToHLCPPTraits<::test_protocolpayloads::LocalStructPayload>::Convert(::test_protocolpayloads::LocalStructPayload&& value) {
@@ -300,19 +260,6 @@ struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnImportWithE
       .b = ::fidl::HLCPPToNatural(std::move(value.b)),
   }};
 }
-::test::protocolpayloads::MainProtocol_OnAnonWithError_Response NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse>::Convert(::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse&& value) {
-  ::test::protocolpayloads::MainProtocol_OnAnonWithError_Response hlcpp;
-  hlcpp.a = ::fidl::NaturalToHLCPP(std::move(value.a()));
-  hlcpp.b = ::fidl::NaturalToHLCPP(std::move(value.b()));
-  return hlcpp;
-}
-
-::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnAnonWithError_Response>::Convert(::test::protocolpayloads::MainProtocol_OnAnonWithError_Response&& value) {
-  return ::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse{{
-      .a = ::fidl::HLCPPToNatural(std::move(value.a)),
-      .b = ::fidl::HLCPPToNatural(std::move(value.b)),
-  }};
-}
 
 ::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult>::Convert(::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult&& value) {
   ::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result hlcpp;
@@ -340,34 +287,6 @@ struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnImportWithE
           ::fidl::HLCPPToNatural(std::move(value.err())));
     default:
       ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result");
-  }
-}
-::test::protocolpayloads::MainProtocol_OnLocalWithError_Result NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnLocalWithErrorResult>::Convert(::test_protocolpayloads::MainProtocolOnLocalWithErrorResult&& value) {
-  ::test::protocolpayloads::MainProtocol_OnLocalWithError_Result hlcpp;
-  switch (value.Which()) {
-    case ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult::Tag::kResponse:
-      hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-      break;
-    case ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult::Tag::kErr:
-      hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-      break;
-    default:
-      break;
-  }
-  return hlcpp;
-}
-
-::test_protocolpayloads::MainProtocolOnLocalWithErrorResult HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnLocalWithError_Result>::Convert(::test::protocolpayloads::MainProtocol_OnLocalWithError_Result&& value) {
-  using _NaturalUnion = ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult;
-  switch (value.Which()) {
-    case ::test::protocolpayloads::MainProtocol_OnLocalWithError_Result::Tag::kResponse:
-      return _NaturalUnion::WithResponse(
-          ::fidl::HLCPPToNatural(std::move(value.response())));
-    case ::test::protocolpayloads::MainProtocol_OnLocalWithError_Result::Tag::kErr:
-      return _NaturalUnion::WithErr(
-          ::fidl::HLCPPToNatural(std::move(value.err())));
-    default:
-      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::protocolpayloads::MainProtocol_OnLocalWithError_Result");
   }
 }
 ::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult>::Convert(::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult&& value) {
@@ -398,34 +317,6 @@ struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnImportWithE
       ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result");
   }
 }
-::test::protocolpayloads::MainProtocol_OnAnonWithError_Result NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorResult>::Convert(::test_protocolpayloads::MainProtocolOnAnonWithErrorResult&& value) {
-  ::test::protocolpayloads::MainProtocol_OnAnonWithError_Result hlcpp;
-  switch (value.Which()) {
-    case ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult::Tag::kResponse:
-      hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-      break;
-    case ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult::Tag::kErr:
-      hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-      break;
-    default:
-      break;
-  }
-  return hlcpp;
-}
-
-::test_protocolpayloads::MainProtocolOnAnonWithErrorResult HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnAnonWithError_Result>::Convert(::test::protocolpayloads::MainProtocol_OnAnonWithError_Result&& value) {
-  using _NaturalUnion = ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult;
-  switch (value.Which()) {
-    case ::test::protocolpayloads::MainProtocol_OnAnonWithError_Result::Tag::kResponse:
-      return _NaturalUnion::WithResponse(
-          ::fidl::HLCPPToNatural(std::move(value.response())));
-    case ::test::protocolpayloads::MainProtocol_OnAnonWithError_Result::Tag::kErr:
-      return _NaturalUnion::WithErr(
-          ::fidl::HLCPPToNatural(std::move(value.err())));
-    default:
-      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::protocolpayloads::MainProtocol_OnAnonWithError_Result");
-  }
-}
 ::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult>::Convert(::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult&& value) {
   ::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result hlcpp;
   switch (value.Which()) {
@@ -452,34 +343,6 @@ struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnImportWithE
           ::fidl::HLCPPToNatural(std::move(value.err())));
     default:
       ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result");
-  }
-}
-::test::protocolpayloads::MainProtocol_OnImportWithError_Result NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnImportWithErrorResult>::Convert(::test_protocolpayloads::MainProtocolOnImportWithErrorResult&& value) {
-  ::test::protocolpayloads::MainProtocol_OnImportWithError_Result hlcpp;
-  switch (value.Which()) {
-    case ::test_protocolpayloads::MainProtocolOnImportWithErrorResult::Tag::kResponse:
-      hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-      break;
-    case ::test_protocolpayloads::MainProtocolOnImportWithErrorResult::Tag::kErr:
-      hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-      break;
-    default:
-      break;
-  }
-  return hlcpp;
-}
-
-::test_protocolpayloads::MainProtocolOnImportWithErrorResult HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnImportWithError_Result>::Convert(::test::protocolpayloads::MainProtocol_OnImportWithError_Result&& value) {
-  using _NaturalUnion = ::test_protocolpayloads::MainProtocolOnImportWithErrorResult;
-  switch (value.Which()) {
-    case ::test::protocolpayloads::MainProtocol_OnImportWithError_Result::Tag::kResponse:
-      return _NaturalUnion::WithResponse(
-          ::fidl::HLCPPToNatural(std::move(value.response())));
-    case ::test::protocolpayloads::MainProtocol_OnImportWithError_Result::Tag::kErr:
-      return _NaturalUnion::WithErr(
-          ::fidl::HLCPPToNatural(std::move(value.err())));
-    default:
-      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::protocolpayloads::MainProtocol_OnImportWithError_Result");
   }
 }
 

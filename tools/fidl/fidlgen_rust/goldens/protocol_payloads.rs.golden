@@ -74,15 +74,6 @@ impl fidl::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
-pub struct MainProtocolOnAnonWithErrorResponse {
-    pub a: u32,
-    pub b: u32,
-}
-
-impl fidl::Persistable for MainProtocolOnAnonWithErrorResponse {}
-
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[repr(C)]
 pub struct MainProtocolTwoWayAnonWithErrorResponse {
     pub a: u32,
     pub b: u32,
@@ -103,11 +94,8 @@ impl fidl::endpoints::ProtocolMarker for MainProtocolMarker {
     const DEBUG_NAME: &'static str = "(anonymous) MainProtocol";
 }
 pub type MainProtocolTwoWayLocalWithErrorResult = Result<(u32, u32), u32>;
-pub type MainProtocolOnLocalWithErrorResult = Result<(u32, u32), u32>;
 pub type MainProtocolTwoWayImportWithErrorResult = Result<i32, u32>;
-pub type MainProtocolOnImportWithErrorResult = Result<i32, u32>;
 pub type MainProtocolTwoWayAnonWithErrorResult = Result<(u32, u32), u32>;
-pub type MainProtocolOnAnonWithErrorResult = Result<(u32, u32), u32>;
 
 pub trait MainProtocolProxyInterface: Send + Sync {
     fn r#one_way_composed(&self, a: i32) -> Result<(), fidl::Error>;
@@ -709,32 +697,10 @@ impl futures::Stream for MainProtocolEventStream {
 
 #[derive(Debug)]
 pub enum MainProtocolEvent {
-    OnComposed {
-        a: i32,
-    },
-    OnComposedWithError {
-        result: fidl_test_protocolpayloads_imported::ComposedProtocolOnComposedWithErrorResult,
-    },
-    OnLocal {
-        a: u32,
-        b: u32,
-    },
-    OnLocalWithError {
-        result: MainProtocolOnLocalWithErrorResult,
-    },
-    OnImport {
-        a: i32,
-    },
-    OnImportWithError {
-        result: MainProtocolOnImportWithErrorResult,
-    },
-    OnAnon {
-        a: u32,
-        b: u32,
-    },
-    OnAnonWithError {
-        result: MainProtocolOnAnonWithErrorResult,
-    },
+    OnComposed { a: i32 },
+    OnLocal { a: u32, b: u32 },
+    OnImport { a: i32 },
+    OnAnon { a: u32, b: u32 },
 }
 
 impl MainProtocolEvent {
@@ -742,17 +708,6 @@ impl MainProtocolEvent {
     pub fn into_on_composed(self) -> Option<i32> {
         if let MainProtocolEvent::OnComposed { a } = self {
             Some((a))
-        } else {
-            None
-        }
-    }
-    #[allow(irrefutable_let_patterns)]
-    pub fn into_on_composed_with_error(
-        self,
-    ) -> Option<fidl_test_protocolpayloads_imported::ComposedProtocolOnComposedWithErrorResult>
-    {
-        if let MainProtocolEvent::OnComposedWithError { result } = self {
-            Some((result))
         } else {
             None
         }
@@ -766,14 +721,6 @@ impl MainProtocolEvent {
         }
     }
     #[allow(irrefutable_let_patterns)]
-    pub fn into_on_local_with_error(self) -> Option<MainProtocolOnLocalWithErrorResult> {
-        if let MainProtocolEvent::OnLocalWithError { result } = self {
-            Some((result))
-        } else {
-            None
-        }
-    }
-    #[allow(irrefutable_let_patterns)]
     pub fn into_on_import(self) -> Option<i32> {
         if let MainProtocolEvent::OnImport { a } = self {
             Some((a))
@@ -782,25 +729,9 @@ impl MainProtocolEvent {
         }
     }
     #[allow(irrefutable_let_patterns)]
-    pub fn into_on_import_with_error(self) -> Option<MainProtocolOnImportWithErrorResult> {
-        if let MainProtocolEvent::OnImportWithError { result } = self {
-            Some((result))
-        } else {
-            None
-        }
-    }
-    #[allow(irrefutable_let_patterns)]
     pub fn into_on_anon(self) -> Option<(u32, u32)> {
         if let MainProtocolEvent::OnAnon { a, b } = self {
             Some((a, b))
-        } else {
-            None
-        }
-    }
-    #[allow(irrefutable_let_patterns)]
-    pub fn into_on_anon_with_error(self) -> Option<MainProtocolOnAnonWithErrorResult> {
-        if let MainProtocolEvent::OnAnonWithError { result } = self {
-            Some((result))
         } else {
             None
         }
@@ -820,16 +751,6 @@ impl MainProtocolEvent {
                 >(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((MainProtocolEvent::OnComposed { a: out.a }))
             }
-            0x63774db677215e98 => {
-                let mut out = fidl::new_empty!(fidl::encoding::ResultType<fidl_test_protocolpayloads_imported::ImportStructPayload, u32>);
-                fidl::encoding::Decoder::decode_into::<
-                    fidl::encoding::ResultType<
-                        fidl_test_protocolpayloads_imported::ImportStructPayload,
-                        u32,
-                    >,
-                >(&tx_header, _body_bytes, _handles, &mut out)?;
-                Ok((MainProtocolEvent::OnComposedWithError { result: out.map(|x| x.a) }))
-            }
             0x4745f7438cd80819 => {
                 let mut out = fidl::new_empty!(LocalStructPayload);
                 fidl::encoding::Decoder::decode_into::<LocalStructPayload>(
@@ -840,13 +761,6 @@ impl MainProtocolEvent {
                 )?;
                 Ok((MainProtocolEvent::OnLocal { a: out.a, b: out.b }))
             }
-            0x4ecd4b3982e221af => {
-                let mut out = fidl::new_empty!(fidl::encoding::ResultType<LocalStructPayload, u32>);
-                fidl::encoding::Decoder::decode_into::<
-                    fidl::encoding::ResultType<LocalStructPayload, u32>,
-                >(&tx_header, _body_bytes, _handles, &mut out)?;
-                Ok((MainProtocolEvent::OnLocalWithError { result: out.map(|x| (x.a, x.b)) }))
-            }
             0x1bb4f4c30b6f8909 => {
                 let mut out =
                     fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
@@ -854,16 +768,6 @@ impl MainProtocolEvent {
                     fidl_test_protocolpayloads_imported::ImportStructPayload,
                 >(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((MainProtocolEvent::OnImport { a: out.a }))
-            }
-            0x6292b793d728f205 => {
-                let mut out = fidl::new_empty!(fidl::encoding::ResultType<fidl_test_protocolpayloads_imported::ImportStructPayload, u32>);
-                fidl::encoding::Decoder::decode_into::<
-                    fidl::encoding::ResultType<
-                        fidl_test_protocolpayloads_imported::ImportStructPayload,
-                        u32,
-                    >,
-                >(&tx_header, _body_bytes, _handles, &mut out)?;
-                Ok((MainProtocolEvent::OnImportWithError { result: out.map(|x| x.a) }))
             }
             0x42d321dacc4df000 => {
                 let mut out = fidl::new_empty!(MainProtocolOnAnonRequest);
@@ -874,13 +778,6 @@ impl MainProtocolEvent {
                     &mut out,
                 )?;
                 Ok((MainProtocolEvent::OnAnon { a: out.a, b: out.b }))
-            }
-            0x45bc24ef47b44a02 => {
-                let mut out = fidl::new_empty!(fidl::encoding::ResultType<MainProtocolOnAnonWithErrorResponse, u32>);
-                fidl::encoding::Decoder::decode_into::<
-                    fidl::encoding::ResultType<MainProtocolOnAnonWithErrorResponse, u32>,
-                >(&tx_header, _body_bytes, _handles, &mut out)?;
-                Ok((MainProtocolEvent::OnAnonWithError { result: out.map(|x| (x.a, x.b)) }))
             }
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal,
@@ -1344,38 +1241,11 @@ impl MainProtocolControlHandle {
         )
     }
 
-    pub fn send_on_composed_with_error(
-        &self,
-        mut result: Result<i32, u32>,
-    ) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::ResultType<
-            fidl_test_protocolpayloads_imported::ImportStructPayload,
-            u32,
-        >>(
-            result.map(|a| (a,)),
-            0,
-            0x63774db677215e98,
-            fidl::encoding::DynamicFlags::empty(),
-        )
-    }
-
     pub fn send_on_local(&self, mut a: u32, mut b: u32) -> Result<(), fidl::Error> {
         self.inner.send::<LocalStructPayload>(
             (a, b),
             0,
             0x4745f7438cd80819,
-            fidl::encoding::DynamicFlags::empty(),
-        )
-    }
-
-    pub fn send_on_local_with_error(
-        &self,
-        mut result: Result<(u32, u32), u32>,
-    ) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::ResultType<LocalStructPayload, u32>>(
-            result,
-            0,
-            0x4ecd4b3982e221af,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -1389,38 +1259,11 @@ impl MainProtocolControlHandle {
         )
     }
 
-    pub fn send_on_import_with_error(
-        &self,
-        mut result: Result<i32, u32>,
-    ) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::ResultType<
-            fidl_test_protocolpayloads_imported::ImportStructPayload,
-            u32,
-        >>(
-            result.map(|a| (a,)),
-            0,
-            0x6292b793d728f205,
-            fidl::encoding::DynamicFlags::empty(),
-        )
-    }
-
     pub fn send_on_anon(&self, mut a: u32, mut b: u32) -> Result<(), fidl::Error> {
         self.inner.send::<MainProtocolOnAnonRequest>(
             (a, b),
             0,
             0x42d321dacc4df000,
-            fidl::encoding::DynamicFlags::empty(),
-        )
-    }
-
-    pub fn send_on_anon_with_error(
-        &self,
-        mut result: Result<(u32, u32), u32>,
-    ) -> Result<(), fidl::Error> {
-        self.inner.send::<fidl::encoding::ResultType<MainProtocolOnAnonWithErrorResponse, u32>>(
-            result,
-            0,
-            0x45bc24ef47b44a02,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -2504,103 +2347,6 @@ mod internal {
     }
 
     impl fidl::encoding::Decode<Self> for MainProtocolTwoWayAnonWithErrorRequest {
-        #[inline(always)]
-        fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u32), b: fidl::new_empty!(u32) }
-        }
-
-        #[inline]
-        unsafe fn decode(
-            &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
-            offset: usize,
-            _depth: fidl::encoding::Depth,
-        ) -> fidl::Result<()> {
-            decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
-            // Verify that padding bytes are zero.
-            // Copy from the buffer into the object.
-            unsafe {
-                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 8);
-            }
-            Ok(())
-        }
-    }
-
-    unsafe impl fidl::encoding::TypeMarker for MainProtocolOnAnonWithErrorResponse {
-        type Owned = Self;
-
-        #[inline(always)]
-        fn inline_align(_context: fidl::encoding::Context) -> usize {
-            4
-        }
-
-        #[inline(always)]
-        fn inline_size(_context: fidl::encoding::Context) -> usize {
-            8
-        }
-        #[inline(always)]
-        fn encode_is_copy() -> bool {
-            true
-        }
-
-        #[inline(always)]
-        fn decode_is_copy() -> bool {
-            true
-        }
-    }
-    impl fidl::encoding::ValueTypeMarker for MainProtocolOnAnonWithErrorResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
-
-    unsafe impl fidl::encoding::Encode<MainProtocolOnAnonWithErrorResponse>
-        for &MainProtocolOnAnonWithErrorResponse
-    {
-        #[inline]
-        unsafe fn encode(
-            self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
-            offset: usize,
-            _depth: fidl::encoding::Depth,
-        ) -> fidl::Result<()> {
-            encoder.debug_check_bounds::<MainProtocolOnAnonWithErrorResponse>(offset);
-            unsafe {
-                // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
-                (buf_ptr as *mut MainProtocolOnAnonWithErrorResponse)
-                    .write_unaligned((self as *const MainProtocolOnAnonWithErrorResponse).read());
-                // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
-                // done second because the memcpy will write garbage to these bytes.
-            }
-            Ok(())
-        }
-    }
-    unsafe impl<T0: fidl::encoding::Encode<u32>, T1: fidl::encoding::Encode<u32>>
-        fidl::encoding::Encode<MainProtocolOnAnonWithErrorResponse> for (T0, T1)
-    {
-        #[inline]
-        unsafe fn encode(
-            self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
-            offset: usize,
-            depth: fidl::encoding::Depth,
-        ) -> fidl::Result<()> {
-            encoder.debug_check_bounds::<MainProtocolOnAnonWithErrorResponse>(offset);
-            // Zero out padding regions. There's no need to apply masks
-            // because the unmasked parts will be overwritten by fields.
-            // Write the fields.
-            self.0.encode(encoder, offset + 0, depth)?;
-            self.1.encode(encoder, offset + 4, depth)?;
-            Ok(())
-        }
-    }
-
-    impl fidl::encoding::Decode<Self> for MainProtocolOnAnonWithErrorResponse {
         #[inline(always)]
         fn new_empty() -> Self {
             Self { a: fidl::new_empty!(u32), b: fidl::new_empty!(u32) }

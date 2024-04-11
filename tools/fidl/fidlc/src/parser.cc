@@ -617,19 +617,12 @@ std::unique_ptr<RawProtocolMethod> Parser::ParseProtocolEvent(
   if (!parse_params(&response))
     return Fail();
 
-  std::unique_ptr<RawTypeConstructor> maybe_error;
-  if (MaybeConsumeToken(IdentifierOfSubkind(Token::Subkind::kError))) {
-    maybe_error = ParseTypeConstructor();
-    if (!Ok())
-      return Fail();
-  }
-
   ZX_ASSERT(method_name);
   ZX_ASSERT(response != nullptr);
 
   return std::make_unique<RawProtocolMethod>(
       scope.GetSourceElement(), std::move(attributes), std::move(modifiers), std::move(method_name),
-      std::move(request), std::move(response), std::move(maybe_error));
+      std::move(request), std::move(response), /*maybe_error_ctor=*/nullptr);
 }
 
 std::unique_ptr<RawProtocolMethod> Parser::ParseProtocolMethod(

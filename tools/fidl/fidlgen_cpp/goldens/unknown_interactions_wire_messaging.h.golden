@@ -108,18 +108,6 @@ template<>
 struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTable> final { static constexpr uint64_t value = 2711448698318579984lu; };
 
 template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr> final { static constexpr uint64_t value = 4437558874343717997lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr> final { static constexpr uint64_t value = 8268703922238340235lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr> final { static constexpr uint64_t value = 4681887988605004475lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr> final { static constexpr uint64_t value = 7827903484869638218lu; };
-
-template<>
 struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEvent> final { static constexpr uint64_t value = 7042257263728687206lu; };
 
 template<>
@@ -130,18 +118,6 @@ struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteract
 
 template<>
 struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTable> final { static constexpr uint64_t value = 5724881371349617120lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr> final { static constexpr uint64_t value = 5465749747219019177lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr> final { static constexpr uint64_t value = 1096356983683709514lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr> final { static constexpr uint64_t value = 906517230981154796lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr> final { static constexpr uint64_t value = 5605294921124359491lu; };
 
 #ifdef __Fuchsia__
 
@@ -753,78 +729,6 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 
 
 template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEvent> {
     
     static constexpr bool HasRequestPayload = false;
@@ -879,78 +783,6 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
     
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult;
-  using DomainError = int32_t;
 };
 
 
@@ -2656,178 +2488,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
 
 #ifdef __Fuchsia__
 template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult UnknownInteractionsProtocolStrictEventErrResult)
-    : body{ UnknownInteractionsProtocolStrictEventErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult UnknownInteractionsProtocolStrictEventFieldsErrResult)
-    : body{ UnknownInteractionsProtocolStrictEventFieldsErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult UnknownInteractionsProtocolStrictEventUnionErrResult)
-    : body{ UnknownInteractionsProtocolStrictEventUnionErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult UnknownInteractionsProtocolStrictEventTableErrResult)
-    : body{ UnknownInteractionsProtocolStrictEventTableErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
 struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEvent> final {
   FIDL_ALIGNDECL
   fidl_message_header_t header;
@@ -2981,178 +2641,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTable>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult UnknownInteractionsProtocolFlexibleEventErrResult)
-    : body{ UnknownInteractionsProtocolFlexibleEventErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult UnknownInteractionsProtocolFlexibleEventFieldsErrResult)
-    : body{ UnknownInteractionsProtocolFlexibleEventFieldsErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult UnknownInteractionsProtocolFlexibleEventUnionErrResult)
-    : body{ UnknownInteractionsProtocolFlexibleEventUnionErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult UnknownInteractionsProtocolFlexibleEventTableErrResult)
-    : body{ UnknownInteractionsProtocolFlexibleEventTableErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
         decoder, position + sizeof(fidl_message_header_t), recursion_depth);
   }
 };
@@ -4342,110 +3830,6 @@ static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknownintera
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 2;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 16;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 3;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEvent>> : public std::true_type {};
 template <>
 struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEvent>> : public std::true_type {};
@@ -4544,110 +3928,6 @@ static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteract
     == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTable>>::kPrimarySize);
 static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTable>, header) == 0);
 static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTable>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 2;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 16;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 3;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr>, body) == sizeof(fidl_message_header_t));
 
 #endif  // __Fuchsia__
 
@@ -5894,18 +5174,10 @@ public:
     virtual void StrictEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFields>* event) = 0;
     virtual void StrictEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnion>* event) = 0;
     virtual void StrictEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTable>* event) = 0;
-    virtual void StrictEventErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr>* event) = 0;
-    virtual void StrictEventFieldsErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr>* event) = 0;
-    virtual void StrictEventUnionErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr>* event) = 0;
-    virtual void StrictEventTableErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr>* event) = 0;
     virtual void FlexibleEvent() = 0;
     virtual void FlexibleEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFields>* event) = 0;
     virtual void FlexibleEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnion>* event) = 0;
     virtual void FlexibleEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTable>* event) = 0;
-    virtual void FlexibleEventErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr>* event) = 0;
-    virtual void FlexibleEventFieldsErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>* event) = 0;
-    virtual void FlexibleEventUnionErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr>* event) = 0;
-    virtual void FlexibleEventTableErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr>* event) = 0;
 };
 
 template<>
@@ -5917,18 +5189,10 @@ class ::fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteracti
     void StrictEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFields>* event) override {}
     void StrictEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnion>* event) override {}
     void StrictEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTable>* event) override {}
-    void StrictEventErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr>* event) override {}
-    void StrictEventFieldsErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr>* event) override {}
-    void StrictEventUnionErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr>* event) override {}
-    void StrictEventTableErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr>* event) override {}
     void FlexibleEvent() override {}
     void FlexibleEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFields>* event) override {}
     void FlexibleEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnion>* event) override {}
     void FlexibleEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTable>* event) override {}
-    void FlexibleEventErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr>* event) override {}
-    void FlexibleEventFieldsErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>* event) override {}
-    void FlexibleEventUnionErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr>* event) override {}
-    void FlexibleEventTableErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr>* event) override {}
 };
 
 
@@ -7071,18 +6335,6 @@ template<>
 struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTable> final { static constexpr uint64_t value = 659277224687564957lu; };
 
 template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr> final { static constexpr uint64_t value = 8168400161206646253lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr> final { static constexpr uint64_t value = 4242995963205975993lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr> final { static constexpr uint64_t value = 48232470144455723lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr> final { static constexpr uint64_t value = 7812263497101509638lu; };
-
-template<>
 struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEvent> final { static constexpr uint64_t value = 1281760452005010931lu; };
 
 template<>
@@ -7093,18 +6345,6 @@ struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteract
 
 template<>
 struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTable> final { static constexpr uint64_t value = 705539350563403440lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr> final { static constexpr uint64_t value = 5746044819880601020lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr> final { static constexpr uint64_t value = 2496089713358680516lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr> final { static constexpr uint64_t value = 870945044986422912lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr> final { static constexpr uint64_t value = 7956124159916849703lu; };
 
 #ifdef __Fuchsia__
 
@@ -7464,78 +6704,6 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 
 
 template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEvent> {
     
     static constexpr bool HasRequestPayload = false;
@@ -7590,78 +6758,6 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
     
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult;
-  using DomainError = int32_t;
 };
 
 
@@ -8631,178 +7727,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
 
 #ifdef __Fuchsia__
 template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult UnknownInteractionsAjarProtocolStrictEventErrResult)
-    : body{ UnknownInteractionsAjarProtocolStrictEventErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult UnknownInteractionsAjarProtocolStrictEventFieldsErrResult)
-    : body{ UnknownInteractionsAjarProtocolStrictEventFieldsErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult UnknownInteractionsAjarProtocolStrictEventUnionErrResult)
-    : body{ UnknownInteractionsAjarProtocolStrictEventUnionErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult UnknownInteractionsAjarProtocolStrictEventTableErrResult)
-    : body{ UnknownInteractionsAjarProtocolStrictEventTableErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
 struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEvent> final {
   FIDL_ALIGNDECL
   fidl_message_header_t header;
@@ -8956,178 +7880,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTable>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult UnknownInteractionsAjarProtocolFlexibleEventErrResult)
-    : body{ UnknownInteractionsAjarProtocolFlexibleEventErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult)
-    : body{ UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult)
-    : body{ UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult UnknownInteractionsAjarProtocolFlexibleEventTableErrResult)
-    : body{ UnknownInteractionsAjarProtocolFlexibleEventTableErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
         decoder, position + sizeof(fidl_message_header_t), recursion_depth);
   }
 };
@@ -9797,110 +8549,6 @@ static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknownintera
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 2;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 16;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 3;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEvent>> : public std::true_type {};
 template <>
 struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEvent>> : public std::true_type {};
@@ -9999,110 +8647,6 @@ static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteract
     == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTable>>::kPrimarySize);
 static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTable>, header) == 0);
 static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTable>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 2;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 16;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 3;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr>, body) == sizeof(fidl_message_header_t));
 
 #endif  // __Fuchsia__
 
@@ -10776,18 +9320,10 @@ public:
     virtual void StrictEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFields>* event) = 0;
     virtual void StrictEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnion>* event) = 0;
     virtual void StrictEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTable>* event) = 0;
-    virtual void StrictEventErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr>* event) = 0;
-    virtual void StrictEventFieldsErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr>* event) = 0;
-    virtual void StrictEventUnionErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr>* event) = 0;
-    virtual void StrictEventTableErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr>* event) = 0;
     virtual void FlexibleEvent() = 0;
     virtual void FlexibleEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFields>* event) = 0;
     virtual void FlexibleEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnion>* event) = 0;
     virtual void FlexibleEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTable>* event) = 0;
-    virtual void FlexibleEventErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr>* event) = 0;
-    virtual void FlexibleEventFieldsErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr>* event) = 0;
-    virtual void FlexibleEventUnionErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr>* event) = 0;
-    virtual void FlexibleEventTableErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr>* event) = 0;
 };
 
 template<>
@@ -10799,18 +9335,10 @@ class ::fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteracti
     void StrictEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFields>* event) override {}
     void StrictEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnion>* event) override {}
     void StrictEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTable>* event) override {}
-    void StrictEventErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr>* event) override {}
-    void StrictEventFieldsErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr>* event) override {}
-    void StrictEventUnionErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr>* event) override {}
-    void StrictEventTableErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr>* event) override {}
     void FlexibleEvent() override {}
     void FlexibleEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFields>* event) override {}
     void FlexibleEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnion>* event) override {}
     void FlexibleEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTable>* event) override {}
-    void FlexibleEventErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr>* event) override {}
-    void FlexibleEventFieldsErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr>* event) override {}
-    void FlexibleEventUnionErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr>* event) override {}
-    void FlexibleEventTableErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr>* event) override {}
 };
 
 
@@ -11469,18 +9997,6 @@ struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteract
 template<>
 struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTable> final { static constexpr uint64_t value = 2871682464255309246lu; };
 
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr> final { static constexpr uint64_t value = 1346864022452572673lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr> final { static constexpr uint64_t value = 3248847528447859862lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr> final { static constexpr uint64_t value = 7912657362107850804lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr> final { static constexpr uint64_t value = 5661281118329630458lu; };
-
 #ifdef __Fuchsia__
 
 
@@ -11809,78 +10325,6 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
     
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult;
-  using DomainError = int32_t;
-};
-
-
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
-
-
-template<>
-struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr> {
-    
-    static constexpr bool HasRequestPayload = true;
-      using Request = ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult;
-  using DomainError = int32_t;
 };
 
 
@@ -12819,178 +11263,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
 #endif  // __Fuchsia__
 
 
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult UnknownInteractionsClosedProtocolStrictEventErrResult)
-    : body{ UnknownInteractionsClosedProtocolStrictEventErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult UnknownInteractionsClosedProtocolStrictEventFieldsErrResult)
-    : body{ UnknownInteractionsClosedProtocolStrictEventFieldsErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult UnknownInteractionsClosedProtocolStrictEventUnionErrResult)
-    : body{ UnknownInteractionsClosedProtocolStrictEventUnionErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-template<>
-struct ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr> final {
-  FIDL_ALIGNDECL
-  fidl_message_header_t header;
-
-  
-    ::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr> body;
-
-    explicit TransactionalEvent(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult UnknownInteractionsClosedProtocolStrictEventTableErrResult)
-    : body{ UnknownInteractionsClosedProtocolStrictEventTableErrResult } {
-      _InitHeader();
-    }
-
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
-};
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
-
-  static void Encode(
-    internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-};
-
-#endif  // __Fuchsia__
-
-
 namespace fidl {
 
 
@@ -13627,110 +11899,6 @@ static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknownintera
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 2;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 16;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-struct IsFidlType<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr>> : public std::true_type {};
-template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr>> : public std::true_type {};
-
-
-template <>
-struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr>> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 3;
-  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasPointer = true;
-  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
-    ::fidl::internal::TransactionalMessageKind::kResponse;
-};
-
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr>)
-    == TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr>, body) == sizeof(fidl_message_header_t));
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 }  // namespace fidl
 
     template<>
@@ -14361,10 +12529,6 @@ public:
     virtual void StrictEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFields>* event) = 0;
     virtual void StrictEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnion>* event) = 0;
     virtual void StrictEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTable>* event) = 0;
-    virtual void StrictEventErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr>* event) = 0;
-    virtual void StrictEventFieldsErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr>* event) = 0;
-    virtual void StrictEventUnionErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr>* event) = 0;
-    virtual void StrictEventTableErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr>* event) = 0;
 };
 
 template<>
@@ -14376,10 +12540,6 @@ class ::fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteracti
     void StrictEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFields>* event) override {}
     void StrictEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnion>* event) override {}
     void StrictEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTable>* event) override {}
-    void StrictEventErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr>* event) override {}
-    void StrictEventFieldsErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr>* event) override {}
-    void StrictEventUnionErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr>* event) override {}
-    void StrictEventTableErr(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr>* event) override {}
 };
 
 
@@ -15193,18 +13353,6 @@ class ::fidl::internal::WireWeakEventSender<::test_unknowninteractions::UnknownI
     fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest UnknownInteractionsProtocolStrictEventTableRequest);
 
 
-    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult UnknownInteractionsProtocolStrictEventErrResult);
-
-
-    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult UnknownInteractionsProtocolStrictEventFieldsErrResult);
-
-
-    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult UnknownInteractionsProtocolStrictEventUnionErrResult);
-
-
-    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult UnknownInteractionsProtocolStrictEventTableErrResult);
-
-
     fidl::OneWayStatus FlexibleEvent();
 
 
@@ -15215,18 +13363,6 @@ class ::fidl::internal::WireWeakEventSender<::test_unknowninteractions::UnknownI
 
 
     fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest UnknownInteractionsProtocolFlexibleEventTableRequest);
-
-
-    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult UnknownInteractionsProtocolFlexibleEventErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult UnknownInteractionsProtocolFlexibleEventFieldsErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult UnknownInteractionsProtocolFlexibleEventUnionErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult UnknownInteractionsProtocolFlexibleEventTableErrResult);
 
 
 };
@@ -15248,18 +13384,6 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_unknowninteractions::Un
     fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest UnknownInteractionsProtocolStrictEventTableRequest);
 
 
-    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult UnknownInteractionsProtocolStrictEventErrResult);
-
-
-    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult UnknownInteractionsProtocolStrictEventFieldsErrResult);
-
-
-    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult UnknownInteractionsProtocolStrictEventUnionErrResult);
-
-
-    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult UnknownInteractionsProtocolStrictEventTableErrResult);
-
-
     fidl::OneWayStatus FlexibleEvent();
 
 
@@ -15270,18 +13394,6 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_unknowninteractions::Un
 
 
     fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest UnknownInteractionsProtocolFlexibleEventTableRequest);
-
-
-    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult UnknownInteractionsProtocolFlexibleEventErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult UnknownInteractionsProtocolFlexibleEventFieldsErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult UnknownInteractionsProtocolFlexibleEventUnionErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult UnknownInteractionsProtocolFlexibleEventTableErrResult);
 
 
 };
@@ -15304,18 +13416,6 @@ class ::fidl::internal::WireEventSender<::test_unknowninteractions::UnknownInter
     fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest UnknownInteractionsProtocolStrictEventTableRequest);
 
 
-    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult UnknownInteractionsProtocolStrictEventErrResult);
-
-
-    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult UnknownInteractionsProtocolStrictEventFieldsErrResult);
-
-
-    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult UnknownInteractionsProtocolStrictEventUnionErrResult);
-
-
-    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult UnknownInteractionsProtocolStrictEventTableErrResult);
-
-
     fidl::OneWayStatus FlexibleEvent();
 
 
@@ -15326,18 +13426,6 @@ class ::fidl::internal::WireEventSender<::test_unknowninteractions::UnknownInter
 
 
     fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest UnknownInteractionsProtocolFlexibleEventTableRequest);
-
-
-    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult UnknownInteractionsProtocolFlexibleEventErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult UnknownInteractionsProtocolFlexibleEventFieldsErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult UnknownInteractionsProtocolFlexibleEventUnionErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult UnknownInteractionsProtocolFlexibleEventTableErrResult);
 
 
 };
@@ -15360,18 +13448,6 @@ class ::fidl::internal::WireBufferEventSender<::test_unknowninteractions::Unknow
     fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest UnknownInteractionsProtocolStrictEventTableRequest);
 
 
-    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult UnknownInteractionsProtocolStrictEventErrResult);
-
-
-    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult UnknownInteractionsProtocolStrictEventFieldsErrResult);
-
-
-    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult UnknownInteractionsProtocolStrictEventUnionErrResult);
-
-
-    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult UnknownInteractionsProtocolStrictEventTableErrResult);
-
-
     fidl::OneWayStatus FlexibleEvent();
 
 
@@ -15382,18 +13458,6 @@ class ::fidl::internal::WireBufferEventSender<::test_unknowninteractions::Unknow
 
 
     fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest UnknownInteractionsProtocolFlexibleEventTableRequest);
-
-
-    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult UnknownInteractionsProtocolFlexibleEventErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult UnknownInteractionsProtocolFlexibleEventFieldsErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult UnknownInteractionsProtocolFlexibleEventUnionErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult UnknownInteractionsProtocolFlexibleEventTableErrResult);
 
 
 };
@@ -15543,18 +13607,6 @@ class ::fidl::internal::WireWeakEventSender<::test_unknowninteractions::UnknownI
     fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest UnknownInteractionsAjarProtocolStrictEventTableRequest);
 
 
-    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult UnknownInteractionsAjarProtocolStrictEventErrResult);
-
-
-    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult UnknownInteractionsAjarProtocolStrictEventFieldsErrResult);
-
-
-    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult UnknownInteractionsAjarProtocolStrictEventUnionErrResult);
-
-
-    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult UnknownInteractionsAjarProtocolStrictEventTableErrResult);
-
-
     fidl::OneWayStatus FlexibleEvent();
 
 
@@ -15565,18 +13617,6 @@ class ::fidl::internal::WireWeakEventSender<::test_unknowninteractions::UnknownI
 
 
     fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest UnknownInteractionsAjarProtocolFlexibleEventTableRequest);
-
-
-    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult UnknownInteractionsAjarProtocolFlexibleEventErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult UnknownInteractionsAjarProtocolFlexibleEventTableErrResult);
 
 
 };
@@ -15598,18 +13638,6 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_unknowninteractions::Un
     fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest UnknownInteractionsAjarProtocolStrictEventTableRequest);
 
 
-    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult UnknownInteractionsAjarProtocolStrictEventErrResult);
-
-
-    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult UnknownInteractionsAjarProtocolStrictEventFieldsErrResult);
-
-
-    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult UnknownInteractionsAjarProtocolStrictEventUnionErrResult);
-
-
-    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult UnknownInteractionsAjarProtocolStrictEventTableErrResult);
-
-
     fidl::OneWayStatus FlexibleEvent();
 
 
@@ -15620,18 +13648,6 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_unknowninteractions::Un
 
 
     fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest UnknownInteractionsAjarProtocolFlexibleEventTableRequest);
-
-
-    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult UnknownInteractionsAjarProtocolFlexibleEventErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult UnknownInteractionsAjarProtocolFlexibleEventTableErrResult);
 
 
 };
@@ -15654,18 +13670,6 @@ class ::fidl::internal::WireEventSender<::test_unknowninteractions::UnknownInter
     fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest UnknownInteractionsAjarProtocolStrictEventTableRequest);
 
 
-    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult UnknownInteractionsAjarProtocolStrictEventErrResult);
-
-
-    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult UnknownInteractionsAjarProtocolStrictEventFieldsErrResult);
-
-
-    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult UnknownInteractionsAjarProtocolStrictEventUnionErrResult);
-
-
-    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult UnknownInteractionsAjarProtocolStrictEventTableErrResult);
-
-
     fidl::OneWayStatus FlexibleEvent();
 
 
@@ -15676,18 +13680,6 @@ class ::fidl::internal::WireEventSender<::test_unknowninteractions::UnknownInter
 
 
     fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest UnknownInteractionsAjarProtocolFlexibleEventTableRequest);
-
-
-    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult UnknownInteractionsAjarProtocolFlexibleEventErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult UnknownInteractionsAjarProtocolFlexibleEventTableErrResult);
 
 
 };
@@ -15710,18 +13702,6 @@ class ::fidl::internal::WireBufferEventSender<::test_unknowninteractions::Unknow
     fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest UnknownInteractionsAjarProtocolStrictEventTableRequest);
 
 
-    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult UnknownInteractionsAjarProtocolStrictEventErrResult);
-
-
-    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult UnknownInteractionsAjarProtocolStrictEventFieldsErrResult);
-
-
-    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult UnknownInteractionsAjarProtocolStrictEventUnionErrResult);
-
-
-    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult UnknownInteractionsAjarProtocolStrictEventTableErrResult);
-
-
     fidl::OneWayStatus FlexibleEvent();
 
 
@@ -15732,18 +13712,6 @@ class ::fidl::internal::WireBufferEventSender<::test_unknowninteractions::Unknow
 
 
     fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest UnknownInteractionsAjarProtocolFlexibleEventTableRequest);
-
-
-    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult UnknownInteractionsAjarProtocolFlexibleEventErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult);
-
-
-    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult UnknownInteractionsAjarProtocolFlexibleEventTableErrResult);
 
 
 };
@@ -15886,18 +13854,6 @@ class ::fidl::internal::WireWeakEventSender<::test_unknowninteractions::UnknownI
     fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest UnknownInteractionsClosedProtocolStrictEventTableRequest);
 
 
-    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult UnknownInteractionsClosedProtocolStrictEventErrResult);
-
-
-    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult UnknownInteractionsClosedProtocolStrictEventFieldsErrResult);
-
-
-    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult UnknownInteractionsClosedProtocolStrictEventUnionErrResult);
-
-
-    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult UnknownInteractionsClosedProtocolStrictEventTableErrResult);
-
-
 };
 
 template<>
@@ -15915,18 +13871,6 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_unknowninteractions::Un
 
 
     fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest UnknownInteractionsClosedProtocolStrictEventTableRequest);
-
-
-    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult UnknownInteractionsClosedProtocolStrictEventErrResult);
-
-
-    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult UnknownInteractionsClosedProtocolStrictEventFieldsErrResult);
-
-
-    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult UnknownInteractionsClosedProtocolStrictEventUnionErrResult);
-
-
-    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult UnknownInteractionsClosedProtocolStrictEventTableErrResult);
 
 
 };
@@ -15949,18 +13893,6 @@ class ::fidl::internal::WireEventSender<::test_unknowninteractions::UnknownInter
     fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest UnknownInteractionsClosedProtocolStrictEventTableRequest);
 
 
-    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult UnknownInteractionsClosedProtocolStrictEventErrResult);
-
-
-    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult UnknownInteractionsClosedProtocolStrictEventFieldsErrResult);
-
-
-    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult UnknownInteractionsClosedProtocolStrictEventUnionErrResult);
-
-
-    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult UnknownInteractionsClosedProtocolStrictEventTableErrResult);
-
-
 };
 
 template<>
@@ -15979,18 +13911,6 @@ class ::fidl::internal::WireBufferEventSender<::test_unknowninteractions::Unknow
 
 
     fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest UnknownInteractionsClosedProtocolStrictEventTableRequest);
-
-
-    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult UnknownInteractionsClosedProtocolStrictEventErrResult);
-
-
-    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult UnknownInteractionsClosedProtocolStrictEventFieldsErrResult);
-
-
-    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult UnknownInteractionsClosedProtocolStrictEventUnionErrResult);
-
-
-    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult UnknownInteractionsClosedProtocolStrictEventTableErrResult);
 
 
 };

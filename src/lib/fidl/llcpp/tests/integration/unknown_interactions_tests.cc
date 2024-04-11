@@ -41,34 +41,12 @@ class UnknownInteractionsEventHandlerBase
           ::test_unknown_interactions::UnknownInteractionsProtocol::StrictEventFields>*) override {
     ADD_FAILURE() << "StrictEventFields called unexpectedly";
   }
-  void StrictEventErr(
-      ::fidl::WireEvent<::test_unknown_interactions::UnknownInteractionsProtocol::StrictEventErr>*)
-      override {
-    ADD_FAILURE() << "StrictEventErr called unexpectedly";
-  }
-  void StrictEventFieldsErr(
-      ::fidl::WireEvent<
-          ::test_unknown_interactions::UnknownInteractionsProtocol::StrictEventFieldsErr>*)
-      override {
-    ADD_FAILURE() << "StrictEventFieldsErr called unexpectedly";
-  }
   void FlexibleEvent() override { ADD_FAILURE() << "FlexibleEvent called unexpectedly"; }
   void FlexibleEventFields(
       ::fidl::WireEvent<
           ::test_unknown_interactions::UnknownInteractionsProtocol::FlexibleEventFields>*)
       override {
     ADD_FAILURE() << "FlexibleEventFields called unexpectedly";
-  }
-  void FlexibleEventErr(
-      ::fidl::WireEvent<
-          ::test_unknown_interactions::UnknownInteractionsProtocol::FlexibleEventErr>*) override {
-    ADD_FAILURE() << "FlexibleEventErr called unexpectedly";
-  }
-  void FlexibleEventFieldsErr(
-      ::fidl::WireEvent<
-          ::test_unknown_interactions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>*)
-      override {
-    ADD_FAILURE() << "FlexibleEventFieldsErr called unexpectedly";
   }
 
   void handle_unknown_event(
