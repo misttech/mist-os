@@ -6,10 +6,9 @@ use {
     crate::{
         access_point::{state_machine as ap_fsm, state_machine::AccessPointApi, types as ap_types},
         client::{
-            connection_selection::{
-                local_roam_manager::LocalRoamManagerApi, ConnectionSelectionRequester,
-            },
-            state_machine as client_fsm, types as client_types,
+            connection_selection::ConnectionSelectionRequester,
+            roaming::local_roam_manager::LocalRoamManagerApi, state_machine as client_fsm,
+            types as client_types,
         },
         config_management::SavedNetworksManagerApi,
         mode_management::{

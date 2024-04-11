@@ -5,10 +5,8 @@
 use {
     crate::{
         client::{
-            connection_selection::{
-                self,
-                local_roam_manager::{LocalRoamManager, LocalRoamManagerService},
-            },
+            connection_selection,
+            roaming::local_roam_manager::{LocalRoamManager, LocalRoamManagerService},
             scan, serve_provider_requests, types,
         },
         config_management::{SavedNetworksManager, SavedNetworksManagerApi},

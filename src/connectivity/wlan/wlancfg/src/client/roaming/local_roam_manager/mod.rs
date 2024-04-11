@@ -6,6 +6,7 @@ use {
     crate::{
         client::{
             connection_selection::{bss_selection, ConnectionSelectionRequester},
+            roaming::{lib::*, roam_monitor},
             types,
         },
         telemetry::{TelemetryEvent, TelemetrySender},
@@ -17,8 +18,6 @@ use {
     },
     tracing::{info, warn},
 };
-
-pub mod roam_monitor;
 
 const MIN_RSSI_IMPROVEMENT_TO_ROAM: f64 = 3.0;
 const MIN_SNR_IMPROVEMENT_TO_ROAM: f64 = 3.0;
@@ -130,71 +129,6 @@ impl LocalRoamManagerService {
                 }
             }
         }
-    }
-}
-
-/// Data tracked about a connection to make decisions about whether to roam.
-#[derive(Clone)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
-pub struct ConnectionData {
-    // Information about the current connection, from the time of initial connection.
-    currently_fulfilled_connection: types::ConnectSelection,
-    // Rolling data about the current quality of the connection
-    quality_data: bss_selection::BssQualityData,
-    // Roaming related metadata
-    roam_decision_data: RoamDecisionData,
-}
-
-impl ConnectionData {
-    pub fn new(
-        currently_fulfilled_connection: types::ConnectSelection,
-        quality_data: bss_selection::BssQualityData,
-        connection_start_time: fasync::Time,
-    ) -> Self {
-        Self {
-            currently_fulfilled_connection,
-            roam_decision_data: RoamDecisionData::new(
-                quality_data.signal_data.ewma_rssi.get(),
-                connection_start_time,
-            ),
-            quality_data,
-        }
-    }
-}
-
-#[derive(Clone)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
-struct RoamDecisionData {
-    time_prev_roam_scan: fasync::Time,
-    roam_reasons_prev_scan: Vec<bss_selection::RoamReason>,
-    /// This is the EWMA value, hence why it is an f64
-    rssi_prev_roam_scan: f64,
-}
-
-impl RoamDecisionData {
-    fn new(rssi: f64, connection_start_time: fasync::Time) -> Self {
-        Self {
-            time_prev_roam_scan: connection_start_time,
-            roam_reasons_prev_scan: vec![],
-            rssi_prev_roam_scan: rssi,
-        }
-    }
-}
-
-#[cfg_attr(test, derive(Debug))]
-pub struct RoamSearchRequest {
-    connection_data: ConnectionData,
-    /// This is used to tell the state machine to roam. The state machine should drop its end of
-    /// the channel to ignore roam requests if the connection has already changed.
-    _roam_req_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
-}
-
-impl RoamSearchRequest {
-    fn new(
-        connection_data: ConnectionData,
-        _roam_req_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
-    ) -> Self {
-        RoamSearchRequest { connection_data, _roam_req_sender }
     }
 }
 

@@ -38,7 +38,6 @@ use {
 };
 
 pub mod bss_selection;
-pub mod local_roam_manager;
 pub mod network_selection;
 pub mod scoring_functions;
 

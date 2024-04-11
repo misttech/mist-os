@@ -28,6 +28,7 @@ use {
 };
 
 pub mod connection_selection;
+pub mod roaming;
 pub mod scan;
 pub mod state_machine;
 pub mod types;

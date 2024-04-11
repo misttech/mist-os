@@ -6,9 +6,9 @@ use {
     crate::{
         client::{
             connection_selection::{
-                bss_selection, local_roam_manager::LocalRoamManagerApi, EWMA_SMOOTHING_FACTOR,
-                EWMA_VELOCITY_SMOOTHING_FACTOR,
+                bss_selection, EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR,
             },
+            roaming::local_roam_manager::LocalRoamManagerApi,
             types,
         },
         config_management::{PastConnectionData, SavedNetworksManagerApi},

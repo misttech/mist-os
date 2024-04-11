@@ -32,7 +32,7 @@ use {
     wlan_trace as wtrace,
     wlancfg_lib::{
         access_point::AccessPoint,
-        client::{self, connection_selection::*, scan},
+        client::{self, connection_selection::*, roaming::local_roam_manager, scan},
         config_management::{SavedNetworksManager, SavedNetworksManagerApi},
         legacy::{self, IfaceRef},
         mode_management::{

@@ -4,10 +4,7 @@
 
 use {
     crate::{
-        client::{
-            connection_selection::{bss_selection, local_roam_manager},
-            types,
-        },
+        client::{connection_selection::bss_selection, roaming::lib::*, types},
         telemetry::{TelemetryEvent, TelemetrySender},
         util::pseudo_energy::SignalData,
     },
@@ -36,18 +33,18 @@ pub trait RoamMonitorApi: Send + Sync {
 pub struct RoamMonitor {
     /// Channel to send requests for roam searches so LocalRoamManagerService can serve
     /// connection selection scans.
-    roam_search_sender: mpsc::UnboundedSender<local_roam_manager::RoamSearchRequest>,
+    roam_search_sender: mpsc::UnboundedSender<RoamSearchRequest>,
     /// Channel to send roam requests to a state machine.
     roam_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
-    connection_data: local_roam_manager::ConnectionData,
+    connection_data: ConnectionData,
     telemetry_sender: TelemetrySender,
 }
 
 impl RoamMonitor {
     pub fn new(
-        roam_search_sender: mpsc::UnboundedSender<local_roam_manager::RoamSearchRequest>,
+        roam_search_sender: mpsc::UnboundedSender<RoamSearchRequest>,
         roam_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
-        connection_data: local_roam_manager::ConnectionData,
+        connection_data: ConnectionData,
         telemetry_sender: TelemetrySender,
     ) -> Self {
         Self { roam_search_sender, roam_sender, connection_data, telemetry_sender }
@@ -95,10 +92,8 @@ impl RoamMonitorApi for RoamMonitor {
                     > MIN_RSSI_CHANGE_TO_ROAM_SCAN;
             if is_scan_old || has_new_reason || is_rssi_different {
                 // Initiate roam scan.
-                let req = local_roam_manager::RoamSearchRequest::new(
-                    self.connection_data.clone(),
-                    self.roam_sender.clone(),
-                );
+                let req =
+                    RoamSearchRequest::new(self.connection_data.clone(), self.roam_sender.clone());
                 let _ = self.roam_search_sender.unbounded_send(req);
 
                 // Updated fields for tracking roam scan decisions
@@ -133,8 +128,8 @@ mod test {
     };
 
     struct RoamMonitorTestValues {
-        roam_search_sender: mpsc::UnboundedSender<local_roam_manager::RoamSearchRequest>,
-        roam_search_receiver: mpsc::UnboundedReceiver<local_roam_manager::RoamSearchRequest>,
+        roam_search_sender: mpsc::UnboundedSender<RoamSearchRequest>,
+        roam_search_receiver: mpsc::UnboundedReceiver<RoamSearchRequest>,
         roam_req_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
         telemetry_sender: TelemetrySender,
         telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
@@ -168,8 +163,7 @@ mod test {
 
         let init_rssi = -75;
         let init_snr = 15;
-        let roam_data =
-            local_roam_manager::RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
+        let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
         let past_connections = PastConnectionList::default();
         let mut bss_quality_data = bss_selection::BssQualityData::new(
             SignalData::new(
@@ -181,7 +175,7 @@ mod test {
             generate_random_channel(),
             past_connections,
         );
-        let connection_data = local_roam_manager::ConnectionData {
+        let connection_data = ConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
             quality_data: bss_quality_data.clone(),
             roam_decision_data: roam_data,
@@ -230,8 +224,7 @@ mod test {
 
         let init_rssi = -70;
         let init_snr = 20;
-        let roam_data =
-            local_roam_manager::RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
+        let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
         let past_connections = PastConnectionList::default();
         let bss_quality_data = bss_selection::BssQualityData::new(
             SignalData::new(
@@ -244,7 +237,7 @@ mod test {
             past_connections,
         );
 
-        let connection_data = local_roam_manager::ConnectionData {
+        let connection_data = ConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
             quality_data: bss_quality_data.clone(),
             roam_decision_data: roam_data,
@@ -299,8 +292,7 @@ mod test {
 
         let init_rssi = -80;
         let init_snr = 10;
-        let roam_data =
-            local_roam_manager::RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
+        let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
         let past_connections = PastConnectionList::default();
         let bss_quality_data = bss_selection::BssQualityData::new(
             SignalData::new(
@@ -312,7 +304,7 @@ mod test {
             generate_random_channel(),
             past_connections,
         );
-        let connection_data = local_roam_manager::ConnectionData {
+        let connection_data = ConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
             quality_data: bss_quality_data.clone(),
             roam_decision_data: roam_data,

@@ -4,8 +4,9 @@
 
 use {
     crate::{
-        client::connection_selection::{
-            local_roam_manager::LocalRoamManagerApi, ConnectionSelectionRequester,
+        client::{
+            connection_selection::ConnectionSelectionRequester,
+            roaming::local_roam_manager::LocalRoamManagerApi,
         },
         config_management::SavedNetworksManagerApi,
         telemetry::TelemetrySender,
