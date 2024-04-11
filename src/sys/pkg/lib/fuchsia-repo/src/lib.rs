@@ -19,8 +19,6 @@ pub mod package_manifest_watcher;
 #[cfg(not(target_os = "fuchsia"))]
 pub mod repo_client;
 #[cfg(not(target_os = "fuchsia"))]
-pub mod resolve;
-#[cfg(not(target_os = "fuchsia"))]
 pub mod server;
 
 mod util;
