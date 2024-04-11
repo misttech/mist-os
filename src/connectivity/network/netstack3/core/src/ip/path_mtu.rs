@@ -31,7 +31,7 @@ const PMTU_STALE_TIMEOUT: Duration = Duration::from_secs(10800);
 
 /// The timer ID for the path MTU cache.
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct PmtuTimerId<I: Ip>(IpVersionMarker<I>);
+pub struct PmtuTimerId<I: Ip>(IpVersionMarker<I>);
 
 /// The state context for the path MTU cache.
 pub(super) trait PmtuStateContext<I: Ip, Instant> {

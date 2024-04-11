@@ -37,10 +37,10 @@ use alloc::{
     },
     vec::Vec,
 };
-use core::{cmp::Ordering, marker::PhantomData, time::Duration};
+use core::{cmp::Ordering, time::Duration};
 
 use assert_matches::assert_matches;
-use net_types::ip::{Ip, IpAddr, IpAddress};
+use net_types::ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpVersionMarker};
 use packet::BufferViewMut;
 use packet_formats::{
     ip::IpPacket,
@@ -50,8 +50,11 @@ use packet_formats::{
 use zerocopy::{ByteSlice, ByteSliceMut};
 
 use crate::{
-    context::{TimerContext, TimerHandler},
+    context::{
+        CoreTimerContext, InstantBindingsTypes, TimerBindingsTypes, TimerContext2, TimerHandler,
+    },
     ip::IpExt,
+    time::LocalTimerHeap,
 };
 
 /// The maximum amount of time from receipt of the first fragment to reassembly
@@ -86,28 +89,23 @@ const MAX_FRAGMENT_BLOCKS: u16 = 8191;
 const MAX_FRAGMENT_CACHE_SIZE: usize = 4 * 1024 * 1024;
 
 /// The state context for the fragment cache.
-pub(super) trait FragmentStateContext<I: Ip, Instant> {
+pub(super) trait FragmentContext<I: Ip, BT: FragmentBindingsTypes> {
     /// Returns a mutable reference to the fragment cache.
-    fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<I, Instant>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O;
+    fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<I, BT>) -> O>(&mut self, cb: F) -> O;
 }
+
+/// The bindings types for IP packet fragment reassembly.
+pub trait FragmentBindingsTypes: TimerBindingsTypes + InstantBindingsTypes {}
+impl<BT> FragmentBindingsTypes for BT where BT: TimerBindingsTypes + InstantBindingsTypes {}
 
 /// The bindings execution context for IP packet fragment reassembly.
-trait FragmentBindingsContext<I: Ip>: TimerContext<FragmentCacheKey<I::Addr>> {}
-impl<I: Ip, BC: TimerContext<FragmentCacheKey<I::Addr>>> FragmentBindingsContext<I> for BC {}
+pub trait FragmentBindingsContext: TimerContext2 + FragmentBindingsTypes {}
+impl<BC> FragmentBindingsContext for BC where BC: TimerContext2 + FragmentBindingsTypes {}
 
-/// The execution context for IP packet fragment reassembly.
-trait FragmentContext<I: Ip, BC: FragmentBindingsContext<I>>:
-    FragmentStateContext<I, BC::Instant>
-{
-}
-
-impl<I: Ip, BC: FragmentBindingsContext<I>, CC: FragmentStateContext<I, BC::Instant>>
-    FragmentContext<I, BC> for CC
-{
-}
+/// The timer ID for the fragment cache.
+#[derive(Hash, Eq, PartialEq, Default, Clone, Debug, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+pub struct FragmentTimerId<I: Ip>(IpVersionMarker<I>);
 
 /// An implementation of a fragment cache.
 pub(crate) trait FragmentHandler<I: IpExt, BC> {
@@ -149,7 +147,7 @@ pub(crate) trait FragmentHandler<I: IpExt, BC> {
     ) -> Result<I::Packet<B>, FragmentReassemblyError>;
 }
 
-impl<I: IpExt, BC: FragmentBindingsContext<I>, CC: FragmentContext<I, BC>> FragmentHandler<I, BC>
+impl<I: IpExt, BC: FragmentBindingsContext, CC: FragmentContext<I, BC>> FragmentHandler<I, BC>
     for CC
 {
     fn process_fragment<B: ByteSlice>(
@@ -161,15 +159,18 @@ impl<I: IpExt, BC: FragmentBindingsContext<I>, CC: FragmentContext<I, BC>> Fragm
         I::Packet<B>: FragmentablePacket,
     {
         self.with_state_mut(|cache| {
-            let (res, timer_id) = cache.process_fragment(packet);
+            let (res, timer_action) = cache.process_fragment(packet);
 
-            if let Some(timer_id) = timer_id {
-                match timer_id {
-                    CacheTimerAction::CreateNewTimer(timer_id) => {
-                        assert_eq!(bindings_ctx.schedule_timer(REASSEMBLY_TIMEOUT, timer_id), None)
+            if let Some(timer_action) = timer_action {
+                match timer_action {
+                    CacheTimerAction::CreateNewTimer(key) => {
+                        assert_eq!(
+                            cache.timers.schedule_after(bindings_ctx, key, (), REASSEMBLY_TIMEOUT),
+                            None
+                        )
                     }
-                    CacheTimerAction::CancelExistingTimer(timer_id) => {
-                        assert_ne!(bindings_ctx.cancel_timer(timer_id), None)
+                    CacheTimerAction::CancelExistingTimer(key) => {
+                        assert_ne!(cache.timers.cancel(bindings_ctx, &key), None)
                     }
                 }
             }
@@ -192,7 +193,7 @@ impl<I: IpExt, BC: FragmentBindingsContext<I>, CC: FragmentContext<I, BC>> Fragm
                     // Cancel the reassembly timer as we attempt reassembly which
                     // means we had all the fragments for the final packet, even
                     // if parsing the reassembled packet failed.
-                    assert_matches!(bindings_ctx.cancel_timer(*key), Some(_));
+                    assert_matches!(cache.timers.cancel(bindings_ctx, key), Some(_));
                 }
                 Err(FragmentReassemblyError::InvalidKey)
                 | Err(FragmentReassemblyError::MissingFragments) => {}
@@ -203,17 +204,21 @@ impl<I: IpExt, BC: FragmentBindingsContext<I>, CC: FragmentContext<I, BC>> Fragm
     }
 }
 
-impl<
-        A: IpAddress,
-        BC: FragmentBindingsContext<A::Version>,
-        CC: FragmentContext<A::Version, BC>,
-    > TimerHandler<BC, FragmentCacheKey<A>> for CC
-where
-    A::Version: IpExt,
+impl<I: IpExt, BC: FragmentBindingsContext, CC: FragmentContext<I, BC>>
+    TimerHandler<BC, FragmentTimerId<I>> for CC
 {
-    fn handle_timer(&mut self, _bindings_ctx: &mut BC, key: FragmentCacheKey<A>) {
-        // If a timer fired, the `key` must still exist in our fragment cache.
-        assert_matches!(self.with_state_mut(|cache| cache.remove_data(&key)), Some(_));
+    fn handle_timer(
+        &mut self,
+        bindings_ctx: &mut BC,
+        FragmentTimerId(IpVersionMarker { .. }): FragmentTimerId<I>,
+    ) {
+        self.with_state_mut(|cache| {
+            let Some((key, ())) = cache.timers.pop(bindings_ctx) else {
+                return;
+            };
+            // If a timer fired, the `key` must still exist in our fragment cache.
+            assert_matches!(cache.remove_data(&key), Some(_));
+        });
     }
 }
 
@@ -416,20 +421,22 @@ impl FragmentCacheData {
 
 /// A cache of inbound IP packet fragments.
 #[derive(Debug)]
-pub struct IpPacketFragmentCache<I: Ip, Instant> {
+pub struct IpPacketFragmentCache<I: Ip, BT: FragmentBindingsTypes> {
     cache: HashMap<FragmentCacheKey<I::Addr>, FragmentCacheData>,
     size: usize,
     threshold: usize,
-    _marker: PhantomData<Instant>,
+    timers: LocalTimerHeap<FragmentCacheKey<I::Addr>, (), BT>,
 }
 
-impl<I: Ip, Instant> Default for IpPacketFragmentCache<I, Instant> {
-    fn default() -> IpPacketFragmentCache<I, Instant> {
+impl<I: Ip, BC: FragmentBindingsContext> IpPacketFragmentCache<I, BC> {
+    pub fn new<CC: CoreTimerContext<FragmentTimerId<I>, BC>>(
+        bindings_ctx: &mut BC,
+    ) -> IpPacketFragmentCache<I, BC> {
         IpPacketFragmentCache {
             cache: HashMap::new(),
             size: 0,
             threshold: MAX_FRAGMENT_CACHE_SIZE,
-            _marker: PhantomData,
+            timers: LocalTimerHeap::new(bindings_ctx, CC::convert_timer(Default::default())),
         }
     }
 }
@@ -441,7 +448,7 @@ enum CacheTimerAction<A: IpAddress> {
 
 // TODO(https://fxbug.dev/42174372): Make these operate on a context trait rather
 // than `&self` and `&mut self`.
-impl<I: IpExt, Instant> IpPacketFragmentCache<I, Instant> {
+impl<I: IpExt, BT: FragmentBindingsTypes> IpPacketFragmentCache<I, BT> {
     /// Attempts to process a packet fragment.
     ///
     /// # Panics
@@ -813,6 +820,7 @@ mod tests {
         ip::{Ipv4, Ipv6},
         Witness,
     };
+    use netstack3_base::{testutil::LocalTimerHeapTestExt as _, IntoCoreTimerCtx};
     use packet::{Buf, ParseBuffer, Serializer};
     use packet_formats::{
         ip::{IpProto, Ipv6ExtHdrType},
@@ -822,24 +830,32 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::{
-            testutil::{FakeCoreCtx, FakeCtx, FakeInstant, FakeTimerCtxExt},
-            InstantContext as _,
-        },
+        context::testutil::{FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt},
         testutil::{assert_empty, FakeEventDispatcherConfig, FAKE_CONFIG_V4, FAKE_CONFIG_V6},
     };
 
-    #[derive(Default)]
-    struct FakeFragmentContext<I: Ip> {
-        cache: IpPacketFragmentCache<I, FakeInstant>,
+    struct FakeFragmentContext<I: Ip, BT: FragmentBindingsTypes> {
+        cache: IpPacketFragmentCache<I, BT>,
     }
 
-    type FakeCtxImpl<I> =
-        FakeCtx<FakeFragmentContext<I>, FragmentCacheKey<<I as Ip>::Addr>, (), (), (), ()>;
-    type FakeCoreCtxImpl<I> = FakeCoreCtx<FakeFragmentContext<I>, (), ()>;
+    impl<I: Ip, BC: FragmentBindingsContext> FakeFragmentContext<I, BC>
+    where
+        BC::DispatchId: From<FragmentTimerId<I>>,
+    {
+        fn new(bindings_ctx: &mut BC) -> Self {
+            Self { cache: IpPacketFragmentCache::new::<IntoCoreTimerCtx>(bindings_ctx) }
+        }
+    }
 
-    impl<I: Ip> FragmentStateContext<I, FakeInstant> for FakeCoreCtxImpl<I> {
-        fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<I, FakeInstant>) -> O>(
+    type FakeCtxImpl<I> = crate::testutil::ContextPair<FakeCoreCtxImpl<I>, FakeBindingsCtxImpl<I>>;
+    type FakeBindingsCtxImpl<I> = FakeBindingsCtx<FragmentTimerId<I>, (), (), ()>;
+    type FakeCoreCtxImpl<I> = FakeCoreCtx<FakeFragmentContext<I, FakeBindingsCtxImpl<I>>, (), ()>;
+
+    impl<I: Ip> FragmentContext<I, FakeBindingsCtxImpl<I>> for FakeCoreCtxImpl<I> {
+        fn with_state_mut<
+            O,
+            F: FnOnce(&mut IpPacketFragmentCache<I, FakeBindingsCtxImpl<I>>) -> O,
+        >(
             &mut self,
             cb: F,
         ) -> O {
@@ -905,7 +921,7 @@ mod tests {
     }
 
     /// Validate that IpPacketFragmentCache has correct size.
-    fn validate_size<I: Ip>(cache: &IpPacketFragmentCache<I, FakeInstant>) {
+    fn validate_size<I: Ip, BT: FragmentBindingsTypes>(cache: &IpPacketFragmentCache<I, BT>) {
         let mut sz: usize = 0;
 
         for v in cache.cache.values() {
@@ -923,7 +939,7 @@ mod tests {
     fn process_ip_fragment<
         I: TestIpExt,
         CC: FragmentContext<I, BC>,
-        BC: FragmentBindingsContext<I>,
+        BC: FragmentBindingsContext,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -945,7 +961,7 @@ mod tests {
     /// Generates and processes an IPv4 fragment packet.
     ///
     /// The generated packet will have body of size `FRAGMENT_BLOCK_SIZE` bytes.
-    fn process_ipv4_fragment<CC: FragmentContext<Ipv4, BC>, BC: FragmentBindingsContext<Ipv4>>(
+    fn process_ipv4_fragment<CC: FragmentContext<Ipv4, BC>, BC: FragmentBindingsContext>(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         fragment_id: u16,
@@ -997,7 +1013,7 @@ mod tests {
     /// Generates and processes an IPv6 fragment packet.
     ///
     /// The generated packet will have body of size `FRAGMENT_BLOCK_SIZE` bytes.
-    fn process_ipv6_fragment<CC: FragmentContext<Ipv6, BC>, BC: FragmentBindingsContext<Ipv6>>(
+    fn process_ipv6_fragment<CC: FragmentContext<Ipv6, BC>, BC: FragmentBindingsContext>(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         fragment_id: u16,
@@ -1058,7 +1074,7 @@ mod tests {
     trait TestIpExt: crate::testutil::TestIpExt {
         const HEADER_LENGTH: usize;
 
-        fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentBindingsContext<Self>>(
+        fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentBindingsContext>(
             core_ctx: &mut CC,
             bindings_ctx: &mut BC,
             fragment_id: u16,
@@ -1071,7 +1087,7 @@ mod tests {
     impl TestIpExt for Ipv4 {
         const HEADER_LENGTH: usize = packet_formats::ipv4::HDR_PREFIX_LEN;
 
-        fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentBindingsContext<Self>>(
+        fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentBindingsContext>(
             core_ctx: &mut CC,
             bindings_ctx: &mut BC,
             fragment_id: u16,
@@ -1092,7 +1108,7 @@ mod tests {
     impl TestIpExt for Ipv6 {
         const HEADER_LENGTH: usize = packet_formats::ipv6::IPV6_FIXED_HDR_LEN;
 
-        fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentBindingsContext<Self>>(
+        fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentBindingsContext>(
             core_ctx: &mut CC,
             bindings_ctx: &mut BC,
             fragment_id: u16,
@@ -1115,7 +1131,7 @@ mod tests {
     fn try_reassemble_ip_packet<
         I: TestIpExt,
         CC: FragmentContext<I, BC>,
-        BC: FragmentBindingsContext<I>,
+        BC: FragmentBindingsContext,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -1155,10 +1171,15 @@ mod tests {
         FragmentCacheKey::new(I::FAKE_CONFIG.remote_ip.get(), I::FAKE_CONFIG.local_ip.get(), id)
     }
 
+    fn new_context<I: Ip>() -> FakeCtxImpl<I> {
+        FakeCtxImpl::<I>::with_default_bindings_ctx(|bindings_ctx| {
+            FakeCoreCtxImpl::with_state(FakeFragmentContext::new(bindings_ctx))
+        })
+    }
+
     #[test]
     fn test_ipv4_reassembly_not_needed() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::<Ipv4>::with_core_ctx(FakeCoreCtxImpl::<Ipv4>::default());
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<Ipv4>();
 
         // Test that we don't attempt reassembly if the packet is not
         // fragmented.
@@ -1179,8 +1200,7 @@ mod tests {
         expected = "internal error: entered unreachable code: Should never call this function if the packet does not have a fragment header"
     )]
     fn test_ipv6_reassembly_not_needed() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::<Ipv6>::with_core_ctx(FakeCoreCtxImpl::<Ipv6>::default());
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<Ipv6>();
 
         // Test that we panic if we call `fragment_data` on a packet that has no
         // fragment data.
@@ -1197,8 +1217,7 @@ mod tests {
 
     #[ip_test]
     fn test_ip_reassembly<I: Ip + TestIpExt>() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::<I>::with_core_ctx(FakeCoreCtxImpl::<I>::default());
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
 
         // Test that we properly reassemble fragmented packets.
@@ -1239,8 +1258,7 @@ mod tests {
     #[ip_test]
     fn test_ip_reassemble_with_missing_blocks<I: Ip + TestIpExt>() {
         let fake_config = I::FAKE_CONFIG;
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::<I>::with_core_ctx(FakeCoreCtxImpl::<I>::default());
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
 
         // Test the error we get when we attempt to reassemble with missing
@@ -1283,8 +1301,7 @@ mod tests {
     #[ip_test]
     fn test_ip_reassemble_after_timer<I: Ip + TestIpExt>() {
         let fake_config = I::FAKE_CONFIG;
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::<I>::with_core_ctx(FakeCoreCtxImpl::<I>::default());
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
         let key = test_key::<I>(fragment_id.into());
 
@@ -1303,10 +1320,13 @@ mod tests {
             true,
             ExpectedResult::NeedMore,
         );
+
         // Make sure a timer got added.
-        bindings_ctx
-            .timer_ctx()
-            .assert_timers_installed([(key, FakeInstant::from(REASSEMBLY_TIMEOUT))]);
+        core_ctx.state.cache.timers.assert_timers([(
+            key,
+            (),
+            FakeInstant::from(REASSEMBLY_TIMEOUT),
+        )]);
         validate_size(&core_ctx.get_ref().cache);
 
         // Process fragment #1
@@ -1319,9 +1339,11 @@ mod tests {
             ExpectedResult::NeedMore,
         );
         // Make sure no new timers got added or fired.
-        bindings_ctx
-            .timer_ctx()
-            .assert_timers_installed([(key, FakeInstant::from(REASSEMBLY_TIMEOUT))]);
+        core_ctx.state.cache.timers.assert_timers([(
+            key,
+            (),
+            FakeInstant::from(REASSEMBLY_TIMEOUT),
+        )]);
         validate_size(&core_ctx.get_ref().cache);
 
         // Process fragment #2
@@ -1334,13 +1356,18 @@ mod tests {
             ExpectedResult::Ready { total_body_len: 24 },
         );
         // Make sure no new timers got added or fired.
-        bindings_ctx
-            .timer_ctx()
-            .assert_timers_installed([(key, FakeInstant::from(REASSEMBLY_TIMEOUT))]);
+        core_ctx.state.cache.timers.assert_timers([(
+            key,
+            (),
+            FakeInstant::from(REASSEMBLY_TIMEOUT),
+        )]);
         validate_size(&core_ctx.get_ref().cache);
 
-        // Trigger the timer (simulate a timer for the fragmented packet)
-        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(key));
+        // Trigger the timer (simulate a timer for the fragmented packet).
+        assert_eq!(
+            bindings_ctx.trigger_next_timer(&mut core_ctx),
+            Some(FragmentTimerId::<I>::default())
+        );
 
         // Make sure no other times exist..
         bindings_ctx.timer_ctx().assert_no_timers_installed();
@@ -1365,8 +1392,7 @@ mod tests {
 
     #[ip_test]
     fn test_ip_fragment_cache_oom<I: Ip + TestIpExt>() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::<I>::with_core_ctx(FakeCoreCtxImpl::<I>::default());
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let mut fragment_id = 0;
         const THRESHOLD: usize = 8196usize;
 
@@ -1404,7 +1430,7 @@ mod tests {
         let timers = bindings_ctx
             .trigger_timers_for(REASSEMBLY_TIMEOUT + Duration::from_secs(1), &mut core_ctx)
             .len();
-        assert!(timers == 171 || timers == 293); // ipv4 || ipv6
+        assert!(timers == 171 || timers == 293, "timers is {timers}"); // ipv4 || ipv6
         assert_eq!(core_ctx.get_ref().cache.size, 0);
         validate_size(&core_ctx.get_ref().cache);
 
@@ -1421,8 +1447,7 @@ mod tests {
 
     #[ip_test]
     fn test_unordered_fragments<I: Ip + TestIpExt>() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::<I>::with_core_ctx(FakeCoreCtxImpl::<I>::default());
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
 
         // Test that we error on overlapping/duplicate fragments.
@@ -1460,8 +1485,7 @@ mod tests {
 
     #[ip_test]
     fn test_ip_overlapping_single_fragment<I: Ip + TestIpExt>() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::<I>::with_core_ctx(FakeCoreCtxImpl::<I>::default());
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
 
         // Test that we error on overlapping/duplicate fragments.
@@ -1489,8 +1513,7 @@ mod tests {
 
     #[test]
     fn test_ipv4_fragment_not_multiple_of_offset_unit() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::<Ipv4>::with_core_ctx(FakeCoreCtxImpl::<Ipv4>::default());
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<Ipv4>();
         let fragment_id = 0;
 
         assert_eq!(core_ctx.get_ref().cache.size, 0);
@@ -1558,8 +1581,7 @@ mod tests {
 
     #[test]
     fn test_ipv6_fragment_not_multiple_of_offset_unit() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::<Ipv6>::with_core_ctx(FakeCoreCtxImpl::<Ipv6>::default());
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<Ipv6>();
         let fragment_id = 0;
 
         assert_eq!(core_ctx.get_ref().cache.size, 0);
@@ -1637,8 +1659,7 @@ mod tests {
 
     #[ip_test]
     fn test_ip_reassembly_with_multiple_intertwined_packets<I: Ip + TestIpExt>() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::<I>::with_core_ctx(FakeCoreCtxImpl::<I>::default());
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id_0 = 5;
         let fragment_id_1 = 10;
 
@@ -1712,8 +1733,7 @@ mod tests {
 
     #[ip_test]
     fn test_ip_reassembly_timer_with_multiple_intertwined_packets<I: Ip + TestIpExt>() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::<I>::with_core_ctx(FakeCoreCtxImpl::<I>::default());
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id_0 = 5;
         let fragment_id_1 = 10;
         let fragment_id_2 = 15;
@@ -1839,7 +1859,7 @@ mod tests {
         // the reassembly of packet #1
         bindings_ctx.trigger_timers_for_and_expect(
             Duration::from_secs(10),
-            [test_key::<I>(fragment_id_1.into())],
+            [FragmentTimerId::<I>::default()],
             &mut core_ctx,
         );
 
@@ -1861,8 +1881,7 @@ mod tests {
 
     #[test]
     fn test_no_more_fragments_in_middle_of_block() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::<Ipv4>::with_core_ctx(FakeCoreCtxImpl::<Ipv4>::default());
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<Ipv4>();
         process_ipv4_fragment(
             &mut core_ctx,
             &mut bindings_ctx,
@@ -1888,8 +1907,7 @@ mod tests {
         const FRAGMENT_OFFSET: u16 = 0;
         const M_FLAG: bool = true;
 
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } =
-            FakeCtxImpl::<I>::with_core_ctx(FakeCoreCtxImpl::<I>::default());
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         let FakeEventDispatcherConfig {
             subnet: _,
@@ -1911,10 +1929,11 @@ mod tests {
                 M_FLAG,
                 ExpectedResult::NeedMore,
             );
-            assert_eq!(
-                bindings_ctx.timer_ctx().timers(),
-                [(bindings_ctx.now() + REASSEMBLY_TIMEOUT, key)]
-            );
+            core_ctx
+                .state
+                .cache
+                .timers
+                .assert_timers_after(&mut bindings_ctx, [(key, (), REASSEMBLY_TIMEOUT)]);
 
             process_ip_fragment(
                 &mut core_ctx,

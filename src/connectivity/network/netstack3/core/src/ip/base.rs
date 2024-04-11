@@ -6,14 +6,15 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::{
     borrow::Borrow,
     cmp::Ordering,
+    convert::Infallible as Never,
     fmt::Debug,
     hash::Hash,
+    marker::PhantomData,
     num::{NonZeroU32, NonZeroU8},
     sync::atomic::{self, AtomicU16},
 };
 
 use const_unwrap::const_unwrap_option;
-use derivative::Derivative;
 use explicit::ResultExt as _;
 use lock_order::lock::UnlockedAccess;
 use lock_order::{
@@ -41,8 +42,8 @@ use tracing::{debug, trace};
 
 use crate::{
     context::{
-        CounterContext, EventContext, InstantBindingsTypes, InstantContext, NonTestCtxMarker,
-        TimerBindingsTypes, TimerHandler, TracingContext,
+        CoreTimerContext, CounterContext, EventContext, InstantBindingsTypes, InstantContext,
+        NonTestCtxMarker, TimerBindingsTypes, TimerContext2, TimerHandler, TracingContext,
     },
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
@@ -70,7 +71,8 @@ use crate::{
         ipv6::Ipv6PacketAction,
         path_mtu::{PmtuCache, PmtuTimerId},
         reassembly::{
-            FragmentCacheKey, FragmentHandler, FragmentProcessingState, IpPacketFragmentCache,
+            FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
+            IpPacketFragmentCache,
         },
         socket::{IpSocketBindingsContext, IpSocketContext, IpSocketHandler},
         types::{
@@ -1158,13 +1160,18 @@ impl Ipv4StateBuilder {
         &mut self.icmp
     }
 
-    pub(crate) fn build<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>(
+    pub(crate) fn build<
+        CC: CoreTimerContext<IpLayerTimerId, BC>,
+        StrongDeviceId: StrongId,
+        BC: TimerContext2 + IpLayerBindingsTypes,
+    >(
         self,
-    ) -> Ipv4State<StrongDeviceId, BT> {
+        bindings_ctx: &mut BC,
+    ) -> Ipv4State<StrongDeviceId, BC> {
         let Ipv4StateBuilder { icmp } = self;
 
         Ipv4State {
-            inner: Default::default(),
+            inner: IpStateInner::new::<CC>(bindings_ctx),
             icmp: icmp.build(),
             next_packet_id: Default::default(),
             filter: RwLock::new(crate::filter::State::default()),
@@ -1179,13 +1186,18 @@ pub(crate) struct Ipv6StateBuilder {
 }
 
 impl Ipv6StateBuilder {
-    pub(crate) fn build<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>(
+    pub(crate) fn build<
+        CC: CoreTimerContext<IpLayerTimerId, BC>,
+        StrongDeviceId: StrongId,
+        BC: TimerContext2 + IpLayerBindingsTypes,
+    >(
         self,
-    ) -> Ipv6State<StrongDeviceId, BT> {
+        bindings_ctx: &mut BC,
+    ) -> Ipv6State<StrongDeviceId, BC> {
         let Ipv6StateBuilder { icmp } = self;
 
         Ipv6State {
-            inner: Default::default(),
+            inner: IpStateInner::new::<CC>(bindings_ctx),
             icmp: icmp.build(),
             slaac_counters: Default::default(),
             filter: RwLock::new(crate::filter::State::default()),
@@ -1266,8 +1278,8 @@ where
     I: IpLayerIpExt,
     BT: BindingsTypes,
 {
-    type Data = IpPacketFragmentCache<I, BT::Instant>;
-    type Guard<'l> = LockGuard<'l, IpPacketFragmentCache<I, BT::Instant>> where Self: 'l;
+    type Data = IpPacketFragmentCache<I, BT>;
+    type Guard<'l> = LockGuard<'l, IpPacketFragmentCache<I, BT>> where Self: 'l;
 
     fn lock(&self) -> Self::Guard<'_> {
         self.inner_ip_state().fragment_cache.lock()
@@ -1496,16 +1508,15 @@ impl<BC: BindingsContext, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::
 }
 
 /// Marker trait for the bindings types required by the IP layer's inner state.
-pub trait IpStateBindingsTypes: TimerBindingsTypes + InstantBindingsTypes {}
+pub trait IpStateBindingsTypes: FragmentBindingsTypes + InstantBindingsTypes {}
 
-impl<BT> IpStateBindingsTypes for BT where BT: TimerBindingsTypes + InstantBindingsTypes {}
+impl<BT> IpStateBindingsTypes for BT where BT: FragmentBindingsTypes + InstantBindingsTypes {}
 
-#[derive(Derivative, GenericOverIp)]
-#[derivative(Default(bound = ""))]
+#[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub struct IpStateInner<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> {
     table: RwLock<ForwardingTable<I, DeviceId>>,
-    fragment_cache: Mutex<IpPacketFragmentCache<I, BT::Instant>>,
+    fragment_cache: Mutex<IpPacketFragmentCache<I, BT>>,
     pmtu_cache: Mutex<PmtuCache<I, BT::Instant>>,
     counters: IpCounters<I>,
 }
@@ -1516,28 +1527,38 @@ impl<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> IpStateInner<I, Device
     }
 }
 
+impl<I: IpLayerIpExt, DeviceId, BC: TimerContext2 + IpStateBindingsTypes>
+    IpStateInner<I, DeviceId, BC>
+{
+    pub fn new<CC: CoreTimerContext<IpLayerTimerId, BC>>(bindings_ctx: &mut BC) -> Self {
+        Self {
+            table: Default::default(),
+            fragment_cache: Mutex::new(IpPacketFragmentCache::new::<IpLayerTimerCtx<CC>>(
+                bindings_ctx,
+            )),
+            pmtu_cache: Default::default(),
+            counters: Default::default(),
+        }
+    }
+}
+
 /// The identifier for timer events in the IP layer.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub(crate) enum IpLayerTimerId {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, GenericOverIp)]
+#[generic_over_ip()]
+pub enum IpLayerTimerId {
     /// A timer event for IPv4 packet reassembly timers.
-    ReassemblyTimeoutv4(FragmentCacheKey<Ipv4Addr>),
+    ReassemblyTimeoutv4(FragmentTimerId<Ipv4>),
     /// A timer event for IPv6 packet reassembly timers.
-    ReassemblyTimeoutv6(FragmentCacheKey<Ipv6Addr>),
+    ReassemblyTimeoutv6(FragmentTimerId<Ipv6>),
     /// A timer event for IPv4 path MTU discovery.
     PmtuTimeoutv4(PmtuTimerId<Ipv4>),
     /// A timer event for IPv6 path MTU discovery.
     PmtuTimeoutv6(PmtuTimerId<Ipv6>),
 }
 
-impl From<FragmentCacheKey<Ipv4Addr>> for IpLayerTimerId {
-    fn from(timer: FragmentCacheKey<Ipv4Addr>) -> IpLayerTimerId {
-        IpLayerTimerId::ReassemblyTimeoutv4(timer)
-    }
-}
-
-impl From<FragmentCacheKey<Ipv6Addr>> for IpLayerTimerId {
-    fn from(timer: FragmentCacheKey<Ipv6Addr>) -> IpLayerTimerId {
-        IpLayerTimerId::ReassemblyTimeoutv6(timer)
+impl<I: Ip> From<FragmentTimerId<I>> for IpLayerTimerId {
+    fn from(timer: FragmentTimerId<I>) -> IpLayerTimerId {
+        I::map_ip(timer, IpLayerTimerId::ReassemblyTimeoutv4, IpLayerTimerId::ReassemblyTimeoutv6)
     }
 }
 
@@ -1553,32 +1574,34 @@ impl From<PmtuTimerId<Ipv6>> for IpLayerTimerId {
     }
 }
 
-impl_timer_context!(
-    IpLayerTimerId,
-    FragmentCacheKey<Ipv4Addr>,
-    IpLayerTimerId::ReassemblyTimeoutv4(id),
-    id
-);
-impl_timer_context!(
-    IpLayerTimerId,
-    FragmentCacheKey<Ipv6Addr>,
-    IpLayerTimerId::ReassemblyTimeoutv6(id),
-    id
-);
 impl_timer_context!(IpLayerTimerId, PmtuTimerId<Ipv4>, IpLayerTimerId::PmtuTimeoutv4(id), id);
 impl_timer_context!(IpLayerTimerId, PmtuTimerId<Ipv6>, IpLayerTimerId::PmtuTimeoutv6(id), id);
 
+/// An uninstantiable type providing timer ID conversion for the IP layer.
+struct IpLayerTimerCtx<CC>(Never, PhantomData<CC>);
+
+impl<I, CC, BT> CoreTimerContext<FragmentTimerId<I>, BT> for IpLayerTimerCtx<CC>
+where
+    I: Ip,
+    CC: CoreTimerContext<IpLayerTimerId, BT>,
+    BT: TimerBindingsTypes,
+{
+    fn convert_timer(timer: FragmentTimerId<I>) -> BT::DispatchId {
+        CC::convert_timer(IpLayerTimerId::from(timer))
+    }
+}
+
 impl<CC, BC> TimerHandler<BC, IpLayerTimerId> for CC
 where
-    CC: TimerHandler<BC, FragmentCacheKey<Ipv4Addr>>
-        + TimerHandler<BC, FragmentCacheKey<Ipv6Addr>>
+    CC: TimerHandler<BC, FragmentTimerId<Ipv4>>
+        + TimerHandler<BC, FragmentTimerId<Ipv6>>
         + TimerHandler<BC, PmtuTimerId<Ipv4>>
         + TimerHandler<BC, PmtuTimerId<Ipv6>>,
 {
     fn handle_timer(&mut self, bindings_ctx: &mut BC, id: IpLayerTimerId) {
         match id {
-            IpLayerTimerId::ReassemblyTimeoutv4(key) => self.handle_timer(bindings_ctx, key),
-            IpLayerTimerId::ReassemblyTimeoutv6(key) => self.handle_timer(bindings_ctx, key),
+            IpLayerTimerId::ReassemblyTimeoutv4(id) => self.handle_timer(bindings_ctx, id),
+            IpLayerTimerId::ReassemblyTimeoutv6(id) => self.handle_timer(bindings_ctx, id),
             IpLayerTimerId::PmtuTimeoutv4(id) => self.handle_timer(bindings_ctx, id),
             IpLayerTimerId::PmtuTimeoutv6(id) => self.handle_timer(bindings_ctx, id),
         }
@@ -3172,6 +3195,7 @@ pub(crate) mod testutil {
 
     use alloc::collections::HashSet;
 
+    use derivative::Derivative;
     use net_types::ip::IpInvariant;
 
     use crate::{
@@ -3930,7 +3954,7 @@ mod tests {
     #[ip_test]
     fn test_ip_packet_reassembly_timer<I: Ip + TestIpExt>()
     where
-        IpLayerTimerId: From<FragmentCacheKey<I::Addr>>,
+        IpLayerTimerId: From<FragmentTimerId<I>>,
     {
         let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
@@ -3944,25 +3968,17 @@ mod tests {
 
         // Make sure a timer got added.
         ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(
-            IpLayerTimerId::from(FragmentCacheKey::new(
-                I::FAKE_CONFIG.remote_ip.get(),
-                I::FAKE_CONFIG.local_ip.get(),
-                fragment_id.into(),
-            ))
-            .into(),
+            IpLayerTimerId::from(FragmentTimerId::<I>::default()).into(),
             ..,
         )]);
 
         // Process fragment #1
         process_ip_fragment::<I>(&mut ctx, &device, fragment_id, 1, 3);
 
-        // Trigger the timer (simulate a timer for the fragmented packet)
-        let key = FragmentCacheKey::new(
-            I::FAKE_CONFIG.remote_ip.get(),
-            I::FAKE_CONFIG.local_ip.get(),
-            u32::from(fragment_id),
+        assert_eq!(
+            ctx.trigger_next_timer().unwrap(),
+            IpLayerTimerId::from(FragmentTimerId::<I>::default()).into(),
         );
-        assert_eq!(ctx.trigger_next_timer().unwrap(), IpLayerTimerId::from(key).into(),);
 
         // Make sure no other timers exist.
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();

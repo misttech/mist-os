@@ -8,7 +8,7 @@ use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6};
 
 use crate::{
     api::CoreApi,
-    context::{ContextProvider, CtxPair},
+    context::{ContextProvider, CoreTimerContext, CtxPair},
     device::{
         arp::ArpCounters, DeviceCounters, DeviceId, DeviceLayerState, EthernetDeviceCounters,
         PureIpDeviceCounters, WeakDeviceId,
@@ -18,10 +18,11 @@ use crate::{
         device::nud::NudCounters,
         device::slaac::SlaacCounters,
         icmp::{IcmpState, NdpCounters},
-        IpCounters, IpLayerIpExt, IpStateInner, Ipv4State, Ipv6State,
+        IpCounters, IpLayerIpExt, IpLayerTimerId, IpStateInner, Ipv4State, Ipv6State,
     },
     socket::datagram,
     sync::RwLock,
+    time::TimerId,
     transport::{self, tcp::TcpCounters, udp::UdpCounters, TransportLayerState},
     BindingsContext, BindingsTypes, CoreCtx,
 };
@@ -54,8 +55,8 @@ impl StackStateBuilder {
     ) -> StackState<BC> {
         StackState {
             transport: self.transport.build_with_ctx(bindings_ctx),
-            ipv4: self.ipv4.build(),
-            ipv6: self.ipv6.build(),
+            ipv4: self.ipv4.build::<StackState<BC>, _, _>(bindings_ctx),
+            ipv6: self.ipv6.build::<StackState<BC>, _, _>(bindings_ctx),
             device: DeviceLayerState::new(),
         }
     }
@@ -162,5 +163,11 @@ impl<BC: BindingsContext> StackState<BC> {
     /// Create a new `StackState`.
     pub fn new(bindings_ctx: &mut BC) -> Self {
         StackStateBuilder::default().build_with_ctx(bindings_ctx)
+    }
+}
+
+impl<BT: BindingsTypes> CoreTimerContext<IpLayerTimerId, BT> for StackState<BT> {
+    fn convert_timer(timer: IpLayerTimerId) -> TimerId<BT> {
+        timer.into()
     }
 }

@@ -14,25 +14,22 @@ use crate::{
     ip::{
         device::{self, IpDeviceBindingsContext, IpDeviceIpExt},
         path_mtu::{PmtuCache, PmtuStateContext},
-        reassembly::{FragmentStateContext, IpPacketFragmentCache},
+        reassembly::{FragmentContext, IpPacketFragmentCache},
         IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, MulticastMembershipHandler,
         ResolveRouteError,
     },
     routes::ResolvedRoute,
     socket::address::SocketIpAddr,
-    BindingsContext, CoreCtx,
+    BindingsContext, BindingsTypes, CoreCtx,
 };
 
-impl<I, BC, L> FragmentStateContext<I, BC::Instant> for CoreCtx<'_, BC, L>
+impl<I, BT, L> FragmentContext<I, BT> for CoreCtx<'_, BT, L>
 where
     I: IpLayerIpExt,
-    BC: BindingsContext,
+    BT: BindingsTypes,
     L: LockBefore<crate::lock_ordering::IpStateFragmentCache<I>>,
 {
-    fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<I, BC::Instant>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O {
+    fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<I, BT>) -> O>(&mut self, cb: F) -> O {
         let mut cache = self.lock::<crate::lock_ordering::IpStateFragmentCache<I>>();
         cb(&mut cache)
     }

@@ -22,7 +22,7 @@ pub use counters::Counter;
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
 pub use time::{
     local_timer_heap::LocalTimerHeap, CoreTimerContext, Instant, InstantBindingsTypes,
-    InstantContext, TimerBindingsTypes, TimerContext2,
+    InstantContext, IntoCoreTimerCtx, TimerBindingsTypes, TimerContext2,
 };
 
 /// Test utilities provided to all crates.

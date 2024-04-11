@@ -150,3 +150,16 @@ pub trait CoreTimerContext<T, BT: TimerBindingsTypes> {
         bindings_ctx.new_timer(Self::convert_timer(dispatch_id))
     }
 }
+
+/// A timer context that performs conversions based on `Into` implementations.
+pub struct IntoCoreTimerCtx;
+
+impl<T, BT> CoreTimerContext<T, BT> for IntoCoreTimerCtx
+where
+    BT: TimerBindingsTypes,
+    T: Into<BT::DispatchId>,
+{
+    fn convert_timer(dispatch_id: T) -> <BT as TimerBindingsTypes>::DispatchId {
+        dispatch_id.into()
+    }
+}
