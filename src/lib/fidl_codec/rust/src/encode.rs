@@ -69,7 +69,14 @@ impl<'n> EncodeBuffer<'n> {
         )))?;
 
         let (ty, has) = match direction {
-            Direction::Request => (method.request.as_ref(), method.has_request),
+            Direction::Request => {
+                if !method.has_response && txid != 0 {
+                    return Err(Error::EncodeError(
+                        "Non-zero transaction ID for one-way method.".to_owned(),
+                    ));
+                }
+                (method.request.as_ref(), method.has_request)
+            }
             Direction::Response => (method.response.as_ref(), method.has_response),
         };
 
@@ -91,16 +98,14 @@ impl<'n> EncodeBuffer<'n> {
         buf.bytes.push(MAGIC_NUMBER_INITIAL);
         buf.bytes.extend(&method.ordinal.to_le_bytes());
 
-        let (data, handles) = if let Some(ty) = ty {
-            buf.encode_type(ty, value)?(&mut buf, RecursionCounter::new())
-                .map(|_| (buf.bytes, buf.handles))?
+        if let Some(ty) = ty {
+            buf.encode_type(ty, value)?(&mut buf, RecursionCounter::new())?
         } else if !matches!(value, Value::Null) {
             return Err(Error::EncodeError("Value must be null.".to_owned()));
         } else {
-            buf.align_8();
-            (buf.bytes, buf.handles)
         };
-        Ok((data, handles))
+        buf.align_8();
+        Ok((buf.bytes, buf.handles))
     }
 
     fn encode_struct_nonnull<'t>(
@@ -363,6 +368,20 @@ impl<'n> EncodeBuffer<'n> {
                     )))
                 } else {
                     Ok(Some(fidl::HandleOp::Move(h.into())))
+                }
+            }
+            (Value::ServerEnd(_, s), _, HandleType::ClientEnd(expect))
+            | (Value::ClientEnd(_, s), _, HandleType::ServerEnd(expect)) => {
+                if expect != s {
+                    Err(Error::EncodeError(format!(
+                        "Expected endpoint for protocol {expect}, got one for {s}"
+                    )))
+                } else if object_type != fidl::ObjectType::CHANNEL {
+                    Err(Error::EncodeError(format!(
+                        "Expected object type {object_type:?} got channel for protocol {s}"
+                    )))
+                } else {
+                    Err(Error::EncodeError(format!("Got wrong end of channel for {expect}")))
                 }
             }
             (Value::ServerEnd(h, s), _, HandleType::Bare)
