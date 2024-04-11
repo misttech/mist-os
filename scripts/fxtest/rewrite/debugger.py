@@ -65,7 +65,9 @@ def spawn(
                 ["--execute", f"attach --weak --recursive {test.info.name}"]
             )
         else:
-            attach_args.extend(["--execute", f"attach {test.info.name}"])
+            attach_args.extend(
+                ["--execute", f"attach --recursive {test.info.name}"]
+            )
 
     # If only --breakpoint was specified on the command line (we won't get here if neither
     # debug option was specified), we want to output a more general message than "test
