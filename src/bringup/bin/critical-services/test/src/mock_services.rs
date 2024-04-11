@@ -24,7 +24,7 @@ fn event_handle_rights() -> zx::Rights {
     zx::Rights::BASIC | zx::Rights::SIGNAL
 }
 
-#[fuchsia::main(logging_tags = ["pwrbtn-monitor-mock-services"])]
+#[fuchsia::main(logging_tags = ["critical-services-mock-services"])]
 async fn main() -> Result<(), Error> {
     info!("started");
     let (send_test_result, recv_test_result) = mpsc::channel(10);
@@ -68,7 +68,7 @@ async fn main() -> Result<(), Error> {
                 info!("new connection to {}", statecontrol::AdminMarker::DEBUG_NAME);
                 match stream.try_next().await? {
                     Some(statecontrol::AdminRequest::Poweroff { responder }) => {
-                        // If we respond to pwrbtn-monitor it will go back to check the signals
+                        // If we respond to critical-services it will go back to check the signals
                         // on the event we gave it, see that ZX_USER_SIGNAL_0 is still set, and
                         // call this again, and thus be stuck in a loop until the test is torn
                         // down. This isn't useful, and generates quite a bit of log noise at
@@ -77,7 +77,7 @@ async fn main() -> Result<(), Error> {
                         event_for_test_protocol
                             .signal_handle(zx::Signals::USER_0, zx::Signals::NONE)?;
 
-                        // Failing to send the response is fine, the pwrbtn-monitor code doesn't
+                        // Failing to send the response is fine, the critical-services code doesn't
                         // wait for a reply to this call and therefore it might have closed the
                         // channel by the time we try to send the reply.
                         let _ = responder.send(Ok(()));
@@ -101,7 +101,7 @@ async fn main() -> Result<(), Error> {
         .detach();
     });
     // A pseudo_directory must be used here because a ServiceFs does not support portions of
-    // fuchsia.io required by `fdio_watch_directory`, which pwrbtn-monitor uses on this directory.
+    // fuchsia.io required by `fdio_watch_directory`, which critical-services uses on this directory.
     let input_dir = pseudo_directory! {
         "mock_input_device" => service::endpoint(move |_, channel| {
             let event = event.duplicate_handle(event_handle_rights()).expect("failed to clone event");
@@ -124,7 +124,7 @@ async fn main() -> Result<(), Error> {
                                                 finput::DeviceRequest::GetReportDesc { responder } => {
                                                     info!("sending report desc");
                                                     // The following sequence of numbers is a HID report containing a
-                                                    // power button press. This is used to convince pwrbtn-monitor that
+                                                    // power button press. This is used to convince critical-services that
                                                     // the power button has been pressed, and that it should begin a
                                                     // system power off.
                                                     responder.send(&[

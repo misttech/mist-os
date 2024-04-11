@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/bringup/bin/pwrbtn-monitor/crashsvc/crashsvc.h"
+#include "src/bringup/bin/critical-services/crashsvc/crashsvc.h"
 
 #include <lib/async/cpp/task.h>
 #include <lib/zx/channel.h>
@@ -19,8 +19,8 @@
 
 #include <inspector/inspector.h>
 
-#include "src/bringup/bin/pwrbtn-monitor/crashsvc/exception_handler.h"
-#include "src/bringup/bin/pwrbtn-monitor/crashsvc/logging.h"
+#include "src/bringup/bin/critical-services/crashsvc/exception_handler.h"
+#include "src/bringup/bin/critical-services/crashsvc/logging.h"
 #include "src/lib/debug/backtrace-request-utils.h"
 #include "src/lib/fsl/handles/object_info.h"
 

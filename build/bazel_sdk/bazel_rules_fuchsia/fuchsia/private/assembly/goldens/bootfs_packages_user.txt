@@ -13,6 +13,7 @@ clock
 ?console
 ?console-launcher
 cpu-manager
+critical-services
 devfs
 device-name-provider
 display-coordinator
@@ -41,7 +42,6 @@ platform-bus
 power
 power-manager
 pwm
-pwrbtn-monitor
 ramdisk
 registers
 rndis-function

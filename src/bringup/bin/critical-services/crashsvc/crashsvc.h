@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_BRINGUP_BIN_PWRBTN_MONITOR_CRASHSVC_CRASHSVC_H_
-#define SRC_BRINGUP_BIN_PWRBTN_MONITOR_CRASHSVC_CRASHSVC_H_
+#ifndef SRC_BRINGUP_BIN_CRITICAL_SERVICES_CRASHSVC_CRASHSVC_H_
+#define SRC_BRINGUP_BIN_CRITICAL_SERVICES_CRASHSVC_CRASHSVC_H_
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async/cpp/wait.h>
@@ -26,4 +26,4 @@ zx::result<std::unique_ptr<async::Wait>> start_crashsvc(
     async_dispatcher_t* dispatcher, zx::channel exception_channel,
     fidl::ClientEnd<fuchsia_io::Directory> exception_handler_svc);
 
-#endif  // SRC_BRINGUP_BIN_PWRBTN_MONITOR_CRASHSVC_CRASHSVC_H_
+#endif  // SRC_BRINGUP_BIN_CRITICAL_SERVICES_CRASHSVC_CRASHSVC_H_

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/bringup/bin/pwrbtn-monitor/monitor.h"
+#include "src/bringup/bin/critical-services/monitor.h"
 
 #include <fidl/fuchsia.hardware.power.statecontrol/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -32,7 +32,7 @@ zx_status_t PowerButtonMonitor::DoAction() {
     case Action::kShutdown:
       return SendPoweroff();
     default:
-      printf("pwrbtn-monitor: unknown action %d\n", fidl::ToUnderlying(action_));
+      printf("critical-services: unknown action %d\n", fidl::ToUnderlying(action_));
       return ZX_ERR_NOT_SUPPORTED;
   }
 }
@@ -44,7 +44,7 @@ zx_status_t PowerButtonMonitor::SendButtonEvent(ButtonEvent event) {
         auto result = fidl::WireSendEvent(binding)->OnButtonEvent(
             fuchsia_power_button::wire::PowerButtonEvent(event));
         if (!result.ok()) {
-          printf("pwrbtn-monitor: failed to send button event: %s\n",
+          printf("critical-services: failed to send button event: %s\n",
                  result.FormatDescription().c_str());
           all_status = result.status();
         }
@@ -55,7 +55,7 @@ zx_status_t PowerButtonMonitor::SendButtonEvent(ButtonEvent event) {
 zx_status_t PowerButtonMonitor::SendPoweroff() {
   auto connect_result = component::Connect<statecontrol_fidl::Admin>();
   if (connect_result.is_error()) {
-    printf("pwrbtn-monitor: Failed to connect to statecontrol service: %s\n",
+    printf("critical-services: Failed to connect to statecontrol service: %s\n",
            zx_status_get_string(connect_result.status_value()));
     return connect_result.status_value();
   }
@@ -68,7 +68,8 @@ zx_status_t PowerButtonMonitor::SendPoweroff() {
   // but there's nothing we can really do with it so instead we return so we
   // can listne for more key events.
   if (!resp.ok()) {
-    printf("pwrbtn-monitor: Call to statecontrol failed: %s\n", resp.FormatDescription().c_str());
+    printf("critical-services: Call to statecontrol failed: %s\n",
+           resp.FormatDescription().c_str());
     return resp.status();
   }
 

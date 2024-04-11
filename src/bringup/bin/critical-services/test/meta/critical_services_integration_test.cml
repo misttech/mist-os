@@ -8,16 +8,16 @@
     ],
     program: {
         runner: "elf",
-        binary: "bin/pwrbtn_monitor_mock_services",
+        binary: "bin/critical_services_mock_services",
     },
     children: [
         {
             name: "config",
-            url: "#meta/pwrbtn-monitor_config.cm",
+            url: "#meta/critical-services_config.cm",
         },
         {
-            name: "pwrbtn-monitor",
-            url: "#meta/pwrbtn-monitor.cm",
+            name: "critical-services",
+            url: "#meta/critical-services.cm",
             startup: "eager",
         },
         {
@@ -41,18 +41,18 @@
     offer: [
         {
             from: "#config",
-            to: "#pwrbtn-monitor",
+            to: "#critical-services",
             config: "fuchsia.diagnostics.ExceptionHandlerAvailable",
         },
         {
             directory: "input",
             from: "self",
-            to: "#pwrbtn-monitor",
+            to: "#critical-services",
         },
         {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "self",
-            to: "#pwrbtn-monitor",
+            to: "#critical-services",
         },
         {
             protocol: "fuchsia.test.pwrbtn.Tests",
@@ -63,14 +63,14 @@
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: [
-                "#pwrbtn-monitor",
+                "#critical-services",
                 "#test-driver",
             ],
         },
         {
             protocol: "fuchsia.boot.WriteOnlyLog",
             from: "parent",
-            to: "#pwrbtn-monitor",
+            to: "#critical-services",
         },
     ],
     expose: [

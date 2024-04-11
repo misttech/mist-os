@@ -7,7 +7,7 @@ use {
     tracing::info,
 };
 
-#[fuchsia::test(logging_tags = ["pwrbtn-monitor-integration-test"])]
+#[fuchsia::test(logging_tags = ["critical-services-integration-test"])]
 async fn run() -> Result<(), Error> {
     info!("started");
 

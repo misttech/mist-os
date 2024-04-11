@@ -42,10 +42,10 @@
 #include <fbl/unique_fd.h>
 #include <src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h>
 
-#include "src/bringup/bin/pwrbtn-monitor/crashsvc/crashsvc.h"
-#include "src/bringup/bin/pwrbtn-monitor/monitor.h"
-#include "src/bringup/bin/pwrbtn-monitor/oom_watcher.h"
-#include "src/bringup/bin/pwrbtn-monitor/pwrbtn_monitor_config.h"
+#include "src/bringup/bin/critical-services/crashsvc/crashsvc.h"
+#include "src/bringup/bin/critical-services/monitor.h"
+#include "src/bringup/bin/critical-services/oom_watcher.h"
+#include "src/bringup/bin/critical-services/pwrbtn_monitor_config.h"
 
 #define INPUT_PATH "/input"
 
@@ -168,7 +168,7 @@ zx_status_t GetButtonReportEvent(zx::event* event_out, PowerButtonInfo* info_out
   {
     int fd = open(INPUT_PATH, O_DIRECTORY);
     if (fd < 0) {
-      printf("pwrbtn-monitor: Failed to open " INPUT_PATH ": %d\n", errno);
+      printf("critical-services: Failed to open " INPUT_PATH ": %d\n", errno);
       // TODO(jmatt) is this the right failure code?
       return ZX_ERR_INTERNAL;
     }
@@ -178,7 +178,7 @@ zx_status_t GetButtonReportEvent(zx::event* event_out, PowerButtonInfo* info_out
   zx_status_t status =
       fdio_watch_directory(dirfd.get(), InputDeviceAdded, ZX_TIME_INFINITE, info_out);
   if (status != ZX_ERR_STOP) {
-    printf("pwrbtn-monitor: Failed to find power button device\n");
+    printf("critical-services: Failed to find power button device\n");
     return status;
   }
   dirfd.reset();
@@ -188,11 +188,11 @@ zx_status_t GetButtonReportEvent(zx::event* event_out, PowerButtonInfo* info_out
   // Get the report event.
   auto result = client->GetReportsEvent();
   if (result.status() != ZX_OK) {
-    printf("pwrbtn-monitor: failed to get report event: %d\n", result.status());
+    printf("critical-services: failed to get report event: %d\n", result.status());
     return result.status();
   }
   if (result->status != ZX_OK) {
-    printf("pwrbtn-monitor: failed to get report event: %d\n", result->status);
+    printf("critical-services: failed to get report event: %d\n", result->status);
     return result->status;
   }
   *event_out = std::move(result->event);
@@ -208,12 +208,12 @@ void ProcessPowerEvent(zx::event* report_event, pwrbtn::PowerButtonMonitor* moni
   }
   auto result = info->client->ReadReport();
   if (result.status() != ZX_OK) {
-    printf("pwrbtn-monitor: failed to read report: %d\n", result.status());
+    printf("critical-services: failed to read report: %d\n", result.status());
     loop->Quit();
     return;
   }
   if (result->status != ZX_OK) {
-    printf("pwrbtn-monitor: failed to read report: %d\n", result->status);
+    printf("critical-services: failed to read report: %d\n", result->status);
     loop->Quit();
     return;
   }
@@ -221,7 +221,7 @@ void ProcessPowerEvent(zx::event* report_event, pwrbtn::PowerButtonMonitor* moni
   // Ignore reports from different report IDs
   const fidl::VectorView<uint8_t>& report = result->data;
   if (info->has_report_id_byte && report[0] != info->report_id) {
-    printf("pwrbtn-monitor: input-watcher: wrong id\n");
+    printf("critical-services: input-watcher: wrong id\n");
     return;
   }
 
@@ -234,7 +234,7 @@ void ProcessPowerEvent(zx::event* report_event, pwrbtn::PowerButtonMonitor* moni
 
     auto status = monitor->DoAction();
     if (status != ZX_OK) {
-      printf("pwrbtn-monitor: input-watcher: failed to handle press.\n");
+      printf("critical-services: input-watcher: failed to handle press.\n");
       return;
     }
   }
@@ -250,7 +250,7 @@ zx::result<zx::job> GetRootJob() {
 
   auto response = fidl::WireCall(connect_result.value())->Get();
   if (response.status() != ZX_OK) {
-    printf("pwrbtn-monitor: Service didn't give us the root job: %u\n", response.status());
+    printf("critical-services: Service didn't give us the root job: %u\n", response.status());
     return zx::error(response.status());
   }
 
@@ -274,7 +274,7 @@ bool StartOomWatcher(pwrbtn::OomWatcher* watcher, async_dispatcher_t* dispatcher
   zx::event event_handle;
   zx::result get_root_job = GetRootJob();
   if (!get_root_job.is_ok()) {
-    printf("pwrbtn-monitor: failed to get root job, OOM events will not be monitored: %s\n",
+    printf("critical-services: failed to get root job, OOM events will not be monitored: %s\n",
            get_root_job.status_string());
     return false;
   }
@@ -282,16 +282,16 @@ bool StartOomWatcher(pwrbtn::OomWatcher* watcher, async_dispatcher_t* dispatcher
 
   zx_status_t status = GetOomEvent(root_job, &event_handle);
   if (status != ZX_OK) {
-    printf("pwrbtn-monitor: couldn't get the OOM system event: %u\n", status);
+    printf("critical-services: couldn't get the OOM system event: %u\n", status);
     return false;
   }
   status =
       watcher->WatchForOom(dispatcher, std::move(event_handle), std::move(pwr_client_req.value()));
   if (status != ZX_OK) {
-    printf("pwrbtn-monitor: OOM watcher object failed to initialize: %u\n", status);
+    printf("critical-services: OOM watcher object failed to initialize: %u\n", status);
     return false;
   }
-  printf("pwrbtn-monitor: OOM monitoring active\n");
+  printf("critical-services: OOM monitoring active\n");
   return true;
 }
 
@@ -308,7 +308,7 @@ void RunCrashSvcThread(bool exception_handler_available) {
   // Get the root job.
   zx::result<zx::job> root_job = GetRootJob();
   if (!root_job.is_ok()) {
-    printf("pwrbtn-monitor: failed to get root job, crashsvc will not be started: %s\n",
+    printf("critical-services: failed to get root job, crashsvc will not be started: %s\n",
            root_job.status_string());
     return;
   }
@@ -316,7 +316,7 @@ void RunCrashSvcThread(bool exception_handler_available) {
   zx::channel exception_channel;
   if (zx_status_t status = root_job->create_exception_channel(0, &exception_channel);
       status != ZX_OK) {
-    fprintf(stderr, "pwrbtn-monitor: error: Failed to create exception channel: %s",
+    fprintf(stderr, "critical-services: error: Failed to create exception channel: %s",
             zx_status_get_string(status));
     return;
   }
@@ -325,7 +325,8 @@ void RunCrashSvcThread(bool exception_handler_available) {
   if (exception_handler_available) {
     zx::result result = component::OpenServiceRoot();
     if (result.is_error()) {
-      fprintf(stderr, "pwrbtn-monitor: unable to open service root: %s\n", result.status_string());
+      fprintf(stderr, "critical-services: unable to open service root: %s\n",
+              result.status_string());
       return;
     }
     svc = std::move(result.value());
@@ -336,7 +337,7 @@ void RunCrashSvcThread(bool exception_handler_available) {
   if (crashsvc.is_error()) {
     // The system can still function without crashsvc, log the error but
     // keep going.
-    fprintf(stderr, "pwrbtn-monitor: error: Failed to start crashsvc: %d (%s).\n",
+    fprintf(stderr, "critical-services: error: Failed to start crashsvc: %d (%s).\n",
             crashsvc.error_value(), crashsvc.status_string());
     return;
   }
@@ -368,7 +369,7 @@ int main(int argc, char** argv) {
     zx_status_t status = GetButtonReportEvent(&report_event, &info);
 
     if (status != ZX_OK) {
-      printf("pwrbtn-monitor: failed to get power button info, events will not be monitored.\n");
+      printf("critical-services: failed to get power button info, events will not be monitored.\n");
       loop.Quit();
       return;
     }
@@ -389,7 +390,7 @@ int main(int argc, char** argv) {
 
   // Start the thread and looper that will listen for OOM events. We create a
   // second thread because the power button code uses a synchronous directory
-  // watcher to watch for new directory entries. We could change pwrbtn-monitor
+  // watcher to watch for new directory entries. We could change critical-services
   // to use inotify interfaces, but this would require substantial additional
   // work.
   std::thread oom_thread(RunOomThread);
@@ -403,13 +404,13 @@ int main(int argc, char** argv) {
   component::OutgoingDirectory outgoing{loop.dispatcher()};
   zx::result result = outgoing.ServeFromStartupInfo();
   if (!result.is_ok()) {
-    printf("pwrbtn-monitor: failed to ServeFromStartupInfo: %s\n", result.status_string());
+    printf("critical-services: failed to ServeFromStartupInfo: %s\n", result.status_string());
     return 1;
   }
 
   result = outgoing.AddUnmanagedProtocol<fuchsia_power_button::Monitor>(monitor.Publish());
   if (!result.is_ok()) {
-    printf("pwrbtn-monitor: failed to AddEntry: %s\n", result.status_string());
+    printf("critical-services: failed to AddEntry: %s\n", result.status_string());
     return 1;
   }
 

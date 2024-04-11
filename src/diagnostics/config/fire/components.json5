@@ -624,4 +624,9 @@
         label: "Paver Service",
         moniker: "bootstrap/paver",
     },
+    {
+        id: 259,
+        label: "Critical Services",
+        moniker: "bootstrap/critical-services",
+    },
 ]

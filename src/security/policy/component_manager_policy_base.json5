@@ -110,7 +110,7 @@
                     "/bootstrap",
                     "/bootstrap/console-launcher",
                     "/bootstrap/netsvc",
-                    "/bootstrap/pwrbtn-monitor",
+                    "/bootstrap/critical-services",
                     "/bootstrap/svchost",
                 ],
             },

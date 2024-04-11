@@ -7,10 +7,10 @@ group("tests") {
   deps = [
     "console:tests",
     "console-launcher:tests",
+    "critical-services:tests",
     "device-name-provider:tests",
     "netsvc:tests",
     "ptysvc:tests",
-    "pwrbtn-monitor:tests",
     "virtcon:tests",
   ]
 }

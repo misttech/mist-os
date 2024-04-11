@@ -18,7 +18,7 @@ var cmdlineCommon = []string{"kernel.oom.behavior=reboot", "kernel.oom.reboot-ti
 var initMessages []string = []string{
 	// Ensure the kernel OOM system was properly initialized.
 	"memory-pressure: memory availability state - Normal",
-	"pwrbtn-monitor: OOM monitoring active",
+	"critical-services: OOM monitoring active",
 	// Make sure the shell is ready to accept commands over serial.
 	"console.shell: enabled",
 	"fshost: lifecycle handler ready",

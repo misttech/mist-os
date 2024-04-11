@@ -8,8 +8,8 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/zx/event.h>
 
-#ifndef SRC_BRINGUP_BIN_PWRBTN_MONITOR_OOM_WATCHER_H_
-#define SRC_BRINGUP_BIN_PWRBTN_MONITOR_OOM_WATCHER_H_
+#ifndef SRC_BRINGUP_BIN_CRITICAL_SERVICES_OOM_WATCHER_H_
+#define SRC_BRINGUP_BIN_CRITICAL_SERVICES_OOM_WATCHER_H_
 
 namespace pwrbtn {
 namespace statecontrol_fidl = fuchsia_hardware_power_statecontrol;
@@ -35,4 +35,4 @@ class OomWatcher {
 
 }  // namespace pwrbtn
 
-#endif  // SRC_BRINGUP_BIN_PWRBTN_MONITOR_OOM_WATCHER_H_
+#endif  // SRC_BRINGUP_BIN_CRITICAL_SERVICES_OOM_WATCHER_H_

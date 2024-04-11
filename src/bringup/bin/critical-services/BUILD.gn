@@ -6,15 +6,15 @@ import("//build/components.gni")
 import("//build/test.gni")
 
 fuchsia_component_manifest("manifest") {
-  component_name = "pwrbtn-monitor"
-  manifest = "meta/pwrbtn-monitor.cml"
+  component_name = "critical-services"
+  manifest = "meta/critical-services.cml"
 }
 
 fuchsia_structured_config_cpp_elf_lib("pwrbtn_monitor_config") {
   cm_label = ":manifest"
 }
 
-executable("pwrbtn-monitor") {
+executable("critical-services") {
   sources = [
     "main.cc",
     "monitor.cc",
@@ -32,7 +32,7 @@ executable("pwrbtn-monitor") {
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp",
-    "//src/bringup/bin/pwrbtn-monitor/crashsvc",
+    "//src/bringup/bin/critical-services/crashsvc",
     "//src/sys/lib/stdout-to-debuglog/cpp",
     "//src/ui/input/lib/hid-parser",
     "//zircon/system/ulib/async-default",
@@ -47,8 +47,8 @@ executable("pwrbtn-monitor") {
   public_deps = [ "//zircon/system/ulib/zx" ]
 }
 
-test("pwrbtn-monitor-unittests-bin") {
-  output_name = "pwrbtn-monitor-unittests"
+test("critical-services-unittests-bin") {
+  output_name = "critical-services-unittests"
   sources = [
     "monitor-test.cc",
     "monitor.cc",
@@ -70,24 +70,24 @@ test("pwrbtn-monitor-unittests-bin") {
   ]
 }
 
-fuchsia_unittest_package("pwrbtn-monitor-unittests") {
-  deps = [ ":pwrbtn-monitor-unittests-bin" ]
+fuchsia_unittest_package("critical-services-unittests") {
+  deps = [ ":critical-services-unittests-bin" ]
 }
 
 fuchsia_component("component") {
   cm_label = ":manifest"
-  deps = [ ":pwrbtn-monitor" ]
+  deps = [ ":critical-services" ]
 }
 
 fuchsia_package("package") {
-  package_name = "pwrbtn-monitor"
+  package_name = "critical-services"
   deps = [ ":component" ]
 }
 
 group("tests") {
   testonly = true
   deps = [
-    ":pwrbtn-monitor-unittests",
-    "test:pwrbtn-monitor-integration-test",
+    ":critical-services-unittests",
+    "test:critical-services-integration-test",
   ]
 }

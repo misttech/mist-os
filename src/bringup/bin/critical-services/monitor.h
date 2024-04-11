@@ -5,8 +5,8 @@
 #include <fidl/fuchsia.power.button/cpp/wire.h>
 #include <zircon/compiler.h>
 
-#ifndef SRC_BRINGUP_BIN_PWRBTN_MONITOR_MONITOR_H_
-#define SRC_BRINGUP_BIN_PWRBTN_MONITOR_MONITOR_H_
+#ifndef SRC_BRINGUP_BIN_CRITICAL_SERVICES_MONITOR_H_
+#define SRC_BRINGUP_BIN_CRITICAL_SERVICES_MONITOR_H_
 
 namespace pwrbtn {
 
@@ -37,4 +37,4 @@ class PowerButtonMonitor : public fidl::WireServer<fuchsia_power_button::Monitor
 
 }  // namespace pwrbtn
 
-#endif  // SRC_BRINGUP_BIN_PWRBTN_MONITOR_MONITOR_H_
+#endif  // SRC_BRINGUP_BIN_CRITICAL_SERVICES_MONITOR_H_

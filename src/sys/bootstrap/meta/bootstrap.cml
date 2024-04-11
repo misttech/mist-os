@@ -8,10 +8,10 @@
             url: "fuchsia-boot:///archivist#meta/archivist.cm",
         },
         {
-            name: "pwrbtn-monitor",
-            url: "fuchsia-boot:///pwrbtn-monitor#meta/pwrbtn-monitor.cm",
+            name: "critical-services",
+            url: "fuchsia-boot:///critical-services#meta/critical-services.cm",
 
-            // pwrbtn-monitor should start eagerly - the only services it offers may never be called
+            // critical-services should start eagerly - the only services it offers may never be called
             // on some builds, so there's no other way to start it. Importantly it hosts the crashsvc
             // and oom handler.
             startup: "eager",
@@ -32,7 +32,7 @@
     offer: [
         {
             from: "parent",
-            to: "#pwrbtn-monitor",
+            to: "#critical-services",
             config: [ "fuchsia.diagnostics.ExceptionHandlerAvailable" ],
         },
         {
@@ -92,7 +92,7 @@
             protocol: [ "fuchsia.boot.WriteOnlyLog" ],
             from: "parent",
             to: [
-                "#pwrbtn-monitor",
+                "#critical-services",
                 "#shutdown_shim",
             ],
         },
@@ -104,7 +104,7 @@
         {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "#shutdown_shim",
-            to: "#pwrbtn-monitor",
+            to: "#critical-services",
         },
 
         // Things shutdown_shim and power_manager need
@@ -126,7 +126,7 @@
             ],
             from: "#archivist",
             to: [
-                "#pwrbtn-monitor",
+                "#critical-services",
                 "#role_manager",
                 "#shutdown_shim",
                 "#svchost",
@@ -138,13 +138,13 @@
                 "fuchsia.kernel.RootJob",
             ],
             from: "parent",
-            to: [ "#pwrbtn-monitor" ],
+            to: [ "#critical-services" ],
         },
         {
             directory: "dev-class",
             from: "#devfs-with-pkg",
             as: "input",
-            to: "#pwrbtn-monitor",
+            to: "#critical-services",
             subdir: "input",
         },
 
@@ -209,7 +209,7 @@
         },
         {
             protocol: "fuchsia.power.button.Monitor",
-            from: "#pwrbtn-monitor",
+            from: "#critical-services",
         },
         {
             protocol: "fuchsia.tpm.cr50.Cr50",

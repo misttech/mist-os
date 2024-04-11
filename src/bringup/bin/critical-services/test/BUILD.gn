@@ -8,7 +8,7 @@ import("//build/rust/rustc_test.gni")
 
 rustc_binary("mock_services") {
   testonly = true
-  name = "pwrbtn_monitor_mock_services"
+  name = "critical_services_mock_services"
   edition = "2021"
   source_root = "src/mock_services.rs"
 
@@ -33,7 +33,7 @@ rustc_binary("mock_services") {
 
 rustc_test("test_driver") {
   testonly = true
-  name = "pwrbtn_monitor_integration_test"
+  name = "critical_services_integration_test"
   edition = "2021"
   source_root = "src/test.rs"
 
@@ -49,20 +49,20 @@ rustc_test("test_driver") {
 }
 
 fuchsia_component_manifest("manifest") {
-  component_name = "pwrbtn-monitor"
-  manifest = "//src/bringup/bin/pwrbtn-monitor/meta/pwrbtn-monitor.cml"
+  component_name = "critical-services"
+  manifest = "//src/bringup/bin/critical-services/meta/critical-services.cml"
 }
 
-fuchsia_component("pwrbtn_monitor_component") {
+fuchsia_component("critical-services-component") {
   testonly = true
   cm_label = ":manifest"
-  deps = [ "//src/bringup/bin/pwrbtn-monitor" ]
+  deps = [ "//src/bringup/bin/critical-services" ]
 }
 
 fuchsia_structured_config_values2("config_values") {
   testonly = true
   cm_label = ":manifest"
-  component_name = "pwrbtn-monitor"
+  component_name = "critical-services"
   values = {
     exception_handler_available = false
   }
@@ -77,14 +77,15 @@ fuchsia_component("test_driver_component") {
 
 fuchsia_test_component("mock_services_component") {
   component_name = "mock_services"
-  manifest = "meta/pwrbtn_monitor_integration_test.cml"
+  manifest = "meta/critical_services_integration_test.cml"
   deps = [ ":mock_services" ]
 }
-fuchsia_test_package("pwrbtn-monitor-integration-test") {
+
+fuchsia_test_package("critical-services-integration-test") {
   test_components = [ ":mock_services_component" ]
   deps = [
     ":config_values",
-    ":pwrbtn_monitor_component",
+    ":critical-services-component",
     ":test_driver_component",
   ]
 }

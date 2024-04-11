@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/bringup/bin/pwrbtn-monitor/crashsvc/crashsvc.h"
+#include "src/bringup/bin/critical-services/crashsvc/crashsvc.h"
 
 #include <fidl/fuchsia.exception/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -30,7 +30,7 @@
 #include <mini-process/mini-process.h>
 #include <zxtest/zxtest.h>
 
-#include "src/bringup/bin/pwrbtn-monitor/crashsvc/exception_handler.h"
+#include "src/bringup/bin/critical-services/crashsvc/exception_handler.h"
 
 namespace {
 
