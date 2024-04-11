@@ -10,6 +10,15 @@
     capabilities: [
         { protocol: "fuchsia.sensors.Manager" },
     ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.hardware.sensors.Driver",
+                "fuchsia.hardware.sensors.Playback",
+            ],
+            from: "parent",
+        },
+    ],
     expose: [
         {
             protocol: "fuchsia.sensors.Manager",

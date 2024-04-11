@@ -24,9 +24,13 @@ rustc_library("lib") {
     "src/sensor_manager.rs",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_rust",
     "//sdk/fidl/fuchsia.sensors:fuchsia.sensors_rust",
     "//sdk/fidl/fuchsia.sensors.types:fuchsia.sensors.types_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/sensors/playback:sensors_playback",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures-util",
     "//third_party/rust_crates:itertools",
@@ -37,6 +41,7 @@ rustc_library("lib") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:tracing",
   ]
 }
 
@@ -46,7 +51,9 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
   deps = [
     ":lib",
+    "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_rust",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:tracing",
   ]
@@ -62,8 +69,39 @@ fuchsia_package("sensors") {
   deps = [ ":component" ]
 }
 
-fuchsia_unittest_package("sensors-tests") {
+fuchsia_component("test-driver-component") {
+  component_name = "test-driver"
+  testonly = true
+  manifest = "meta/test-driver.cml"
   deps = [ ":lib_test" ]
+}
+
+fuchsia_package("test-driver") {
+  testonly = true
+  deps = [ ":test-driver-component" ]
+}
+
+fuchsia_component("sensors-test-component") {
+  component_name = "sensors-test"
+  manifest = "meta/sensors-test.cml"
+}
+
+fuchsia_test_package("sensors-tests") {
+  test_components = [ ":sensors-test-component" ]
+  subpackages = [
+    ":sensors",
+    ":test-driver",
+    "//src/sensors/playback:sensors_playback",
+  ]
+  test_specs = {
+    # TODO(https://fxbug.dev/331662688): These tests use the same playback component, so the tests
+    # flake when they attempt to configure playback at the same time. These tests should use realm
+    # builder to ensure that each test has its own instance of the playback component.
+    parallel = 1
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 core_shard("sensors-core-shard") {

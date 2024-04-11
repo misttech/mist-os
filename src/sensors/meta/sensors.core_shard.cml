@@ -22,5 +22,13 @@
             from: "parent",
             to: [ "#sensors" ],
         },
+        {
+            protocol: [ "fuchsia.hardware.sensors.Driver" ],
+            from: "#sensors_playback",
+            to: "#sensors",
+
+            // playback is only supported for _eng builds.
+            source_availability: "unknown",
+        },
     ],
 }
