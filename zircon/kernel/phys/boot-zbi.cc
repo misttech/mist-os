@@ -13,17 +13,40 @@
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/item.h>
 
+#include <ktl/byte.h>
+#include <ktl/move.h>
+#include <ktl/optional.h>
+#include <ktl/string_view.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
 #include <pretty/cpp/sizes.h>
 
+#include <ktl/enforce.h>
+
 namespace {
 
-constexpr fit::error<BootZbi::Error> InputError(BootZbi::InputZbi::Error error) {
+// zbitl::PrintViewCopyError only uses the read_offset if read_error is not
+// nullopt, and only uses the write_offset if write_error is not nullopt.  So
+// they must be set even though the error_type confers no information.
+
+constexpr fit::error<BootZbi::Error> ReadError(ktl::string_view error, uint32_t offset) {
   return fit::error{BootZbi::Error{
-      .zbi_error = error.zbi_error,
-      .read_offset = error.item_offset,
+      .zbi_error = error,
+      .read_offset = offset,
+      .read_error = BootZbi::Error::ReadError{},
   }};
+}
+
+constexpr fit::error<BootZbi::Error> WriteError(ktl::string_view error, uint32_t offset) {
+  return fit::error{BootZbi::Error{
+      .zbi_error = error,
+      .write_offset = offset,
+      .write_error = BootZbi::Error::WriteError{},
+  }};
+}
+
+constexpr fit::error<BootZbi::Error> InputError(BootZbi::InputZbi::Error error) {
+  return ReadError(error.zbi_error, error.item_offset);
 }
 
 constexpr fit::error<BootZbi::Error> EmptyZbi(fit::result<BootZbi::InputZbi::Error> result) {
@@ -34,10 +57,7 @@ constexpr fit::error<BootZbi::Error> EmptyZbi(fit::result<BootZbi::InputZbi::Err
 }
 
 constexpr fit::error<BootZbi::Error> OutputError(BootZbi::Zbi::Error error) {
-  return fit::error{BootZbi::Error{
-      .zbi_error = error.zbi_error,
-      .write_offset = error.item_offset,
-  }};
+  return WriteError(error.zbi_error, error.item_offset);
 }
 
 constexpr fit::error<BootZbi::Error> OutputError(
@@ -45,7 +65,9 @@ constexpr fit::error<BootZbi::Error> OutputError(
   return fit::error{BootZbi::Error{
       .zbi_error = error.zbi_error,
       .read_offset = error.read_offset,
+      .read_error = BootZbi::Error::ReadError{},
       .write_offset = error.write_offset,
+      .write_error = BootZbi::Error::WriteError{},
   }};
 }
 
@@ -111,7 +133,7 @@ void BootZbi::InitData(Allocation data) {
 fit::result<BootZbi::Error> BootZbi::Init(InputZbi arg_zbi) {
   // Move the incoming zbitl::View into the object before using
   // iterators into it.
-  zbi_ = std::move(arg_zbi);
+  zbi_ = ktl::move(arg_zbi);
 
   auto it = zbi_.begin();
   if (it == zbi_.end()) {
@@ -143,15 +165,13 @@ fit::result<BootZbi::Error> BootZbi::Init(InputZbi arg_zbi) {
     return InputError(result.error_value());
   }
 
-  return fit::error{Error{
-      .zbi_error = "ZBI does not start with valid kernel item",
-      .read_offset =
-          it == zbi_.end() ? static_cast<uint32_t>(sizeof(zbi_header_t)) : it.item_offset(),
-  }};
+  return ReadError(
+      "ZBI does not start with valid kernel item",
+      it == zbi_.end() ? static_cast<uint32_t>(sizeof(zbi_header_t)) : it.item_offset());
 }
 
 fit::result<BootZbi::Error> BootZbi::Init(InputZbi arg_zbi, InputZbi::iterator kernel_item) {
-  zbi_ = std::move(arg_zbi);
+  zbi_ = ktl::move(arg_zbi);
   kernel_item_ = zbi_.begin();
   while (true) {
     if (kernel_item_ == zbi_.end()) {
@@ -329,7 +349,7 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
     // It so happens it's perfectly aligned to use the whole thing in place.
     // The lower pages used for the kernel image will just be skipped over.
     data_.storage() = {
-        reinterpret_cast<std::byte*>(data_address),
+        reinterpret_cast<ktl::byte*>(data_address),
         input_capacity - (data_address - input_address),
     };
   } else if (aligned_data_address > input_address &&
@@ -338,7 +358,7 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
     // the remaining space with a ZBI_TYPE_DISCARD item so the actual
     // contents can be left in place.
     data_.storage() = {
-        reinterpret_cast<std::byte*>(aligned_data_address),
+        reinterpret_cast<ktl::byte*>(aligned_data_address),
         input_capacity - (aligned_data_address - input_address),
     };
   }
@@ -371,10 +391,8 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
         Allocation::New(ac, memalloc::Type::kKernel, static_cast<size_t>(KernelMemorySize()),
                         arch::kZbiBootKernelAlignment);
     if (!ac.check()) {
-      return fit::error{Error{
-          .zbi_error = "cannot allocate memory for kernel image",
-          .write_offset = static_cast<uint32_t>(KernelMemorySize()),
-      }};
+      return WriteError("cannot allocate memory for kernel image",
+                        static_cast<uint32_t>(KernelMemorySize()));
     }
     memcpy(kernel_buffer_.get(), KernelImage(), KernelLoadSize());
     kernel_ = reinterpret_cast<arch::ZbiKernelImage*>(kernel_buffer_.get());
@@ -386,10 +404,7 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
     data_buffer_ = Allocation::New(ac, memalloc::Type::kDataZbi, data_required_size,
                                    arch::kZbiBootDataAlignment);
     if (!ac.check()) {
-      return fit::error{Error{
-          .zbi_error = "cannot allocate memory for data ZBI",
-          .write_offset = data_required_size,
-      }};
+      return WriteError("cannot allocate memory for data ZBI", data_required_size);
     }
     data_.storage() = data_buffer_.data();
     if (auto result = data_.clear(); result.is_error()) {
