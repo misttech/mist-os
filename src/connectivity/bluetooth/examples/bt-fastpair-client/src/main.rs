@@ -13,6 +13,7 @@ use fidl_fuchsia_bluetooth_sys::{
 };
 use fuchsia_component::client::connect_to_protocol;
 use futures::{select, stream::TryStreamExt, FutureExt};
+use std::pin::pin;
 use tracing::{info, warn};
 
 async fn process_provider_events(mut stream: ProviderWatcherRequestStream) -> Result<(), Error> {
