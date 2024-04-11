@@ -1,0 +1,60 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "paver",
+            url: "fuchsia-boot:///paver#meta/paver.cm",
+        },
+    ],
+    offer: [
+        // For /boot/config/zxcrypt
+        {
+            directory: "boot",
+            from: "parent",
+            as: "boot-config",
+            to: "#paver",
+            rights: [ "r*" ],
+            subdir: "config",
+        },
+        {
+            protocol: [
+                "fuchsia.boot.Arguments",
+                "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.process.Launcher",
+            ],
+            from: "parent",
+            to: "#paver",
+        },
+        {
+            directory: "dev-topological",
+            from: "#devfs-with-pkg",
+            to: "#paver",
+        },
+        {
+            protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
+            from: "#shutdown_shim",
+            to: "#paver",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: "#paver",
+        },
+        {
+            protocol: [ "fuchsia.fshost.BlockWatcher" ],
+            from: "#fshost",
+            to: "#paver",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.paver.Paver",
+            from: "#paver",
+        },
+    ],
+}

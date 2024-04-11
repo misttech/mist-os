@@ -8,10 +8,6 @@
             url: "fuchsia-boot:///archivist#meta/archivist.cm",
         },
         {
-            name: "paver",
-            url: "fuchsia-boot:///paver#meta/paver.cm",
-        },
-        {
             name: "pwrbtn-monitor",
             url: "fuchsia-boot:///pwrbtn-monitor#meta/pwrbtn-monitor.cm",
 
@@ -68,16 +64,6 @@
             to: "#archivist",
             availability: "optional",
         },
-
-        // For /boot/config/zxcrypt
-        {
-            directory: "boot",
-            from: "parent",
-            as: "boot-config",
-            to: "#paver",
-            rights: [ "r*" ],
-            subdir: "config",
-        },
         {
             directory: "boot",
             from: "parent",
@@ -93,15 +79,6 @@
             to: "#role_manager",
             rights: [ "r*" ],
             subdir: "config/profiles",
-        },
-        {
-            protocol: [
-                "fuchsia.boot.Arguments",
-                "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.process.Launcher",
-            ],
-            from: "parent",
-            to: "#paver",
         },
         {
             protocol: [
@@ -125,11 +102,6 @@
             to: [ "#role_manager" ],
         },
         {
-            directory: "dev-topological",
-            from: "#devfs-with-pkg",
-            to: "#paver",
-        },
-        {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "#shutdown_shim",
             to: "#pwrbtn-monitor",
@@ -140,11 +112,6 @@
             protocol: [ "fuchsia.sys2.SystemController" ],
             from: "parent",
             to: "#shutdown_shim",
-        },
-        {
-            protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
-            from: "#shutdown_shim",
-            to: [ "#paver" ],
         },
         {
             protocol: [ "fuchsia.hardware.power.statecontrol.Admin" ],
@@ -159,7 +126,6 @@
             ],
             from: "#archivist",
             to: [
-                "#paver",
                 "#pwrbtn-monitor",
                 "#role_manager",
                 "#shutdown_shim",
@@ -180,11 +146,6 @@
             as: "input",
             to: "#pwrbtn-monitor",
             subdir: "input",
-        },
-        {
-            protocol: [ "fuchsia.fshost.BlockWatcher" ],
-            from: "#fshost",
-            to: "#paver",
         },
 
         // -- Archivist offers below here --
@@ -245,10 +206,6 @@
         {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "#shutdown_shim",
-        },
-        {
-            protocol: "fuchsia.paver.Paver",
-            from: "#paver",
         },
         {
             protocol: "fuchsia.power.button.Monitor",

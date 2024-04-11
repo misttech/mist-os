@@ -136,6 +136,7 @@ assembly_input_bundle("bootstrap") {
           component_name = "bootstrap"
           shards = rebase_path(
                   [
+                    "//src/bringup/bin/paver/meta/paver.bootstrap_shard.cml",
                     "//src/bringup/bin/sysinfo/meta/sysinfo.shard.cml",
                     "//src/devices/sysmem/bin/sysmem_connector/meta/sysmem_connector.bootstrap_shard.cml",
                     "//src/bringup/bin/device-name-provider/meta/device-name-provider.bootstrap_shard.cml",
