@@ -7,6 +7,7 @@ import("//build/dist/renamed_binary.gni")
 import("//build/dist/resource.gni")
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
+import("//build/toolchain/runtime/toolchain_runtime_deps.gni")
 
 test("runtests-utils") {
   sources = [
@@ -82,7 +83,21 @@ resource("packaged-raw-profile") {
   outputs = [
     "test/sys/runtests-utils-testdata/profile/15822697145192797690.profraw",
   ]
-  sources = [ "helper/15822697145192797690.profraw" ]
+
+  # TODO(https://fxbug.dev/333762947): To unblock the clang roll, we can upload
+  # the new profraw file with the updated llvm profdata header format. We can't
+  # replace it completely because the new format would break existing tests, so
+  # we can do a quick check to see which version of the toolchain we're using
+  # and dispatch to the appropriate file.
+  #
+  # "SkDvAQt_IN7-4-_K2xShZJxH9sfemvCs0bioG10wxIEC" is the cipd ID for the older
+  # toolchain with the older format. We should remove this after rolling clang.
+  if (clang_toolchain_spec.version_string ==
+      "SkDvAQt_IN7-4-_K2xShZJxH9sfemvCs0bioG10wxIEC") {
+    sources = [ "helper/15822697145192797690.profraw" ]
+  } else {
+    sources = [ "helper/15822697145192797690.v10.profraw" ]
+  }
 }
 
 generated_resource("test-data") {
