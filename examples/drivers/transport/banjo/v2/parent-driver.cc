@@ -12,8 +12,6 @@
 namespace banjo_transport {
 
 zx::result<> ParentBanjoTransportDriver::Start() {
-  node_.Bind(std::move(node()));
-
   auto child_name = "banjo-transport-child";
 
   // Initialize our compat server with a banjo config from |banjo_server_|.
@@ -27,26 +25,16 @@ zx::result<> ParentBanjoTransportDriver::Start() {
 
   // Add a child device node and offer the service capabilities.
   // Offer `fuchsia.examples.gizmo.Service` to the driver that binds to the node.
-  auto args = fuchsia_driver_framework::NodeAddArgs({
-      .name = child_name,
-      .properties = {{banjo_server_.property(),
-                      fdf::MakeProperty(bind_gizmo_example::TEST_NODE_ID, "banjo_child")}},
-      .offers2 = child_.CreateOffers2(),
-  });
-
-  // Create endpoints of the `NodeController` for the node.
-  auto [client_end, server_end] =
-      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
-
-  auto result = node_->AddChild({std::move(args), std::move(server_end), {}});
-  if (result.is_error()) {
-    const auto& error = result.error_value();
-    FDF_SLOG(ERROR, "Failed to add child", KV("status", error.FormatDescription()));
-    return zx::error(error.is_domain_error() ? static_cast<uint32_t>(error.domain_error())
-                                             : error.framework_error().status());
+  zx::result child_result =
+      AddChild(child_name,
+               {{banjo_server_.property(),
+                 fdf::MakeProperty(bind_gizmo_example::TEST_NODE_ID, "banjo_child")}},
+               child_.CreateOffers2());
+  if (child_result.is_error()) {
+    return child_result.take_error();
   }
-  controller_.Bind(std::move(client_end), dispatcher());
 
+  controller_.Bind(std::move(child_result.value()), dispatcher());
   return zx::ok();
 }
 

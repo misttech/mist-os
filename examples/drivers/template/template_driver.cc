@@ -26,26 +26,13 @@ zx::result<> TemplateDriver::Start() {
   auto child_name = "example_child";
 
   // Add a child node.
-  fidl::Arena arena;
-  auto properties = std::vector{fdf::MakeProperty(arena, bind_fuchsia_test::TEST_CHILD, "simple")};
-  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                  .name(arena, child_name)
-                  .properties(arena, std::move(properties))
-                  .Build();
-
-  zx::result controller_endpoints =
-      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed to create endpoints: %s",
-                controller_endpoints.status_string());
-  child_controller_.Bind(std::move(controller_endpoints->client));
-
-  fidl::WireResult result =
-      fidl::WireCall(node())->AddChild(args, std::move(controller_endpoints->server), {});
-  if (!result.ok()) {
-    FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
-    return zx::error(result.status());
+  auto properties = std::vector{fdf::MakeProperty(bind_fuchsia_test::TEST_CHILD, "simple")};
+  zx::result child_result = AddChild(child_name, properties, {});
+  if (child_result.is_error()) {
+    return child_result.take_error();
   }
 
+  child_controller_.Bind(std::move(child_result.value()));
   return zx::ok();
 }
 

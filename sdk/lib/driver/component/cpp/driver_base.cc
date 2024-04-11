@@ -78,6 +78,32 @@ cpp20::span<const fuchsia_driver_framework::NodeProperty> DriverBase::node_prope
   return {it->second};
 }
 
+#if __Fuchsia_API_level__ >= 18
+
+zx::result<OwnedChildNode> DriverBase::AddOwnedChild(std::string_view node_name) {
+  return fdf::AddOwnedChild(node(), logger(), node_name);
+}
+
+zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> DriverBase::AddChild(
+    std::string_view node_name, const fuchsia_driver_framework::NodePropertyVector& properties,
+    const std::vector<fuchsia_driver_framework::Offer>& offers) {
+  return fdf::AddChild(node(), logger(), node_name, properties, offers);
+}
+
+zx::result<OwnedChildNode> DriverBase::AddOwnedChild(
+    std::string_view node_name, fuchsia_driver_framework::DevfsAddArgs& devfs_args) {
+  return fdf::AddOwnedChild(node(), logger(), node_name, devfs_args);
+}
+
+zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> DriverBase::AddChild(
+    std::string_view node_name, fuchsia_driver_framework::DevfsAddArgs& devfs_args,
+    const fuchsia_driver_framework::NodePropertyVector& properties,
+    const std::vector<fuchsia_driver_framework::Offer>& offers) {
+  return fdf::AddChild(node(), logger(), node_name, devfs_args, properties, offers);
+}
+
+#endif  // __Fuchsia_API_level__ >= 18
+
 DriverBase::~DriverBase() { Logger::SetGlobalInstance(nullptr); }
 
 }  // namespace fdf

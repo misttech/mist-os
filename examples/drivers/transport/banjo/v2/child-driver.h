@@ -29,7 +29,6 @@ class ChildBanjoTransportDriver : public fdf::DriverBase {
 
  private:
   ddk::MiscProtocolClient client_;
-  fidl::SyncClient<fuchsia_driver_framework::Node> parent_node_;
   fidl::Client<fuchsia_driver_framework::NodeController> controller_;
 
   // Values queried from the parent driver through Banjo transport. Set in Start().

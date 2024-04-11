@@ -11,8 +11,6 @@
 namespace banjo_transport {
 
 zx::result<> ChildBanjoTransportDriver::Start() {
-  parent_node_.Bind(std::move(node()));
-
   // Connect to the `fuchsia.examples.gizmo.Misc` protocol provided by the parent.
   zx::result<ddk::MiscProtocolClient> client =
       compat::ConnectBanjo<ddk::MiscProtocolClient>(incoming());
@@ -28,22 +26,12 @@ zx::result<> ChildBanjoTransportDriver::Start() {
     return zx::error(status);
   }
 
-  // Create endpoints of the `NodeController` for a child node.
-  auto [client_end, server_end] =
-      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
-
-  // Add the child node.
-  auto args = fuchsia_driver_framework::NodeAddArgs({
-      .name = "transport-child",
-  });
-  auto result = parent_node_->AddChild({std::move(args), std::move(server_end), {}});
-  if (result.is_error()) {
-    const auto& error = result.error_value();
-    FDF_SLOG(ERROR, "Failed to add child", KV("status", error.FormatDescription()));
-    return zx::error(error.is_domain_error() ? static_cast<uint32_t>(error.domain_error())
-                                             : error.framework_error().status());
+  zx::result child_result = AddChild("transport-child", {}, {});
+  if (child_result.is_error()) {
+    return child_result.take_error();
   }
-  controller_.Bind(std::move(client_end), dispatcher());
+
+  controller_.Bind(std::move(child_result.value()), dispatcher());
   return zx::ok();
 }
 

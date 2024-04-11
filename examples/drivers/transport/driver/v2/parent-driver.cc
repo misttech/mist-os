@@ -24,26 +24,13 @@ zx::result<> ParentDriverTransportDriver::Start() {
   }
 
   // Add a child with a `fuchsia.examples.gizmo.Service` offer.
-  fidl::Arena arena;
-  fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers(arena, 1);
-  offers[0] = fdf::MakeOffer2<fuchsia_examples_gizmo::Service>(arena);
-
-  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                  .name(arena, "driver_transport_child")
-                  .offers2(offers)
-                  .Build();
-
-  // Create endpoints of the `NodeController` for the child node.
-  auto [client_end, server_end] =
-      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
-
-  auto child_result = fidl::WireCall(node())->AddChild(args, std::move(server_end), {});
-  if (!child_result.ok()) {
-    FDF_SLOG(ERROR, "Failed to add child", KV("status", child_result.status_string()));
-    return zx::error(child_result.status());
+  zx::result child_result =
+      AddChild("driver_transport_child", {}, {fdf::MakeOffer2<fuchsia_examples_gizmo::Service>()});
+  if (child_result.is_error()) {
+    return child_result.take_error();
   }
 
-  controller_.Bind(std::move(client_end), dispatcher());
+  controller_.Bind(std::move(child_result.value()), dispatcher());
   return zx::ok();
 }
 

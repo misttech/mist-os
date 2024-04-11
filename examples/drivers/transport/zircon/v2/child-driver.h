@@ -24,7 +24,6 @@ class ChildZirconTransportDriver : public fdf::DriverBase {
 
  private:
   zx::result<> QueryParent(fidl::ClientEnd<fuchsia_examples_gizmo::Device> client_end);
-  zx::result<> AddChild(std::string_view node_name);
 
   uint32_t hardware_id_;
   uint32_t major_version_;

@@ -13,6 +13,7 @@
 #include <lib/driver/component/cpp/start_completer.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/node/cpp/add_child.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/inspect/component/cpp/component.h>
@@ -219,6 +220,45 @@ class DriverBase {
   //
   // To avoid data races, subsequent calls are ignored are not an error.
   void InitInspectorExactlyOnce(inspect::Inspector inspector);
+
+#if __Fuchsia_API_level__ >= 18
+
+  // Creates an owned child node on the node that the driver is bound to. The driver framework will
+  // NOT try to match and bind a driver to this child as it is owned by the current driver.
+  //
+  // The |node()| must not have been moved out manually by the user. This is a synchronous call
+  // and requires that the dispatcher allow sync calls.
+  zx::result<OwnedChildNode> AddOwnedChild(std::string_view node_name);
+
+  // Creates a child node with the given offers and properties on the node that the driver is
+  // bound to. The driver framework will try to match and bind a driver to this child.
+  //
+  // The |node()| must not have been moved out manually by the user. This is a synchronous call
+  // and requires that the dispatcher allow sync calls.
+  zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChild(
+      std::string_view node_name, const fuchsia_driver_framework::NodePropertyVector& properties,
+      const std::vector<fuchsia_driver_framework::Offer>& offers);
+
+  // Creates an owned child node with devfs support on the node that the driver is bound to. The
+  // driver framework will NOT try to match and bind a driver to this child as it is already owned
+  // by the current driver.
+  //
+  // The |node()| must not have been moved out manually by the user. This is a synchronous call
+  // and requires that the dispatcher allow sync calls.
+  zx::result<OwnedChildNode> AddOwnedChild(std::string_view node_name,
+                                           fuchsia_driver_framework::DevfsAddArgs& devfs_args);
+
+  // Creates a child node with devfs support and the given offers and properties on the node that
+  // the driver is bound to. The driver framework will try to match and bind a driver to this child.
+  //
+  // The |node()| must not have been moved out manually by the user. This is a synchronous call
+  // and requires that the dispatcher allow sync calls.
+  zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChild(
+      std::string_view node_name, fuchsia_driver_framework::DevfsAddArgs& devfs_args,
+      const fuchsia_driver_framework::NodePropertyVector& properties,
+      const std::vector<fuchsia_driver_framework::Offer>& offers);
+
+#endif  // __Fuchsia_API_level__ >= 18
 
  private:
   void InitializeAndServe(Namespace incoming,

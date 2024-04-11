@@ -21,11 +21,12 @@ zx::result<> ChildZirconTransportDriver::Start() {
     return result.take_error();
   }
 
-  result = AddChild("transport-child");
-  if (result.is_error()) {
-    return result.take_error();
+  zx::result child_result = AddChild("transport-child", {}, {});
+  if (child_result.is_error()) {
+    return child_result.take_error();
   }
 
+  controller_.Bind(std::move(child_result.value()), dispatcher());
   return zx::ok();
 }
 
@@ -63,25 +64,6 @@ zx::result<> ChildZirconTransportDriver::QueryParent(
   major_version_ = firmware_result.value().value()->major;
   minor_version_ = firmware_result.value().value()->minor;
   FDF_LOG(INFO, "Transport client firmware: %d.%d", major_version_, minor_version_);
-
-  return zx::ok();
-}
-
-zx::result<> ChildZirconTransportDriver::AddChild(std::string_view node_name) {
-  fidl::Arena arena;
-  auto args =
-      fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, node_name).Build();
-
-  // Create endpoints of the `NodeController` for the node.
-  auto [client_end, server_end] =
-      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
-
-  fidl::WireResult result = fidl::WireCall(node())->AddChild(args, std::move(server_end), {});
-  if (!result.ok()) {
-    FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
-    return zx::error(result.status());
-  }
-  controller_.Bind(std::move(client_end), dispatcher());
 
   return zx::ok();
 }

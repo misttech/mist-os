@@ -34,7 +34,6 @@ class ParentBanjoTransportDriver : public fdf::DriverBase,
     return config;
   }
 
-  fidl::SyncClient<fuchsia_driver_framework::Node> node_;
   fidl::Client<fuchsia_driver_framework::NodeController> controller_;
 
   compat::BanjoServer banjo_server_{bind_fuchsia_platform::BIND_PROTOCOL_MISC, this,

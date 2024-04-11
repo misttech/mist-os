@@ -61,6 +61,7 @@ cc_source_library://pkg/driver_component_cpp
 cc_source_library://pkg/driver_devfs_cpp
 cc_source_library://pkg/driver_incoming_cpp
 cc_source_library://pkg/driver_logging_cpp
+cc_source_library://pkg/driver_node_cpp
 cc_source_library://pkg/driver_outgoing_cpp
 cc_source_library://pkg/driver_runtime
 cc_source_library://pkg/driver_runtime_cpp
