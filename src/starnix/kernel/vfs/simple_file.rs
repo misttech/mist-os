@@ -6,11 +6,12 @@ use crate::{
     task::{CurrentTask, Kernel},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_seekable, fs_node_impl_not_dir, FileObject, FileOps, FsNode, FsNodeOps,
+        fileops_impl_seekable, fs_node_impl_not_dir, FileObject, FileOps, FsNode, FsNodeInfo,
+        FsNodeOps,
     },
 };
 
-use starnix_sync::{FileOpsCore, Locked, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, RwLock, WriteOps};
 use starnix_uapi::{
     as_any::AsAny, auth::Capabilities, errno, error, errors::Errno, file_mode::Access,
     open_flags::OpenFlags,
@@ -57,16 +58,17 @@ where
 
     fn check_access(
         &self,
-        _node: &FsNode,
+        node: &FsNode,
         current_task: &CurrentTask,
-        _access: Access,
+        access: Access,
+        info: &RwLock<FsNodeInfo>,
     ) -> Result<(), Errno> {
         if self.capabilities != Capabilities::empty()
             && current_task.creds().has_capability(self.capabilities)
         {
             Ok(())
         } else {
-            error!(ENOSYS)
+            node.default_check_access_impl(current_task, access, info.read())
         }
     }
 

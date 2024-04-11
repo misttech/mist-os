@@ -819,9 +819,10 @@ impl FsNodeOps for Arc<FuseNode> {
         node: &FsNode,
         current_task: &CurrentTask,
         access: Access,
+        info: &RwLock<FsNodeInfo>,
     ) -> Result<(), Errno> {
         if FuseFs::from_fs(&node.fs())?.default_permissions {
-            return Errno::fail(ENOSYS);
+            return node.default_check_access_impl(current_task, access, info.read());
         }
 
         let response = self.connection.lock().execute_operation(

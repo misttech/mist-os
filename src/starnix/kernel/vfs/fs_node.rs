@@ -38,7 +38,7 @@ use starnix_uapi::{
     },
     device_type::DeviceType,
     errno, error,
-    errors::{Errno, EACCES, ENOSYS},
+    errors::{Errno, EACCES},
     file_mode::{mode, Access, FileMode},
     fsverity_descriptor, gid_t, ino_t,
     open_flags::OpenFlags,
@@ -498,15 +498,15 @@ impl FallocMode {
 }
 
 pub trait FsNodeOps: Send + Sync + AsAny + 'static {
-    /// Delegate the access check to the node. Returns `Err(ENOSYS)` if the kernel must handle the
-    /// access check by itself.
+    /// Delegate the access check to the node.
     fn check_access(
         &self,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _access: Access,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        access: Access,
+        info: &RwLock<FsNodeInfo>,
     ) -> Result<(), Errno> {
-        Errno::fail(ENOSYS)
+        node.default_check_access_impl(current_task, access, info.read())
     }
 
     /// Build the `FileOps` for the file associated to this node.
@@ -1556,30 +1556,14 @@ impl FsNode {
         }
     }
 
-    /// Check whether the node can be accessed in the current context with the specified access
-    /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
-    /// owner or is in the file's group.
-    pub fn check_access(
+    pub fn default_check_access_impl(
         &self,
         current_task: &CurrentTask,
-        mount: &MountInfo,
         access: Access,
+        info: RwLockReadGuard<'_, FsNodeInfo>,
     ) -> Result<(), Errno> {
-        if access.contains(Access::WRITE) {
-            mount.check_readonly_filesystem()?;
-        }
-
-        match self.ops.check_access(self, current_task, access) {
-            // Use the default access checks.
-            Err(e) if e == ENOSYS => {}
-            // The node implementation handled the access check.
-            result @ _ => return result,
-        }
-
-        let (node_uid, node_gid, mode) = {
-            let info = self.info();
-            (info.uid, info.gid, info.mode.bits())
-        };
+        let (node_uid, node_gid, mode) = (info.uid, info.gid, info.mode.bits());
+        std::mem::drop(info);
         let creds = current_task.creds();
 
         let mode_flags = if creds.has_capability(CAP_DAC_OVERRIDE) {
@@ -1601,6 +1585,22 @@ impl FsNode {
         }
 
         Ok(())
+    }
+
+    /// Check whether the node can be accessed in the current context with the specified access
+    /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
+    /// owner or is in the file's group.
+    pub fn check_access(
+        &self,
+        current_task: &CurrentTask,
+        mount: &MountInfo,
+        access: Access,
+    ) -> Result<(), Errno> {
+        if access.contains(Access::WRITE) {
+            mount.check_readonly_filesystem()?;
+        }
+
+        self.ops.check_access(self, current_task, access, &self.info)
     }
 
     /// Check whether the stick bit, `S_ISVTX`, forbids the `current_task` from removing the given
