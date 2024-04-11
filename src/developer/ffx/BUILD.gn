@@ -156,6 +156,9 @@ if (is_host) {
     deps = [
       # This will bring in all built-in subtool config.json files.
       "//src/developer/ffx/frontends/ffx:config.json($host_toolchain)",
+
+      # These are separate subtools with plugin-generated config.json
+      "//src/developer/ffx/plugins/trace:config.json($host_toolchain)",
     ]
 
     foreach(dep, deps) {
