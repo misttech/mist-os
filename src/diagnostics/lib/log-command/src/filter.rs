@@ -98,6 +98,9 @@ impl LogFilterCriteria {
     pub fn matches(&self, entry: &LogEntry) -> bool {
         match entry {
             LogEntry { data: LogData::TargetLog(data), .. } => self.match_filters_to_log_data(data),
+            LogEntry { data: LogData::SymbolizedTargetLog(data, _), .. } => {
+                self.match_filters_to_log_data(data)
+            }
         }
     }
 
@@ -224,6 +227,7 @@ impl LogFilterCriteria {
 
 #[cfg(test)]
 mod test {
+    use assert_matches::assert_matches;
     use diagnostics_data::Timestamp;
     use selectors::parse_log_interest_selector;
     use std::time::Duration;
@@ -810,7 +814,7 @@ mod test {
             .into()
         )));
 
-        let entry = make_log_entry(
+        let mut entry = make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
                 component_url: Some(String::default()),
@@ -820,6 +824,10 @@ mod test {
             .set_message("included message")
             .build()
             .into(),
+        );
+        entry.data = assert_matches!(
+            entry.data.clone(),
+            LogData::TargetLog(d) => LogData::SymbolizedTargetLog(d, "symbolized".to_string())
         );
 
         assert!(!criteria.matches(&entry));

@@ -35,6 +35,8 @@ pub enum EventType {
 pub enum LogData {
     /// A log entry from the target
     TargetLog(LogsData),
+    /// A symbolized log (Original log, Symbolizer output)
+    SymbolizedTargetLog(LogsData, String),
 }
 
 impl LogData {
@@ -42,12 +44,22 @@ impl LogData {
     pub fn as_target_log(&self) -> Option<&LogsData> {
         match self {
             LogData::TargetLog(log) => Some(log),
+            _ => None,
+        }
+    }
+
+    /// Gets the LogData as a symbolized log.
+    pub fn as_symbolized_log(&self) -> Option<(&LogsData, &String)> {
+        match self {
+            LogData::SymbolizedTargetLog(log, message) => Some((log, message)),
+            _ => None,
         }
     }
 
     pub fn as_target_log_mut(&mut self) -> Option<&mut LogsData> {
         match self {
             LogData::TargetLog(log) => Some(log),
+            _ => None,
         }
     }
 }
@@ -181,11 +193,18 @@ pub struct LogFormatterOptions {
     pub since: Option<DeviceOrLocalTimestamp>,
     /// Only display logs until the specified time.
     pub until: Option<DeviceOrLocalTimestamp>,
+    /// If true, displays "raw" logs without symbolization.
+    pub raw: bool,
 }
 
 impl Default for LogFormatterOptions {
     fn default() -> Self {
-        LogFormatterOptions { display: Some(Default::default()), since: None, until: None }
+        LogFormatterOptions {
+            display: Some(Default::default()),
+            raw: false,
+            since: None,
+            until: None,
+        }
     }
 }
 
@@ -241,6 +260,11 @@ where
             }
             None => {
                 match log_entry {
+                    LogEntry { data: LogData::SymbolizedTargetLog(_, ref symbolized), .. } => {
+                        if !self.options.raw && symbolized.is_empty() {
+                            return Ok(());
+                        }
+                    }
                     _ => {}
                 }
                 self.writer.item(&log_entry)?;
@@ -337,6 +361,7 @@ where
                         ..Default::default()
                     })
                 },
+                raw: cmd.raw,
                 since: DeviceOrLocalTimestamp::new(
                     cmd.since.as_ref(),
                     cmd.since_monotonic.as_ref(),
@@ -386,6 +411,17 @@ where
             LogEntry { data: LogData::TargetLog(data), .. } => {
                 // TODO(https://fxbug.dev/42072442): Add support for log spam redaction and other
                 // features listed in the design doc.
+                writeln!(self.writer, "{}", LogTextPresenter::new(&data, text_options))?;
+            }
+            LogEntry { data: LogData::SymbolizedTargetLog(mut data, symbolized), .. } => {
+                if !options.raw && symbolized.is_empty() {
+                    return Ok(());
+                }
+                if !options.raw {
+                    *data.msg_mut().expect(
+                        "if a symbolized message is provided then the payload has a message",
+                    ) = symbolized;
+                }
                 writeln!(self.writer, "{}", LogTextPresenter::new(&data, text_options))?;
             }
         })
@@ -450,15 +486,16 @@ mod test {
     /// Symbolizer that prints "Fuchsia".
     pub struct FakeFuchsiaSymbolizer;
 
-    fn set_log_msg(entry: &mut LogEntry, msg: impl Into<String>) {
-        *entry.data.as_target_log_mut().unwrap().msg_mut().unwrap() = msg.into();
-    }
-
     #[async_trait(?Send)]
     impl Symbolize for FakeFuchsiaSymbolizer {
-        async fn symbolize(&self, mut entry: LogEntry) -> Option<LogEntry> {
-            set_log_msg(&mut entry, "Fuchsia");
-            Some(entry)
+        async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry> {
+            Some(LogEntry {
+                data: LogData::SymbolizedTargetLog(
+                    entry.data.as_target_log().unwrap().clone(),
+                    "Fuchsia".to_string(),
+                ),
+                timestamp: entry.timestamp,
+            })
         }
     }
 
@@ -474,13 +511,20 @@ mod test {
 
     #[async_trait(?Send)]
     impl Symbolize for FakeSymbolizerCallback {
-        async fn symbolize(&self, mut input: LogEntry) -> Option<LogEntry> {
+        async fn symbolize(&self, input: LogEntry) -> Option<LogEntry> {
             self.should_discard.set(!self.should_discard.get());
             if self.should_discard.get() {
                 None
             } else {
-                set_log_msg(&mut input, "symbolized log");
-                Some(input)
+                let timestamp = input.timestamp;
+                Some(LogEntry {
+                    timestamp,
+                    data: LogData::SymbolizedTargetLog(
+                        input.data.as_target_log().unwrap().clone(),
+                        "symbolized log".into(),
+                    ),
+                    ..log_entry()
+                })
             }
         }
     }
@@ -800,6 +844,22 @@ mod test {
         );
     }
 
+    #[fuchsia::test]
+    async fn test_default_formatter_symbolized_log_message() {
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let options = LogFormatterOptions::default();
+        let mut formatter = DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options);
+        let mut entry = log_entry();
+        entry.data = assert_matches!(entry.data.clone(), LogData::TargetLog(d)=>LogData::SymbolizedTargetLog(d, "symbolized".to_string()));
+        formatter.push_log(entry).await.unwrap();
+        drop(formatter);
+        assert_eq!(
+            buffers.into_stdout_str(),
+            "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: symbolized\n"
+        );
+    }
+
     fn emit_log(
         sender: &mut fuchsia_zircon::Socket,
         msg: &str,
@@ -824,17 +884,15 @@ mod test {
     async fn test_default_formatter_discards_when_told_by_symbolizer() {
         let mut formatter = FakeFormatter::new();
         let (mut sender, receiver) = fuchsia_zircon::Socket::create_stream();
-        let mut target_log_0 = emit_log(&mut sender, "Hello world!", 0);
+        let target_log_0 = emit_log(&mut sender, "Hello world!", 0);
         emit_log(&mut sender, "Dropped world!", 1);
-        let mut target_log_2 = emit_log(&mut sender, "Hello world!", 2);
+        let target_log_2 = emit_log(&mut sender, "Hello world!", 2);
         emit_log(&mut sender, "Dropped world!", 3);
-        let mut target_log_4 = emit_log(&mut sender, "Hello world!", 4);
+        let target_log_4 = emit_log(&mut sender, "Hello world!", 4);
         drop(sender);
         // Drop every other log.
         let symbolizer = FakeSymbolizerCallback::new();
-        *target_log_0.msg_mut().unwrap() = "symbolized log".into();
-        *target_log_2.msg_mut().unwrap() = "symbolized log".into();
-        *target_log_4.msg_mut().unwrap() = "symbolized log".into();
+
         dump_logs_from_socket(
             fuchsia_async::Socket::from_socket(receiver),
             &mut formatter,
@@ -845,22 +903,109 @@ mod test {
         assert_eq!(
             formatter.logs,
             vec![
-                LogEntry { data: LogData::TargetLog(target_log_0), timestamp: Timestamp::from(0) },
-                LogEntry { data: LogData::TargetLog(target_log_2), timestamp: Timestamp::from(2) },
-                LogEntry { data: LogData::TargetLog(target_log_4), timestamp: Timestamp::from(4) }
+                LogEntry {
+                    data: LogData::SymbolizedTargetLog(target_log_0, "symbolized log".into()),
+                    timestamp: Timestamp::from(0)
+                },
+                LogEntry {
+                    data: LogData::SymbolizedTargetLog(target_log_2, "symbolized log".into()),
+                    timestamp: Timestamp::from(2)
+                },
+                LogEntry {
+                    data: LogData::SymbolizedTargetLog(target_log_4, "symbolized log".into()),
+                    timestamp: Timestamp::from(4)
+                }
             ],
         );
     }
 
     #[fuchsia::test]
-    async fn test_symbolized_output() {
+    async fn test_default_formatter_symbolized_log_message_with_empty_discarded() {
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let options = LogFormatterOptions::default();
+        let mut formatter = DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options);
+        let mut entry = log_entry();
+        entry.data = match entry.data.clone() {
+            LogData::TargetLog(data) => LogData::SymbolizedTargetLog(data, "".into()),
+            _ => unreachable!(),
+        };
+        formatter.push_log(entry).await.unwrap();
+        drop(formatter);
+        assert_eq!(buffers.into_stdout_str().is_empty(), true);
+    }
+
+    #[fuchsia::test]
+    async fn test_default_formatter_symbolized_json_log_message() {
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(Some(Format::Json), &buffers);
+        let options = LogFormatterOptions { display: None, ..Default::default() };
+        let mut formatter = DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options);
+        let mut entry = log_entry();
+        entry.data = assert_matches!(entry.data.clone(), LogData::TargetLog(d)=>LogData::SymbolizedTargetLog(d, "symbolized".to_string()));
+        formatter.push_log(entry.clone()).await.unwrap();
+        drop(formatter);
+        assert_eq!(serde_json::from_str::<LogEntry>(&buffers.into_stdout_str()).unwrap(), entry);
+    }
+
+    #[fuchsia::test]
+    async fn test_default_formatter_symbolize_failed_json_log_message() {
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let options = LogFormatterOptions { display: None, ..Default::default() };
+        let mut formatter = DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options);
+        let mut entry = log_entry();
+        entry.data = assert_matches!(entry.data.clone(), LogData::TargetLog(d)=>LogData::SymbolizedTargetLog(d, "".to_string()));
+        formatter.push_log(entry.clone()).await.unwrap();
+        drop(formatter);
+        assert_eq!(buffers.into_stdout_str().is_empty(), true);
+    }
+
+    #[fuchsia::test]
+    async fn test_raw_omits_symbolized_output() {
         let symbolizer = FakeFuchsiaSymbolizer;
         let buffers = TestBuffers::default();
         let output = MachineWriter::<LogEntry>::new_test(None, &buffers);
         let mut formatter = DefaultLogFormatter::new(
             LogFilterCriteria::default(),
             output,
-            LogFormatterOptions { ..Default::default() },
+            LogFormatterOptions { raw: true, ..Default::default() },
+        );
+        formatter.set_boot_timestamp(0);
+        let target_log = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+            moniker: "ffx".into(),
+            timestamp_nanos: Timestamp::from(0),
+            component_url: Some("ffx".into()),
+            severity: Severity::Info,
+        })
+        .set_message("Hello world!")
+        .set_pid(1)
+        .set_tid(2)
+        .build();
+        let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
+        sender
+            .write(serde_json::to_string(&target_log).unwrap().as_bytes())
+            .expect("failed to write target log");
+        drop(sender);
+        dump_logs_from_socket(
+            fuchsia_async::Socket::from_socket(receiver),
+            &mut formatter,
+            &symbolizer,
+        )
+        .await
+        .unwrap();
+        assert_eq!(buffers.stdout.into_string(), "[00000.000000][1][2][ffx] INFO: Hello world!\n");
+    }
+
+    #[fuchsia::test]
+    async fn test_raw_false_includes_symbolized_output() {
+        let symbolizer = FakeFuchsiaSymbolizer;
+        let buffers = TestBuffers::default();
+        let output = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let mut formatter = DefaultLogFormatter::new(
+            LogFilterCriteria::default(),
+            output,
+            LogFormatterOptions { raw: false, ..Default::default() },
         );
         formatter.set_boot_timestamp(0);
         let target_log = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
