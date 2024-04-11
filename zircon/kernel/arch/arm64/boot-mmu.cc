@@ -48,9 +48,10 @@ static size_t vaddr_to_l3_index(uintptr_t addr) {
 __NO_SAFESTACK
 static inline zx_status_t _arm64_boot_map(pte_t* kernel_table0, const vaddr_t vaddr,
                                           const paddr_t paddr, const size_t len, const pte_t flags,
-                                          paddr_t (*alloc_func)(), pte_t* phys_to_virt(paddr_t)) {
+                                          paddr_t (*alloc_func)(), pte_t* phys_to_virt(paddr_t),
+                                          const bool allow_large_pages) {
   // loop through the virtual range and map each physical page, using the largest
-  // page size supported. Allocates necessar page tables along the way.
+  // page size supported. Allocates necessary page tables along the way.
   size_t off = 0;
   while (off < len) {
     // make sure the level 1 pointer is valid
@@ -77,7 +78,7 @@ static inline zx_status_t _arm64_boot_map(pte_t* kernel_table0, const vaddr_t va
     switch (kernel_table1[index1] & MMU_PTE_DESCRIPTOR_MASK) {
       default: {  // invalid/unused entry
         // a large page at this level is 1GB long, see if we can make one here
-        if ((((vaddr + off) & l1_large_page_size_mask) == 0) &&
+        if (allow_large_pages && (((vaddr + off) & l1_large_page_size_mask) == 0) &&
             (((paddr + off) & l1_large_page_size_mask) == 0) && (len - off) >= l1_large_page_size) {
           // set up a 1GB page here
           kernel_table1[index1] =
@@ -106,7 +107,7 @@ static inline zx_status_t _arm64_boot_map(pte_t* kernel_table0, const vaddr_t va
     switch (kernel_table2[index2] & MMU_PTE_DESCRIPTOR_MASK) {
       default: {  // invalid/unused entry
         // a large page at this level is 2MB long, see if we can make one here
-        if ((((vaddr + off) & l2_large_page_size_mask) == 0) &&
+        if (allow_large_pages && (((vaddr + off) & l2_large_page_size_mask) == 0) &&
             (((paddr + off) & l2_large_page_size_mask) == 0) && (len - off) >= l2_large_page_size) {
           // set up a 2MB page here
           kernel_table2[index2] =
@@ -144,7 +145,8 @@ static inline zx_status_t _arm64_boot_map(pte_t* kernel_table0, const vaddr_t va
 // physically to KERNEL_BASE
 __NO_SAFESTACK
 extern "C" zx_status_t arm64_boot_map(pte_t* kernel_table0, const vaddr_t vaddr,
-                                      const paddr_t paddr, const size_t len, const pte_t flags) {
+                                      const paddr_t paddr, const size_t len, const pte_t flags,
+                                      bool allow_large_pages) {
   // the following helper routines assume that code is running in physical addressing mode (mmu
   // off). any physical addresses calculated are assumed to be the same as virtual
   auto alloc = []() __NO_SAFESTACK -> paddr_t {
@@ -165,13 +167,14 @@ extern "C" zx_status_t arm64_boot_map(pte_t* kernel_table0, const vaddr_t vaddr,
   auto phys_to_virt = [](paddr_t pa)
                           __NO_SAFESTACK -> pte_t* { return reinterpret_cast<pte_t*>(pa); };
 
-  return _arm64_boot_map(kernel_table0, vaddr, paddr, len, flags, alloc, phys_to_virt);
+  return _arm64_boot_map(kernel_table0, vaddr, paddr, len, flags, alloc, phys_to_virt,
+                         allow_large_pages);
 }
 
 // called a bit later in the boot process once the kernel is in virtual memory to map early kernel
 // data
 zx_status_t arm64_boot_map_v(const vaddr_t vaddr, const paddr_t paddr, const size_t len,
-                             const pte_t flags) {
+                             const pte_t flags, bool allow_large_pages) {
   // assumed to be running with virtual memory enabled, so use a slightly different set of routines
   // to allocate and find the virtual mapping of memory
   auto alloc = []() -> paddr_t {
@@ -189,5 +192,6 @@ zx_status_t arm64_boot_map_v(const vaddr_t vaddr, const paddr_t paddr, const siz
     return reinterpret_cast<pte_t*>(paddr_to_physmap(pa));
   };
 
-  return _arm64_boot_map(arm64_get_kernel_ptable(), vaddr, paddr, len, flags, alloc, phys_to_virt);
+  return _arm64_boot_map(arm64_get_kernel_ptable(), vaddr, paddr, len, flags, alloc, phys_to_virt,
+                         allow_large_pages);
 }

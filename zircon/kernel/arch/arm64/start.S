@@ -173,6 +173,7 @@ ImageFixup = AfterImageFixup
     mov     x2, 0
     mov     x3, ARCH_PHYSMAP_SIZE
     movlit  x4, MMU_PTE_KERNEL_DATA_FLAGS
+    mov     x5, 1 /* allow large pages */
     bl      arm64_boot_map
 
     /* map the kernel to a fixed address */
@@ -183,6 +184,7 @@ ImageFixup = AfterImageFixup
     adr_global x3, _end
     sub     x3, x3, x2
     movlit  x4, MMU_PTE_KERNEL_RWX_FLAGS
+    mov     x5, 0 /* no large pages to map the kernel */
     bl      arm64_boot_map
 
     /* Prepare tt_trampoline page table.

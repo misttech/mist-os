@@ -466,9 +466,10 @@ const uint16_t MMU_ARM64_MAX_USER_ASID_16 = (1u << 16) - 1;
 pte_t* arm64_get_kernel_ptable();
 
 extern "C" zx_status_t arm64_boot_map(pte_t* kernel_table0, const vaddr_t vaddr,
-                                      const paddr_t paddr, const size_t len, const pte_t flags);
+                                      const paddr_t paddr, const size_t len, const pte_t pte_flags,
+                                      bool allow_large_pages);
 zx_status_t arm64_boot_map_v(const vaddr_t vaddr, const paddr_t paddr, const size_t len,
-                             const pte_t flags);
+                             const pte_t pte_flags, bool allow_large_pages);
 
 // use built-in virtual to physical translation instructions to query
 // the physical address of a virtual address

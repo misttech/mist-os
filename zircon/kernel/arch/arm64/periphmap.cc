@@ -305,7 +305,7 @@ zx_status_t add_periph_range(paddr_t base_phys, size_t length) {
   for (auto& range : periph_ranges) {
     if (range.length == 0) {
       base_virt -= length;
-      auto status = arm64_boot_map_v(base_virt, base_phys, length, MMU_INITIAL_MAP_DEVICE);
+      auto status = arm64_boot_map_v(base_virt, base_phys, length, MMU_INITIAL_MAP_DEVICE, true);
       if (status == ZX_OK) {
         range.base_phys = base_phys;
         range.base_virt = base_virt;
