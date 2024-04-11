@@ -70,11 +70,6 @@ fuchsia_structured_config_rust_lib("httpsdate_config") {
   cm_label = ":manifest"
 }
 
-fuchsia_structured_config_values("httpsdate-config-values") {
-  cm_label = ":manifest"
-  values_source = "config/values.json5"
-}
-
 fuchsia_component("service") {
   cm_label = ":manifest"
   deps = [ ":bin" ]
@@ -96,16 +91,9 @@ fuchsia_package("httpsdate-time-source") {
   ]
 }
 
-fuchsia_structured_config_values("httpsdate-config-values-pull-api") {
-  cm_label = ":manifest"
-  values_source = "config/values-pull.json5"
-}
-
 fuchsia_package("httpsdate-time-source-pull") {
-  deps = [
-    ":httpsdate-config-values-pull-api",
-    ":service",
-  ]
+  deps = [ ":service" ]
+  validate_structured_config = false
 }
 
 group("tests") {

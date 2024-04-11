@@ -33,6 +33,8 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
         // See: b/299320231
         let early_exit = context.board_info.provides_feature("fuchsia::soft_crypto");
 
+        // Refer to //src/sys/time/timekeeper/config.shard.cml
+        // for details.
         config_builder
             .field("disable_delays", false)?
             .field("oscillator_error_std_dev_ppm", 15)?
@@ -52,7 +54,27 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             .field("early_exit", early_exit)?
             // TODO: b/295537795 - provide this setting somehow.
             .field("power_topology_integration_enabled", false)?
-            .field("rtc_is_read_only", false)?;
+            .field("rtc_is_read_only", config.rtc_is_read_only)?;
+
+        let mut time_source_config_builder = builder
+            .package("httpsdate-time-source-pull")
+            .component("meta/httpsdate_time_source.cm")
+            .context("while finding the time source component")?;
+
+        // Refer to //src/sys/time/httpsdate_time_source/meta/service.cml
+        // for details.
+        time_source_config_builder
+            .field("https_timeout_sec", 10)?
+            .field("standard_deviation_bound_percentage", 30)?
+            .field("first_rtt_time_factor", 5)?
+            .field("use_pull_api", true)?
+            .field("max_attempts_urgency_low", 3)?
+            .field("num_polls_urgency_low", 7)?
+            .field("max_attempts_urgency_medium", 3)?
+            .field("num_polls_urgency_medium", 5)?
+            .field("max_attempts_urgency_high", 3)?
+            .field("num_polls_urgency_high", 3)?
+            .field("time_source_endpoint_url", &*config.time_source_endpoint_url)?;
 
         Ok(())
     }
