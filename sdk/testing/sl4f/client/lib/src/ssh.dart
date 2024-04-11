@@ -42,12 +42,21 @@ class Ssh {
   /// the resolved path of `~/.ssh/fuchsia_ed25519`.
   final String? sshKeyPath;
 
+  static String _fixupIPv6Target(String target) {
+    if (target.startsWith('[') && target.endsWith(']')) {
+      return target.substring(1, target.length - 1);
+    }
+    return target;
+  }
+
   /// Builds an SSH object that uses the credentials from a file.
-  Ssh(this.target, String this.sshKeyPath, [this.sshPort])
-      : assert(target != null && target.isNotEmpty),
+  Ssh(String setTarget, String this.sshKeyPath, [this.sshPort])
+      : assert(setTarget != null && setTarget.isNotEmpty),
         assert(sshKeyPath != null && sshKeyPath.isNotEmpty),
-        assert(sshPort == null || sshPort > 0) {
+        assert(sshPort == null || sshPort > 0),
+        this.target = _fixupIPv6Target(setTarget) {
     _log.info('SSH key path: $sshKeyPath, setting owner only');
+    _log.info('SSH target: ${this.target}, port: ${sshPort}');
     // Swarming does not maintain file permissions any longer, so this file will
     // be world-readable when it arrives on the tester bot. Ensure that it's not
     // readable otherwise ssh will reject it. See https://fxbug.dev/42130911 and
