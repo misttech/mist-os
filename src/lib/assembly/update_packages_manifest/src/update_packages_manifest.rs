@@ -109,16 +109,17 @@ mod tests {
     fn update_packages_manifest() {
         let mut manifest = UpdatePackagesManifest::default();
         manifest.add("one/0".parse().unwrap(), [0u8; 32].into(), None).unwrap();
-        let package_manifest =
-            PackageManifestBuilder::new(MetaPackage::from_name("two".parse().unwrap()))
-                .repository("two.com")
-                .add_blob(BlobInfo {
-                    source_path: "source_path".into(),
-                    path: "meta/".into(),
-                    merkle: [0x22u8; 32].into(),
-                    size: 42,
-                })
-                .build();
+        let package_manifest = PackageManifestBuilder::new(
+            MetaPackage::from_name_and_variant_zero("two".parse().unwrap()),
+        )
+        .repository("two.com")
+        .add_blob(BlobInfo {
+            source_path: "source_path".into(),
+            path: "meta/".into(),
+            merkle: [0x22u8; 32].into(),
+            size: 42,
+        })
+        .build();
         manifest.add_by_manifest(&package_manifest).unwrap();
         let out = serde_json::to_value(&manifest).unwrap();
         assert_eq!(

@@ -83,7 +83,7 @@ impl Builder {
     pub(crate) fn new(name: PackageName) -> Self {
         Self {
             contents: HashMap::new(),
-            meta_package: MetaPackage::from_name(name),
+            meta_package: MetaPackage::from_name_and_variant_zero(name),
             subpackages: Vec::new(),
             blobs: BTreeMap::new(),
         }
@@ -171,7 +171,7 @@ mod test_package {
 
     #[test]
     fn test_create_package() {
-        let meta_package = MetaPackage::from_name("package-name".parse().unwrap());
+        let meta_package = MetaPackage::from_name_and_variant_zero("package-name".parse().unwrap());
 
         let subpackages = vec![
             SubpackageEntry {
@@ -261,7 +261,8 @@ mod test_package {
         .unwrap();
         let component_manifest_contents = "my_component.cml contents";
         let mut meta_package_json_bytes = vec![];
-        let meta_package = MetaPackage::from_name("my-package-name".parse().unwrap());
+        let meta_package =
+            MetaPackage::from_name_and_variant_zero("my-package-name".parse().unwrap());
         meta_package.serialize(&mut meta_package_json_bytes).unwrap();
 
         let subpackages = vec![

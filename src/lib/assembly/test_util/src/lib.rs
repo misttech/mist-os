@@ -36,7 +36,8 @@ pub fn generate_test_manifest(name: &str, file_path: Option<&Path>) -> PackageMa
         Some(path) => path.to_string_lossy().into_owned(),
         _ => format!("path/to/{}/file.txt", name),
     };
-    let builder = PackageManifestBuilder::new(MetaPackage::from_name(name.parse().unwrap()));
+    let builder =
+        PackageManifestBuilder::new(MetaPackage::from_name_and_variant_zero(name.parse().unwrap()));
     let builder = builder.repository("testrepository.com");
     let builder = builder.add_blob(BlobInfo {
         source_path: meta_source,

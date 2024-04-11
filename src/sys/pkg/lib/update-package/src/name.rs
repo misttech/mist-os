@@ -34,7 +34,7 @@ pub(crate) async fn verify(proxy: &fio::DirectoryProxy) -> Result<(), VerifyName
             .map_err(VerifyNameError::OpenMetaPackage)?;
     let contents = fuchsia_fs::file::read(&file).await.map_err(VerifyNameError::ReadMetaPackage)?;
 
-    let expected = MetaPackage::from_name("update".parse().unwrap());
+    let expected = MetaPackage::from_name_and_variant_zero("update".parse().unwrap());
 
     let actual =
         MetaPackage::deserialize(&mut &contents[..]).map_err(VerifyNameError::ParseMetaPackage)?;
@@ -56,7 +56,7 @@ mod tests {
     };
 
     fn make_meta_package(name: &str) -> Vec<u8> {
-        let meta_package = MetaPackage::from_name(name.parse().unwrap());
+        let meta_package = MetaPackage::from_name_and_variant_zero(name.parse().unwrap());
         let mut bytes = vec![];
         let () = meta_package.serialize(&mut bytes).unwrap();
         bytes
@@ -83,7 +83,7 @@ mod tests {
                 .verify_name()
                 .await,
             Err(VerifyNameError::Invalid(actual))
-                if actual == MetaPackage::from_name("invalid".parse().unwrap())
+                if actual == MetaPackage::from_name_and_variant_zero("invalid".parse().unwrap())
         );
     }
 

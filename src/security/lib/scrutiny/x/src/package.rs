@@ -480,8 +480,9 @@ pub(crate) mod test {
 
     /// Returns a pair (meta FAR hash, FAR bytes) for a placeholder package definition.
     pub(crate) fn placeholder_package_far() -> (Box<dyn api::Hash>, Vec<u8>) {
-        let meta_package =
-            FuchsiaMetaPackage::from_name(PackageName::from_str("placeholder").unwrap());
+        let meta_package = FuchsiaMetaPackage::from_name_and_variant_zero(
+            PackageName::from_str("placeholder").unwrap(),
+        );
         let mut meta_package_bytes = vec![];
         meta_package.serialize(&mut meta_package_bytes).unwrap();
 
@@ -576,8 +577,9 @@ mod tests {
             FuchsiaMerkleTree::from_reader(content_blob_content_str.as_bytes()).unwrap().root();
 
         // Define meta/package.
-        let meta_package =
-            FuchsiaMetaPackage::from_name(PackageName::from_str("frobinator").unwrap());
+        let meta_package = FuchsiaMetaPackage::from_name_and_variant_zero(
+            PackageName::from_str("frobinator").unwrap(),
+        );
         let mut meta_package_bytes = vec![];
         meta_package.serialize(&mut meta_package_bytes).unwrap();
 
@@ -777,8 +779,9 @@ mod tests {
     #[fuchsia::test]
     fn missing_meta_contents() {
         // Define meta/package.
-        let meta_package =
-            FuchsiaMetaPackage::from_name(PackageName::from_str("frobinator").unwrap());
+        let meta_package = FuchsiaMetaPackage::from_name_and_variant_zero(
+            PackageName::from_str("frobinator").unwrap(),
+        );
         let mut meta_package_bytes = vec![];
         meta_package.serialize(&mut meta_package_bytes).unwrap();
 
@@ -822,8 +825,9 @@ mod tests {
             Box::new(Hash::from(content_blob_fuchsia_hash.clone()));
 
         // Define meta/package.
-        let meta_package =
-            FuchsiaMetaPackage::from_name(PackageName::from_str("frobinator").unwrap());
+        let meta_package = FuchsiaMetaPackage::from_name_and_variant_zero(
+            PackageName::from_str("frobinator").unwrap(),
+        );
         let mut meta_package_bytes = vec![];
         meta_package.serialize(&mut meta_package_bytes).unwrap();
 

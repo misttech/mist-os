@@ -240,7 +240,9 @@ mod tests {
             Some(path) => path.as_ref().to_string_lossy().into_owned(),
             _ => format!("path/to/{}/file.txt", name),
         };
-        let builder = PackageManifestBuilder::new(MetaPackage::from_name(name.parse().unwrap()));
+        let builder = PackageManifestBuilder::new(MetaPackage::from_name_and_variant_zero(
+            name.parse().unwrap(),
+        ));
         let builder = builder.add_blob(BlobInfo {
             source_path: file_source,
             path: "data/file.txt".into(),

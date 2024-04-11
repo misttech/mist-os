@@ -219,8 +219,9 @@ impl PackageCopier {
 
         // Pass the package name from the manifest through to the builder, instead of
         // using the published name (the 'name' argument passed to this fn).
-        let mut builder =
-            PackageManifestBuilder::new(MetaPackage::from_name(manifest.name().clone()));
+        let mut builder = PackageManifestBuilder::new(MetaPackage::from_name_and_variant_zero(
+            manifest.name().clone(),
+        ));
 
         // Pass the repository through if it was set.
         if let Some(repository) = manifest.repository() {

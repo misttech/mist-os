@@ -1042,7 +1042,7 @@ mod tests {
     fn make_test_assembly_bundle(outdir: &Utf8Path, bundle_path: &Utf8Path) -> AssemblyInputBundle {
         let test_file_path = outdir.join("bootfs_files_package");
         let mut test_file = File::create(&test_file_path).unwrap();
-        let builder = PackageManifestBuilder::new(MetaPackage::from_name(
+        let builder = PackageManifestBuilder::new(MetaPackage::from_name_and_variant_zero(
             "bootfs_files_package".parse().unwrap(),
         ));
         let builder = builder.repository("testrepository.com");

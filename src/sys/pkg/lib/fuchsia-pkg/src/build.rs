@@ -204,7 +204,8 @@ mod test_build_with_file_system {
             {
                 if *resource_path == *"meta/package" {
                     let mut v = vec![];
-                    let meta_package = MetaPackage::from_name("my-package-name".parse().unwrap());
+                    let meta_package =
+                        MetaPackage::from_name_and_variant_zero("my-package-name".parse().unwrap());
                     meta_package.serialize(&mut v).unwrap();
                     content_map.insert(host_path.to_string(), v);
                 } else {
@@ -249,7 +250,8 @@ mod test_build_with_file_system {
         .unwrap();
         let component_manifest_contents = "my_component.cml contents";
         let mut v = vec![];
-        let meta_package = MetaPackage::from_name("my-package-name".parse().unwrap());
+        let meta_package =
+            MetaPackage::from_name_and_variant_zero("my-package-name".parse().unwrap());
         meta_package.serialize(&mut v).unwrap();
         let file_system = FakeFileSystem {
             content_map: hashmap! {
@@ -294,7 +296,8 @@ mod test_build_with_file_system {
         )
         .unwrap();
         let mut v = vec![];
-        let meta_package = MetaPackage::from_name("my-package-name".parse().unwrap());
+        let meta_package =
+            MetaPackage::from_name_and_variant_zero("my-package-name".parse().unwrap());
         meta_package.serialize(&mut v).unwrap();
         let file_system = FakeFileSystem {
             content_map: hashmap! {
@@ -466,7 +469,8 @@ mod test_build {
                 fs::create_dir_all(new_host_path.parent().unwrap()).unwrap();
                 let mut f = fs::File::create(&new_host_path).unwrap();
                 if *resource_path == *"meta/package" {
-                    let meta_package = MetaPackage::from_name("my-package-name".parse().unwrap());
+                    let meta_package =
+                        MetaPackage::from_name_and_variant_zero("my-package-name".parse().unwrap());
                     meta_package.serialize(f).unwrap();
                 } else {
                     let file_size = rng.gen_range(0..6000);

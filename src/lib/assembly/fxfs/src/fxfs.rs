@@ -135,7 +135,9 @@ mod tests {
         let source_path = file_path.as_ref().to_string_lossy().into_owned();
         let file = File::open(&file_path).unwrap();
         let merkle = MerkleTree::from_reader(&file).unwrap().root();
-        let builder = PackageManifestBuilder::new(MetaPackage::from_name(name.parse().unwrap()));
+        let builder = PackageManifestBuilder::new(MetaPackage::from_name_and_variant_zero(
+            name.parse().unwrap(),
+        ));
         let builder = builder.add_blob(BlobInfo {
             source_path,
             path: "data/file.txt".into(),

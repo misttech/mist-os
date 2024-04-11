@@ -898,7 +898,7 @@ mod tests {
             fs::create_dir(dir.path().join("meta")).unwrap();
             fs::create_dir(dir.path().join("data")).unwrap();
 
-            MetaPackage::from_name("asdf".parse().unwrap())
+            MetaPackage::from_name_and_variant_zero("asdf".parse().unwrap())
                 .serialize(File::create(dir.path().join("meta/package")).unwrap())
                 .unwrap();
 

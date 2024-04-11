@@ -21,8 +21,8 @@ pub struct MetaPackage {
 impl MetaPackage {
     pub const PATH: &'static str = "meta/package";
 
-    /// Create a `MetaPackage` with `name`.
-    pub fn from_name(name: PackageName) -> Self {
+    /// Create a `MetaPackage` with `name` and variant 0.
+    pub fn from_name_and_variant_zero(name: PackageName) -> Self {
         Self { name, variant: PackageVariant::zero() }
     }
 
@@ -112,14 +112,14 @@ mod tests {
 
     #[test]
     fn test_accessors() {
-        let meta_package = MetaPackage::from_name("foo".parse().unwrap());
+        let meta_package = MetaPackage::from_name_and_variant_zero("foo".parse().unwrap());
         assert_eq!(meta_package.name(), &"foo".parse::<PackageName>().unwrap());
         assert_eq!(meta_package.variant(), &"0".parse::<PackageVariant>().unwrap());
     }
 
     #[test]
     fn test_serialize() {
-        let meta_package = MetaPackage::from_name("package-name".parse().unwrap());
+        let meta_package = MetaPackage::from_name_and_variant_zero("package-name".parse().unwrap());
         let mut v: Vec<u8> = Vec::new();
 
         meta_package.serialize(&mut v).unwrap();

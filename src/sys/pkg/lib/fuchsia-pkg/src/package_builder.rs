@@ -557,7 +557,7 @@ fn create_meta_package_file(gendir: &Path, name: impl Into<String>) -> Result<St
     }
 
     let file = std::fs::File::create(&meta_package_path)?;
-    let meta_package = MetaPackage::from_name(package_name.try_into()?);
+    let meta_package = MetaPackage::from_name_and_variant_zero(package_name.try_into()?);
     meta_package.serialize(file)?;
     meta_package_path.path_to_string()
 }

@@ -248,7 +248,7 @@ mod test {
 
         let meta_package_path = root.join("package");
         let meta_package_file = File::create(&meta_package_path).unwrap();
-        let meta_package = MetaPackage::from_name("my-package".parse().unwrap());
+        let meta_package = MetaPackage::from_name_and_variant_zero("my-package".parse().unwrap());
         meta_package.serialize(meta_package_file).unwrap();
 
         let package_build_manifest_path = root.join("package-build.manifest");
@@ -325,7 +325,7 @@ mod test {
 
         let meta_package_path = root.join("package");
         let meta_package_file = File::create(&meta_package_path).unwrap();
-        let meta_package = MetaPackage::from_name("my-package".parse().unwrap());
+        let meta_package = MetaPackage::from_name_and_variant_zero("my-package".parse().unwrap());
         meta_package.serialize(meta_package_file).unwrap();
 
         let package_build_manifest_path = root.join("package-build.manifest");
@@ -408,7 +408,7 @@ mod test {
 
         let meta_package_path = root.join("package");
         let meta_package_file = File::create(&meta_package_path).unwrap();
-        let meta_package = MetaPackage::from_name("my-package".parse().unwrap());
+        let meta_package = MetaPackage::from_name_and_variant_zero("my-package".parse().unwrap());
         meta_package.serialize(meta_package_file).unwrap();
 
         let package_build_manifest_path = root.join("package-build.manifest");
@@ -504,7 +504,7 @@ mod test {
         // Write the MetaPackage file.
         let meta_package_path = root.join("package");
         let meta_package_file = File::create(&meta_package_path).unwrap();
-        let meta_package = MetaPackage::from_name("my-package".parse().unwrap());
+        let meta_package = MetaPackage::from_name_and_variant_zero("my-package".parse().unwrap());
         meta_package.serialize(meta_package_file).unwrap();
 
         let supported_version = HISTORY.get_example_supported_version_for_tests();
@@ -692,7 +692,7 @@ mod test {
         // Write the MetaPackage file.
         let meta_package_path = root.join("package");
         let meta_package_file = File::create(&meta_package_path).unwrap();
-        let meta_package = MetaPackage::from_name("my-package".parse().unwrap());
+        let meta_package = MetaPackage::from_name_and_variant_zero("my-package".parse().unwrap());
         meta_package.serialize(meta_package_file).unwrap();
 
         let supported_version = HISTORY.get_example_supported_version_for_tests();

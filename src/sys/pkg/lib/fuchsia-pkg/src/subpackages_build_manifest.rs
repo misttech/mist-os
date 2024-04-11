@@ -198,7 +198,7 @@ mod tests {
         let pkg2_meta_far_file = dir.join("pkg2-meta.far");
 
         // Write out all the files.
-        let meta_package = MetaPackage::from_name(pkg2_name.clone());
+        let meta_package = MetaPackage::from_name_and_variant_zero(pkg2_name.clone());
         meta_package.serialize(File::create(&pkg2_meta_package_file).unwrap()).unwrap();
 
         let mut builder = PackageBuilder::new(&pkg1_name, FAKE_ABI_REVISION);
@@ -306,7 +306,7 @@ mod tests {
         let pkg_hash = package_manifest.blobs().iter().find(|b| b.path == "meta/").unwrap().merkle;
 
         let pkg_name = PackageName::try_from("pkg".to_string()).unwrap();
-        MetaPackage::from_name(pkg_name.clone())
+        MetaPackage::from_name_and_variant_zero(pkg_name.clone())
             .serialize(File::create(&pkg_meta_package_file).unwrap())
             .unwrap();
         let pkg_url = RelativePackageUrl::from(pkg_name);
