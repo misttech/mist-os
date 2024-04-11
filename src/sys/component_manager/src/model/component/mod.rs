@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub mod instance;
+
 use {
     crate::{
         bedrock::program::StopRequestSuccess,
@@ -57,6 +59,10 @@ use {
         future::{join_all, BoxFuture},
         lock::{MappedMutexGuard, Mutex, MutexGuard},
     },
+    instance::{
+        InstanceState, ResolvedInstanceState, ShutdownInstanceState, StartedInstanceState,
+        StopOutcomeWithEscrow,
+    },
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     sandbox::{Capability, Dict, Open},
     std::{
@@ -75,13 +81,6 @@ use {
         path::Path,
         ToObjectRequest,
     },
-};
-
-#[path = "component_instance_state.rs"]
-pub mod instance;
-use instance::{
-    InstanceState, ResolvedInstanceState, ShutdownInstanceState, StartedInstanceState,
-    StopOutcomeWithEscrow,
 };
 
 pub type WeakComponentInstance = WeakComponentInstanceInterface<ComponentInstance>;
