@@ -21,6 +21,7 @@
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
+#include <linux/capability.h>
 #include <linux/fuse.h>
 #include <linux/magic.h>
 
@@ -255,14 +256,21 @@ class FuseServer {
     return WriteAckResponse(in_header);
   }
 
-  testing::AssertionResult WriteAckResponse(const struct fuse_in_header* in_header) {
-    struct fuse_out_header out_header = {};
-    out_header.len = sizeof(out_header);
-    out_header.unique = in_header->unique;
+  testing::AssertionResult WriteDataFreeResponse(const struct fuse_in_header* in_header,
+                                                 int32_t error) {
+    fuse_out_header out_header = {
+        .len = sizeof(fuse_out_header),
+        .error = error,
+        .unique = in_header->unique,
+    };
 
     auto data = reinterpret_cast<std::byte*>(&out_header);
     std::vector<std::byte> response(data, data + sizeof(out_header));
     return WriteResponse(response);
+  }
+
+  testing::AssertionResult WriteAckResponse(const struct fuse_in_header* in_header) {
+    return WriteDataFreeResponse(in_header, /* error= */ 0);
   }
 
   template <typename Data>
@@ -345,7 +353,7 @@ class FuseServerTest : public ::testing::Test {
  protected:
   std::string GetMountDir() { return *mount_dir_; }
 
-  testing::AssertionResult Mount(std::unique_ptr<FuseServer> server) {
+  testing::AssertionResult Mount(std::shared_ptr<FuseServer> server) {
     std::string mount_dir = "/tmp/fuse_mount_dir_XXXXXX";
     if (mkdtemp(const_cast<char*>(mount_dir.c_str())) == nullptr) {
       return testing::AssertionFailure()
@@ -366,7 +374,7 @@ class FuseServerTest : public ::testing::Test {
 
  private:
   std::optional<std::string> mount_dir_;
-  std::unique_ptr<FuseServer> server_;
+  std::shared_ptr<FuseServer> server_;
   std::thread server_thread_;
 };
 
@@ -630,7 +638,7 @@ TEST_F(FuseTest, XAttr) {
 }
 
 TEST_F(FuseServerTest, OpenAndClose) {
-  ASSERT_TRUE(Mount(std::make_unique<FuseServer>()));
+  ASSERT_TRUE(Mount(std::make_shared<FuseServer>()));
 
   std::string filename = GetMountDir() + "/file";
   test_helper::ScopedFD fd(open(filename.c_str(), O_RDWR | O_CREAT));
@@ -654,7 +662,7 @@ TEST_F(FuseServerTest, HeaderLengthUnderflow) {
     }
   };
 
-  ASSERT_TRUE(Mount(std::make_unique<HeaderLengthUnderflowServer>()));
+  ASSERT_TRUE(Mount(std::make_shared<HeaderLengthUnderflowServer>()));
 
   std::string filename = GetMountDir() + "/file";
   test_helper::ScopedFD fd(open(filename.c_str(), O_RDWR | O_CREAT));
@@ -684,10 +692,55 @@ TEST_F(FuseServerTest, OverlongHeaderLength) {
     }
   };
 
-  ASSERT_TRUE(Mount(std::make_unique<OverlongHeaderLengthServer>()));
+  ASSERT_TRUE(Mount(std::make_shared<OverlongHeaderLengthServer>()));
 
   std::string filename = GetMountDir() + "/file";
   test_helper::ScopedFD fd(open(filename.c_str(), O_RDWR | O_CREAT));
   ASSERT_TRUE(fd.is_valid());
   fd.reset();
+}
+
+TEST_F(FuseServerTest, BypassUnimplementedAccess) {
+  class BypassUnimplementedAccessServer : public FuseServer {
+   public:
+    uint64_t AccessCount() { return calls_to_access_.load(std::memory_order_relaxed); }
+
+   protected:
+    testing::AssertionResult HandleAccess(const struct fuse_in_header* in_header,
+                                          const struct fuse_access_in* access_in,
+                                          const std::vector<std::byte>& message) override {
+      calls_to_access_.fetch_add(1, std::memory_order_relaxed);
+      return WriteDataFreeResponse(in_header, -ENOSYS);
+    }
+
+   private:
+    std::atomic_uint64_t calls_to_access_;
+  };
+
+  std::shared_ptr<BypassUnimplementedAccessServer> server(new BypassUnimplementedAccessServer());
+  ASSERT_TRUE(Mount(server));
+  EXPECT_EQ(server->AccessCount(), 0u);
+
+  // Run the checks in a separate thread where we drop the |CAP_DAC_OVERRIDE|
+  // capability which bypasses file permission checks. See capabilities(7).
+  std::thread thrd([&]() {
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+
+    auto check_access = [&](const char* file) {
+      const std::string filename = GetMountDir() + "/" + file;
+      ASSERT_EQ(access(filename.c_str(), R_OK), 0) << strerror(errno);
+      EXPECT_EQ(server->AccessCount(), 1u);
+    };
+
+    // No matter how many times we access a file, we should have only ever made
+    // the |FUSE_ACCESS| request once for the lifetime of the connection/server.
+    for (int i = 0; i < 3; ++i) {
+      ASSERT_NO_FATAL_FAILURE(check_access("somefile1"));
+    }
+
+    // Accessing another file shouldn't change the access count since it is still
+    // part of the same connection.
+    ASSERT_NO_FATAL_FAILURE(check_access("somefile2"));
+  });
+  thrd.join();
 }

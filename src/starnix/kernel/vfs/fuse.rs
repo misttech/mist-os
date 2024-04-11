@@ -1757,8 +1757,14 @@ impl RunningOperationKind {
     ) -> Result<FuseResponse, Errno> {
         match self {
             Self::Access if errno == ENOSYS => {
-                state.insert(self.opcode(), Ok(FuseResponse::Access(Errno::fail(ENOSYS))));
-                Ok(FuseResponse::Access(Errno::fail(ENOSYS)))
+                // Per libfuse, ENOSYS is interpreted as a "permanent success"
+                // so we don't need to do anything further, including performing
+                // the default/standard file permission checks like we do
+                // when the `default_permissions` mount option is set.
+                const UNIMPLEMENTED_ACCESS_RESPONSE: Result<FuseResponse, Errno> =
+                    Ok(FuseResponse::Access(Ok(())));
+                state.insert(self.opcode(), UNIMPLEMENTED_ACCESS_RESPONSE);
+                UNIMPLEMENTED_ACCESS_RESPONSE
             }
             Self::Flush if errno == ENOSYS => {
                 state.insert(self.opcode(), Ok(FuseResponse::None));
