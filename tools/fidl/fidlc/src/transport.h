@@ -41,7 +41,7 @@ struct Transport {
   std::set<HandleClass> compatible_handle_classes;
 
   bool IsCompatible(HandleClass) const;
-  static std::optional<Transport> FromTransportName(std::string_view transport_name);
+  static const Transport* FromTransportName(std::string_view transport_name);
   static std::set<std::string_view> AllTransportNames();
 
  private:

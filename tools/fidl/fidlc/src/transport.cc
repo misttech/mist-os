@@ -31,13 +31,13 @@ bool Transport::IsCompatible(HandleClass handle_class) const {
   return compatible_handle_classes.find(handle_class) != compatible_handle_classes.end();
 }
 
-std::optional<Transport> Transport::FromTransportName(std::string_view transport_name) {
+const Transport* Transport::FromTransportName(std::string_view transport_name) {
   for (const Transport& transport : transports) {
     if (transport.name == transport_name) {
-      return transport;
+      return &transport;
     }
   }
-  return std::nullopt;
+  return nullptr;
 }
 
 std::set<std::string_view> Transport::AllTransportNames() {

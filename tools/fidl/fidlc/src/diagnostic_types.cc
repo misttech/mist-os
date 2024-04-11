@@ -49,6 +49,17 @@ std::string Display(Openness o) {
   }
 }
 
+std::string Display(Protocol::Method::Kind i) {
+  switch (i) {
+    case Protocol::Method::Kind::kOneWay:
+      return "one-way method";
+    case Protocol::Method::Kind::kTwoWay:
+      return "two-way method";
+    case Protocol::Method::Kind::kEvent:
+      return "event";
+  }
+}
+
 std::string Display(const std::vector<std::string_view>& library_name) {
   return NameLibrary(library_name);
 }

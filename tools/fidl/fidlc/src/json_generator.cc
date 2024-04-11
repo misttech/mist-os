@@ -422,16 +422,10 @@ void JSONGenerator::Generate(const Protocol::MethodWithInfo& method_with_info) {
     }
     GenerateObjectMember("is_composed", method_with_info.is_composed);
     GenerateObjectMember("has_error", value.has_error);
-    if (value.HasResultUnion()) {
-      ZX_ASSERT(value.maybe_response->type->kind == Type::Kind::kIdentifier);
-      auto response_id = static_cast<const IdentifierType*>(value.maybe_response->type);
-      ZX_ASSERT(response_id->type_decl->kind == Decl::Kind::kUnion);
-      auto result_union = static_cast<const Union*>(response_id->type_decl);
-      GenerateObjectMember("maybe_response_success_type", result_union->members[0].type_ctor->type);
-      if (value.has_error) {
-        GenerateObjectMember("maybe_response_err_type", result_union->members[1].type_ctor->type);
-      }
-    }
+    if (auto type_ctor = value.result_success_type_ctor)
+      GenerateObjectMember("maybe_response_success_type", type_ctor->type);
+    if (auto type_ctor = value.result_domain_error_type_ctor)
+      GenerateObjectMember("maybe_response_err_type", type_ctor->type);
   });
 }
 

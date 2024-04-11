@@ -424,7 +424,7 @@ Builtin* Library::Declarations::LookupBuiltin(Builtin::Identity id) const {
 }
 
 std::unique_ptr<TypeConstructor> TypeConstructor::Clone() const {
-  return std::make_unique<TypeConstructor>(layout, parameters->Clone(), constraints->Clone());
+  return std::make_unique<TypeConstructor>(span, layout, parameters->Clone(), constraints->Clone());
 }
 
 std::unique_ptr<LayoutParameterList> LayoutParameterList::Clone() const {
@@ -465,8 +465,9 @@ void IdentifierLayoutParameter::Disambiguate() {
       break;
     }
     default: {
-      as_type_ctor = std::make_unique<TypeConstructor>(
-          reference, std::make_unique<LayoutParameterList>(), std::make_unique<TypeConstraints>());
+      as_type_ctor = std::make_unique<TypeConstructor>(span, reference,
+                                                       std::make_unique<LayoutParameterList>(),
+                                                       std::make_unique<TypeConstraints>());
       break;
     }
   }

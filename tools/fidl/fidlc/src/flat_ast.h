@@ -308,15 +308,18 @@ struct TypeConstraints;
 // step (i.e. RegisterDecl) and the compilation step (i.e. Typespace::Create),
 // while ensuring that users cannot refer to anonymous layouts by name.
 struct TypeConstructor final {
-  TypeConstructor(Reference layout, std::unique_ptr<LayoutParameterList> parameters,
+  TypeConstructor(SourceSpan span, Reference layout,
+                  std::unique_ptr<LayoutParameterList> parameters,
                   std::unique_ptr<TypeConstraints> constraints)
-      : layout(std::move(layout)),
+      : span(span),
+        layout(std::move(layout)),
         parameters(std::move(parameters)),
         constraints(std::move(constraints)) {}
 
   std::unique_ptr<TypeConstructor> Clone() const;
 
   // Set during construction.
+  SourceSpan span;
   Reference layout;
   std::unique_ptr<LayoutParameterList> parameters;
   std::unique_ptr<TypeConstraints> constraints;
@@ -675,6 +678,13 @@ struct Protocol final : public Decl {
     }
     Method Clone() const;
 
+    enum class Kind : uint8_t { kOneWay, kTwoWay, kEvent };
+    Kind kind() const {
+      if (has_request && has_response)
+        return Kind::kTwoWay;
+      return has_request ? Kind::kOneWay : Kind::kEvent;
+    }
+
     Strictness strictness;
     // Owned by Library::raw_identifiers.
     const RawIdentifier* identifier;
@@ -684,27 +694,19 @@ struct Protocol final : public Decl {
     bool has_response;
     std::unique_ptr<TypeConstructor> maybe_response;
     bool has_error;
-
-    // Returns true if this method should use a result union. Result union is used if the
-    // method uses error syntax or if it is a flexible two-way method.
-    bool HasResultUnion() const {
-      return has_error || (has_request && has_response && strictness == Strictness::kFlexible);
-    }
-
-    // This is set to the |Protocol| instance that owns this |Method|,
-    // when the |Protocol| is constructed.
     Protocol* owning_protocol = nullptr;
 
     // Set during compilation
     std::unique_ptr<RawOrdinal64> generated_ordinal64;
+    const Union* result_union = nullptr;
+    const TypeConstructor* result_success_type_ctor = nullptr;
+    const TypeConstructor* result_domain_error_type_ctor = nullptr;
   };
 
   // Used to keep track of a all methods (i.e. including composed methods).
   // Method pointers here are set after composed_protocols are compiled, and
   // are owned by the corresponding composed_protocols.
   struct MethodWithInfo {
-    MethodWithInfo(const Method* method, bool is_composed)
-        : method(method), is_composed(is_composed) {}
     const Method* method;
     const bool is_composed;
   };

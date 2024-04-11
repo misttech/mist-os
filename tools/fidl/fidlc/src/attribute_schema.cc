@@ -409,8 +409,7 @@ static bool TransportConstraint(Reporter* reporter, ExperimentalFlagSet flags,
   auto& arg_value = static_cast<const StringConstantValue&>(arg->value->Value());
 
   const std::string& value = arg_value.MakeContents();
-  std::optional<Transport> transport = Transport::FromTransportName(value);
-  if (!transport.has_value()) {
+  if (!Transport::FromTransportName(value)) {
     return reporter->Fail(ErrInvalidTransportType, attribute->span, value,
                           Transport::AllTransportNames());
   }

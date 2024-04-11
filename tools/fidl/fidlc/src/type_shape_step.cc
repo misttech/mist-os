@@ -120,6 +120,11 @@ TypeShape TypeShapeStep::Calculate(TypeDecl* decl) {
         acc.inline_size = checked.Add(acc.inline_size, padding);
         acc.has_padding = acc.has_padding || padding != 0;
       }
+      // This limit exists so that coding tables can use uint16_t.
+      if (uint32_t limit = UINT16_MAX; acc.inline_size > limit) {
+        reporter()->Fail(ErrInlineSizeExceedsLimit, struct_decl->name.span().value(),
+                         struct_decl->name, acc.inline_size, limit);
+      }
       return acc;
     }
     case Decl::Kind::kTable: {

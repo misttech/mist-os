@@ -262,7 +262,7 @@ void ConsumeStep::ConsumeConstDeclaration(std::unique_ptr<RawConstDeclaration> c
 
 // Create a type constructor pointing to an anonymous layout.
 static std::unique_ptr<TypeConstructor> IdentifierTypeForDecl(Decl* decl) {
-  return std::make_unique<TypeConstructor>(Reference(Reference::Target(decl)),
+  return std::make_unique<TypeConstructor>(SourceSpan(), Reference(Reference::Target(decl)),
                                            std::make_unique<LayoutParameterList>(),
                                            std::make_unique<TypeConstraints>());
 }
@@ -807,7 +807,7 @@ bool ConsumeStep::ConsumeTypeConstructor(std::unique_ptr<RawTypeConstructor> raw
     }
     if (out_type_ctor) {
       *out_type_ctor = std::make_unique<TypeConstructor>(
-          Reference(Reference::Target(inline_decl)),
+          raw_type_ctor->span(), Reference(Reference::Target(inline_decl)),
           std::make_unique<LayoutParameterList>(std::move(params), params_span),
           std::make_unique<TypeConstraints>(std::move(constraints), constraints_span));
     }
@@ -817,7 +817,7 @@ bool ConsumeStep::ConsumeTypeConstructor(std::unique_ptr<RawTypeConstructor> raw
   auto named_ref = static_cast<RawNamedLayoutReference*>(raw_type_ctor->layout_ref.get());
   ZX_ASSERT_MSG(out_type_ctor, "out type ctors should always be provided for a named type ctor");
   *out_type_ctor = std::make_unique<TypeConstructor>(
-      Reference(*named_ref->identifier),
+      raw_type_ctor->span(), Reference(*named_ref->identifier),
       std::make_unique<LayoutParameterList>(std::move(params), params_span),
       std::make_unique<TypeConstraints>(std::move(constraints), constraints_span));
   return true;

@@ -46,15 +46,11 @@ bool Compiler::Compile() {
     return false;
   if (!TypeShapeStep(this).Run())
     return false;
-  if (!VerifyHandleTransportCompatibilityStep(this).Run())
+  if (!VerifyHandleTransportStep(this).Run())
     return false;
   if (!VerifyAttributesStep(this).Run())
     return false;
-  if (!VerifyInlineSizeStep(this).Run())
-    return false;
   if (!VerifyDependenciesStep(this).Run())
-    return false;
-  if (!VerifyOpenInteractionsStep(this).Run())
     return false;
 
   if (!all_libraries_->Insert(std::move(library_)))
@@ -178,59 +174,40 @@ void Libraries::WarnOnAttributeTypo(const Attribute* attribute) const {
   }
 }
 
-// Helper function to calculate Compilation::external_structs.
 static std::vector<const Struct*> ExternalStructs(const Library* target_library,
                                                   const std::vector<const Protocol*>& protocols) {
-  // Use the comparator below to ensure deterministic output when this set is
-  // converted into a vector at the end of this function.
+  // Ensure deterministic ordering.
   auto ordering = [](const Struct* a, const Struct* b) {
     return NameFlatName(a->name) < NameFlatName(b->name);
   };
   std::set<const Struct*, decltype(ordering)> external_structs(ordering);
 
-  for (const auto& protocol : protocols) {
-    for (const auto method_with_info : protocol->all_methods) {
-      const auto& method = method_with_info.method;
-      if (method->maybe_request) {
-        auto id = static_cast<const IdentifierType*>(method->maybe_request->type);
-
-        // Make sure this is actually an externally defined struct before proceeding.
-        if (id->name.library() != target_library && id->type_decl->kind == Decl::Kind::kStruct) {
-          auto as_struct = static_cast<const Struct*>(id->type_decl);
-          external_structs.insert(as_struct);
-        }
+  auto visit = [&](const Type* type) {
+    if (type->kind == Type::Kind::kIdentifier) {
+      auto decl = static_cast<const IdentifierType*>(type)->type_decl;
+      if (decl->kind == Decl::Kind::kStruct && type->name.library() != target_library) {
+        external_structs.insert(static_cast<const Struct*>(decl));
       }
-      if (method->maybe_response) {
-        auto id = static_cast<const IdentifierType*>(method->maybe_response->type);
+    }
+  };
 
-        // Make sure this is actually an externally defined struct before proceeding.
-        if (id->name.library() != target_library && id->type_decl->kind == Decl::Kind::kStruct) {
-          auto as_struct = static_cast<const Struct*>(id->type_decl);
-          external_structs.insert(as_struct);
-        }
-
-        // Include the success variant of a result union, if it's an external struct.
-        if (method->HasResultUnion()) {
-          ZX_ASSERT(id->type_decl->kind == Decl::Kind::kUnion);
-          const auto* result_union = static_cast<const Union*>(id->type_decl);
-          const auto* success_variant_type =
-              static_cast<const IdentifierType*>(result_union->members[0].type_ctor->type);
-          if (success_variant_type->type_decl->kind != Decl::Kind::kStruct) {
-            continue;
-          }
-          const auto* success_variant_struct =
-              static_cast<const Struct*>(success_variant_type->type_decl);
-
-          // Make sure this is actually an externally defined struct before proceeding.
-          if (success_variant_type->name.library() != target_library) {
-            external_structs.insert(success_variant_struct);
-          }
+  for (auto& protocol : protocols) {
+    for (auto& method_with_info : protocol->all_methods) {
+      if (auto& request = method_with_info.method->maybe_request) {
+        visit(request->type);
+      }
+      if (auto& response = method_with_info.method->maybe_response) {
+        visit(response->type);
+      }
+      if (auto union_decl = method_with_info.method->result_union) {
+        for (auto& member : union_decl->members) {
+          visit(member.type_ctor->type);
         }
       }
     }
   }
 
-  return std::vector<const Struct*>(external_structs.begin(), external_structs.end());
+  return std::vector(external_structs.begin(), external_structs.end());
 }
 
 namespace {
@@ -290,11 +267,8 @@ class CalcDependencies {
           if (auto request = method->maybe_request.get()) {
             VisitTypeConstructorAndStructFields(request);
           }
-          if (method->HasResultUnion()) {
-            auto response_id = static_cast<const IdentifierType*>(method->maybe_response->type);
-            ZX_ASSERT(response_id->type_decl->kind == Decl::Kind::kUnion);
-            auto result_union = static_cast<const Union*>(response_id->type_decl);
-            for (const auto& member : result_union->members) {
+          if (auto union_decl = method->result_union) {
+            for (const auto& member : union_decl->members) {
               VisitTypeConstructorAndStructFields(member.type_ctor.get());
             }
           } else if (auto response = method->maybe_response.get()) {

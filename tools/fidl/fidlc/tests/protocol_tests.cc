@@ -750,8 +750,8 @@ protocol MyProtocol {
 TEST(ProtocolTests, BadMethodEmptyPayloadStruct) {
   TestLibrary library;
   library.AddFile("bad/fi-0077-a.test.fidl");
-  library.ExpectFail(ErrEmptyPayloadStructs, "MyMethod");
-  library.ExpectFail(ErrEmptyPayloadStructs, "MyMethod");
+  library.ExpectFail(ErrEmptyPayloadStructs);
+  library.ExpectFail(ErrEmptyPayloadStructs);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -764,7 +764,7 @@ TEST(ProtocolTests, GoodMethodAbsentPayloadStruct) {
 TEST(ProtocolTests, BadEventEmptyPayloadStruct) {
   TestLibrary library;
   library.AddFile("bad/fi-0077-b.test.fidl");
-  library.ExpectFail(ErrEmptyPayloadStructs, "MyEvent");
+  library.ExpectFail(ErrEmptyPayloadStructs);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -800,7 +800,7 @@ protocol MyProtocol {
     MyMethod() -> (struct {}) error uint32;
 };
 )FIDL");
-  library.ExpectFail(ErrEmptyPayloadStructs, "MyMethod");
+  library.ExpectFail(ErrEmptyPayloadStructs);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -879,8 +879,8 @@ protocol MyProtocol {
     MyMethod(MyStruct) -> (MyStruct);
 };
 )FIDL");
-  library.ExpectFail(ErrEmptyPayloadStructs, "MyMethod");
-  library.ExpectFail(ErrEmptyPayloadStructs, "MyMethod");
+  library.ExpectFail(ErrEmptyPayloadStructs);
+  library.ExpectFail(ErrEmptyPayloadStructs);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

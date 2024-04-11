@@ -168,9 +168,8 @@ constexpr ErrorDef<74, Decl::Kind> ErrInvalidMethodPayloadLayoutClass(
 constexpr ErrorDef<75, const Type *> ErrInvalidMethodPayloadType(
     "invalid request/response type '{0}'; must use a struct, table, or union");
 constexpr RetiredDef<76> ErrResponsesWithErrorsMustNotBeEmpty;
-constexpr ErrorDef<77, std::string_view> ErrEmptyPayloadStructs(
-    "method '{0}' cannot have an empty struct as a payload, prefer omitting "
-    "the payload altogether");
+constexpr ErrorDef<77> ErrEmptyPayloadStructs(
+    "(struct {}) is not allowed as a request or response, use () instead");
 constexpr RetiredDef<78> ErrDuplicateElementName;
 constexpr RetiredDef<79> ErrDuplicateElementNameCanonical;
 constexpr ErrorDef<80> ErrGeneratedZeroValueOrdinal("Ordinal value 0 disallowed.");
@@ -231,7 +230,7 @@ constexpr ErrorDef<114, Openness, Name, Openness, Name> ErrComposedProtocolTooOp
     "may not be more open than composing protocol");
 constexpr ErrorDef<115, Openness> ErrFlexibleTwoWayMethodRequiresOpenProtocol(
     "flexible two-way method may only be defined in an open protocol, not {0}");
-constexpr ErrorDef<116, std::string_view> ErrFlexibleOneWayMethodInClosedProtocol(
+constexpr ErrorDef<116, Protocol::Method::Kind> ErrFlexibleOneWayMethodInClosedProtocol(
     "flexible {0} may only be defined in an open or ajar protocol, not closed");
 constexpr ErrorDef<117, std::string_view, std::string_view, const Decl *>
     ErrHandleUsedInIncompatibleTransport(

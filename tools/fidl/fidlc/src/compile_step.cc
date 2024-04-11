@@ -75,12 +75,6 @@ class Scope {
 
 using Ordinal64Scope = Scope<uint64_t>;
 
-struct MethodScope {
-  Ordinal64Scope ordinals;
-  Scope<std::string> canonical_names;
-  Scope<const Protocol*> protocols;
-};
-
 }  // namespace
 
 void CompileStep::CompileDecl(Decl* decl) {
@@ -920,272 +914,204 @@ void CompileStep::CompileResource(Resource* resource_declaration) {
   }
 }
 
-void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
-  CompileAttributeList(protocol_declaration->attributes.get());
-
-  MethodScope method_scope;
-  auto CheckScopes = [this, &protocol_declaration, &method_scope](const Protocol* protocol,
-                                                                  auto Visitor) -> void {
-    for (const auto& composed_protocol : protocol->composed_protocols) {
-      auto target = composed_protocol.reference.resolved().element();
-      if (target->kind != Element::Kind::kProtocol) {
-        // No need to report an error here since it was already done by the loop
-        // after the definition of CheckScopes (before calling CheckScopes).
-        continue;
-      }
-      auto composed_protocol_declaration = static_cast<const Protocol*>(target);
-      auto span = composed_protocol_declaration->name.span();
-      ZX_ASSERT(span);
-      if (method_scope.protocols.Insert(composed_protocol_declaration, span.value()).ok()) {
-        Visitor(composed_protocol_declaration, Visitor);
-      } else {
-        // Otherwise we have already seen this protocol in
-        // the inheritance graph.
-      }
-    }
-    for (const auto& method : protocol->methods) {
-      const auto original_name = method.name.data();
-      const auto canonical_name = canonicalize(original_name);
-      const auto name_result = method_scope.canonical_names.Insert(canonical_name, method.name);
-      if (!name_result.ok()) {
-        const auto previous_span = name_result.previous_occurrence();
-        if (original_name == previous_span.data()) {
-          reporter()->Fail(ErrNameCollision, method.name, Element::Kind::kProtocolMethod,
-                           original_name, Element::Kind::kProtocolMethod, previous_span);
-        } else {
-          reporter()->Fail(ErrNameCollisionCanonical, method.name, Element::Kind::kProtocolMethod,
-                           original_name, Element::Kind::kProtocolMethod, previous_span.data(),
-                           previous_span, canonical_name);
-        }
-      }
-      if (!method.generated_ordinal64) {
-        // If a composed method failed to compile, we do not associate have a
-        // generated ordinal, and proceeding leads to a segfault. Instead,
-        // continue to the next method, without reporting additional errors (the
-        // error emitted when compiling the composed method is sufficient).
-        continue;
-      }
-      if (method.generated_ordinal64->value == 0) {
-        reporter()->Fail(ErrGeneratedZeroValueOrdinal, method.generated_ordinal64->span());
-      }
-      auto ordinal_result =
-          method_scope.ordinals.Insert(method.generated_ordinal64->value, method.name);
-      if (!ordinal_result.ok()) {
-        reporter()->Fail(ErrDuplicateMethodOrdinal, method.generated_ordinal64->span(),
-                         ordinal_result.previous_occurrence());
-      }
-
-      // Add a pointer to this method to the protocol_declarations list.
-      bool is_composed = protocol_declaration != protocol;
-      protocol_declaration->all_methods.emplace_back(&method, is_composed);
-    }
-  };
-
-  // Before scope checking can occur, ordinals must be generated for each of the
-  // protocol's methods, including those that were composed from transitive
-  // child protocols.  This means that child protocols must be compiled prior to
-  // this one, or they will not have generated_ordinal64s on their methods, and
-  // will fail the scope check.  Also check for duplicate composed protocols.
-  Scope<const Protocol*> scope;
-  for (const auto& composed_protocol : protocol_declaration->composed_protocols) {
-    CompileAttributeList(composed_protocol.attributes.get());
-    auto target = composed_protocol.reference.resolved().element();
-    auto span = composed_protocol.reference.span();
-    if (target->kind != Element::Kind::kProtocol) {
-      reporter()->Fail(ErrComposingNonProtocol, span);
-      continue;
-    }
-    auto target_protocol = static_cast<Protocol*>(target);
-    auto result = scope.Insert(target_protocol, span);
-    ZX_ASSERT_MSG(result.ok(), "duplicate composition should have caused name collision earlier");
-    CompileDecl(target_protocol);
-  }
-  for (auto& method : protocol_declaration->methods) {
-    CompileAttributeList(method.attributes.get());
-    auto selector = GetSelector(method.attributes.get(), method.name);
-    if (!IsValidIdentifierComponent(selector) && !IsValidFullyQualifiedMethodIdentifier(selector)) {
-      reporter()->Fail(
-          ErrInvalidSelectorValue,
-          method.attributes->Get("selector")->GetArg(AttributeArg::kDefaultAnonymousName)->span);
-      continue;
-    }
-    // TODO(https://fxbug.dev/42157659): Remove.
-    auto library_name = library()->name;
-    if (library_name.size() == 2 && library_name[0] == "fuchsia" && library_name[1] == "io" &&
-        selector.find('/') == std::string::npos) {
-      reporter()->Fail(ErrFuchsiaIoExplicitOrdinals, method.name);
-      continue;
-    }
-    method.generated_ordinal64 = std::make_unique<RawOrdinal64>(method_hasher()(
-        library_name, protocol_declaration->name.decl_name(), selector, *method.identifier));
-  }
-
-  CheckScopes(protocol_declaration, CheckScopes);
-
-  // Ensure that the method's type constructors for request/response payloads actually exist, and
-  // are the right kind of layout.
-  std::function<void(const SourceSpan&, const Decl*)> CheckPayloadDeclKind =
-      [&](const SourceSpan& method_name, const Decl* decl) -> void {
-    switch (decl->kind) {
-      case Decl::Kind::kStruct: {
-        auto empty = static_cast<const Struct*>(decl)->members.empty();
-        auto anonymous = decl->name.as_anonymous();
-        auto compiler_generated =
-            anonymous && anonymous->provenance == Name::Provenance::kGeneratedEmptySuccessStruct;
-        if (empty && !compiler_generated) {
-          reporter()->Fail(ErrEmptyPayloadStructs, method_name, method_name.data());
-        }
+static void SetResultUnionFields(Protocol::Method* method) {
+  bool has_framework_error = method->kind() == Protocol::Method::Kind::kTwoWay &&
+                             method->strictness == Strictness::kFlexible;
+  if (!method->has_error && !has_framework_error)
+    return;
+  auto& response = method->maybe_response;
+  ZX_ASSERT(response && response->type);
+  ZX_ASSERT(response->type->kind == Type::Kind::kIdentifier);
+  auto identifier_type = static_cast<IdentifierType*>(response->type);
+  ZX_ASSERT(identifier_type->type_decl->kind == Decl::Kind::kUnion);
+  auto anonymous = identifier_type->type_decl->name.as_anonymous();
+  ZX_ASSERT(anonymous && anonymous->provenance == Name::Provenance::kGeneratedResultUnion);
+  auto decl = static_cast<Union*>(identifier_type->type_decl);
+  method->result_union = decl;
+  for (auto& member : decl->members) {
+    switch (member.ordinal->value) {
+      case kSuccessOrdinal:
+        method->result_success_type_ctor = member.type_ctor.get();
         break;
-      }
-      case Decl::Kind::kTable:
-      case Decl::Kind::kUnion: {
+      case kDomainErrorOrdinal:
+        method->result_domain_error_type_ctor = member.type_ctor.get();
         break;
-      }
-      case Decl::Kind::kAlias: {
-        const auto as_alias = static_cast<const Alias*>(decl);
-        const Type* aliased_type = as_alias->partial_type_ctor->type;
-        switch (aliased_type->kind) {
-          case Type::Kind::kIdentifier: {
-            const auto as_identifier_type = static_cast<const IdentifierType*>(aliased_type);
-            CheckPayloadDeclKind(method_name, as_identifier_type->type_decl);
-            break;
-          }
-          default: {
-            reporter()->Fail(ErrInvalidMethodPayloadLayoutClass, method_name, decl->kind);
-            break;
-          }
-        }
+      case kFrameworkErrorOrdinal:
         break;
-      }
-      default: {
-        reporter()->Fail(ErrInvalidMethodPayloadLayoutClass, method_name, decl->kind);
-        break;
-      }
-    }
-  };
-
-  // Ensure that structs used as message payloads do not have default values.
-  auto CheckNoDefaultMembers = [this](const Decl* decl) -> void {
-    switch (decl->kind) {
-      case Decl::Kind::kStruct: {
-        auto struct_decl = static_cast<const Struct*>(decl);
-        for (auto& member : struct_decl->members) {
-          if (member.maybe_default_value != nullptr) {
-            reporter()->Fail(ErrPayloadStructHasDefaultMembers, member.name);
-            break;
-          }
-        }
-
-        break;
-      }
-      default: {
-        return;
-      }
-    }
-  };
-
-  for (auto& method : protocol_declaration->methods) {
-    if (method.maybe_request) {
-      CompileTypeConstructor(method.maybe_request.get());
-      if (auto type = method.maybe_request->type) {
-        if (type->kind != Type::Kind::kIdentifier) {
-          reporter()->Fail(ErrInvalidMethodPayloadType, method.name, type);
-        } else {
-          ZX_ASSERT(type->kind == Type::Kind::kIdentifier);
-          auto decl = static_cast<const IdentifierType*>(type)->type_decl;
-          CompileDecl(decl);
-          CheckNoDefaultMembers(decl);
-          CheckPayloadDeclKind(method.name, decl);
-        }
-      }
-    }
-    if (method.maybe_response) {
-      CompileTypeConstructor(method.maybe_response.get());
-      if (auto type = method.maybe_response->type) {
-        if (type->kind != Type::Kind::kIdentifier) {
-          reporter()->Fail(ErrInvalidMethodPayloadType, method.name, type);
-        } else {
-          ZX_ASSERT(type->kind == Type::Kind::kIdentifier);
-          auto decl = static_cast<const IdentifierType*>(type)->type_decl;
-          CompileDecl(decl);
-          if (method.HasResultUnion()) {
-            ZX_ASSERT(decl->kind == Decl::Kind::kUnion);
-            const auto* result_union = static_cast<const Union*>(decl);
-            ZX_ASSERT(!result_union->members.empty());
-            const auto* success_variant_type = result_union->members[0].type_ctor->type;
-            if (success_variant_type) {
-              if (success_variant_type->kind != Type::Kind::kIdentifier) {
-                reporter()->Fail(ErrInvalidMethodPayloadType, method.name, success_variant_type);
-              } else {
-                const auto* success_decl =
-                    static_cast<const IdentifierType*>(success_variant_type)->type_decl;
-                CheckNoDefaultMembers(success_decl);
-                CheckPayloadDeclKind(method.name, success_decl);
-              }
-            }
-            ValidateDomainErrorType(result_union);
-          } else {
-            CheckNoDefaultMembers(decl);
-            CheckPayloadDeclKind(method.name, decl);
-          }
-        }
-      }
-    }
-  }
-
-  // Ensure that events do not use the error syntax except those in an allowlist.
-  // TODO(https://fxbug.dev/42180639): Error syntax in events should not parse.
-  auto CheckNoEventErrorSyntax = [this](const Protocol::Method& event) -> void {
-    if (!event.maybe_response)
-      return;
-    if (!event.HasResultUnion())
-      return;
-    const auto& protocol = *event.owning_protocol;
-    const Library& library = *protocol.name.library();
-    // TODO(https://fxbug.dev/42180639): Migrate test libraries.
-    ZX_ASSERT(!library.name.empty());
-    if (library.name[0] == "test" || library.name[0] == "fidl") {
-      return;
-    }
-    // TODO(https://fxbug.dev/42182418): Migrate fuchsia.hardware.radar.
-    if (library.name.size() == 3) {
-      if (library.name[0] == "fuchsia" && library.name[1] == "hardware" &&
-          library.name[2] == "radar") {
-        return;
-      }
-    }
-    reporter()->Fail(ErrEventErrorSyntaxDeprecated, event.name, event.name.data());
-  };
-  for (auto& method : protocol_declaration->methods) {
-    if (method.has_response && !method.has_request) {
-      CheckNoEventErrorSyntax(method);
+      default:
+        ZX_PANIC("unexpected ordinal in result union");
     }
   }
 }
 
-void CompileStep::ValidateDomainErrorType(const Union* result_union) {
-  if (experimental_flags().IsEnabled(ExperimentalFlag::kAllowArbitraryErrorTypes)) {
-    return;
-  }
-  const Union::Member* error_member = nullptr;
-  for (auto& member : result_union->members) {
-    if (member.ordinal->value == kDomainErrorOrdinal) {
-      error_member = &member;
-      break;
+// Populates protocol->all_methods by recursively visiting composed protocols.
+class PopulateAllMethods {
+ public:
+  PopulateAllMethods(Protocol* protocol, Reporter* reporter)
+      : original_protocol_(protocol), reporter_(reporter) {}
+
+  void Run() { Visit(original_protocol_); }
+
+ private:
+  void Visit(const Protocol* protocol) {
+    for (const auto& member : protocol->composed_protocols) {
+      auto target = member.reference.resolved().element();
+      if (target->kind != Element::Kind::kProtocol)
+        continue;
+      auto composed = static_cast<Protocol*>(target);
+      if (auto [it, inserted] = seen_.insert(composed); inserted)
+        Visit(composed);
+    }
+    for (auto& method : protocol->methods) {
+      auto original_name = method.name.data();
+      auto canonical_name = canonicalize(original_name);
+      if (auto result = canonical_names_.Insert(canonical_name, method.name); !result.ok()) {
+        auto previous_span = result.previous_occurrence();
+        if (original_name == previous_span.data()) {
+          reporter_->Fail(ErrNameCollision, method.name, Element::Kind::kProtocolMethod,
+                          original_name, Element::Kind::kProtocolMethod, previous_span);
+        } else {
+          reporter_->Fail(ErrNameCollisionCanonical, method.name, Element::Kind::kProtocolMethod,
+                          original_name, Element::Kind::kProtocolMethod, previous_span.data(),
+                          previous_span, canonical_name);
+        }
+      }
+      if (auto& ordinal = method.generated_ordinal64) {
+        if (auto result = ordinals_.Insert(ordinal->value, method.name); !result.ok()) {
+          reporter_->Fail(ErrDuplicateMethodOrdinal, ordinal->span(), result.previous_occurrence());
+        }
+      }
+      original_protocol_->all_methods.push_back(
+          {.method = &method, .is_composed = protocol != original_protocol_});
     }
   }
-  if (!error_member) {
+
+  Protocol* original_protocol_;
+  Reporter* reporter_;
+  Scope<std::string> canonical_names_;
+  Ordinal64Scope ordinals_;
+  std::set<const Protocol*> seen_;
+};
+
+void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
+  CompileAttributeList(protocol_declaration->attributes.get());
+  auto openness = protocol_declaration->openness;
+
+  for (auto& composed : protocol_declaration->composed_protocols) {
+    CompileAttributeList(composed.attributes.get());
+    auto target = composed.reference.resolved().element();
+    if (target->kind != Element::Kind::kProtocol) {
+      reporter()->Fail(ErrComposingNonProtocol, composed.reference.span());
+      continue;
+    }
+    auto composed_protocol = static_cast<Protocol*>(target);
+    CompileDecl(composed_protocol);
+    if (openness < composed_protocol->openness) {
+      reporter()->Fail(ErrComposedProtocolTooOpen, composed.reference.span(), openness,
+                       protocol_declaration->name, composed_protocol->openness,
+                       composed_protocol->name);
+    }
+  }
+
+  for (auto& method : protocol_declaration->methods) {
+    CompileAttributeList(method.attributes.get());
+    ValidateSelectorAndCalcOrdinal(protocol_declaration->name, &method);
+    if (auto& type_ctor = method.maybe_request) {
+      CompileTypeConstructor(type_ctor.get());
+      ValidatePayload(type_ctor.get());
+    }
+    if (auto& type_ctor = method.maybe_response) {
+      CompileTypeConstructor(type_ctor.get());
+      ValidatePayload(type_ctor.get());
+    }
+    SetResultUnionFields(&method);
+    if (auto* type_ctor = method.result_success_type_ctor)
+      ValidatePayload(type_ctor);
+    if (auto* type_ctor = method.result_domain_error_type_ctor)
+      ValidateDomainError(type_ctor);
+    auto kind = method.kind();
+    if (kind == Protocol::Method::Kind::kEvent)
+      ValidateEventErrorSyntax(method);
+    bool flexible = method.strictness == Strictness::kFlexible;
+    bool two_way = kind == Protocol::Method::Kind::kTwoWay;
+    if (flexible && two_way && openness != Openness::kOpen) {
+      reporter()->Fail(ErrFlexibleTwoWayMethodRequiresOpenProtocol, method.name, openness);
+    } else if (flexible && !two_way && openness == Openness::kClosed) {
+      reporter()->Fail(ErrFlexibleOneWayMethodInClosedProtocol, method.name, kind);
+    }
+  }
+
+  PopulateAllMethods(protocol_declaration, reporter()).Run();
+}
+
+bool CompileStep::ValidateSelectorAndCalcOrdinal(const Name& protocol_name,
+                                                 Protocol::Method* method) {
+  auto selector = GetSelector(method->attributes.get(), method->name);
+  if (!IsValidIdentifierComponent(selector) && !IsValidFullyQualifiedMethodIdentifier(selector)) {
+    return reporter()->Fail(
+        ErrInvalidSelectorValue,
+        method->attributes->Get("selector")->GetArg(AttributeArg::kDefaultAnonymousName)->span);
+  }
+  // TODO(https://fxbug.dev/42157659): Remove.
+  auto library_name = library()->name;
+  if (library_name.size() == 2 && library_name[0] == "fuchsia" && library_name[1] == "io" &&
+      selector.find('/') == std::string::npos) {
+    return reporter()->Fail(ErrFuchsiaIoExplicitOrdinals, method->name);
+  }
+  auto ordinal = std::make_unique<RawOrdinal64>(
+      method_hasher()(library_name, protocol_name.decl_name(), selector, *method->identifier));
+  if (ordinal->value == 0)
+    return reporter()->Fail(ErrGeneratedZeroValueOrdinal, ordinal->span());
+  method->generated_ordinal64 = std::move(ordinal);
+  return true;
+}
+
+void CompileStep::ValidatePayload(const TypeConstructor* type_ctor) {
+  const Type* type = type_ctor->type;
+  if (!type)
+    return;
+  if (type->kind != Type::Kind::kIdentifier) {
+    reporter()->Fail(ErrInvalidMethodPayloadType, type_ctor->span, type);
     return;
   }
-  auto error_type = error_member->type_ctor->type;
-  if (!error_type) {
-    return;
+  auto decl = static_cast<const IdentifierType*>(type)->type_decl;
+  switch (decl->kind) {
+    case Decl::Kind::kStruct: {
+      auto empty = static_cast<const Struct*>(decl)->members.empty();
+      auto anonymous = decl->name.as_anonymous();
+      auto compiler_generated =
+          anonymous && anonymous->provenance == Name::Provenance::kGeneratedEmptySuccessStruct;
+      if (empty && !compiler_generated) {
+        reporter()->Fail(ErrEmptyPayloadStructs, type_ctor->span);
+      }
+      for (auto& member : static_cast<const Struct*>(decl)->members) {
+        if (member.maybe_default_value) {
+          reporter()->Fail(ErrPayloadStructHasDefaultMembers, member.name);
+          break;
+        }
+      }
+      break;
+    }
+    case Decl::Kind::kTable:
+    case Decl::Kind::kUnion:
+      break;
+    default:
+      reporter()->Fail(ErrInvalidMethodPayloadLayoutClass, type_ctor->span, decl->kind);
+      break;
   }
+}
+
+void CompileStep::ValidateDomainError(const TypeConstructor* type_ctor) {
+  if (experimental_flags().IsEnabled(ExperimentalFlag::kAllowArbitraryErrorTypes))
+    return;
+  const Type* type = type_ctor->type;
+  if (!type)
+    return;
   const PrimitiveType* error_primitive = nullptr;
-  if (error_type->kind == Type::Kind::kPrimitive) {
-    error_primitive = static_cast<const PrimitiveType*>(error_type);
-  } else if (error_type->kind == Type::Kind::kIdentifier) {
-    auto identifier_type = static_cast<const IdentifierType*>(error_type);
+  if (type->kind == Type::Kind::kPrimitive) {
+    error_primitive = static_cast<const PrimitiveType*>(type);
+  } else if (type->kind == Type::Kind::kIdentifier) {
+    auto identifier_type = static_cast<const IdentifierType*>(type);
     if (identifier_type->type_decl->kind == Decl::Kind::kEnum) {
       auto error_enum = static_cast<const Enum*>(identifier_type->type_decl);
       ZX_ASSERT(error_enum->subtype_ctor->type->kind == Type::Kind::kPrimitive);
@@ -1194,8 +1120,28 @@ void CompileStep::ValidateDomainErrorType(const Union* result_union) {
   }
   if (!error_primitive || (error_primitive->subtype != PrimitiveSubtype::kInt32 &&
                            error_primitive->subtype != PrimitiveSubtype::kUint32)) {
-    reporter()->Fail(ErrInvalidErrorType, result_union->name.span().value());
+    reporter()->Fail(ErrInvalidErrorType, type_ctor->span);
   }
+}
+
+void CompileStep::ValidateEventErrorSyntax(const Protocol::Method& event) {
+  if (!event.has_error)
+    return;
+  const auto& protocol = *event.owning_protocol;
+  const Library& library = *protocol.name.library();
+  // TODO(https://fxbug.dev/42180639): Migrate test libraries.
+  ZX_ASSERT(!library.name.empty());
+  if (library.name[0] == "test" || library.name[0] == "fidl") {
+    return;
+  }
+  // TODO(https://fxbug.dev/42182418): Migrate fuchsia.hardware.radar.
+  if (library.name.size() == 3) {
+    if (library.name[0] == "fuchsia" && library.name[1] == "hardware" &&
+        library.name[2] == "radar") {
+      return;
+    }
+  }
+  reporter()->Fail(ErrEventErrorSyntaxDeprecated, event.name, event.name.data());
 }
 
 void CompileStep::CompileService(Service* service_decl) {

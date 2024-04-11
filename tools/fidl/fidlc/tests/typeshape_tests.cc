@@ -2407,14 +2407,22 @@ TEST(TypeShapeTests, BadIntegerOverflowStruct) {
   TestLibrary library(R"FIDL(
 library example;
 type Foo = struct {
-    big array<uint8, 2147483648>; // 2^31
-};
-type Bar = struct {
-    f1 Foo;
-    f2 Foo;
+    f1 array<uint8, 2147483648>; // 2^31
+    f2 array<uint8, 2147483648>; // 2^31
 };
 )FIDL");
-  library.ExpectFail(ErrTypeShapeIntegerOverflow, 2147483648, '+', 2147483648);
+  library.ExpectFail(ErrTypeShapeIntegerOverflow, 1 << 31, '+', 1 << 31);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(TypeShapeTests, BadInlineSizeExceedsLimit) {
+  TestLibrary library(R"FIDL(
+library example;
+type Foo = struct {
+    big array<uint8, 65536>; // 2^16
+};
+)FIDL");
+  library.ExpectFail(ErrInlineSizeExceedsLimit, "Foo", UINT16_MAX + 1, UINT16_MAX);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

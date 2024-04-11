@@ -32,6 +32,7 @@ std::string Display(const std::set<std::string_view>& s);
 std::string Display(SourceSpan s);
 std::string Display(Token::KindAndSubkind t);
 std::string Display(Openness o);
+std::string Display(Protocol::Method::Kind k);
 std::string Display(const std::vector<std::string_view>& library_name);
 std::string Display(const Attribute* a);
 std::string Display(const AttributeArg* a);
@@ -87,9 +88,9 @@ constexpr void CheckFormatArgs(std::string_view msg) {
   static_assert(
       (std::is_same_v<Args, std::remove_const_t<std::remove_reference_t<Args>>> && ...),
       "remove redundant `const` or `&`; DiagnosticDef args are always passed by const reference");
-  static_assert(((!std::is_pointer_v<Args> || std::is_const_v<std::remove_pointer_t<Args>>)&&...),
+  static_assert(((!std::is_pointer_v<Args> || std::is_const_v<std::remove_pointer_t<Args>>) && ...),
                 "use a const pointer; DiagnosticDef args should not be mutable pointers");
-  static_assert(((!std::is_same_v<Args, std::string>)&&...),
+  static_assert(((!std::is_same_v<Args, std::string>) && ...),
                 "use std::string_view, not std::string");
 
   // We can't static_assert below because the compiler doesn't know msg is

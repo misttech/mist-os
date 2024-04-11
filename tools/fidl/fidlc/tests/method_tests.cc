@@ -482,7 +482,7 @@ open protocol Test {
   strict Method() -> (struct {});
 };
 )FIDL");
-  library.ExpectFail(ErrEmptyPayloadStructs, "Method");
+  library.ExpectFail(ErrEmptyPayloadStructs);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -494,7 +494,7 @@ open protocol Test {
   flexible Method() -> (struct {});
 };
 )FIDL");
-  library.ExpectFail(ErrEmptyPayloadStructs, "Method");
+  library.ExpectFail(ErrEmptyPayloadStructs);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -506,7 +506,7 @@ open protocol Test {
   strict Method() -> (struct {}) error int32;
 };
 )FIDL");
-  library.ExpectFail(ErrEmptyPayloadStructs, "Method");
+  library.ExpectFail(ErrEmptyPayloadStructs);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -518,7 +518,7 @@ open protocol Test {
   flexible Method() -> (struct {}) error int32;
 };
 )FIDL");
-  library.ExpectFail(ErrEmptyPayloadStructs, "Method");
+  library.ExpectFail(ErrEmptyPayloadStructs);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

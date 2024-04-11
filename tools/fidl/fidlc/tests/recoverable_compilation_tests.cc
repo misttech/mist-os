@@ -221,7 +221,7 @@ protocol Foo {
 )FIDL");
   library.ExpectFail(ErrComposingNonProtocol);
   library.ExpectFail(ErrInvalidSelectorValue);
-  library.ExpectFail(ErrEmptyPayloadStructs, "Bar");
+  library.ExpectFail(ErrEmptyPayloadStructs);
   library.ExpectFail(ErrCannotBeOptional, "bool");
   library.ExpectFail(ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
   ASSERT_COMPILER_DIAGNOSTICS(library);
