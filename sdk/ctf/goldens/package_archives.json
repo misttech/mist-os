@@ -65,16 +65,6 @@
     "package_name": "simulate-scan-wlan-hw-sim-tests"
   },
   {
-    "archive_gn_label": "//src/devices/tests/ctf/basic_driver:basic-driver-test_archive_copy",
-    "archive_name": "basic-driver-test",
-    "package_name": "basic-driver-test"
-  },
-  {
-    "archive_gn_label": "//src/devices/tests/v2/node_group:nodegroup_test_archive_copy",
-    "archive_name": "nodegroup_test",
-    "package_name": "nodegroup_test"
-  },
-  {
     "archive_gn_label": "//src/sys/pkg/tests/pkgdir:pkgdir-tests_archive_copy",
     "archive_name": "pkgdir-tests",
     "package_name": "pkgdir-tests"

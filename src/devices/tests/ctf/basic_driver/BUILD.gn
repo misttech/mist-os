@@ -16,7 +16,8 @@ group("tests") {
 
 group("ctf-tests") {
   testonly = true
-  deps = [ ":basic-driver-test_archive" ]
+  # TODO(https://fxbug.dev/42073139): Re-enable after CTF tests only use stable APIs.
+  #deps = [ ":basic-driver-test_archive" ]
 }
 
 group("drivers") {
