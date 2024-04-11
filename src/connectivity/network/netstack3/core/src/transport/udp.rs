@@ -3447,7 +3447,7 @@ mod tests {
     /// ports are exhausted.
     #[ip_test]
     fn test_udp_conn_exhausted<I: Ip + TestIpExt>() {
-        set_logger_for_test();
+        // NB: We don't enable logging for this test because it's very spammy.
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
 
@@ -4153,7 +4153,7 @@ mod tests {
         available_port: NonZeroU16,
         expected_result: Result<NonZeroU16, LocalAddressError>,
     ) {
-        set_logger_for_test();
+        // NB: We don't enable logging for this test because it's very spammy.
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
 
