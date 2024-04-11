@@ -261,6 +261,9 @@ class_permission_enum! {
         Create("create"),
         /// Permission to open a file.
         Open("open"),
+        /// Permission to use a file as an entry point to the calling domain without performing a
+        /// transition.
+        ExecuteNoTrans("execute_no_trans"),
     }
 }
 

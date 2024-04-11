@@ -5,7 +5,7 @@
 use crate::task::Kernel;
 
 use selinux::{permission_check::PermissionCheck, InitialSid, SecurityId};
-use selinux_common::ProcessPermission;
+use selinux_common::{FilePermission, ProcessPermission};
 use starnix_uapi::{
     error,
     errors::Errno,
@@ -28,6 +28,7 @@ pub(crate) fn check_task_create_access(
 pub(crate) fn check_exec_access(
     permission_check: &impl PermissionCheck,
     selinux_state: &SeLinuxThreadGroupState,
+    executable_sid: SecurityId,
 ) -> Result<Option<SeLinuxResolvedElfState>, Errno> {
     let current_sid = selinux_state.current_sid;
     let new_sid = if let Some(exec_sid) = selinux_state.exec_sid {
@@ -40,9 +41,15 @@ pub(crate) fn check_exec_access(
         current_sid
     };
     if current_sid == new_sid {
-        // No domain transition.
-        // TODO(http://b/320436714): check that the current security context has execute
-        // rights to the executable file.
+        // To `exec()` a binary in the caller's domain, the caller must be granted
+        // "execute_no_trans" permission to the binary.
+        if !permission_check.has_permission(
+            current_sid,
+            executable_sid,
+            FilePermission::ExecuteNoTrans,
+        ) {
+            // TODO(http://b/330904217): once filesystems are labeled, deny access.
+        }
     } else {
         // Domain transition, check that transition is allowed.
         if !permission_check.has_permission(current_sid, new_sid, ProcessPermission::Transition) {
@@ -271,7 +278,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn exec_access_allowed_for_allowed_type() {
+    fn exec_access_allowed_for_allowed_transition_type() {
         let security_server = security_server_with_policy();
 
         let current_sid = security_server
@@ -279,6 +286,9 @@ mod tests {
             .expect("invalid security context");
         let exec_sid = security_server
             .security_context_to_sid(b"u:object_r:exec_transition_target_t:s0")
+            .expect("invalid security context");
+        let executable_sid = security_server
+            .security_context_to_sid(b"u:object_r:executable_file_trans_t:s0")
             .expect("invalid security context");
         let selinux_state = SeLinuxThreadGroupState {
             current_sid: current_sid,
@@ -290,19 +300,26 @@ mod tests {
         };
 
         assert_eq!(
-            check_exec_access(&security_server.as_permission_check(), &selinux_state),
+            check_exec_access(
+                &security_server.as_permission_check(),
+                &selinux_state,
+                executable_sid
+            ),
             Ok(Some(SeLinuxResolvedElfState { sid: exec_sid }))
         );
     }
 
     #[fuchsia::test]
-    fn exec_access_denied_for_denied_type() {
+    fn exec_access_denied_for_denied_transition_type() {
         let security_server = security_server_with_policy();
         let current_sid = security_server
             .security_context_to_sid(b"u:object_r:exec_transition_target_t:s0")
             .expect("invalid security context");
         let exec_sid = security_server
             .security_context_to_sid(b"u:object_r:exec_transition_source_t:s0")
+            .expect("invalid security context");
+        let executable_sid = security_server
+            .security_context_to_sid(b"u:object_r:executable_file_trans_t:s0")
             .expect("invalid security context");
         let selinux_state = SeLinuxThreadGroupState {
             current_sid: current_sid,
@@ -314,7 +331,72 @@ mod tests {
         };
 
         assert_eq!(
-            check_exec_access(&security_server.as_permission_check(), &selinux_state),
+            check_exec_access(
+                &security_server.as_permission_check(),
+                &selinux_state,
+                executable_sid
+            ),
+            error!(EACCES)
+        );
+    }
+
+    #[fuchsia::test]
+    fn exec_no_trans_allowed_for_executable() {
+        let security_server = security_server_with_policy();
+
+        let current_sid = security_server
+            .security_context_to_sid(b"u:object_r:exec_no_trans_source_t:s0")
+            .expect("invalid security context");
+        let executable_sid = security_server
+            .security_context_to_sid(b"u:object_r:executable_file_no_trans_t:s0")
+            .expect("invalid security context");
+        let selinux_state = SeLinuxThreadGroupState {
+            current_sid: current_sid,
+            exec_sid: None,
+            fscreate_sid: None,
+            keycreate_sid: None,
+            previous_sid: current_sid,
+            sockcreate_sid: None,
+        };
+
+        assert_eq!(
+            check_exec_access(
+                &security_server.as_permission_check(),
+                &selinux_state,
+                executable_sid
+            ),
+            Ok(Some(SeLinuxResolvedElfState { sid: current_sid }))
+        );
+    }
+
+    // TODO(http://b/330904217): reenable test once filesystems are labeled and access is denied.
+    #[ignore]
+    #[fuchsia::test]
+    fn exec_no_trans_denied_for_executable() {
+        let security_server = security_server_with_policy();
+        let current_sid = security_server
+            .security_context_to_sid(b"u:object_r:exec_transition_target_t:s0")
+            .expect("invalid security context");
+        let executable_sid = security_server
+            .security_context_to_sid(b"u:object_r:executable_file_no_trans_t:s0")
+            .expect("invalid security context");
+        let selinux_state = SeLinuxThreadGroupState {
+            current_sid: current_sid,
+            exec_sid: None,
+            fscreate_sid: None,
+            keycreate_sid: None,
+            previous_sid: current_sid,
+            sockcreate_sid: None,
+        };
+
+        // There is no `execute_no_trans` allow statement from `current_sid` to `executable_sid`,
+        // expect access denied.
+        assert_eq!(
+            check_exec_access(
+                &security_server.as_permission_check(),
+                &selinux_state,
+                executable_sid
+            ),
             error!(EACCES)
         );
     }

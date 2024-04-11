@@ -7,7 +7,7 @@ use std::sync::Arc;
 use super::thread_group_hooks::{self, SeLinuxResolvedElfState};
 use crate::{
     task::{CurrentTask, Task, ThreadGroup},
-    vfs::{FsNode, FsStr, ValueOrSize},
+    vfs::{FsNode, FsNodeHandle, FsStr, ValueOrSize},
 };
 
 use selinux::{
@@ -73,8 +73,7 @@ where
     })
 }
 
-/// Check if creating a task is allowed. Access is allowed if SELinux is disabled, in fake mode, or
-/// not enforcing.
+/// Check if creating a task is allowed.
 pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno> {
     check_if_selinux(current_task, |security_server| {
         let sid = current_task.get_current_sid();
@@ -82,21 +81,23 @@ pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno>
     })
 }
 
-/// Checks if exec is allowed. Access is allowed if SELinux is disabled, in fake mode, or not
-/// enforcing.
+/// Checks if exec is allowed.
 pub fn check_exec_access(
     current_task: &CurrentTask,
+    executable_node: &FsNodeHandle,
 ) -> Result<Option<SeLinuxResolvedElfState>, Errno> {
     check_if_selinux(current_task, |security_server| {
+        let executable_sid = executable_node.effective_sid(current_task);
         let group_state = current_task.thread_group.read();
         thread_group_hooks::check_exec_access(
             &security_server.as_permission_check(),
             &group_state.selinux_state,
+            executable_sid,
         )
     })
 }
 
-/// Updates the SELinux thread group state on exec. No-op if SELinux is disabled.
+/// Updates the SELinux thread group state on exec.
 pub fn update_state_on_exec(
     current_task: &mut CurrentTask,
     elf_selinux_state: &Option<SeLinuxResolvedElfState>,
@@ -110,8 +111,7 @@ pub fn update_state_on_exec(
     });
 }
 
-/// Checks if `source` may exercise the "getsched" permission on `target`. Access is allowed if
-/// SELinux is disabled, in fake mode, or not enforcing.
+/// Checks if `source` may exercise the "getsched" permission on `target`.
 pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
         // TODO(b/323856891): Consider holding `source.thread_group` and `target.thread_group`
@@ -126,8 +126,7 @@ pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
     })
 }
 
-/// Checks if setsched is allowed. Access is allowed if SELinux is disabled, in fake mode, or
-/// not enforcing.
+/// Checks if setsched is allowed.
 pub fn check_setsched_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
         let source_sid = source.get_current_sid();
@@ -140,8 +139,7 @@ pub fn check_setsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
     })
 }
 
-/// Checks if getpgid is allowed, if SELinux is enabled. Access is allowed if SELinux is disabled,
-/// in fake mode, or not enforcing.
+/// Checks if getpgid is allowed.
 pub fn check_getpgid_access(source_task: &CurrentTask, target_task: &Task) -> Result<(), Errno> {
     check_if_selinux(source_task, |security_server| {
         let source_sid = source_task.get_current_sid();
@@ -154,8 +152,7 @@ pub fn check_getpgid_access(source_task: &CurrentTask, target_task: &Task) -> Re
     })
 }
 
-/// Checks if setpgid is allowed, if SELinux is enabled. Access is allowed if SELinux is disabled,
-/// in fake mode, or not enforcing.
+/// Checks if setpgid is allowed.
 pub fn check_setpgid_access(source_task: &CurrentTask, target_task: &Task) -> Result<(), Errno> {
     check_if_selinux(source_task, |security_server| {
         let source_sid = source_task.get_current_sid();
@@ -168,8 +165,7 @@ pub fn check_setpgid_access(source_task: &CurrentTask, target_task: &Task) -> Re
     })
 }
 
-/// Checks if sending a signal is allowed, if SELinux is enabled. Access is allowed if SELinux is
-/// disabled, in fake mode, or not enforcing.
+/// Checks if sending a signal is allowed.
 pub fn check_signal_access(
     source_task: &CurrentTask,
     target_task: &Task,
@@ -187,8 +183,7 @@ pub fn check_signal_access(
     })
 }
 
-/// Checks if tracing the current task is allowed, if SELinux is enabled. Access is allowed if
-/// SELinux is disabled, in fake mode, or not enforcing.
+/// Checks if tracing the current task is allowed.
 pub fn check_ptrace_traceme_access(
     parent: &Arc<ThreadGroup>,
     current_task: &CurrentTask,
@@ -204,8 +199,7 @@ pub fn check_ptrace_traceme_access(
     })
 }
 
-/// Checks if `current_task` is allowed to trace `tracee_task`, if SELinux is enabled. Access is
-/// allowed if SELinux is disabled, in fake mode, or not enforcing.
+/// Checks if `current_task` is allowed to trace `tracee_task`.
 pub fn check_ptrace_attach_access(
     current_task: &CurrentTask,
     tracee_task: &Task,
@@ -469,24 +463,29 @@ mod tests {
 
     #[fuchsia::test]
     async fn exec_access_allowed_for_selinux_disabled() {
-        let (kernel, task) = create_kernel_and_task();
+        let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
         assert!(kernel.security_server.is_none());
-        assert_eq!(check_exec_access(&task), Ok(None));
+        let executable_node = &create_test_file(&mut locked, &task).entry.node;
+        assert_eq!(check_exec_access(&task, executable_node), Ok(None));
     }
 
     #[fuchsia::test]
     async fn exec_access_allowed_for_fake_mode() {
         let security_server = security_server_with_policy(Mode::Fake);
-        let (_kernel, task) = create_kernel_and_task_with_selinux(security_server);
-        assert_eq!(check_exec_access(&task), Ok(None));
+        let (_kernel, task, mut locked) =
+            create_kernel_task_and_unlocked_with_selinux(security_server);
+        let executable_node = &create_test_file(&mut locked, &task).entry.node;
+        assert_eq!(check_exec_access(&task, executable_node), Ok(None));
     }
 
     #[fuchsia::test]
     async fn exec_access_allowed_for_permissive_mode() {
         let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(false);
-        let (_kernel, task) = create_kernel_and_task_with_selinux(security_server);
-        assert_eq!(check_exec_access(&task), Ok(None));
+        let (_kernel, task, mut locked) =
+            create_kernel_task_and_unlocked_with_selinux(security_server);
+        let executable_node = &create_test_file(&mut locked, &task).entry.node;
+        assert_eq!(check_exec_access(&task, executable_node), Ok(None));
     }
 
     #[fuchsia::test]

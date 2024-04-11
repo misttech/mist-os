@@ -15,6 +15,8 @@
                 "*selinux_entrypoint*",
                 "*selinux_execshare*",
                 "*selinux_exectrace*",
+
+                // TODO(http://b/330904217): update `execute_no_trans` expectation to pass once filesystems are labeled correctly.
                 "*selinux_execute_no_trans*",
                 "*selinux_fdreceive*",
                 "*selinux_inherit*",

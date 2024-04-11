@@ -831,7 +831,7 @@ impl CurrentTask {
         // used in the `open` call.
         executable.name.check_access(self, Access::EXEC)?;
 
-        let elf_selinux_state = selinux_hooks::check_exec_access(self)?;
+        let elf_selinux_state = selinux_hooks::check_exec_access(self, executable.node())?;
 
         let resolved_elf = resolve_executable(
             locked,
