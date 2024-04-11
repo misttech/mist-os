@@ -14,9 +14,7 @@ TEST(PaverSvcTest, PaverSvccEnumeratesSuccessfully) {
   ASSERT_OK(client_end);
   fidl::WireSyncClient paver(std::move(client_end.value()));
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_paver::DataSink>();
-  ASSERT_OK(endpoints);
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_paver::DataSink>::Create();
 
   const fidl::OneWayStatus result = paver->FindDataSink(std::move(server));
   ASSERT_OK(result.status());

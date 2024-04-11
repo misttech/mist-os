@@ -39,14 +39,13 @@ constexpr uint8_t kTestData[] = {0x00, 0x11, 0x22, 0x33};
 
 TEST(DebugDataTest, PublishData) {
   async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_debugdata::Publisher>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fuchsia_debugdata::Publisher>::Create();
   std::unordered_map<std::string, std::vector<zx::vmo>> data;
   debugdata::Publisher publisher(loop.dispatcher(), fbl::unique_fd{open("/", O_RDONLY)},
                                  [&](const std::string& data_sink, zx::vmo vmo) {
                                    data[data_sink].push_back(std::move(vmo));
                                  });
-  publisher.Bind(std::move(endpoints->server));
+  publisher.Bind(std::move(endpoints.server));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(ZX_PAGE_SIZE, 0, &vmo));
@@ -54,7 +53,7 @@ TEST(DebugDataTest, PublishData) {
 
   zx::eventpair token1, token2;
   ASSERT_EQ(ZX_OK, zx::eventpair::create(0, &token1, &token2));
-  ASSERT_OK(fidl::WireCall(endpoints->client)
+  ASSERT_OK(fidl::WireCall(endpoints.client)
                 ->Publish(kTestSink, std::move(vmo), std::move(token1))
                 .status());
   // close the client handle to indicate the VMO is ready to process.
@@ -76,14 +75,13 @@ TEST(DebugDataTest, PublishData) {
 
 TEST(DebugDataTest, DrainData) {
   async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_debugdata::Publisher>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fuchsia_debugdata::Publisher>::Create();
   std::unordered_map<std::string, std::vector<zx::vmo>> data;
   debugdata::Publisher publisher(loop.dispatcher(), fbl::unique_fd{open("/", O_RDONLY)},
                                  [&](const std::string& data_sink, zx::vmo vmo) {
                                    data[data_sink].push_back(std::move(vmo));
                                  });
-  publisher.Bind(std::move(endpoints->server));
+  publisher.Bind(std::move(endpoints.server));
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(ZX_PAGE_SIZE, 0, &vmo));
@@ -91,7 +89,7 @@ TEST(DebugDataTest, DrainData) {
 
   zx::eventpair token1, token2;
   ASSERT_EQ(ZX_OK, zx::eventpair::create(0, &token1, &token2));
-  ASSERT_OK(fidl::WireCall(endpoints->client)
+  ASSERT_OK(fidl::WireCall(endpoints.client)
                 ->Publish(kTestSink, std::move(vmo), std::move(token1))
                 .status());
 

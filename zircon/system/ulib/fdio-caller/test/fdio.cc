@@ -68,9 +68,7 @@ class FdioCallerTest : public zxtest::Test {
     ASSERT_OK(result);
     auto& [memfs, root] = result.value();
 
-    zx::result endpoints = fidl::CreateEndpoints<fio::Directory>();
-    ASSERT_OK(endpoints);
-    auto& [client, server] = endpoints.value();
+    auto [client, server] = fidl::Endpoints<fio::Directory>::Create();
 
     ASSERT_OK(memfs->ServeDirectory(std::move(root), std::move(server)));
     memfs_ = std::move(memfs);

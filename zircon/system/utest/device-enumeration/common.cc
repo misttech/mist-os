@@ -142,9 +142,7 @@ void DeviceEnumerationTest::PrintAllDevices() {
   ASSERT_OK(driver_development.status_value());
 
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_driver_development::NodeInfoIterator>();
-    ASSERT_OK(endpoints.status_value());
-    auto& [client, server] = endpoints.value();
+    auto [client, server] = fidl::Endpoints<fuchsia_driver_development::NodeInfoIterator>::Create();
 
     const fidl::Status result = fidl::WireCall(driver_development.value())
                                     ->GetNodeInfo({}, std::move(server), /* exact_match= */ true);

@@ -17,11 +17,7 @@ namespace mock_boot_arguments {
 
 zx::result<fidl::WireSyncClient<fuchsia_boot::Arguments>> Server::CreateClient(
     async_dispatcher_t* dispatcher) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_boot::Arguments>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_boot::Arguments>::Create();
 
   fidl::BindServer(dispatcher, std::move(server), this);
 

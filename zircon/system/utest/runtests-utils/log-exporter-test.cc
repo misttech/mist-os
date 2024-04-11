@@ -25,9 +25,7 @@ fuchsia_logger::wire::LogMessage CreateLogMessage(fuchsia_logger::wire::LogMessa
 }
 
 TEST(LogListenerTests, TestLog) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_logger::LogListenerSafe>();
-  ASSERT_OK(endpoints);
-  auto& [listener, listener_request] = endpoints.value();
+  auto [listener, listener_request] = fidl::Endpoints<fuchsia_logger::LogListenerSafe>::Create();
 
   // We expect the log file to be much smaller than this.
   char buf[1024];
@@ -91,9 +89,7 @@ TEST(LogListenerTests, TestLog) {
 }
 
 TEST(LogListenerTests, TestLogMany) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_logger::LogListenerSafe>();
-  ASSERT_OK(endpoints);
-  auto& [listener, listener_request] = endpoints.value();
+  auto [listener, listener_request] = fidl::Endpoints<fuchsia_logger::LogListenerSafe>::Create();
 
   // We expect the log file to be much smaller than this.
   char buf[1024];
@@ -156,9 +152,7 @@ TEST(LogListenerTests, TestLogMany) {
 }
 
 TEST(LogListenerTests, TestDroppedLogs) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_logger::LogListenerSafe>();
-  ASSERT_OK(endpoints);
-  auto& [listener, listener_request] = endpoints.value();
+  auto [listener, listener_request] = fidl::Endpoints<fuchsia_logger::LogListenerSafe>::Create();
 
   // We expect the log file to be much smaller than this.
   char buf[1024];
@@ -246,9 +240,7 @@ TEST(LogListenerTests, TestDroppedLogs) {
 }
 
 TEST(LogListenerTests, TestBadOutputFile) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_logger::LogListenerSafe>();
-  ASSERT_OK(endpoints);
-  auto& [listener, listener_request] = endpoints.value();
+  auto [listener, listener_request] = fidl::Endpoints<fuchsia_logger::LogListenerSafe>::Create();
 
   char buf[1024];
   memset(buf, 0, sizeof(buf));

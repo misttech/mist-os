@@ -96,12 +96,7 @@ zx::result<BusLauncher> BusLauncher::Create(IsolatedDevmgr::Args args) {
 
 zx_status_t BusLauncher::SetupPeripheralDevice(DeviceDescriptor&& device_desc,
                                                std::vector<ConfigurationDescriptor> config_descs) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb_peripheral::Events>();
-  if (endpoints.is_error()) {
-    std::cout << "Failed to create endpoints: " << endpoints.status_string() << '\n';
-    return endpoints.error_value();
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_usb_peripheral::Events>::Create();
 
   if (const fidl::Status result = peripheral_->SetStateChangeListener(std::move(client));
       !result.ok()) {
@@ -149,12 +144,7 @@ zx_status_t BusLauncher::SetupPeripheralDevice(DeviceDescriptor&& device_desc,
 }
 
 zx_status_t BusLauncher::ClearPeripheralDeviceFunctions() {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb_peripheral::Events>();
-  if (endpoints.is_error()) {
-    std::cout << "Failed to create endpoints: " << endpoints.status_string() << '\n';
-    return endpoints.error_value();
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_usb_peripheral::Events>::Create();
 
   if (const fidl::Status result = peripheral_->SetStateChangeListener(std::move(client));
       !result.ok()) {

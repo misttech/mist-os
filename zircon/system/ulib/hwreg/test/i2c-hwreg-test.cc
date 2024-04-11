@@ -19,11 +19,10 @@ class I2cHwregTest : public zxtest::Test {
   I2cHwregTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
 
   void SetUp() override {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    EXPECT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
 
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
-    i2c_client_ = std::move(endpoints->client);
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), &mock_i2c_);
+    i2c_client_ = std::move(endpoints.client);
 
     EXPECT_OK(loop_.StartThread());
   }

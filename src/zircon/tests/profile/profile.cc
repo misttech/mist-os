@@ -23,13 +23,12 @@ namespace {
 
 void GetProfileProvider(fidl::ClientEnd<fuchsia_scheduler_deprecated::ProfileProvider>* provider) {
   // Connect to ProfileProvider.
-  auto endpoints = fidl::CreateEndpoints<fuchsia_scheduler_deprecated::ProfileProvider>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fuchsia_scheduler_deprecated::ProfileProvider>::Create();
   ASSERT_OK(fdio_service_connect_by_name(
                 fidl::DiscoverableProtocolName<fuchsia_scheduler_deprecated::ProfileProvider>,
-                endpoints->server.channel().release()),
+                endpoints.server.channel().release()),
             "Could not connect to ProfileProvider.");
-  *provider = std::move(endpoints->client);
+  *provider = std::move(endpoints.client);
 }
 
 void CheckBasicDetails(const zx::profile& profile) {

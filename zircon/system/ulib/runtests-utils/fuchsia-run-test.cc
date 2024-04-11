@@ -224,12 +224,7 @@ std::unique_ptr<Result> RunTest(const char* argv[], const char* output_dir, cons
         {"/tmp", fuchsia_io::OpenFlags::kRightReadable | fuchsia_io::OpenFlags::kRightWritable},
     };
     for (auto [path, flags] : map) {
-      zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-      if (endpoints.is_error()) {
-        fprintf(stderr, "FAILURE: Could not create endpoints: %s\n", endpoints.status_string());
-        return std::make_unique<Result>(path, FAILED_UNKNOWN, 0, 0);
-      }
-      auto& [client_end, server_end] = endpoints.value();
+      auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
       if (zx_status_t status =
               fdio_open(path, static_cast<uint32_t>(flags), server_end.TakeChannel().release());
           status != ZX_OK) {
