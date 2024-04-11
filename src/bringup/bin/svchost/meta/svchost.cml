@@ -19,11 +19,6 @@
     ],
     use: [
         {
-            directory: "config-profiles",
-            rights: [ "r*" ],
-            path: "/config/profiles",
-        },
-        {
             directory: "boot-kernel",
             rights: [ "r*" ],
             path: "/boot/kernel",
@@ -31,16 +26,9 @@
         {
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.exception.Handler",
                 "fuchsia.kernel.DebugResource",
-                "fuchsia.kernel.RootJob",
                 "fuchsia.logger.LogSink",
             ],
-        },
-        {
-            config: "fuchsia.diagnostics.ExceptionHandlerAvailable",
-            key: "exception_handler_available",
-            type: "bool",
         },
     ],
     expose: [

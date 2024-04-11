@@ -42,8 +42,10 @@
 #include <fbl/unique_fd.h>
 #include <src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h>
 
+#include "src/bringup/bin/pwrbtn-monitor/crashsvc/crashsvc.h"
 #include "src/bringup/bin/pwrbtn-monitor/monitor.h"
 #include "src/bringup/bin/pwrbtn-monitor/oom_watcher.h"
+#include "src/bringup/bin/pwrbtn-monitor/pwrbtn_monitor_config.h"
 
 #define INPUT_PATH "/input"
 
@@ -302,6 +304,46 @@ void RunOomThread() {
   }
 }
 
+void RunCrashSvcThread(bool exception_handler_available) {
+  // Get the root job.
+  zx::result<zx::job> root_job = GetRootJob();
+  if (!root_job.is_ok()) {
+    printf("pwrbtn-monitor: failed to get root job, crashsvc will not be started: %s\n",
+           root_job.status_string());
+    return;
+  }
+
+  zx::channel exception_channel;
+  if (zx_status_t status = root_job->create_exception_channel(0, &exception_channel);
+      status != ZX_OK) {
+    fprintf(stderr, "pwrbtn-monitor: error: Failed to create exception channel: %s",
+            zx_status_get_string(status));
+    return;
+  }
+
+  fidl::ClientEnd<fuchsia_io::Directory> svc;
+  if (exception_handler_available) {
+    zx::result result = component::OpenServiceRoot();
+    if (result.is_error()) {
+      fprintf(stderr, "pwrbtn-monitor: unable to open service root: %s\n", result.status_string());
+      return;
+    }
+    svc = std::move(result.value());
+  }
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  zx::result crashsvc =
+      start_crashsvc(loop.dispatcher(), std::move(exception_channel), std::move(svc));
+  if (crashsvc.is_error()) {
+    // The system can still function without crashsvc, log the error but
+    // keep going.
+    fprintf(stderr, "pwrbtn-monitor: error: Failed to start crashsvc: %d (%s).\n",
+            crashsvc.error_value(), crashsvc.status_string());
+    return;
+  }
+  zx_status_t status = loop.Run();
+  ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -352,6 +394,12 @@ int main(int argc, char** argv) {
   // work.
   std::thread oom_thread(RunOomThread);
 
+  auto config = pwrbtn_monitor_config::Config::TakeFromStartupHandle();
+
+  // Handle exceptions on another thread; the system won't deliver exceptions to the thread that
+  // generated them.
+  std::thread crashsvc(RunCrashSvcThread, config.exception_handler_available());
+
   component::OutgoingDirectory outgoing{loop.dispatcher()};
   zx::result result = outgoing.ServeFromStartupInfo();
   if (!result.is_ok()) {
@@ -367,7 +415,9 @@ int main(int argc, char** argv) {
 
   loop.Run();
 
-  // Wait for the oom thread to exit
+  // Wait for the oom thread and crashsvc thread to exit
   oom_thread.join();
+  crashsvc.join();
+
   return 1;
 }

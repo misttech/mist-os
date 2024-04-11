@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_BRINGUP_BIN_SVCHOST_INCLUDE_CRASHSVC_EXCEPTION_HANDLER_H_
-#define SRC_BRINGUP_BIN_SVCHOST_INCLUDE_CRASHSVC_EXCEPTION_HANDLER_H_
+#ifndef SRC_BRINGUP_BIN_PWRBTN_MONITOR_CRASHSVC_EXCEPTION_HANDLER_H_
+#define SRC_BRINGUP_BIN_PWRBTN_MONITOR_CRASHSVC_EXCEPTION_HANDLER_H_
 
 #include <fidl/fuchsia.exception/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
@@ -53,4 +53,4 @@ class ExceptionHandler : public fidl::WireAsyncEventHandler<fuchsia_exception::H
   fxl::WeakPtrFactory<ExceptionHandler> weak_factory_{this};
 };
 
-#endif  // SRC_BRINGUP_BIN_SVCHOST_INCLUDE_CRASHSVC_EXCEPTION_HANDLER_H_
+#endif  // SRC_BRINGUP_BIN_PWRBTN_MONITOR_CRASHSVC_EXCEPTION_HANDLER_H_

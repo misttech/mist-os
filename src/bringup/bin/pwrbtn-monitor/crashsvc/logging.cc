@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/bringup/bin/pwrbtn-monitor/crashsvc/logging.h"
+
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
-
-#include <crashsvc/logging.h>
 
 void LogError(const char* message, zx_status_t status) {
   fprintf(stderr, "crashsvc: %s: %s (%d)\n", message, zx_status_get_string(status), status);

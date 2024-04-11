@@ -24,12 +24,6 @@
 #include <iterator>
 #include <string_view>
 
-#include <crashsvc/crashsvc.h>
-#include <fbl/algorithm.h>
-#include <fbl/string_printf.h>
-#include <fbl/unique_fd.h>
-
-#include "src/bringup/bin/svchost/svchost_config.h"
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
 
 // An instance of a zx_service_provider_t.
@@ -129,24 +123,6 @@ int main(int argc, char** argv) {
   async_dispatcher_t* dispatcher = loop.dispatcher();
   svc::Outgoing outgoing(dispatcher);
 
-  // Get the root job.
-  zx::job root_job;
-  {
-    zx::result client = component::ConnectAt<fuchsia_kernel::RootJob>(svc);
-    if (client.is_error()) {
-      fprintf(stderr, "svchost: unable to connect to %s: %s\n",
-              fidl::DiscoverableProtocolName<fuchsia_kernel::RootJob>, client.status_string());
-      return 1;
-    }
-    fidl::WireResult result = fidl::WireCall(client.value())->Get();
-    if (!result.ok()) {
-      fprintf(stderr, "svchost: unable to get root job: %s\n", result.status_string());
-      return 1;
-    }
-    auto& response = result.value();
-    root_job = std::move(response.job);
-  }
-
   // Get the debug resource.
   zx::resource debug_resource;
   {
@@ -196,36 +172,6 @@ int main(int argc, char** argv) {
       return 1;
     }
   }
-
-  auto config = svchost_config::Config::TakeFromStartupHandle();
-
-  zx::channel exception_channel;
-  if (zx_status_t status = root_job.create_exception_channel(0, &exception_channel);
-      status != ZX_OK) {
-    fprintf(stderr, "svchost: error: Failed to create exception channel: %s",
-            zx_status_get_string(status));
-    return 1;
-  }
-
-  // Handle exceptions on another thread; the system won't deliver exceptions to the thread that
-  // generated them.
-  std::thread crashsvc(
-      [exception_channel = std::move(exception_channel),
-       svc = config.exception_handler_available() ? std::move(svc) : decltype(svc){}]() mutable {
-        async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-        zx::result crashsvc =
-            start_crashsvc(loop.dispatcher(), std::move(exception_channel), std::move(svc));
-        if (crashsvc.is_error()) {
-          // The system can still function without crashsvc, log the error but
-          // keep going.
-          fprintf(stderr, "svchost: error: Failed to start crashsvc: %d (%s).\n",
-                  crashsvc.error_value(), crashsvc.status_string());
-          return;
-        }
-        zx_status_t status = loop.Run();
-        ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
-      });
-  crashsvc.detach();
 
   zx_status_t status = loop.Run();
 

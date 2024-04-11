@@ -5,6 +5,15 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
+fuchsia_component_manifest("manifest") {
+  component_name = "pwrbtn-monitor"
+  manifest = "meta/pwrbtn-monitor.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("pwrbtn_monitor_config") {
+  cm_label = ":manifest"
+}
+
 executable("pwrbtn-monitor") {
   sources = [
     "main.cc",
@@ -14,6 +23,7 @@ executable("pwrbtn-monitor") {
     "oom_watcher.h",
   ]
   deps = [
+    ":pwrbtn_monitor_config",
     "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
@@ -22,6 +32,7 @@ executable("pwrbtn-monitor") {
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp",
+    "//src/bringup/bin/pwrbtn-monitor/crashsvc",
     "//src/sys/lib/stdout-to-debuglog/cpp",
     "//src/ui/input/lib/hid-parser",
     "//zircon/system/ulib/async-default",
@@ -64,8 +75,7 @@ fuchsia_unittest_package("pwrbtn-monitor-unittests") {
 }
 
 fuchsia_component("component") {
-  component_name = "pwrbtn-monitor"
-  manifest = "meta/pwrbtn-monitor.cml"
+  cm_label = ":manifest"
   deps = [ ":pwrbtn-monitor" ]
 }
 

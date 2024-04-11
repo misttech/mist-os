@@ -12,13 +12,17 @@
     },
     children: [
         {
+            name: "config",
+            url: "#meta/pwrbtn-monitor_config.cm",
+        },
+        {
             name: "pwrbtn-monitor",
-            url: "fuchsia-pkg://fuchsia.com/pwrbtn-monitor-integration-test#meta/pwrbtn-monitor.cm",
+            url: "#meta/pwrbtn-monitor.cm",
             startup: "eager",
         },
         {
             name: "test-driver",
-            url: "fuchsia-pkg://fuchsia.com/pwrbtn-monitor-integration-test#meta/test-driver.cm",
+            url: "#meta/test-driver.cm",
         },
     ],
     capabilities: [
@@ -35,6 +39,11 @@
         },
     ],
     offer: [
+        {
+            from: "#config",
+            to: "#pwrbtn-monitor",
+            config: "fuchsia.diagnostics.ExceptionHandlerAvailable",
+        },
         {
             directory: "input",
             from: "self",

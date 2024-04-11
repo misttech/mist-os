@@ -16,7 +16,8 @@
             url: "fuchsia-boot:///pwrbtn-monitor#meta/pwrbtn-monitor.cm",
 
             // pwrbtn-monitor should start eagerly - the only services it offers may never be called
-            // on some builds, so there's no other way to start it.
+            // on some builds, so there's no other way to start it. Importantly it hosts the crashsvc
+            // and oom handler.
             startup: "eager",
         },
         {
@@ -26,10 +27,6 @@
         {
             name: "svchost",
             url: "fuchsia-boot:///svchost#meta/svchost.cm",
-
-            // Start eager in order to register the crash handler as early as
-            // possible.
-            startup: "eager",
         },
         {
             name: "role_manager",
@@ -39,7 +36,7 @@
     offer: [
         {
             from: "parent",
-            to: "#svchost",
+            to: "#pwrbtn-monitor",
             config: [ "fuchsia.diagnostics.ExceptionHandlerAvailable" ],
         },
         {
@@ -93,14 +90,6 @@
             directory: "boot",
             from: "parent",
             as: "config-profiles",
-            to: "#svchost",
-            rights: [ "r*" ],
-            subdir: "config/profiles",
-        },
-        {
-            directory: "boot",
-            from: "parent",
-            as: "config-profiles",
             to: "#role_manager",
             rights: [ "r*" ],
             subdir: "config/profiles",
@@ -117,10 +106,7 @@
         {
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.exception.Handler",
                 "fuchsia.kernel.DebugResource",
-                "fuchsia.kernel.ProfileResource",
-                "fuchsia.kernel.RootJob",
             ],
             from: "parent",
             to: "#svchost",
@@ -146,10 +132,7 @@
         {
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "#shutdown_shim",
-            to: [
-                "#pwrbtn-monitor",
-                "#svchost",
-            ],
+            to: "#pwrbtn-monitor",
         },
 
         // Things shutdown_shim and power_manager need
@@ -184,7 +167,10 @@
             ],
         },
         {
-            protocol: [ "fuchsia.kernel.RootJob" ],
+            protocol: [
+                "fuchsia.exception.Handler",
+                "fuchsia.kernel.RootJob",
+            ],
             from: "parent",
             to: [ "#pwrbtn-monitor" ],
         },

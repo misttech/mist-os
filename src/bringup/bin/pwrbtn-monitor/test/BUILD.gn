@@ -48,11 +48,24 @@ rustc_test("test_driver") {
   sources = [ "src/test.rs" ]
 }
 
-fuchsia_component("pwrbtn_monitor_component") {
-  testonly = true
+fuchsia_component_manifest("manifest") {
   component_name = "pwrbtn-monitor"
   manifest = "//src/bringup/bin/pwrbtn-monitor/meta/pwrbtn-monitor.cml"
+}
+
+fuchsia_component("pwrbtn_monitor_component") {
+  testonly = true
+  cm_label = ":manifest"
   deps = [ "//src/bringup/bin/pwrbtn-monitor" ]
+}
+
+fuchsia_structured_config_values2("config_values") {
+  testonly = true
+  cm_label = ":manifest"
+  component_name = "pwrbtn-monitor"
+  values = {
+    exception_handler_available = false
+  }
 }
 
 fuchsia_component("test_driver_component") {
@@ -67,10 +80,10 @@ fuchsia_test_component("mock_services_component") {
   manifest = "meta/pwrbtn_monitor_integration_test.cml"
   deps = [ ":mock_services" ]
 }
-
 fuchsia_test_package("pwrbtn-monitor-integration-test") {
   test_components = [ ":mock_services_component" ]
   deps = [
+    ":config_values",
     ":pwrbtn_monitor_component",
     ":test_driver_component",
   ]

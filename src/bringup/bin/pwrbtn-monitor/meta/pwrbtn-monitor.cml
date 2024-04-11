@@ -19,9 +19,15 @@
         {
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.exception.Handler",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.kernel.RootJob",
             ],
+        },
+        {
+            config: "fuchsia.diagnostics.ExceptionHandlerAvailable",
+            key: "exception_handler_available",
+            type: "bool",
         },
     ],
     expose: [
