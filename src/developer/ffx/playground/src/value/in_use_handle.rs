@@ -257,6 +257,15 @@ impl InUseHandle {
         }
     }
 
+    /// Test method that verifies that this contains a socket and returns it as a socket.
+    #[cfg(test)]
+    pub fn unwrap_socket(self) -> fidl::Socket {
+        let mut h = std::mem::replace(&mut *self.handle.lock().unwrap(), HandleObject::Defunct);
+        h.determine();
+        let HandleObject::Endpoint(Endpoint::Socket(h)) = h else { panic!() };
+        h.into()
+    }
+
     /// If this is a channel, perform a `read_etc` operation on it
     /// asynchronously. Returns an error if it is not a channel.
     pub fn poll_read_channel_etc(

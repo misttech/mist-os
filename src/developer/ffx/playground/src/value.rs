@@ -616,6 +616,14 @@ impl PlaygroundValue {
                 .take_client(Some(&name))
                 .map(|x| FidlValue::ClientEnd(x, name.to_owned()))
                 .map_err(|_| error!("Cannot conver type to client for {name}")),
+            (
+                LookupResultOrType::Type(lib::Type::Handle {
+                    object_type: fidl::ObjectType::SOCKET,
+                    rights: _,
+                    nullable: _,
+                }),
+                PlaygroundValue::InUseHandle(h),
+            ) => h.take_socket().map_err(|_| error!("Cannot convert type to socket")),
             (LookupResultOrType::Type(ty), PlaygroundValue::Invocable(_)) => {
                 Err(error!("Cannot convert invocable to {ty:?}"))
             }
@@ -813,7 +821,7 @@ impl std::fmt::Display for PlaygroundValue {
 mod test {
     use super::*;
     use fidl::HandleBased;
-    use futures::FutureExt;
+    use futures::{AsyncReadExt, AsyncWriteExt, FutureExt};
 
     #[test]
     fn compare() {
@@ -1233,6 +1241,48 @@ mod test {
         let Value::OutOfLine(PlaygroundValue::InUseHandle(server)) = server else { panic!() };
 
         assert!(server.take_server(Some("test.fidlcodec.examples/FidlCodecTestProtocol")).is_err());
+    }
+
+    #[fuchsia::test]
+    async fn promote_to_socket() {
+        let ns = lib::Namespace::new();
+        let (a, b) = InUseHandle::new_endpoints();
+        let a = Value::OutOfLine(PlaygroundValue::InUseHandle(a));
+
+        let a = a
+            .to_fidl_value(
+                &ns,
+                &lib::Type::Handle {
+                    object_type: fidl::ObjectType::SOCKET,
+                    rights: fidl::Rights::SOCKET_DEFAULT,
+                    nullable: false,
+                },
+            )
+            .unwrap();
+        let FidlValue::Handle(a, fidl::ObjectType::SOCKET) = a else { panic!() };
+        let a = fidl::Socket::from(a);
+        let b = b.unwrap_socket();
+        let mut a = fuchsia_async::Socket::from_socket(a);
+        let mut b = fuchsia_async::Socket::from_socket(b);
+        static CALL: &[u8] = b"What if we shared some extremely basic opinions?";
+        static RESPONSE: &[u8] = b"I think pickles are alright.";
+        futures::future::join(
+            async move {
+                a.write_all(CALL).await.unwrap();
+                let mut buf = [0u8; 28];
+                assert_eq!(buf.len(), RESPONSE.len());
+                a.read_exact(&mut buf).await.unwrap();
+                assert_eq!(RESPONSE, &buf);
+            },
+            async move {
+                let mut buf = [0u8; 48];
+                assert_eq!(buf.len(), CALL.len());
+                b.read_exact(&mut buf).await.unwrap();
+                assert_eq!(CALL, &buf);
+                b.write_all(RESPONSE).await.unwrap();
+            },
+        )
+        .await;
     }
 
     #[test]
