@@ -136,9 +136,3 @@ pub(crate) enum IfaceManagerOperation {
     ReportDefect,
     PerformRecovery,
 }
-
-#[cfg_attr(test, derive(Debug))]
-pub enum BssSelectionOperation {
-    FulfillConnectRequest(api::ConnectAttemptRequest, Option<client_types::ScannedCandidate>),
-    _LocalRoam(Option<client_types::ScannedCandidate>),
-}

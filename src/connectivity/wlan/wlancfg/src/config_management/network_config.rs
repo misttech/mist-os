@@ -548,8 +548,8 @@ impl SecurityType {
 #[derive(Arbitrary)]
 // Derive Arbitrary for fuzzer
 // To avoid printing PII, only allow Debug in tests, runtime logging should use Display
-#[cfg_attr(test, derive(Debug))]
 #[derive(Clone, Eq, Hash, PartialEq)]
+#[cfg_attr(test, derive(Debug))]
 pub struct NetworkIdentifier {
     pub ssid: client_types::Ssid,
     pub security_type: SecurityType,

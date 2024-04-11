@@ -14,7 +14,8 @@ use {
         },
         telemetry::{self, TelemetryEvent, TelemetrySender},
     },
-    anyhow::{format_err, Error},
+    anyhow::format_err,
+    async_trait::async_trait,
     fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
     fuchsia_inspect::{Node as InspectNode, StringReference},
     fuchsia_inspect_contrib::{
@@ -24,7 +25,12 @@ use {
         nodes::BoundedListNode as InspectBoundedListNode,
     },
     fuchsia_zircon as zx,
-    futures::lock::Mutex,
+    futures::{
+        channel::{mpsc, oneshot},
+        lock::Mutex,
+        select,
+        stream::StreamExt,
+    },
     std::collections::HashMap,
     std::{collections::HashSet, sync::Arc},
     tracing::{debug, error, info, warn},
@@ -35,6 +41,8 @@ pub mod bss_selection;
 pub mod local_roam_manager;
 pub mod network_selection;
 pub mod scoring_functions;
+
+pub const CONNECTION_SELECTION_REQUEST_BUFFER_SIZE: usize = 100;
 
 /// Number of previous RSSI measurements to exponentially weigh into average.
 /// TODO(https://fxbug.dev/42165706): Tune smoothing factor.
@@ -49,6 +57,109 @@ const INSPECT_EVENT_LIMIT_FOR_CONNECTION_SELECTIONS: usize = 10;
 const RECENT_DISCONNECT_WINDOW: zx::Duration = zx::Duration::from_seconds(60 * 15);
 const RECENT_FAILURE_WINDOW: zx::Duration = zx::Duration::from_seconds(60 * 5);
 const SHORT_CONNECT_DURATION: zx::Duration = zx::Duration::from_seconds(7 * 60);
+
+#[derive(Clone)]
+pub struct ConnectionSelectionRequester {
+    sender: mpsc::Sender<ConnectionSelectionRequest>,
+}
+
+impl ConnectionSelectionRequester {
+    pub fn new(sender: mpsc::Sender<ConnectionSelectionRequest>) -> Self {
+        Self { sender }
+    }
+
+    pub async fn do_connection_selection(
+        &mut self,
+        // None if no specific SSID is requested.
+        network_id: Option<types::NetworkIdentifier>,
+        reason: types::ConnectReason,
+    ) -> Result<Option<types::ScannedCandidate>, anyhow::Error> {
+        let (sender, receiver) = oneshot::channel();
+        let _ = self
+            .sender
+            .try_send(ConnectionSelectionRequest::NewConnectionSelection {
+                network_id,
+                reason,
+                responder: sender,
+            })
+            .map_err(|e| format_err!("Failed to queue connection selection: {}", e))?;
+        receiver.await.map_err(|e| format_err!("Error during connection selection: {:?}", e))
+    }
+    pub async fn do_roam_selection(
+        &mut self,
+        network_id: types::NetworkIdentifier,
+        credential: network_config::Credential,
+    ) -> Result<Option<types::ScannedCandidate>, anyhow::Error> {
+        let (sender, receiver) = oneshot::channel();
+        let _ = self
+            .sender
+            .try_send(ConnectionSelectionRequest::RoamSelection {
+                network_id,
+                credential,
+                responder: sender,
+            })
+            .map_err(|e| format_err!("Failed to queue connection selection: {}", e))?;
+        receiver.await.map_err(|e| format_err!("Error during roam selection: {:?}", e))
+    }
+}
+
+#[cfg_attr(test, derive(Debug))]
+pub enum ConnectionSelectionRequest {
+    NewConnectionSelection {
+        network_id: Option<types::NetworkIdentifier>,
+        reason: types::ConnectReason,
+        responder: oneshot::Sender<Option<types::ScannedCandidate>>,
+    },
+    RoamSelection {
+        network_id: types::NetworkIdentifier,
+        credential: network_config::Credential,
+        responder: oneshot::Sender<Option<types::ScannedCandidate>>,
+    },
+}
+
+// Primary functionality in a trait, so it can be stubbed for tests.
+#[async_trait]
+pub trait ConnectionSelectorApi: Send + Sync {
+    // Find best connection candidate to initialize a connection.
+    async fn find_and_select_connection_candidate(
+        &self,
+        network: Option<types::NetworkIdentifier>,
+        reason: types::ConnectReason,
+    ) -> Option<types::ScannedCandidate>;
+    // Find best roam candidate.
+    async fn find_and_select_roam_candidate(
+        &self,
+        network: types::NetworkIdentifier,
+        credential: &network_config::Credential,
+    ) -> Option<types::ScannedCandidate>;
+}
+
+// Main loop to handle incoming requests.
+pub async fn serve_connection_selection_request_loop(
+    connection_selector: Arc<dyn ConnectionSelectorApi>,
+    mut request_channel: mpsc::Receiver<ConnectionSelectionRequest>,
+) {
+    loop {
+        select! {
+            request = request_channel.select_next_some() => {
+                match request {
+                    ConnectionSelectionRequest::NewConnectionSelection { network_id, reason, responder} => {
+                        let selected = connection_selector.find_and_select_connection_candidate(network_id, reason).await;
+                        if let Err(..) = responder.send(selected) {
+                            error!("Unexpected error returning selected connection candidate.");
+                        }
+                    }
+                    ConnectionSelectionRequest::RoamSelection { network_id, credential, responder } => {
+                        let selected = connection_selector.find_and_select_roam_candidate(network_id, &credential).await;
+                        if let Err(..) = responder.send(selected) {
+                            error!("Unexpected error returning selected roam candidate.");
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 pub struct ConnectionSelector {
     saved_network_manager: Arc<dyn SavedNetworksManagerApi>,
@@ -86,73 +197,6 @@ impl ConnectionSelector {
             )),
             telemetry_sender,
         }
-    }
-
-    /// Full connection selection. Scans to find available candidates, uses network selection (or
-    /// optional provided network) to filter out networks, and then bss selection to select the best
-    /// of the remaining candidates. If the candidate was discovered via a passive scan, augments the
-    /// bss info with an active scan
-    pub(crate) async fn find_and_select_scanned_candidate(
-        &self,
-        network: Option<types::NetworkIdentifier>,
-        reason: types::ConnectReason,
-    ) -> Option<types::ScannedCandidate> {
-        // Scan for BSSs belonging to saved networks.
-        let available_candidate_list =
-            self.find_available_bss_candidate_list(network.clone()).await;
-
-        // Network selection.
-        let available_networks: HashSet<types::NetworkIdentifier> =
-            available_candidate_list.iter().map(|candidate| candidate.network.clone()).collect();
-        let selected_networks = network_selection::select_networks(available_networks, &network);
-
-        // Send network selection metrics
-        self.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
-            network_selection_type: match network {
-                Some(_) => telemetry::NetworkSelectionType::Directed,
-                None => telemetry::NetworkSelectionType::Undirected,
-            },
-            num_candidates: (!available_candidate_list.is_empty())
-                .then_some(available_candidate_list.len())
-                .ok_or(()),
-            selected_count: selected_networks.len(),
-        });
-
-        // Filter down to only BSSs in the selected networks.
-        let allowed_candidate_list = available_candidate_list
-            .iter()
-            .filter(|candidate| selected_networks.contains(&candidate.network))
-            .cloned()
-            .collect();
-
-        // BSS Selection.
-        let selection = match bss_selection::select_bss(
-            allowed_candidate_list,
-            reason,
-            self.inspect_node_for_connection_selection.clone(),
-            self.telemetry_sender.clone(),
-        )
-        .await
-        {
-            Some(mut candidate) => {
-                if network.is_some() {
-                    // Strip scan observation type, because the candidate was discovered via a
-                    // directed active scan, so we cannot know if it is discoverable via a passive
-                    // scan.
-                    candidate.bss.observation = types::ScanObservation::Unknown;
-                }
-                // If it was observed passively, augment with active scan.
-                match candidate.bss.observation {
-                    types::ScanObservation::Passive => {
-                        Some(self.augment_bss_candidate_with_active_scan(candidate.clone()).await)
-                    }
-                    _ => Some(candidate),
-                }
-            }
-            None => None,
-        };
-
-        selection
     }
 
     /// Requests scans and compiles list of BSSs that appear in scan results and belong to currently
@@ -304,22 +348,95 @@ impl ConnectionSelector {
             Err(()) => scanned_candidate,
         }
     }
+}
 
-    /// Return the best AP to connect to from the network. It may be the same AP that is currently
-    /// connected to. Returning None means that no APs were seen.
-    /// Credential is required to lookup the network config and ensure that the credential matches.
-    pub async fn find_and_select_roam_candidate(
+#[async_trait]
+impl ConnectionSelectorApi for ConnectionSelector {
+    /// Full connection selection. Scans to find available candidates, uses network selection (or
+    /// optional provided network) to filter out networks, and then bss selection to select the best
+    /// of the remaining candidates. If the candidate was discovered via a passive scan, augments the
+    /// bss info with an active scan.
+    async fn find_and_select_connection_candidate(
+        &self,
+        network: Option<types::NetworkIdentifier>,
+        reason: types::ConnectReason,
+    ) -> Option<types::ScannedCandidate> {
+        // Scan for BSSs belonging to saved networks.
+        let available_candidate_list =
+            self.find_available_bss_candidate_list(network.clone()).await;
+
+        // Network selection.
+        let available_networks: HashSet<types::NetworkIdentifier> =
+            available_candidate_list.iter().map(|candidate| candidate.network.clone()).collect();
+        let selected_networks = network_selection::select_networks(available_networks, &network);
+
+        // Send network selection metrics
+        self.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
+            network_selection_type: match network {
+                Some(_) => telemetry::NetworkSelectionType::Directed,
+                None => telemetry::NetworkSelectionType::Undirected,
+            },
+            num_candidates: (!available_candidate_list.is_empty())
+                .then_some(available_candidate_list.len())
+                .ok_or(()),
+            selected_count: selected_networks.len(),
+        });
+
+        // Filter down to only BSSs in the selected networks.
+        let allowed_candidate_list = available_candidate_list
+            .iter()
+            .filter(|candidate| selected_networks.contains(&candidate.network))
+            .cloned()
+            .collect();
+
+        // BSS selection.
+        let selection = match bss_selection::select_bss(
+            allowed_candidate_list,
+            reason,
+            self.inspect_node_for_connection_selection.clone(),
+            self.telemetry_sender.clone(),
+        )
+        .await
+        {
+            Some(mut candidate) => {
+                if network.is_some() {
+                    // Strip scan observation type, because the candidate was discovered via a
+                    // directed active scan, so we cannot know if it is discoverable via a passive
+                    // scan.
+                    candidate.bss.observation = types::ScanObservation::Unknown;
+                }
+                // If it was observed passively, augment with active scan.
+                match candidate.bss.observation {
+                    types::ScanObservation::Passive => {
+                        Some(self.augment_bss_candidate_with_active_scan(candidate.clone()).await)
+                    }
+                    _ => Some(candidate),
+                }
+            }
+            None => None,
+        };
+
+        selection
+    }
+
+    /// Return the "best" AP to connect to from the current network. It may be the same AP that is
+    /// currently connected. Returning None means that no APs were seen. The credential is required
+    /// to ensure the network config matches.
+    async fn find_and_select_roam_candidate(
         &self,
         network: types::NetworkIdentifier,
         credential: &network_config::Credential,
-    ) -> Result<Option<types::ScannedCandidate>, Error> {
+    ) -> Option<types::ScannedCandidate> {
         // Scan for APs in this network
         // TODO(https://fxbug.dev/42082248) Use an active scan in cases where a faster scan is justified.
         let mut matching_scans = self
             .scan_requester
             .perform_scan(ScanReason::RoamSearch, vec![], vec![])
             .await
-            .map_err(|e| format_err!("Error scanning: {:?}", e))?
+            .unwrap_or_else(|e| {
+                error!("{}", format_err!("Error scanning: {:?}", e));
+                vec![]
+            })
             .into_iter()
             .filter(|s| {
                 s.ssid == network.ssid
@@ -349,7 +466,7 @@ impl ConnectionSelector {
                 }
                 Err(e) => {
                     info!("Active scan to find hidden APs to roam to failed: {:?}", e);
-                    return Ok(None);
+                    return None;
                 }
             }
         }
@@ -374,13 +491,13 @@ impl ConnectionSelector {
         }
 
         // Choose the best AP
-        Ok(bss_selection::select_bss(
+        bss_selection::select_bss(
             candidates,
             types::ConnectReason::ProactiveNetworkSwitch,
             self.inspect_node_for_connection_selection.clone(),
             self.telemetry_sender.clone(),
         )
-        .await)
+        .await
     }
 }
 
@@ -653,7 +770,7 @@ mod tests {
         diagnostics_assertions::{assert_data_tree, AnyNumericProperty},
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
         fuchsia_async as fasync, fuchsia_inspect as inspect,
-        futures::{channel::mpsc, task::Poll},
+        futures::task::Poll,
         ieee80211_testutils::BSSID_REGEX,
         lazy_static::lazy_static,
         rand::Rng,
@@ -1227,7 +1344,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn find_and_select_scanned_candidate_scan_error() {
+    fn find_and_select_connection_candidate_scan_error() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
         let connection_selector = test_values.connection_selector;
@@ -1239,9 +1356,8 @@ mod tests {
         );
 
         // Kick off network selection
-        let connection_selection_fut = connection_selector
-            .find_and_select_scanned_candidate(None, generate_random_connect_reason());
-        let mut connection_selection_fut = pin!(connection_selection_fut);
+        let mut connection_selection_fut = pin!(connection_selector
+            .find_and_select_connection_candidate(None, generate_random_connect_reason()));
         // Check that nothing is returned
         assert_variant!(exec.run_until_stalled(&mut connection_selection_fut), Poll::Ready(None));
 
@@ -1278,7 +1394,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn find_and_select_scanned_candidate_end_to_end() {
+    fn find_and_select_connection_candidate_end_to_end() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
         let connection_selector = test_values.connection_selector;
@@ -1405,9 +1521,8 @@ mod tests {
         ])));
 
         // Check that we pick a network
-        let connection_selection_fut = connection_selector
-            .find_and_select_scanned_candidate(None, generate_random_connect_reason());
-        let mut connection_selection_fut = pin!(connection_selection_fut);
+        let mut connection_selection_fut = pin!(connection_selector
+            .find_and_select_connection_candidate(None, generate_random_connect_reason()));
         let results =
             exec.run_singlethreaded(&mut connection_selection_fut).expect("no selected candidate");
         assert_eq!(&results.network, &test_id_1.clone());
@@ -1487,7 +1602,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn find_and_select_scanned_candidate_with_network_end_to_end() {
+    fn find_and_select_connection_candidate_with_network_end_to_end() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
         let connection_selector = test_values.connection_selector;
@@ -1535,7 +1650,7 @@ mod tests {
         ])));
 
         // Run network selection
-        let connection_selection_fut = connection_selector.find_and_select_scanned_candidate(
+        let connection_selection_fut = connection_selector.find_and_select_connection_candidate(
             Some(test_id_1.clone()),
             generate_random_connect_reason(),
         );
@@ -1567,7 +1682,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn find_and_select_scanned_candidate_with_network_end_to_end_with_failure() {
+    fn find_and_select_connection_candidate_with_network_end_to_end_with_failure() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
         let connection_selector = test_values.connection_selector;
@@ -1585,7 +1700,7 @@ mod tests {
         );
 
         // Kick off network selection
-        let connection_selection_fut = connection_selector.find_and_select_scanned_candidate(
+        let connection_selection_fut = connection_selector.find_and_select_connection_candidate(
             Some(test_id_1.clone()),
             generate_random_connect_reason(),
         );
@@ -1699,5 +1814,98 @@ mod tests {
                 assert_eq!(saved_network_count_found_by_active_scan, 0);
             }
         );
+    }
+
+    // Fake selector to test that ConnectionSelectionRequester and the service loop plumb requests
+    // to the correct methods.
+    struct FakeConnectionSelector {
+        pub response_to_find_and_select_connection_candidate: Option<types::ScannedCandidate>,
+        pub response_to_find_and_select_roam_candidate: Option<types::ScannedCandidate>,
+    }
+    #[async_trait]
+    impl ConnectionSelectorApi for FakeConnectionSelector {
+        async fn find_and_select_connection_candidate(
+            &self,
+            _network: Option<types::NetworkIdentifier>,
+            _reason: types::ConnectReason,
+        ) -> Option<types::ScannedCandidate> {
+            self.response_to_find_and_select_connection_candidate.clone()
+        }
+        async fn find_and_select_roam_candidate(
+            &self,
+            _network: types::NetworkIdentifier,
+            _credential: &network_config::Credential,
+        ) -> Option<types::ScannedCandidate> {
+            self.response_to_find_and_select_roam_candidate.clone()
+        }
+    }
+    #[fuchsia::test]
+    fn test_service_loop_passes_connection_selection_request() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Create a fake selector, since we're just testing the service loop.
+        let candidate = generate_random_scanned_candidate();
+        let connection_selector = Arc::new(FakeConnectionSelector {
+            response_to_find_and_select_connection_candidate: Some(candidate.clone()),
+            response_to_find_and_select_roam_candidate: None,
+        });
+
+        // Start the service loop
+        let (request_sender, request_receiver) = mpsc::channel(5);
+        let mut serve_fut =
+            pin!(serve_connection_selection_request_loop(connection_selector, request_receiver));
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Create a requester struct
+        let mut requester = ConnectionSelectionRequester { sender: request_sender };
+
+        // Call request method
+        let mut connection_selection_fut =
+            pin!(requester
+                .do_connection_selection(None, types::ConnectReason::IdleInterfaceAutoconnect));
+        assert_variant!(exec.run_until_stalled(&mut connection_selection_fut), Poll::Pending);
+
+        // Run the service loop forward
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Check that receiver gets expected result, confirming the request was plumbed correctly.
+        assert_variant!(exec.run_until_stalled(&mut connection_selection_fut), Poll::Ready(Ok(Some(selected_candidate))) => {
+            assert_eq!(selected_candidate, candidate);
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_service_loop_passes_roam_selection_request() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Create a fake selector, since we're just testing the service loop.
+        let candidate = generate_random_scanned_candidate();
+        let connection_selector = Arc::new(FakeConnectionSelector {
+            response_to_find_and_select_connection_candidate: None,
+            response_to_find_and_select_roam_candidate: Some(candidate.clone()),
+        });
+
+        // Start the service loop
+        let (request_sender, request_receiver) = mpsc::channel(5);
+        let mut serve_fut =
+            pin!(serve_connection_selection_request_loop(connection_selector, request_receiver));
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Create a requester struct
+        let mut requester = ConnectionSelectionRequester { sender: request_sender };
+
+        // Call request method
+        let mut roam_selection_fut =
+            pin!(requester
+                .do_roam_selection(candidate.network.clone(), candidate.credential.clone()));
+        assert_variant!(exec.run_until_stalled(&mut roam_selection_fut), Poll::Pending);
+
+        // Run the service loop forward
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Check that receiver gets expected result, confirming the request was plumbed correctly.
+        assert_variant!(exec.run_until_stalled(&mut roam_selection_fut), Poll::Ready(Ok(Some(selected_candidate))) => {
+            assert_eq!(selected_candidate, candidate);
+        });
     }
 }

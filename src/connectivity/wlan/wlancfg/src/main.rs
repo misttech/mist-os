@@ -32,14 +32,7 @@ use {
     wlan_trace as wtrace,
     wlancfg_lib::{
         access_point::AccessPoint,
-        client::{
-            self,
-            connection_selection::{
-                local_roam_manager::{LocalRoamManager, LocalRoamManagerService},
-                ConnectionSelector,
-            },
-            scan,
-        },
+        client::{self, connection_selection::*, scan},
         config_management::{SavedNetworksManager, SavedNetworksManagerApi},
         legacy::{self, IfaceRef},
         mode_management::{
@@ -345,6 +338,7 @@ async fn run_all_futures() -> Result<(), Error> {
         mpsc::channel(scan::SCAN_REQUEST_BUFFER_SIZE);
     let scan_requester = Arc::new(scan::ScanRequester { sender: scan_request_sender });
     let saved_networks = Arc::new(SavedNetworksManager::new(telemetry_sender.clone()).await);
+
     let connection_selector = Arc::new(ConnectionSelector::new(
         saved_networks.clone(),
         scan_requester.clone(),
@@ -352,16 +346,25 @@ async fn run_all_futures() -> Result<(), Error> {
         persistence_req_sender.clone(),
         telemetry_sender.clone(),
     ));
+    let (connection_selection_request_sender, connection_selection_request_receiver) =
+        mpsc::channel(CONNECTION_SELECTION_REQUEST_BUFFER_SIZE);
+    let connection_selection_service = serve_connection_selection_request_loop(
+        connection_selector,
+        connection_selection_request_receiver,
+    );
+    let connection_selection_requester =
+        ConnectionSelectionRequester::new(connection_selection_request_sender);
 
     let (roam_stats_sender, roam_stats_receiver) = mpsc::unbounded();
-    let local_roam_manager =
-        Arc::new(Mutex::new(LocalRoamManager::new(roam_stats_sender, telemetry_sender.clone())));
-    let roam_manager_service = LocalRoamManagerService::new(
+    let local_roam_manager = Arc::new(Mutex::new(local_roam_manager::LocalRoamManager::new(
+        roam_stats_sender,
+        telemetry_sender.clone(),
+    )));
+    let roam_manager_service = local_roam_manager::LocalRoamManagerService::new(
         roam_stats_receiver,
         telemetry_sender.clone(),
-        connection_selector.clone(),
+        connection_selection_requester.clone(),
     );
-
     let roam_manager_service_fut = roam_manager_service.serve();
 
     let (recovery_sender, recovery_receiver) =
@@ -394,7 +397,7 @@ async fn run_all_futures() -> Result<(), Error> {
         monitor_svc.clone(),
         saved_networks.clone(),
         local_roam_manager,
-        connection_selector.clone(),
+        connection_selection_requester.clone(),
         telemetry_sender.clone(),
         recovery_receiver,
     );
@@ -456,6 +459,7 @@ async fn run_all_futures() -> Result<(), Error> {
         telemetry_fut.map(Ok),
         persistence_req_forwarder_fut.map(Ok),
         roam_manager_service_fut.map(Ok),
+        connection_selection_service.map(Ok)
     )?;
     Ok(())
 }

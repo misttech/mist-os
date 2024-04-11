@@ -186,22 +186,36 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
     let scan_requester = Arc::new(scan::ScanRequester { sender: scan_request_sender });
     let (recovery_sender, recovery_receiver) =
         mpsc::channel::<recovery::RecoverySummary>(recovery::RECOVERY_SUMMARY_CHANNEL_CAPACITY);
-
     let connection_selector = Arc::new(connection_selection::ConnectionSelector::new(
         saved_networks.clone(),
         scan_requester.clone(),
         inspect::Inspector::default().root().create_child("connection_selector"),
-        persistence_req_sender,
+        persistence_req_sender.clone(),
         telemetry_sender.clone(),
     ));
-
+    let (connection_selection_request_sender, connection_selection_request_receiver) =
+        mpsc::channel(5);
+    let connection_selection_fut = Box::pin(
+        connection_selection::serve_connection_selection_request_loop(
+            connection_selector,
+            connection_selection_request_receiver,
+        ) // Map the output type of this future to match the other ones we want to combine with it
+        .map(|_| {
+            let result: Result<Infallible, Error> =
+                Err(format_err!("connection_selection future exited unexpectedly"));
+            result
+        }),
+    );
+    let connection_selection_requester = connection_selection::ConnectionSelectionRequester::new(
+        connection_selection_request_sender,
+    );
     let (roam_stats_sender, roam_stats_receiver) = mpsc::unbounded();
     let local_roam_manager =
         Arc::new(Mutex::new(LocalRoamManager::new(roam_stats_sender, telemetry_sender.clone())));
     let roam_manager_service = LocalRoamManagerService::new(
         roam_stats_receiver,
         telemetry_sender.clone(),
-        connection_selector.clone(),
+        connection_selection_requester.clone(),
     );
     let roam_manager_service_fut = Box::pin(
         roam_manager_service
@@ -238,7 +252,7 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
         monitor_service_proxy.clone(),
         saved_networks.clone(),
         local_roam_manager,
-        connection_selector.clone(),
+        connection_selection_requester.clone(),
         telemetry_sender.clone(),
         recovery_receiver,
     );
@@ -303,6 +317,7 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
         scan_manager_service,
         serve_client_policy_listeners,
         roam_manager_service_fut,
+        connection_selection_fut,
     ]);
 
     let internal_objects = InternalObjects {

@@ -5,16 +5,16 @@
 use {
     crate::{
         client::{
-            connection_selection::{bss_selection, ConnectionSelector},
+            connection_selection::{bss_selection, ConnectionSelectionRequester},
             types,
         },
         telemetry::{TelemetryEvent, TelemetrySender},
     },
+    anyhow::{format_err, Error},
     fuchsia_async as fasync,
     futures::{
         channel::mpsc, future::BoxFuture, select, stream::FuturesUnordered, FutureExt, StreamExt,
     },
-    std::sync::Arc,
     tracing::{info, warn},
 };
 
@@ -22,9 +22,6 @@ pub mod roam_monitor;
 
 const MIN_RSSI_IMPROVEMENT_TO_ROAM: f64 = 3.0;
 const MIN_SNR_IMPROVEMENT_TO_ROAM: f64 = 3.0;
-
-/// Roam searches return None if there were no BSSs found in the scan.
-type RoamSearchResult = Result<Option<(types::ScannedCandidate, RoamSearchRequest)>, anyhow::Error>;
 
 /// Local Roam Manager is implemented as a trait so that it can be stubbed out in unit tests.
 pub trait LocalRoamManagerApi: Send + Sync {
@@ -81,8 +78,10 @@ impl LocalRoamManagerApi for LocalRoamManager {
 /// State machine's connected state sends updates to RoamMonitors, which may send scan requests
 /// to LocalRoamManagerService.
 pub struct LocalRoamManagerService {
-    roam_futures: FuturesUnordered<BoxFuture<'static, RoamSearchResult>>,
-    connection_selector: Arc<ConnectionSelector>,
+    roam_futures: FuturesUnordered<
+        BoxFuture<'static, Result<(types::ScannedCandidate, RoamSearchRequest), Error>>,
+    >,
+    connection_selection_requester: ConnectionSelectionRequester,
     // Receive requests for roam searches.
     roam_search_receiver: mpsc::UnboundedReceiver<RoamSearchRequest>,
     telemetry_sender: TelemetrySender,
@@ -92,11 +91,11 @@ impl LocalRoamManagerService {
     pub fn new(
         roam_search_receiver: mpsc::UnboundedReceiver<RoamSearchRequest>,
         telemetry_sender: TelemetrySender,
-        connection_selector: Arc<ConnectionSelector>,
+        connection_selection_requester: ConnectionSelectionRequester,
     ) -> Self {
         Self {
             roam_futures: FuturesUnordered::new(),
-            connection_selector,
+            connection_selection_requester,
             roam_search_receiver,
             telemetry_sender,
         }
@@ -110,7 +109,7 @@ impl LocalRoamManagerService {
                 req  = self.roam_search_receiver.select_next_some() => {
                     info!("Performing scan to find proactive local roaming candidates.");
                     let roam_fut = get_roaming_connection_selection_future(
-                        self.connection_selector.clone(),
+                        self.connection_selection_requester.clone(),
                         req,
                     );
                     self.roam_futures.push(roam_fut.boxed());
@@ -118,14 +117,15 @@ impl LocalRoamManagerService {
                 }
                 roam_fut_response = self.roam_futures.select_next_some() => {
                     match roam_fut_response {
-                        Ok(Some((candidate, request))) => {
+                        Ok((candidate, request)) => {
                             if is_roam_worthwhile(&request, &candidate) {
                                 info!("Roam would be requested to candidate: {:?}. Roaming is not enabled.", candidate.to_string_without_pii());
                                 self.telemetry_sender.send(TelemetryEvent::WouldRoamConnect);
                             }
                         },
-                        Ok(None) => warn!("No roam candidates found in scan. This is unexpected, as at least the currently connected BSS should be found."),
-                        Err(e) => warn!("An error occured during the roam scan: {:?}", e),
+                        Err(e) => {
+                            warn!("An error occured during the roam scan: {:?}", e);
+                        }
                     }
                 }
             }
@@ -199,18 +199,18 @@ impl RoamSearchRequest {
 }
 
 async fn get_roaming_connection_selection_future(
-    connection_selector: Arc<ConnectionSelector>,
+    mut connection_selection_requester: ConnectionSelectionRequester,
     request: RoamSearchRequest,
-) -> RoamSearchResult {
-    match connection_selector
-        .find_and_select_roam_candidate(
+) -> Result<(types::ScannedCandidate, RoamSearchRequest), Error> {
+    match connection_selection_requester
+        .do_roam_selection(
             request.connection_data.currently_fulfilled_connection.target.network.clone(),
-            &request.connection_data.currently_fulfilled_connection.target.credential,
+            request.connection_data.currently_fulfilled_connection.target.credential.clone(),
         )
         .await?
     {
-        Some(selected_candidate) => Ok(Some((selected_candidate, request))),
-        _ => Ok(None),
+        Some(candidate) => Ok((candidate, request)),
+        None => Err(format_err!("No roam candidates found.")),
     }
 }
 
@@ -254,26 +254,22 @@ mod tests {
         super::*,
         crate::{
             client::connection_selection::{
-                scan, EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR,
+                ConnectionSelectionRequest, EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR,
             },
-            config_management::network_config::{NetworkConfig, PastConnectionList},
+            config_management::network_config::PastConnectionList,
             util::{
                 pseudo_energy::SignalData,
                 testing::{
-                    create_inspect_persistence_channel,
-                    fakes::{FakeSavedNetworksManager, FakeScanRequester},
                     generate_connect_selection, generate_random_bss,
-                    generate_random_bss_quality_data, generate_random_bssid,
-                    generate_random_channel,
+                    generate_random_bss_quality_data, generate_random_channel,
+                    generate_random_scanned_candidate,
                 },
             },
         },
-        fidl_fuchsia_wlan_internal as fidl_internal,
         fuchsia_async::TestExecutor,
         futures::task::Poll,
-        ieee80211::MacAddrBytes,
         std::pin::pin,
-        wlan_common::{assert_variant, random_fidl_bss_description, security::SecurityDescriptor},
+        wlan_common::assert_variant,
     };
 
     struct RoamManagerServiceTestValues {
@@ -283,100 +279,35 @@ mod tests {
         roam_req_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
         roam_manager_service: LocalRoamManagerService,
         telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
-        fake_scan_requester: Arc<FakeScanRequester>,
         currently_fulfilled_connection: types::ConnectSelection,
+        connection_selection_request_receiver: mpsc::Receiver<ConnectionSelectionRequest>,
     }
 
     fn roam_service_test_setup() -> RoamManagerServiceTestValues {
         let currently_fulfilled_connection = generate_connect_selection();
-        let config = NetworkConfig::new(
-            currently_fulfilled_connection.target.network.clone(),
-            currently_fulfilled_connection.target.credential.clone(),
-            true,
-        )
-        .expect("failed to create config");
-        let fake_saved_networks =
-            Arc::new(FakeSavedNetworksManager::new_with_saved_networks(vec![config.into()]));
-
         let (roam_search_sender, roam_search_receiver) = mpsc::unbounded();
         let (roam_req_sender, _roam_req_receiver) = mpsc::unbounded();
-        let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let fake_scan_requester = Arc::new(FakeScanRequester::new());
-        let selector = Arc::new(ConnectionSelector::new(
-            fake_saved_networks.clone(),
-            fake_scan_requester.clone(),
-            fuchsia_inspect::Inspector::default().root().create_child("connection_selector"),
-            persistence_req_sender,
-            telemetry_sender.clone(),
-        ));
+        let (connection_selection_request_sender, connection_selection_request_receiver) =
+            mpsc::channel(5);
 
-        let roam_manager_service =
-            LocalRoamManagerService::new(roam_search_receiver, telemetry_sender, selector);
+        let connection_selection_requester =
+            ConnectionSelectionRequester::new(connection_selection_request_sender);
+
+        let roam_manager_service = LocalRoamManagerService::new(
+            roam_search_receiver,
+            telemetry_sender,
+            connection_selection_requester,
+        );
 
         RoamManagerServiceTestValues {
             roam_search_sender,
             roam_req_sender,
             roam_manager_service,
             telemetry_receiver,
-            fake_scan_requester,
             currently_fulfilled_connection,
-        }
-    }
-
-    /// Generate scan results using the network identifier in test values, one for each
-    /// provided BSSID.
-    fn gen_scan_result_with_bssids(
-        test_values: &RoamManagerServiceTestValues,
-        bssids: Vec<types::Bssid>,
-    ) -> Vec<types::ScanResult> {
-        use rand::Rng;
-        bssids
-            .into_iter()
-            .map(|bssid| {
-                let bss_description = fidl_internal::BssDescription {
-                    bssid: bssid.to_array(),
-                    ..random_fidl_bss_description!()
-                };
-                types::ScanResult {
-                    ssid: test_values.currently_fulfilled_connection.target.network.ssid.clone(),
-                    // A WPA2 network is generated for the test values.
-                    security_type_detailed: types::SecurityTypeDetailed::Wpa2Personal,
-                    compatibility: types::Compatibility::Supported,
-                    entries: vec![types::Bss {
-                        compatibility: wlan_common::scan::Compatibility::expect_some(vec![
-                            SecurityDescriptor::WPA2_PERSONAL,
-                        ]),
-                        bss_description: bss_description.into(),
-                        ..generate_random_bss()
-                    }],
-                }
-            })
-            .collect()
-    }
-
-    fn gen_scan_result_with_signal(
-        test_values: &RoamManagerServiceTestValues,
-        bssid: types::Bssid,
-        rssi: i8,
-        snr: i8,
-    ) -> types::ScanResult {
-        use rand::Rng;
-        types::ScanResult {
-            ssid: test_values.currently_fulfilled_connection.target.network.ssid.clone(),
-            // A WPA2 network is generated for the test values.
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2Personal,
-            compatibility: types::Compatibility::Supported,
-            entries: vec![types::Bss {
-                bssid,
-                compatibility: wlan_common::scan::Compatibility::expect_some(vec![
-                    SecurityDescriptor::WPA2_PERSONAL,
-                ]),
-                bss_description: random_fidl_bss_description!().into(),
-                signal: types::Signal { rssi_dbm: rssi, snr_db: snr },
-                ..generate_random_bss()
-            }],
+            connection_selection_request_receiver,
         }
     }
 
@@ -385,30 +316,15 @@ mod tests {
     fn test_roam_manager_service_initiates_network_selection() {
         let mut exec = TestExecutor::new();
         let mut test_values = roam_service_test_setup();
-        // Add scan result to send back with another BSS to connect to.
-        let other_bssid = generate_random_bssid();
-        let scan_results = gen_scan_result_with_bssids(
-            &test_values,
-            vec![test_values.currently_fulfilled_connection.target.bss.bssid, other_bssid],
-        );
-        exec.run_singlethreaded(test_values.fake_scan_requester.add_scan_result(Ok(scan_results)));
 
         let serve_fut = test_values.roam_manager_service.serve();
         let mut serve_fut = pin!(serve_fut);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
-        let init_rssi = -80;
-        let init_snr = 10;
-        let past_connections = PastConnectionList::default();
         let bss_quality_data = bss_selection::BssQualityData::new(
-            SignalData::new(
-                init_rssi,
-                init_snr,
-                EWMA_SMOOTHING_FACTOR,
-                EWMA_VELOCITY_SMOOTHING_FACTOR,
-            ),
+            SignalData::new(-80, 10, EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR),
             generate_random_channel(),
-            past_connections,
+            PastConnectionList::default(),
         );
 
         let connection_data = ConnectionData::new(
@@ -430,20 +346,12 @@ mod tests {
             Ok(Some(TelemetryEvent::RoamingScan))
         );
 
-        // Check that a scan happens for bss selection. An undirected passive scan is used for
-        // roaming so no SSIDs are in the scan request.
-        let scan_reason = scan::ScanReason::RoamSearch;
-        let ssids = vec![];
-        let channels = vec![];
-        let verify_scan_fut =
-            test_values.fake_scan_requester.verify_scan_request((scan_reason, ssids, channels));
-        let mut verify_scan_fut = pin!(verify_scan_fut);
-        assert_variant!(&mut exec.run_until_stalled(&mut verify_scan_fut), Poll::Ready(()));
-
-        //  A metric will be logged for BSS selection, ignore it.
+        // Verify that connection selection receives request
         assert_variant!(
-            test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::BssSelectionResult { .. }))
+            test_values.connection_selection_request_receiver.try_next(),
+            Ok(Some(request)) => {
+                assert_variant!(request, ConnectionSelectionRequest::RoamSelection {..});
+            }
         );
     }
 
@@ -456,16 +364,16 @@ mod tests {
         // Set up fake scan results of a better candidate BSS.
         let init_rssi = -80;
         let init_snr = 10;
-        let other_bssid = generate_random_bssid();
-        let scan_result = gen_scan_result_with_signal(
-            &test_values,
-            other_bssid,
-            init_rssi + MIN_RSSI_IMPROVEMENT_TO_ROAM as i8 + 1,
-            init_snr + 10,
-        );
-        exec.run_singlethreaded(
-            test_values.fake_scan_requester.add_scan_result(Ok(vec![scan_result])),
-        );
+        let selected_roam_candidate = types::ScannedCandidate {
+            bss: types::Bss {
+                signal: types::Signal {
+                    rssi_dbm: init_rssi + MIN_RSSI_IMPROVEMENT_TO_ROAM as i8 + 1,
+                    snr_db: init_snr + MIN_SNR_IMPROVEMENT_TO_ROAM as i8 + 1,
+                },
+                ..generate_random_bss()
+            },
+            ..generate_random_scanned_candidate()
+        };
 
         // Start roam manager service
         let serve_fut = test_values.roam_manager_service.serve();
@@ -503,20 +411,17 @@ mod tests {
             Ok(Some(TelemetryEvent::RoamingScan))
         );
 
-        // Check that a scan happens for bss selection. An undirected passive scan is used for
-        // roaming, so no SSIDs are in the scan request.
-        let verify_scan_fut = test_values.fake_scan_requester.verify_scan_request((
-            scan::ScanReason::RoamSearch,
-            vec![],
-            vec![],
-        ));
-        let mut verify_scan_fut = pin!(verify_scan_fut);
-        assert_variant!(&mut exec.run_until_stalled(&mut verify_scan_fut), Poll::Ready(()));
-
-        //  A metric will be logged for BSS selection, ignore it.
+        // Verify that connection selection receives request
         assert_variant!(
-            test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::BssSelectionResult { .. }))
+            test_values.connection_selection_request_receiver.try_next(),
+            Ok(Some(request)) => {
+                assert_variant!(request, ConnectionSelectionRequest::RoamSelection {network_id, credential, responder} => {
+                    assert_eq!(network_id, test_values.currently_fulfilled_connection.target.network);
+                    assert_eq!(credential, test_values.currently_fulfilled_connection.target.credential);
+                    // Respond with barely better candidate.
+                    responder.send(Some(selected_roam_candidate)).expect("failed to send connection selection");
+                });
+            }
         );
 
         // Progress the RoamManager future to process the roam search response.
@@ -535,20 +440,20 @@ mod tests {
         let mut exec = TestExecutor::new();
         let mut test_values = roam_service_test_setup();
 
-        // Set up fake scan results of a barely better candidate BSS, less than the min improvement
+        // Set up fake roam candidate with barely better rssi, less than the min improvement
         // threshold.
         let init_rssi = -80;
         let init_snr = 10;
-        let other_bssid = generate_random_bssid();
-        let scan_result = gen_scan_result_with_signal(
-            &test_values,
-            other_bssid,
-            init_rssi + MIN_RSSI_IMPROVEMENT_TO_ROAM as i8 - 1,
-            init_snr + MIN_SNR_IMPROVEMENT_TO_ROAM as i8 - 1,
-        );
-        exec.run_singlethreaded(
-            test_values.fake_scan_requester.add_scan_result(Ok(vec![scan_result])),
-        );
+        let selected_roam_candidate = types::ScannedCandidate {
+            bss: types::Bss {
+                signal: types::Signal {
+                    rssi_dbm: init_rssi + MIN_RSSI_IMPROVEMENT_TO_ROAM as i8 - 1,
+                    snr_db: init_snr + MIN_SNR_IMPROVEMENT_TO_ROAM as i8 - 1,
+                },
+                ..generate_random_bss()
+            },
+            ..generate_random_scanned_candidate()
+        };
 
         // Start roam manager service
         let serve_fut = test_values.roam_manager_service.serve();
@@ -586,20 +491,17 @@ mod tests {
             Ok(Some(TelemetryEvent::RoamingScan))
         );
 
-        // Check that a scan happens for bss selection. An undirected passive scan is used for
-        // roaming, so no SSIDs are in the scan request.
-        let verify_scan_fut = test_values.fake_scan_requester.verify_scan_request((
-            scan::ScanReason::RoamSearch,
-            vec![],
-            vec![],
-        ));
-        let mut verify_scan_fut = pin!(verify_scan_fut);
-        assert_variant!(&mut exec.run_until_stalled(&mut verify_scan_fut), Poll::Ready(()));
-
-        //  A metric will be logged for BSS selection, ignore it.
+        // Verify that connection selection receives request
         assert_variant!(
-            test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::BssSelectionResult { .. }))
+            test_values.connection_selection_request_receiver.try_next(),
+            Ok(Some(request)) => {
+                assert_variant!(request, ConnectionSelectionRequest::RoamSelection { network_id, credential, responder } => {
+                    assert_eq!(network_id, test_values.currently_fulfilled_connection.target.network);
+                    assert_eq!(credential, test_values.currently_fulfilled_connection.target.credential);
+                    // Respond with barely better candidate.
+                    responder.send(Some(selected_roam_candidate)).expect("failed to send connection selection");
+                });
+            }
         );
 
         // Progress the RoamManager future to process the roam search response. No roam connect

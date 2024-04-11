@@ -5,7 +5,7 @@
 use {
     crate::{
         client::connection_selection::{
-            local_roam_manager::LocalRoamManagerApi, ConnectionSelector,
+            local_roam_manager::LocalRoamManagerApi, ConnectionSelectionRequester,
         },
         config_management::SavedNetworksManagerApi,
         telemetry::TelemetrySender,
@@ -32,7 +32,7 @@ pub fn create_iface_manager(
     dev_monitor_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
     saved_networks: Arc<dyn SavedNetworksManagerApi>,
     local_roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
-    connection_selector: Arc<ConnectionSelector>,
+    connection_selection_requester: ConnectionSelectionRequester,
     telemetry_sender: TelemetrySender,
     recovery_receiver: recovery::RecoveryActionReceiver,
 ) -> (Arc<Mutex<iface_manager_api::IfaceManager>>, impl Future<Output = Result<Infallible, Error>>)
@@ -46,13 +46,13 @@ pub fn create_iface_manager(
         ap_update_sender,
         dev_monitor_proxy,
         saved_networks,
+        connection_selection_requester,
         local_roam_manager,
         telemetry_sender,
         defect_sender,
     );
     let iface_manager_service = iface_manager::serve_iface_manager_requests(
         iface_manager,
-        connection_selector,
         receiver,
         defect_receiver,
         recovery_receiver,
