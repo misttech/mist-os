@@ -547,6 +547,20 @@
         },
         {
             protocol: [
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            from: "parent",
+            to: [ "#session-manager" ],
+            availability: "optional",
+        },
+        {
+            from: "parent",
+            to: "#session-manager",
+            config: "fuchsia.power.SuspendEnabled",
+        },
+        {
+            protocol: [
                 "fuchsia.tracing.perfetto.ProducerConnector",
                 "fuchsia.tracing.provider.Registry",
             ],

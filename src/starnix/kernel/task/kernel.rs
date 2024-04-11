@@ -29,7 +29,7 @@ use crate::{
 };
 use bstr::BString;
 use fidl::{
-    endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy},
+    endpoints::{create_endpoints, ClientEnd, DiscoverableProtocolMarker, ProtocolMarker, Proxy},
     AsHandleRef,
 };
 use fidl_fuchsia_io as fio;
@@ -410,7 +410,7 @@ impl Kernel {
         })
     }
 
-    /// Returns a Proxy to the service exposed to the container at `filename`.
+    /// Returns a Proxy to the service used by the container at `filename`.
     #[allow(unused)]
     pub fn connect_to_named_protocol_at_container_svc<P: ProtocolMarker>(
         &self,
@@ -421,6 +421,13 @@ impl Kernel {
         fdio::service_connect_at(svc.as_channel().as_ref(), filename, server_end.into_channel())
             .map_err(|status| from_status_like_fdio!(status))?;
         Ok(client_end)
+    }
+
+    /// Returns a Proxy to the service `P` used by the container.
+    pub fn connect_to_protocol_at_container_svc<P: DiscoverableProtocolMarker>(
+        &self,
+    ) -> Result<ClientEnd<P>, Errno> {
+        self.connect_to_named_protocol_at_container_svc::<P>(P::PROTOCOL_NAME)
     }
 
     /// Returns true if SELinux is enabled with a hard-coded fake policy.

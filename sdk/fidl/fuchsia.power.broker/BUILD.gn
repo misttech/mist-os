@@ -13,6 +13,7 @@ fidl("fuchsia.power.broker") {
   visibility = [
     "//sdk/fidl/fuchsia.hardware.hrtimer/*:*",
     "//sdk/fidl/fuchsia.power.system/*:*",
+    "//sdk/fidl/fuchsia.session.power/*:*",
     "//sdk/lib/driver/power/cpp/*:*",
     "//src/devices/block/drivers/aml-sdmmc/*:*",
     "//src/devices/bus/drivers/platform/test/*:*",
@@ -20,6 +21,7 @@ fidl("fuchsia.power.broker") {
     "//src/power/broker/*:*",
     "//src/power/system-activity-governor/*:*",
     "//src/power/testing/fake-broker/*:*",
+    "//src/session/bin/*",
     "//src/starnix/kernel/*:*",
     "//src/sys/time/timekeeper/*:*",
     "//vendor/*",

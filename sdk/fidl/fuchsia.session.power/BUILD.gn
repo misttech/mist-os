@@ -1,0 +1,17 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("fuchsia.session.power") {
+  sdk_category = "internal"
+  sdk_area = "Unknown"
+
+  sources = [
+    "overview.fidl",
+    "power.fidl",
+  ]
+
+  public_deps = [ "//sdk/fidl/fuchsia.power.broker" ]
+}

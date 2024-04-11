@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::startup,
+    crate::{power, startup},
     anyhow::{anyhow, Context as _, Error},
-    fidl::endpoints::{create_proxy, ServerEnd},
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_session as fsession,
+    fidl::endpoints::{create_proxy, ClientEnd, ServerEnd},
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
+    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_session as fsession,
+    fidl_fuchsia_session_power as fpower,
     fuchsia_component::server::{ServiceFs, ServiceObjLocal},
     fuchsia_inspect_contrib::nodes::BoundedListNode,
     fuchsia_zircon as zx,
@@ -33,6 +35,7 @@ pub enum IncomingRequest {
     Launcher(fsession::LauncherRequestStream),
     Restarter(fsession::RestarterRequestStream),
     Lifecycle(fsession::LifecycleRequestStream),
+    Handoff(fpower::HandoffRequestStream),
 }
 
 struct Diagnostics {
@@ -84,6 +87,64 @@ impl Session {
     }
 }
 
+struct PowerState {
+    /// The power element corresponding to the session.
+    ///
+    /// The async mutex exists to serialize concurrent power lease operations, where
+    /// we need to take a lock over async FIDL calls.
+    power_element: futures::lock::Mutex<Option<power::PowerElement>>,
+
+    /// Whether the system supports suspending.
+    suspend_enabled: bool,
+}
+
+impl PowerState {
+    pub fn new(suspend_enabled: bool) -> Self {
+        Self { power_element: Default::default(), suspend_enabled }
+    }
+
+    /// Attempt to ensures that `session_manager` has a lease on the application activity element.
+    ///
+    /// This method is idempotent if it is a success.
+    pub async fn ensure_power_lease(&self) {
+        if !self.suspend_enabled {
+            return;
+        }
+        let power_element = &mut *self.power_element.lock().await;
+        if let Some(power_element) = power_element {
+            if power_element.has_lease() {
+                return;
+            }
+        }
+        *power_element = match power::PowerElement::new().await {
+            Ok(element) => Some(element),
+            Err(err) => {
+                warn!("Failed to create power element: {err}");
+                None
+            }
+        };
+    }
+
+    pub async fn take_power_lease(
+        &self,
+    ) -> Result<ClientEnd<fbroker::LeaseControlMarker>, fpower::HandoffError> {
+        if !self.suspend_enabled {
+            tracing::warn!(
+                "Session component wants to take our power lease, but the platform is \
+                configured to not support suspend"
+            );
+            return Err(fpower::HandoffError::Unavailable);
+        }
+        tracing::info!("Session component is taking our power lease");
+        let lease = match &mut *self.power_element.lock().await {
+            Some(power_element) => power_element.take_lease(),
+            None => return Err(fpower::HandoffError::Unavailable),
+        }
+        .ok_or(fpower::HandoffError::AlreadyTaken)?;
+        Ok(lease)
+    }
+}
+
 struct SessionManagerState {
     /// The component URL for the default session.
     default_session_url: Option<String>,
@@ -93,6 +154,9 @@ struct SessionManagerState {
 
     /// The realm in which session components will be created.
     realm: fcomponent::RealmProxy,
+
+    /// Power-related state.
+    power: PowerState,
 
     /// Other mutable state.
     inner: Mutex<Inner>,
@@ -124,6 +188,7 @@ impl SessionManagerState {
 
     /// Start a session, replacing any already session.
     async fn start(&self, url: String) -> Result<(), startup::StartupError> {
+        self.power.ensure_power_lease().await;
         self.start_impl(&mut *self.session.lock().await, url).await
     }
 
@@ -155,6 +220,7 @@ impl SessionManagerState {
 
     /// Stops the session, if any.
     async fn stop(&self) -> Result<(), startup::StartupError> {
+        self.power.ensure_power_lease().await;
         let mut session = self.session.lock().await;
         if let Session::Started(_) = &*session {
             let (proxy, new_pending) = Session::new_pending();
@@ -167,13 +233,21 @@ impl SessionManagerState {
 
     /// Restarts a session.
     async fn restart(&self) -> Result<(), startup::StartupError> {
+        self.power.ensure_power_lease().await;
         let mut session = self.session.lock().await;
-        let Session::Started(StartedSession { url }) = &*session else {
+        let Session::Started(StartedSession { url }) = &mut *session else {
             return Err(startup::StartupError::NotRunning);
         };
         let url = url.clone();
         self.start_impl(&mut *session, url).await?;
         Ok(())
+    }
+
+    async fn take_power_lease(
+        &self,
+    ) -> Result<ClientEnd<fbroker::LeaseControlMarker>, fpower::HandoffError> {
+        let lease = self.power.take_power_lease().await?;
+        Ok(lease)
     }
 }
 
@@ -198,6 +272,7 @@ impl SessionManager {
         realm: fcomponent::RealmProxy,
         inspector: &fuchsia_inspect::Inspector,
         default_session_url: Option<String>,
+        suspend_enabled: bool,
     ) -> Self {
         let session_started_at = BoundedListNode::new(
             inspector.root().create_child(DIANGNOSTICS_SESSION_STARTED_AT_NAME),
@@ -209,9 +284,18 @@ impl SessionManager {
             default_session_url,
             session: futures::lock::Mutex::new(new_pending),
             realm,
+            power: PowerState::new(suspend_enabled),
             inner: Mutex::new(Inner { exposed_dir: proxy, diagnostics }),
         };
         SessionManager { state: Arc::new(state) }
+    }
+
+    #[cfg(test)]
+    pub fn new_default(
+        realm: fcomponent::RealmProxy,
+        inspector: &fuchsia_inspect::Inspector,
+    ) -> Self {
+        Self::new(realm, inspector, None, false)
     }
 
     /// Starts the session with the default session component URL, if any.
@@ -237,7 +321,8 @@ impl SessionManager {
         fs.dir("svc")
             .add_fidl_service(IncomingRequest::Launcher)
             .add_fidl_service(IncomingRequest::Restarter)
-            .add_fidl_service(IncomingRequest::Lifecycle);
+            .add_fidl_service(IncomingRequest::Lifecycle)
+            .add_fidl_service(IncomingRequest::Handoff);
 
         // Requests to /svc_from_session are forwarded to the session's exposed dir.
         fs.add_entry_at("svc_from_session", self.state.clone());
@@ -280,6 +365,11 @@ impl SessionManager {
                 self.handle_lifecycle_request_stream(request_stream)
                     .await
                     .context("Session Lifecycle request stream got an error.")?;
+            }
+            IncomingRequest::Handoff(request_stream) => {
+                self.handle_handoff_request_stream(request_stream)
+                    .await
+                    .context("Session Handoff request stream got an error.")?;
             }
         }
 
@@ -369,6 +459,26 @@ impl SessionManager {
         Ok(())
     }
 
+    pub async fn handle_handoff_request_stream(
+        &mut self,
+        mut request_stream: fpower::HandoffRequestStream,
+    ) -> Result<(), Error> {
+        while let Some(request) =
+            request_stream.try_next().await.context("Error handling Handoff request stream")?
+        {
+            match request {
+                fpower::HandoffRequest::Take { responder } => {
+                    let result = self.handle_handoff_take_request().await;
+                    let _ = responder.send(result);
+                }
+                fpower::HandoffRequest::_UnknownMethod { ordinal, .. } => {
+                    warn!(%ordinal, "Lifecycle received an unknown method")
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Handles calls to Launcher.Launch().
     ///
     /// # Parameters
@@ -410,6 +520,13 @@ impl SessionManager {
     /// Handles a `Lifecycle.Restart()` request.
     async fn handle_lifecycle_restart_request(&mut self) -> Result<(), fsession::LifecycleError> {
         self.state.restart().await.map_err(Into::into)
+    }
+
+    /// Handles a `Handoff.Take()` request.
+    async fn handle_handoff_take_request(
+        &mut self,
+    ) -> Result<ClientEnd<fbroker::LeaseControlMarker>, fpower::HandoffError> {
+        self.state.take_power_lease().await.map_err(Into::into)
     }
 }
 
@@ -534,7 +651,7 @@ mod tests {
         .unwrap();
 
         let inspector = fuchsia_inspect::Inspector::default();
-        let session_manager = SessionManager::new(realm, &inspector, None);
+        let session_manager = SessionManager::new_default(realm, &inspector);
         let launcher = serve_launcher(session_manager);
 
         assert!(launcher
@@ -578,7 +695,7 @@ mod tests {
         .unwrap();
 
         let inspector = fuchsia_inspect::Inspector::default();
-        let session_manager = SessionManager::new(realm, &inspector, None);
+        let session_manager = SessionManager::new_default(realm, &inspector);
         let launcher = serve_launcher(session_manager.clone());
         let restarter = serve_restarter(session_manager);
 
@@ -614,7 +731,7 @@ mod tests {
         .unwrap();
 
         let inspector = fuchsia_inspect::Inspector::default();
-        let session_manager = SessionManager::new(realm, &inspector, None);
+        let session_manager = SessionManager::new_default(realm, &inspector);
         let restarter = serve_restarter(session_manager);
 
         assert_eq!(
@@ -652,7 +769,7 @@ mod tests {
         .unwrap();
 
         let inspector = fuchsia_inspect::Inspector::default();
-        let session_manager = SessionManager::new(realm, &inspector, None);
+        let session_manager = SessionManager::new_default(realm, &inspector);
         let lifecycle = serve_lifecycle(session_manager);
 
         assert!(lifecycle
@@ -697,7 +814,7 @@ mod tests {
 
         let inspector = fuchsia_inspect::Inspector::default();
         let session_manager =
-            SessionManager::new(realm, &inspector, Some(default_session_url.to_owned()));
+            SessionManager::new(realm, &inspector, Some(default_session_url.to_owned()), false);
         let lifecycle = serve_lifecycle(session_manager);
 
         assert!(lifecycle
@@ -743,7 +860,7 @@ mod tests {
         .unwrap();
 
         let inspector = fuchsia_inspect::Inspector::default();
-        let session_manager = SessionManager::new(realm, &inspector, None);
+        let session_manager = SessionManager::new_default(realm, &inspector);
         let lifecycle = serve_lifecycle(session_manager);
 
         assert!(lifecycle
@@ -792,7 +909,7 @@ mod tests {
         .unwrap();
 
         let inspector = fuchsia_inspect::Inspector::default();
-        let session_manager = SessionManager::new(realm, &inspector, None);
+        let session_manager = SessionManager::new_default(realm, &inspector);
         let lifecycle = serve_lifecycle(session_manager.clone());
 
         assert!(lifecycle
@@ -856,7 +973,7 @@ mod tests {
         })?;
 
         let inspector = fuchsia_inspect::Inspector::default();
-        let session_manager = SessionManager::new(realm, &inspector, None);
+        let session_manager = SessionManager::new_default(realm, &inspector);
         let lifecycle = serve_lifecycle(session_manager.clone());
 
         // Open an arbitrary node in the session's exposed dir.
@@ -917,7 +1034,7 @@ mod tests {
         })?;
 
         let inspector = fuchsia_inspect::Inspector::default();
-        let session_manager = SessionManager::new(realm, &inspector, None);
+        let session_manager = SessionManager::new_default(realm, &inspector);
         let lifecycle = serve_lifecycle(session_manager.clone());
 
         lifecycle

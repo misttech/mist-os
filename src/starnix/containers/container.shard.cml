@@ -21,6 +21,13 @@
             ],
         },
     ],
+    use: [
+        {
+            protocol: "fuchsia.session.power.Handoff",
+            from: "parent",
+            availability: "optional",
+        },
+    ],
     offer: [
         {
             protocol: [

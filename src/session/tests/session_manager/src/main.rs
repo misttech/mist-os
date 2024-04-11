@@ -60,12 +60,19 @@ mod tests {
                 value: autolaunch.into(),
             }))
             .await?;
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.power.SuspendEnabled".to_string().parse()?,
+                value: false.into(),
+            }))
+            .await?;
 
         builder
             .add_route(
                 Route::new()
                     .capability(Capability::configuration("fuchsia.session.SessionUrl"))
                     .capability(Capability::configuration("fuchsia.session.AutoLaunch"))
+                    .capability(Capability::configuration("fuchsia.power.SuspendEnabled"))
                     .from(Ref::self_())
                     .to(&child_ref),
             )

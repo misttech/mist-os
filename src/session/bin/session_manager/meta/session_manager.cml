@@ -24,6 +24,7 @@
             protocol: [
                 "fuchsia.session.Launcher",
                 "fuchsia.session.Lifecycle",
+                "fuchsia.session.power.Handoff",
                 "fuchsia.session.Restarter",
             ],
         },
@@ -54,6 +55,16 @@
             from: "parent",
         },
 
+        // System power level controls.
+        {
+            protocol: [
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            from: "parent",
+            availability: "optional",
+        },
+
         // TODO(https://fxbug.dev/42077029): As of 2023-04-26, this is only used to allow
         // developers to stop the session from automatically launching on boot.
         // Once structured configuration provides first-class support for this
@@ -76,6 +87,11 @@
             // on device startup.
             config: "fuchsia.session.AutoLaunch",
             key: "autolaunch",
+            type: "bool",
+        },
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "suspend_enabled",
             type: "bool",
         },
     ],
@@ -517,6 +533,13 @@
         // Allow components in the session to restart it (the session).
         {
             protocol: "fuchsia.session.Restarter",
+            from: "self",
+            to: "#session",
+        },
+
+        // Allow components in the session to take the power lease.
+        {
+            protocol: "fuchsia.session.power.Handoff",
             from: "self",
             to: "#session",
         },

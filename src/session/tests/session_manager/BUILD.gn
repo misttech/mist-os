@@ -59,5 +59,6 @@ fuchsia_structured_config_values("bogus_session_manager_test_config_values") {
   values = {
     session_url = ""
     autolaunch = false
+    suspend_enabled = false
   }
 }

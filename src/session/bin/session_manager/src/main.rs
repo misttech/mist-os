@@ -26,10 +26,14 @@ async fn main() -> Result<(), Error> {
     let realm = connect_to_protocol::<fcomponent::RealmMarker>()?;
 
     // Start the startup session, if any, and serve services exposed by session manager.
-    let Config { session_url, autolaunch } = Config::take_from_startup_handle();
+    let Config { session_url, autolaunch, suspend_enabled } = Config::take_from_startup_handle();
     let is_session_url_empty = session_url.is_empty();
-    let mut session_manager =
-        SessionManager::new(realm, inspector, (!is_session_url_empty).then_some(session_url));
+    let mut session_manager = SessionManager::new(
+        realm,
+        inspector,
+        (!is_session_url_empty).then_some(session_url),
+        suspend_enabled,
+    );
 
     if is_session_url_empty {
         info!("Received an empty startup session URL. Waiting for a request.");

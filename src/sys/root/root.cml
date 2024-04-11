@@ -68,6 +68,7 @@
                 "fuchsia.memory.ImminentOomCaptureDelay",
                 "fuchsia.memory.NormalCaptureDelay",
                 "fuchsia.memory.WarningCaptureDelay",
+                "fuchsia.power.SuspendEnabled",
                 "fuchsia.session.AutoLaunch",
                 "fuchsia.session.SessionUrl",
                 "fuchsia.wlan.RecoveryEnabled",

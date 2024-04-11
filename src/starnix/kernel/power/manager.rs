@@ -15,6 +15,7 @@ use fidl::endpoints::{create_request_stream, create_sync_proxy};
 use fidl_fuchsia_power_broker as fbroker;
 use fidl_fuchsia_power_suspend as fsuspend;
 use fidl_fuchsia_power_system as fsystem;
+use fidl_fuchsia_session_power as fpower;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
 use fuchsia_zircon as zx;
 use futures::StreamExt;
@@ -80,7 +81,11 @@ impl SuspendResumeManager {
         system_task: &CurrentTask,
     ) -> Result<(), anyhow::Error> {
         let activity_governor = connect_to_protocol_sync::<fsystem::ActivityGovernorMarker>()?;
-        self.init_power_element(&activity_governor)?;
+        let handoff = system_task
+            .kernel()
+            .connect_to_protocol_at_container_svc::<fpower::HandoffMarker>()?
+            .into_sync_proxy();
+        self.init_power_element(&activity_governor, &handoff)?;
         self.init_listener(&activity_governor, system_task);
         self.init_stats_watcher(system_task);
         Ok(())
@@ -89,6 +94,7 @@ impl SuspendResumeManager {
     fn init_power_element(
         self: &SuspendResumeManagerHandle,
         activity_governor: &fsystem::ActivityGovernorSynchronousProxy,
+        handoff: &fpower::HandoffSynchronousProxy,
     ) -> Result<(), anyhow::Error> {
         let topology = connect_to_protocol_sync::<fbroker::TopologyMarker>()?;
 
@@ -100,7 +106,7 @@ impl SuspendResumeManager {
             .application_activity
             .map(|application_activity| application_activity.active_dependency_token)
         {
-            // TODO(b/316023943): also depends on execution_resume_latency after implemented.
+            // TODO(https://fxbug.dev/316023943): also depend on execution_resume_latency after implemented.
             let power_levels: Vec<u8> = (0..=POWER_ON_LEVEL).collect();
             let (lessor, lessor_server_end) = create_sync_proxy::<fbroker::LessorMarker>();
             let (current_level, current_level_server_end) =
@@ -146,6 +152,12 @@ impl SuspendResumeManager {
                     level_proxy: current_level,
                 })
                 .expect("Power Mode should be uninitialized");
+
+            let parent_lease = handoff
+                .take(zx::Time::INFINITE)
+                .context("Handoff::Take")?
+                .map_err(|e| anyhow!("Failed to take lessor and lease from parent: {e:?}"))?;
+            drop(parent_lease);
         };
 
         Ok(())
