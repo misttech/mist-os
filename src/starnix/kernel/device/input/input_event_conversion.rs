@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::uinput;
+use crate::uinput;
 use fidl_fuchsia_input::Key;
 use fidl_fuchsia_input_report as fir;
 use fidl_fuchsia_ui_input3 as fuiinput;

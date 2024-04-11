@@ -21,7 +21,7 @@ use fidl_fuchsia_ui_views as fuiviews;
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, log_info, log_warn};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, RwLock, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::DeviceType,
@@ -47,6 +47,8 @@ pub struct Framebuffer {
     vmo_len: u32,
     pub info: RwLock<fb_var_screeninfo>,
     server: Option<Arc<FramebufferServer>>,
+    pub view_identity: Mutex<Option<fuiviews::ViewIdentityOnCreation>>,
+    pub view_bound_protocols: Mutex<Option<fuicomposition::ViewBoundProtocols>>,
 }
 
 impl Framebuffer {
@@ -89,36 +91,47 @@ impl Framebuffer {
                 log_warn!("could not write initial framebuffer: {:?}", err);
             }
 
-            Ok(Arc::new(Self { vmo, vmo_len, server: Some(server), info: RwLock::new(info) }))
+            Ok(Arc::new(Self {
+                vmo,
+                vmo_len,
+                server: Some(server),
+                info: RwLock::new(info),
+                view_identity: Default::default(),
+                view_bound_protocols: Default::default(),
+            }))
         } else {
             let vmo_len = info.xres * info.yres * (info.bits_per_pixel / 8);
             let vmo = Arc::new(zx::Vmo::create(vmo_len as u64).map_err(|s| match s {
                 zx::Status::NO_MEMORY => errno!(ENOMEM),
                 _ => impossible_error(s),
             })?);
-            Ok(Arc::new(Self { vmo, vmo_len, server: None, info: RwLock::new(info) }))
+            Ok(Arc::new(Self {
+                vmo,
+                vmo_len,
+                server: None,
+                info: RwLock::new(info),
+                view_identity: Default::default(),
+                view_bound_protocols: Default::default(),
+            }))
         }
     }
 
     /// Starts presenting a view based on this framebuffer.
     ///
     /// # Parameters
-    /// * `view_bound_protocols`: handles to input clients which will be
-    ///    associated with the view
-    /// * `view_identify`: the identity used to create view with flatland
     /// * `incoming_dir`: the incoming service directory under which the
     ///   `fuchsia.element.GraphicalPresenter` protocol can be retrieved.
     pub fn start_server(
         &self,
         kernel: &Arc<Kernel>,
-        view_bound_protocols: fuicomposition::ViewBoundProtocols,
-        view_identity: fuiviews::ViewIdentityOnCreation,
         incoming_dir: Option<fio::DirectoryProxy>,
     ) -> Result<(), anyhow::Error> {
         if let Some(server) = &self.server {
             // Start presentation loop to prepare for display updates.
             start_flatland_presentation_loop(kernel, server.clone());
 
+            let view_bound_protocols = self.view_bound_protocols.lock().take().unwrap();
+            let view_identity = self.view_identity.lock().take().unwrap();
             // Attempt to find and connect to GraphicalPresenter.
             if let Some(incoming_dir) = incoming_dir {
                 log_info!("Presenting view using GraphicalPresenter");
@@ -177,7 +190,7 @@ impl DeviceOps for Arc<Framebuffer> {
     }
 }
 
-impl FileOps for Arc<Framebuffer> {
+impl FileOps for Framebuffer {
     fileops_impl_vmo!(self, &self.vmo);
 
     fn ioctl(

@@ -7,13 +7,13 @@ use bstr::BString;
 use fuchsia_zircon as zx;
 use gpu::gpu_device_init;
 use gralloc::gralloc_device_init;
+use input_device::{uinput::register_uinput_device, InputDevice};
 use magma_device::magma_device_init;
 use selinux::security_server;
 use starnix_core::{
     device::{
         ashmem::ashmem_device_init,
         framebuffer::{fb_device_init, AspectRatio},
-        input::init_input_devices,
         perfetto_consumer::start_perfetto_consumer_thread,
     },
     task::{CurrentTask, Kernel, KernelFeatures},
@@ -129,7 +129,52 @@ pub fn run_container_features(
     let mut enabled_profiling = false;
     if features.framebuffer {
         fb_device_init(locked, system_task);
-        init_input_devices(locked, system_task);
+
+        let (touch_source_proxy, touch_source_stream) = fidl::endpoints::create_sync_proxy();
+        let view_bound_protocols = fuicomposition::ViewBoundProtocols {
+            touch_source: Some(touch_source_stream),
+            ..Default::default()
+        };
+        let view_identity = fuiviews::ViewIdentityOnCreation::from(
+            fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair"),
+        );
+        let view_ref = fuchsia_scenic::duplicate_view_ref(&view_identity.view_ref)
+            .expect("Failed to dup view ref.");
+        let keyboard =
+            fuchsia_component::client::connect_to_protocol_sync::<fuiinput::KeyboardMarker>()
+                .expect("Failed to connect to keyboard");
+        let registry_proxy = fuchsia_component::client::connect_to_protocol_sync::<
+            fuipolicy::DeviceListenerRegistryMarker,
+        >()
+        .expect("Failed to connect to device listener registry");
+
+        // These need to be set before `Framebuffer::start_server` is called.
+        // `Framebuffer::start_server` is only called when the `framebuffer` component feature is
+        // enabled. The container is the runner for said components, and `run_container_features`
+        // is performed before the Container is fully initialized. Therefore, it's safe to set
+        // these values at this point.
+        //
+        // In the future, we would like to avoid initializing a framebuffer unconditionally on the
+        // Kernel, at which point this logic will need to change.
+        *kernel.framebuffer.view_identity.lock() = Some(view_identity);
+        *kernel.framebuffer.view_bound_protocols.lock() = Some(view_bound_protocols);
+
+        let framebuffer = kernel.framebuffer.info.read();
+
+        let display_width = framebuffer.xres as i32;
+        let display_height = framebuffer.yres as i32;
+        let input_files_node = kernel.inspect_node.create_child("input_files");
+
+        let touch_device = InputDevice::new_touch(display_width, display_height, &input_files_node);
+        let keyboard_device = InputDevice::new_keyboard(&input_files_node);
+
+        touch_device.clone().register(locked, &kernel.kthreads.system_task());
+        keyboard_device.clone().register(locked, &kernel.kthreads.system_task());
+        register_uinput_device(locked, &kernel.kthreads.system_task());
+
+        touch_device.start_touch_relay(&kernel, touch_source_proxy);
+        keyboard_device.start_keyboard_relay(&kernel, keyboard, view_ref);
+        keyboard_device.start_button_relay(&kernel, registry_proxy);
     }
     if features.gralloc {
         // The virtgralloc0 device allows vulkan_selector to indicate to gralloc
@@ -173,41 +218,17 @@ pub fn run_container_features(
 
 /// Runs features requested by individual components inside the container.
 pub fn run_component_features(
-    entries: &Vec<String>,
     kernel: &Arc<Kernel>,
+    entries: &Vec<String>,
     mut incoming_dir: Option<fio::DirectoryProxy>,
 ) -> Result<(), Errno> {
     for entry in entries {
         match entry.as_str() {
             "framebuffer" => {
-                let (touch_source_proxy, touch_source_stream) =
-                    fidl::endpoints::create_proxy().expect("failed to create TouchSourceProxy");
-                let view_bound_protocols = fuicomposition::ViewBoundProtocols {
-                    touch_source: Some(touch_source_stream),
-                    ..Default::default()
-                };
-                let view_identity = fuiviews::ViewIdentityOnCreation::from(
-                    fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair"),
-                );
-                let view_ref = fuchsia_scenic::duplicate_view_ref(&view_identity.view_ref)
-                    .expect("Failed to dup view ref.");
-                let keyboard =
-                    fuchsia_component::client::connect_to_protocol::<fuiinput::KeyboardMarker>()
-                        .expect("Failed to connect to keyboard");
-                let registry_proxy = fuchsia_component::client::connect_to_protocol::<
-                    fuipolicy::DeviceListenerRegistryMarker,
-                >()
-                .expect("Failed to connect to device listener registry");
                 kernel
                     .framebuffer
-                    .start_server(kernel, view_bound_protocols, view_identity, incoming_dir.take())
+                    .start_server(kernel, incoming_dir.take())
                     .expect("Failed to start framebuffer server");
-                kernel.input_device.start_relay(
-                    touch_source_proxy,
-                    keyboard,
-                    registry_proxy,
-                    view_ref,
-                );
             }
             feature => {
                 return error!(ENOSYS, format!("Unsupported feature: {}", feature));

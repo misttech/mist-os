@@ -278,7 +278,7 @@ impl FsNodeOps for Arc<ProcDirectory> {
     }
 }
 
-impl FileOps for Arc<ProcDirectory> {
+impl FileOps for ProcDirectory {
     fileops_impl_directory!();
 
     fn seek(

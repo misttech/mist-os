@@ -2499,7 +2499,10 @@ impl MemoryManager {
             profile_duration!("UsercopyWrite");
             let num_copied = usercopy.copyout(bytes, addr.ptr());
             if num_copied != bytes.len() {
-                error!(EFAULT)
+                error!(
+                    EFAULT,
+                    format!("expected {:?} bytes, copied {:?} bytes", bytes.len(), num_copied)
+                )
             } else {
                 Ok(num_copied)
             }

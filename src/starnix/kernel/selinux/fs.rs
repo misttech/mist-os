@@ -457,7 +457,7 @@ impl FsNodeOps for Arc<SeLinuxBooleansDirectory> {
     }
 }
 
-impl FileOps for Arc<SeLinuxBooleansDirectory> {
+impl FileOps for SeLinuxBooleansDirectory {
     fileops_impl_directory!();
 
     fn seek(

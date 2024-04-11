@@ -123,7 +123,7 @@ impl FsNodeOps for Arc<NetstackDevicesDirectory> {
     }
 }
 
-impl FileOps for Arc<NetstackDevicesDirectory> {
+impl FileOps for NetstackDevicesDirectory {
     fileops_impl_directory!();
 
     fn seek(

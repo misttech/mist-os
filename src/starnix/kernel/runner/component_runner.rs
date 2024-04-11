@@ -151,7 +151,7 @@ pub async fn start_component(
         credentials.cap_inheritable = capabilities;
     }
 
-    run_component_features(&component_features, system_task.kernel(), maybe_svc).unwrap_or_else(
+    run_component_features(system_task.kernel(), &component_features, maybe_svc).unwrap_or_else(
         |e| {
             log_error!("failed to set component features for {} - {:?}", url, e);
         },

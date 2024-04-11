@@ -55,7 +55,7 @@ impl DeviceOps for Arc<ZramDevice> {
     }
 }
 
-impl FileOps for Arc<ZramDevice> {
+impl FileOps for ZramDevice {
     fileops_impl_seekless!();
     fileops_impl_dataless!();
 }

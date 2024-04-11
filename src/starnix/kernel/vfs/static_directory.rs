@@ -192,7 +192,7 @@ impl FsNodeOps for Arc<StaticDirectory> {
     }
 }
 
-impl FileOps for Arc<StaticDirectory> {
+impl FileOps for StaticDirectory {
     fileops_impl_directory!();
 
     fn seek(

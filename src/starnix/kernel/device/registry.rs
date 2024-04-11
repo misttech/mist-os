@@ -30,6 +30,7 @@ use starnix_sync::{
 };
 use std::{
     collections::btree_map::{BTreeMap, Entry},
+    ops::Deref,
     sync::Arc,
 };
 
@@ -57,6 +58,19 @@ pub trait DeviceOps: DynClone + Send + Sync + 'static {
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno>;
+}
+
+impl<T: DeviceOps> DeviceOps for Arc<T> {
+    fn open(
+        &self,
+        locked: &mut Locked<'_, DeviceOpen>,
+        current_task: &CurrentTask,
+        id: DeviceType,
+        node: &FsNode,
+        flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        self.deref().open(locked, current_task, id, node, flags)
+    }
 }
 
 clone_trait_object!(DeviceOps);

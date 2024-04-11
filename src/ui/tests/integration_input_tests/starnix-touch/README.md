@@ -77,52 +77,8 @@ code in this directory.
 
 ### Synchronization
 
-It's not clear what ordering guarantees exist regarding the initialization of Starnix input. With that in mind, there are a couple of synchronization risks that come to mind, and why they seem unlikely.
-
-1. It might be possible for `touch_dump` to start execution before `/dev/input/event0`
-   exists. This seems unlikely, because the work to create the device node is
-   done synchronously at the time that a container launches:
-
-   ```
-   starnix/kernel/device/features.rs:run_container_features()
-   -> s/k/d/input.rs:init_input_devices()
-    -> s/k/d/input.rs:add_and_register_input_device()
-     -> s/k/d/registry.rs:add_and_register_device()
-      -> s/k/d/registry.rs:add_device()
-       -> s/k/d/registry.rs:add_device_with_directory()
-        -> s/k/d/registry.rs:devtmpfs_create_device()
-         -> s/k/vfs/dir_entry.rs:create_entry()
-          -> s/k/v/dir_entry.rs:create_entry_internal()
-           -> s/k/v/dir_entry.rs:get_or_create_child() [DirEntry]
-            -> s/k/v/dir_entry.rs:get_or_create_child() [DirEntryLockedChildren]
-             -> [callback to lambda from devtmpfs_create_device()]
-              -> mknod()
-   ```
-
-   If, however, we do encounter flake in opening the device node, we can probably work
-   around it with a retry loop in `touch_dump`.
-
-1. It might be possible for `touch_dump` to start execution before the relevant
-   `InputFile` has connected to the `TouchSource` protocol from Scenic.
-
-   This is because the `TouchSource` connection happens in response to the execution
-   of `launch_input`, but there's no direct feedback from `InputFile` to the test
-   logic that launches `touch_dump`.
-
-   However, this also seems unlikely, because:
-
-   1. Connecting to `TouchSource` happens synchronously in `run_component_features()`:
-      ```
-      starnix/kernel/device/features.rs:run_component_features()
-      -> s/k/d/input.rs:start_relay()
-      -> fidl::endpoints::create_proxy()
-      ```
-   1. `starnix-touch-test.cc` eagerly starts `launch_input` before manually starting `touch_dump`.
-   1. `starnix-touch-test.cc` waits until at least one view (`launch_input`) is presented before
-      injecting input.
-
-   If, however, we do encounter flake in receiving touch events, we can probably
-   work around it with a retry loop for `InjectInput()`.
+The input devices will be present in the container by the time Linux code is running. The
+input handling threads will also have been spawned before init runs.
 
 ## Build the test
 

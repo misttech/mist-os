@@ -5,14 +5,16 @@
 use crate::{
     device::{
         kobject::DeviceMetadata, loop_device::create_loop_control_device, mem::DevRandom,
-        simple_device_ops, uinput::create_uinput_device, DeviceMode,
+        simple_device_ops, DeviceMode,
     },
+    device::{loop_device::loop_device_init, mem::mem_device_init, zram::zram_device_init},
+    fs::devpts::tty_device_init,
     fs::sysfs::DeviceDirectory,
     task::CurrentTask,
     vfs::{create_stub_device_with_bug, fuse::open_fuse_device},
 };
 use starnix_logging::bug_ref;
-use starnix_sync::{FileOpsCore, LockBefore, Locked};
+use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
 
 pub fn misc_device_init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
@@ -62,13 +64,17 @@ where
         DeviceDirectory::new,
         create_loop_control_device,
     );
-    registry.add_and_register_device(
-        locked,
-        current_task,
-        "uinput".into(),
-        DeviceMetadata::new("uinput".into(), DeviceType::UINPUT, DeviceMode::Char),
-        misc_class,
-        DeviceDirectory::new,
-        create_uinput_device,
-    );
+}
+
+/// Initializes common devices in `Kernel`.
+///
+/// Adding device nodes to devtmpfs requires the current running task. The `Kernel` constructor does
+/// not create an initial task, so this function should be triggered after a `CurrentTask` has been
+/// initialized.
+pub fn init_common_devices(locked: &mut Locked<'_, Unlocked>, system_task: &CurrentTask) {
+    misc_device_init(locked, system_task);
+    mem_device_init(locked, system_task);
+    tty_device_init(locked, system_task);
+    loop_device_init(locked, system_task);
+    zram_device_init(locked, system_task);
 }

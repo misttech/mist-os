@@ -5,7 +5,6 @@
 use crate::{
     device::{
         framebuffer::{AspectRatio, Framebuffer},
-        input::InputDevice,
         loop_device::LoopDeviceRegistry,
         sync_fence_registry::SyncFenceRegistry,
         BinderDevice, DeviceMode, DeviceRegistry,
@@ -144,15 +143,6 @@ pub struct Kernel {
     /// compatible fences for Fuchsia.
     pub sync_fence_registry: Arc<SyncFenceRegistry>,
 
-    /// An `InputDevice` that can be opened to read input events from Fuchsia.
-    ///
-    /// If the container specifies the `framebuffer` features, this `InputDevice` will be registered
-    /// as a device.
-    ///
-    /// When a component is run in that container, and also specifies the `framebuffer` feature,
-    /// Starnix will relay input events from Fuchsia to the component.
-    pub input_device: Arc<InputDevice>,
-
     /// The binder driver registered for this container, indexed by their device type.
     pub binders: RwLock<BTreeMap<DeviceType, BinderDevice>>,
 
@@ -187,7 +177,7 @@ pub struct Kernel {
     network_netlink: OnceCell<Netlink<NetlinkSenderReceiverProvider>>,
 
     /// Inspect instrumentation for this kernel instance.
-    inspect_node: fuchsia_inspect::Node,
+    pub inspect_node: fuchsia_inspect::Node,
 
     /// Diagnostics information about crashed tasks.
     pub core_dumps: CoreDumpList,
@@ -300,7 +290,6 @@ impl Kernel {
         let vsock_address_maker = Box::new(|x: u32| -> SocketAddress { SocketAddress::Vsock(x) });
         let framebuffer =
             Framebuffer::new(framebuffer_aspect_ratio).expect("Failed to create framebuffer");
-        let input_device = InputDevice::new(framebuffer.clone(), &inspect_node);
 
         let core_dumps = CoreDumpList::new(inspect_node.create_child("coredumps"));
 
@@ -330,7 +319,6 @@ impl Kernel {
             loop_device_registry: Default::default(),
             framebuffer,
             sync_fence_registry: SyncFenceRegistry::new(),
-            input_device,
             binders: Default::default(),
             iptables: OrderedRwLock::new(IpTables::new()),
             shared_futexes: FutexTable::<SharedFutexKey>::default(),

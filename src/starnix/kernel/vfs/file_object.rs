@@ -48,6 +48,7 @@ use starnix_uapi::{
 };
 use std::{
     fmt,
+    ops::Deref,
     sync::{Arc, Weak},
 };
 
@@ -388,6 +389,169 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     }
 }
 
+impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
+    fn close(&self, file: &FileObject, current_task: &CurrentTask) {
+        self.deref().close(file, current_task)
+    }
+
+    fn flush(&self, file: &FileObject, current_task: &CurrentTask) {
+        self.deref().flush(file, current_task)
+    }
+
+    fn has_persistent_offsets(&self) -> bool {
+        self.deref().has_persistent_offsets()
+    }
+
+    fn is_seekable(&self) -> bool {
+        self.deref().is_seekable()
+    }
+
+    fn read(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        self.deref().read(locked, file, current_task, offset, data)
+    }
+
+    fn write(
+        &self,
+        locked: &mut Locked<'_, WriteOps>,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        self.deref().write(locked, file, current_task, offset, data)
+    }
+
+    fn seek(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        current_offset: off_t,
+        target: SeekTarget,
+    ) -> Result<off_t, Errno> {
+        self.deref().seek(file, current_task, current_offset, target)
+    }
+
+    fn sync(&self, file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno> {
+        self.deref().sync(file, current_task)
+    }
+
+    fn data_sync(&self, file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno> {
+        self.deref().data_sync(file, current_task)
+    }
+
+    fn get_vmo(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        length: Option<usize>,
+        prot: ProtectionFlags,
+    ) -> Result<Arc<zx::Vmo>, Errno> {
+        self.deref().get_vmo(file, current_task, length, prot)
+    }
+
+    fn mmap(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        addr: DesiredAddress,
+        vmo_offset: u64,
+        length: usize,
+        prot_flags: ProtectionFlags,
+        options: MappingOptions,
+        filename: NamespaceNode,
+    ) -> Result<UserAddress, Errno> {
+        self.deref().mmap(
+            file,
+            current_task,
+            addr,
+            vmo_offset,
+            length,
+            prot_flags,
+            options,
+            filename,
+        )
+    }
+
+    fn readdir(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        sink: &mut dyn DirentSink,
+    ) -> Result<(), Errno> {
+        self.deref().readdir(file, current_task, sink)
+    }
+
+    fn wait_async(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> Option<WaitCanceler> {
+        self.deref().wait_async(file, current_task, waiter, events, handler)
+    }
+
+    fn query_events(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        self.deref().query_events(file, current_task)
+    }
+
+    fn ioctl(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        request: u32,
+        arg: SyscallArg,
+    ) -> Result<SyscallResult, Errno> {
+        self.deref().ioctl(locked, file, current_task, request, arg)
+    }
+
+    fn fcntl(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        cmd: u32,
+        arg: u64,
+    ) -> Result<SyscallResult, Errno> {
+        self.deref().fcntl(file, current_task, cmd, arg)
+    }
+
+    fn to_handle(
+        &self,
+        locked: &mut Locked<'_, FileOpsToHandle>,
+        file: &FileObject,
+        current_task: &CurrentTask,
+    ) -> Result<Option<zx::Handle>, Errno> {
+        self.deref().to_handle(locked, file, current_task)
+    }
+
+    fn as_pid(&self, file: &FileObject) -> Result<pid_t, Errno> {
+        self.deref().as_pid(file)
+    }
+
+    fn readahead(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        length: usize,
+    ) -> Result<(), Errno> {
+        self.deref().readahead(file, current_task, offset, length)
+    }
+}
+
 pub fn default_eof_offset(file: &FileObject, current_task: &CurrentTask) -> Result<off_t, Errno> {
     Ok(file.node().stat(current_task)?.st_size as off_t)
 }
@@ -523,6 +687,7 @@ macro_rules! fileops_impl_nonseekable {
 
 /// Implements [`FileOps::seek`] methods in a way that makes sense for files that ignore
 /// seeking operations and always read/write at offset 0.
+#[macro_export]
 macro_rules! fileops_impl_seekless {
     () => {
         fn has_persistent_offsets(&self) -> bool {
@@ -535,10 +700,10 @@ macro_rules! fileops_impl_seekless {
 
         fn seek(
             &self,
-            _file: &crate::vfs::FileObject,
-            _current_task: &crate::task::CurrentTask,
+            _file: &$crate::vfs::FileObject,
+            _current_task: &$crate::task::CurrentTask,
             _current_offset: starnix_uapi::off_t,
-            _target: crate::vfs::SeekTarget,
+            _target: $crate::vfs::SeekTarget,
         ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
             Ok(0)
         }

@@ -124,7 +124,7 @@ impl FsNodeOps for Arc<TaskDirectory> {
     }
 }
 
-impl FileOps for Arc<TaskDirectory> {
+impl FileOps for TaskDirectory {
     fileops_impl_directory!();
 
     fn seek(
