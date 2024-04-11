@@ -52,17 +52,16 @@ The easiest way to interact with the profiler is through the ffx plugin:
 ffx profiler start --pid <target pid> --duration 5
 ```
 
-This will place a `profile.out` file in your current directory. You'll need to symbolize it and
-export it to pprof format.
+This will place a `profile.out` file in your current directory. You'll need to export it to pprof format.
 
 ```
-ffx debug symbolize < profile.out > profile.out.sym; fx samples_to_pprof profile.out.sym
+fx samples_to_pprof profile.out
 ```
 
-This will output the file `profile.out.sym.pb` which can be handed to pprof.
+This will output the file `profile.out.pb` which can be handed to pprof.
 
 ```
-$ pprof -top profile.out.sym.pb
+$ pprof -top profile.out.pb
 Main binary filename not available.
 Type: location
 Showing nodes accounting for 272, 100% of 272 total

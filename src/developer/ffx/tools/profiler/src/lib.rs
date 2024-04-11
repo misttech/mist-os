@@ -3,13 +3,18 @@
 // found in the LICENSE file.
 mod args;
 
+use ::std::path::PathBuf;
+use anyhow::Context;
 use anyhow::Result;
 use args::{ProfilerCommand, ProfilerSubCommand};
 use async_fs::File;
 use errors::{ffx_bail, ffx_error};
 use fho::{deferred, moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_cpu_profiler as profiler;
+use fuchsia_async::unblock;
+use std::process::Command;
 use std::{io::stdin, io::BufRead, time::Duration};
+use tempfile::Builder;
 
 type Writer = MachineWriter<()>;
 #[derive(FfxTool)]
@@ -66,6 +71,35 @@ fn gather_targets(opts: &args::Start) -> Result<fidl_fuchsia_cpu_profiler::Targe
     }
 }
 
+pub async fn symbolize(from: &PathBuf, to: &PathBuf) -> Result<()> {
+    let sdk = ffx_config::global_env_context()
+        .context("loading global environment context")?
+        .get_sdk()
+        .await?;
+    if let Err(e) = symbol_index::ensure_symbol_index_registered(&sdk).await {
+        eprintln!("ensure_symbol_index_registered failed, error was: {:#?}", e);
+    }
+
+    let symbolizer_path = sdk.get_host_tool("symbolizer")?;
+    let unsymbolized_input = std::fs::File::open(&from)?;
+    let symbolized_output = std::fs::File::create(&to)?;
+    let mut cmd = Command::new(symbolizer_path)
+        .stdin(unsymbolized_input)
+        .stdout(symbolized_output)
+        .spawn()
+        .map_err(|err| ffx_error!("Failed to spawn symbolizer: {err:?}"))?;
+
+    match unblock(move || cmd.wait())
+        .await
+        .map_err(|err| ffx_error!("Failed to wait cmd: {err:?}"))?
+        .code()
+    {
+        Some(0) => Ok(()),
+        Some(exit_code) => ffx_bail!("Symbolizer exited with code: {exit_code}"),
+        None => ffx_bail!("Symbolizer terminated by signal."),
+    }
+}
+
 pub async fn profiler(
     controller: fho::Deferred<profiler::SessionProxy>,
     mut writer: Writer,
@@ -92,10 +126,19 @@ pub async fn profiler(
                 .await?
                 .map_err(|e| ffx_error!("Failed to start: {:?}", e))?;
 
-            let copy_task = fuchsia_async::Task::local(async {
-                let mut out_file = File::create(opts.output).await.unwrap();
-                futures::io::copy(client, &mut out_file).await
-            });
+            let tmp_dir = Builder::new().prefix("fuchsia_cpu_profiler_").tempdir()?;
+
+            let unsymbolized_path = if opts.symbolize {
+                tmp_dir.path().join("unsymbolized.txt")
+            } else {
+                std::path::PathBuf::from(&opts.output)
+            };
+
+            let mut output = File::create(&unsymbolized_path).await.unwrap();
+            let copy_task =
+                fuchsia_async::Task::local(
+                    async move { futures::io::copy(client, &mut output).await },
+                );
 
             controller
                 .start(&profiler::SessionStartRequest {
@@ -136,9 +179,14 @@ pub async fn profiler(
             }
             copy_task.await?;
             controller.reset().await?;
+
+            if !opts.symbolize {
+                return Ok(());
+            }
+            let symbolized_path = std::path::PathBuf::from(&opts.output);
+            symbolize(&unsymbolized_path, &symbolized_path).await
         }
     }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -155,6 +203,7 @@ mod tests {
             duration: None,
             output: String::from("output_file"),
             print_stats: false,
+            symbolize: false,
         };
         let target = gather_targets(&args);
         match target {
@@ -171,6 +220,7 @@ mod tests {
             duration: None,
             output: String::from("output_file"),
             print_stats: false,
+            symbolize: false,
         };
 
         let empty_targets = gather_targets(&empty_args);
@@ -185,6 +235,7 @@ mod tests {
             duration: None,
             output: String::from("output_file"),
             print_stats: false,
+            symbolize: false,
         };
         let invalid_args2 = args::Start {
             pids: vec![],
@@ -195,6 +246,7 @@ mod tests {
             duration: None,
             output: String::from("output_file"),
             print_stats: false,
+            symbolize: false,
         };
         let invalid_args3 = args::Start {
             pids: vec![],
@@ -205,6 +257,7 @@ mod tests {
             duration: None,
             output: String::from("output_file"),
             print_stats: false,
+            symbolize: false,
         };
 
         let invalid_targets1 = gather_targets(&invalid_args1);

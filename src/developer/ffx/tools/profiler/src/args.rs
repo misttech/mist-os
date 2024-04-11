@@ -54,4 +54,8 @@ pub struct Start {
     /// print stats about how the profiling session went
     #[argh(switch)]
     pub print_stats: bool,
+
+    /// if false, output the raw sample file instead of attempting to symbolize it
+    #[argh(option, default = "true")]
+    pub symbolize: bool,
 }
