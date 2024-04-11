@@ -119,7 +119,16 @@ pub async fn handle_suite_requests(
                 debug!(?test_start_info, "running tests with info");
 
                 match test_type {
-                    TestType::Gtest | TestType::Gunit | TestType::GtestXmlOutput => {
+                    TestType::Gunit => {
+                        run_gunit_cases(
+                            tests,
+                            test_start_info,
+                            &run_listener_proxy,
+                            &component_runner,
+                        )
+                        .await?;
+                    }
+                    TestType::Gtest | TestType::GtestXmlOutput => {
                         run_gtest_cases(
                             tests,
                             test_start_info,

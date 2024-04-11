@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use {
-    crate::helpers::*,
-    crate::results_parser::*,
+    crate::{helpers::*, results_parser::*},
     anyhow::{Context, Error},
     fidl::endpoints::create_proxy,
     fidl_fuchsia_component_runner as frunner,
     fidl_fuchsia_test::{self as ftest, Result_ as TestResult, Status},
-    fuchsia_zircon as zx,
+    ftest::CaseListenerProxy,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+    futures::{io::BufReader, AsyncBufReadExt},
     gtest_runner_lib::parser::*,
     std::collections::HashMap,
     test_runners_lib::cases::TestCaseInfo,
@@ -34,7 +35,7 @@ pub async fn get_cases_list_for_gtests(
     let output_arg = format_arg(test_type, &output_path);
     replace_program_args(
         vec![list_tests_arg, output_arg],
-        start_info.program.as_mut().expect("No program."),
+        start_info.program.as_mut().context("No program.")?,
     );
 
     let (outgoing_dir, _outgoing_dir_server) = zx::Channel::create();
@@ -60,10 +61,10 @@ pub async fn get_cases_list_for_gtests(
         .collect())
 }
 
-/// Runs a gtest case associated with a single `ftest::SuiteRequest::Run` request.
+/// Runs a gunit test case associated with a single `ftest::SuiteRequest::Run` request.
 ///
 /// Running the test component is delegated to an instance of the starnix kernel.
-/// stdout logs are filtered before they're reported to the test framework.
+/// stdout logs are parsed for results and forwarded to the test framework.
 ///
 /// # Parameters
 /// - `tests`: The test invocations to run.
@@ -72,17 +73,21 @@ pub async fn get_cases_list_for_gtests(
 ///                         framework.
 /// - `component_runner`: The runner that will run the test component.
 /// - `test_type`: The type of test to run, used to determine which arguments to pass to the test.
-pub async fn run_gtest_cases(
+pub async fn run_gunit_cases(
     tests: Vec<ftest::Invocation>,
     mut start_info: frunner::ComponentStartInfo,
     run_listener_proxy: &ftest::RunListenerProxy,
     component_runner: &frunner::ComponentRunnerProxy,
-    test_type: TestType,
 ) -> Result<(), Error> {
-    let (numbered_handles, std_handles) = create_numbered_handles();
+    let (numbered_handles, mut std_handles) = create_numbered_handles();
     start_info.numbered_handles = numbered_handles;
 
-    // Hacky - report an overall case to see all of stdout/stderr.
+    // Grab stdout for result parsing.
+    let (stdout_reader, stdout_writer) = zx::Socket::create_stream();
+    let stdout_source = std_handles.out.take().unwrap();
+    std_handles.out = Some(stdout_reader);
+
+    // Hacky - send a fake case to test manager and use it to see all of stdout/stderr.
     let (overall_test_listener_proxy, overall_test_listener) =
         create_proxy::<ftest::CaseListenerMarker>()?;
     run_listener_proxy.on_test_case_started(
@@ -95,25 +100,88 @@ pub async fn run_gtest_cases(
         overall_test_listener,
     )?;
 
-    let mut test_filter_arg = format_arg(test_type, FILTER_ARG);
-    let mut run_listener_proxies = HashMap::new();
-    for test in tests {
-        let test_name = test.name.clone().expect("No test name.");
-        test_filter_arg = format!("{}{}:", test_filter_arg, &test_name);
+    // Notify test manager of cases starting.
+    let (mut run_listener_proxies, test_filter_arg) =
+        start_tests(tests, run_listener_proxy, TestType::Gunit)?;
+    append_program_args(vec![test_filter_arg], start_info.program.as_mut().context("No program.")?);
 
-        let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
-        run_listener_proxy.on_test_case_started(
-            &test,
-            ftest::StdHandles::default(),
-            case_listener,
-        )?;
+    // Start the test component.
+    let component_controller = start_test_component(start_info, component_runner)?;
+    let _ = read_result(component_controller.take_event_stream()).await;
+    overall_test_listener_proxy
+        .finished(&TestResult { status: Some(Status::Passed), ..Default::default() })?;
 
-        run_listener_proxies.insert(test_name, case_listener_proxy);
+    // Parse stdout.
+    let mut reader = BufReader::new(fasync::Socket::from_socket(stdout_source));
+    let mut line = String::new();
+    while reader.read_line(&mut line).await? > 0 {
+        // Copy output to test's stdout.
+        let _ = stdout_writer.write(line.as_bytes())?;
+
+        let status = if line.starts_with("[       OK ]") {
+            Status::Passed
+        } else if line.starts_with("[  FAILED  ]") {
+            Status::Failed
+        } else if line.starts_with("[  SKIPPED ]") {
+            Status::Skipped
+        } else {
+            line.clear();
+            continue;
+        };
+
+        let test_name = line[13..].split_whitespace().next().unwrap_or_default();
+        if let Some(case_listener_proxy) = run_listener_proxies.remove(test_name) {
+            case_listener_proxy
+                .finished(&TestResult { status: Some(status), ..Default::default() })?;
+        }
+        line.clear();
     }
+
+    resolve_remaining_cases(run_listener_proxies)?;
+    Ok(())
+}
+
+/// Runs a gtest case associated with a single `ftest::SuiteRequest::Run` request.
+///
+/// Running the test component is delegated to an instance of the starnix kernel.
+/// Results are read from and output file and stdout logs are forwarded to the test framework.
+///
+/// # Parameters
+/// - `tests`: The test invocations to run.
+/// - `start_info`: The component start info of the test to run.
+/// - `run_listener_proxy`: The proxy used to communicate results of the test run to the test
+///                         framework.
+/// - `component_runner`: The runner that will run the test component.
+pub async fn run_gtest_cases(
+    tests: Vec<ftest::Invocation>,
+    mut start_info: frunner::ComponentStartInfo,
+    run_listener_proxy: &ftest::RunListenerProxy,
+    component_runner: &frunner::ComponentRunnerProxy,
+    test_type: TestType,
+) -> Result<(), Error> {
+    let (numbered_handles, std_handles) = create_numbered_handles();
+    start_info.numbered_handles = numbered_handles;
+
+    // Hacky - send a fake case to test manager and use it to see all of stdout/stderr.
+    let (overall_test_listener_proxy, overall_test_listener) =
+        create_proxy::<ftest::CaseListenerMarker>()?;
+    run_listener_proxy.on_test_case_started(
+        &ftest::Invocation {
+            name: Some(start_info.resolved_url.clone().unwrap_or_default()),
+            tag: None,
+            ..Default::default()
+        },
+        std_handles,
+        overall_test_listener,
+    )?;
+
+    // Notify test manager of cases starting.
+    let (mut run_listener_proxies, test_filter_arg) =
+        start_tests(tests, run_listener_proxy, test_type)?;
 
     let output_file_name = unique_filename();
     let output_format = match test_type {
-        TestType::Gtest | TestType::Gunit => "json",
+        TestType::Gtest => "json",
         TestType::GtestXmlOutput => "xml",
         _ => panic!("unexpected test type"),
     };
@@ -174,14 +242,32 @@ pub async fn run_gtest_cases(
         }
     }
 
-    // Mark any tests without results as failed.
-    for (name, case_listener_proxy) in run_listener_proxies {
-        tracing::warn!("Did not receive result for {name}. Marking as failed.");
-        case_listener_proxy
-            .finished(&TestResult { status: Some(Status::Failed), ..Default::default() })?;
+    resolve_remaining_cases(run_listener_proxies)?;
+    result
+}
+
+fn start_tests(
+    tests: Vec<ftest::Invocation>,
+    run_listener_proxy: &ftest::RunListenerProxy,
+    test_type: TestType,
+) -> Result<(HashMap<String, CaseListenerProxy>, String), Error> {
+    let mut test_filter_arg = format_arg(test_type, FILTER_ARG);
+    let mut run_listener_proxies = HashMap::new();
+    for test in tests {
+        let test_name = test.name.clone().expect("No test name.");
+        test_filter_arg = format!("{}{}:", test_filter_arg, &test_name);
+
+        let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
+        run_listener_proxy.on_test_case_started(
+            &test,
+            ftest::StdHandles::default(),
+            case_listener,
+        )?;
+
+        run_listener_proxies.insert(test_name, case_listener_proxy);
     }
 
-    result
+    Ok((run_listener_proxies, test_filter_arg))
 }
 
 fn format_arg(test_type: TestType, test_arg: &str) -> String {
@@ -194,4 +280,17 @@ fn format_arg(test_type: TestType, test_arg: &str) -> String {
 
 fn unique_filename() -> String {
     format!("test_result-{}.json", uuid::Uuid::new_v4())
+}
+
+fn resolve_remaining_cases(
+    run_listener_proxies: HashMap<String, CaseListenerProxy>,
+) -> Result<(), Error> {
+    for (name, case_listener_proxy) in run_listener_proxies {
+        tracing::warn!(
+            "Did not receive result for {name}. Marking as failed if not a disabled test."
+        );
+        let status = if name.contains("DISABLED") { Status::Skipped } else { Status::Failed };
+        case_listener_proxy.finished(&TestResult { status: Some(status), ..Default::default() })?;
+    }
+    Ok(())
 }

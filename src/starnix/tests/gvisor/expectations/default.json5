@@ -755,9 +755,6 @@
                 // socket_capability_test
                 "SocketTest.UnixConnectNeedsWritePerm",
 
-                // socket_domain_test
-                // TODO: same name of test in socket_ip_tcp_loopback_test that passes
-
                 // socket_filesystem_test
                 "FilesystemUnixSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
                 "FilesystemUnixSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*",
@@ -778,9 +775,6 @@
                 "AllUDPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
                 "AllUDPSockets/NonStreamSocketPairTest.RecvmsgMsghdrFlagMsgTrunc/*",
                 "AllUDPSockets/UDPSocketPairTest.PayloadTooBig/*",
-
-                // socket_ipv4_udp_unbound_loopback_test
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
 
                 // socket_netdevice_test
                 "NetdeviceTest.InterfaceName",
@@ -877,22 +871,6 @@
                 // socket_ip_unbound_netlink_test
                 "IPUnboundSockets/IPv6UnboundSocketTest.ConnectToBadLocalAddress/1",
                 "IPUnboundSockets/IPv4UnboundSocketTest.ConnectToBadLocalAddress/0",
-
-                // socket_ipv4_udp_unbound_loopback_test
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.ReuseAddrReusePortDistribution/0",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrReusePortConvertibleToReusePort/0",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketRecvBufAboveMax/0",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketRecvBufBelowMin/0",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrThenReusePort/0",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindDoubleReuseAddrReusePortThenReusePort/0",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.ReuseAddrReusePortDistribution/1",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReusePortThenReuseAddr/0",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindDoubleReuseAddrReusePortThenReusePort/1",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrThenReusePort/1",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketRecvBufBelowMin/1",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReusePortThenReuseAddr/1",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketRecvBufAboveMax/1",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrReusePortConvertibleToReusePort/1",
 
                 // socket_ipv6_unbound_test
                 "IPv6UnboundSockets/IPv6UnboundSocketTest.ZeroHopLimit/0",
@@ -1077,6 +1055,9 @@
                 "AllUnixDomainSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
                 "AllUnixDomainSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
                 "AllUnixDomainSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*",
+
+                // socket_ipv4_udp_unbound_loopback_test - crashes.
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
 
                 // socket_udp_test - hanging tests.
                 "AllInetTests/UdpSocketTest.ReadShutdown/*",
