@@ -97,13 +97,17 @@ async def async_main_wrapper(
 
     ret = await async_main(flags, tasks, recorder, config_file)
 
+    to_wait = asyncio.Task(asyncio.wait(tasks), name="Drain tasks")
+    timeout_seconds = 5
     try:
-        await asyncio.wait_for(asyncio.wait(tasks), timeout=5)
+        await asyncio.wait_for(asyncio.shield(to_wait), timeout=timeout_seconds)
     except asyncio.TimeoutError:
         print(
-            "\n\nTimed out waiting for tasks to exit, terminating...\n",
+            f"\n\nWaiting for tasks to complete for longer than {timeout_seconds} seconds...\n",
             file=sys.stderr,
         )
+        await to_wait
+
     return ret
 
 
