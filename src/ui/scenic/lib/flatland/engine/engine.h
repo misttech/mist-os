@@ -83,10 +83,9 @@ class Engine {
   flatland::GlobalTopologyData last_global_topology_data_ = {};
 
   bool first_frame_with_image_is_rendered_ = false;
-  uint64_t last_rendered_frame_ = 0;
 
-  // TODO(https://fxbug.dev/42156567): hack so that we can call DisplayCompositor::AddDisplay() when we first
-  // encounter a new display.  Need a more straightforward way to call AddDisplay().
+  // TODO(https://fxbug.dev/42156567): hack so that we can call DisplayCompositor::AddDisplay() when
+  // we first encounter a new display.  Need a more straightforward way to call AddDisplay().
   std::set</*fuchsia::hardware::display::types::DisplayId::value*/ uint64_t>
       hack_seen_display_id_values_;
 

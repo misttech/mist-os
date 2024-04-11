@@ -736,8 +736,9 @@ void App::InitializeHeartbeat(display::Display& display) {
         TRACE_DURATION("gfx", "App render_scheduled_frame");
         FX_CHECK(flatland_frame_count_ + skipped_frame_count_ == frame_number - 1);
         if (auto display = flatland_manager_->GetPrimaryFlatlandDisplayForRendering()) {
-          flatland_engine_->RenderScheduledFrame(++flatland_frame_count_, presentation_time,
-                                                 *display, std::move(callback));
+          flatland_engine_->RenderScheduledFrame(frame_number, presentation_time, *display,
+                                                 std::move(callback));
+          ++flatland_frame_count_;
         } else {
           FX_LOGS(INFO) << "No FlatlandDisplay; skipping render scheduled frame.";
           skipped_frame_count_++;

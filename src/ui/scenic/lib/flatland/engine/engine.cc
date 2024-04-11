@@ -15,7 +15,8 @@
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/lib/utils/logging.h"
 
-// TODO(https://fxbug.dev/42157427): for hacky invocation of OnVsync() at the end of RenderScheduledFrame().
+// TODO(https://fxbug.dev/42157427): for hacky invocation of OnVsync() at the end of
+// RenderScheduledFrame().
 #include <lib/trace/event.h>
 #include <lib/zx/time.h>
 
@@ -24,9 +25,9 @@
 #include <unordered_set>
 
 // Hardcoded double buffering.
-// TODO(https://fxbug.dev/42156567): make this configurable.  Even fancier: is it worth considering sharing a
-// pool of framebuffers between multiple displays?  (assuming that their dimensions are similar,
-// etc.)
+// TODO(https://fxbug.dev/42156567): make this configurable.  Even fancier: is it worth considering
+// sharing a pool of framebuffers between multiple displays?  (assuming that their dimensions are
+// similar, etc.)
 static constexpr uint32_t kNumDisplayFramebuffers = 2;
 
 namespace flatland {
@@ -87,11 +88,6 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
   TRACE_DURATION("gfx", "RenderFrame", "frame_number", frame_number, "time",
                  presentation_time.get());
   TRACE_FLOW_STEP("gfx", "scenic_frame", frame_number);
-
-  // NOTE: This is a temporary situation; soon FlatlandDisplay will be the only way to connect
-  // content to a display.
-  FX_CHECK(frame_number == last_rendered_frame_ + 1);
-  last_rendered_frame_ = frame_number;
 
   SceneState scene_state(*this, display.root_transform());
   scenic_impl::display::Display* const hw_display = display.display();
@@ -182,8 +178,8 @@ view_tree::SubtreeSnapshot Engine::GenerateViewTreeSnapshot(
       link_child_to_parent_transform_map);
 }
 
-// TODO(https://fxbug.dev/42162342) If we put Screenshot on its own thread, we should make this call thread
-// safe.
+// TODO(https://fxbug.dev/42162342) If we put Screenshot on its own thread, we should make this call
+// thread safe.
 Renderables Engine::GetRenderables(const FlatlandDisplay& display) {
   TransformHandle root = display.root_transform();
 
