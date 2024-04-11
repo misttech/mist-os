@@ -22,6 +22,7 @@ fuchsia_board_input_bundle(
     bootfs_driver_packages = [
         "//src/devices/gpio/drivers/aml-gpio",
         "//src/devices/i2c/drivers/aml-i2c",
+        "//src/devices/usb/drivers/aml-usb-phy",
     ],
 )
 
