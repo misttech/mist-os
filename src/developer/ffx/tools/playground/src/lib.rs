@@ -27,6 +27,7 @@ use vfs::directory::helper::DirectlyMutable;
 
 mod analytics;
 mod cf_fs;
+mod host_fs;
 mod presentation;
 mod repl;
 mod strict_mutex;
@@ -125,6 +126,7 @@ pub async fn exec_playground(
     let cf_root = cf_fs::CFDirectory::new_root(query);
     let fs_root_simple = vfs::directory::mutable::simple();
     let root_dir_client = vfs::directory::spawn_directory(Arc::clone(&fs_root_simple));
+    fs_root_simple.add_entry("host", host_fs::HostDirectory::new("/"))?;
     fs_root_simple.add_entry("toolbox", toolbox)?;
     fs_root_simple.add_entry("cf", cf_root)?;
     let Ok(root_dir_client) = root_dir_client.into_channel() else {

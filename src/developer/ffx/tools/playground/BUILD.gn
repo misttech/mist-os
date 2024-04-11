@@ -14,6 +14,7 @@ rustc_library("lib") {
   sources = [
     "src/analytics.rs",
     "src/cf_fs.rs",
+    "src/host_fs.rs",
     "src/lib.rs",
     "src/presentation.rs",
     "src/repl.rs",
@@ -45,7 +46,10 @@ rustc_library("lib") {
     "//third_party/rust_crates:futures",
   ]
 
-  test_deps = [ "//src/lib/fuchsia" ]
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:tempfile",
+  ]
 }
 
 ffx_tool("ffx_playground") {
