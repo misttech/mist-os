@@ -21,11 +21,14 @@ use {
     fuchsia_audio::device::Selector,
     fuchsia_zircon_status::Status,
     futures::{AsyncWrite, FutureExt},
+    prettytable::Table,
     serde::Serialize,
     std::io::Read,
 };
 
+mod info;
 pub mod list;
+mod serde_ext;
 
 use list::QueryExt;
 
@@ -33,7 +36,7 @@ use list::QueryExt;
 pub enum DeviceResult {
     Play(ffx_audio_common::PlayResult),
     Record(ffx_audio_common::RecordResult),
-    Info(ffx_audio_common::device_info::DeviceInfoResult),
+    Info(info::InfoResult),
     List(list::ListResult),
 }
 
@@ -163,11 +166,16 @@ async fn device_info(
         .bug_context("Failed to get device info")?;
 
     let device_info = info.device_info.ok_or_else(|| bug!("DeviceInfo missing from response."))?;
-    let device_info_result =
-        ffx_audio_common::device_info::DeviceInfoResult::from((device_info, selector));
-    let device_result = DeviceResult::Info(device_info_result.clone());
 
-    writer.machine_or_else(&device_result, || format!("{}", device_info_result))?;
+    let info_result = info::InfoResult::from((device_info, selector));
+    let result = DeviceResult::Info(info_result.clone());
+
+    if writer.is_machine() {
+        writer.machine(&result)?;
+    } else {
+        let table = Table::from(info_result);
+        table.print(&mut writer).bug_context("failed to write output")?;
+    }
 
     Ok(())
 }
@@ -500,14 +508,31 @@ mod tests {
         result.unwrap();
 
         let stdout = test_buffers.into_stdout_str();
-        let stdout_expected = format!(
-            "{{\"Info\":{{\"device_path\":\"/dev/class/audio-input/abc123\",\
+        let stdout_expected = "{\"Info\":{\
+            \"device_path\":\"/dev/class/audio-input/abc123\",\
+            \"unique_id\":\"000102030405060708090a0b0c0d0e0f\",\
             \"manufacturer\":\"Spacely Sprockets\",\"product_name\":\"Test Microphone\",\
-            \"current_gain_db\":null,\"mute_state\":null,\"agc_state\":null,\"min_gain\":-32.0,\
-            \"max_gain\":60.0,\"gain_step\":0.5,\"can_mute\":true,\"can_agc\":true,\
-            \"plugged\":null,\"plug_time\":null,\"pd_caps\":null,\"supported_formats\":null,\
-            \"unique_id\":\"00010203040506-08090a0b0c0d0e\",\"clock_domain\":null}}}}\n"
-        );
+            \"gain_state\":null,\
+            \"gain_capabilities\":{\
+                \"min_gain_db\":-32.0,\
+                \"max_gain_db\":60.0,\
+                \"gain_step_db\":0.5,\
+                \"can_mute\":true,\
+                \"can_agc\":true\
+            },\
+            \"plug_state\":null,\
+            \"plug_time\":null,\
+            \"plug_detect_capabilities\":null,\
+            \"clock_domain\":null,\
+            \"supported_ring_buffer_formats\":[\
+                {\"channel_sets\":[\
+                    {\"attributes\":[{\"min_frequency\":null,\"max_frequency\":null}]},\
+                    {\"attributes\":[{\"min_frequency\":null,\"max_frequency\":null},\
+                                     {\"min_frequency\":null,\"max_frequency\":null}]}\
+                ],\
+                \"sample_types\":[\"int16\"],\
+                \"frame_rates\":[16000,22050,32000,44100,48000,88200,96000]}\
+            ]}}\n";
 
         assert_eq!(stdout, stdout_expected);
 
@@ -530,14 +555,12 @@ mod tests {
         result.unwrap();
 
         let stdout = test_buffers.into_stdout_str();
-        let stdout_expected = format!(
-            "{{\"Info\":{{\"device_path\":\"/dev/class/audio-composite/abc123\",\
-            \"manufacturer\":null,\"product_name\":null,\
-            \"current_gain_db\":null,\"mute_state\":null,\"agc_state\":null,\"min_gain\":null,\
-            \"max_gain\":null,\"gain_step\":null,\"can_mute\":null,\"can_agc\":null,\
-            \"plugged\":null,\"plug_time\":null,\"pd_caps\":null,\"supported_formats\":null,\
-            \"unique_id\":null,\"clock_domain\":0}}}}\n"
-        );
+        let stdout_expected = "\
+            {\"Info\":{\"device_path\":\"/dev/class/audio-composite/abc123\",\
+            \"unique_id\":null,\"manufacturer\":null,\"product_name\":null,\
+            \"gain_state\":null,\"gain_capabilities\":null,\"plug_state\":null,\
+            \"plug_time\":null,\"plug_detect_capabilities\":null,\"clock_domain\":0,\
+            \"supported_ring_buffer_formats\":null}}\n";
 
         assert_eq!(stdout, stdout_expected);
 

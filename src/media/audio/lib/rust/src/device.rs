@@ -303,6 +303,211 @@ impl From<fadevice::Info> for Info {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct UniqueInstanceId(pub [u8; fadevice::UNIQUE_INSTANCE_ID_SIZE as usize]);
+
+impl Display for UniqueInstanceId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for byte in self.0 {
+            write!(f, "{:02x}", byte)?;
+        }
+        Ok(())
+    }
+}
+
+impl From<[u8; fadevice::UNIQUE_INSTANCE_ID_SIZE as usize]> for UniqueInstanceId {
+    fn from(value: [u8; fadevice::UNIQUE_INSTANCE_ID_SIZE as usize]) -> Self {
+        Self(value)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PlugDetectCapabilities(pub fadevice::PlugDetectCapabilities);
+
+impl Display for PlugDetectCapabilities {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self.0 {
+            fadevice::PlugDetectCapabilities::Hardwired => "Hardwired",
+            fadevice::PlugDetectCapabilities::Pluggable => "Pluggable (can async notify)",
+            _ => "<unknown>",
+        };
+        f.write_str(s)
+    }
+}
+
+impl From<fadevice::PlugDetectCapabilities> for PlugDetectCapabilities {
+    fn from(value: fadevice::PlugDetectCapabilities) -> Self {
+        Self(value)
+    }
+}
+
+impl From<PlugDetectCapabilities> for fadevice::PlugDetectCapabilities {
+    fn from(value: PlugDetectCapabilities) -> Self {
+        value.0
+    }
+}
+
+impl From<fhaudio::PlugDetectCapabilities> for PlugDetectCapabilities {
+    fn from(value: fhaudio::PlugDetectCapabilities) -> Self {
+        let plug_detect_caps = match value {
+            fhaudio::PlugDetectCapabilities::Hardwired => {
+                fadevice::PlugDetectCapabilities::Hardwired
+            }
+            fhaudio::PlugDetectCapabilities::CanAsyncNotify => {
+                fadevice::PlugDetectCapabilities::Pluggable
+            }
+        };
+        Self(plug_detect_caps)
+    }
+}
+
+impl TryFrom<PlugDetectCapabilities> for fhaudio::PlugDetectCapabilities {
+    type Error = String;
+
+    fn try_from(value: PlugDetectCapabilities) -> Result<Self, Self::Error> {
+        match value.0 {
+            fadevice::PlugDetectCapabilities::Hardwired => Ok(Self::Hardwired),
+            fadevice::PlugDetectCapabilities::Pluggable => Ok(Self::CanAsyncNotify),
+            _ => Err("unsupported PlugDetectCapabilities value".to_string()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PlugState(pub fadevice::PlugState);
+
+impl Display for PlugState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self.0 {
+            fadevice::PlugState::Plugged => "Plugged",
+            fadevice::PlugState::Unplugged => "Unplugged",
+            _ => "<unknown>",
+        };
+        f.write_str(s)
+    }
+}
+
+impl From<fadevice::PlugState> for PlugState {
+    fn from(value: fadevice::PlugState) -> Self {
+        Self(value)
+    }
+}
+
+impl From<PlugState> for fadevice::PlugState {
+    fn from(value: PlugState) -> Self {
+        value.0
+    }
+}
+
+impl TryFrom<fhaudio::PlugState> for PlugState {
+    type Error = String;
+
+    fn try_from(value: fhaudio::PlugState) -> Result<Self, Self::Error> {
+        let plugged = value.plugged.ok_or_else(|| "missing 'plugged'".to_string())?;
+        let plug_state =
+            if plugged { fadevice::PlugState::Plugged } else { fadevice::PlugState::Unplugged };
+        Ok(Self(plug_state))
+    }
+}
+
+// TODO(https://fxbug.dev/102027): Remove legacy gain aspects once driver API does.
+// Going forward, gain will be handled by `SignalProcessing`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GainState {
+    pub gain_db: f32,
+    pub muted: Option<bool>,
+    pub agc_enabled: Option<bool>,
+}
+
+impl TryFrom<fadevice::GainState> for GainState {
+    type Error = String;
+
+    fn try_from(value: fadevice::GainState) -> Result<Self, Self::Error> {
+        Ok(Self {
+            gain_db: value.gain_db.ok_or_else(|| "missing 'gain_db'".to_string())?,
+            muted: value.muted,
+            agc_enabled: value.agc_enabled,
+        })
+    }
+}
+
+impl TryFrom<fhaudio::GainState> for GainState {
+    type Error = String;
+
+    fn try_from(value: fhaudio::GainState) -> Result<Self, Self::Error> {
+        Ok(Self {
+            gain_db: value.gain_db.ok_or_else(|| "missing 'gain_db'".to_string())?,
+            muted: value.muted,
+            agc_enabled: value.agc_enabled,
+        })
+    }
+}
+
+// TODO(https://fxbug.dev/102027): Remove legacy gain aspects once driver API does.
+// Going forward, gain will be handled by `SignalProcessing`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GainCapabilities {
+    pub min_gain_db: f32,
+    pub max_gain_db: f32,
+    pub gain_step_db: f32,
+    pub can_mute: Option<bool>,
+    pub can_agc: Option<bool>,
+}
+
+impl TryFrom<fadevice::GainCapabilities> for GainCapabilities {
+    type Error = String;
+
+    fn try_from(value: fadevice::GainCapabilities) -> Result<Self, Self::Error> {
+        Ok(Self {
+            min_gain_db: value.min_gain_db.ok_or_else(|| "missing 'min_gain_db'".to_string())?,
+            max_gain_db: value.max_gain_db.ok_or_else(|| "missing 'max_gain_db'".to_string())?,
+            gain_step_db: value.gain_step_db.ok_or_else(|| "missing 'gain_step_db'".to_string())?,
+            can_mute: value.can_mute,
+            can_agc: value.can_agc,
+        })
+    }
+}
+
+impl TryFrom<&fhaudio::StreamProperties> for GainCapabilities {
+    type Error = String;
+
+    fn try_from(value: &fhaudio::StreamProperties) -> Result<Self, Self::Error> {
+        Ok(Self {
+            min_gain_db: value.min_gain_db.ok_or_else(|| "missing 'min_gain_db'".to_string())?,
+            max_gain_db: value.max_gain_db.ok_or_else(|| "missing 'max_gain_db'".to_string())?,
+            gain_step_db: value.gain_step_db.ok_or_else(|| "missing 'gain_step_db'".to_string())?,
+            can_mute: value.can_mute,
+            can_agc: value.can_agc,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ClockDomain(pub fhaudio::ClockDomain);
+
+impl Display for ClockDomain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)?;
+        match self.0 {
+            fhaudio::CLOCK_DOMAIN_MONOTONIC => f.write_str(" (monotonic)"),
+            fhaudio::CLOCK_DOMAIN_EXTERNAL => f.write_str(" (external)"),
+            _ => Ok(()),
+        }
+    }
+}
+
+impl From<fhaudio::ClockDomain> for ClockDomain {
+    fn from(value: fhaudio::ClockDomain) -> Self {
+        Self(value)
+    }
+}
+
+impl From<ClockDomain> for fhaudio::ClockDomain {
+    fn from(value: ClockDomain) -> Self {
+        value.0
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum ListDevfsError {
     #[error("Failed to open directory {}: {:?}", name, err)]
@@ -572,5 +777,15 @@ mod test {
                 Info::from(fadevice::Info { token_id: Some(3), ..Default::default() }),
             ]
         );
+    }
+
+    #[test]
+    fn test_unique_instance_id_display() {
+        let id = UniqueInstanceId([
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
+            0x0e, 0x0f,
+        ]);
+        let expected = "000102030405060708090a0b0c0d0e0f";
+        assert_eq!(id.to_string(), expected);
     }
 }

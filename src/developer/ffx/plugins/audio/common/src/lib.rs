@@ -15,7 +15,6 @@ use {
     std::io::{BufRead, ErrorKind},
 };
 
-pub mod device_info;
 pub mod ffxtool;
 
 #[derive(Debug, Serialize, PartialEq, Deserialize)]
@@ -156,7 +155,7 @@ pub mod tests {
         DeviceControlRequest, DeviceInfo, DeviceSelector, RecorderRequest, StreamConfigDeviceInfo,
     };
     use fidl_fuchsia_audio_device as fadevice;
-    use fidl_fuchsia_hardware_audio::{CompositeProperties, StreamProperties, SupportedFormats};
+    use fidl_fuchsia_hardware_audio as fhaudio;
     use fuchsia_audio::stop_listener;
     use futures::AsyncWriteExt;
     use timeout::timeout;
@@ -198,9 +197,10 @@ pub mod tests {
                     let result = match devfs.device_type {
                         fadevice::DeviceType::Input | fadevice::DeviceType::Output => {
                             let stream_device_info = StreamConfigDeviceInfo {
-                                stream_properties: Some(StreamProperties {
+                                stream_properties: Some(fhaudio::StreamProperties {
                                     unique_id: Some([
-                                        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+                                        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
+                                        0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
                                     ]),
                                     is_input: Some(true),
                                     can_mute: Some(true),
@@ -214,8 +214,33 @@ pub mod tests {
                                     clock_domain: Some(2),
                                     ..Default::default()
                                 }),
-                                supported_formats: Some(vec![SupportedFormats {
-                                    pcm_supported_formats: None,
+                                supported_formats: Some(vec![fhaudio::SupportedFormats {
+                                    pcm_supported_formats: Some(fhaudio::PcmSupportedFormats {
+                                        channel_sets: Some(vec![
+                                            fhaudio::ChannelSet {
+                                                attributes: Some(vec![
+                                                    fhaudio::ChannelAttributes::default(),
+                                                ]),
+                                                ..Default::default()
+                                            },
+                                            fhaudio::ChannelSet {
+                                                attributes: Some(vec![
+                                                    fhaudio::ChannelAttributes::default(),
+                                                    fhaudio::ChannelAttributes::default(),
+                                                ]),
+                                                ..Default::default()
+                                            },
+                                        ]),
+                                        sample_formats: Some(vec![
+                                            fhaudio::SampleFormat::PcmSigned,
+                                        ]),
+                                        bytes_per_sample: Some(vec![2]),
+                                        valid_bits_per_sample: Some(vec![16]),
+                                        frame_rates: Some(vec![
+                                            16000, 22050, 32000, 44100, 48000, 88200, 96000,
+                                        ]),
+                                        ..Default::default()
+                                    }),
                                     ..Default::default()
                                 }]),
                                 gain_state: None,
@@ -226,7 +251,7 @@ pub mod tests {
                         }
                         fadevice::DeviceType::Composite => {
                             let composite_device_info = CompositeDeviceInfo {
-                                composite_properties: Some(CompositeProperties {
+                                composite_properties: Some(fhaudio::CompositeProperties {
                                     clock_domain: Some(0),
                                     ..Default::default()
                                 }),

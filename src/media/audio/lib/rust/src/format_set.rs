@@ -129,35 +129,40 @@ impl TryFrom<fadevice::PcmFormatSet> for PcmFormatSet {
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
-pub struct ChannelAttributes(pub fadevice::ChannelAttributes);
+pub struct ChannelAttributes {
+    /// Minimum frequency, in hertz.
+    pub min_frequency: Option<u32>,
+    /// Maximum frequency, in hertz.
+    pub max_frequency: Option<u32>,
+}
 
 impl From<fadevice::ChannelAttributes> for ChannelAttributes {
     fn from(value: fadevice::ChannelAttributes) -> Self {
-        Self(value)
+        Self { min_frequency: value.min_frequency, max_frequency: value.max_frequency }
     }
 }
 
 impl From<ChannelAttributes> for fadevice::ChannelAttributes {
     fn from(value: ChannelAttributes) -> Self {
-        value.0
+        fadevice::ChannelAttributes {
+            min_frequency: value.min_frequency,
+            max_frequency: value.max_frequency,
+            ..Default::default()
+        }
     }
 }
 
 impl From<fhaudio::ChannelAttributes> for ChannelAttributes {
     fn from(value: fhaudio::ChannelAttributes) -> Self {
-        Self(fadevice::ChannelAttributes {
-            min_frequency: value.min_frequency,
-            max_frequency: value.max_frequency,
-            ..Default::default()
-        })
+        Self { min_frequency: value.min_frequency, max_frequency: value.max_frequency }
     }
 }
 
 impl From<ChannelAttributes> for fhaudio::ChannelAttributes {
     fn from(value: ChannelAttributes) -> Self {
         Self {
-            min_frequency: value.0.min_frequency,
-            max_frequency: value.0.max_frequency,
+            min_frequency: value.min_frequency,
+            max_frequency: value.max_frequency,
             ..Default::default()
         }
     }
@@ -165,7 +170,7 @@ impl From<ChannelAttributes> for fhaudio::ChannelAttributes {
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct ChannelSet {
-    attributes: Vec<ChannelAttributes>,
+    pub attributes: Vec<ChannelAttributes>,
 }
 
 impl ChannelSet {
