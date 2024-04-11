@@ -13,7 +13,7 @@ async fn accessor_truncation_test() {
     let puppets = itertools::iproduct!(0..3, letters.iter())
         .map(|(i, x)| test_topology::PuppetDeclBuilder::new(format!("child_{x}{i}")).into())
         .collect();
-    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         puppets: Some(puppets),
         ..Default::default()
     })

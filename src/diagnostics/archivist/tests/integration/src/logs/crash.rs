@@ -19,7 +19,7 @@ async fn logs_from_crashing_component() -> Result<(), anyhow::Error> {
         format!("realm_factory/realm_builder:{REALM_NAME}/test/{PUPPET_NAME}");
 
     // Create the test realm.
-    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         realm_name: Some(REALM_NAME.to_string()),
         puppets: Some(vec![test_topology::PuppetDeclBuilder::new(PUPPET_NAME).into()]),
         ..Default::default()

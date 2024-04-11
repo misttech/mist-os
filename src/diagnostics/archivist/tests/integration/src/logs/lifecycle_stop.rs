@@ -17,7 +17,7 @@ const PUPPET_NAME: &str = "puppet";
 
 #[fuchsia::test]
 async fn embedding_stop_api_for_log_listener() {
-    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         puppets: Some(vec![test_topology::PuppetDeclBuilder::new(PUPPET_NAME).into()]),
         ..Default::default()
     })
@@ -82,7 +82,7 @@ async fn embedding_stop_api_for_log_listener() {
 
 #[fuchsia::test]
 async fn embedding_stop_api_works_for_batch_iterator() {
-    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         puppets: Some(vec![test_topology::PuppetDeclBuilder::new(PUPPET_NAME).into()]),
         ..Default::default()
     })

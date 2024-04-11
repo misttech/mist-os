@@ -26,11 +26,11 @@ pub struct Options {
 /// Creates a new test realm with an archivist inside.
 /// `options_fn` is called with a default RealmOptions struct and can modify any options
 /// before the realm is created.
-pub async fn create_realm(options: &ftest::RealmOptions) -> Result<RealmProxyClient> {
+pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmProxyClient> {
     let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
     let (client, server) = create_endpoints::<fharness::RealmProxy_Marker>();
     realm_factory
-        .create_realm(options, server)
+        .create_realm(&options, server)
         .await?
         .map_err(realm_proxy_client::Error::OperationError)?;
     Ok(RealmProxyClient::from(client))

@@ -18,7 +18,7 @@ async fn set_interest() {
     const REALM_NAME: &str = "set_interest";
     const PUPPET_MONIKER: &str = PUPPET_NAME;
 
-    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         realm_name: Some(REALM_NAME.to_string()),
         puppets: Some(vec![test_topology::PuppetDeclBuilder::new(PUPPET_NAME).into()]),
         ..Default::default()
@@ -167,7 +167,7 @@ async fn set_interest_before_startup() {
 
     // Create the test realm.
     // We won't connect to the puppet until after we've configured logging interest.
-    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         realm_name: Some(REALM_NAME.to_string()),
         puppets: Some(vec![test_topology::PuppetDeclBuilder::new(PUPPET_NAME).into()]),
         ..Default::default()

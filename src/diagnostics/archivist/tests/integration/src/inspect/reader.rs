@@ -37,7 +37,7 @@ lazy_static! {
 
 #[fuchsia::test]
 async fn read_components_inspect() {
-    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         puppets: Some(vec![test_topology::PuppetDeclBuilder::new("child").into()]),
         ..Default::default()
     })
@@ -67,7 +67,7 @@ async fn read_components_inspect() {
 
 #[fuchsia::test]
 async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
-    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         realm_name: Some("hanging_lazy".to_string()),
         puppets: Some(vec![test_topology::PuppetDeclBuilder::new("hanging_data").into()]),
         ..Default::default()
@@ -103,7 +103,7 @@ async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn read_components_single_selector() -> Result<(), Error> {
-    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         puppets: Some(vec![
             test_topology::PuppetDeclBuilder::new("child_a").into(),
             test_topology::PuppetDeclBuilder::new("child_b").into(),
@@ -142,7 +142,7 @@ async fn read_components_single_selector() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn unified_reader() -> Result<(), Error> {
-    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         puppets: Some(vec![test_topology::PuppetDeclBuilder::new("puppet").into()]),
         ..Default::default()
     })
@@ -201,7 +201,7 @@ async fn unified_reader() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn feedback_canonical_reader_test() -> Result<(), Error> {
-    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         puppets: Some(vec![test_topology::PuppetDeclBuilder::new("test_component").into()]),
         archivist_config: Some(ftest::ArchivistConfig {
             pipelines_path: Some("/pkg/data/config/pipelines/feedback_filtered".to_string()),
@@ -253,7 +253,7 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn feedback_disabled_pipeline() -> Result<(), Error> {
-    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         puppets: Some(vec![test_topology::PuppetDeclBuilder::new("test_component").into()]),
         archivist_config: Some(ftest::ArchivistConfig {
             pipelines_path: Some(
@@ -276,7 +276,7 @@ async fn feedback_disabled_pipeline() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn feedback_pipeline_missing_selectors() -> Result<(), Error> {
-    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         puppets: Some(vec![test_topology::PuppetDeclBuilder::new("test_component").into()]),
         archivist_config: Some(ftest::ArchivistConfig::default()),
         ..Default::default()
@@ -294,7 +294,7 @@ async fn feedback_pipeline_missing_selectors() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn lowpan_canonical_reader_test() -> Result<(), Error> {
-    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         puppets: Some(vec![test_topology::PuppetDeclBuilder::new("test_component").into()]),
         archivist_config: Some(ftest::ArchivistConfig {
             pipelines_path: Some("/pkg/data/config/pipelines/lowpan_filtered".to_string()),
