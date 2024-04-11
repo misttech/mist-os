@@ -5,7 +5,7 @@
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Data, DeriveInput};
+use syn::{parse_macro_input, DeriveInput, FieldsNamed};
 
 #[proc_macro_derive(SupportsFileRelativePaths, attributes(file_relative_paths))]
 pub fn supports_file_relative_paths_derive(
@@ -23,8 +23,23 @@ fn derive_impl(input: DeriveInput) -> proc_macro::TokenStream {
     let generics = input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    let fields_for_resolve = handle_fields(&input.data, Operation::Resolve);
-    let fields_for_relative = handle_fields(&input.data, Operation::MakeFileRelative);
+    let ImplementationStreams {
+        resolve: resolve_implementation,
+        relative: relative_implementation,
+    } = match &input.data {
+        syn::Data::Struct(data) => match &data.fields {
+            syn::Fields::Named(fields) => handle_struct_with_named_fields(fields),
+            _ => {
+                panic!("Deriving SupportsFileRelativePaths is only supported for structs with named fields");
+            }
+        },
+        syn::Data::Enum(_) => {
+            panic!("Enums are not supported by the SupportsFileRelativePaths derive macro.")
+        }
+        syn::Data::Union(_) => {
+            panic!("Unions are not supported by the SupportsFileRelativePaths derive macro.")
+        }
+    };
 
     // Create the start of the implementation of the 'SupportsFileRelativePaths'
     // trait.  This will be added to in pieces.
@@ -32,22 +47,31 @@ fn derive_impl(input: DeriveInput) -> proc_macro::TokenStream {
         // The generated impl.
         impl #impl_generics assembly_file_relative_path::SupportsFileRelativePaths for #name #ty_generics #where_clause {
           fn resolve_paths_from_dir(self, dir_path: impl AsRef<camino::Utf8Path>) -> anyhow::Result<Self> {
-            Ok( Self {
-              #fields_for_resolve
-            })
+            Ok( #resolve_implementation )
           }
 
           fn make_paths_relative_to_dir(
             self,
             dir_path: impl AsRef<camino::Utf8Path>,
           ) -> anyhow::Result<Self> {
-            Ok( Self {
-              #fields_for_relative
-            })
+            Ok( #relative_implementation )
           }
         }
     };
+
     proc_macro::TokenStream::from(expanded)
+}
+
+struct ImplementationStreams {
+    resolve: TokenStream,
+    relative: TokenStream,
+}
+
+fn handle_struct_with_named_fields(fields: &FieldsNamed) -> ImplementationStreams {
+    ImplementationStreams {
+        resolve: handle_named_fields(fields, Operation::Resolve),
+        relative: handle_named_fields(fields, Operation::MakeFileRelative),
+    }
 }
 
 enum Operation {
@@ -55,25 +79,10 @@ enum Operation {
     MakeFileRelative,
 }
 
-fn handle_fields(data: &Data, operation: Operation) -> TokenStream {
+fn handle_named_fields(fields: &FieldsNamed, operation: Operation) -> TokenStream {
     let file_relative_path_buf_type = syn::parse_str::<syn::Type>("FileRelativePathBuf").unwrap();
 
-    let named = &match data {
-        syn::Data::Struct(data) => {
-            match &data.fields {
-              syn::Fields::Named(fields) => fields,
-                _ => {panic!("Deriving SupportsFileRelativePaths is only supported for structs with named fields");}
-            }
-        }
-        syn::Data::Enum(_) => {
-            panic!("Enums are not supported by the SupportsFileRelativePaths derive macro.")
-        }
-        syn::Data::Union(_) => {
-            panic!("Unions are not supported by the SupportsFileRelativePaths derive macro.")
-        }
-    }.named;
-
-    TokenStream::from_iter(named.into_iter().map(|field| {
+    let inner = TokenStream::from_iter(fields.named.iter().map(|field| {
         let name = &field.ident;
 
         if field.ty == file_relative_path_buf_type {
@@ -112,5 +121,6 @@ fn handle_fields(data: &Data, operation: Operation) -> TokenStream {
           }
         }
       }
-    ))
+    ));
+    quote! { Self{ #inner }}
 }
