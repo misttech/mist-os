@@ -2147,7 +2147,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
                 mock_call.assert_called_once()
                 mock_cleanup.assert_not_called()
 
-    def test_flag_forwarding_pass_through(self):
+    def test_flag_forwarding_pass_through_remote(self):
         # RemoteAction construction no longer forwards --remote-* flags;
         # that responsibility has been moved to
         # remote_action.forward_remote_flags().
@@ -2158,7 +2158,28 @@ class RemoteActionConstructionTests(unittest.TestCase):
         ]
         action = self._make_remote_action(command=command)
         self.assertEqual(action.local_only_command, command)
+        self.assertEqual(action.local_only_flags, [])
         self.assertEqual(action.options, [])
+
+    def test_local_only_flag_forwarding(self):
+        local_file = Path("local_preamble.txt")
+        command = [
+            "cat",
+            f"--local-only={local_file}",
+            "main.txt",
+        ]
+        output_files = [Path("out/banner.txt")]
+        action = self._make_remote_action(
+            command=command, output_files=output_files
+        )
+        self.assertEqual(action.local_only_command, command)
+        self.assertEqual(action.local_only_flags, [str(local_file)])
+        self.assertIn(str(local_file), action.local_wrapper_text)
+        self.assertEqual(action.options, [])
+        rewrapper_prefix = list(action._generate_remote_command_prefix())
+        # --local-only options are sifted into the --local_wrapper script,
+        # which is generated and cleaned up.
+        self.assertIn("--local_wrapper=./out/banner.local.sh", rewrapper_prefix)
 
     def test_relativize_local_deps(self):
         exec_root = Path("/exec/root")

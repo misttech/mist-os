@@ -20,6 +20,7 @@ import multiprocessing
 import os
 import re
 import subprocess
+import stat
 import sys
 
 import fuchsia
@@ -878,6 +879,17 @@ def download_from_stub_path(
         )
 
 
+_FORWARDED_LOCAL_FLAGS = cl_utils.FlagForwarder(
+    [
+        cl_utils.ForwardedFlag(
+            name="--local-only",
+            has_optarg=True,
+            mapped_name="",
+        ),
+    ]
+)
+
+
 class RemoteAction(object):
     """RemoteAction represents a command that is to be executed remotely."""
 
@@ -973,10 +985,11 @@ class RemoteAction(object):
         self._exec_root = (exec_root or PROJECT_ROOT).absolute()
         # Parse and strip out --remote-* flags from command.
         # Hide --local-only options from remote execution, so they don't affect
-        # the command_digest.
-        self._remote_only_command = list(
-            cl_utils.filter_out_option_with_arg(command, "--local-only")
-        )
+        # the command_digest, but then add them back though --local_wrapper.
+        (
+            self._local_only_flags,
+            self._remote_only_command,
+        ) = _FORWARDED_LOCAL_FLAGS.sift(command)
         self._remote_disable = disable
         self._verbose = verbose
         self._label = label
@@ -1115,6 +1128,24 @@ class RemoteAction(object):
         All of the --remote-* flags have been removed at this point.
         """
         return cl_utils.auto_env_prefix_command(self._local_only_command)
+
+    @property
+    def local_only_flags(self) -> Sequence[str]:
+        return self._local_only_flags
+
+    @property
+    def local_wrapper_text(self) -> str:
+        local_flags_text = cl_utils.command_quoted_str(self.local_only_flags)
+        return f"""#!/bin/sh
+base="$(basename $0)"
+cmd=( "$@" {local_flags_text} )
+# echo "[$base]:" "${{cmd[@]}}"
+exec "${{cmd[@]}}"
+"""
+
+    @property
+    def local_wrapper_filename(self) -> Path:
+        return self._output_files[0].with_suffix(".local.sh")
 
     @property
     def remote_only_command(self) -> Sequence[str]:
@@ -1315,6 +1346,10 @@ class RemoteAction(object):
                 str(x) for x in self.output_dirs_relative_to_project_root
             )
             yield f"--output_directories={output_dirs}"
+
+        if self.local_only_flags:
+            # Note: this will override previous --local_wrapper options
+            yield f"--local_wrapper=./{self.local_wrapper_filename}"
 
     @property
     def _remote_log_command_prefix(self) -> Sequence[str]:
@@ -1722,6 +1757,14 @@ class RemoteAction(object):
             # Return non-zero to signal that the expected outputs were not
             # produced in this mode.
             return 1
+
+        # If needed, emit a --local_wrapper for local execution based on
+        # --local-only flags seen in the original command.
+        if self.local_only_flags:
+            wrapper = self.local_wrapper_filename
+            wrapper.write_text(self.local_wrapper_text)
+            wrapper.chmod(stat.S_IRWXU)  # chmod u+rwx
+            self._cleanup_files.append(wrapper)
 
         try:
             # If any local execution is involved, we need to make sure
