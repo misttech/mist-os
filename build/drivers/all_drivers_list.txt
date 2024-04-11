@@ -290,7 +290,7 @@
 //src/devices/usb/tests/usb-hci-test:fuchsia_driver
 //src/diagnostics/validator/logs/ddk/log-test-driver:log-test-driver-driver
 //src/graphics/display/drivers/aml-canvas:aml-canvas-driver
-//src/graphics/display/drivers/amlogic-display:amlogic-display-driver
+//src/graphics/display/drivers/amlogic-display:amlogic-display-dfv1-driver
 //src/graphics/display/drivers/coordinator:coordinator-driver
 //src/graphics/display/drivers/goldfish-display:goldfish-display-driver
 //src/graphics/display/drivers/intel-i915:intel-i915-driver

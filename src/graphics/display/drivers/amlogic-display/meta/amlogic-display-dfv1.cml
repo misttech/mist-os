@@ -11,7 +11,7 @@
         runner: "driver",
         bind: "meta/bind/amlogic-display.bindbc",
         colocate: "false",
-        compat: "driver/amlogic-display.so",
+        compat: "driver/amlogic-display-dfv1.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     use: [
