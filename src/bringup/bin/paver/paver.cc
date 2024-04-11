@@ -2,126 +2,111 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/lib/paver/paver.h"
+
+#include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/paver/provider.h>
-#include <lib/svc/outgoing.h>
-#include <lib/svc/service.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/fidl/cpp/wire/server.h>
+#include <zircon/processargs.h>
 #include <zircon/status.h>
 
-#include <iterator>
-
-#include <fbl/algorithm.h>
-
+#include "src/storage/lib/paver/abr-client.h"
+#include "src/storage/lib/paver/astro.h"
+#include "src/storage/lib/paver/device-partitioner.h"
+#include "src/storage/lib/paver/luis.h"
+#include "src/storage/lib/paver/nelson.h"
+#include "src/storage/lib/paver/pave-logging.h"
+#include "src/storage/lib/paver/sherlock.h"
+#include "src/storage/lib/paver/vim3.h"
+#include "src/storage/lib/paver/violet.h"
+#include "src/storage/lib/paver/x64.h"
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
 
-// An instance of a zx_service_provider_t.
-//
-// Includes the |ctx| pointer for the zx_service_provider_t.
-typedef struct zx_service_provider_instance {
-  // The service provider for which this structure is an instance.
-  const zx_service_provider_t* provider;
+class LifecycleServer final : public fidl::WireServer<fuchsia_process_lifecycle::Lifecycle> {
+ public:
+  using FinishedCallback = fit::callback<void(zx_status_t status)>;
+  using ShutdownCallback = fit::callback<void(FinishedCallback)>;
 
-  // The |ctx| pointer returned by the provider's |init| function, if any.
-  void* ctx;
-} zx_service_provider_instance_t;
+  explicit LifecycleServer(ShutdownCallback shutdown) : shutdown_(std::move(shutdown)) {}
 
-static zx_status_t provider_init(zx_service_provider_instance_t* instance) {
-  if (instance->provider->ops->init) {
-    zx_status_t status = instance->provider->ops->init(&instance->ctx);
-    if (status != ZX_OK)
-      return status;
-  }
-  return ZX_OK;
-}
+  void Stop(StopCompleter::Sync& completer) override;
 
-static zx_status_t provider_publish(zx_service_provider_instance_t* instance,
-                                    async_dispatcher_t* dispatcher,
-                                    const fbl::RefPtr<fs::PseudoDir>& dir) {
-  const zx_service_provider_t* provider = instance->provider;
+ private:
+  ShutdownCallback shutdown_;
+};
 
-  if (!provider->services || !provider->ops->connect)
-    return ZX_ERR_INVALID_ARGS;
-
-  for (size_t i = 0; provider->services[i]; ++i) {
-    const char* service_name = provider->services[i];
-    zx_status_t status = dir->AddEntry(
-        service_name,
-        fbl::MakeRefCounted<fs::Service>([instance, dispatcher, service_name](zx::channel request) {
-          return instance->provider->ops->connect(instance->ctx, dispatcher, service_name,
-                                                  request.release());
-        }));
+void LifecycleServer::Stop(StopCompleter::Sync& completer) {
+  LOG("Received shutdown command over lifecycle interface");
+  shutdown_([completer = completer.ToAsync()](zx_status_t status) mutable {
     if (status != ZX_OK) {
-      for (size_t j = 0; j < i; ++j)
-        dir->RemoveEntry(provider->services[j]);
-      return status;
+      ERROR("Shutdown failed: %s", zx_status_get_string(status));
+    } else {
+      LOG("Paver shutdown complete");
     }
-  }
-
-  return ZX_OK;
-}
-
-static void provider_release(zx_service_provider_instance_t* instance) {
-  if (instance->provider->ops->release)
-    instance->provider->ops->release(instance->ctx);
-  instance->ctx = nullptr;
-}
-
-static zx_status_t provider_load(zx_service_provider_instance_t* instance,
-                                 async_dispatcher_t* dispatcher,
-                                 const fbl::RefPtr<fs::PseudoDir>& dir) {
-  if (instance->provider->version != SERVICE_PROVIDER_VERSION) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  zx_status_t status = provider_init(instance);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  status = provider_publish(instance, dispatcher, dir);
-  if (status != ZX_OK) {
-    provider_release(instance);
-    return status;
-  }
-
-  return ZX_OK;
+    completer.Close(status);
+  });
 }
 
 int main(int argc, char** argv) {
   zx_status_t status = StdoutToDebuglog::Init();
   if (status != ZX_OK) {
-    printf("Failed to redirect stdout to debuglog, assuming test environment and continuing\n");
+    LOG("Failed to redirect stdout to debuglog, assuming test environment and continuing\n");
   }
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();
-  svc::Outgoing outgoing(dispatcher);
+  component::OutgoingDirectory outgoing(dispatcher);
 
-  status = outgoing.ServeFromStartupInfo();
-  if (status != ZX_OK) {
-    fprintf(stderr, "paver: error: Failed to serve outgoing directory: %d (%s).\n", status,
-            zx_status_get_string(status));
+  paver::Paver paver;
+  paver.set_dispatcher(dispatcher);
+
+  // NOTE: Ordering matters!
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::AstroPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::NelsonPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::VioletPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::AstroAbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::NelsonAbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::SherlockAbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::LuisAbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::Vim3AbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::VioletAbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::X64AbrClientFactory>());
+
+  fidl::ServerBindingGroup<fuchsia_paver::Paver> bindings;
+  zx::result result = outgoing.AddUnmanagedProtocol<fuchsia_paver::Paver>(
+      bindings.CreateHandler(&paver, dispatcher, fidl::kIgnoreBindingClosure));
+  if (result.is_error()) {
+    ERROR("paver: error: Failed add paver protocol: %s.\n", result.status_string());
     return 1;
   }
 
-  zx_service_provider_instance_t service_providers[] = {
-      {.provider = paver_get_service_provider(), .ctx = nullptr},
-  };
-
-  for (size_t i = 0; i < std::size(service_providers); ++i) {
-    status = provider_load(&service_providers[i], dispatcher, outgoing.svc_dir());
-    if (status != ZX_OK) {
-      fprintf(stderr, "paver: error: Failed to load service provider %zu: %d (%s).\n", i, status,
-              zx_status_get_string(status));
-      return 1;
-    }
+  result = outgoing.ServeFromStartupInfo();
+  if (result.is_error()) {
+    ERROR("paver: error: Failed to serve outgoing directory: %s.\n", result.status_string());
+    return 1;
   }
 
-  status = loop.Run();
+  zx::channel lifecycle_channel = zx::channel(zx_take_startup_handle(PA_LIFECYCLE));
+  if (!lifecycle_channel.is_valid()) {
+    ERROR("PA_LIFECYCLE startup handle is required.");
+    return 1;
+  }
+  fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle_request(
+      std::move(lifecycle_channel));
 
-  for (size_t i = 0; i < std::size(service_providers); ++i) {
-    provider_release(&service_providers[i]);
+  LifecycleServer lifecycle(fit::bind_member<&paver::Paver::LifecycleStopCallback>(&paver));
+  fidl::ServerBinding lifecycle_binding(dispatcher, std::move(lifecycle_request), &lifecycle,
+                                        fidl::kIgnoreBindingClosure);
+  if (result.is_error()) {
+    ERROR("paver: error: Failed add paver protocol: %s.\n", result.status_string());
+    return 1;
   }
 
-  return status;
+  return loop.Run();
 }

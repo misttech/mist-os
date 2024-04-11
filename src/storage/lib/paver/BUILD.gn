@@ -21,7 +21,6 @@ source_set("paver-core") {
     "abr-client.cc",
     "device-partitioner.cc",
     "fvm.cc",
-    "lifecycle.cc",
     "partition-client.cc",
     "paver.cc",
     "sparse.cc",
@@ -59,7 +58,6 @@ source_set("paver-core") {
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp",
     "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
-    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
     "//sdk/lib/zbi-format",
     "//src/firmware/lib/abr",
     "//src/lib/uuid",
@@ -182,11 +180,8 @@ source_set("x64") {
 
 # Glob together all paver implementations into a single library until we can compose ZBI via
 # packages.
-zx_library("paver") {
-  sdk = "source"
-  sdk_headers = [ "lib/paver/provider.h" ]
-  sources = [ "provider.cc" ]
-  deps = [
+source_set("paver") {
+  public_deps = [
     ":astro",
     ":luis",
     ":nelson",
@@ -197,5 +192,4 @@ zx_library("paver") {
     ":x64",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
   ]
-  public_deps = [ "//zircon/system/ulib/svc" ]
 }

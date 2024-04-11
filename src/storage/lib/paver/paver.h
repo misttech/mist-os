@@ -53,7 +53,7 @@ class Paver : public fidl::WireServer<fuchsia_paver::Paver> {
 
   Paver() : context_(std::make_shared<Context>()) {}
 
-  void ListenForLifecycleStop();
+  void LifecycleStopCallback(fit::callback<void(zx_status_t status)> cb);
 
  private:
   // Used for test injection.

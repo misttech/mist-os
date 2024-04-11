@@ -5,7 +5,6 @@
 #include "src/storage/lib/paver/system_shutdown_state.h"
 
 #include <fidl/fuchsia.device.manager/cpp/fidl.h>
-#include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
 
 #include <sdk/lib/component/incoming/cpp/protocol.h>
 

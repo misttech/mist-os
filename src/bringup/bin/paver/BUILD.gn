@@ -7,15 +7,14 @@ import("//build/components.gni")
 executable("paver") {
   sources = [ "paver.cc" ]
   deps = [
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
     "//src/storage/lib/paver",
     "//src/sys/lib/stdout-to-debuglog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/svc",
   ]
-  output_dir = "$root_out_dir/zircon-migrated"
 }
 
 fuchsia_component("component") {

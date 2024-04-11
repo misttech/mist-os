@@ -22,7 +22,6 @@
 #include <string.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
-#include <zircon/processargs.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/system/public/zircon/errors.h>
@@ -40,7 +39,6 @@
 
 #include "src/storage/lib/paver/device-partitioner.h"
 #include "src/storage/lib/paver/fvm.h"
-#include "src/storage/lib/paver/lifecycle.h"
 #include "src/storage/lib/paver/partition-client.h"
 #include "src/storage/lib/paver/pave-logging.h"
 #include "src/storage/lib/paver/sparse.h"
@@ -326,9 +324,9 @@ zx::result<> PartitionPave(const DevicePartitioner& partitioner, zx::vmo payload
   // the block server can deadlock due to a read fault, putting the device in an unrecoverable
   // state.
   //
-  // TODO(https://fxbug.dev/42124970): If it's possible for payload_vmo to be a root pager-backed VMO, we will
-  // need to lock it instead of simply committing its pages, to opt it out of eviction. The assert
-  // below verifying that it's a pager-backed clone will need to be removed as well.
+  // TODO(https://fxbug.dev/42124970): If it's possible for payload_vmo to be a root pager-backed
+  // VMO, we will need to lock it instead of simply committing its pages, to opt it out of eviction.
+  // The assert below verifying that it's a pager-backed clone will need to be removed as well.
   zx_info_vmo_t info;
   zx::result status =
       zx::make_result(payload_vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
@@ -882,42 +880,24 @@ void Paver::FindSysconfig(fidl::ServerEnd<fuchsia_paver::Sysconfig> sysconfig) {
                   std::move(sysconfig));
 }
 
-void Paver::ListenForLifecycleStop() {
-  ZX_ASSERT(dispatcher_);
-  zx::channel lifecycle_channel = zx::channel(zx_take_startup_handle(PA_LIFECYCLE));
-  if (!lifecycle_channel.is_valid()) {
-    ERROR("PA_LIFECYCLE startup handle is required.");
-    return;
+void Paver::LifecycleStopCallback(fit::callback<void(zx_status_t status)> cb) {
+  LOG("Lifecycle stop request received.");
+
+  if (!svc_root_) {
+    svc_root_ = OpenServiceRoot();
   }
 
-  fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle(std::move(lifecycle_channel));
-  if (!lifecycle.is_valid()) {
-    LOG("No valid handle found for lifecycle events, assuming test environment and continuing");
+  zx::result partitioner = DevicePartitionerFactory::Create(devfs_root_.duplicate(), svc_root_,
+                                                            GetCurrentArch(), context_);
+  if (partitioner.is_error()) {
+    ERROR("Unable to initialize a partitioner: %s.\n", partitioner.status_string());
     return;
   }
-
-  LifecycleServer::Create(
-      dispatcher_,
-      [this](fit::callback<void(zx_status_t status)> cb) {
-        LOG("Lifecycle stop request received.");
-
-        if (!svc_root_) {
-          svc_root_ = OpenServiceRoot();
-        }
-
-        zx::result partitioner = DevicePartitionerFactory::Create(
-            devfs_root_.duplicate(), svc_root_, GetCurrentArch(), context_);
-        if (partitioner.is_error()) {
-          ERROR("Unable to initialize a partitioner: %s.\n", partitioner.status_string());
-          return;
-        }
-        zx::result res = partitioner->OnStop();
-        if (res.is_error()) {
-          ERROR("Failed to process OnStop with partitioner.");
-        }
-        cb(ZX_OK);
-      },
-      std::move(lifecycle));
+  zx::result res = partitioner->OnStop();
+  if (res.is_error()) {
+    ERROR("Failed to process OnStop with partitioner.");
+  }
+  cb(ZX_OK);
 }
 
 }  // namespace paver

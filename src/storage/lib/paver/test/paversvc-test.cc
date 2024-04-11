@@ -19,7 +19,6 @@
 #include <lib/fidl/cpp/wire/string_view.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/paver/provider.h>
 #include <lib/sysconfig/sync-client.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zx/vmo.h>
@@ -32,7 +31,6 @@
 #include <zircon/hw/gpt.h>
 
 #include <memory>
-#include <optional>
 
 #include <fbl/algorithm.h>
 #include <fbl/unique_fd.h>
@@ -40,13 +38,20 @@
 #include <zxtest/zxtest.h>
 
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
-#include "src/storage/lib/fs_management/cpp/format.h"
+#include "src/storage/lib/paver/abr-client.h"
+#include "src/storage/lib/paver/astro.h"
+#include "src/storage/lib/paver/device-partitioner.h"
 #include "src/storage/lib/paver/fvm.h"
 #include "src/storage/lib/paver/gpt.h"
+#include "src/storage/lib/paver/luis.h"
+#include "src/storage/lib/paver/nelson.h"
 #include "src/storage/lib/paver/paver.h"
+#include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/test/test-utils.h"
 #include "src/storage/lib/paver/utils.h"
-#include "src/storage/lib/utils/topological_path.h"
+#include "src/storage/lib/paver/vim3.h"
+#include "src/storage/lib/paver/violet.h"
+#include "src/storage/lib/paver/x64.h"
 
 namespace {
 
@@ -259,7 +264,7 @@ class PaverServiceTest : public zxtest::Test {
     }
   }
 
-  void* provider_ctx_ = nullptr;
+  std::unique_ptr<paver::Paver> paver_;
   fidl::WireSyncClient<fuchsia_paver::Paver> client_;
   async::Loop loop_;
   // The paver makes synchronous calls into /svc, so it must run in a separate loop to not
@@ -276,11 +281,25 @@ PaverServiceTest::PaverServiceTest()
 
   client_ = fidl::WireSyncClient(std::move(client));
 
-  ASSERT_OK(paver_get_service_provider()->ops->init(&provider_ctx_));
+  paver_ = std::make_unique<paver::Paver>();
+  paver_->set_dispatcher(loop_.dispatcher());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::AstroPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::NelsonPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::VioletPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::AstroAbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::NelsonAbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::SherlockAbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::LuisAbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::Vim3AbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::VioletAbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::X64AbrClientFactory>());
 
-  ASSERT_OK(paver_get_service_provider()->ops->connect(
-      provider_ctx_, loop_.dispatcher(), fidl::DiscoverableProtocolName<fuchsia_paver::Paver>,
-      server.TakeChannel().release()));
+  fidl::BindServer(loop_.dispatcher(), std::move(server), paver_.get());
   loop_.StartThread("paver-svc-test-loop");
   loop2_.StartThread("paver-svc-test-loop-2");
 }
@@ -288,8 +307,7 @@ PaverServiceTest::PaverServiceTest()
 PaverServiceTest::~PaverServiceTest() {
   loop_.Shutdown();
   loop2_.Shutdown();
-  paver_get_service_provider()->ops->release(provider_ctx_);
-  provider_ctx_ = nullptr;
+  paver_.reset();
 }
 
 void PaverServiceTest::CreatePayload(size_t num_pages, fuchsia_mem::wire::Buffer* out) {
@@ -314,9 +332,9 @@ class PaverServiceSkipBlockTest : public PaverServiceTest {
   void SpawnIsolatedDevmgr(fuchsia_hardware_nand::wire::RamNandInfo nand_info) {
     ASSERT_EQ(device_.get(), nullptr);
     ASSERT_NO_FATAL_FAILURE(SkipBlockDevice::Create(std::move(nand_info), &device_));
-    static_cast<paver::Paver*>(provider_ctx_)->set_dispatcher(loop_.dispatcher());
-    static_cast<paver::Paver*>(provider_ctx_)->set_devfs_root(device_->devfs_root());
-    static_cast<paver::Paver*>(provider_ctx_)->set_svc_root(std::move(fake_svc_.svc_chan()));
+    paver_->set_dispatcher(loop_.dispatcher());
+    paver_->set_devfs_root(device_->devfs_root());
+    paver_->set_svc_root(std::move(fake_svc_.svc_chan()));
   }
 
   void WaitForDevices() {
@@ -1870,8 +1888,8 @@ class PaverServiceBlockTest : public PaverServiceTest {
 
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/00:00:2d/ramctl")
                   .status_value());
-    static_cast<paver::Paver*>(provider_ctx_)->set_devfs_root(devmgr_.devfs_root().duplicate());
-    static_cast<paver::Paver*>(provider_ctx_)->set_svc_root(std::move(fake_svc_.svc_chan()));
+    paver_->set_devfs_root(devmgr_.devfs_root().duplicate());
+    paver_->set_svc_root(std::move(fake_svc_.svc_chan()));
   }
 
   void UseBlockDevice(DeviceAndController block_device) {
@@ -1959,10 +1977,10 @@ class PaverServiceGptDeviceTest : public PaverServiceTest {
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/00:00:2d/ramctl")
                   .status_value());
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform").status_value());
-    static_cast<paver::Paver*>(provider_ctx_)->set_dispatcher(loop_.dispatcher());
-    static_cast<paver::Paver*>(provider_ctx_)->set_devfs_root(devmgr_.devfs_root().duplicate());
+    paver_->set_dispatcher(loop_.dispatcher());
+    paver_->set_devfs_root(devmgr_.devfs_root().duplicate());
     fidl::ClientEnd<fuchsia_io::Directory> svc_root = GetSvcRoot();
-    static_cast<paver::Paver*>(provider_ctx_)->set_svc_root(std::move(svc_root));
+    paver_->set_svc_root(std::move(svc_root));
   }
 
   void InitializeGptDevice(const char* board_name, uint64_t block_count, uint32_t block_size) {
