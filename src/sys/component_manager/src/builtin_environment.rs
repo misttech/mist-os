@@ -62,7 +62,7 @@ use {
         inspect_sink_provider::InspectSinkProvider,
         model::events::registry::EventSubscription,
         model::{
-            component::ComponentManagerInstance,
+            component::manager::ComponentManagerInstance,
             environment::Environment,
             event_logger::EventLogger,
             events::{

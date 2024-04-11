@@ -6,7 +6,9 @@ use {
     crate::{
         capability::{BuiltinCapability, CapabilityProvider, FrameworkCapability},
         model::{
-            component::{ComponentManagerInstance, WeakComponentInstance, WeakExtendedInstance},
+            component::{
+                manager::ComponentManagerInstance, WeakComponentInstance, WeakExtendedInstance,
+            },
             events::{
                 registry::EventRegistry, source::EventSource, stream_provider::EventStreamProvider,
             },

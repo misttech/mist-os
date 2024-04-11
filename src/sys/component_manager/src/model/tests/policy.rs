@@ -5,7 +5,7 @@
 use {
     crate::model::{
         component::{
-            ComponentInstance, ComponentManagerInstance, WeakComponentInstance,
+            manager::ComponentManagerInstance, ComponentInstance, WeakComponentInstance,
             WeakExtendedInstance,
         },
         context::ModelContext,

@@ -5,7 +5,7 @@
 use {
     crate::model::{
         actions::{ActionKey, DiscoverAction},
-        component::{ComponentInstance, ComponentManagerInstance, StartReason},
+        component::{manager::ComponentManagerInstance, ComponentInstance, StartReason},
         context::ModelContext,
         environment::Environment,
         error::ModelError,

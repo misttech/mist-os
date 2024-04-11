@@ -200,7 +200,7 @@ mod tests {
         super::*,
         crate::model::{
             actions::DiscoverAction,
-            component::{ComponentManagerInstance, WeakExtendedInstance},
+            component::{manager::ComponentManagerInstance, WeakExtendedInstance},
             context::ModelContext,
             environment::Environment,
             hooks::Hooks,

@@ -5,7 +5,8 @@
 use {
     crate::model::{
         component::{
-            ComponentInstance, ComponentManagerInstance, ExtendedInstance, WeakExtendedInstance,
+            manager::ComponentManagerInstance, ComponentInstance, ExtendedInstance,
+            WeakExtendedInstance,
         },
         resolver::{Resolver, ResolverRegistry},
     },
