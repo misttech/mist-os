@@ -98,19 +98,19 @@ pub enum VmoBufferError {
     #[error("Buffer size is invalid; contains incomplete frames")]
     BufferIncompleteFrames,
 
-    #[error("Failed to memory map VMO")]
+    #[error("Failed to memory map VMO: {}", .0)]
     VmoMap(#[source] zx::Status),
 
-    #[error("Failed to get VMO size")]
+    #[error("Failed to get VMO size: {}", .0)]
     VmoGetSize(#[source] zx::Status),
 
-    #[error("Failed to flush VMO memory cache")]
+    #[error("Failed to flush VMO memory cache: {}", .0)]
     VmoFlushCache(#[source] zx::Status),
 
-    #[error("Failed to read from VMO")]
+    #[error("Failed to read from VMO: {}", .0)]
     VmoRead(#[source] zx::Status),
 
-    #[error("Failed to write to VMO")]
+    #[error("Failed to write to VMO: {}", .0)]
     VmoWrite(#[source] zx::Status),
 }
 
