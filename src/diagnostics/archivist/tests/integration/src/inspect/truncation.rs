@@ -2,35 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{constants::*, test_topology};
+use crate::test_topology;
 use diagnostics_reader::{ArchiveReader, Data, Inspect};
+use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
 
 #[fuchsia::test]
 async fn accessor_truncation_test() {
-    let (builder, test_realm) = test_topology::create(test_topology::Options::default())
-        .await
-        .expect("create base topology");
-    for i in 0..3 {
-        test_topology::add_eager_child(
-            &test_realm,
-            &format!("child_a{i}"),
-            IQUERY_TEST_COMPONENT_URL,
-        )
-        .await
-        .expect("add child a");
-        test_topology::add_eager_child(
-            &test_realm,
-            &format!("child_b{i}"),
-            IQUERY_TEST_COMPONENT_URL,
-        )
-        .await
-        .expect("add child b");
+    let letters = ['a', 'b'];
+    let puppets = itertools::iproduct!(0..3, letters.iter())
+        .map(|(i, x)| test_topology::PuppetDeclBuilder::new(format!("child_{x}{i}")).into())
+        .collect();
+    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+        puppets: Some(puppets),
+        ..Default::default()
+    })
+    .await
+    .expect("create base topology");
+
+    for (i, x) in itertools::iproduct!(0..3, letters.iter()) {
+        let puppet =
+            test_topology::connect_to_puppet(&realm_proxy, &format!("child_{x}{i}")).await.unwrap();
+        puppet.emit_example_inspect_data().unwrap();
     }
 
-    let instance = builder.build().await.expect("create instance");
-    let accessor =
-        instance.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
+    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
     let mut reader = ArchiveReader::new();
     reader.with_archive(accessor);
     let data = reader

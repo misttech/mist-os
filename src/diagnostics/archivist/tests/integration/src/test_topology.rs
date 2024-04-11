@@ -38,18 +38,18 @@ pub async fn create_realm(options: &ftest::RealmOptions) -> Result<RealmProxyCli
 
 // Helper type for constructing `PuppetDecl`.
 pub(crate) struct PuppetDeclBuilder {
-    name: &'static str,
+    name: String,
 }
 
 impl PuppetDeclBuilder {
-    pub fn new(name: &'static str) -> Self {
-        Self { name }
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into() }
     }
 }
 
 impl Into<ftest::PuppetDecl> for PuppetDeclBuilder {
     fn into(self) -> ftest::PuppetDecl {
-        ftest::PuppetDecl { name: Some(self.name.to_string()), ..Default::default() }
+        ftest::PuppetDecl { name: Some(self.name), ..Default::default() }
     }
 }
 
