@@ -31,7 +31,7 @@ class Comparator {
  public:
   Comparator(std::string_view compare_file_name, std::ostream& os) : compare_results_(os) {
     std::string golden_file_contents;
-    std::ifstream compare_file(compare_file_name);
+    std::ifstream compare_file(compare_file_name.data());
     golden_file_contents.assign((std::istreambuf_iterator<char>(compare_file)),
                                 (std::istreambuf_iterator<char>()));
     ParseGolden(golden_file_contents);
