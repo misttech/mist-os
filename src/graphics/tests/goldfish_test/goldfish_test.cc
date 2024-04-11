@@ -62,15 +62,11 @@ void SetDefaultCollectionName(fidl::WireSyncClient<fuchsia_sysmem::BufferCollect
 TEST(GoldfishPipeTests, GoldfishPipeTest) {
   zx::result controller = ConnectToPipe();
   ASSERT_EQ(controller.status_value(), ZX_OK);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish::PipeDevice>();
-  ASSERT_EQ(endpoints.status_value(), ZX_OK);
-  auto& [channel, server] = endpoints.value();
+  auto [channel, server] = fidl::Endpoints<fuchsia_hardware_goldfish::PipeDevice>::Create();
 
   ASSERT_EQ(fidl::WireCall(controller.value())->OpenSession(std::move(server)).status(), ZX_OK);
 
-  zx::result pipe_endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish::Pipe>();
-  ASSERT_EQ(pipe_endpoints.status_value(), ZX_OK);
-  auto& [pipe_client, pipe_server] = pipe_endpoints.value();
+  auto [pipe_client, pipe_server] = fidl::Endpoints<fuchsia_hardware_goldfish::Pipe>::Create();
 
   fidl::WireSyncClient pipe_device(std::move(channel));
   ASSERT_EQ(pipe_device->OpenPipe(std::move(pipe_server)).status(), ZX_OK);
@@ -177,16 +173,13 @@ TEST(GoldfishControlTests, GoldfishControlTest) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_EQ(token_endpoints.status_value(), ZX_OK);
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints->server)).status(),
-            ZX_OK);
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
+  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
 
-  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_EQ(collection_endpoints.status_value(), ZX_OK);
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints->client),
-                                       std::move(collection_endpoints->server))
+                ->BindSharedCollection(std::move(token_endpoints.client),
+                                       std::move(collection_endpoints.server))
                 .status(),
             ZX_OK);
 
@@ -206,7 +199,7 @@ TEST(GoldfishControlTests, GoldfishControlTest) {
       .heap_permitted = {fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal}};
 
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
-      std::move(collection_endpoints->client));
+      std::move(collection_endpoints.client));
 
   SetDefaultCollectionName(collection);
   EXPECT_TRUE(collection->SetConstraints(true, std::move(constraints)).ok());
@@ -280,16 +273,13 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisible) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_EQ(token_endpoints.status_value(), ZX_OK);
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints->server)).status(),
-            ZX_OK);
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
+  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
 
-  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_EQ(collection_endpoints.status_value(), ZX_OK);
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints->client),
-                                       std::move(collection_endpoints->server))
+                ->BindSharedCollection(std::move(token_endpoints.client),
+                                       std::move(collection_endpoints.server))
                 .status(),
             ZX_OK);
 
@@ -327,7 +317,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisible) {
   };
 
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
-      std::move(collection_endpoints->client));
+      std::move(collection_endpoints.client));
   SetDefaultCollectionName(collection);
   EXPECT_TRUE(collection->SetConstraints(true, std::move(constraints)).ok());
 
@@ -390,33 +380,30 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisible_MultiClients) {
 
   // Client 0.
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    ASSERT_EQ(allocator->AllocateSharedCollection(std::move(endpoints->server)).status(), ZX_OK);
-    token_client[0] = std::move(endpoints->client);
+    auto endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
+    ASSERT_EQ(allocator->AllocateSharedCollection(std::move(endpoints.server)).status(), ZX_OK);
+    token_client[0] = std::move(endpoints.client);
   }
 
   // Client 1.
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
+    auto endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
     ASSERT_EQ(fidl::WireCall(token_client[0].borrow())
-                  ->Duplicate(0, std::move(endpoints->server))
+                  ->Duplicate(0, std::move(endpoints.server))
                   .status(),
               ZX_OK);
     ASSERT_EQ(fidl::WireCall(token_client[0].borrow())->Sync().status(), ZX_OK);
-    token_client[1] = std::move(endpoints->client);
+    token_client[1] = std::move(endpoints.client);
   }
 
   for (size_t i = 0; i < kNumClients; i++) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
+    auto endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
 
     ASSERT_EQ(
-        allocator->BindSharedCollection(std::move(token_client[i]), std::move(endpoints->server))
+        allocator->BindSharedCollection(std::move(token_client[i]), std::move(endpoints.server))
             .status(),
         ZX_OK);
-    collection_client[i] = std::move(endpoints->client);
+    collection_client[i] = std::move(endpoints.client);
   }
 
   const size_t kMinSizeBytes = 4 * 1024;
@@ -535,16 +522,13 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisibleBuffer) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_EQ(token_endpoints.status_value(), ZX_OK);
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints->server)).status(),
-            ZX_OK);
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
+  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
 
-  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_EQ(collection_endpoints.status_value(), ZX_OK);
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints->client),
-                                       std::move(collection_endpoints->server))
+                ->BindSharedCollection(std::move(token_endpoints.client),
+                                       std::move(collection_endpoints.server))
                 .status(),
             ZX_OK);
 
@@ -567,7 +551,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisibleBuffer) {
   constraints.image_format_constraints_count = 0;
 
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
-      std::move(collection_endpoints->client));
+      std::move(collection_endpoints.client));
   SetDefaultCollectionName(collection);
   EXPECT_TRUE(collection->SetConstraints(true, std::move(constraints)).ok());
 
@@ -622,16 +606,13 @@ TEST(GoldfishControlTests, GoldfishControlTest_DataBuffer) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_EQ(token_endpoints.status_value(), ZX_OK);
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints->server)).status(),
-            ZX_OK);
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
+  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
 
-  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_EQ(collection_endpoints.status_value(), ZX_OK);
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints->client),
-                                       std::move(collection_endpoints->server))
+                ->BindSharedCollection(std::move(token_endpoints.client),
+                                       std::move(collection_endpoints.server))
                 .status(),
             ZX_OK);
 
@@ -652,7 +633,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_DataBuffer) {
       .heap_permitted = {fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal}};
 
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
-      std::move(collection_endpoints->client));
+      std::move(collection_endpoints.client));
   SetDefaultCollectionName(collection);
   EXPECT_TRUE(collection->SetConstraints(true, std::move(constraints)).ok());
 
@@ -787,16 +768,13 @@ TEST(GoldfishControlTests, GoldfishControlTest_CreateColorBuffer2Args) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_EQ(token_endpoints.status_value(), ZX_OK);
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints->server)).status(),
-            ZX_OK);
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
+  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
 
-  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_EQ(collection_endpoints.status_value(), ZX_OK);
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints->client),
-                                       std::move(collection_endpoints->server))
+                ->BindSharedCollection(std::move(token_endpoints.client),
+                                       std::move(collection_endpoints.server))
                 .status(),
             ZX_OK);
 
@@ -819,7 +797,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_CreateColorBuffer2Args) {
       .heap_permitted = {fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal}};
 
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
-      std::move(collection_endpoints->client));
+      std::move(collection_endpoints.client));
   SetDefaultCollectionName(collection);
   EXPECT_TRUE(collection->SetConstraints(true, std::move(constraints)).ok());
 
@@ -924,16 +902,13 @@ TEST(GoldfishControlTests, GoldfishControlTest_CreateBuffer2Args) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_EQ(token_endpoints.status_value(), ZX_OK);
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints->server)).status(),
-            ZX_OK);
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
+  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
 
-  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_EQ(collection_endpoints.status_value(), ZX_OK);
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints->client),
-                                       std::move(collection_endpoints->server))
+                ->BindSharedCollection(std::move(token_endpoints.client),
+                                       std::move(collection_endpoints.server))
                 .status(),
             ZX_OK);
 
@@ -956,7 +931,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_CreateBuffer2Args) {
       .heap_permitted = {fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal}};
 
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
-      std::move(collection_endpoints->client));
+      std::move(collection_endpoints.client));
   SetDefaultCollectionName(collection);
   EXPECT_TRUE(collection->SetConstraints(true, std::move(constraints)).ok());
 
@@ -1024,16 +999,13 @@ TEST(GoldfishControlTests, GoldfishControlTest_GetNotCreatedColorBuffer) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_EQ(token_endpoints.status_value(), ZX_OK);
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints->server)).status(),
-            ZX_OK);
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
+  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
 
-  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_EQ(collection_endpoints.status_value(), ZX_OK);
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints->client),
-                                       std::move(collection_endpoints->server))
+                ->BindSharedCollection(std::move(token_endpoints.client),
+                                       std::move(collection_endpoints.server))
                 .status(),
             ZX_OK);
 
@@ -1053,7 +1025,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_GetNotCreatedColorBuffer) {
       .heap_permitted = {fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal}};
 
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
-      std::move(collection_endpoints->client));
+      std::move(collection_endpoints.client));
   SetDefaultCollectionName(collection);
   EXPECT_TRUE(collection->SetConstraints(true, constraints).ok());
 
@@ -1088,19 +1060,18 @@ TEST(GoldfishAddressSpaceTests, GoldfishAddressSpaceTest) {
   ASSERT_EQ(asd_connection.status_value(), ZX_OK);
   fidl::WireSyncClient asd_parent(std::move(asd_connection.value()));
 
-  zx::result child_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_goldfish::AddressSpaceChildDriver>();
-  EXPECT_EQ(child_endpoints.status_value(), ZX_OK);
+  auto child_endpoints =
+      fidl::Endpoints<fuchsia_hardware_goldfish::AddressSpaceChildDriver>::Create();
   {
     auto result = asd_parent->OpenChildDriver(
         fuchsia_hardware_goldfish::wire::AddressSpaceChildDriverType::kDefault,
-        std::move(child_endpoints->server));
+        std::move(child_endpoints.server));
     ASSERT_TRUE(result.ok());
   }
 
   constexpr uint64_t kHeapSize = 16ULL * 1048576ULL;
 
-  fidl::WireSyncClient asd_child(std::move(child_endpoints->client));
+  fidl::WireSyncClient asd_child(std::move(child_endpoints.client));
   uint64_t paddr = 0;
   zx::vmo vmo;
   {
@@ -1236,20 +1207,17 @@ TEST(GoldfishHostMemoryTests, GoldfishHostVisibleColorBuffer) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_EQ(token_endpoints.status_value(), ZX_OK);
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints->server)).status(),
-            ZX_OK);
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
+  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
 
-  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_EQ(collection_endpoints.status_value(), ZX_OK);
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints->client),
-                                       std::move(collection_endpoints->server))
+                ->BindSharedCollection(std::move(token_endpoints.client),
+                                       std::move(collection_endpoints.server))
                 .status(),
             ZX_OK);
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
-      std::move(collection_endpoints->client));
+      std::move(collection_endpoints.client));
 
   // ----------------------------------------------------------------------//
   // Setup address space driver.
@@ -1257,21 +1225,20 @@ TEST(GoldfishHostMemoryTests, GoldfishHostVisibleColorBuffer) {
   ASSERT_EQ(asd_connection.status_value(), ZX_OK);
   fidl::WireSyncClient asd_parent(std::move(asd_connection.value()));
 
-  zx::result child_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_goldfish::AddressSpaceChildDriver>();
-  EXPECT_EQ(child_endpoints.status_value(), ZX_OK);
+  auto child_endpoints =
+      fidl::Endpoints<fuchsia_hardware_goldfish::AddressSpaceChildDriver>::Create();
 
   {
     auto result = asd_parent->OpenChildDriver(
         fuchsia_hardware_goldfish::wire::AddressSpaceChildDriverType::kDefault,
-        std::move(child_endpoints->server));
+        std::move(child_endpoints.server));
     ASSERT_TRUE(result.ok());
   }
 
   // Allocate device memory block using address space device.
   constexpr uint64_t kHeapSize = 32768ULL;
 
-  fidl::WireSyncClient asd_child(std::move(child_endpoints->client));
+  fidl::WireSyncClient asd_child(std::move(child_endpoints.client));
   uint64_t physical_addr = 0;
   zx::vmo address_space_vmo;
   {
@@ -1397,19 +1364,16 @@ TEST_P(GoldfishCreateColorBufferTest, CreateColorBufferWithFormat) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_EQ(token_endpoints.status_value(), ZX_OK);
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints->server)).status(),
-            ZX_OK);
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
+  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
 
-  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_EQ(collection_endpoints.status_value(), ZX_OK);
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints->client),
-                                       std::move(collection_endpoints->server))
+                ->BindSharedCollection(std::move(token_endpoints.client),
+                                       std::move(collection_endpoints.server))
                 .status(),
             ZX_OK);
-  fidl::WireSyncClient collection(std::move(collection_endpoints->client));
+  fidl::WireSyncClient collection(std::move(collection_endpoints.client));
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
   constraints.usage.vulkan = fuchsia_sysmem::wire::kVulkanImageUsageTransferDst;

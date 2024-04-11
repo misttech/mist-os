@@ -659,8 +659,8 @@ class TestConnection {
     auto start = std::chrono::steady_clock::now();
     EXPECT_EQ(MAGMA_STATUS_TIMED_OUT,
               magma_poll(items.data(), to_uint32(items.size()), ms_to_ns(kTimeoutMs)));
-    // TODO(https://fxbug.dev/42126035) - remove this adjustment for magma_poll timeout truncation in ns to ms
-    // conversion
+    // TODO(https://fxbug.dev/42126035) - remove this adjustment for magma_poll timeout truncation
+    // in ns to ms conversion
     EXPECT_LE(kTimeoutMs - 1, std::chrono::duration_cast<std::chrono::milliseconds>(
                                   std::chrono::steady_clock::now() - start)
                                   .count());
@@ -679,8 +679,8 @@ class TestConnection {
     start = std::chrono::steady_clock::now();
     EXPECT_EQ(MAGMA_STATUS_TIMED_OUT,
               magma_poll(items.data(), to_uint32(items.size()), ms_to_ns(kTimeoutMs)));
-    // TODO(https://fxbug.dev/42126035) - remove this adjustment for magma_poll timeout truncation in ns to ms
-    // conversion
+    // TODO(https://fxbug.dev/42126035) - remove this adjustment for magma_poll timeout truncation
+    // in ns to ms conversion
     EXPECT_LE(kTimeoutMs - 1, std::chrono::duration_cast<std::chrono::milliseconds>(
                                   std::chrono::steady_clock::now() - start)
                                   .count());
@@ -1104,14 +1104,13 @@ class TestConnection {
 
   void TracingInitFake() {
 #if defined(__Fuchsia__)
-    auto endpoints = fidl::CreateEndpoints<fuchsia_tracing_provider::Registry>();
-    ASSERT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_tracing_provider::Registry>::Create();
     async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
     FakeTraceRegistry registry(loop);
 
-    fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &registry);
+    fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), &registry);
 
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_initialize_tracing(endpoints->client.TakeChannel().release()));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_initialize_tracing(endpoints.client.TakeChannel().release()));
     // The loop runs until RegisterProvider is received.
     loop.Run();
 #else
@@ -1131,14 +1130,13 @@ class TestConnection {
 
   void LoggingInitFake() {
 #if defined(__Fuchsia__)
-    auto endpoints = fidl::CreateEndpoints<fuchsia_logger::LogSink>();
-    ASSERT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_logger::LogSink>::Create();
     async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
     FakeLogSink logsink(loop);
 
-    fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &logsink);
+    fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), &logsink);
 
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_initialize_logging(endpoints->client.TakeChannel().release()));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_initialize_logging(endpoints.client.TakeChannel().release()));
     // The loop runs until Connect is received.
     loop.Run();
 #else
@@ -1352,12 +1350,11 @@ class TestConnection {
     async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
     ASSERT_EQ(ZX_OK, loop.StartThread("server-loop"));
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::PerformanceCounterAccess>();
-    ASSERT_TRUE(endpoints.is_ok());
-    fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &server);
+    auto endpoints = fidl::Endpoints<fuchsia_gpu_magma::PerformanceCounterAccess>::Create();
+    fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), &server);
 
     EXPECT_EQ(expected_result, magma_connection_enable_performance_counter_access(
-                                   connection_, endpoints->client.TakeChannel().release()));
+                                   connection_, endpoints.client.TakeChannel().release()));
   }
 #endif
 

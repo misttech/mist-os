@@ -162,17 +162,16 @@ TEST(IcdConformance, SharedLibraries) {
 
   fidl::WireSyncClient client{std::move(*client_end)};
 
-  auto manifest_fs_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_EQ(ZX_OK, manifest_fs_endpoints.status_value());
+  auto manifest_fs_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
   auto manifest_result =
       client->ConnectToManifestFs(fuchsia_vulkan_loader::ConnectToManifestOptions::kWaitForIdle,
-                                  manifest_fs_endpoints->server.TakeChannel());
+                                  manifest_fs_endpoints.server.TakeChannel());
   EXPECT_EQ(ZX_OK, manifest_result.status());
 
   fdio_ns_t* ns;
   EXPECT_EQ(ZX_OK, fdio_ns_get_installed(&ns));
   EXPECT_EQ(ZX_OK, fdio_ns_bind(ns, kManifestFsPath,
-                                manifest_fs_endpoints->client.TakeChannel().release()));
+                                manifest_fs_endpoints.client.TakeChannel().release()));
   auto defer_unbind = fit::defer([&]() { fdio_ns_unbind(ns, kManifestFsPath); });
 
   std::vector<std::string> manifests;

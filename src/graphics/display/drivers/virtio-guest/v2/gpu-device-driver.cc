@@ -300,16 +300,14 @@ void GpuDeviceDriver::Start(fdf::StartCompleter completer) {
                   .properties(properties)
                   .Build();
 
-  zx::result controller_endpoints =
-      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ZX_ASSERT(controller_endpoints.is_ok());
-  auto add_result = parent_node_->AddChild(args, std::move(controller_endpoints->server), {});
+  auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
+  auto add_result = parent_node_->AddChild(args, std::move(controller_endpoints.server), {});
   if (!add_result.ok()) {
     FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
     completer(zx::error(add_result.status()));
     return;
   }
-  controller_.Bind(std::move(controller_endpoints->client));
+  controller_.Bind(std::move(controller_endpoints.client));
 
   auto defer_teardown = fit::defer([this]() { parent_node_ = {}; });
 

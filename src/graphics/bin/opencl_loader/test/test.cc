@@ -114,21 +114,19 @@ TEST_F(OpenclLoader, VmosIndependent) {
 }
 
 TEST_F(OpenclLoader, DeviceFs) {
-  zx::result dir = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(dir.is_ok()) << dir.status_string();
-  auto connect_result = loader()->ConnectToDeviceFs(dir->server.TakeChannel());
+  auto dir = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  auto connect_result = loader()->ConnectToDeviceFs(dir.server.TakeChannel());
   ASSERT_TRUE(connect_result.ok()) << connect_result.status_string();
 
   ASSERT_TRUE(GetIcd(kIcdFilename).is_ok());  // Wait for idle.
 
-  zx::result device = fidl::CreateEndpoints<fuchsia_gpu_magma::Device>();
-  ASSERT_TRUE(device.is_ok()) << device.status_string();
-  ASSERT_EQ(fdio_service_connect_at(dir->client.handle()->get(), "class/gpu/000",
-                                    device->server.TakeHandle().release()),
+  auto device = fidl::Endpoints<fuchsia_gpu_magma::Device>::Create();
+  ASSERT_EQ(fdio_service_connect_at(dir.client.handle()->get(), "class/gpu/000",
+                                    device.server.TakeHandle().release()),
             ZX_OK);
 
   auto response =
-      fidl::WireCall(device->client)->Query(::fuchsia_gpu_magma::wire::QueryId::kVendorId);
+      fidl::WireCall(device.client)->Query(::fuchsia_gpu_magma::wire::QueryId::kVendorId);
   ASSERT_TRUE(response.ok()) << response.error();
   ASSERT_TRUE(response->is_ok()) << zx_status_get_string(response->error_value());
   ASSERT_TRUE(response->value()->is_simple_result());
@@ -144,18 +142,17 @@ TEST_F(OpenclLoader, Features) {
 }
 
 TEST_F(OpenclLoader, ManifestFs) {
-  auto manifest_fs = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(manifest_fs.is_ok()) << manifest_fs.status_string();
+  auto manifest_fs = fidl::Endpoints<fuchsia_io::Directory>::Create();
   {
     auto response =
         loader()->ConnectToManifestFs(fuchsia_opencl_loader::ConnectToManifestOptions::kWaitForIdle,
-                                      manifest_fs->server.TakeChannel());
+                                      manifest_fs.server.TakeChannel());
     ASSERT_TRUE(response.ok()) << response;
   }
 
   fbl::unique_fd dir_fd;
   zx_status_t status =
-      fdio_fd_create(manifest_fs->client.TakeChannel().release(), dir_fd.reset_and_get_address());
+      fdio_fd_create(manifest_fs.client.TakeChannel().release(), dir_fd.reset_and_get_address());
   ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
 
   fbl::unique_fd manifest_fd(
@@ -171,16 +168,15 @@ TEST_F(OpenclLoader, ManifestFs) {
 TEST_F(OpenclLoader, DebugFilesystems) {
   ASSERT_TRUE(GetIcd(kIcdFilename).is_ok());  // Wait for idle.
 
-  zx::result realm = fidl::CreateEndpoints<fuchsia_sys2::RealmQuery>();
-  ASSERT_TRUE(realm.is_ok()) << realm.status_string();
+  auto realm = fidl::Endpoints<fuchsia_sys2::RealmQuery>::Create();
   ASSERT_EQ(
-      fdio_service_connect("/svc/fuchsia.sys2.RealmQuery", realm->server.TakeChannel().release()),
+      fdio_service_connect("/svc/fuchsia.sys2.RealmQuery", realm.server.TakeChannel().release()),
       ZX_OK);
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
   ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
 
-  auto response = fidl::WireCall(realm->client)
+  auto response = fidl::WireCall(realm.client)
                       ->Open("./opencl_loader", fuchsia_sys2::OpenDirType::kOutgoingDir,
                              fuchsia_io::OpenFlags::kRightReadable, /*mode=*/{}, /*path=*/".",
                              std::move(endpoints->server));

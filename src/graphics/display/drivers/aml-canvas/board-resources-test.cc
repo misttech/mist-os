@@ -39,10 +39,8 @@ class FakePdevTest : public ::testing::Test, public loop_fixture::RealLoop {
   }
 
   fidl::ClientEnd<fuchsia_hardware_platform_device::Device> ConnectToFakePdev() {
-    zx::result endpoints_result = fidl::CreateEndpoints<fuchsia_hardware_platform_device::Device>();
-    EXPECT_OK(endpoints_result.status_value());
-
-    auto [pdev_client, pdev_server] = std::move(endpoints_result).value();
+    auto [pdev_client, pdev_server] =
+        fidl::Endpoints<fuchsia_hardware_platform_device::Device>::Create();
     fake_pdev_server_.Connect(std::move(pdev_server));
     return std::move(pdev_client);
   }

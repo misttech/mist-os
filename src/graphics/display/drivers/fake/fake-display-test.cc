@@ -185,14 +185,8 @@ class FakeDisplayRealSysmemTest : public FakeDisplayTest {
     }
 
     // Bind duplicated token to BufferCollection client.
-    zx::result<fidl::Endpoints<fuchsia_sysmem::BufferCollection>> collection_endpoints =
-        fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-    EXPECT_OK(collection_endpoints.status_value());
-    if (!collection_endpoints.is_ok()) {
-      return collection_endpoints.take_error();
-    }
-
-    auto& [collection_client, collection_server] = collection_endpoints.value();
+    auto [collection_client, collection_server] =
+        fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
     fidl::Status bind_status = sysmem_->BindSharedCollection(std::move(duplicate_value.tokens[0]),
                                                              std::move(collection_server));
     EXPECT_OK(bind_status.status());

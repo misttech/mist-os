@@ -259,12 +259,11 @@ TEST(TransactionElimination, ForeignQueueSysmem) {
                     ->SetDebugClientInfo(fuchsia_sysmem::AllocatorSetDebugClientInfoRequest{
                         GetCurrentProcessName(), GetCurrentProcessKoid()})
                     .is_ok());
-    auto token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-    ASSERT_TRUE(token_endpoints.is_ok()) << token_endpoints.status_string();
+    auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
 
     ASSERT_TRUE(
-        sysmem_allocator->AllocateSharedCollection(std::move(token_endpoints->server)).is_ok());
-    fidl::SyncClient token(std::move(token_endpoints->client));
+        sysmem_allocator->AllocateSharedCollection(std::move(token_endpoints.server)).is_ok());
+    fidl::SyncClient token(std::move(token_endpoints.client));
     ASSERT_TRUE(token
                     ->SetName(fuchsia_sysmem::NodeSetNameRequest{
                         1u, ::testing::UnitTest::GetInstance()->current_test_info()->name()})

@@ -56,9 +56,7 @@ TEST_F(PciConfigOpRegionTest, ReadMemoryOpRegionAddressUnsupported) {
 }
 
 TEST_F(PciConfigOpRegionTest, ReadMemoryOpRegionAddressError) {
-  auto pci_endpoints = fidl::CreateEndpoints<fuchsia_hardware_pci::Device>();
-  ASSERT_TRUE(pci_endpoints.is_ok());
-  auto [pci_client, pci_server] = std::move(pci_endpoints).value();
+  auto [pci_client, pci_server] = fidl::Endpoints<fuchsia_hardware_pci::Device>::Create();
   pci_server.Close(ZX_OK);
 
   ddk::Pci disconnected_pci(std::move(pci_client));
@@ -97,9 +95,7 @@ TEST_F(PciConfigOpRegionTest, IsSystemControlInterruptInUseUnsupported) {
 }
 
 TEST_F(PciConfigOpRegionTest, IsSystemControlInterruptInUseError) {
-  auto pci_endpoints = fidl::CreateEndpoints<fuchsia_hardware_pci::Device>();
-  ASSERT_TRUE(pci_endpoints.is_ok());
-  auto [pci_client, pci_server] = std::move(pci_endpoints).value();
+  auto [pci_client, pci_server] = fidl::Endpoints<fuchsia_hardware_pci::Device>::Create();
   pci_server.Close(ZX_OK);
 
   ddk::Pci disconnected_pci(std::move(pci_client));
@@ -140,9 +136,7 @@ TEST_F(PciConfigOpRegionTest, TriggerSystemControlInterruptUnsupported) {
 }
 
 TEST_F(PciConfigOpRegionTest, TriggerSystemControlInterruptPciError) {
-  auto pci_endpoints = fidl::CreateEndpoints<fuchsia_hardware_pci::Device>();
-  ASSERT_TRUE(pci_endpoints.is_ok());
-  auto [pci_client, pci_server] = std::move(pci_endpoints).value();
+  auto [pci_client, pci_server] = fidl::Endpoints<fuchsia_hardware_pci::Device>::Create();
   pci_server.Close(ZX_OK);
 
   ddk::Pci disconnected_pci(std::move(pci_client));

@@ -29,10 +29,7 @@ TEST(DisplayTest, ClientVSyncOk) {
   constexpr ConfigStamp kControllerStampValue(1);
   constexpr ConfigStamp kClientStampValue(2);
 
-  zx::result<fidl::Endpoints<fuchsia_hardware_display::Coordinator>> endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client_end, server_end] = endpoints.value();
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
 
   Controller controller(nullptr);
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
@@ -75,10 +72,7 @@ TEST(DisplayTest, ClientVSyncOk) {
 }
 
 TEST(DisplayTest, ClientVSynPeerClosed) {
-  zx::result<fidl::Endpoints<fuchsia_hardware_display::Coordinator>> endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client_end, server_end] = endpoints.value();
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
 
   Controller controller(nullptr);
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
@@ -91,10 +85,7 @@ TEST(DisplayTest, ClientVSynPeerClosed) {
 }
 
 TEST(DisplayTest, ClientVSyncNotSupported) {
-  zx::result<fidl::Endpoints<fuchsia_hardware_display::Coordinator>> endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client_end, server_end] = endpoints.value();
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
 
   Controller controller(nullptr);
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
@@ -110,10 +101,7 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
   constexpr std::array<uint64_t, kNumPendingStamps> kControllerStampValues = {1u, 2u, 3u, 4u, 5u};
   constexpr std::array<uint64_t, kNumPendingStamps> kClientStampValues = {2u, 3u, 4u, 5u, 6u};
 
-  zx::result<fidl::Endpoints<fuchsia_hardware_display::Coordinator>> endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client_end, server_end] = endpoints.value();
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
 
   Controller controller(nullptr);
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),

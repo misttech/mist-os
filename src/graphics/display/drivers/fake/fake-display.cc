@@ -202,12 +202,8 @@ zx_status_t FakeDisplay::DisplayControllerImplImportBufferCollection(
     return ZX_ERR_ALREADY_EXISTS;
   }
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  if (!endpoints.is_ok()) {
-    zxlogf(ERROR, "Cannot create sysmem BufferCollection endpoints: %s", endpoints.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-  auto& [collection_client_endpoint, collection_server_endpoint] = endpoints.value();
+  auto [collection_client_endpoint, collection_server_endpoint] =
+      fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
 
   fuchsia_sysmem::AllocatorBindSharedCollectionRequest bind_request;
   bind_request.token() =

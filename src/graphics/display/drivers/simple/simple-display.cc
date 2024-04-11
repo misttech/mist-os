@@ -142,12 +142,8 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportBufferCollection(
 
   ZX_DEBUG_ASSERT_MSG(sysmem_.is_valid(), "sysmem allocator is not initialized");
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollection>();
-  if (!endpoints.is_ok()) {
-    zxlogf(ERROR, "Cannot create sysmem BufferCollection endpoints: %s", endpoints.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-  auto& [collection_client_endpoint, collection_server_endpoint] = endpoints.value();
+  auto [collection_client_endpoint, collection_server_endpoint] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
 
   fidl::Arena arena;
   fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest bind_request =

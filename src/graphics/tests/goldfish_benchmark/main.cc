@@ -152,9 +152,8 @@ int main(int argc, char** argv) {
       component::Connect<fuchsia_hardware_goldfish::Controller>("/dev/class/goldfish-pipe/000");
   ZX_ASSERT_MSG(controller.is_ok(), "%s", controller.status_string());
 
-  zx::result pipe_device_endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish::PipeDevice>();
-  ZX_ASSERT_MSG(pipe_device_endpoints.is_ok(), "%s", pipe_device_endpoints.status_string());
-  auto& [pipe_device_client, pipe_device_server] = pipe_device_endpoints.value();
+  auto [pipe_device_client, pipe_device_server] =
+      fidl::Endpoints<fuchsia_hardware_goldfish::PipeDevice>::Create();
   {
     fidl::Status status =
         fidl::WireCall(controller.value())->OpenSession(std::move(pipe_device_server));
@@ -163,9 +162,7 @@ int main(int argc, char** argv) {
 
   fidl::WireSyncClient pipe_device(std::move(pipe_device_client));
 
-  zx::result pipe_endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish::Pipe>();
-  ZX_ASSERT_MSG(pipe_endpoints.is_ok(), "%s", pipe_endpoints.status_string());
-  auto& [pipe_client, pipe_server] = pipe_endpoints.value();
+  auto [pipe_client, pipe_server] = fidl::Endpoints<fuchsia_hardware_goldfish::Pipe>::Create();
   {
     fidl::Status status = pipe_device->OpenPipe(std::move(pipe_server));
     ZX_ASSERT_MSG(status.ok(), "%s", status.status_string());

@@ -130,18 +130,17 @@ void FakeDisplayStack::SetUpOutgoingServices() {
 }
 
 fidl::ClientEnd<fuchsia_io::Directory> FakeDisplayStack::ConnectToOutgoingServiceDirectory() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ZX_ASSERT(endpoints.is_ok());
+  auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   libsync::Completion serve_complete;
   async::TaskClosure serve_task([&] {
-    ZX_ASSERT(outgoing_->Serve(std::move(endpoints->server)).is_ok());
+    ZX_ASSERT(outgoing_->Serve(std::move(endpoints.server)).is_ok());
     serve_complete.Signal();
   });
   ZX_ASSERT(serve_task.Post(service_loop_.dispatcher()) == ZX_OK);
   serve_complete.Wait();
 
-  return std::move(endpoints->client);
+  return std::move(endpoints.client);
 }
 
 const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& FakeDisplayStack::display_client() {

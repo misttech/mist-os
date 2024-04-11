@@ -170,8 +170,7 @@ class AddressSpaceDeviceTest : public zxtest::Test, public loop_fixture::RealLoo
 
     ns_loop_.StartThread("incoming-namespace-thread");
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
     ns_.SyncCall([&](IncomingNamespace* ns) {
       auto service_result = ns->outgoing.AddService<fuchsia_hardware_pci::Service>(
@@ -180,10 +179,10 @@ class AddressSpaceDeviceTest : public zxtest::Test, public loop_fixture::RealLoo
           }));
       ZX_ASSERT(service_result.is_ok());
 
-      ZX_ASSERT(ns->outgoing.Serve(std::move(endpoints->server)).is_ok());
+      ZX_ASSERT(ns->outgoing.Serve(std::move(endpoints.server)).is_ok());
     });
 
-    fake_root_->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(endpoints->client),
+    fake_root_->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(endpoints.client),
                                "pci");
 
     std::unique_ptr<AddressSpaceDevice> dut(new AddressSpaceDevice(fake_root_.get(), dispatcher()));
@@ -263,9 +262,7 @@ TEST_F(AddressSpaceDeviceTest, OpenChildDriver) {
   auto mapped = MapControlRegisters();
   Registers* ctrl_regs = reinterpret_cast<Registers*>(mapped->ptr());
 
-  zx::result endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_goldfish::AddressSpaceChildDriver>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_goldfish::AddressSpaceChildDriver>::Create();
 
   // Before opening child driver, we set up the mock PCI device
   // to accept GenHandle commands.
@@ -281,7 +278,7 @@ TEST_F(AddressSpaceDeviceTest, OpenChildDriver) {
   // because the driver doesn't rely on multiple threads in a real environment.
   // TODO(https://fxbug.dev/42067777): Use one thread when mock-ddk doesn't block on unbind.
   async::PostTask(loop.dispatcher(), [dispatcher = loop.dispatcher(),
-                                      server = std::move(endpoints->server),
+                                      server = std::move(endpoints.server),
                                       dut = this->dut_]() mutable {
     ASSERT_OK(dut->OpenChildDriver(dispatcher,
                                    fuchsia_hardware_goldfish::AddressSpaceChildDriverType::kDefault,
@@ -292,7 +289,7 @@ TEST_F(AddressSpaceDeviceTest, OpenChildDriver) {
   EXPECT_EQ(ctrl_regs->handle, kChildDriverHandle);
 
   // Test availability of the FIDL channel communication.
-  fidl::WireSyncClient client{std::move(endpoints->client)};
+  fidl::WireSyncClient client{std::move(endpoints.client)};
 
   // Set up return status and offset on the mock PCI device
   // to accept AllocateBlock() calls.

@@ -25,12 +25,7 @@ namespace {
 using ProviderClientEnd = fidl::ClientEnd<fuchsia_hardware_display::Provider>;
 
 zx::result<ProviderClientEnd> GetProvider() {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Provider>();
-  if (endpoints.is_error()) {
-    FX_PLOGS(ERROR, endpoints.status_value()) << "Failed to create fuchsia.io.Node endpoints: ";
-    return endpoints.take_error();
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_display::Provider>::Create();
 
   constexpr const char* kServicePath =
       fidl::DiscoverableProtocolDefaultPath<fuchsia_hardware_display::Provider>;
@@ -44,15 +39,8 @@ zx::result<ProviderClientEnd> GetProvider() {
 
 fpromise::promise<CoordinatorClientEnd, zx_status_t> GetCoordinatorFromProvider(
     async_dispatcher_t* dispatcher, ProviderClientEnd& provider_client) {
-  zx::result<fidl::Endpoints<fuchsia_hardware_display::Coordinator>> coordinator_endpoints_result =
-      fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
-  if (!coordinator_endpoints_result.is_ok()) {
-    FX_PLOGS(ERROR, coordinator_endpoints_result.status_value())
-        << "Failed to create fuchsia.hardware.display.Coordinator endpoints: ";
-    return fpromise::make_result_promise<CoordinatorClientEnd, zx_status_t>(
-        fpromise::error(coordinator_endpoints_result.status_value()));
-  }
-  auto& [coordinator_client, coordinator_server] = coordinator_endpoints_result.value();
+  auto [coordinator_client, coordinator_server] =
+      fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
 
   fpromise::bridge<void, zx_status_t> bridge;
   std::shared_ptr completer =

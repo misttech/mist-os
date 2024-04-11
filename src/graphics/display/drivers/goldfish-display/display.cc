@@ -235,12 +235,7 @@ void Display::DisplayControllerImplResetDisplayControllerInterface() {
 }
 
 zx_status_t Display::InitSysmemAllocatorClientLocked() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-  if (!endpoints.is_ok()) {
-    zxlogf(ERROR, "Cannot create sysmem allocator endpoints: %s", endpoints.status_string());
-    return endpoints.status_value();
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
   auto connect_result = pipe_->ConnectSysmem(server.TakeChannel());
   if (!connect_result.ok()) {
     zxlogf(ERROR, "Cannot connect to sysmem Allocator protocol: %s",
@@ -323,12 +318,8 @@ zx_status_t Display::DisplayControllerImplImportBufferCollection(
 
   ZX_DEBUG_ASSERT_MSG(sysmem_allocator_client_.is_valid(), "sysmem allocator is not initialized");
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  if (!endpoints.is_ok()) {
-    zxlogf(ERROR, "Cannot create sysmem BufferCollection endpoints: %s", endpoints.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-  auto& [collection_client_endpoint, collection_server_endpoint] = endpoints.value();
+  auto [collection_client_endpoint, collection_server_endpoint] =
+      fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
 
   auto bind_result = sysmem_allocator_client_->BindSharedCollection(
       fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(collection_token)),

@@ -182,16 +182,15 @@ TEST_F(MagmaDriverStarted, DependencyInjection) {
       std::move(device_result.value()));
   fidl::WireSyncClient client(std::move(device_client_end));
 
-  auto memory_pressure_endpoints = fidl::CreateEndpoints<fuchsia_memorypressure::Provider>();
-  ASSERT_EQ(ZX_OK, memory_pressure_endpoints.status_value());
+  auto memory_pressure_endpoints = fidl::Endpoints<fuchsia_memorypressure::Provider>::Create();
 
-  auto result = client->SetMemoryPressureProvider(std::move(memory_pressure_endpoints->client));
+  auto result = client->SetMemoryPressureProvider(std::move(memory_pressure_endpoints.client));
   ASSERT_EQ(ZX_OK, result.status());
 
   EXPECT_EQ(ZX_OK, fdf::RunOnDispatcherSync(test_env_dispatcher_->async_dispatcher(), [&]() {
                      auto server = std::make_unique<MemoryPressureProviderServer>();
                      fidl::BindServer(test_env_dispatcher_->async_dispatcher(),
-                                      std::move(memory_pressure_endpoints->server),
+                                      std::move(memory_pressure_endpoints.server),
                                       std::move(server));
                    }).status_value());
 

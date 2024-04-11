@@ -48,12 +48,7 @@ DisplayId TestFidlClient::display_id() const { return displays_[0].id_; }
 
 bool TestFidlClient::CreateChannel(const fidl::WireSyncClient<fhd::Provider>& provider,
                                    bool is_vc) {
-  zx::result endpoints = fidl::CreateEndpoints<fhd::Coordinator>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "Could not create coordinator channels, error=%s", endpoints.status_string());
-    return false;
-  }
-  auto& [dc_client, dc_server] = endpoints.value();
+  auto [dc_client, dc_server] = fidl::Endpoints<fhd::Coordinator>::Create();
   zxlogf(INFO, "Opening coordinator");
   if (is_vc) {
     auto response = provider->OpenCoordinatorForVirtcon(std::move(dc_server));
@@ -325,13 +320,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
   // Create all the tokens.
   fidl::WireSyncClient<sysmem::BufferCollectionToken> local_token;
   {
-    zx::result endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-    if (endpoints.is_error()) {
-      zxlogf(ERROR, "Failed to create channel for shared collection: %s",
-             endpoints.status_string());
-      return zx::error(ZX_ERR_NO_MEMORY);
-    }
-    auto& [client, server] = endpoints.value();
+    auto [client, server] = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
     auto result = sysmem_->AllocateSharedCollection(std::move(server));
     if (!result.ok()) {
       zxlogf(ERROR, "Failed to allocate shared collection: %s", result.status_string());
@@ -340,12 +329,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
     local_token = fidl::WireSyncClient<sysmem::BufferCollectionToken>(std::move(client));
     EXPECT_NE(ZX_HANDLE_INVALID, local_token.client_end().channel().get());
   }
-  zx::result endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "Failed to create channel for shared collection: %s", endpoints.status_string());
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
   {
     if (auto result = local_token->Duplicate(ZX_RIGHT_SAME_RIGHTS, std::move(server));
         !result.ok()) {
@@ -402,13 +386,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
   // into another process.
   fidl::WireSyncClient<sysmem::BufferCollection> sysmem_collection;
   {
-    zx::result endpoints = fidl::CreateEndpoints<sysmem::BufferCollection>();
-    if (endpoints.is_error()) {
-      zxlogf(ERROR, "Failed to create channel for shared collection: %s",
-             endpoints.status_string());
-      return zx::error(ZX_ERR_NO_MEMORY);
-    }
-    auto& [client, server] = endpoints.value();
+    auto [client, server] = fidl::Endpoints<sysmem::BufferCollection>::Create();
     if (auto result = sysmem_->BindSharedCollection(local_token.TakeClientEnd(), std::move(server));
         !result.ok()) {
       zxlogf(ERROR, "Failed to bind shared collection: %s", result.FormatDescription().c_str());

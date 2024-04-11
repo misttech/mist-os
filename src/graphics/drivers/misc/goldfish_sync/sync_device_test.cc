@@ -247,11 +247,10 @@ TEST_F(SyncDeviceTest, TriggerHostWait) {
     ctrl_regs->batch_guestcommand = 0xffffffffu;
   }
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish::SyncTimeline>();
-  ASSERT_TRUE(endpoints.is_ok());
-  ASSERT_OK(dut->CreateTimeline(std::move(endpoints->server)));
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_goldfish::SyncTimeline>::Create();
+  ASSERT_OK(dut->CreateTimeline(std::move(endpoints.server)));
 
-  fidl::WireSyncClient tl{std::move(endpoints->client)};
+  fidl::WireSyncClient tl{std::move(endpoints.client)};
 
   uint64_t kGlSyncHandle = 0xabcd'1234'5678'90abUL;
   uint64_t kSyncThreadHandle = 0xdcba'9876'5432'01feUL;
@@ -551,11 +550,10 @@ TEST_F(SyncDeviceTest, TriggerHostWaitAndSignalFence) {
   auto dut = CreateAndBindDut();
   ASSERT_NE(dut, nullptr);
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish::SyncTimeline>();
-  ASSERT_TRUE(endpoints.is_ok());
-  ASSERT_OK(dut->CreateTimeline(std::move(endpoints->server)));
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_goldfish::SyncTimeline>::Create();
+  ASSERT_OK(dut->CreateTimeline(std::move(endpoints.server)));
 
-  fidl::WireSyncClient tl{std::move(endpoints->client)};
+  fidl::WireSyncClient tl{std::move(endpoints.client)};
 
   uint64_t kGlSyncHandle = 0xabcd'1234'5678'90abUL;
   uint64_t kSyncThreadHandle = 0xdcba'9876'5432'01feUL;

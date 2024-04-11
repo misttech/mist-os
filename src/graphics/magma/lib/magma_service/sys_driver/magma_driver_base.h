@@ -245,15 +245,13 @@ class MagmaDriverBase : public fdf::DriverBase,
                     .devfs_args(devfs.Build())
                     .Build();
 
-    zx::result controller_endpoints =
-        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-    ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed: %s", controller_endpoints.status_string());
+    auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
     zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
     ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed: %s", node_endpoints.status_string());
 
-    fidl::WireResult result = node_client_->AddChild(args, std::move(controller_endpoints->server),
+    fidl::WireResult result = node_client_->AddChild(args, std::move(controller_endpoints.server),
                                                      std::move(node_endpoints->server));
-    gpu_node_controller_.Bind(std::move(controller_endpoints->client));
+    gpu_node_controller_.Bind(std::move(controller_endpoints.client));
     gpu_node_.Bind(std::move(node_endpoints->client));
     return zx::ok();
   }

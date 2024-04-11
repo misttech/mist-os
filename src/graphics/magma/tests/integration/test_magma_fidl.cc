@@ -63,14 +63,13 @@ class TestMagmaFidl : public gtest::RealLoopFixture {
     for (auto& p : std::filesystem::directory_iterator(kDevicePathFuchsia)) {
       ASSERT_FALSE(device_.is_valid()) << " More than one GPU device found, specify --vendor-id";
 
-      auto endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::CombinedDevice>();
-      ASSERT_TRUE(endpoints.is_ok());
+      auto endpoints = fidl::Endpoints<fuchsia_gpu_magma::CombinedDevice>::Create();
 
       zx_status_t zx_status =
-          fdio_service_connect(p.path().c_str(), endpoints->server.TakeChannel().release());
+          fdio_service_connect(p.path().c_str(), endpoints.server.TakeChannel().release());
       ASSERT_EQ(ZX_OK, zx_status);
 
-      device_ = DeviceClient(std::move(endpoints->client));
+      device_ = DeviceClient(std::move(endpoints.client));
 
       {
         auto wire_result = device_->Query(fuchsia_gpu_magma::wire::QueryId::kVendorId);
@@ -106,18 +105,17 @@ class TestMagmaFidl : public gtest::RealLoopFixture {
       max_inflight_messages_ = static_cast<uint32_t>(params >> 32);
     }
 
-    auto primary_endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Primary>();
-    ASSERT_TRUE(primary_endpoints.is_ok());
+    auto primary_endpoints = fidl::Endpoints<fuchsia_gpu_magma::Primary>::Create();
 
     auto notification_endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Notification>();
     ASSERT_TRUE(notification_endpoints.is_ok());
 
     uint64_t client_id = 0xabcd;  // anything
-    auto wire_result = device_->Connect2(client_id, std::move(primary_endpoints->server),
+    auto wire_result = device_->Connect2(client_id, std::move(primary_endpoints.server),
                                          std::move(notification_endpoints->server));
     ASSERT_TRUE(wire_result.ok());
 
-    primary_ = PrimaryClient(std::move(primary_endpoints->client), dispatcher(), &async_handler_);
+    primary_ = PrimaryClient(std::move(primary_endpoints.client), dispatcher(), &async_handler_);
     ASSERT_TRUE(primary_.is_valid());
 
     notification_channel_ = std::move(notification_endpoints->client.channel());
@@ -629,11 +627,10 @@ TEST_F(TestMagmaFidl, EnablePerformanceCounters) {
     fidl::WireSyncClient<fuchsia_gpu_magma::PerformanceCounterAccess> perf_counter_access;
 
     {
-      auto endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::PerformanceCounterAccess>();
-      ASSERT_TRUE(endpoints.is_ok());
+      auto endpoints = fidl::Endpoints<fuchsia_gpu_magma::PerformanceCounterAccess>::Create();
       ASSERT_EQ(ZX_OK,
-                fdio_service_connect(p.path().c_str(), endpoints->server.TakeChannel().release()));
-      perf_counter_access = fidl::WireSyncClient(std::move(endpoints->client));
+                fdio_service_connect(p.path().c_str(), endpoints.server.TakeChannel().release()));
+      perf_counter_access = fidl::WireSyncClient(std::move(endpoints.client));
     }
 
     zx::event access_token;

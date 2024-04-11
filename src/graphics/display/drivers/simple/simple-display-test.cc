@@ -179,11 +179,7 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
 
   fit::result<zx_status_t, fidl::WireSyncClient<fuchsia_sysmem2::Allocator>>
   MakeFakeSysmemAllocator() {
-    auto sysmem_endpoints_result = fidl::CreateEndpoints<fuchsia_sysmem2::Allocator>();
-    if (!sysmem_endpoints_result.is_ok()) {
-      return sysmem_endpoints_result.take_error();
-    }
-    auto& [sysmem_client, sysmem_server] = *sysmem_endpoints_result;
+    auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
 
     mock_allocators_.emplace_front(*this, dispatcher_, framebuffer_vmo_->borrow());
     auto it = mock_allocators_.begin();
@@ -255,9 +251,8 @@ TEST(SimpleDisplay, ImportBufferCollection) {
   FakeSysmem fake_sysmem(loop.dispatcher(), /*framebuffer_vmo=*/{}, 0);
   FakeMmio fake_mmio;
 
-  auto hardware_sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
-  ASSERT_TRUE(hardware_sysmem_endpoints.is_ok());
-  auto& [hardware_sysmem_client, hardware_sysmem_server] = hardware_sysmem_endpoints.value();
+  auto [hardware_sysmem_client, hardware_sysmem_server] =
+      fidl::Endpoints<fuchsia_hardware_sysmem::Sysmem>::Create();
   fidl::BindServer(loop.dispatcher(), std::move(hardware_sysmem_server), &fake_sysmem);
 
   auto sysmem_client_result = fake_sysmem.MakeFakeSysmemAllocator();
@@ -273,8 +268,7 @@ TEST(SimpleDisplay, ImportBufferCollection) {
                         std::move(sysmem_client), fake_mmio.MmioBuffer(), kWidth, kHeight, kStride,
                         kPixelFormat);
 
-  zx::result token1_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
-  ASSERT_TRUE(token1_endpoints.is_ok());
+  auto token1_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
   zx::result token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token2_endpoints.is_ok());
 
@@ -283,7 +277,7 @@ TEST(SimpleDisplay, ImportBufferCollection) {
   const uint64_t kBanjoValidCollectionId =
       display::ToBanjoDriverBufferCollectionId(kValidCollectionId);
   EXPECT_OK(display.DisplayControllerImplImportBufferCollection(
-      kBanjoValidCollectionId, token1_endpoints->client.TakeChannel()));
+      kBanjoValidCollectionId, token1_endpoints.client.TakeChannel()));
 
   // `collection_id` must be unused.
   EXPECT_EQ(display.DisplayControllerImplImportBufferCollection(
@@ -305,7 +299,7 @@ TEST(SimpleDisplay, ImportBufferCollection) {
         display.GetBufferCollectionsForTesting().at(kValidCollectionId).client_end();
     ExpectObjectsArePaired(buffer_collection_server.handle(), buffer_collection_client.handle());
 
-    const auto& buffer_collection_token_server = token1_endpoints->server;
+    const auto& buffer_collection_token_server = token1_endpoints.server;
     const auto& buffer_collection_token_client = buffer_collection_connections[0].first;
     ExpectObjectsArePaired(buffer_collection_token_server.handle(),
                            buffer_collection_token_client.handle());
@@ -349,9 +343,8 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
 
   loop.StartThread("sysmem loop");
 
-  auto hardware_sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
-  ASSERT_TRUE(hardware_sysmem_endpoints.is_ok());
-  auto& [hardware_sysmem_client, hardware_sysmem_server] = hardware_sysmem_endpoints.value();
+  auto [hardware_sysmem_client, hardware_sysmem_server] =
+      fidl::Endpoints<fuchsia_hardware_sysmem::Sysmem>::Create();
   fidl::BindServer(loop.dispatcher(), std::move(hardware_sysmem_server), &fake_sysmem);
 
   auto sysmem_client_result = fake_sysmem.MakeFakeSysmemAllocator();
@@ -376,9 +369,7 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(&kDisplayUsage,
                                                                         kBanjoCollectionId));
 
-  zx::result heap_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Heap>();
-  ASSERT_TRUE(heap_endpoints.is_ok());
-  auto& [heap_client, heap_server] = heap_endpoints.value();
+  auto [heap_client, heap_server] = fidl::Endpoints<fuchsia_hardware_sysmem::Heap>::Create();
   auto bind_ref = fidl::BindServer(loop.dispatcher(), std::move(heap_server), &display);
   fidl::WireSyncClient heap{std::move(heap_client)};
 

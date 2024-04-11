@@ -348,10 +348,8 @@ class FakeSysmemTest : public testing::Test {
     mock_root_ = MockDevice::FakeRootParent();
 
     loop_.StartThread("sysmem-handler-loop");
-    zx::result<fidl::Endpoints<fuchsia_hardware_amlogiccanvas::Device>> endpoints =
-        fidl::CreateEndpoints<fuchsia_hardware_amlogiccanvas::Device>();
-    ASSERT_OK(endpoints.status_value());
-    canvas_.SyncCall(&FakeCanvasProtocol::Serve, std::move(endpoints.value().server));
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_amlogiccanvas::Device>::Create();
+    canvas_.SyncCall(&FakeCanvasProtocol::Serve, std::move(endpoints.server));
 
     zx::result<std::unique_ptr<display::Namespace>> create_incoming_result =
         display::NamespaceDfv1::Create(mock_root_.get());
@@ -371,7 +369,7 @@ class FakeSysmemTest : public testing::Test {
     display_engine_ = std::make_unique<DisplayEngine>(incoming_.get(), metadata_getter_.get(),
                                                       dispatcher_factory_.get());
     display_engine_->SetFormatSupportCheck([](auto) { return true; });
-    display_engine_->SetCanvasForTesting(std::move(endpoints.value().client));
+    display_engine_->SetCanvasForTesting(std::move(endpoints.client));
 
     zx::result<std::unique_ptr<Vout>> create_dsi_vout_result = Vout::CreateDsiVoutForTesting(
         /*panel_type=*/PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO, /*width=*/kWidth,
@@ -402,12 +400,10 @@ class FakeSysmemTest : public testing::Test {
     });
 
     {
-      zx::result<fidl::Endpoints<sysmem::Allocator>> endpoints =
-          fidl::CreateEndpoints<sysmem::Allocator>();
-      ASSERT_OK(endpoints.status_value());
-      fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), allocator_.get());
+      auto endpoints = fidl::Endpoints<sysmem::Allocator>::Create();
+      fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), allocator_.get());
       display_engine_->SetSysmemAllocatorForTesting(
-          fidl::WireSyncClient(std::move(endpoints->client)));
+          fidl::WireSyncClient(std::move(endpoints.client)));
     }
   }
 
@@ -531,10 +527,7 @@ TEST_F(FakeSysmemTest, ImportBufferCollection) {
 }
 
 TEST_F(FakeSysmemTest, ImportImage) {
-  zx::result<fidl::Endpoints<sysmem::BufferCollectionToken>> token_endpoints =
-      fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints.status_value());
-  auto& [token_client, token_server] = token_endpoints.value();
+  auto [token_client, token_server] = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
@@ -603,10 +596,7 @@ TEST_F(FakeSysmemTest, ImportImageForCapture) {
   allocator_->set_mock_buffer_collection_builder(
       [] { return std::make_unique<MockBufferCollectionForCapture>(); });
 
-  zx::result<fidl::Endpoints<sysmem::BufferCollectionToken>> token_endpoints =
-      fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints.status_value());
-  auto& [token_client, token_server] = token_endpoints.value();
+  auto [token_client, token_server] = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
@@ -659,10 +649,7 @@ TEST_F(FakeSysmemTest, SysmemRequirements) {
     return new_buffer_collection;
   });
 
-  zx::result<fidl::Endpoints<sysmem::BufferCollectionToken>> token_endpoints =
-      fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints.status_value());
-  auto& [token_client, token_server] = token_endpoints.value();
+  auto [token_client, token_server] = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
@@ -696,10 +683,7 @@ TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
     return format == fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
   });
 
-  zx::result<fidl::Endpoints<sysmem::BufferCollectionToken>> token_endpoints =
-      fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints.status_value());
-  auto& [token_client, token_server] = token_endpoints.value();
+  auto [token_client, token_server] = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
@@ -751,10 +735,7 @@ TEST_F(FakeSysmemTest, NoLeakCaptureCanvas) {
   allocator_->set_mock_buffer_collection_builder(
       [] { return std::make_unique<MockBufferCollectionForCapture>(); });
 
-  zx::result<fidl::Endpoints<sysmem::BufferCollectionToken>> token_endpoints =
-      fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints.status_value());
-  auto& [token_client, token_server] = token_endpoints.value();
+  auto [token_client, token_server] = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =

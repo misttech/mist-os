@@ -120,9 +120,7 @@ TEST_F(LoaderUnittest, MagmaDevice) {
                            fbl::MakeRefCounted<fs::Service>(magma_device.ProtocolConnector())),
             ZX_OK);
   vfs_loop.StartThread("vfs-loop");
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-  auto [client, server] = std::move(*endpoints);
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   ASSERT_EQ(vfs.ServeDirectory(root, std::move(server), fs::Rights::ReadOnly()), ZX_OK);
 
   zx::result device = MagmaDevice::Create(app(), client, kDeviceNodeName, &inspector().GetRoot());
@@ -196,9 +194,7 @@ TEST_F(LoaderUnittest, GoldfishDevice) {
                            fbl::MakeRefCounted<fs::Service>(goldfish_device.ProtocolConnector())),
             ZX_OK);
   vfs_loop.StartThread("vfs-loop");
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   vfs.ServeDirectory(root, std::move(server), fs::Rights::ReadOnly());
 
   auto device = GoldfishDevice::Create(app(), client, kDeviceNodeName, &inspector().GetRoot());

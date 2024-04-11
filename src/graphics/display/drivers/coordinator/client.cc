@@ -1472,11 +1472,8 @@ Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) 
 
   if (zx_status_t status =
           [&]() {
-            zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-            if (endpoints.is_error()) {
-              return endpoints.error_value();
-            }
-            auto& [sysmem_allocator_client, sysmem_allocator_server] = endpoints.value();
+            auto [sysmem_allocator_client, sysmem_allocator_server] =
+                fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
             zx::result<> result =
                 controller_->driver()->GetSysmemConnection(sysmem_allocator_server.TakeChannel());
             if (result.is_error()) {

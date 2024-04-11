@@ -295,9 +295,7 @@ class FakeSysmemSingleThreadedTest : public testing::Test {
         display_(nullptr) {}
 
   void SetUp() override {
-    auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-    ASSERT_TRUE(sysmem_endpoints.is_ok());
-    auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
+    auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
     fidl::BindServer(loop_.dispatcher(), std::move(sysmem_server), &sysmem_);
 
     ASSERT_OK(display_.SetAndInitSysmemForTesting(fidl::WireSyncClient(std::move(sysmem_client))));
@@ -411,9 +409,7 @@ TEST(IntelI915Display, ImportImage) {
 
   // Prepare fake sysmem.
   MockAllocator fake_sysmem(loop.dispatcher());
-  auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-  ASSERT_TRUE(sysmem_endpoints.is_ok());
-  auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
+  auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
   fidl::BindServer(loop.dispatcher(), std::move(sysmem_server), &fake_sysmem);
 
   // Prepare fake PCI.

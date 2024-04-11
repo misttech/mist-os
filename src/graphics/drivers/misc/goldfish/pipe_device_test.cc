@@ -208,8 +208,7 @@ class PipeDeviceTest : public zxtest::Test {
 
     fake_root_->AddProtocol(ZX_PROTOCOL_ACPI, nullptr, nullptr, "acpi");
 
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints.status_value());
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
     ns_.SyncCall([&endpoints](IncomingNamespace* ns) {
       zx::result service_result = ns->outgoing.AddService<fuchsia_hardware_sysmem::Service>(
@@ -218,10 +217,10 @@ class PipeDeviceTest : public zxtest::Test {
           }));
       ASSERT_EQ(service_result.status_value(), ZX_OK);
 
-      ASSERT_OK(ns->outgoing.Serve(std::move(endpoints->server)).status_value());
+      ASSERT_OK(ns->outgoing.Serve(std::move(endpoints.server)).status_value());
     });
 
-    fake_root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name, std::move(endpoints->client),
+    fake_root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name, std::move(endpoints.client),
                                "sysmem");
 
     auto dut = std::make_unique<PipeDevice>(fake_root_.get(), std::move(acpi_client.value()),
@@ -231,15 +230,14 @@ class PipeDeviceTest : public zxtest::Test {
     dut_ = dut.release();
 
     {
-      auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>();
-      EXPECT_EQ(endpoints.status_value(), ZX_OK);
+      auto endpoints = fidl::Endpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>::Create();
 
       dut_child_ = std::make_unique<PipeChildDevice>(dut_, test_loop_.dispatcher());
       binding_ =
-          fidl::BindServer(test_loop_.dispatcher(), std::move(endpoints->server), dut_child_.get());
+          fidl::BindServer(test_loop_.dispatcher(), std::move(endpoints.server), dut_child_.get());
       EXPECT_TRUE(binding_.has_value());
 
-      client_.Bind(std::move(endpoints->client), test_loop_.dispatcher());
+      client_.Bind(std::move(endpoints.client), test_loop_.dispatcher());
     }
   }
 

@@ -51,18 +51,16 @@ class AmlCanvasTest : public testing::Test {
     zx::bti bti;
     EXPECT_OK(fake_bti_create(bti.reset_and_get_address()));
 
-    zx::result<fidl::Endpoints<fuchsia_hardware_amlogiccanvas::Device>> endpoints =
-        fidl::CreateEndpoints<fuchsia_hardware_amlogiccanvas::Device>();
-    ASSERT_EQ(ZX_OK, endpoints.status_value());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_amlogiccanvas::Device>::Create();
 
     // TODO(136015): This test should invoke ::Create(), which requires a FakePDevFidl.
     canvas_ = std::make_unique<AmlCanvas>(mmio_range_.GetMmioBuffer(), std::move(bti),
                                           inspect::Inspector{});
 
-    binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                     std::move(endpoints->server), canvas_.get(), fidl::kIgnoreBindingClosure);
+    binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(endpoints.server),
+                     canvas_.get(), fidl::kIgnoreBindingClosure);
 
-    canvas_client_.Bind(std::move(endpoints->client));
+    canvas_client_.Bind(std::move(endpoints.client));
   }
 
   void TearDown() override { mmio_range_.CheckAllAccessesReplayed(); }

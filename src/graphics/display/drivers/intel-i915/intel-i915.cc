@@ -882,12 +882,8 @@ zx_status_t Controller::DisplayControllerImplImportBufferCollection(
 
   ZX_DEBUG_ASSERT_MSG(sysmem_.is_valid(), "sysmem allocator is not initialized");
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  if (!endpoints.is_ok()) {
-    zxlogf(ERROR, "Cannot create sysmem BufferCollection endpoints: %s", endpoints.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-  auto& [collection_client_endpoint, collection_server_endpoint] = endpoints.value();
+  auto [collection_client_endpoint, collection_server_endpoint] =
+      fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
 
   auto bind_result = sysmem_->BindSharedCollection(
       fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(collection_token)),

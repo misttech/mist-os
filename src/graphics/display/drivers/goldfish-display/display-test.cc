@@ -82,11 +82,10 @@ void GoldfishDisplayTest::SetUp() {
   // devices without any dependency on proper driver binding.
   display_->SetupPrimaryDisplayForTesting(kDisplayWidthPx, kDisplayHeightPx, kDisplayRefreshRateHz);
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-  ASSERT_TRUE(endpoints.is_ok());
+  auto endpoints = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
   allocator_binding_ =
-      fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &mock_allocator_);
-  display_->SetSysmemAllocatorForTesting(fidl::WireSyncClient(std::move(endpoints->client)));
+      fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), &mock_allocator_);
+  display_->SetSysmemAllocatorForTesting(fidl::WireSyncClient(std::move(endpoints.client)));
 }
 
 void GoldfishDisplayTest::TearDown() { allocator_binding_->Unbind(); }

@@ -204,10 +204,7 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
         std::make_unique<VirtioGpuDevice>(std::move(virtio_device_result).value());
 
     fake_sysmem_ = std::make_unique<MockAllocator>(dispatcher());
-    zx::result<fidl::Endpoints<fuchsia_sysmem::Allocator>> sysmem_endpoints =
-        fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-    ASSERT_OK(sysmem_endpoints.status_value());
-    auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
+    auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
     fidl::BindServer(dispatcher(), std::move(sysmem_server), fake_sysmem_.get());
 
     device_ =
@@ -222,11 +219,10 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
   }
 
   void ImportBufferCollection(display::DriverBufferCollectionId buffer_collection_id) {
-    zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-    ASSERT_TRUE(token_endpoints.is_ok());
+    auto token_endpoints = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
     EXPECT_OK(device_->DisplayControllerImplImportBufferCollection(
         display::ToBanjoDriverBufferCollectionId(buffer_collection_id),
-        token_endpoints->client.TakeChannel()));
+        token_endpoints.client.TakeChannel()));
   }
 
  protected:
@@ -319,8 +315,7 @@ TEST_F(VirtioGpuTest, ImportBufferCollection) {
   // available, so it should outlive the test body.
   const MockAllocator* allocator = fake_sysmem_.get();
 
-  zx::result token1_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-  ASSERT_TRUE(token1_endpoints.is_ok());
+  auto token1_endpoints = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
   zx::result token2_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token2_endpoints.is_ok());
 
@@ -333,7 +328,7 @@ TEST_F(VirtioGpuTest, ImportBufferCollection) {
   constexpr uint64_t kBanjoValidBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kValidBufferCollectionId);
   EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kBanjoValidBufferCollectionId,
-                                                token1_endpoints->client.handle()->get()));
+                                                token1_endpoints.client.handle()->get()));
 
   // `collection_id` must be unused.
   EXPECT_EQ(proto.ops->import_buffer_collection(device_.get(), kBanjoValidBufferCollectionId,
@@ -352,7 +347,7 @@ TEST_F(VirtioGpuTest, ImportBufferCollection) {
     EXPECT_EQ(inactive_buffer_token_clients.size(), 0u);
 
     ExpectObjectsArePaired(active_buffer_token_clients[0].channel(),
-                           token1_endpoints->server.channel().borrow());
+                           token1_endpoints.server.channel().borrow());
   }
 
   // Test ReleaseBufferCollection().
@@ -375,7 +370,7 @@ TEST_F(VirtioGpuTest, ImportBufferCollection) {
     EXPECT_EQ(inactive_buffer_token_clients.size(), 1u);
 
     ExpectObjectsArePaired(inactive_buffer_token_clients[0].channel(),
-                           token1_endpoints->server.channel().borrow());
+                           token1_endpoints.server.channel().borrow());
   }
 }
 

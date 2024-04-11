@@ -114,17 +114,16 @@ TEST_F(VulkanLoader, VmosIndependent) {
 }
 
 TEST_F(VulkanLoader, DeviceFs) {
-  auto dev_fs = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(dev_fs.is_ok()) << dev_fs.status_string();
+  auto dev_fs = fidl::Endpoints<fuchsia_io::Directory>::Create();
   {
-    auto response = loader()->ConnectToDeviceFs(dev_fs->server.TakeChannel());
+    auto response = loader()->ConnectToDeviceFs(dev_fs.server.TakeChannel());
     ASSERT_TRUE(response.ok()) << response;
   }
   ASSERT_TRUE(GetIcd(kIcdFilename).is_ok());  // Wait for idle.
 
   auto device = fidl::CreateEndpoints<fuchsia_gpu_magma::Device>();
   ASSERT_TRUE(device.is_ok()) << device.status_string();
-  zx_status_t status = fdio_service_connect_at(dev_fs->client.channel().get(), "class/gpu/000",
+  zx_status_t status = fdio_service_connect_at(dev_fs.client.channel().get(), "class/gpu/000",
                                                device->server.TakeChannel().release());
   ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
 
@@ -146,18 +145,17 @@ TEST_F(VulkanLoader, Features) {
 }
 
 TEST_F(VulkanLoader, ManifestFs) {
-  auto manifest_fs = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(manifest_fs.is_ok()) << manifest_fs.status_string();
+  auto manifest_fs = fidl::Endpoints<fuchsia_io::Directory>::Create();
   {
     auto response =
         loader()->ConnectToManifestFs(fuchsia_vulkan_loader::ConnectToManifestOptions::kWaitForIdle,
-                                      manifest_fs->server.TakeChannel());
+                                      manifest_fs.server.TakeChannel());
     ASSERT_TRUE(response.ok()) << response;
   }
 
   fbl::unique_fd dir_fd;
   zx_status_t status =
-      fdio_fd_create(manifest_fs->client.TakeChannel().release(), dir_fd.reset_and_get_address());
+      fdio_fd_create(manifest_fs.client.TakeChannel().release(), dir_fd.reset_and_get_address());
   ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
 
   fbl::unique_fd manifest_fd(
@@ -171,10 +169,9 @@ TEST_F(VulkanLoader, ManifestFs) {
 }
 
 TEST_F(VulkanLoader, GoldfishSyncDeviceFs) {
-  auto dev_fs = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(dev_fs.is_ok()) << dev_fs.status_string();
+  auto dev_fs = fidl::Endpoints<fuchsia_io::Directory>::Create();
   {
-    auto response = loader()->ConnectToDeviceFs(dev_fs->server.TakeChannel());
+    auto response = loader()->ConnectToDeviceFs(dev_fs.server.TakeChannel());
     ASSERT_TRUE(response.ok()) << response;
   }
   ASSERT_TRUE(GetIcd(kIcdFilename).is_ok());  // Wait for idle.
@@ -187,7 +184,7 @@ TEST_F(VulkanLoader, GoldfishSyncDeviceFs) {
 
   for (auto& device_class : kDeviceClassList) {
     fuchsia::io::NodeSyncPtr device_ptr;
-    EXPECT_EQ(ZX_OK, fdio_service_connect_at(dev_fs->client.channel().get(), device_class,
+    EXPECT_EQ(ZX_OK, fdio_service_connect_at(dev_fs.client.channel().get(), device_class,
                                              device_ptr.NewRequest().TakeChannel().release()));
 
     // Check that the directory is connected to something.
@@ -204,19 +201,18 @@ TEST_F(VulkanLoader, DebugFilesystems) {
   auto client_end = realm().component().Connect<fuchsia_sys2::RealmQuery>();
   ASSERT_TRUE(client_end.is_ok()) << client_end.status_string();
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto endpoints = fidl::Endpoints<fuchsia_io::Node>::Create();
 
   auto response = fidl::WireCall(*client_end)
                       ->Open("./vulkan_loader", fuchsia_sys2::OpenDirType::kOutgoingDir,
                              fuchsia_io::OpenFlags::kRightReadable, /*mode=*/{}, /*path=*/".",
-                             std::move(endpoints->server));
+                             std::move(endpoints.server));
   ASSERT_TRUE(response.ok()) << response;
   ASSERT_TRUE(response->is_ok()) << static_cast<uint32_t>(response->error_value());
 
   fdio_ns_t* ns;
   EXPECT_EQ(ZX_OK, fdio_ns_get_installed(&ns));
-  EXPECT_EQ(ZX_OK, fdio_ns_bind(ns, "/loader_out", endpoints->client.TakeChannel().release()));
+  EXPECT_EQ(ZX_OK, fdio_ns_bind(ns, "/loader_out", endpoints.client.TakeChannel().release()));
   auto cleanup_binding = fit::defer([&]() { fdio_ns_unbind(ns, "/loader_out"); });
 
   const std::string debug_path("/loader_out/debug/");

@@ -74,12 +74,11 @@ TEST(MagmaNotification, NotAfterShutdown) {
   auto dev = std::unique_ptr<MagmaSystemDevice>(
       MagmaSystemDevice::Create(msd_driver.get(), std::move(msd_dev)));
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Primary>();
-  ASSERT_TRUE(endpoints.is_ok());
+  auto endpoints = fidl::Endpoints<fuchsia_gpu_magma::Primary>::Create();
   auto notification_endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Notification>();
   ASSERT_TRUE(notification_endpoints.is_ok());
   auto zircon_connection =
-      dev->Open(0, std::move(endpoints->server), std::move(notification_endpoints->server));
+      dev->Open(0, std::move(endpoints.server), std::move(notification_endpoints->server));
 
   dev->StartConnectionThread(std::move(zircon_connection), [](const char* role_profile) {});
   auto completion = connection_ptr->completion();
@@ -99,19 +98,18 @@ TEST(MagmaNotification, NotAfterConnectionTeardown) {
   auto dev = std::unique_ptr<MagmaSystemDevice>(
       MagmaSystemDevice::Create(msd_driver.get(), std::move(msd_dev)));
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Primary>();
-  ASSERT_TRUE(endpoints.is_ok());
+  auto endpoints = fidl::Endpoints<fuchsia_gpu_magma::Primary>::Create();
   auto notification_endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Notification>();
   ASSERT_TRUE(notification_endpoints.is_ok());
   auto zircon_connection =
-      dev->Open(0, std::move(endpoints->server), std::move(notification_endpoints->server));
+      dev->Open(0, std::move(endpoints.server), std::move(notification_endpoints->server));
 
   dev->StartConnectionThread(std::move(zircon_connection), [](const char* role_profile) {});
   auto completion = connection_ptr->completion();
   connection_ptr->SendTask();
 
   // Should trigger the client connection to close.
-  endpoints->client.reset();
+  endpoints.client.reset();
   completion->Wait();
 
   dev->Shutdown();

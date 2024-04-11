@@ -61,28 +61,26 @@ TEST(DependencyInjection, Load) {
   EXPECT_TRUE(device);
   auto* child = parent->GetLatestChild();
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::DependencyInjection>();
-  ASSERT_TRUE(endpoints.is_ok());
+  auto endpoints = fidl::Endpoints<fuchsia_gpu_magma::DependencyInjection>::Create();
   std::optional<fidl::ServerBindingRef<fuchsia_gpu_magma::DependencyInjection>> binding =
-      fidl::BindServer(fidl_loop.dispatcher(), std::move(endpoints->server),
+      fidl::BindServer(fidl_loop.dispatcher(), std::move(endpoints.server),
                        static_cast<fidl::WireServer<fuchsia_gpu_magma::DependencyInjection>*>(
                            child->GetDeviceContext<magma::MagmaDependencyInjectionDevice>()));
   EXPECT_EQ(ZX_OK, fidl_loop.StartThread("fidl-server-thread"));
 
   EXPECT_EQ(ZX_OK, loop.StartThread("memory-pressure-thread"));
 
-  fidl::WireSyncClient client{std::move(endpoints->client)};
+  fidl::WireSyncClient client{std::move(endpoints.client)};
 
-  auto provider_endpoints = fidl::CreateEndpoints<fuchsia_memorypressure::Provider>();
-  ASSERT_TRUE(provider_endpoints.is_ok());
+  auto provider_endpoints = fidl::Endpoints<fuchsia_memorypressure::Provider>::Create();
   async::PostTask(loop.dispatcher(),
-                  [&loop, server = std::move(provider_endpoints->server), &provider]() mutable {
+                  [&loop, server = std::move(provider_endpoints.server), &provider]() mutable {
                     provider.binding_set().AddBinding(loop.dispatcher(), std::move(server),
                                                       &provider, fidl::kIgnoreBindingClosure);
                   });
 
   EXPECT_EQ(ZX_OK,
-            client->SetMemoryPressureProvider(std::move(provider_endpoints->client)).status());
+            client->SetMemoryPressureProvider(std::move(provider_endpoints.client)).status());
 
   sync_completion_wait(&owner.completion(), ZX_TIME_INFINITE);
   EXPECT_EQ(owner.level(), msd::MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL);

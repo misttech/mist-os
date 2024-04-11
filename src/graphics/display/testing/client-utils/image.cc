@@ -79,12 +79,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
 
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> token;
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-    if (endpoints.is_error()) {
-      fprintf(stderr, "Failed to allocate shared collection: %s\n", endpoints.status_string());
-      return nullptr;
-    }
-    auto& [client, server] = endpoints.value();
+    auto [client, server] = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
     const fidl::OneWayStatus result = allocator->AllocateSharedCollection(std::move(server));
     if (!result.ok()) {
       fprintf(stderr, "Failed to allocate shared collection: %s\n",
@@ -95,12 +90,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
   }
   fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> display_token_handle;
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-    if (endpoints.is_error()) {
-      fprintf(stderr, "Failed to duplicate token: %s\n", endpoints.status_string());
-      return nullptr;
-    }
-    auto& [client, server] = endpoints.value();
+    auto [client, server] = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
     const fidl::OneWayStatus result =
         token->Duplicate(/*rights_attenuation_mask=*/0xffffffff, std::move(server));
     if (!result.ok()) {
@@ -138,12 +128,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
 
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection;
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-    if (endpoints.is_error()) {
-      fprintf(stderr, "Failed to bind shared collection: %s\n", endpoints.status_string());
-      return nullptr;
-    }
-    auto& [client, server] = endpoints.value();
+    auto [client, server] = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
     const fidl::OneWayStatus result =
         allocator->BindSharedCollection(token.TakeClientEnd(), std::move(server));
     if (!result.ok()) {
