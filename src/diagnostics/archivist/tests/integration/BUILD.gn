@@ -88,30 +88,9 @@ fuchsia_test_component("archivist_integration_tests") {
   test_type = "system"
 }
 
-resource("filter_feedback") {
-  sources = [ "configs/pipelines/static_selectors.cfg" ]
-  outputs = [
-    "data/config/pipelines/feedback_filtered/feedback/static_selectors.cfg",
-  ]
-}
-
-resource("filter_lowpan") {
-  sources = [ "configs/pipelines/static_selectors.cfg" ]
-  outputs =
-      [ "data/config/pipelines/lowpan_filtered/lowpan/static_selectors.cfg" ]
-}
-
-resource("do_not_filter_feedback") {
-  sources = [ "configs/pipelines/DISABLE_FILTERING.txt" ]
-  outputs = [ "data/config/pipelines/feedback_filtering_disabled/feedback/DISABLE_FILTERING.txt" ]
-}
-
 fuchsia_test_package("archivist-integration-tests") {
   test_components = [ ":archivist_integration_tests" ]
   deps = [
-    ":do_not_filter_feedback",
-    ":filter_feedback",
-    ":filter_lowpan",
     "components",
     "//src/diagnostics/archivist/testing/realm-factory:archivist-component",
     "//src/diagnostics/iquery/test/test_component",

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{constants::*, test_topology};
+use crate::test_topology;
 use anyhow::Error;
 use archivist_lib::constants;
 use diagnostics_assertions::{assert_data_tree, assert_json_diff, AnyProperty};
@@ -10,8 +10,8 @@ use diagnostics_reader::{ArchiveReader, Inspect};
 use difference::assert_diff;
 use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, ArchiveAccessorProxy};
-use fuchsia_component_test::RealmInstance;
 use lazy_static::lazy_static;
+use realm_proxy_client::RealmProxyClient;
 
 const MONIKER_KEY: &str = "moniker";
 const METADATA_KEY: &str = "metadata";
@@ -150,7 +150,6 @@ async fn unified_reader() -> Result<(), Error> {
     .expect("create realm");
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, "puppet").await.unwrap();
-
     puppet.emit_example_inspect_data().unwrap();
 
     // First, retrieve all of the information in our realm to make sure that everything
@@ -202,28 +201,27 @@ async fn unified_reader() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn feedback_canonical_reader_test() -> Result<(), Error> {
-    let (builder, test_realm) = test_topology::create(test_topology::Options {
-        archivist_config: ftest::ArchivistConfig {
+    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+        puppets: Some(vec![test_topology::PuppetDeclBuilder::new("test_component").into()]),
+        archivist_config: Some(ftest::ArchivistConfig {
             pipelines_path: Some("/pkg/data/config/pipelines/feedback_filtered".to_string()),
             ..Default::default()
-        },
-        realm_name: None,
+        }),
+        ..Default::default()
     })
     .await
     .expect("create base topology");
-    test_topology::add_eager_child(&test_realm, "test_component", IQUERY_TEST_COMPONENT_URL)
-        .await
-        .expect("add child a");
 
-    let instance = builder.build().await.expect("create instance");
+    let puppet = test_topology::connect_to_puppet(&realm_proxy, "test_component").await.unwrap();
+    puppet.emit_example_inspect_data().unwrap();
 
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
-    let accessor = connect_to_feedback_accessor(&instance);
+    let accessor = connect_to_feedback_accessor(&realm_proxy).await;
     retrieve_and_validate_results(accessor, Vec::new(), &PIPELINE_ALL_GOLDEN, 1).await;
 
     // Then verify that from the expected data, we can retrieve one specific value.
-    let accessor = connect_to_feedback_accessor(&instance);
+    let accessor = connect_to_feedback_accessor(&realm_proxy).await;
     retrieve_and_validate_results(
         accessor,
         vec!["test_component:*:lazy-*"],
@@ -233,13 +231,13 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
     .await;
 
     // Then verify that subtree selection retrieves all trees under and including root.
-    let accessor = connect_to_feedback_accessor(&instance);
+    let accessor = connect_to_feedback_accessor(&realm_proxy).await;
     retrieve_and_validate_results(accessor, vec!["test_component:root"], &PIPELINE_ALL_GOLDEN, 1)
         .await;
 
     // Then verify that client selectors dont override the static selectors provided
     // to the archivist.
-    let accessor = connect_to_feedback_accessor(&instance);
+    let accessor = connect_to_feedback_accessor(&realm_proxy).await;
     retrieve_and_validate_results(
         accessor,
         vec![r"test_component:root:array\:0x15"],
@@ -248,74 +246,75 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
     )
     .await;
 
-    assert!(pipeline_is_filtered(instance, 1, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
+    assert!(pipeline_is_filtered(realm_proxy, 1, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
 
     Ok(())
 }
 
 #[fuchsia::test]
 async fn feedback_disabled_pipeline() -> Result<(), Error> {
-    let (builder, test_realm) = test_topology::create(test_topology::Options {
-        realm_name: None,
-        archivist_config: ftest::ArchivistConfig {
+    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+        puppets: Some(vec![test_topology::PuppetDeclBuilder::new("test_component").into()]),
+        archivist_config: Some(ftest::ArchivistConfig {
             pipelines_path: Some(
                 "/pkg/data/config/pipelines/feedback_filtering_disabled".to_string(),
             ),
             ..Default::default()
-        },
+        }),
+        ..Default::default()
     })
     .await
     .expect("create base topology");
-    test_topology::add_eager_child(&test_realm, "test_component", IQUERY_TEST_COMPONENT_URL)
-        .await
-        .expect("add child a");
 
-    let instance = builder.build().await.expect("create instance");
-    assert!(!pipeline_is_filtered(instance, 2, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
+    let puppet = test_topology::connect_to_puppet(&realm_proxy, "test_component").await.unwrap();
+    puppet.emit_example_inspect_data().unwrap();
+
+    assert!(!pipeline_is_filtered(realm_proxy, 2, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
 
     Ok(())
 }
 
 #[fuchsia::test]
 async fn feedback_pipeline_missing_selectors() -> Result<(), Error> {
-    let (builder, test_realm) = test_topology::create(test_topology::Options::default())
-        .await
-        .expect("create base topology");
-    test_topology::add_eager_child(&test_realm, "test_component", IQUERY_TEST_COMPONENT_URL)
-        .await
-        .expect("add child a");
+    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+        puppets: Some(vec![test_topology::PuppetDeclBuilder::new("test_component").into()]),
+        archivist_config: Some(ftest::ArchivistConfig::default()),
+        ..Default::default()
+    })
+    .await
+    .expect("create base topology");
 
-    let instance = builder.build().await.expect("create instance");
+    let puppet = test_topology::connect_to_puppet(&realm_proxy, "test_component").await.unwrap();
+    puppet.emit_example_inspect_data().unwrap();
 
-    assert!(!pipeline_is_filtered(instance, 2, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
+    assert!(!pipeline_is_filtered(realm_proxy, 2, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
 
     Ok(())
 }
 
 #[fuchsia::test]
 async fn lowpan_canonical_reader_test() -> Result<(), Error> {
-    let (builder, test_realm) = test_topology::create(test_topology::Options {
-        archivist_config: ftest::ArchivistConfig {
+    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+        puppets: Some(vec![test_topology::PuppetDeclBuilder::new("test_component").into()]),
+        archivist_config: Some(ftest::ArchivistConfig {
             pipelines_path: Some("/pkg/data/config/pipelines/lowpan_filtered".to_string()),
             ..Default::default()
-        },
-        realm_name: None,
+        }),
+        ..Default::default()
     })
     .await
     .expect("create base topology");
-    test_topology::add_eager_child(&test_realm, "test_component", IQUERY_TEST_COMPONENT_URL)
-        .await
-        .expect("add child a");
 
-    let instance = builder.build().await.expect("create instance");
+    let puppet = test_topology::connect_to_puppet(&realm_proxy, "test_component").await.unwrap();
+    puppet.emit_example_inspect_data().unwrap();
 
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
-    let accessor = connect_to_lowpan_accessor(&instance);
+    let accessor = connect_to_lowpan_accessor(&realm_proxy).await;
     retrieve_and_validate_results(accessor, Vec::new(), &PIPELINE_ALL_GOLDEN, 1).await;
 
     // Then verify that from the expected data, we can retrieve one specific value.
-    let accessor = connect_to_lowpan_accessor(&instance);
+    let accessor = connect_to_lowpan_accessor(&realm_proxy).await;
     retrieve_and_validate_results(
         accessor,
         vec!["test_component:*:lazy-*"],
@@ -325,13 +324,13 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
     .await;
 
     // Then verify that subtree selection retrieves all trees under and including root.
-    let accessor = connect_to_lowpan_accessor(&instance);
+    let accessor = connect_to_lowpan_accessor(&realm_proxy).await;
     retrieve_and_validate_results(accessor, vec!["test_component:root"], &PIPELINE_ALL_GOLDEN, 1)
         .await;
 
     // Then verify that client selectors dont override the static selectors provided
     // to the archivist.
-    let accessor = connect_to_lowpan_accessor(&instance);
+    let accessor = connect_to_lowpan_accessor(&realm_proxy).await;
     retrieve_and_validate_results(
         accessor,
         vec![r"test_component:root:array\:0x15"],
@@ -340,26 +339,26 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
     )
     .await;
 
-    assert!(pipeline_is_filtered(instance, 1, constants::LOWPAN_ARCHIVE_ACCESSOR_NAME).await);
+    assert!(pipeline_is_filtered(realm_proxy, 1, constants::LOWPAN_ARCHIVE_ACCESSOR_NAME).await);
 
     Ok(())
 }
 
-fn connect_to_feedback_accessor(instance: &RealmInstance) -> ArchiveAccessorProxy {
-    instance
-        .root
-        .connect_to_named_protocol_at_exposed_dir::<ArchiveAccessorMarker>(
+async fn connect_to_feedback_accessor(realm_proxy: &RealmProxyClient) -> ArchiveAccessorProxy {
+    realm_proxy
+        .connect_to_named_protocol::<ArchiveAccessorMarker>(
             "fuchsia.diagnostics.FeedbackArchiveAccessor",
         )
+        .await
         .unwrap()
 }
 
-fn connect_to_lowpan_accessor(instance: &RealmInstance) -> ArchiveAccessorProxy {
-    instance
-        .root
-        .connect_to_named_protocol_at_exposed_dir::<ArchiveAccessorMarker>(
+async fn connect_to_lowpan_accessor(realm_proxy: &RealmProxyClient) -> ArchiveAccessorProxy {
+    realm_proxy
+        .connect_to_named_protocol::<ArchiveAccessorMarker>(
             "fuchsia.diagnostics.LoWPANArchiveAccessor",
         )
+        .await
         .unwrap()
 }
 
@@ -437,14 +436,12 @@ fn process_results_for_comparison(results: serde_json::Value) -> serde_json::Val
 }
 
 async fn pipeline_is_filtered(
-    instance: RealmInstance,
+    realm: RealmProxyClient,
     expected_results_count: usize,
     accessor_name: &str,
 ) -> bool {
-    let archive_accessor = instance
-        .root
-        .connect_to_named_protocol_at_exposed_dir::<ArchiveAccessorMarker>(accessor_name)
-        .unwrap();
+    let archive_accessor =
+        realm.connect_to_named_protocol::<ArchiveAccessorMarker>(accessor_name).await.unwrap();
 
     let pipeline_results = ArchiveReader::new()
         .with_archive(archive_accessor)
@@ -453,8 +450,7 @@ async fn pipeline_is_filtered(
         .await
         .expect("got result");
 
-    let all_archive_accessor =
-        instance.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
+    let all_archive_accessor = realm.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
 
     let all_results = ArchiveReader::new()
         .with_archive(all_archive_accessor)

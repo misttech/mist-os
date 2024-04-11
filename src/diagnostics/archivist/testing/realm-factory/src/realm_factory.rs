@@ -71,6 +71,8 @@ impl ArchivistRealmFactory {
         // LINT.ThenChange(//src/diagnostics/archivist/testing/realm-factory/meta/realm-factory.cml)
         let archivist_to_parent = Route::new()
             .capability(Capability::protocol::<fdiagnostics::ArchiveAccessorMarker>())
+            .capability(Capability::protocol_by_name("fuchsia.diagnostics.FeedbackArchiveAccessor"))
+            .capability(Capability::protocol_by_name("fuchsia.diagnostics.LoWPANArchiveAccessor"))
             .capability(Capability::protocol::<fdiagnostics::LogSettingsMarker>())
             .capability(Capability::protocol::<flogger::LogSinkMarker>())
             .capability(Capability::protocol::<finspect::InspectSinkMarker>())

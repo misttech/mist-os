@@ -57,6 +57,9 @@ fuchsia_package("realm-factory") {
   deps = [
     ":archivist-component",
     ":archivist-realm-factory-component",
+    ":do_not_filter_feedback",
+    ":filter_feedback",
+    ":filter_lowpan",
   ]
   subpackages = [
     # The puppet is subpackaged instead of included locally because the inspect
@@ -66,4 +69,22 @@ fuchsia_package("realm-factory") {
     # relative URL for this property.
     "//src/diagnostics/archivist/testing/puppet",
   ]
+}
+
+resource("filter_feedback") {
+  sources = [ "configs/pipelines/static_selectors.cfg" ]
+  outputs = [
+    "data/config/pipelines/feedback_filtered/feedback/static_selectors.cfg",
+  ]
+}
+
+resource("do_not_filter_feedback") {
+  sources = [ "configs/pipelines/DISABLE_FILTERING.txt" ]
+  outputs = [ "data/config/pipelines/feedback_filtering_disabled/feedback/DISABLE_FILTERING.txt" ]
+}
+
+resource("filter_lowpan") {
+  sources = [ "configs/pipelines/static_selectors.cfg" ]
+  outputs =
+      [ "data/config/pipelines/lowpan_filtered/lowpan/static_selectors.cfg" ]
 }
