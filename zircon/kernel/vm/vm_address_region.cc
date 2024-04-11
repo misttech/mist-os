@@ -1134,6 +1134,25 @@ zx_status_t VmAddressRegion::ReserveSpace(const char* name, vaddr_t base, size_t
     return status;
   }
   vmo->set_name(name, strlen(name));
+
+  // Set the cache policy on the VMO to match arch_mmu_flags to squelch a warning elsewhere when
+  // the mapping is created.
+  switch (arch_mmu_flags & ARCH_MMU_FLAG_CACHE_MASK) {
+    case ARCH_MMU_FLAG_UNCACHED:
+      vmo->SetMappingCachePolicy(ZX_CACHE_POLICY_UNCACHED);
+      break;
+    case ARCH_MMU_FLAG_UNCACHED_DEVICE:
+      vmo->SetMappingCachePolicy(ZX_CACHE_POLICY_UNCACHED_DEVICE);
+      break;
+    case ARCH_MMU_FLAG_WRITE_COMBINING:
+      vmo->SetMappingCachePolicy(ZX_CACHE_POLICY_WRITE_COMBINING);
+      break;
+    case ARCH_MMU_FLAG_CACHED:
+      break;  // nop
+    default:
+      panic("unhandled arch_mmu_flags %#x\n", arch_mmu_flags);
+  }
+
   // allocate a region and put it in the aspace list.
   // Need to set the VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING since we are 'cheating' with this fake
   // zero-length VMO and so the checks that the pages in that VMO are pinned would otherwise fail.

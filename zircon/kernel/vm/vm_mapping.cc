@@ -1207,8 +1207,8 @@ void VmMapping::ActivateLocked() {
     // something in the kernel maps into their aspace incorrectly.
     if ((arch_mmu_flags & ARCH_MMU_FLAG_CACHE_MASK) != 0) {
       TRACEF(
-          "warning: mapping has conflicting cache policies: vmo %02x "
-          "arch_mmu_flags %02x.\n",
+          "warning: mapping has conflicting cache policies: vmo %#02x "
+          "arch_mmu_flags %#02x.\n",
           cache_policy, arch_mmu_flags & ARCH_MMU_FLAG_CACHE_MASK);
       // Clear the existing cache policy and use the new one.
       arch_mmu_flags &= ~ARCH_MMU_FLAG_CACHE_MASK;
