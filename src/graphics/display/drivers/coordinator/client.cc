@@ -574,34 +574,40 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
-    zxlogf(ERROR, "SetLayerImage ordinal with invalid layer %lu", request->layer_id.value);
+    zxlogf(ERROR, "SetLayerImage with invalid layer ID: %" PRIu64, request->layer_id.value);
     TearDown();
     return;
   }
   if (layer->pending_type() != LAYER_TYPE_PRIMARY) {
-    zxlogf(ERROR, "SetLayerImage ordinal with bad layer type");
+    zxlogf(ERROR, "SetLayerImage with invalid layer type: %" PRIu32, layer->pending_type());
     TearDown();
     return;
   }
 
   const ImageId image_id = ToImageId(request->image_id);
-  auto image = images_.find(image_id);
-  if (!image.IsValid() || !image->Acquire()) {
-    zxlogf(ERROR, "SetLayerImage ordinal with %s image", !image.IsValid() ? "invl" : "busy");
+  auto image_it = images_.find(image_id);
+  if (!image_it.IsValid()) {
+    zxlogf(ERROR, "SetLayerImage with invalid image ID: %" PRIu64, image_id.value());
     TearDown();
     return;
   }
+
+  Image& image = *image_it;
+  if (!image.Acquire()) {
+    zxlogf(ERROR, "SetLayerImage with image that is already in use");
+    TearDown();
+    return;
+  }
+
   const image_t* cur_image = layer->pending_image();
   // TODO(https://fxbug.dev/42076907): Warning: Currently we only compare size and usage
   // type between `image` and `layer`. This implicitly assume that images can
   // be applied to any layer as long as the format is negotiated by sysmem,
   // which may not be true in the future. We should figure out a way to better
   // indicate pixel format support of a Layer in display Controller API.
-  if (!image->HasSameDisplayPropertiesAsLayer(*cur_image)) {
-    zxlogf(ERROR, "SetLayerImage with mismatch layer config");
-    if (image.IsValid()) {
-      image->DiscardAcquire();
-    }
+  if (!image.HasSameDisplayPropertiesAsLayer(*cur_image)) {
+    zxlogf(ERROR, "SetLayerImage with mismatching layer and image metadata");
+    image.DiscardAcquire();
     TearDown();
     return;
   }
@@ -610,7 +616,7 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
   const EventId signal_event_id = ToEventId(request->signal_event_id);
   // TODO(https://fxbug.dev/42080337): Check if the IDs are valid (i.e. imported but not
   // yet released) before calling SetImage().
-  layer->SetImage(image.CopyPointer(), wait_event_id, signal_event_id);
+  layer->SetImage(image_it.CopyPointer(), wait_event_id, signal_event_id);
   // no Reply defined
 }
 
