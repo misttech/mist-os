@@ -251,9 +251,15 @@ where
 async fn main() -> Result<(), Error> {
     let config = httpsdate_config::Config::take_from_startup_handle();
     let time_source_url = config.time_source_endpoint_url.clone();
+
+    let inspector = fuchsia_inspect::component::inspector();
+    // Export structured configuration into diagnostics.
+    inspector.root().record_child("config", |config_node| config.record_inspect(config_node));
+    let inspect = InspectDiagnostics::new(inspector.root());
+
+    // From here on, use the local type `Config` for configuration bits.
     let config: Config = config.into();
 
-    let inspect = InspectDiagnostics::new(fuchsia_inspect::component::inspector().root());
     let (cobalt, cobalt_sender_fut) = CobaltDiagnostics::new();
     let diagnostics = CompositeDiagnostics::new(inspect, cobalt);
 
