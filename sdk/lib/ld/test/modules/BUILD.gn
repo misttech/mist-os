@@ -176,7 +176,12 @@ template("_test_non_executable") {
 template("test_shared_library") {
   _test_non_executable(target_name) {
     target_type = "shared_library"
+    configs = []
     forward_variables_from(invoker, "*", [ "target_type" ])
+
+    # Make sure a system dlopen loading the shared library as a dependency of
+    # another module will look for its own dependencies adjacent to it.
+    configs += [ ":runpath-origin" ]
   }
 }
 
