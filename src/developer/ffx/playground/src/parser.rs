@@ -30,9 +30,11 @@ use nom::multi::{
     fold_many0, many0, many0_count, many1, many_till, separated_list, separated_nonempty_list,
 };
 use nom::sequence::{delimited, pair, preceded, separated_pair, terminated, tuple};
+use nom::Slice;
 use nom_locate::LocatedSpan;
 use std::cell::RefCell;
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::hash::Hash;
 use std::rc::Rc;
 
 /// Value indicating whether a variable is mutable or constant
@@ -67,22 +69,50 @@ impl<'a> nom_error::ParseError<ESpan<'a>> for Error<'a> {
 
 type IResult<'a, O> = nom::IResult<ESpan<'a>, O, Error<'a>>;
 
+/// Indicates a type of tab completion that might be able to occur at a given position.
+#[derive(Debug, Clone)]
+pub enum TabHint<'a> {
+    Invocable(Span<'a>),
+    CommandArgument(Span<'a>),
+}
+
 /// Global parser state which keeps track of backtracking as well as tab completion.
 #[derive(Debug, Clone)]
 struct ParseState<'a> {
     errors_accepted: Vec<(Span<'a>, String)>,
     trying: Option<(Span<'a>, String)>,
     errors_new: Vec<(Span<'a>, String)>,
+    /// Accumulates [`ParseResult::tab_completions`]
+    tab_completions: BTreeMap<usize, Vec<TabHint<'a>>>,
+    /// Accumulates [`ParseResult::whitespace`]
+    whitespace: HashSet<HashSpanWrapper<'a>>,
 }
 
 impl<'a> ParseState<'a> {
     fn new() -> Self {
-        ParseState { errors_accepted: Vec::new(), trying: None, errors_new: Vec::new() }
+        ParseState {
+            errors_accepted: Vec::new(),
+            trying: None,
+            errors_new: Vec::new(),
+            tab_completions: BTreeMap::new(),
+            whitespace: HashSet::new(),
+        }
     }
 }
 
 pub type Span<'a> = LocatedSpan<&'a str>;
 type ESpan<'a> = LocatedSpan<&'a str, Rc<RefCell<ParseState<'a>>>>;
+
+/// Wrapper around a [`Span`] that implements [`Hash`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct HashSpanWrapper<'a>(Span<'a>);
+
+impl<'a> Hash for HashSpanWrapper<'a> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.location_offset().hash(state);
+        self.0.fragment().hash(state);
+    }
+}
 
 trait StripParseState<'a> {
     fn strip_parse_state(self) -> Span<'a>;
@@ -390,9 +420,17 @@ impl ParameterList<'_> {
 }
 
 /// Result of parsing. Contains a Node which roots the parse tree and a list of errors.
+#[derive(Debug)]
 pub struct ParseResult<'a> {
     pub tree: Node<'a>,
     pub errors: Vec<(Span<'a>, String)>,
+
+    /// Positions where we might be able to tab-complete
+    pub tab_completions: BTreeMap<usize, Vec<TabHint<'a>>>,
+
+    /// Ranges where there is whitespace in the parsed text. Used mostly to move
+    /// around hints from tab_completions.
+    pub whitespace: Vec<Span<'a>>,
 }
 
 impl<'a> From<&'a str> for ParseResult<'a> {
@@ -407,12 +445,17 @@ impl<'a> From<&'a str> for ParseResult<'a> {
         )))(text)
         .expect("Incorrectly handled parse error");
 
-        let mut errors = std::mem::take(&mut end_pos.extra.borrow_mut().errors_accepted);
-        if let Some(last) = end_pos.extra.borrow_mut().trying.take() {
+        let extra = Rc::try_unwrap(end_pos.extra).unwrap().into_inner();
+
+        let mut errors = extra.errors_accepted;
+        if let Some(last) = extra.trying {
             errors.push(last)
         }
+        let tab_completions = extra.tab_completions;
+        let mut whitespace: Vec<Span<'a>> = extra.whitespace.into_iter().map(|x| x.0).collect();
+        whitespace.sort_by_key(|x| x.location_offset());
 
-        ParseResult { tree, errors }
+        ParseResult { tree, errors, tab_completions, whitespace }
     }
 }
 
@@ -543,6 +586,32 @@ fn ws_separated_nonempty_list<
     separated_nonempty_list(ws_around(fs), f)
 }
 
+/// Marks the contained parser as parsing something which could be tab-completed.
+fn completion_hint<'a, X>(
+    f: impl Fn(ESpan<'a>) -> IResult<'a, X>,
+    hint: impl Fn(Span<'a>) -> TabHint<'a>,
+) -> impl Fn(ESpan<'a>) -> IResult<'a, X> {
+    move |span| {
+        let hint_span = span.clone();
+        let ret = f(span);
+
+        let hint_span = if let Ok((end, _)) = &ret {
+            let start = hint_span.location_offset();
+            let len = end.location_offset() - start;
+            hint_span.slice(..len)
+        } else {
+            hint_span.slice(..0)
+        };
+
+        let extra = Rc::clone(&hint_span.extra);
+        let location = hint_span.location_offset();
+        let hint = hint(hint_span.strip_parse_state());
+        extra.borrow_mut().tab_completions.entry(location).or_insert_with(Vec::new).push(hint);
+
+        ret
+    }
+}
+
 /// Left-associative operator parsing.
 fn lassoc<
     'a: 'b,
@@ -609,10 +678,19 @@ fn kw<'s>(kw: &'s str) -> impl for<'a> Fn(ESpan<'a>) -> IResult<'a, ESpan<'a>> +
 /// # This line will parse entirely as whitespace.
 /// ```
 fn whitespace<'a>(input: ESpan<'a>) -> IResult<'a, ESpan<'a>> {
-    recognize(many1(alt((
-        take_while1(char::is_whitespace),
-        recognize(tuple((chr('#'), many_till(anychar, chr('\n'))))),
-    ))))(input)
+    map(
+        recognize(many1(alt((
+            take_while1(char::is_whitespace),
+            recognize(tuple((chr('#'), many_till(anychar, chr('\n'))))),
+        )))),
+        |span: ESpan<'a>| {
+            span.extra
+                .borrow_mut()
+                .whitespace
+                .insert(HashSpanWrapper(span.clone().strip_parse_state()));
+            span
+        },
+    )(input)
 }
 
 /// Unescaped Identifiers are defined as follows:
@@ -1302,19 +1380,22 @@ fn invocation<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     alt((
         map(
             pair(
-                identifier,
-                many0(ws_before(alt((
-                    delimited(
-                        not(tag(".")),
-                        simple_expression,
-                        peek(alt((
-                            recognize(whitespace),
-                            recognize(one_of("|&;)}")),
-                            recognize(not(anychar)),
-                        ))),
-                    ),
-                    bare_string,
-                )))),
+                completion_hint(identifier, TabHint::Invocable),
+                many0(ws_before(completion_hint(
+                    alt((
+                        delimited(
+                            not(tag(".")),
+                            simple_expression,
+                            peek(alt((
+                                recognize(whitespace),
+                                recognize(one_of("|&;)}")),
+                                recognize(not(anychar)),
+                            ))),
+                        ),
+                        bare_string,
+                    )),
+                    TabHint::CommandArgument,
+                ))),
             ),
             |(first, args)| {
                 Node::Invocation(
@@ -1825,5 +1906,49 @@ mod test {
             r#"cd .."#,
             Node::Program(vec![Node::Invocation(sp("cd"), vec![Node::BareString(sp(".."))])]),
         );
+    }
+
+    #[test]
+    fn tab_complete_empty_start() {
+        let result = ParseResult::from("  ");
+
+        assert_eq!(1, result.tab_completions.len());
+        let (key, completions) = result.tab_completions.last_key_value().unwrap();
+        assert_eq!(2, *key);
+        assert_eq!(1, completions.len());
+        let TabHint::Invocable(arg) = &completions[0] else { panic!() };
+        assert_eq!("", *arg.fragment());
+        assert_eq!(1, result.whitespace.len());
+        assert_eq!("  ", *result.whitespace[0].fragment());
+    }
+
+    #[test]
+    fn tab_complete_cmd() {
+        let result = ParseResult::from("  open /ab ");
+
+        assert_eq!(3, result.tab_completions.len());
+        let tab_completions = result
+            .tab_completions
+            .into_iter()
+            .map(|(x, mut y)| {
+                assert!(y.len() == 1);
+                (x, y.pop().unwrap())
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(3, tab_completions.len());
+        assert_eq!(2, tab_completions[0].0);
+        assert_eq!(7, tab_completions[1].0);
+        assert_eq!(11, tab_completions[2].0);
+        let TabHint::Invocable(cmd) = &tab_completions[0].1 else { panic!() };
+        assert_eq!("open", *cmd.fragment());
+        let TabHint::CommandArgument(arg) = &tab_completions[1].1 else { panic!() };
+        assert_eq!("/ab", *arg.fragment());
+        let TabHint::CommandArgument(arg) = &tab_completions[2].1 else { panic!() };
+        assert_eq!("", *arg.fragment());
+
+        assert_eq!(3, result.whitespace.len());
+        assert_eq!("  ", *result.whitespace[0].fragment());
+        assert_eq!(" ", *result.whitespace[1].fragment());
+        assert_eq!(" ", *result.whitespace[2].fragment());
     }
 }
