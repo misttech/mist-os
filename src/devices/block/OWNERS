@@ -1,4 +1,2 @@
 include /src/storage/OWNERS
-bradenkell@google.com
-hanbinyoon@google.com
-hansens@google.com
+include /src/devices/platform/OWNERS

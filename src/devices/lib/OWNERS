@@ -1,6 +1,2 @@
 include /src/devices/driver_framework/OWNERS
-
-bradenkell@google.com
-surajmalhotra@google.com
-andresoportus@google.com
-gkalsi@google.com
+include /src/devices/platform/OWNERS
