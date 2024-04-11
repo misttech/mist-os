@@ -12,4 +12,5 @@
     num_polls_urgency_medium: 5,
     max_attempts_urgency_high: 3,
     num_polls_urgency_high: 3,
+    time_source_endpoint_url: "https://clients3.google.com/generate_204",
 }

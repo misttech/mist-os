@@ -41,10 +41,6 @@ const RETRY_STRATEGY: RetryStrategy = RetryStrategy {
     maintain_time_between_samples: zx::Duration::from_minutes(20),
 };
 
-/// URI used to obtain time samples.
-// TODO(https://fxbug.dev/42147665): Allow configuration per product.
-const REQUEST_URI: &str = "https://clients3.google.com/generate_204";
-
 /// HttpsDate config, populated from build-time generated structured config.
 pub struct Config {
     https_timeout: zx::Duration,
@@ -253,13 +249,15 @@ where
 
 #[fuchsia::main(logging_tags=["time"])]
 async fn main() -> Result<(), Error> {
-    let config: Config = httpsdate_config::Config::take_from_startup_handle().into();
+    let config = httpsdate_config::Config::take_from_startup_handle();
+    let time_source_url = config.time_source_endpoint_url.clone();
+    let config: Config = config.into();
 
     let inspect = InspectDiagnostics::new(fuchsia_inspect::component::inspector().root());
     let (cobalt, cobalt_sender_fut) = CobaltDiagnostics::new();
     let diagnostics = CompositeDiagnostics::new(inspect, cobalt);
 
-    let sampler = HttpsSamplerImpl::new(REQUEST_URI.parse()?, &config);
+    let sampler = HttpsSamplerImpl::new(time_source_url.parse()?, &config);
 
     let interface_state_service = fuchsia_component::client::connect_to_protocol::<StateMarker>()
         .context("failed to connect to fuchsia.net.interfaces/State")?;

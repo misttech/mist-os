@@ -41,6 +41,17 @@
         },
     ],
     config: {
+        // The endpoint URL for querying time information. The HTTPS time source
+        // uses the time reported in HTTPS responses to estimate current time.
+        // None of the other approaches such as NTP are acceptable for Fuchsia
+        // products in general.
+        time_source_endpoint_url: {
+            type: "string",
+
+            // A nice, round, number.
+            max_size: 1024,
+        },
+
         // HTTPS request is considered failed after the timeout.
         https_timeout_sec: { type: "uint8" },
 

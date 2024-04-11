@@ -32,4 +32,7 @@
 
     // Fastest possible sample that gives an acceptable worst case slew duration.
     num_polls_urgency_high: 3,
+
+    // URI used to obtain time samples.
+    time_source_endpoint_url: "https://clients3.google.com/generate_204",
 }
