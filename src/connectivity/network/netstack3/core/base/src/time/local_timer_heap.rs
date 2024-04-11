@@ -55,7 +55,11 @@ where
         value: V,
         at: BC::Instant,
     ) -> Option<(BC::Instant, V)> {
-        self.update_heap(bindings_ctx, |_bindings_ctx, heap| heap.schedule(timer, value, at))
+        let (prev_value, dirty) = self.heap.schedule(timer, value, at);
+        if dirty {
+            self.heal_and_reschedule(bindings_ctx);
+        }
+        prev_value
     }
 
     /// Like [`schedule_instant`] but does the instant math from current time.
@@ -77,9 +81,12 @@ where
 
     /// Pops an expired timer from the heap, if any.
     pub fn pop(&mut self, bindings_ctx: &mut BC) -> Option<(K, V)> {
-        self.update_heap(bindings_ctx, |bindings_ctx, heap| {
-            heap.pop_if(|t| t <= bindings_ctx.now())
-        })
+        let Self { next_wakeup: _, heap } = self;
+        let (popped, dirty) = heap.pop_if(|t| t <= bindings_ctx.now());
+        if dirty {
+            self.heal_and_reschedule(bindings_ctx);
+        }
+        popped
     }
 
     /// Returns the scheduled instant and associated value for `timer`, if it's
@@ -91,32 +98,27 @@ where
     /// Cancels `timer`, returning the scheduled instant and associated value if
     /// any.
     pub fn cancel(&mut self, bindings_ctx: &mut BC, timer: &K) -> Option<(BC::Instant, V)> {
-        self.update_heap(bindings_ctx, |_bindings_ctx, heap| heap.cancel(timer))
+        let (scheduled, dirty) = self.heap.cancel(timer);
+        if dirty {
+            self.heal_and_reschedule(bindings_ctx);
+        }
+        scheduled
     }
 
-    /// Calls the function with a mutable reference to the heap and updates the
-    /// scheduled time if the top of the heap changes.
-    fn update_heap<O, F: FnOnce(&mut BC, &mut KeyedHeap<K, V, BC::Instant>) -> O>(
-        &mut self,
-        bindings_ctx: &mut BC,
-        f: F,
-    ) -> O {
+    fn heal_and_reschedule(&mut self, bindings_ctx: &mut BC) {
         let Self { next_wakeup, heap } = self;
-        let top = heap.peek_time();
-        let ret = f(bindings_ctx, heap);
-        // Run the heap healing here before checking the top time again. This
-        // will prevent us from scheduling spurious wakeups if the top of the
-        // heap is already stale.
-        let _ = heap.pop_if(|_| false);
-        let new_top = heap.peek_time();
-        // Avoid updating the timer if the heap didn't change.
-        if new_top != top {
-            let _: Option<BC::Instant> = match new_top {
-                Some(time) => bindings_ctx.schedule_timer_instant2(time, next_wakeup),
-                None => bindings_ctx.cancel_timer2(next_wakeup),
-            };
-        }
-        ret
+        let mut new_top = None;
+        let _ = heap.pop_if(|t| {
+            // Extract the next time to fire, but don't pop it from the heap.
+            // This is equivalent to peeking, but it also "heals" the keyed heap
+            // by getting rid of stale entries.
+            new_top = Some(t);
+            false
+        });
+        let _: Option<BC::Instant> = match new_top {
+            Some(time) => bindings_ctx.schedule_timer_instant2(time, next_wakeup),
+            None => bindings_ctx.cancel_timer2(next_wakeup),
+        };
     }
 }
 
@@ -140,8 +142,21 @@ impl<K: Hash + Eq + Clone, V, T: Instant> KeyedHeap<K, V, T> {
         Self { map: HashMap::new(), heap: BinaryHeap::new() }
     }
 
-    fn schedule(&mut self, key: K, value: V, at: T) -> Option<(T, V)> {
+    /// Schedules `key` with associated `value` at time `at`.
+    ///
+    /// Returns the previously associated value and firing time for `key` +
+    /// a boolean indicating whether the top of the heap (i.e. the next timer to
+    /// fire) changed with this operation.
+    fn schedule(&mut self, key: K, value: V, at: T) -> (Option<(T, V)>, bool) {
         let Self { map, heap } = self;
+        // The top of the heap is changed if any of the following is true:
+        // - There were previously no entries in the heap.
+        // - The current top of the heap is the key being changed here.
+        // - The scheduled value is earlier than the current top of the heap.
+        let dirty = heap
+            .peek()
+            .map(|HeapEntry { time, key: top_key }| top_key == &key || at < *time)
+            .unwrap_or(true);
         let (heap_entry, prev) = match map.entry(key) {
             hash_map::Entry::Occupied(mut o) => {
                 let MapEntry { time, value } = o.insert(MapEntry { time: at, value });
@@ -159,24 +174,38 @@ impl<K: Hash + Eq + Clone, V, T: Instant> KeyedHeap<K, V, T> {
         if let Some(heap_entry) = heap_entry {
             heap.push(heap_entry);
         }
-        prev
+        (prev, dirty)
     }
 
-    fn cancel(&mut self, key: &K) -> Option<(T, V)> {
-        self.map.remove(key).map(|MapEntry { time, value }| (time, value))
+    /// Cancels the timer with `key`.
+    ///
+    /// Returns the scheduled instant and value for `key` if it was scheduled +
+    /// a boolean indicating whether the top of the heap (i.e. the next timer to
+    /// fire) changed with this operation.
+    fn cancel(&mut self, key: &K) -> (Option<(T, V)>, bool) {
+        let Self { heap, map } = self;
+        // The front of the heap will be changed if we're cancelling the top.
+        let was_front = heap.peek().is_some_and(|HeapEntry { time: _, key: top }| key == top);
+        let prev = map.remove(key).map(|MapEntry { time, value }| (time, value));
+        (prev, was_front)
     }
 
-    fn peek_time(&self) -> Option<T> {
-        self.heap.peek().map(|HeapEntry { time, key: _ }| *time)
-    }
-
-    // NB: This API is a bit wonky, but unfortunately we can't seem to be
-    // able to express a type that would be equivalent to `BinaryHeap`'s
-    // `PeekMut`. This is the next best thing.
-    fn pop_if<F: FnOnce(T) -> bool>(&mut self, f: F) -> Option<(K, V)> {
-        loop {
+    /// Heals the heap of stale entries, popping the first valid entry if `f`
+    /// returns `true``.
+    ///
+    /// Returns the popped value if one is found *and* `f` returns true + a
+    /// boolean that is `true` iff the internal heap has changed.
+    ///
+    /// NB: This API is a bit wonky, but unfortunately we can't seem to be able
+    /// to express a type that would be equivalent to `BinaryHeap`'s `PeekMut`.
+    /// This is the next best thing.
+    fn pop_if<F: FnOnce(T) -> bool>(&mut self, f: F) -> (Option<(K, V)>, bool) {
+        let mut changed_heap = false;
+        let popped = loop {
             let Self { heap, map } = self;
-            let peek_mut = heap.peek_mut()?;
+            let Some(peek_mut) = heap.peek_mut() else {
+                break None;
+            };
             let HeapEntry { time: heap_time, key } = &*peek_mut;
             // Always check the map state for the given key, since it's the
             // source of truth for desired firing time.
@@ -187,6 +216,7 @@ impl<K: Hash + Eq + Clone, V, T: Instant> KeyedHeap<K, V, T> {
                 hash_map::Entry::Vacant(_) => {
                     // Timer has been canceled. Pop and continue looking.
                     let _: HeapEntry<_, _> = binary_heap::PeekMut::pop(peek_mut);
+                    changed_heap = true;
                 }
                 hash_map::Entry::Occupied(map_entry) => {
                     let MapEntry { time: scheduled_for, value: _ } = map_entry.get();
@@ -195,9 +225,10 @@ impl<K: Hash + Eq + Clone, V, T: Instant> KeyedHeap<K, V, T> {
                         core::cmp::Ordering::Equal => {
                             // Map and heap agree on firing time, this is the top of
                             // the heap.
-                            return f(*scheduled_for).then(|| {
+                            break f(*scheduled_for).then(|| {
                                 let HeapEntry { time: _, key } =
                                     binary_heap::PeekMut::pop(peek_mut);
+                                changed_heap = true;
                                 let MapEntry { time: _, value } = map_entry.remove();
                                 (key, value)
                             });
@@ -209,6 +240,7 @@ impl<K: Hash + Eq + Clone, V, T: Instant> KeyedHeap<K, V, T> {
                             // later, so we must put it back in the heap.
                             let HeapEntry { time: _, key } = binary_heap::PeekMut::pop(peek_mut);
                             heap.push(HeapEntry { time: *scheduled_for, key });
+                            changed_heap = true;
                         }
                         core::cmp::Ordering::Greater => {
                             // Heap time greater than scheduled time is
@@ -226,7 +258,8 @@ impl<K: Hash + Eq + Clone, V, T: Instant> KeyedHeap<K, V, T> {
                     }
                 }
             }
-        }
+        };
+        (popped, changed_heap)
     }
 }
 
@@ -579,6 +612,26 @@ mod tests {
         assert_eq!(heap.pop(&mut ctx), Some((TIMER3, ())));
         heap.assert_heap_entries([]);
         heap.assert_map_entries([]);
+        assert_eq!(heap.next_wakeup.scheduled, None);
+        assert_eq!(heap.pop(&mut ctx), None);
+    }
+
+    // Regression test for a bug where the timer heap would not reschedule the
+    // next wakeup when it has two timers for the exact same instant at the top.
+    #[test]
+    fn multiple_timers_same_instant() {
+        let mut ctx = FakeTimerCtx::default();
+        let mut heap = LocalTimerHeap::new(&mut ctx, ());
+        assert_eq!(heap.schedule_instant(&mut ctx, TIMER1, (), T1), None);
+        assert_eq!(heap.schedule_instant(&mut ctx, TIMER2, (), T1), None);
+        assert_eq!(heap.next_wakeup.scheduled.take(), Some(T1));
+
+        ctx.instant.time = T1;
+
+        // Ordering is not guaranteed, just assert that we're getting timers.
+        assert!(heap.pop(&mut ctx).is_some());
+        assert_eq!(heap.next_wakeup.scheduled, Some(T1));
+        assert!(heap.pop(&mut ctx).is_some());
         assert_eq!(heap.next_wakeup.scheduled, None);
         assert_eq!(heap.pop(&mut ctx), None);
     }
