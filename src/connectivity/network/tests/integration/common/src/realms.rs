@@ -83,8 +83,8 @@ impl NetstackVersion {
                 fnet_routes::StateMarker::PROTOCOL_NAME,
                 fnet_routes::StateV4Marker::PROTOCOL_NAME,
                 fnet_routes::StateV6Marker::PROTOCOL_NAME,
-                fnet_routes_admin::SetProviderV4Marker::PROTOCOL_NAME,
-                fnet_routes_admin::SetProviderV6Marker::PROTOCOL_NAME,
+                fnet_routes_admin::RouteTableV4Marker::PROTOCOL_NAME,
+                fnet_routes_admin::RouteTableV6Marker::PROTOCOL_NAME,
                 fnet_stack::StackMarker::PROTOCOL_NAME,
                 fposix_socket_packet::ProviderMarker::PROTOCOL_NAME,
                 fposix_socket_raw::ProviderMarker::PROTOCOL_NAME,
@@ -421,12 +421,12 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                                         constants::netstack::COMPONENT_NAME,
                                     )),
                                     fnetemul::Capability::ChildDep(protocol_dep::<
-                                        fnet_routes_admin::SetProviderV4Marker,
+                                        fnet_routes_admin::RouteTableV4Marker,
                                     >(
                                         constants::netstack::COMPONENT_NAME,
                                     )),
                                     fnetemul::Capability::ChildDep(protocol_dep::<
-                                        fnet_routes_admin::SetProviderV6Marker,
+                                        fnet_routes_admin::RouteTableV6Marker,
                                     >(
                                         constants::netstack::COMPONENT_NAME,
                                     )),

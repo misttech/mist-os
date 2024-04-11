@@ -25,7 +25,7 @@ closed protocol RoutesV4 {
     ///
     /// Note that the established connection to the `RouteSetV4` protocol will
     /// have a few notable differences from a `RouteSetV4` obtained by
-    /// [`fuchsia.net.routes.admin/SetProviderV4.NewRouteSet`]:
+    /// [`fuchsia.net.routes.admin/RouteTableV4.NewRouteSet`]:
     ///   - When removing a route from this route set, the route will be
     ///     completely removed from the system, including removal from all other
     ///     route sets to which it belongs.
@@ -61,7 +61,7 @@ closed protocol RoutesV6 {
     ///
     /// Note that the established connection to the `RouteSetV6` protocol will
     /// have a few notable differences from a `RouteSetV6` obtained by
-    /// [`fuchsia.net.routes.admin/SetProviderV6.NewRouteSet`]:
+    /// [`fuchsia.net.routes.admin/RouteTableV6.NewRouteSet`]:
     ///   - When removing a route from this route set, the route will be
     ///     completely removed from the system, including removal from all other
     ///     route sets to which it belongs.

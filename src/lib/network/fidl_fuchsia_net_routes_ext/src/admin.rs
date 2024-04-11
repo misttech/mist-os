@@ -48,7 +48,7 @@ pub trait FidlRouteAdminIpExt: Ip {
 }
 
 impl FidlRouteAdminIpExt for Ipv4 {
-    type SetProviderMarker = fnet_routes_admin::SetProviderV4Marker;
+    type SetProviderMarker = fnet_routes_admin::RouteTableV4Marker;
     type GlobalSetProviderMarker = fnet_root::RoutesV4Marker;
     type RouteSetMarker = fnet_routes_admin::RouteSetV4Marker;
     type RouteSetRequestStream = fnet_routes_admin::RouteSetV4RequestStream;
@@ -59,7 +59,7 @@ impl FidlRouteAdminIpExt for Ipv4 {
 }
 
 impl FidlRouteAdminIpExt for Ipv6 {
-    type SetProviderMarker = fnet_routes_admin::SetProviderV6Marker;
+    type SetProviderMarker = fnet_routes_admin::RouteTableV6Marker;
     type GlobalSetProviderMarker = fnet_root::RoutesV6Marker;
     type RouteSetMarker = fnet_routes_admin::RouteSetV6Marker;
     type RouteSetRequestStream = fnet_routes_admin::RouteSetV6RequestStream;
@@ -115,8 +115,8 @@ impl_responder!(
     Result<(), fnet_routes_admin::AuthenticateForInterfaceError>,
 );
 
-/// Dispatches `new_route_set` on either the `SetProviderV4`
-/// or `SetProviderV6` proxy.
+/// Dispatches `new_route_set` on either the `RouteTableV4`
+/// or `RouteTableV6` proxy.
 pub fn new_route_set<I: Ip + FidlRouteAdminIpExt>(
     set_provider_proxy: &<I::SetProviderMarker as ProtocolMarker>::Proxy,
 ) -> Result<<I::RouteSetMarker as ProtocolMarker>::Proxy, RouteSetCreationError> {

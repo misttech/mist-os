@@ -134,8 +134,8 @@
             protocol: [
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.name.DnsServerWatcher",
-                "fuchsia.net.routes.admin.SetProviderV4",
-                "fuchsia.net.routes.admin.SetProviderV6",
+                "fuchsia.net.routes.admin.RouteTableV4",
+                "fuchsia.net.routes.admin.RouteTableV6",
                 "fuchsia.net.stack.Stack",
             ],
             from: "#netstack",
@@ -226,6 +226,10 @@
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.multicast.admin.Ipv6RoutingTableController",
+                "fuchsia.net.routes.admin.RouteTableV4",
+                "fuchsia.net.routes.admin.RouteTableV6",
+
+                // TODO(https://fxbug.dev/333900329): Remove the following.
                 "fuchsia.net.routes.admin.SetProviderV4",
                 "fuchsia.net.routes.admin.SetProviderV6",
                 "fuchsia.net.routes.State",

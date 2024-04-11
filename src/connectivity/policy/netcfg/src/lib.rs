@@ -409,7 +409,7 @@ impl InterfaceState {
         dhcpv4_client_provider: Option<&fnet_dhcp::ClientProviderProxy>,
         dhcpv6_client_provider: Option<&fnet_dhcpv6::ClientProviderProxy>,
         dhcpv4_server: Option<&fnet_dhcp::Server_Proxy>,
-        route_set_provider: &fnet_routes_admin::SetProviderV4Proxy,
+        route_set_provider: &fnet_routes_admin::RouteTableV4Proxy,
         watchers: &mut DnsServerWatchers<'_>,
         dhcpv4_configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dhcpv6_prefixes_streams: &mut dhcpv6::PrefixesStreamMap,
@@ -486,7 +486,7 @@ pub struct NetCfg<'a> {
     dhcp_server: Option<fnet_dhcp::Server_Proxy>,
     dhcpv4_client_provider: Option<fnet_dhcp::ClientProviderProxy>,
     dhcpv6_client_provider: Option<fnet_dhcpv6::ClientProviderProxy>,
-    route_set_v4_provider: fnet_routes_admin::SetProviderV4Proxy,
+    route_set_v4_provider: fnet_routes_admin::RouteTableV4Proxy,
 
     filter_enabled_state: FilterEnabledState,
 
@@ -766,9 +766,9 @@ impl<'a> NetCfg<'a> {
         } else {
             None
         };
-        let route_set_v4_provider = svc_connect::<fnet_routes_admin::SetProviderV4Marker>(&svc_dir)
+        let route_set_v4_provider = svc_connect::<fnet_routes_admin::RouteTableV4Marker>(&svc_dir)
             .await
-            .context("could not connect to fuchsia.net.routes.admin.SetProviderV4")?;
+            .context("could not connect to fuchsia.net.routes.admin.RouteTableV4")?;
         let installer = svc_connect::<fnet_interfaces_admin::InstallerMarker>(&svc_dir)
             .await
             .context("could not connect to installer")?;
@@ -1406,7 +1406,7 @@ impl<'a> NetCfg<'a> {
         name: &str,
         dhcpv4_client: &mut Dhcpv4ClientState,
         dhcpv4_client_provider: Option<&fnet_dhcp::ClientProviderProxy>,
-        route_set_provider: &fnet_routes_admin::SetProviderV4Proxy,
+        route_set_provider: &fnet_routes_admin::RouteTableV4Proxy,
         interface_admin_auth: &fnet_interfaces_admin::GrantForInterfaceAuthorization,
         configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
     ) -> Result<(), errors::Error> {
@@ -1437,7 +1437,7 @@ impl<'a> NetCfg<'a> {
         dns_servers: &mut DnsServers,
         control: &fnet_interfaces_ext::admin::Control,
         lookup_admin: &fnet_name::LookupAdminProxy,
-        route_set_provider: &fnet_routes_admin::SetProviderV4Proxy,
+        route_set_provider: &fnet_routes_admin::RouteTableV4Proxy,
         interface_admin_auth: &fnet_interfaces_admin::GrantForInterfaceAuthorization,
     ) -> Result<(), errors::Error> {
         if online {
@@ -1633,7 +1633,7 @@ impl<'a> NetCfg<'a> {
         dhcp_server: &Option<fnet_dhcp::Server_Proxy>,
         dhcpv4_client_provider: &Option<fnet_dhcp::ClientProviderProxy>,
         dhcpv6_client_provider: &Option<fnet_dhcpv6::ClientProviderProxy>,
-        route_set_v4_provider: &fnet_routes_admin::SetProviderV4Proxy,
+        route_set_v4_provider: &fnet_routes_admin::RouteTableV4Proxy,
     ) -> Result<(), errors::Error> {
         match update_result {
             fnet_interfaces_ext::UpdateResult::Added { properties, state: _ } => {
@@ -3246,7 +3246,7 @@ mod tests {
         lookup_admin: fnet_name::LookupAdminRequestStream,
         dhcpv4_client_provider: fnet_dhcp::ClientProviderRequestStream,
         dhcpv6_client_provider: fnet_dhcpv6::ClientProviderRequestStream,
-        route_set_v4_provider: fidl::endpoints::ServerEnd<fnet_routes_admin::SetProviderV4Marker>,
+        route_set_v4_provider: fidl::endpoints::ServerEnd<fnet_routes_admin::RouteTableV4Marker>,
         dhcpv4_server: fidl::endpoints::ServerEnd<fnet_dhcp::Server_Marker>,
     }
 
@@ -3304,7 +3304,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::InstallerMarker>()
                 .context("error creating installer endpoints")?;
         let (route_set_v4_provider, route_set_v4_provider_server) =
-            fidl::endpoints::create_proxy::<fnet_routes_admin::SetProviderV4Marker>()
+            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteTableV4Marker>()
                 .context("error creating route set v4 provider endpoints")?;
 
         Ok((

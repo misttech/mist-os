@@ -1093,8 +1093,11 @@ pub(crate) enum Service {
     RoutesState(fidl_fuchsia_net_routes::StateRequestStream),
     RoutesStateV4(fidl_fuchsia_net_routes::StateV4RequestStream),
     RoutesStateV6(fidl_fuchsia_net_routes::StateV6RequestStream),
-    RoutesAdminV4(fidl_fuchsia_net_routes_admin::SetProviderV4RequestStream),
-    RoutesAdminV6(fidl_fuchsia_net_routes_admin::SetProviderV6RequestStream),
+    RoutesAdminV4(fidl_fuchsia_net_routes_admin::RouteTableV4RequestStream),
+    RoutesAdminV6(fidl_fuchsia_net_routes_admin::RouteTableV6RequestStream),
+    // TODO(https://fxbug.dev/333900329): Remove the following.
+    SetProviderV4ForTransition(fidl_fuchsia_net_routes_admin::SetProviderV4RequestStream),
+    SetProviderV6ForTransition(fidl_fuchsia_net_routes_admin::SetProviderV6RequestStream),
     RootRoutesV4(fidl_fuchsia_net_root::RoutesV4RequestStream),
     RootRoutesV6(fidl_fuchsia_net_root::RoutesV6RequestStream),
     Socket(fidl_fuchsia_posix_socket::ProviderRequestStream),
@@ -1368,7 +1371,35 @@ impl NetstackSeed {
                         Service::RoutesStateV6(rs) => {
                             routes::state::serve_state_v6(rs, &route_update_dispatcher_v6).await
                         }
-                        Service::RoutesAdminV4(rs) => routes::admin::serve_provider_v4(
+                        Service::SetProviderV4ForTransition(rs) => {
+                            routes::admin::serve_provider_v4(
+                                rs,
+                                route_set_spawner.clone(),
+                                &netstack.ctx,
+                            )
+                            .await
+                            .unwrap_or_else(|e| {
+                                tracing::error!(
+                                    "error serving {}: {e:?}",
+                                    fidl_fuchsia_net_routes_admin::RouteTableV4Marker::DEBUG_NAME
+                                );
+                            })
+                        }
+                        Service::SetProviderV6ForTransition(rs) => {
+                            routes::admin::serve_provider_v6(
+                                rs,
+                                route_set_spawner.clone(),
+                                &netstack.ctx,
+                            )
+                            .await
+                            .unwrap_or_else(|e| {
+                                tracing::error!(
+                                    "error serving {}: {e:?}",
+                                    fidl_fuchsia_net_routes_admin::RouteTableV6Marker::DEBUG_NAME
+                                );
+                            })
+                        }
+                        Service::RoutesAdminV4(rs) => routes::admin::serve_route_table_v4(
                             rs,
                             route_set_spawner.clone(),
                             &netstack.ctx,
@@ -1377,10 +1408,10 @@ impl NetstackSeed {
                         .unwrap_or_else(|e| {
                             tracing::error!(
                                 "error serving {}: {e:?}",
-                                fidl_fuchsia_net_routes_admin::SetProviderV4Marker::DEBUG_NAME
+                                fidl_fuchsia_net_routes_admin::RouteTableV4Marker::DEBUG_NAME
                             );
                         }),
-                        Service::RoutesAdminV6(rs) => routes::admin::serve_provider_v6(
+                        Service::RoutesAdminV6(rs) => routes::admin::serve_route_table_v6(
                             rs,
                             route_set_spawner.clone(),
                             &netstack.ctx,
@@ -1389,7 +1420,7 @@ impl NetstackSeed {
                         .unwrap_or_else(|e| {
                             tracing::error!(
                                 "error serving {}: {e:?}",
-                                fidl_fuchsia_net_routes_admin::SetProviderV6Marker::DEBUG_NAME
+                                fidl_fuchsia_net_routes_admin::RouteTableV6Marker::DEBUG_NAME
                             );
                         }),
                         Service::RootRoutesV4(rs) => root_fidl_worker::serve_routes_v4(

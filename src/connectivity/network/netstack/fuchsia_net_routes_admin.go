@@ -138,13 +138,13 @@ func (r *routeSet[A]) close() {
 	r.ns.DelRouteSet(r.id)
 }
 
-var _ routesAdmin.SetProviderV4WithCtx = (*routesAdminSetProviderV4Impl)(nil)
+var _ routesAdmin.RouteTableV4WithCtx = (*routesAdminRouteTableV4Impl)(nil)
 
-type routesAdminSetProviderV4Impl struct {
+type routesAdminRouteTableV4Impl struct {
 	ns *Netstack
 }
 
-func (impl *routesAdminSetProviderV4Impl) NewRouteSet(ctx_ fidl.Context, request routesAdmin.RouteSetV4WithCtxInterfaceRequest) error {
+func (impl *routesAdminRouteTableV4Impl) NewRouteSet(ctx_ fidl.Context, request routesAdmin.RouteSetV4WithCtxInterfaceRequest) error {
 	return bindV4RouteSet(request.Channel, makeUserRouteSet[fuchsianet.Ipv4Address](impl.ns))
 }
 
@@ -175,13 +175,13 @@ func bindV4RouteSet(ch zx.Channel, rs routeSet[fuchsianet.Ipv4Address]) error {
 	return nil
 }
 
-var _ routesAdmin.SetProviderV6WithCtx = (*routesAdminSetProviderV6Impl)(nil)
+var _ routesAdmin.RouteTableV6WithCtx = (*routesAdminRouteTableV6Impl)(nil)
 
-type routesAdminSetProviderV6Impl struct {
+type routesAdminRouteTableV6Impl struct {
 	ns *Netstack
 }
 
-func (impl *routesAdminSetProviderV6Impl) NewRouteSet(ctx_ fidl.Context, request routesAdmin.RouteSetV6WithCtxInterfaceRequest) error {
+func (impl *routesAdminRouteTableV6Impl) NewRouteSet(ctx_ fidl.Context, request routesAdmin.RouteSetV6WithCtxInterfaceRequest) error {
 	return bindV6RouteSet(request.Channel, makeUserRouteSet[fuchsianet.Ipv6Address](impl.ns))
 }
 

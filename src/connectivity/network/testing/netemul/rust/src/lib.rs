@@ -1216,8 +1216,8 @@ impl<'a> TestInterface<'a> {
         let client = provider.new_client_ext(id, fnet_dhcp_ext::default_new_client_params());
         let control = control.clone();
         let route_set_provider = realm
-            .connect_to_protocol::<fnet_routes_admin::SetProviderV4Marker>()
-            .expect("get fuchsia.net.routes.SetProviderV4");
+            .connect_to_protocol::<fnet_routes_admin::RouteTableV4Marker>()
+            .expect("get fuchsia.net.routes.RouteTableV4");
         let (route_set, server_end) =
             fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>()
                 .expect("creating route set proxy should succeed");

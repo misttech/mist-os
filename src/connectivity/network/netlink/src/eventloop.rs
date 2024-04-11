@@ -77,8 +77,8 @@ pub(crate) struct EventLoop<
     pub(crate) interfaces_state_proxy: fnet_interfaces::StateProxy,
     pub(crate) v4_routes_state: fnet_routes::StateV4Proxy,
     pub(crate) v6_routes_state: fnet_routes::StateV6Proxy,
-    pub(crate) v4_routes_set_provider: fnet_routes_admin::SetProviderV4Proxy,
-    pub(crate) v6_routes_set_provider: fnet_routes_admin::SetProviderV6Proxy,
+    pub(crate) v4_routes_set_provider: fnet_routes_admin::RouteTableV4Proxy,
+    pub(crate) v6_routes_set_provider: fnet_routes_admin::RouteTableV6Proxy,
     pub(crate) interfaces_handler: H,
     pub(crate) route_clients: ClientTable<NetlinkRoute, S>,
     pub(crate) unified_request_stream: mpsc::Receiver<UnifiedRequest<S>>,
@@ -266,9 +266,9 @@ pub(crate) mod testutil {
         pub(crate) v4_routes_state: fidl::endpoints::ServerEnd<fnet_routes::StateV4Marker>,
         pub(crate) v6_routes_state: fidl::endpoints::ServerEnd<fnet_routes::StateV6Marker>,
         pub(crate) v4_routes_set_provider:
-            fidl::endpoints::ServerEnd<fnet_routes_admin::SetProviderV4Marker>,
+            fidl::endpoints::ServerEnd<fnet_routes_admin::RouteTableV4Marker>,
         pub(crate) v6_routes_set_provider:
-            fidl::endpoints::ServerEnd<fnet_routes_admin::SetProviderV6Marker>,
+            fidl::endpoints::ServerEnd<fnet_routes_admin::RouteTableV6Marker>,
     }
 
     pub(crate) fn event_loop_fixture<
@@ -288,9 +288,9 @@ pub(crate) mod testutil {
         let (v6_routes_state_proxy, v6_routes_state_server_end) =
             create_proxy::<fnet_routes::StateV6Marker>().unwrap();
         let (v4_routes_set_provider_proxy, v4_routes_set_provider_server_end) =
-            create_proxy::<fnet_routes_admin::SetProviderV4Marker>().unwrap();
+            create_proxy::<fnet_routes_admin::RouteTableV4Marker>().unwrap();
         let (v6_routes_set_provider_proxy, v6_routes_set_provider_server_end) =
-            create_proxy::<fnet_routes_admin::SetProviderV6Marker>().unwrap();
+            create_proxy::<fnet_routes_admin::RouteTableV6Marker>().unwrap();
 
         (
             EventLoop {

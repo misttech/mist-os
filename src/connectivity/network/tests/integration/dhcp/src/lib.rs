@@ -548,7 +548,7 @@ async fn does_not_crash_with_overlapping_subnet_route<
 
     // Add a second, identical route independently of the DHCP-installed one.
     let set_provider = client_realm
-        .connect_to_protocol::<fnet_routes_admin::SetProviderV4Marker>()
+        .connect_to_protocol::<fnet_routes_admin::RouteTableV4Marker>()
         .expect("connect to routes-admin V4");
     let route_set = fnet_routes_ext::admin::new_route_set::<Ipv4>(&set_provider)
         .expect("new route set should succeed");

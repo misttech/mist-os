@@ -176,13 +176,13 @@ pub mod admin {
                 let Out(route_set_server_end) = I::map_ip(
                     In(item),
                     |In(item)| match item.expect("set provider FIDL error") {
-                        fnet_routes_admin::SetProviderV4Request::NewRouteSet {
+                        fnet_routes_admin::RouteTableV4Request::NewRouteSet {
                             route_set,
                             control_handle: _,
                         } => Out(route_set),
                     },
                     |In(item)| match item.expect("set provider FIDL error") {
-                        fnet_routes_admin::SetProviderV6Request::NewRouteSet {
+                        fnet_routes_admin::RouteTableV6Request::NewRouteSet {
                             route_set,
                             control_handle: _,
                         } => Out(route_set),
@@ -214,13 +214,13 @@ pub mod admin {
                 let Out(route_set_server_end) = I::map_ip(
                     In(item),
                     |In(item)| match item.expect("set provider FIDL error") {
-                        fnet_routes_admin::SetProviderV4Request::NewRouteSet {
+                        fnet_routes_admin::RouteTableV4Request::NewRouteSet {
                             route_set,
                             control_handle: _,
                         } => Out(route_set),
                     },
                     |In(item)| match item.expect("set provider FIDL error") {
-                        fnet_routes_admin::SetProviderV6Request::NewRouteSet {
+                        fnet_routes_admin::RouteTableV6Request::NewRouteSet {
                             route_set,
                             control_handle: _,
                         } => Out(route_set),

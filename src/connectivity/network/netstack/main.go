@@ -661,15 +661,15 @@ func Main() {
 			},
 		)
 	}
-
+	// TODO(https://fxbug.dev/333900329): Remove the following block.
 	{
 		stubV4 := routesAdmin.SetProviderV4WithCtxStub{
-			Impl: &routesAdminSetProviderV4Impl{
+			Impl: &routesAdminRouteTableV4Impl{
 				ns: ns,
 			},
 		}
 		stubV6 := routesAdmin.SetProviderV6WithCtxStub{
-			Impl: &routesAdminSetProviderV6Impl{
+			Impl: &routesAdminRouteTableV6Impl{
 				ns: ns,
 			},
 		}
@@ -690,6 +690,54 @@ func Main() {
 				go component.Serve(ctx, &stubV6, c, component.ServeOptions{
 					OnError: func(err error) {
 						_ = syslog.ErrorTf(routesAdmin.SetProviderV6Name, "%s", err)
+					},
+				})
+				return nil
+			},
+		)
+		stub := stack.StackWithCtxStub{Impl: &stackImpl{
+			ns: ns,
+		}}
+		componentCtx.OutgoingService.AddService(
+			stack.StackName,
+			func(ctx context.Context, c zx.Channel) error {
+				go component.Serve(ctx, &stub, c, component.ServeOptions{
+					OnError: func(err error) {
+						_ = syslog.WarnTf(stack.StackName, "%s", err)
+					},
+				})
+				return nil
+			},
+		)
+	}
+	{
+		stubV4 := routesAdmin.RouteTableV4WithCtxStub{
+			Impl: &routesAdminRouteTableV4Impl{
+				ns: ns,
+			},
+		}
+		stubV6 := routesAdmin.RouteTableV6WithCtxStub{
+			Impl: &routesAdminRouteTableV6Impl{
+				ns: ns,
+			},
+		}
+		componentCtx.OutgoingService.AddService(
+			routesAdmin.RouteTableV4Name,
+			func(ctx context.Context, c zx.Channel) error {
+				go component.Serve(ctx, &stubV4, c, component.ServeOptions{
+					OnError: func(err error) {
+						_ = syslog.ErrorTf(routesAdmin.RouteTableV4Name, "%s", err)
+					},
+				})
+				return nil
+			},
+		)
+		componentCtx.OutgoingService.AddService(
+			routesAdmin.RouteTableV6Name,
+			func(ctx context.Context, c zx.Channel) error {
+				go component.Serve(ctx, &stubV6, c, component.ServeOptions{
+					OnError: func(err error) {
+						_ = syslog.ErrorTf(routesAdmin.RouteTableV6Name, "%s", err)
 					},
 				})
 				return nil

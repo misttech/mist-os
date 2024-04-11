@@ -61,6 +61,8 @@ pub fn main() {
         .add_fidl_service(Service::RoutesState)
         .add_fidl_service(Service::RoutesStateV4)
         .add_fidl_service(Service::RoutesStateV6)
+        .add_fidl_service(Service::SetProviderV4ForTransition)
+        .add_fidl_service(Service::SetProviderV6ForTransition)
         .add_fidl_service(Service::RoutesAdminV4)
         .add_fidl_service(Service::RoutesAdminV6)
         .add_fidl_service(Service::RootRoutesV4)

@@ -953,7 +953,7 @@ impl Controller {
         let control =
             connect_to_interface_admin_control(id.into(), hermetic_network_connector).await?;
         let route_set_provider = hermetic_network_connector
-            .connect_to_protocol::<fnet_routes_admin::SetProviderV4Marker>()?;
+            .connect_to_protocol::<fnet_routes_admin::RouteTableV4Marker>()?;
         let (route_set, server_end) =
             fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>()
                 .expect("creating route set proxy should succeed");

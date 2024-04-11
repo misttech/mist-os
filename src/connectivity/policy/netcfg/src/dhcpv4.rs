@@ -114,7 +114,7 @@ pub(super) async fn start_client(
     interface_id: NonZeroU64,
     interface_name: &str,
     client_provider: &fnet_dhcp::ClientProviderProxy,
-    route_set_provider: &fnet_routes_admin::SetProviderV4Proxy,
+    route_set_provider: &fnet_routes_admin::RouteTableV4Proxy,
     interface_admin_auth: &fnet_interfaces_admin::GrantForInterfaceAuthorization,
     configuration_streams: &mut ConfigurationStreamMap,
 ) -> Result<ClientState, errors::Error> {
