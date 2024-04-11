@@ -321,6 +321,12 @@
             source_availability: "unknown",
         },
         {
+            protocol: "fuchsia.hardware.sensors.Playback",
+            from: "#sensors_playback",
+            to: "#session-manager",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.sensors.Manager",
             from: "#sensors",
             to: "#session-manager",
