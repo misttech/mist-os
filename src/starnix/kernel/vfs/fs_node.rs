@@ -2062,7 +2062,11 @@ impl FsNode {
     /// If no security id is cached, it is recomputed via `get_fs_node_security_id()`. Access
     /// control enforcement code should use this function, *not* `FsNode::cached_sid`.
     pub fn effective_sid(&self, current_task: &CurrentTask) -> SecurityId {
-        match self.info().sid.0 {
+        // Note: the sid is read before the match statement because otherwise the lock in
+        // `self.info()` would be held for the duration of the match statement, leading to a
+        // deadlock with `get_fs_node_security_id()`.
+        let sid = self.info().sid.0;
+        match sid {
             Some(sid) => sid,
             None => get_fs_node_security_id(current_task, self),
         }
