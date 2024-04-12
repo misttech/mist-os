@@ -507,8 +507,8 @@ zx_status_t GpioInitDevice::ConfigureGpios(
         return result.status();
       }
       if (result->is_error()) {
-        zxlogf(ERROR, "SetAltFunction(%lu) failed for %u: %s", step.call.drive_strength_ua(),
-               step.index, zx_status_get_string(result->error_value()));
+        zxlogf(ERROR, "SetAltFunction(%lu) failed for %u: %s", step.call.alt_function(), step.index,
+               zx_status_get_string(result->error_value()));
         return result->error_value();
       }
     } else if (step.call.is_drive_strength_ua()) {
