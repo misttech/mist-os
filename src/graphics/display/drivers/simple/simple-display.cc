@@ -318,8 +318,8 @@ config_check_result_t SimpleDisplay::DisplayControllerImplCheckConfiguration(
         .height = height_,
     };
     success = display_configs[0]->layer_list[0]->type == LAYER_TYPE_PRIMARY &&
-              layer->transform_mode == FRAME_TRANSFORM_IDENTITY && layer->image.width == width_ &&
-              layer->image.height == height_ &&
+              layer->transform_mode == FRAME_TRANSFORM_IDENTITY &&
+              layer->image_metadata.width == width_ && layer->image_metadata.height == height_ &&
               memcmp(&layer->dest_frame, &frame, sizeof(frame_t)) == 0 &&
               memcmp(&layer->src_frame, &frame, sizeof(frame_t)) == 0 &&
               display_configs[0]->cc_flags == 0 && layer->alpha_mode == ALPHA_DISABLE;

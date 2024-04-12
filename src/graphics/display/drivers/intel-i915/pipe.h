@@ -50,9 +50,9 @@ class Pipe {
 
   void ApplyModeConfig(const display::DisplayTiming& mode);
 
-  using GetImagePixelFormatFunc = fit::function<PixelFormatAndModifier(const image_t* image)>;
-  using SetupGttImageFunc =
-      fit::function<const GttRegion&(const image_t* image, uint32_t rotation)>;
+  using GetImagePixelFormatFunc = fit::function<PixelFormatAndModifier(uint64_t image_id)>;
+  using SetupGttImageFunc = fit::function<const GttRegion&(
+      const image_metadata_t& image_metadata, uint64_t image_handle, uint32_t rotation)>;
   void ApplyConfiguration(const display_config_t* banjo_display_config,
                           display::ConfigStamp config_stamp,
                           const SetupGttImageFunc& setup_gtt_image,

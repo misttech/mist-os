@@ -594,13 +594,23 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
     return;
   }
 
-  const image_t* cur_image = layer->pending_image();
-  // TODO(https://fxbug.dev/42076907): Warning: Currently we only compare size and usage
-  // type between `image` and `layer`. This implicitly assume that images can
-  // be applied to any layer as long as the format is negotiated by sysmem,
-  // which may not be true in the future. We should figure out a way to better
-  // indicate pixel format support of a Layer in display Controller API.
-  if (!image.HasSameDisplayPropertiesAsLayer(*cur_image)) {
+  // TODO(https://fxbug.dev/42076907): Currently this logic only compares size
+  // and usage type between current Image and a given Layer's accepted
+  // configuration.
+  //
+  // We don't set the pixel format a Layer can accept, and we don't compare the
+  // Image's pixel format against any accepted pixel format, assuming that all
+  // image buffers allocated by sysmem can always be used for scanout in any
+  // Layer. Currently, this assumption works for all our existing display engine
+  // drivers. However, switching pixel formats in a Layer may cause performance
+  // reduction, or might be not supported by new display engines / new display
+  // formats.
+  //
+  // We should figure out a mechanism to indicate pixel format / modifiers
+  // support for a Layer's image configuration (as opposed of using image_t),
+  // and compare this Image's sysmem buffer collection information against the
+  // Layer's format support.
+  if (image.metadata() != display::ImageMetadata(layer->pending_image_metadata())) {
     zxlogf(ERROR, "SetLayerImage with mismatching layer and image metadata");
     image.DiscardAcquire();
     TearDown();
@@ -919,8 +929,8 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
         frame_t image_frame = {
             .x_pos = 0,
             .y_pos = 0,
-            .width = layer->image.width,
-            .height = layer->image.height,
+            .width = layer->image_metadata.width,
+            .height = layer->image_metadata.height,
         };
         invalid = (!frame_contains(image_frame, layer->src_frame) ||
                    !frame_contains(display_frame, layer->dest_frame));

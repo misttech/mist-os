@@ -105,10 +105,6 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
 
   bool IsReady() const { return wait_fence_ == nullptr; }
 
-  // True iff the image has the same display properties as the `layer_config`,
-  // which are properties of all images that the corresponding Layer can accept.
-  bool HasSameDisplayPropertiesAsLayer(const image_t& layer_config) const;
-
   const zx::vmo& vmo() { return vmo_; }
 
   void set_latest_controller_config_stamp(ConfigStamp stamp) {

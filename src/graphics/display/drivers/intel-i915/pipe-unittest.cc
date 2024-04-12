@@ -49,18 +49,19 @@ class TestGttRegionImpl : public GttRegion {
 
 std::map<uint64_t, TestGttRegionImpl> region_map;
 
-PixelFormatAndModifier GetPixelFormat(const image_t* image) {
+PixelFormatAndModifier GetPixelFormat(uint64_t image_handle) {
   return PixelFormatAndModifier(
       fuchsia_images2::PixelFormat::kB8G8R8A8,
       /*pixel_format_modifier_param=*/fuchsia_images2::PixelFormatModifier::kLinear);
 }
 
-const GttRegion& GetGttImageHandle(const image_t* image, uint32_t rotation) {
-  auto it = region_map.find(image->handle);
+const GttRegion& GetGttImageHandle(const image_metadata_t& image_metadata, uint64_t image_handle,
+                                   uint32_t rotation) {
+  auto it = region_map.find(image_handle);
   if (it != region_map.end()) {
     return it->second;
   }
-  return region_map.try_emplace(image->handle, image->handle).first->second;
+  return region_map.try_emplace(image_handle, image_handle).first->second;
 }
 
 layer_t CreatePrimaryLayerConfig(uint64_t handle, uint32_t z_index = 1u) {
@@ -71,12 +72,12 @@ layer_t CreatePrimaryLayerConfig(uint64_t handle, uint32_t z_index = 1u) {
   layer.type = LAYER_TYPE_PRIMARY;
   layer.z_index = z_index;
   layer.cfg.primary = {
-      .image =
+      .image_handle = handle,
+      .image_metadata =
           {
               .width = kWidth,
               .height = kHeight,
               .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-              .handle = handle,
           },
       .alpha_mode = ALPHA_DISABLE,
       .transform_mode = FRAME_TRANSFORM_IDENTITY,

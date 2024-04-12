@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/intel-i915/pipe.h"
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
+#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/time.h>
@@ -514,9 +515,9 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
   plane_ctrl.set_decompress_render_compressed_surfaces(false)
       .set_double_buffer_update_disabling_allowed(true);
 
-  const image_t* image = &primary->image;
-
-  const GttRegion& region = setup_gtt_image(image, primary->transform_mode);
+  const image_metadata_t& image_metadata = primary->image_metadata;
+  const GttRegion& region =
+      setup_gtt_image(primary->image_metadata, primary->image_handle, primary->transform_mode);
   uint32_t base_address = static_cast<uint32_t>(region.base());
   uint32_t plane_width;
   uint32_t plane_height;
@@ -529,7 +530,8 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
     plane_height = primary->src_frame.height;
     stride =
         [&]() {
-          uint64_t stride = region.bytes_per_row() / get_tile_byte_width(image->tiling_type);
+          uint64_t stride =
+              region.bytes_per_row() / get_tile_byte_width(image_metadata.tiling_type);
           ZX_DEBUG_ASSERT_MSG(stride <= std::numeric_limits<uint32_t>::max(),
                               "%lu overflows uint32_t", stride);
           return static_cast<uint32_t>(stride);
@@ -537,8 +539,8 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
     x_offset = primary->src_frame.x_pos;
     y_offset = primary->src_frame.y_pos;
   } else {
-    uint32_t tile_height = height_in_tiles(image->tiling_type, image->height);
-    uint32_t tile_px_height = get_tile_px_height(image->tiling_type);
+    uint32_t tile_height = height_in_tiles(image_metadata.tiling_type, image_metadata.height);
+    uint32_t tile_px_height = get_tile_px_height(image_metadata.tiling_type);
     uint32_t total_height = tile_height * tile_px_height;
 
     plane_width = primary->src_frame.height;
@@ -664,7 +666,7 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
         registers::PlaneControl::ColorFormatKabyLake::kRgb8888);
   }
 
-  PixelFormatAndModifier pixel_format = get_pixel_format(&primary->image);
+  PixelFormatAndModifier pixel_format = get_pixel_format(primary->image_handle);
   switch (pixel_format.pixel_format) {
     case fuchsia_images2::PixelFormat::kR8G8B8A8:
       plane_ctrl.set_rgb_color_order(registers::PlaneControl::RgbColorOrder::kRgbx);
@@ -681,14 +683,14 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
                     static_cast<uint32_t>(pixel_format.pixel_format));
   }
 
-  if (primary->image.tiling_type == IMAGE_TILING_TYPE_LINEAR) {
+  if (image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR) {
     plane_ctrl.set_surface_tiling(registers::PlaneControl::SurfaceTiling::kLinear);
-  } else if (primary->image.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
+  } else if (image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
     plane_ctrl.set_surface_tiling(registers::PlaneControl::SurfaceTiling::kTilingX);
-  } else if (primary->image.tiling_type == IMAGE_TILING_TYPE_Y_LEGACY_TILED) {
+  } else if (image_metadata.tiling_type == IMAGE_TILING_TYPE_Y_LEGACY_TILED) {
     plane_ctrl.set_surface_tiling(registers::PlaneControl::SurfaceTiling::kTilingYLegacy);
   } else {
-    ZX_ASSERT(primary->image.tiling_type == IMAGE_TILING_TYPE_YF_TILED);
+    ZX_ASSERT(image_metadata.tiling_type == IMAGE_TILING_TYPE_YF_TILED);
     if (platform_ == registers::Platform::kTigerLake) {
       // TODO(https://fxbug.dev/42062668): Remove this warning or turn it into an error.
       zxlogf(ERROR, "The Tiger Lake display engine may not support YF tiling.");
@@ -711,7 +713,7 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
   plane_surface.set_surface_base_addr(base_address >> plane_surface.kRShiftCount);
   regs->plane_surf[plane_num] = plane_surface.reg_value();
 
-  latest_config_stamp_with_image_[image->handle] = config_stamp;
+  latest_config_stamp_with_image_[primary->image_handle] = config_stamp;
 }
 
 void Pipe::DisableCursorPlane(registers::pipe_arming_regs* regs,

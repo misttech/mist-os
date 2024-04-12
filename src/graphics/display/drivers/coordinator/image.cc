@@ -162,29 +162,4 @@ void Image::ResetFences() {
   retire_fence_ = nullptr;
 }
 
-bool Image::HasSameDisplayPropertiesAsLayer(const image_t& layer_config) const {
-  // TODO(https://fxbug.dev/42076907): Currently this function only compares size and
-  // usage type between current Image and a given Layer's accepted
-  // configuration.
-  //
-  // We don't set the pixel format a Layer can accept, and we don't compare the
-  // Image's pixel format against any accepted pixel format, assuming that all
-  // image buffers allocated by sysmem can always be used for scanout in any
-  // Layer. Currently, this assumption works for all our existing display engine
-  // drivers. However, switching pixel formats in a Layer may cause performance
-  // reduction, or might be not supported by new display engines / new display
-  // formats.
-  //
-  // We should figure out a mechanism to indicate pixel format / modifiers
-  // support for a Layer's image configuration (as opposed of using image_t),
-  // and compare this Image's sysmem buffer collection information against the
-  // Layer's format support.
-
-  // The casts will not result in UB, because ImageMetadata's width and height
-  // are guaranteed to be non-negative.
-  return static_cast<uint32_t>(metadata_.width()) == layer_config.width &&
-         static_cast<uint32_t>(metadata_.height()) == layer_config.height &&
-         metadata_.tiling_type().ToBanjo() == layer_config.tiling_type;
-}
-
 }  // namespace display

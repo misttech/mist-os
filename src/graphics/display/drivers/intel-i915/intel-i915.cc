@@ -517,10 +517,11 @@ zx_status_t Controller::InitGttForTesting(const ddk::Pci& pci, fdf::MmioBuffer b
   return gtt_.Init(pci, std::move(buffer), fb_offset);
 }
 
-const GttRegion& Controller::SetupGttImage(const image_t* image, uint32_t rotation) {
-  const std::unique_ptr<GttRegionImpl>& region = GetGttRegionImpl(image->handle);
+const GttRegion& Controller::SetupGttImage(const image_metadata_t& image_metadata,
+                                           uint64_t image_handle, uint32_t rotation) {
+  const std::unique_ptr<GttRegionImpl>& region = GetGttRegionImpl(image_handle);
   ZX_DEBUG_ASSERT(region);
-  region->SetRotation(rotation, *image);
+  region->SetRotation(rotation, image_metadata);
   return *region;
 }
 
@@ -1168,8 +1169,8 @@ bool Controller::CalculateMinimumAllocations(
       ZX_ASSERT(layer->type == LAYER_TYPE_PRIMARY);
       const primary_layer_t* primary = &layer->cfg.primary;
 
-      if (primary->image.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
-          primary->image.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
+      if (primary->image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
+          primary->image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
         min_allocs[pipe_id][plane_num] = 8;
       } else {
         uint32_t plane_source_width;
@@ -1184,7 +1185,7 @@ bool Controller::CalculateMinimumAllocations(
         // need to populate the image_t.handle of pending layers first so that
         // the image of primary layer can be correctly resolved.
         constexpr int bytes_per_pixel = 4;
-        const display::DriverImageId primary_image_id(primary->image.handle);
+        const display::DriverImageId primary_image_id(primary->image_handle);
         if (primary_image_id != display::kInvalidDriverImageId) {
           ZX_DEBUG_ASSERT(bytes_per_pixel == ImageFormatStrideBytesPerWidthPixel(
                                                  GetImportedImagePixelFormat(primary_image_id)));
@@ -1361,7 +1362,7 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t*> ban
         constexpr int bytes_per_pixel = 4;
         // Plane buffers are recalculated only on valid configurations. So all
         // images must be valid.
-        const display::DriverImageId primary_image_id(primary->image.handle);
+        const display::DriverImageId primary_image_id(primary->image_handle);
         ZX_DEBUG_ASSERT(primary_image_id != display::kInvalidDriverImageId);
         ZX_DEBUG_ASSERT(bytes_per_pixel == ImageFormatStrideBytesPerWidthPixel(
                                                GetImportedImagePixelFormat(primary_image_id)));
@@ -1673,8 +1674,8 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
           if (primary->transform_mode == FRAME_TRANSFORM_ROT_90 ||
               primary->transform_mode == FRAME_TRANSFORM_ROT_270) {
             // Linear and x tiled images don't support 90/270 rotation
-            if (primary->image.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
-                primary->image.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
+            if (primary->image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
+                primary->image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
               current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
             }
           } else if (primary->transform_mode != FRAME_TRANSFORM_IDENTITY &&
@@ -1689,8 +1690,8 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
           // If the plane is too wide, force the client to do all composition
           // and just give us a simple configuration.
           uint32_t max_width;
-          if (primary->image.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
-              primary->image.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
+          if (primary->image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
+              primary->image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
             max_width = 8192;
           } else {
             max_width = 4096;

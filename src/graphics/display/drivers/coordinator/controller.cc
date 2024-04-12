@@ -119,8 +119,8 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
     if (duplicate) {
       continue;
     }
-    test_layer.cfg.primary.image.width = width;
-    test_layer.cfg.primary.image.height = height;
+    test_layer.cfg.primary.image_metadata.width = width;
+    test_layer.cfg.primary.image_metadata.height = height;
     test_layer.cfg.primary.src_frame.width = width;
     test_layer.cfg.primary.src_frame.height = height;
     test_layer.cfg.primary.dest_frame.width = width;

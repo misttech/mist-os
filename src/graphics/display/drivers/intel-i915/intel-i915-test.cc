@@ -651,14 +651,9 @@ TEST_F(IntegrationTest, SysmemImport) {
         &kDisplayImageMetadata, kBanjoBufferCollectionId, /*index=*/0, &image_handle));
   });
 
-  const image_t image = {
-      .width = 128,
-      .height = kImageHeight,
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-      .handle = image_handle,
-  };
-  const GttRegion& region = ctx->SetupGttImage(&image, FRAME_TRANSFORM_IDENTITY);
-  EXPECT_LT(image.width * 4, kBytesPerRowDivisor);
+  const GttRegion& region =
+      ctx->SetupGttImage(kDisplayImageMetadata, image_handle, FRAME_TRANSFORM_IDENTITY);
+  EXPECT_LT(kDisplayImageMetadata.width * 4, kBytesPerRowDivisor);
   EXPECT_EQ(kBytesPerRowDivisor, region.bytes_per_row());
   ctx->DisplayControllerImplReleaseImage(image_handle);
 }
@@ -710,14 +705,9 @@ TEST_F(IntegrationTest, SysmemRotated) {
   });
 
   // Check that rotating the image doesn't hang.
-  const image_t image = {
-      .width = 128,
-      .height = kImageHeight,
-      .tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED,
-      .handle = image_handle,
-  };
-  const GttRegion& region = ctx->SetupGttImage(&image, FRAME_TRANSFORM_ROT_90);
-  EXPECT_LT(image.width * 4, kBytesPerRowDivisor);
+  const GttRegion& region =
+      ctx->SetupGttImage(kTiledImageMetadata, image_handle, FRAME_TRANSFORM_ROT_90);
+  EXPECT_LT(kTiledImageMetadata.width * 4, kBytesPerRowDivisor);
   EXPECT_EQ(kBytesPerRowDivisor, region.bytes_per_row());
   ctx->DisplayControllerImplReleaseImage(image_handle);
 }

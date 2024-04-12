@@ -189,7 +189,11 @@ type Frame = struct {
 };
 
 type PrimaryLayer = struct {
-    image Image;
+    /// The result of a successful ImportImage() call.
+    image_handle uint64;
+
+    /// Must match the ImportImage() argument for `image_handle`.
+    image_metadata ImageMetadata;
 
     /// An ALPHA_* constant.
     ///

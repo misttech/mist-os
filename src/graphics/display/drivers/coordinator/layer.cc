@@ -27,6 +27,7 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 
 namespace fhdt = fuchsia_hardware_display_types;
 
@@ -42,12 +43,6 @@ static void EarlyRetireUpTo(Image::DoublyLinkedList& list, Image::DoublyLinkedLi
     fbl::RefPtr<Image> image = list.pop_front();
     image->EarlyRetire();
   }
-}
-
-static void populate_image(const fhdt::wire::ImageMetadata& image_metadata, image_t* image_out) {
-  image_out->width = image_metadata.width;
-  image_out->height = image_metadata.height;
-  image_out->tiling_type = image_metadata.tiling_type;
 }
 
 }  // namespace
@@ -129,7 +124,7 @@ void Layer::ApplyChanges(const display_mode_t& mode) {
 
   if (current_layer_.type == LAYER_TYPE_PRIMARY) {
     if (displayed_image_) {
-      current_layer_.cfg.primary.image.handle = ToBanjoDriverImageId(displayed_image_->driver_id());
+      current_layer_.cfg.primary.image_handle = ToBanjoDriverImageId(displayed_image_->driver_id());
     }
     return;
   }
@@ -220,7 +215,7 @@ bool Layer::ActivateLatestReadyImage() {
 
   if (current_layer_.type == LAYER_TYPE_PRIMARY) {
     uint64_t handle = ToBanjoDriverImageId(displayed_image_->driver_id());
-    current_layer_.cfg.primary.image.handle = handle;
+    current_layer_.cfg.primary.image_handle = handle;
   } else {
     // type is validated in Client::CheckConfig, so something must be very wrong.
     ZX_ASSERT(false);
@@ -240,12 +235,12 @@ bool Layer::AddToConfig(fbl::DoublyLinkedList<LayerNode*>* list, uint32_t z_inde
 
 void Layer::SetPrimaryConfig(fhdt::wire::ImageMetadata image_metadata) {
   pending_layer_.type = LAYER_TYPE_PRIMARY;
-  auto* primary = &pending_layer_.cfg.primary;
-  populate_image(image_metadata, &primary->image);
+  primary_layer_t& primary = pending_layer_.cfg.primary;
+  primary.image_metadata = ImageMetadata(image_metadata).ToBanjo();
   const frame_t new_frame = {
       .x_pos = 0, .y_pos = 0, .width = image_metadata.width, .height = image_metadata.height};
-  primary->src_frame = new_frame;
-  primary->dest_frame = new_frame;
+  primary.src_frame = new_frame;
+  primary.dest_frame = new_frame;
   pending_image_config_gen_++;
   pending_image_ = nullptr;
   config_change_ = true;

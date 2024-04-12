@@ -506,8 +506,8 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
         frame_t src_frame = {
             .x_pos = 0,
             .y_pos = 0,
-            .width = layer->image.width,
-            .height = layer->image.height,
+            .width = layer->image_metadata.width,
+            .height = layer->image_metadata.height,
         };
         if (memcmp(&layer->dest_frame, &dest_frame, sizeof(frame_t)) != 0) {
           // TODO(https://fxbug.dev/42111727): Need to provide proper flag to indicate driver only
@@ -643,7 +643,7 @@ void Display::DisplayControllerImplApplyConfiguration(const display_config_t** d
     if (display::ToDisplayId(display_config->display_id) == kPrimaryDisplayId) {
       if (display_config->layer_count) {
         driver_image_id =
-            display::ToDriverImageId(display_config->layer_list[0]->cfg.primary.image.handle);
+            display::ToDriverImageId(display_config->layer_list[0]->cfg.primary.image_handle);
       }
       break;
     }

@@ -505,8 +505,8 @@ config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
       client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_ALPHA;
     }
     success = display_configs[0]->layer_list[0]->type == LAYER_TYPE_PRIMARY &&
-              layer.transform_mode == FRAME_TRANSFORM_IDENTITY && layer.image.width == width &&
-              layer.image.height == height &&
+              layer.transform_mode == FRAME_TRANSFORM_IDENTITY &&
+              layer.image_metadata.width == width && layer.image_metadata.height == height &&
               memcmp(&layer.dest_frame, &frame, sizeof(frame_t)) == 0 &&
               memcmp(&layer.src_frame, &frame, sizeof(frame_t)) == 0;
   }

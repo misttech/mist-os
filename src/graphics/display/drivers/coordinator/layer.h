@@ -47,7 +47,12 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   friend LayerTest;
 
   bool in_use() const { return current_node_.InContainer() || pending_node_.InContainer(); }
-  const image_t* pending_image() const { return &pending_layer_.cfg.primary.image; }
+
+  const image_metadata_t& pending_image_metadata() const {
+    return pending_layer_.cfg.primary.image_metadata;
+  }
+  uint64_t pending_image_handle() const { return pending_layer_.cfg.primary.image_handle; }
+
   auto current_type() const { return current_layer_.type; }
   auto pending_type() const { return pending_layer_.type; }
 

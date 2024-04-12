@@ -354,11 +354,12 @@ config_check_result_t FakeDisplay::DisplayControllerImplCheckConfiguration(
         .width = kWidth,
         .height = kHeight,
     };
-    success =
-        display_configs[0]->layer_list[0]->type == LAYER_TYPE_PRIMARY &&
-        layer.transform_mode == FRAME_TRANSFORM_IDENTITY && layer.image.width == kWidth &&
-        layer.image.height == kHeight && memcmp(&layer.dest_frame, &frame, sizeof(frame_t)) == 0 &&
-        memcmp(&layer.src_frame, &frame, sizeof(frame_t)) == 0 && layer.alpha_mode == ALPHA_DISABLE;
+    success = display_configs[0]->layer_list[0]->type == LAYER_TYPE_PRIMARY &&
+              layer.transform_mode == FRAME_TRANSFORM_IDENTITY &&
+              layer.image_metadata.width == kWidth && layer.image_metadata.height == kHeight &&
+              memcmp(&layer.dest_frame, &frame, sizeof(frame_t)) == 0 &&
+              memcmp(&layer.src_frame, &frame, sizeof(frame_t)) == 0 &&
+              layer.alpha_mode == ALPHA_DISABLE;
   }
   if (!success) {
     client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
@@ -379,7 +380,7 @@ void FakeDisplay::DisplayControllerImplApplyConfiguration(
     if (display_count == 1 && display_configs[0]->layer_count) {
       // Only support one display.
       current_image_to_capture_id_ =
-          display::ToDriverImageId(display_configs[0]->layer_list[0]->cfg.primary.image.handle);
+          display::ToDriverImageId(display_configs[0]->layer_list[0]->cfg.primary.image_handle);
     } else {
       current_image_to_capture_id_ = display::kInvalidDriverImageId;
     }

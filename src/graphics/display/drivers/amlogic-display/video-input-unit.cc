@@ -276,7 +276,7 @@ void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_c
 
 void VideoInputUnit::FlipOnVsync(const display_config_t* config,
                                  display::ConfigStamp config_stamp) {
-  auto info = reinterpret_cast<ImageInfo*>(config[0].layer_list[0]->cfg.primary.image.handle);
+  auto info = reinterpret_cast<ImageInfo*>(config[0].layer_list[0]->cfg.primary.image_handle);
   const int next_table_idx = rdma_->GetNextAvailableRdmaTableIndex();
   if (next_table_idx < 0) {
     zxlogf(ERROR, "No table available!");

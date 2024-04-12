@@ -43,7 +43,7 @@ class GttRegionImpl : public GttRegion {
   GttRegionImpl(Gtt* gtt, RegionAllocator::Region::UPtr region);
   ~GttRegionImpl() override;
 
-  void SetRotation(uint32_t rotation, const image_t& image);
+  void SetRotation(uint32_t rotation, const image_metadata_t& image_metadata);
 
   zx_status_t PopulateRegion(zx_handle_t vmo, uint64_t page_offset, uint64_t length,
                              bool writable = false);

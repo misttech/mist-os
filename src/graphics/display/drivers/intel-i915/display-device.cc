@@ -242,11 +242,12 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_con
   if (pipe_) {
     pipe_->ApplyConfiguration(
         banjo_display_config, config_stamp,
-        [controller = controller_](const image_t* image, uint32_t rotation) -> const GttRegion& {
-          return controller->SetupGttImage(image, rotation);
+        [controller = controller_](const image_metadata_t& image_metadata, uint64_t image_handle,
+                                   uint32_t rotation) -> const GttRegion& {
+          return controller->SetupGttImage(image_metadata, image_handle, rotation);
         },
-        [controller = controller_](const image_t* image) -> PixelFormatAndModifier {
-          const display::DriverImageId image_id(image->handle);
+        [controller = controller_](uint64_t image_handle) -> PixelFormatAndModifier {
+          const display::DriverImageId image_id = display::ToDriverImageId(image_handle);
           return controller->GetImportedImagePixelFormat(image_id);
         });
   }

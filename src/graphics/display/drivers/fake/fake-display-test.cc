@@ -302,7 +302,7 @@ fuchsia_sysmem::wire::BufferCollectionConstraints CreateImageConstraints(
 
 // Creates a primary layer config for an opaque layer that holds the `image`
 // on the top-left corner of the screen without any scaling.
-layer_t CreatePrimaryLayerConfig(const image_t& image) {
+layer_t CreatePrimaryLayerConfig(uint64_t image_handle, const image_metadata_t& image_metadata) {
   return layer_t{
       .type = LAYER_TYPE_PRIMARY,
       .z_index = 0,
@@ -310,7 +310,8 @@ layer_t CreatePrimaryLayerConfig(const image_t& image) {
           {
               .primary =
                   {
-                      .image = image,
+                      .image_handle = image_handle,
+                      .image_metadata = image_metadata,
                       .alpha_mode = ALPHA_DISABLE,
                       .alpha_layer_val = 1.0,
                       .transform_mode = FRAME_TRANSFORM_IDENTITY,
@@ -318,15 +319,15 @@ layer_t CreatePrimaryLayerConfig(const image_t& image) {
                           {
                               .x_pos = 0,
                               .y_pos = 0,
-                              .width = image.width,
-                              .height = image.height,
+                              .width = image_metadata.width,
+                              .height = image_metadata.height,
                           },
                       .dest_frame =
                           {
                               .x_pos = 0,
                               .y_pos = 0,
-                              .width = image.width,
-                              .height = image.height,
+                              .width = image_metadata.width,
+                              .height = image_metadata.height,
                           },
                   },
           },
@@ -683,13 +684,7 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   EXPECT_NE(framebuffer_image_handle, INVALID_ID);
 
   // Create display configuration.
-  const image_t framebuffer_image_config = {
-      .width = kDisplayWidth,
-      .height = kDisplayHeight,
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-      .handle = framebuffer_image_handle,
-  };
-  layer_t layer = CreatePrimaryLayerConfig(framebuffer_image_config);
+  layer_t layer = CreatePrimaryLayerConfig(framebuffer_image_handle, kFramebufferImageMetadata);
 
   constexpr size_t kNumLayers = 1;
   std::array<const layer_t*, kNumLayers> layers = {&layer};

@@ -346,8 +346,8 @@ config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
     };
     success = display_configs[0]->layer_list[0]->type == LAYER_TYPE_PRIMARY &&
               layer->transform_mode == FRAME_TRANSFORM_IDENTITY &&
-              layer->image.width == current_display_.scanout_info.geometry.width &&
-              layer->image.height == current_display_.scanout_info.geometry.height &&
+              layer->image_metadata.width == current_display_.scanout_info.geometry.width &&
+              layer->image_metadata.height == current_display_.scanout_info.geometry.height &&
               memcmp(&layer->dest_frame, &frame, sizeof(frame_t)) == 0 &&
               memcmp(&layer->src_frame, &frame, sizeof(frame_t)) == 0 &&
               display_configs[0]->cc_flags == 0 && layer->alpha_mode == ALPHA_DISABLE;
@@ -368,7 +368,7 @@ void DisplayEngine::DisplayControllerImplApplyConfiguration(
   display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
   uint64_t handle = display_count == 0 || display_configs[0]->layer_count == 0
                         ? 0
-                        : display_configs[0]->layer_list[0]->cfg.primary.image.handle;
+                        : display_configs[0]->layer_list[0]->cfg.primary.image_handle;
 
   {
     fbl::AutoLock al(&flush_lock_);

@@ -177,7 +177,8 @@ class Controller : public DeviceType,
   // For every frame, in order to use the imported image, it is required to set
   // up the image based on given rotation in GTT and use the handle offset in
   // GTT. Returns the Gtt region representing the image.
-  const GttRegion& SetupGttImage(const image_t* image, uint32_t rotation);
+  const GttRegion& SetupGttImage(const image_metadata_t& image_metadata, uint64_t image_handle,
+                                 uint32_t rotation);
 
   // The pixel format negotiated by sysmem for an imported image.
   //
