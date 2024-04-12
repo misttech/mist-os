@@ -43,12 +43,17 @@ class ObserverServer
   void WatchPlugState(WatchPlugStateCompleter::Sync& completer) final;
   void GetReferenceClock(GetReferenceClockCompleter::Sync& completer) final;
 
-  // Stub signal_processing implementation
-  void GetElements(GetElementsCompleter::Sync& completer) final {}
+  // fuchsia.hardware.audio.signal_processing.Reader implementation
+  void GetElements(GetElementsCompleter::Sync& completer) final;
+  void GetTopologies(GetTopologiesCompleter::Sync& completer) final;
   void WatchElementState(WatchElementStateRequest& request,
-                         WatchElementStateCompleter::Sync& completer) final {}
-  void GetTopologies(GetTopologiesCompleter::Sync& completer) final {}
-  void WatchTopology(WatchTopologyCompleter::Sync& completer) final {}
+                         WatchElementStateCompleter::Sync& completer) final;
+  void WatchTopology(WatchTopologyCompleter::Sync& completer) final;
+
+  void MaybeCompleteWatchGainState();
+  void MaybeCompleteWatchPlugState();
+  void MaybeCompleteWatchTopology();
+  void MaybeCompleteWatchElementState(ElementId element_id);
 
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }
@@ -68,8 +73,14 @@ class ObserverServer
   std::optional<fuchsia_audio_device::ObserverWatchPlugStateResponse> new_plug_state_to_notify_;
   std::optional<WatchPlugStateCompleter::Async> watch_plug_state_completer_;
 
-  bool has_error_ = false;
+  std::optional<TopologyId> topology_id_to_notify_;
+  std::optional<WatchTopologyCompleter::Async> watch_topology_completer_;
 
+  std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>
+      element_states_to_notify_;
+  std::unordered_map<ElementId, WatchElementStateCompleter::Async> watch_element_state_completers_;
+
+  bool device_has_error_ = false;
   std::shared_ptr<const Device> device_;
 };
 

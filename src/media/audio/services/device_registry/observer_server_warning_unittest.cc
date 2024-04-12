@@ -4,6 +4,8 @@
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <zircon/errors.h>
 
@@ -21,9 +23,10 @@
 namespace media_audio {
 
 using DriverClient = fuchsia_audio_device::DriverClient;
+using Observer = fuchsia_audio_device::Observer;
 
 class ObserverServerWarningTest : public AudioDeviceRegistryServerTestBase,
-                                  public fidl::AsyncEventHandler<fuchsia_audio_device::Observer> {
+                                  public fidl::AsyncEventHandler<Observer> {
  protected:
   std::optional<TokenId> WaitForAddedDeviceTokenId(
       fidl::Client<fuchsia_audio_device::Registry>& registry_client) {
@@ -101,8 +104,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchGainStateWrongDeviceType) {
   bool received_callback = false;
 
   observer->client()->WatchGainState().Then(
-      [&received_callback](
-          fidl::Result<fuchsia_audio_device::Observer::WatchGainState>& result) mutable {
+      [&received_callback](fidl::Result<Observer::WatchGainState>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error())
@@ -134,8 +136,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchPlugStateWhilePending) {
   auto observer = CreateTestObserverServer(added_device);
   bool received_initial_callback = false;
   observer->client()->WatchPlugState().Then(
-      [&received_initial_callback](
-          fidl::Result<fuchsia_audio_device::Observer::WatchPlugState>& result) mutable {
+      [&received_initial_callback](fidl::Result<Observer::WatchPlugState>& result) mutable {
         received_initial_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -146,8 +147,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchPlugStateWhilePending) {
   bool received_second_callback = false;
   // The second `WatchPlugState` call should pend indefinitely (even after the third one fails).
   observer->client()->WatchPlugState().Then(
-      [&received_second_callback](
-          fidl::Result<fuchsia_audio_device::Observer::WatchPlugState>& result) mutable {
+      [&received_second_callback](fidl::Result<Observer::WatchPlugState>& result) mutable {
         received_second_callback = true;
         FAIL() << "Unexpected completion for pending WatchPlugState call";
       });
@@ -158,8 +158,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchPlugStateWhilePending) {
   // This third `WatchPlugState` call should fail immediately (domain error ALREADY_PENDING)
   // since the second call has not yet completed.
   observer->client()->WatchPlugState().Then(
-      [&received_third_callback](
-          fidl::Result<fuchsia_audio_device::Observer::WatchPlugState>& result) mutable {
+      [&received_third_callback](fidl::Result<Observer::WatchPlugState>& result) mutable {
         received_third_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
@@ -193,8 +192,7 @@ TEST_F(ObserverServerCodecWarningTest, GetReferenceClockWrongDeviceType) {
   bool received_callback = false;
 
   observer->client()->GetReferenceClock().Then(
-      [&received_callback](
-          fidl::Result<fuchsia_audio_device::Observer::GetReferenceClock>& result) mutable {
+      [&received_callback](fidl::Result<Observer::GetReferenceClock>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error())
@@ -210,8 +208,94 @@ TEST_F(ObserverServerCodecWarningTest, GetReferenceClockWrongDeviceType) {
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
 }
 
-// TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
-// Add Codec negative test cases for WatchTopology and WatchElementState (once implemented)
+// TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain),
+// including in the FakeCodec test fixture. Then add negative test cases for
+// GetTopologies/GetElements/WatchTopology/WatchElementState, as are in Composite.
+
+// Verify WatchTopology if the driver does not support signalprocessing.
+TEST_F(ObserverServerCodecWarningTest, WatchTopologyUnsupported) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
+  auto observer = CreateTestObserverServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ObserverServer::count(), 1u);
+  auto received_callback = false;
+
+  observer->client()->WatchTopology().Then(
+      [&received_callback](fidl::Result<Observer::WatchTopology>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_NOT_SUPPORTED);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  received_callback = false;
+
+  // After this failing call, the binding should not be usable.
+  observer->client()->WatchPlugState().Then(
+      [&received_callback](fidl::Result<Observer::WatchPlugState>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_framework_error());
+        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_NOT_SUPPORTED);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(observer->client().is_valid());
+}
+
+// Verify WatchElementState if the driver does not support signalprocessing.
+TEST_F(ObserverServerCodecWarningTest, WatchElementStateUnsupported) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
+  auto observer = CreateTestObserverServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ObserverServer::count(), 1u);
+  auto received_callback = false;
+
+  observer->client()
+      ->WatchElementState(fuchsia_audio_device::kDefaultDaiInterconnectElementId)
+      .Then([&received_callback](fidl::Result<Observer::WatchElementState>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_NOT_SUPPORTED);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  received_callback = false;
+
+  // After this failing call, the binding should not be usable.
+  observer->client()->WatchPlugState().Then(
+      [&received_callback](fidl::Result<Observer::WatchPlugState>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_framework_error());
+        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_NOT_SUPPORTED);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(observer->client().is_valid());
+}
 
 /////////////////////
 // Composite tests
@@ -233,8 +317,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchGainStateWrongDeviceType) {
   bool received_callback = false;
 
   observer->client()->WatchGainState().Then(
-      [&received_callback](
-          fidl::Result<fuchsia_audio_device::Observer::WatchGainState>& result) mutable {
+      [&received_callback](fidl::Result<Observer::WatchGainState>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error())
@@ -267,8 +350,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchPlugStateWrongDeviceType) {
   bool received_callback = false;
 
   observer->client()->WatchPlugState().Then(
-      [&received_callback](
-          fidl::Result<fuchsia_audio_device::Observer::WatchPlugState>& result) mutable {
+      [&received_callback](fidl::Result<Observer::WatchPlugState>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error())
@@ -282,6 +364,175 @@ TEST_F(ObserverServerCompositeWarningTest, WatchPlugStateWrongDeviceType) {
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ObserverServer::count(), 1u);
   EXPECT_FALSE(observer_fidl_error_status_.has_value());
+}
+
+// WatchTopology cases (without using SetTopology): Watch-while-pending
+TEST_F(ObserverServerCompositeWarningTest, WatchTopologyWhilePending) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ObserverServer::count(), 1u);
+  auto received_callback1 = false, received_callback2 = false;
+
+  observer->client()->WatchTopology().Then(
+      [&received_callback1](fidl::Result<Observer::WatchTopology>& result) {
+        received_callback1 = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback1);
+  received_callback1 = false;
+
+  observer->client()->WatchTopology().Then(
+      [&received_callback1](fidl::Result<Observer::WatchTopology>& result) {
+        received_callback1 = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_BAD_STATE);
+        // EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(received_callback1);
+
+  observer->client()->WatchTopology().Then(
+      [&received_callback2](fidl::Result<Observer::WatchTopology>& result) {
+        received_callback2 = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_BAD_STATE);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback2);
+  // After a failing WatchTopology call, the binding should not be usable, so the previous
+  // WatchElementState will complete with a failure.
+  EXPECT_TRUE(received_callback1);
+}
+
+// WatchElementState cases (without SetElementState): unknown ElementId, Watch-while-pending
+TEST_F(ObserverServerCompositeWarningTest, WatchElementStateUnknownElementId) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ObserverServer::count(), 1u);
+  auto& elements_from_device = element_map(device);
+  ElementId unknown_element_id = 0;
+  while (true) {
+    if (elements_from_device.find(unknown_element_id) == elements_from_device.end()) {
+      break;
+    }
+    ++unknown_element_id;
+  }
+  auto received_callback = false;
+
+  observer->client()
+      ->WatchElementState(unknown_element_id)
+      .Then([&received_callback](fidl::Result<Observer::WatchElementState>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_INVALID_ARGS);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+
+  // After a failing WatchElementState call, the binding should not be usable.
+  observer->client()->GetReferenceClock().Then(
+      [&received_callback](fidl::Result<Observer::GetReferenceClock>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_framework_error());
+        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(observer->client().is_valid());
+}
+
+TEST_F(ObserverServerCompositeWarningTest, WatchElementStateWhilePending) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ObserverServer::count(), 1u);
+  auto& elements_from_device = element_map(device);
+
+  auto element_id = elements_from_device.begin()->first;
+  auto received_callback1 = false, received_callback2 = false;
+
+  observer->client()
+      ->WatchElementState(element_id)
+      .Then([&received_callback1](fidl::Result<Observer::WatchElementState>& result) {
+        received_callback1 = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback1);
+  received_callback1 = false;
+
+  observer->client()
+      ->WatchElementState(element_id)
+      .Then([&received_callback1](fidl::Result<Observer::WatchElementState>& result) {
+        received_callback1 = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_BAD_STATE) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(received_callback1);
+
+  observer->client()
+      ->WatchElementState(element_id)
+      .Then([&received_callback2](fidl::Result<Observer::WatchElementState>& result) {
+        received_callback2 = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_BAD_STATE) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback2);
+  // After a failing WatchElementState call, the binding should not be usable, so the previous
+  // WatchElementState will complete with a failure.
+  EXPECT_TRUE(received_callback1);
+  received_callback1 = false;
+
+  observer->client()->GetReferenceClock().Then(
+      [&received_callback1](fidl::Result<Observer::GetReferenceClock>& result) {
+        received_callback1 = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_framework_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_BAD_STATE)
+            << result.error_value().framework_error();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback1);
+  EXPECT_TRUE(observer->client().is_valid());
 }
 
 /////////////////////
@@ -303,8 +554,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchGainStateWhilePending) {
   auto observer = CreateTestObserverServer(added_device);
   bool received_initial_callback = false;
   observer->client()->WatchGainState().Then(
-      [&received_initial_callback](
-          fidl::Result<fuchsia_audio_device::Observer::WatchGainState>& result) mutable {
+      [&received_initial_callback](fidl::Result<Observer::WatchGainState>& result) mutable {
         received_initial_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -316,8 +566,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchGainStateWhilePending) {
   bool received_second_callback = false;
   // The second `WatchGainState` call should pend indefinitely (even after the third one fails).
   observer->client()->WatchGainState().Then(
-      [&received_second_callback](
-          fidl::Result<fuchsia_audio_device::Observer::WatchGainState>& result) mutable {
+      [&received_second_callback](fidl::Result<Observer::WatchGainState>& result) mutable {
         received_second_callback = true;
         FAIL() << "Unexpected completion for pending WatchGainState call";
       });
@@ -328,8 +577,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchGainStateWhilePending) {
   EXPECT_FALSE(received_second_callback);
   bool received_third_callback = false;
   observer->client()->WatchGainState().Then(
-      [&received_third_callback](
-          fidl::Result<fuchsia_audio_device::Observer::WatchGainState>& result) mutable {
+      [&received_third_callback](fidl::Result<Observer::WatchGainState>& result) mutable {
         received_third_callback = true;
         ASSERT_TRUE(result.is_error()) << "Unexpected success to third WatchGainState";
         ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
@@ -361,8 +609,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchPlugStateWhilePending) {
   auto observer = CreateTestObserverServer(added_device);
   bool received_initial_callback = false;
   observer->client()->WatchPlugState().Then(
-      [&received_initial_callback](
-          fidl::Result<fuchsia_audio_device::Observer::WatchPlugState>& result) mutable {
+      [&received_initial_callback](fidl::Result<Observer::WatchPlugState>& result) mutable {
         received_initial_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
@@ -374,8 +621,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchPlugStateWhilePending) {
   bool received_second_callback = false;
   // The second `WatchPlugState` call should pend indefinitely (even after the third one fails).
   observer->client()->WatchPlugState().Then(
-      [&received_second_callback](
-          fidl::Result<fuchsia_audio_device::Observer::WatchPlugState>& result) mutable {
+      [&received_second_callback](fidl::Result<Observer::WatchPlugState>& result) mutable {
         received_second_callback = true;
         FAIL() << "Unexpected completion for pending WatchPlugState call";
       });
@@ -386,8 +632,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchPlugStateWhilePending) {
   // This third `WatchPlugState` call should fail immediately (domain error ALREADY_PENDING)
   // since the second call has not yet completed.
   observer->client()->WatchPlugState().Then(
-      [&received_third_callback](
-          fidl::Result<fuchsia_audio_device::Observer::WatchPlugState>& result) mutable {
+      [&received_third_callback](fidl::Result<Observer::WatchPlugState>& result) mutable {
         received_third_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
@@ -412,5 +657,94 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchPlugStateWhilePending) {
 
 // TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
 //   unhealthy before GetReferenceClock. Expect Obs/Ctl/RingBuf to drop + Reg/WatchRemove notif.
+
+// TODO(https://fxbug.dev/323270827): implement signalprocessing, including in the FakeStreamConfig
+// test fixture. Then add negative test cases for
+// GetTopologies/GetElements/WatchTopology/WatchElementState, as are in Composite.
+
+// Verify WatchTopology if the driver does not support signalprocessing.
+TEST_F(ObserverServerStreamConfigWarningTest, WatchTopologyUnsupported) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
+  auto observer = CreateTestObserverServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ObserverServer::count(), 1u);
+  auto received_callback = false;
+
+  observer->client()->WatchTopology().Then(
+      [&received_callback](fidl::Result<Observer::WatchTopology>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_NOT_SUPPORTED);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  received_callback = false;
+
+  // After a failing WatchTopology call, the binding should not be usable.
+  observer->client()->GetReferenceClock().Then(
+      [&received_callback](fidl::Result<Observer::GetReferenceClock>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_framework_error());
+        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_NOT_SUPPORTED);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(observer->client().is_valid());
+}
+
+// Verify WatchElementState if the driver does not support signalprocessing.
+TEST_F(ObserverServerStreamConfigWarningTest, WatchElementStateUnsupported) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
+  auto observer = CreateTestObserverServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ObserverServer::count(), 1u);
+  auto received_callback = false;
+
+  observer->client()
+      ->WatchElementState(fuchsia_audio_device::kDefaultDaiInterconnectElementId)
+      .Then([&received_callback](fidl::Result<Observer::WatchElementState>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_NOT_SUPPORTED);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  received_callback = false;
+
+  // After a failing WatchElementState call, the binding should not be usable.
+  observer->client()->GetReferenceClock().Then(
+      [&received_callback](fidl::Result<Observer::GetReferenceClock>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_framework_error());
+        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_NOT_SUPPORTED);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(observer->client().is_valid());
+}
 
 }  // namespace media_audio

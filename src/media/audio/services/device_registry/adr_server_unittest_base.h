@@ -79,6 +79,16 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
         Device::Create(adr_service_, dispatcher(), name, device_type, std::move(driver_client)));
   }
 
+  static const std::unordered_map<TopologyId,
+                                  std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>>&
+  topology_map(const std::shared_ptr<Device>& device) {
+    return device->sig_proc_topology_map_;
+  }
+  static const std::unordered_map<ElementId, ElementRecord>& element_map(
+      const std::shared_ptr<Device>& device) {
+    return device->sig_proc_element_map_;
+  }
+
   class FidlHandler {
    public:
     explicit FidlHandler(AudioDeviceRegistryServerTestBase* parent) : parent_(parent) {}

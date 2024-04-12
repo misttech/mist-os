@@ -23,10 +23,10 @@ std::shared_ptr<ObserverServer> ObserverServer::Create(
     std::shared_ptr<const Device> device) {
   ADR_LOG_STATIC(kLogObserverServerMethods);
 
-  return BaseFidlServer::Create(std::move(thread), std::move(server_end), device);
+  return BaseFidlServer::Create(std::move(thread), std::move(server_end), std::move(device));
 }
 
-ObserverServer::ObserverServer(std::shared_ptr<const Device> device) : device_(device) {
+ObserverServer::ObserverServer(std::shared_ptr<const Device> device) : device_(std::move(device)) {
   ADR_LOG_METHOD(kLogObjectLifetimes);
 
   // TODO(https://fxbug.dev/42068381): Consider Health-check if this can change post-initialization.
@@ -44,7 +44,7 @@ ObserverServer::~ObserverServer() {
 void ObserverServer::DeviceHasError() {
   ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods);
 
-  has_error_ = true;
+  device_has_error_ = true;
   DeviceIsRemoved();
 }
 
@@ -60,7 +60,7 @@ void ObserverServer::DeviceIsRemoved() {
 void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogObserverServerMethods);
 
-  if (has_error_) {
+  if (device_has_error_) {
     ADR_WARN_METHOD() << "Device encountered an error and will be removed";
     completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchGainStateError>(
         fuchsia_audio_device::ObserverWatchGainStateError::kDeviceError));
@@ -82,15 +82,8 @@ void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
     return;
   }
 
-  if (new_gain_state_to_notify_) {
-    fuchsia_audio_device::ObserverWatchGainStateResponse response{{
-        .state = std::move(*new_gain_state_to_notify_),
-    }};
-    new_gain_state_to_notify_.reset();
-    completer.Reply(fit::success(std::move(response)));
-  } else {
-    watch_gain_state_completer_ = completer.ToAsync();
-  }
+  watch_gain_state_completer_ = completer.ToAsync();
+  MaybeCompleteWatchGainState();
 }
 
 void ObserverServer::GainStateChanged(const fuchsia_audio_device::GainState& new_gain_state) {
@@ -98,23 +91,27 @@ void ObserverServer::GainStateChanged(const fuchsia_audio_device::GainState& new
 
   FX_DCHECK(device_->is_stream_config());
 
-  if (watch_gain_state_completer_) {
-    new_gain_state_to_notify_.reset();
+  new_gain_state_to_notify_ = new_gain_state;
+  MaybeCompleteWatchGainState();
+}
 
+void ObserverServer::MaybeCompleteWatchGainState() {
+  if (watch_gain_state_completer_ && new_gain_state_to_notify_) {
     auto completer = std::move(*watch_gain_state_completer_);
     watch_gain_state_completer_.reset();
-    completer.Reply(fit::success(fuchsia_audio_device::ObserverWatchGainStateResponse{{
-        .state = new_gain_state,
-    }}));
-  } else {
-    new_gain_state_to_notify_ = new_gain_state;
+
+    fuchsia_audio_device::ObserverWatchGainStateResponse response{
+        {.state = std::move(*new_gain_state_to_notify_)}};
+    new_gain_state_to_notify_.reset();
+
+    completer.Reply(fit::success(response));
   }
 }
 
 void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogObserverServerMethods);
 
-  if (has_error_) {
+  if (device_has_error_) {
     ADR_WARN_METHOD() << "Device encountered an error and will be removed";
     completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchPlugStateError>(
         fuchsia_audio_device::ObserverWatchPlugStateError::kDeviceError));
@@ -136,14 +133,8 @@ void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
     return;
   }
 
-  if (new_plug_state_to_notify_) {
-    fuchsia_audio_device::ObserverWatchPlugStateResponse response =
-        std::move(*new_plug_state_to_notify_);
-    new_plug_state_to_notify_.reset();
-    completer.Reply(fit::success(response));
-  } else {
-    watch_plug_state_completer_ = completer.ToAsync();
-  }
+  watch_plug_state_completer_ = completer.ToAsync();
+  MaybeCompleteWatchPlugState();
 }
 
 void ObserverServer::PlugStateChanged(const fuchsia_audio_device::PlugState& new_plug_state,
@@ -155,21 +146,25 @@ void ObserverServer::PlugStateChanged(const fuchsia_audio_device::PlugState& new
       .state = new_plug_state,
       .plug_time = plug_change_time.get(),
   }};
+  MaybeCompleteWatchPlugState();
+}
 
-  if (watch_plug_state_completer_) {
+void ObserverServer::MaybeCompleteWatchPlugState() {
+  if (watch_plug_state_completer_ && new_plug_state_to_notify_) {
     auto completer = std::move(*watch_plug_state_completer_);
     watch_plug_state_completer_.reset();
 
-    auto response = std::move(*new_plug_state_to_notify_);
+    auto new_plug_state = std::move(*new_plug_state_to_notify_);
     new_plug_state_to_notify_.reset();
-    completer.Reply(fit::success(response));
+
+    completer.Reply(fit::success(new_plug_state));
   }
 }
 
 void ObserverServer::GetReferenceClock(GetReferenceClockCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogObserverServerMethods);
 
-  if (has_error_) {
+  if (device_has_error_) {
     ADR_WARN_METHOD() << "Device encountered an error and will be removed";
     completer.Reply(fit::error<fuchsia_audio_device::ObserverGetReferenceClockError>(
         fuchsia_audio_device::ObserverGetReferenceClockError::kDeviceError));
@@ -197,17 +192,187 @@ void ObserverServer::GetReferenceClock(GetReferenceClockCompleter::Sync& complet
   completer.Reply(fit::success(std::move(response)));
 }
 
-// For now, don't do anything with this.
+void ObserverServer::GetElements(GetElementsCompleter::Sync& completer) {
+  ADR_LOG_METHOD(kLogObserverServerMethods);
+
+  if (device_has_error_) {
+    ADR_WARN_METHOD() << "Device has error";
+    completer.Reply(fit::error(ZX_ERR_INTERNAL));
+    return;
+  }
+
+  FX_CHECK(device_);
+  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+    ADR_WARN_METHOD() << "This device_type does not support " << __func__;
+    completer.Reply(fit::error(ZX_ERR_WRONG_TYPE));
+    return;
+  }
+
+  if (!device_->supports_signalprocessing()) {
+    ADR_LOG_METHOD(kLogObserverServerMethods) << "This driver does not support signalprocessing";
+    completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
+
+  FX_CHECK(device_->info().has_value() &&
+           device_->info()->signal_processing_elements().has_value() &&
+           !device_->info()->signal_processing_elements()->empty());
+  completer.Reply(fit::success(*device_->info()->signal_processing_elements()));
+}
+
+void ObserverServer::GetTopologies(GetTopologiesCompleter::Sync& completer) {
+  ADR_LOG_METHOD(kLogObserverServerMethods);
+
+  if (device_has_error_) {
+    ADR_WARN_METHOD() << "Device has error";
+    completer.Reply(fit::error(ZX_ERR_INTERNAL));
+    return;
+  }
+
+  FX_CHECK(device_);
+  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+    ADR_WARN_METHOD() << "This device_type does not support " << __func__;
+    completer.Reply(fit::error(ZX_ERR_WRONG_TYPE));
+    return;
+  }
+
+  if (!device_->supports_signalprocessing()) {
+    ADR_LOG_METHOD(kLogObserverServerMethods) << "This driver does not support signalprocessing";
+    completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
+
+  FX_CHECK(device_->info().has_value() &&
+           device_->info()->signal_processing_topologies().has_value() &&
+           !device_->info()->signal_processing_topologies()->empty());
+  completer.Reply(fit::success(*device_->info()->signal_processing_topologies()));
+}
+
+void ObserverServer::WatchTopology(WatchTopologyCompleter::Sync& completer) {
+  ADR_LOG_METHOD(kLogObserverServerMethods);
+
+  if (device_has_error_) {
+    ADR_WARN_METHOD() << "Device has error";
+    completer.Close(ZX_ERR_INTERNAL);
+    return;
+  }
+
+  FX_CHECK(device_);
+  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+    ADR_WARN_METHOD() << "This device_type does not support " << __func__;
+    completer.Close(ZX_ERR_WRONG_TYPE);
+    return;
+  }
+
+  if (!device_->supports_signalprocessing()) {
+    ADR_WARN_METHOD() << "This driver does not support signalprocessing";
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+
+  if (watch_topology_completer_) {
+    ADR_WARN_METHOD() << "previous `WatchTopology` request has not yet completed";
+    completer.Close(ZX_ERR_BAD_STATE);
+    return;
+  }
+
+  watch_topology_completer_ = completer.ToAsync();
+  MaybeCompleteWatchTopology();
+}
+
 void ObserverServer::TopologyChanged(TopologyId topology_id) {
   ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods)
       << "(topology_id " << topology_id << ")";
+
+  topology_id_to_notify_ = topology_id;
+  MaybeCompleteWatchTopology();
 }
 
-// For now, don't do anything with this.
+void ObserverServer::MaybeCompleteWatchTopology() {
+  // ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods);
+
+  if (watch_topology_completer_.has_value() && topology_id_to_notify_.has_value()) {
+    ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods) << " will Reply";
+
+    auto completer = std::move(*watch_topology_completer_);
+    watch_topology_completer_.reset();
+
+    auto new_topology_id = *topology_id_to_notify_;
+    topology_id_to_notify_.reset();
+
+    completer.Reply(new_topology_id);
+  } else {
+    ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods) << " did not occur";
+  }
+}
+
+void ObserverServer::WatchElementState(WatchElementStateRequest& request,
+                                       WatchElementStateCompleter::Sync& completer) {
+  ADR_LOG_METHOD(kLogObserverServerMethods);
+
+  if (device_has_error_) {
+    ADR_WARN_METHOD() << "Device has error";
+    completer.Close(ZX_ERR_INTERNAL);
+    return;
+  }
+
+  FX_CHECK(device_);
+  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+    ADR_WARN_METHOD() << "This device_type does not support " << __func__;
+    completer.Close(ZX_ERR_WRONG_TYPE);
+    return;
+  }
+
+  if (!device_->supports_signalprocessing()) {
+    ADR_WARN_METHOD() << "This driver does not support signalprocessing";
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+
+  ElementId element_id = request.processing_element_id();
+  if (device_->element_ids().find(element_id) == device_->element_ids().end()) {
+    ADR_WARN_METHOD() << "unknown element_id " << element_id;
+    completer.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
+  if (watch_element_state_completers_.find(element_id) != watch_element_state_completers_.end()) {
+    ADR_WARN_METHOD() << "previous `WatchElementState(" << element_id
+                      << ")` request has not yet completed";
+    completer.Close(ZX_ERR_BAD_STATE);
+    return;
+  }
+
+  watch_element_state_completers_.insert({element_id, completer.ToAsync()});
+  MaybeCompleteWatchElementState(element_id);
+}
+
 void ObserverServer::ElementStateChanged(
     ElementId element_id, fuchsia_hardware_audio_signalprocessing::ElementState element_state) {
   ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods)
       << "(element_id " << element_id << ")";
+
+  element_states_to_notify_.insert_or_assign(element_id, element_state);
+  MaybeCompleteWatchElementState(element_id);
+}
+
+// If we have an outstanding hanging-get and a state-change, respond with the state change.
+void ObserverServer::MaybeCompleteWatchElementState(ElementId element_id) {
+  // ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods) << element_id;
+
+  if (watch_element_state_completers_.find(element_id) != watch_element_state_completers_.end() &&
+      element_states_to_notify_.find(element_id) != element_states_to_notify_.end()) {
+    ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods) << element_id << " will Reply";
+    auto completer = std::move(watch_element_state_completers_.find(element_id)->second);
+    watch_element_state_completers_.erase(element_id);
+
+    auto new_element_state = element_states_to_notify_.find(element_id)->second;
+    element_states_to_notify_.erase(element_id);
+
+    completer.Reply(new_element_state);
+  } else {
+    ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods) << " did not occur";
+  }
 }
 
 }  // namespace media_audio

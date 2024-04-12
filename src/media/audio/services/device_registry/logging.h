@@ -48,7 +48,7 @@ inline constexpr bool kLogDeviceMethods = false;
 inline constexpr bool kLogObjectLifetimes = false;
 inline constexpr bool kLogDeviceState = false;
 inline constexpr bool kLogObjectCounts = false;
-inline constexpr bool kLogNotifyMethods = false;
+inline constexpr bool kLogNotifyMethods = true;
 
 // Driver FIDL methods
 inline constexpr bool kLogCodecFidlCalls = false;
@@ -80,8 +80,8 @@ inline constexpr bool kLogControlCreatorServerResponses = false;
 inline constexpr bool kLogControlServerMethods = false;
 inline constexpr bool kLogControlServerResponses = false;
 
-inline constexpr bool kLogObserverServerMethods = false;
-inline constexpr bool kLogObserverServerResponses = false;
+inline constexpr bool kLogObserverServerMethods = true;
+inline constexpr bool kLogObserverServerResponses = true;
 
 inline constexpr bool kLogProviderServerMethods = false;
 inline constexpr bool kLogProviderServerResponses = false;
