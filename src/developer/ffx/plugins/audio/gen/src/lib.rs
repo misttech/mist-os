@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    async_trait::async_trait,
-    errors::ffx_bail,
-    ffx_audio_gen_args::{
-        GenCommand, PinkNoiseCommand, SawtoothCommand, SineCommand, SquareCommand, SubCommand,
-        TriangleCommand, WhiteNoiseCommand,
-    },
-    fho::{FfxMain, FfxTool, SimpleWriter},
-    fuchsia_audio::{format::SampleType, Format},
-    rand::{rngs::ThreadRng, thread_rng, Rng},
-    std::{f64::consts::PI, io, io::Write, time::Duration},
+use anyhow::Result;
+use async_trait::async_trait;
+use errors::ffx_bail;
+use ffx_audio_gen_args::{
+    GenCommand, PinkNoiseCommand, SawtoothCommand, SineCommand, SquareCommand, SubCommand,
+    TriangleCommand, WhiteNoiseCommand,
 };
+use fho::{FfxMain, FfxTool, SimpleWriter};
+use fuchsia_audio::{format::SampleType, Format};
+use rand::{rngs::ThreadRng, thread_rng, Rng};
+use std::{f64::consts::PI, io, io::Write, time::Duration};
 
 // Conversion constants for `SampleType::Uint8`.
 // Note: Sample data in WAV file are stored as unsigned 8 bit values. However, the hound rust

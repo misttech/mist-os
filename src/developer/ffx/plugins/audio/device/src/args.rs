@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::{ArgsInfo, FromArgs},
-    ffx_core::ffx_command,
-    fuchsia_audio::{
-        device::{Direction, HardwareType},
-        Format,
-    },
+use argh::{ArgsInfo, FromArgs};
+use ffx_core::ffx_command;
+use fuchsia_audio::{
+    device::{Direction, HardwareType},
+    Format,
 };
 
 #[ffx_command()]

@@ -2,18 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    blocking::Unblock,
-    fidl::{endpoints::Proxy, Socket},
-    fidl_fuchsia_audio_controller::{
-        PlayerPlayRequest, PlayerPlayResponse, PlayerProxy, PlayerRequest, RecordCancelerProxy,
-        RecorderProxy, RecorderRecordRequest, RecorderRecordResponse,
-    },
-    futures::{future::Either, AsyncReadExt, AsyncWrite, FutureExt, TryFutureExt},
-    serde::{Deserialize, Serialize},
-    std::io::{BufRead, ErrorKind},
-};
+use anyhow::{anyhow, Error};
+use blocking::Unblock;
+use fidl::{endpoints::Proxy, Socket};
+use fidl_fuchsia_audio_controller as fac;
+use futures::{future::Either, AsyncReadExt, AsyncWrite, FutureExt, TryFutureExt};
+use serde::{Deserialize, Serialize};
+use std::io::{BufRead, ErrorKind};
 
 pub mod ffxtool;
 
@@ -30,8 +25,8 @@ pub struct RecordResult {
 }
 
 pub async fn play(
-    request: PlayerPlayRequest,
-    controller: PlayerProxy,
+    request: fac::PlayerPlayRequest,
+    controller: fac::PlayerProxy,
     play_local: Socket, // Send data from ffx to target.
     input_reader: Box<dyn std::io::Read + std::marker::Send + 'static>,
     // Input generalized to stdin or test buffer. Forward to socket.
@@ -39,29 +34,25 @@ pub async fn play(
 where
 {
     let (play_result, _stdin_reader_result) = futures::future::try_join(
-        {
-            controller
-                .play(request)
-                .map_err(|e| anyhow::anyhow!("future try join failed with error {e}"))
-        },
+        controller.play(request).map_err(|e| anyhow!("future try join failed with error {e}")),
         async move {
             let mut socket_writer = fidl::AsyncSocket::from_socket(play_local);
             let stdin_res = futures::io::copy(Unblock::new(input_reader), &mut socket_writer).await;
 
             // Close ffx end of socket so that daemon end reads EOF and stops waiting for data.
             drop(socket_writer);
-            stdin_res.map_err(|e| anyhow::anyhow!("Error stdin: {}", e))
+            stdin_res.map_err(|e| anyhow!("Error stdin: {}", e))
         },
     )
     .await?;
     play_result
         .map(|result| PlayResult { bytes_processed: result.bytes_processed })
-        .map_err(|e| anyhow::anyhow!("Play failed with error {:?}", e))
+        .map_err(|e| anyhow!("Play failed with error {:?}", e))
 }
 
 pub async fn record<W>(
-    controller: RecorderProxy,
-    request: RecorderRecordRequest,
+    controller: fac::RecorderProxy,
+    request: fac::RecorderRecordRequest,
     record_local: fidl::Socket,
     mut output_writer: W, // Output generalized to stdout or a test buffer. Forward data
     // from daemon to this writer.
@@ -70,20 +61,17 @@ pub async fn record<W>(
 where
     W: AsyncWrite + std::marker::Unpin,
 {
-    let response_fut = {
-        controller
-            .record(request)
-            .map_err(|e| anyhow::anyhow!("Controller record failure: {:?}", e))
-    };
+    let response_fut =
+        { controller.record(request).map_err(|e| anyhow!("Controller record failure: {:?}", e)) };
 
     let wav_fut = {
         futures::io::copy(fidl::AsyncSocket::from_socket(record_local), &mut output_writer)
-            .map_err(|e| anyhow::anyhow!("wav output failure: {:?}", e))
+            .map_err(|e| anyhow!("wav output failure: {:?}", e))
     };
 
     let (record_result, _keypress_result, _socket_result) = futures::future::try_join3(
         response_fut,
-        keypress_handler.map_err(|e| anyhow::anyhow!("Failed to wait for keypress: {e}")),
+        keypress_handler.map_err(|e| anyhow!("Failed to wait for keypress: {e}")),
         wav_fut,
     )
     .await?;
@@ -94,7 +82,7 @@ where
             packets_processed: result.packets_processed,
             late_wakeups: result.late_wakeups,
         })
-        .map_err(|e| anyhow::anyhow!("Record request failed with error {:?}", e))
+        .map_err(|e| anyhow!("Record request failed with error {:?}", e))
 }
 
 pub fn get_stdin_waiter() -> futures::future::BoxFuture<'static, Result<(), std::io::Error>> {
@@ -126,7 +114,7 @@ pub fn format_record_result(result: Result<RecordResult, Error>) -> String {
 }
 
 pub async fn cancel_on_keypress(
-    proxy: RecordCancelerProxy,
+    proxy: fac::RecordCancelerProxy,
     input_waiter: impl futures::Future<Output = Result<(), std::io::Error>>
         + futures::future::FusedFuture,
 ) -> Result<(), std::io::Error> {
@@ -150,17 +138,12 @@ pub async fn cancel_on_keypress(
 }
 
 pub mod tests {
-    use fidl_fuchsia_audio_controller::{
-        CompositeDeviceInfo, DeviceControlGetDeviceInfoResponse, DeviceControlProxy,
-        DeviceControlRequest, DeviceInfo, DeviceSelector, RecorderRequest, StreamConfigDeviceInfo,
-    };
+    use super::*;
     use fidl_fuchsia_audio_device as fadevice;
     use fidl_fuchsia_hardware_audio as fhaudio;
     use fuchsia_audio::stop_listener;
     use futures::AsyncWriteExt;
     use timeout::timeout;
-
-    use super::*;
 
     // Header for an infinite-length audio stream: 16 kHz, 3-channel, 16-bit signed.
     // This slice contains a complete WAVE_FORMAT_EXTENSIBLE file header
@@ -186,17 +169,18 @@ pub mod tests {
     \x26\x21\x1d\x18\x14\x10\x0d\x0a\x07\x05\x03\x02\x01\x00\x00\x00\
     \x01\x02\x04\x06\x08\x0b\x0e\x11\x15\x1a\x1e\x23";
 
-    pub fn fake_audio_daemon() -> DeviceControlProxy {
+    pub fn fake_audio_daemon() -> fac::DeviceControlProxy {
         let callback = |req| match req {
-            DeviceControlRequest::GetDeviceInfo { payload, responder } => match payload.device {
+            fac::DeviceControlRequest::GetDeviceInfo { payload, responder } => match payload.device
+            {
                 Some(device_selector) => {
-                    let DeviceSelector::Devfs(devfs) = device_selector else {
+                    let fac::DeviceSelector::Devfs(devfs) = device_selector else {
                         panic!("unknown selector type");
                     };
 
                     let result = match devfs.device_type {
                         fadevice::DeviceType::Input | fadevice::DeviceType::Output => {
-                            let stream_device_info = StreamConfigDeviceInfo {
+                            let stream_device_info = fac::StreamConfigDeviceInfo {
                                 stream_properties: Some(fhaudio::StreamProperties {
                                     unique_id: Some([
                                         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
@@ -247,10 +231,10 @@ pub mod tests {
                                 plug_state: None,
                                 ..Default::default()
                             };
-                            DeviceInfo::StreamConfig(stream_device_info)
+                            fac::DeviceInfo::StreamConfig(stream_device_info)
                         }
                         fadevice::DeviceType::Composite => {
-                            let composite_device_info = CompositeDeviceInfo {
+                            let composite_device_info = fac::CompositeDeviceInfo {
                                 composite_properties: Some(fhaudio::CompositeProperties {
                                     clock_domain: Some(0),
                                     ..Default::default()
@@ -260,13 +244,13 @@ pub mod tests {
                                 ..Default::default()
                             };
 
-                            DeviceInfo::Composite(composite_device_info)
+                            fac::DeviceInfo::Composite(composite_device_info)
                         }
                         _ => unimplemented!(),
                     };
 
                     responder
-                        .send(Ok(DeviceControlGetDeviceInfoResponse {
+                        .send(Ok(fac::DeviceControlGetDeviceInfoResponse {
                             device_info: Some(result),
                             ..Default::default()
                         }))
@@ -279,11 +263,11 @@ pub mod tests {
         fho::testing::fake_proxy(callback)
     }
 
-    pub fn fake_audio_player() -> PlayerProxy {
+    pub fn fake_audio_player() -> fac::PlayerProxy {
         let callback = |req| match req {
-            PlayerRequest::Play { payload, responder } => {
+            fac::PlayerRequest::Play { payload, responder } => {
                 let data_socket =
-                    payload.wav_source.ok_or(anyhow::anyhow!("Socket argument missing.")).unwrap();
+                    payload.wav_source.ok_or(anyhow!("Socket argument missing.")).unwrap();
 
                 let mut socket = fidl::AsyncSocket::from_socket(data_socket);
                 let mut wav_file = vec![0u8; 11];
@@ -294,7 +278,7 @@ pub mod tests {
                     // so controller specific functionality can be covered by tests targeting
                     // it specifically.
                     let response =
-                        PlayerPlayResponse { bytes_processed: Some(1), ..Default::default() };
+                        fac::PlayerPlayResponse { bytes_processed: Some(1), ..Default::default() };
 
                     responder.send(Ok(response)).unwrap();
                 })
@@ -306,11 +290,11 @@ pub mod tests {
         fho::testing::fake_proxy(callback)
     }
 
-    pub fn fake_audio_recorder() -> RecorderProxy {
+    pub fn fake_audio_recorder() -> fac::RecorderProxy {
         let callback = |req| match req {
-            RecorderRequest::Record { payload, responder } => {
+            fac::RecorderRequest::Record { payload, responder } => {
                 let wav_socket =
-                    payload.wav_data.ok_or(anyhow::anyhow!("Socket argument missing.")).unwrap();
+                    payload.wav_data.ok_or(anyhow!("Socket argument missing.")).unwrap();
 
                 fuchsia_async::Task::local(async move {
                     let mut socket = fidl::AsyncSocket::from_socket(wav_socket);
@@ -337,7 +321,7 @@ pub mod tests {
                             assert_eq!(stop_signal.load(std::sync::atomic::Ordering::SeqCst), true);
                         }
                     }
-                    let _ = responder.send(Ok(RecorderRecordResponse {
+                    let _ = responder.send(Ok(fac::RecorderRecordResponse {
                         // Calculating bytes & packets processed can be tested in controller tests.
                         // ffx tests are for I/O and command line validation.
                         bytes_processed: Some(123),

@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    argh::{ArgsInfo, FromArgs},
-    ffx_core::ffx_command,
-    fuchsia_audio::Format,
-    std::time::Duration,
-};
+use anyhow::Result;
+use argh::{ArgsInfo, FromArgs};
+use ffx_core::ffx_command;
+use fuchsia_audio::Format;
+use std::time::Duration;
 
 /// TODO(https://fxbug.dev/42061172) - Add support for writing infinite files.
 #[ffx_command()]

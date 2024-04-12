@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    argh::{ArgsInfo, FromArgs},
-    ffx_core::ffx_command,
-    fidl_fuchsia_media::AudioRenderUsage,
-};
+use anyhow::Result;
+use argh::{ArgsInfo, FromArgs};
+use ffx_core::ffx_command;
+use fidl_fuchsia_audio_controller as fac;
+use fidl_fuchsia_media as fmedia;
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -25,7 +24,7 @@ pub struct PlayCommand {
         Accepted values: BACKGROUND, MEDIA, SYSTEM-AGENT, COMMUNICATION, INTERRUPTION,\
         ULTRASOUND. Default: MEDIA.",
         from_str_fn(str_to_usage),
-        default = "AudioRenderUsageExtended::Media(AudioRenderUsage::Media)"
+        default = "AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage::Media)"
     )]
     pub usage: AudioRenderUsageExtended,
 
@@ -62,9 +61,9 @@ pub struct PlayCommand {
         rate adjustment and offset are integers. To set offset without rate adjustment, pass 0\
         in place of rate adjustment.",
         from_str_fn(str_to_clock),
-        default = "fidl_fuchsia_audio_controller::ClockType::Flexible(fidl_fuchsia_audio_controller::Flexible)"
+        default = "fac::ClockType::Flexible(fac::Flexible)"
     )]
-    pub clock: fidl_fuchsia_audio_controller::ClockType,
+    pub clock: fac::ClockType,
 
     #[argh(
         option,
@@ -76,30 +75,34 @@ pub struct PlayCommand {
 
 #[derive(Debug, PartialEq)]
 pub enum AudioRenderUsageExtended {
-    Background(AudioRenderUsage),
-    Media(AudioRenderUsage),
-    SystemAgent(AudioRenderUsage),
-    Communication(AudioRenderUsage),
-    Interruption(AudioRenderUsage),
+    Background(fmedia::AudioRenderUsage),
+    Media(fmedia::AudioRenderUsage),
+    SystemAgent(fmedia::AudioRenderUsage),
+    Communication(fmedia::AudioRenderUsage),
+    Interruption(fmedia::AudioRenderUsage),
     Ultrasound,
 }
 
 fn str_to_usage(src: &str) -> Result<AudioRenderUsageExtended, String> {
     match src.to_uppercase().as_str() {
-        "BACKGROUND" => Ok(AudioRenderUsageExtended::Background(AudioRenderUsage::Background)),
-        "MEDIA" => Ok(AudioRenderUsageExtended::Media(AudioRenderUsage::Media)),
-        "INTERRUPTION" => {
-            Ok(AudioRenderUsageExtended::Interruption(AudioRenderUsage::Interruption))
+        "BACKGROUND" => {
+            Ok(AudioRenderUsageExtended::Background(fmedia::AudioRenderUsage::Background))
         }
-        "SYSTEM-AGENT" => Ok(AudioRenderUsageExtended::SystemAgent(AudioRenderUsage::SystemAgent)),
+        "MEDIA" => Ok(AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage::Media)),
+        "INTERRUPTION" => {
+            Ok(AudioRenderUsageExtended::Interruption(fmedia::AudioRenderUsage::Interruption))
+        }
+        "SYSTEM-AGENT" => {
+            Ok(AudioRenderUsageExtended::SystemAgent(fmedia::AudioRenderUsage::SystemAgent))
+        }
         "COMMUNICATION" => {
-            Ok(AudioRenderUsageExtended::Communication(AudioRenderUsage::Communication))
+            Ok(AudioRenderUsageExtended::Communication(fmedia::AudioRenderUsage::Communication))
         }
         "ULTRASOUND" => Ok(AudioRenderUsageExtended::Ultrasound),
         _ => Err(String::from("Couldn't parse usage.")),
     }
 }
 
-fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_controller::ClockType, String> {
+fn str_to_clock(src: &str) -> Result<fac::ClockType, String> {
     fuchsia_audio::str_to_clock(src)
 }

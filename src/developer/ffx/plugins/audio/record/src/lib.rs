@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    async_trait::async_trait,
-    blocking::Unblock,
-    ffx_audio_record_args::{AudioCaptureUsageExtended, RecordCommand},
-    fho::ToolIO,
-    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_audio_controller::{
-        CapturerConfig, RecordSource, RecorderProxy, RecorderRecordRequest, StandardCapturerConfig,
-    },
-    fidl_fuchsia_media::AudioStreamType,
-    futures::AsyncWrite,
-    futures::FutureExt,
-};
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use blocking::Unblock;
+use ffx_audio_record_args::{AudioCaptureUsageExtended, RecordCommand};
+use fho::ToolIO;
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_audio_controller as fac;
+use fidl_fuchsia_media as fmedia;
+use futures::{AsyncWrite, FutureExt};
 
 #[derive(FfxTool)]
 pub struct RecordTool {
@@ -23,8 +19,9 @@ pub struct RecordTool {
     cmd: RecordCommand,
 
     #[with(moniker("/core/audio_ffx_daemon"))]
-    controller: RecorderProxy,
+    controller: fac::RecorderProxy,
 }
+
 fho::embedded_plugin!(RecordTool);
 #[async_trait(?Send)]
 impl FfxMain for RecordTool {
@@ -40,20 +37,19 @@ impl FfxMain for RecordTool {
 
         let (location, gain_settings) = match self.cmd.usage {
             AudioCaptureUsageExtended::Loopback => {
-                (RecordSource::Loopback(fidl_fuchsia_audio_controller::Loopback {}), None)
+                (fac::RecordSource::Loopback(fac::Loopback {}), None)
             }
             AudioCaptureUsageExtended::Ultrasound => (
-                RecordSource::Capturer(CapturerConfig::UltrasoundCapturer(
-                    fidl_fuchsia_audio_controller::UltrasoundCapturer {},
+                fac::RecordSource::Capturer(fac::CapturerConfig::UltrasoundCapturer(
+                    fac::UltrasoundCapturer {},
                 )),
                 None,
             ),
             _ => (
-                RecordSource::Capturer(CapturerConfig::StandardCapturer(StandardCapturerConfig {
-                    usage: capturer_usage,
-                    ..Default::default()
-                })),
-                Some(fidl_fuchsia_audio_controller::GainSettings {
+                fac::RecordSource::Capturer(fac::CapturerConfig::StandardCapturer(
+                    fac::StandardCapturerConfig { usage: capturer_usage, ..Default::default() },
+                )),
+                Some(fac::GainSettings {
                     mute: Some(self.cmd.mute),
                     gain: Some(self.cmd.gain),
                     ..Default::default()
@@ -62,13 +58,12 @@ impl FfxMain for RecordTool {
         };
 
         let (record_remote, record_local) = fidl::Socket::create_datagram();
-        let (cancel_proxy, cancel_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_audio_controller::RecordCancelerMarker>()
-                .map_err(|e| anyhow::anyhow!("FIDL Error creating canceler proxy: {e}"))?;
+        let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>()
+            .map_err(|e| anyhow!("FIDL Error creating canceler proxy: {e}"))?;
 
-        let request = RecorderRecordRequest {
+        let request = fac::RecorderRecordRequest {
             source: Some(location),
-            stream_type: Some(AudioStreamType::from(self.cmd.format)),
+            stream_type: Some(fmedia::AudioStreamType::from(self.cmd.format)),
             duration: self.cmd.duration.map(|duration| duration.as_nanos() as i64),
             canceler: Some(cancel_server),
             gain_settings,
@@ -90,8 +85,8 @@ impl FfxMain for RecordTool {
 }
 
 async fn record_impl<W>(
-    controller: RecorderProxy,
-    request: RecorderRecordRequest,
+    controller: fac::RecorderProxy,
+    request: fac::RecorderRecordRequest,
     keypress_waiter: impl futures::Future<Output = Result<(), std::io::Error>>,
     record_local: fidl::Socket,
     mut wav_writer: W, // Output generalized to stdout or a test buffer. Forward data
@@ -112,7 +107,7 @@ where
 
     let message = ffx_audio_common::format_record_result(result);
     writeln!(output_result_writer.stderr(), "{}", message)
-        .map_err(|e| anyhow::anyhow!("Writing result failed with error {e}."))
+        .map_err(|e| anyhow!("Writing result failed with error {e}."))
 }
 
 #[cfg(test)]
@@ -131,14 +126,12 @@ mod tests {
         let test_buffers = TestBuffers::default();
         let result_writer: SimpleWriter = SimpleWriter::new_test(&test_buffers);
 
-        let (cancel_proxy, cancel_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_audio_controller::RecordCancelerMarker>()
-                .unwrap();
+        let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>().unwrap();
 
         let test_stdout = TestBuffer::default();
 
         let (record_remote, record_local) = fidl::Socket::create_datagram();
-        let request = RecorderRecordRequest {
+        let request = fac::RecorderRecordRequest {
             source: None,
             stream_type: None,
             duration: Some(500),
@@ -180,14 +173,12 @@ mod tests {
         let test_buffers = TestBuffers::default();
         let result_writer: SimpleWriter = SimpleWriter::new_test(&test_buffers);
 
-        let (cancel_proxy, cancel_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_audio_controller::RecordCancelerMarker>()
-                .unwrap();
+        let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>().unwrap();
 
         let test_stdout = TestBuffer::default();
 
         let (record_remote, record_local) = fidl::Socket::create_datagram();
-        let request = RecorderRecordRequest {
+        let request = fac::RecorderRecordRequest {
             source: None,
             stream_type: None,
             duration: None,

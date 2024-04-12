@@ -2,21 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    async_trait::async_trait,
-    ffx_audio_common::PlayResult,
-    ffx_audio_play_args::{
-        AudioRenderUsageExtended::{
-            Background, Communication, Interruption, Media, SystemAgent, Ultrasound,
-        },
-        PlayCommand,
-    },
-    fho::{moniker, FfxMain, FfxTool, MachineWriter},
-    fidl::HandleBased,
-    fidl_fuchsia_audio_controller::{PlayerPlayRequest, PlayerProxy},
-    std::io::Read,
-};
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use ffx_audio_common::PlayResult;
+use ffx_audio_play_args::{AudioRenderUsageExtended, PlayCommand};
+use fho::{moniker, FfxMain, FfxTool, MachineWriter};
+use fidl::HandleBased;
+use fidl_fuchsia_audio_controller as fac;
+use std::io::Read;
 
 #[derive(FfxTool)]
 pub struct PlayTool {
@@ -24,7 +17,7 @@ pub struct PlayTool {
     cmd: PlayCommand,
 
     #[with(moniker("/core/audio_ffx_daemon"))]
-    controller: PlayerProxy,
+    controller: fac::PlayerProxy,
 }
 
 fho::embedded_plugin!(PlayTool);
@@ -35,9 +28,8 @@ impl FfxMain for PlayTool {
         let (play_remote, play_local) = fidl::Socket::create_datagram();
         let reader: Box<dyn Read + Send + 'static> = match &self.cmd.file {
             Some(input_file_path) => {
-                let file = std::fs::File::open(&input_file_path).map_err(|e| {
-                    anyhow::anyhow!("Error trying to open file \"{input_file_path}\": {e}")
-                })?;
+                let file = std::fs::File::open(&input_file_path)
+                    .map_err(|e| anyhow!("Error trying to open file \"{input_file_path}\": {e}"))?;
                 Box::new(file)
             }
             None => Box::new(std::io::stdin()),
@@ -50,7 +42,7 @@ impl FfxMain for PlayTool {
 }
 
 async fn play_impl(
-    controller: PlayerProxy,
+    controller: fac::PlayerProxy,
     wav_local: fidl::Socket,
     wav_remote: fidl::Socket,
     command: PlayCommand,
@@ -58,32 +50,35 @@ async fn play_impl(
     mut writer: MachineWriter<PlayResult>,
 ) -> Result<(), anyhow::Error> {
     let renderer = match command.usage {
-        Ultrasound => fidl_fuchsia_audio_controller::RendererConfig::UltrasoundRenderer(
-            fidl_fuchsia_audio_controller::UltrasoundRendererConfig {
+        AudioRenderUsageExtended::Ultrasound => {
+            fac::RendererConfig::UltrasoundRenderer(fac::UltrasoundRendererConfig {
                 packet_count: command.packet_count,
                 ..Default::default()
-            },
-        ),
+            })
+        }
 
-        Background(usage) | Media(usage) | SystemAgent(usage) | Communication(usage)
-        | Interruption(usage) => fidl_fuchsia_audio_controller::RendererConfig::StandardRenderer(
-            fidl_fuchsia_audio_controller::StandardRendererConfig {
+        AudioRenderUsageExtended::Background(usage)
+        | AudioRenderUsageExtended::Media(usage)
+        | AudioRenderUsageExtended::SystemAgent(usage)
+        | AudioRenderUsageExtended::Communication(usage)
+        | AudioRenderUsageExtended::Interruption(usage) => {
+            fac::RendererConfig::StandardRenderer(fac::StandardRendererConfig {
                 usage: Some(usage),
                 clock: Some(command.clock),
                 ..Default::default()
-            },
-        ),
+            })
+        }
     };
 
     // Duplicate socket handle so that connection stays alive in real + testing scenarios.
     let remote_socket = wav_remote
         .duplicate_handle(fidl::Rights::SAME_RIGHTS)
-        .map_err(|e| anyhow::anyhow!("Error duplicating socket: {e}"))?;
+        .map_err(|e| anyhow!("Error duplicating socket: {e}"))?;
 
-    let request = PlayerPlayRequest {
+    let request = fac::PlayerPlayRequest {
         wav_source: Some(remote_socket),
-        destination: Some(fidl_fuchsia_audio_controller::PlayDestination::Renderer(renderer)),
-        gain_settings: Some(fidl_fuchsia_audio_controller::GainSettings {
+        destination: Some(fac::PlayDestination::Renderer(renderer)),
+        gain_settings: Some(fac::GainSettings {
             mute: Some(command.mute),
             gain: Some(command.gain),
             ..Default::default()
@@ -107,10 +102,9 @@ async fn play_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_audio_play_args::AudioRenderUsageExtended;
     use ffx_core::macro_deps::futures::AsyncWriteExt;
     use ffx_writer::TestBuffers;
-    use fidl_fuchsia_media::AudioRenderUsage;
+    use fidl_fuchsia_media as fmedia;
     use std::fs;
     use std::io::Write;
     use std::os::unix::fs::PermissionsExt;
@@ -123,15 +117,13 @@ mod tests {
         let writer: MachineWriter<PlayResult> = MachineWriter::new_test(None, &test_buffers);
 
         let stdin_command = PlayCommand {
-            usage: AudioRenderUsageExtended::Media(AudioRenderUsage::Media),
+            usage: AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage::Media),
             buffer_size: Some(48000),
             packet_count: None,
             file: None,
             gain: 0.0,
             mute: false,
-            clock: fidl_fuchsia_audio_controller::ClockType::Flexible(
-                fidl_fuchsia_audio_controller::Flexible,
-            ),
+            clock: fac::ClockType::Flexible(fac::Flexible),
         };
 
         let (play_remote, play_local) = fidl::Socket::create_datagram();
@@ -166,7 +158,7 @@ mod tests {
             .clone()
             .into_os_string()
             .into_string()
-            .map_err(|_e| anyhow::anyhow!("Error turning path into string"))?;
+            .map_err(|_e| anyhow!("Error turning path into string"))?;
 
         // Create valid WAV file.
         fs::File::create(&test_wav_path)
@@ -176,18 +168,16 @@ mod tests {
         fs::set_permissions(&test_wav_path, fs::Permissions::from_mode(0o770)).unwrap();
 
         let file_reader = std::fs::File::open(&test_wav_path)
-            .map_err(|e| anyhow::anyhow!("Error trying to open file \"{}\": {e}", wav_path))?;
+            .map_err(|e| anyhow!("Error trying to open file \"{}\": {e}", wav_path))?;
 
         let file_command = PlayCommand {
-            usage: AudioRenderUsageExtended::Media(AudioRenderUsage::Media),
+            usage: AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage::Media),
             buffer_size: Some(48000),
             packet_count: None,
             file: Some(wav_path),
             gain: 0.0,
             mute: false,
-            clock: fidl_fuchsia_audio_controller::ClockType::Flexible(
-                fidl_fuchsia_audio_controller::Flexible,
-            ),
+            clock: fac::ClockType::Flexible(fac::Flexible),
         };
 
         let test_buffers = TestBuffers::default();

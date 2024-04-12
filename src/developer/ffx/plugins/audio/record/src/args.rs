@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    argh::{ArgsInfo, FromArgs},
-    ffx_core::ffx_command,
-    fidl_fuchsia_media::AudioCaptureUsage,
-    fuchsia_audio::Format,
-    std::time::Duration,
-};
+use anyhow::Result;
+use argh::{ArgsInfo, FromArgs};
+use ffx_core::ffx_command;
+use fidl_fuchsia_audio_controller as fac;
+use fidl_fuchsia_media as fmedia;
+use fuchsia_audio::Format;
+use std::time::Duration;
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -37,7 +36,7 @@ pub struct RecordCommand {
         Accepted values: BACKGROUND, FOREGROUND, SYSTEM-AGENT, COMMUNICATION, ULTRASOUND,\
         or LOOPBACK. Default: COMMUNICATION.",
         from_str_fn(str_to_usage),
-        default = "AudioCaptureUsageExtended::Communication(AudioCaptureUsage::Communication)"
+        default = "AudioCaptureUsageExtended::Communication(fmedia::AudioCaptureUsage::Communication)"
     )]
     pub usage: AudioCaptureUsageExtended,
 
@@ -57,9 +56,9 @@ pub struct RecordCommand {
         rate adjustment and offset are integers. To set offset without rate adjustment, pass 0\
         in place of rate adjustment.",
         from_str_fn(str_to_clock),
-        default = "fidl_fuchsia_audio_controller::ClockType::Flexible(fidl_fuchsia_audio_controller::Flexible)"
+        default = "fac::ClockType::Flexible(fac::Flexible)"
     )]
-    pub clock: fidl_fuchsia_audio_controller::ClockType,
+    pub clock: fac::ClockType,
 
     #[argh(
         option,
@@ -74,23 +73,27 @@ pub struct RecordCommand {
 
 #[derive(Debug, PartialEq)]
 pub enum AudioCaptureUsageExtended {
-    Background(AudioCaptureUsage),
-    Foreground(AudioCaptureUsage),
-    SystemAgent(AudioCaptureUsage),
-    Communication(AudioCaptureUsage),
+    Background(fmedia::AudioCaptureUsage),
+    Foreground(fmedia::AudioCaptureUsage),
+    SystemAgent(fmedia::AudioCaptureUsage),
+    Communication(fmedia::AudioCaptureUsage),
     Ultrasound,
     Loopback,
 }
 
 fn str_to_usage(src: &str) -> Result<AudioCaptureUsageExtended, String> {
     match src.to_uppercase().as_str() {
-        "BACKGROUND" => Ok(AudioCaptureUsageExtended::Background(AudioCaptureUsage::Background)),
-        "FOREGROUND" => Ok(AudioCaptureUsageExtended::Foreground(AudioCaptureUsage::Foreground)),
+        "BACKGROUND" => {
+            Ok(AudioCaptureUsageExtended::Background(fmedia::AudioCaptureUsage::Background))
+        }
+        "FOREGROUND" => {
+            Ok(AudioCaptureUsageExtended::Foreground(fmedia::AudioCaptureUsage::Foreground))
+        }
         "SYSTEM-AGENT" => {
-            Ok(AudioCaptureUsageExtended::SystemAgent(AudioCaptureUsage::SystemAgent))
+            Ok(AudioCaptureUsageExtended::SystemAgent(fmedia::AudioCaptureUsage::SystemAgent))
         }
         "COMMUNICATION" => {
-            Ok(AudioCaptureUsageExtended::Communication(AudioCaptureUsage::Communication))
+            Ok(AudioCaptureUsageExtended::Communication(fmedia::AudioCaptureUsage::Communication))
         }
         "ULTRASOUND" => Ok(AudioCaptureUsageExtended::Ultrasound),
         "LOOPBACK" => Ok(AudioCaptureUsageExtended::Loopback),
@@ -105,6 +108,6 @@ fn parse_duration(value: &str) -> Result<Duration, String> {
     fuchsia_audio::parse_duration(value)
 }
 
-fn str_to_clock(value: &str) -> Result<fidl_fuchsia_audio_controller::ClockType, String> {
+fn str_to_clock(value: &str) -> Result<fac::ClockType, String> {
     fuchsia_audio::str_to_clock(value)
 }

@@ -2,29 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::list::DeviceQuery,
-    async_trait::async_trait,
-    blocking::Unblock,
-    ffx_audio_common::ffxtool::{exposed_dir, optional_moniker},
-    ffx_audio_device_args::{DeviceCommand, DeviceRecordCommand, SubCommand},
-    ffx_command::{bug, user_error},
-    fho::{moniker, FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO},
-    fidl::{endpoints::ServerEnd, HandleBased},
-    fidl_fuchsia_audio_controller::{
-        DeviceControlDeviceSetGainStateRequest, DeviceControlGetDeviceInfoRequest,
-        DeviceControlProxy, PlayerPlayRequest, PlayerProxy, RecordCancelerMarker, RecordSource,
-        RecorderProxy, RecorderRecordRequest,
-    },
-    fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_io as fio,
-    fidl_fuchsia_media::AudioStreamType,
-    fuchsia_audio::device::Selector,
-    fuchsia_zircon_status::Status,
-    futures::{AsyncWrite, FutureExt},
-    prettytable::Table,
-    serde::Serialize,
-    std::io::Read,
+use crate::list::DeviceQuery;
+use async_trait::async_trait;
+use blocking::Unblock;
+use ffx_audio_common::ffxtool::{exposed_dir, optional_moniker};
+use ffx_audio_device_args::{DeviceCommand, DeviceRecordCommand, SubCommand};
+use ffx_command::{bug, user_error};
+use fho::{moniker, FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fidl::{
+    endpoints::{create_proxy, ServerEnd},
+    HandleBased,
 };
+use fidl_fuchsia_audio_controller as fac;
+use fidl_fuchsia_audio_device as fadevice;
+use fidl_fuchsia_hardware_audio as fhaudio;
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_media as fmedia;
+use fuchsia_audio::device::Selector;
+use fuchsia_zircon_status::Status;
+use futures::{AsyncWrite, FutureExt};
+use prettytable::Table;
+use serde::Serialize;
+use std::io::Read;
 
 mod info;
 pub mod list;
@@ -45,11 +44,11 @@ pub struct DeviceTool {
     #[command]
     cmd: DeviceCommand,
     #[with(moniker("/core/audio_ffx_daemon"))]
-    device_controller: DeviceControlProxy,
+    device_controller: fac::DeviceControlProxy,
     #[with(moniker("/core/audio_ffx_daemon"))]
-    record_controller: RecorderProxy,
+    record_controller: fac::RecorderProxy,
     #[with(moniker("/core/audio_ffx_daemon"))]
-    play_controller: PlayerProxy,
+    play_controller: fac::PlayerProxy,
     #[with(exposed_dir("/bootstrap/devfs", "dev-class"))]
     dev_class: fio::DirectoryProxy,
     #[with(optional_moniker("/core/audio_device_registry"))]
@@ -109,7 +108,7 @@ impl FfxMain for DeviceTool {
                 let mut stdout = Unblock::new(std::io::stdout());
 
                 let (cancel_proxy, cancel_server) =
-                    fidl::endpoints::create_proxy::<RecordCancelerMarker>().bug()?;
+                    create_proxy::<fac::RecordCancelerMarker>().bug()?;
 
                 let keypress_waiter = ffx_audio_common::cancel_on_keypress(
                     cancel_proxy,
@@ -132,7 +131,7 @@ impl FfxMain for DeviceTool {
             | SubCommand::Mute(_)
             | SubCommand::Unmute(_)
             | SubCommand::Agc(_) => {
-                let mut gain_state = fidl_fuchsia_hardware_audio::GainState::default();
+                let mut gain_state = fhaudio::GainState::default();
 
                 match self.cmd.subcommand {
                     SubCommand::Gain(gain_cmd) => gain_state.gain_db = Some(gain_cmd.gain),
@@ -151,12 +150,12 @@ impl FfxMain for DeviceTool {
 }
 
 async fn device_info(
-    device_control: DeviceControlProxy,
+    device_control: fac::DeviceControlProxy,
     selector: Selector,
     mut writer: MachineWriter<DeviceResult>,
 ) -> fho::Result<()> {
     let info = device_control
-        .get_device_info(DeviceControlGetDeviceInfoRequest {
+        .get_device_info(fac::DeviceControlGetDeviceInfoRequest {
             device: Some(selector.clone().into()),
             ..Default::default()
         })
@@ -181,7 +180,7 @@ async fn device_info(
 }
 
 async fn device_play(
-    player_controller: PlayerProxy,
+    player_controller: fac::PlayerProxy,
     selector: Selector,
     play_local: fidl::Socket,
     play_remote: fidl::Socket,
@@ -194,12 +193,10 @@ async fn device_play(
         .duplicate_handle(fidl::Rights::SAME_RIGHTS)
         .bug_context("Error duplicating socket")?;
 
-    let request = PlayerPlayRequest {
+    let request = fac::PlayerPlayRequest {
         wav_source: Some(remote_socket),
-        destination: Some(fidl_fuchsia_audio_controller::PlayDestination::DeviceRingBuffer(
-            selector.into(),
-        )),
-        gain_settings: Some(fidl_fuchsia_audio_controller::GainSettings {
+        destination: Some(fac::PlayDestination::DeviceRingBuffer(selector.into())),
+        gain_settings: Some(fac::GainSettings {
             mute: None, // TODO(https://fxbug.dev/42072218)
             gain: None, // TODO(https://fxbug.dev/42072218)
             ..Default::default()
@@ -224,10 +221,10 @@ async fn device_play(
 }
 
 async fn device_record<W, E>(
-    recorder: RecorderProxy,
+    recorder: fac::RecorderProxy,
     selector: Selector,
     record_command: DeviceRecordCommand,
-    cancel_server: ServerEnd<RecordCancelerMarker>,
+    cancel_server: ServerEnd<fac::RecordCancelerMarker>,
     mut output_writer: W,
     mut output_error_writer: E,
     keypress_waiter: impl futures::Future<Output = Result<(), std::io::Error>>,
@@ -238,9 +235,9 @@ where
 {
     let (record_remote, record_local) = fidl::Socket::create_datagram();
 
-    let request = RecorderRecordRequest {
-        source: Some(RecordSource::DeviceRingBuffer(selector.into())),
-        stream_type: Some(AudioStreamType::from(record_command.format)),
+    let request = fac::RecorderRecordRequest {
+        source: Some(fac::RecordSource::DeviceRingBuffer(selector.into())),
+        stream_type: Some(fmedia::AudioStreamType::from(record_command.format)),
         duration: record_command.duration.map(|duration| duration.as_nanos() as i64),
         canceler: Some(cancel_server),
         wav_data: Some(record_remote),
@@ -264,12 +261,12 @@ where
 }
 
 async fn device_set_gain_state(
-    device_control: DeviceControlProxy,
+    device_control: fac::DeviceControlProxy,
     selector: Selector,
-    gain_state: fidl_fuchsia_hardware_audio::GainState,
+    gain_state: fhaudio::GainState,
 ) -> fho::Result<()> {
     device_control
-        .device_set_gain_state(DeviceControlDeviceSetGainStateRequest {
+        .device_set_gain_state(fac::DeviceControlDeviceSetGainStateRequest {
             device: Some(selector.into()),
             gain_state: Some(gain_state),
             ..Default::default()
@@ -416,9 +413,7 @@ mod tests {
             device_type: fadevice::DeviceType::Input,
         });
 
-        let (cancel_proxy, cancel_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_audio_controller::RecordCancelerMarker>()
-                .unwrap();
+        let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>().unwrap();
 
         let test_stdout = TestBuffer::default();
 
@@ -468,9 +463,7 @@ mod tests {
             device_type: fadevice::DeviceType::Input,
         });
 
-        let (cancel_proxy, cancel_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_audio_controller::RecordCancelerMarker>()
-                .unwrap();
+        let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>().unwrap();
 
         let test_stdout = TestBuffer::default();
 
