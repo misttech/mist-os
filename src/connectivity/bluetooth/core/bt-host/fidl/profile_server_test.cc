@@ -201,7 +201,9 @@ class FakeConnectionReceiver : public fidlbredr::testing::ConnectionReceiver_Tes
  public:
   FakeConnectionReceiver(fidl::InterfaceRequest<ConnectionReceiver> request,
                          async_dispatcher_t* dispatcher)
-      : binding_(this, std::move(request), dispatcher), connected_count_(0) {}
+      : binding_(this, std::move(request), dispatcher), connected_count_(0), closed_(false) {
+    binding_.set_error_handler([&](zx_status_t /*status*/) { closed_ = true; });
+  }
 
   void Connected(fuchsia::bluetooth::PeerId peer_id, fidlbredr::Channel channel,
                  std::vector<fidlbredr::ProtocolDescriptor> protocol) override {
@@ -211,12 +213,15 @@ class FakeConnectionReceiver : public fidlbredr::testing::ConnectionReceiver_Tes
     connected_count_++;
   }
 
+  void Revoke() { binding_.events().OnRevoke(); }
+
   size_t connected_count() const { return connected_count_; }
   const std::optional<fuchsia::bluetooth::PeerId>& peer_id() const { return peer_id_; }
   const std::optional<fidlbredr::Channel>& channel() const { return channel_; }
   const std::optional<std::vector<fidlbredr::ProtocolDescriptor>>& protocol() const {
     return protocol_;
   }
+  bool closed() { return closed_; }
 
   std::optional<fidlbredr::AudioDirectionExtPtr> bind_ext_direction() {
     if (!channel().has_value()) {
@@ -238,6 +243,7 @@ class FakeConnectionReceiver : public fidlbredr::testing::ConnectionReceiver_Tes
   std::optional<fuchsia::bluetooth::PeerId> peer_id_;
   std::optional<fidlbredr::Channel> channel_;
   std::optional<std::vector<fidlbredr::ProtocolDescriptor>> protocol_;
+  bool closed_;
 
   void NotImplemented_(const std::string& name) override {
     FAIL() << name << " is not implemented";
@@ -429,6 +435,39 @@ TEST_F(ProfileServerTest, UnregisterAdvertisementTriggersCallback) {
 
   // Profile server should drop the advertisement and notify the callback of termination.
   ASSERT_EQ(cb_count, 1u);
+}
+
+TEST_F(ProfileServerTest, RevokeConnectionReceiverUnregistersAdvertisement) {
+  fidlbredr::ConnectionReceiverHandle receiver_handle;
+  FakeConnectionReceiver connect_receiver(receiver_handle.NewRequest(), dispatcher());
+
+  std::vector<fidlbredr::ServiceDefinition> services;
+  services.emplace_back(MakeFIDLServiceDefinition());
+
+  size_t cb_count = 0;
+  auto cb = [&](fidlbredr::Profile_Advertise_Result result) {
+    cb_count++;
+    EXPECT_TRUE(result.is_response());
+  };
+
+  fidlbredr::ProfileAdvertiseRequest adv_request;
+  adv_request.set_services(std::move(services));
+  adv_request.set_receiver(std::move(receiver_handle));
+  client()->Advertise(std::move(adv_request), std::move(cb));
+  RunLoopUntilIdle();
+
+  // Advertisement is still active, callback shouldn't get triggered.
+  ASSERT_EQ(cb_count, 0u);
+  ASSERT_FALSE(connect_receiver.closed());
+
+  // Server end of `ConnectionReceiver` revokes the advertisement.
+  connect_receiver.Revoke();
+  RunLoopUntilIdle();
+
+  // Profile server should drop the advertisement and notify the callback of termination. The
+  // `connect_receiver` should be closed.
+  ASSERT_EQ(cb_count, 1u);
+  ASSERT_TRUE(connect_receiver.closed());
 }
 
 class ProfileServerTestConnectedPeer : public ProfileServerTest {

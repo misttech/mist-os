@@ -142,8 +142,8 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
   void ConnectSco(::fuchsia::bluetooth::bredr::ProfileConnectScoRequest request) override;
   void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
 
-  // Callback when clients close their connection targets
-  void OnConnectionReceiverError(uint64_t ad_id);
+  // Callback when clients close or revoke their connection targets
+  void OnConnectionReceiverClosed(uint64_t ad_id);
 
   // Callback when clients close their search results
   void OnSearchResultError(uint64_t search_id, zx_status_t status);

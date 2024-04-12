@@ -228,6 +228,11 @@ open protocol ConnectionReceiver {
         channel Channel;
         protocol ProtocolDescriptorList;
     });
+
+    /// An event produced by a FIDL server to signal that the registered service should be revoked
+    /// and removed from the Service Discovery Protocol database.
+    /// It is expected that this protocol will be subsequently closed after issuing this event.
+    flexible -> OnRevoke();
 };
 
 /// Maximum number of attributes returned or allowed in a search request.

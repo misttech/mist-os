@@ -552,9 +552,19 @@ void ProfileServer::Advertise(fuchsia::bluetooth::bredr::ProfileAdvertiseRequest
   };
 
   fidlbredr::ConnectionReceiverPtr receiver = request.mutable_receiver()->Bind();
-
-  receiver.set_error_handler(
-      [this, next](zx_status_t /*status*/) { OnConnectionReceiverError(next); });
+  // Monitor events on the `ConnectionReceiver`. Remove the service if the FIDL client revokes the
+  // service registration.
+  receiver.events().OnRevoke = [this, ad_id = next]() {
+    bt_log(DEBUG, "fidl", "Connection receiver revoked. Ending service advertisement %lu", ad_id);
+    OnConnectionReceiverClosed(ad_id);
+  };
+  // Errors on the `ConnectionReceiver` will result in service unregistration.
+  receiver.set_error_handler([this, ad_id = next](zx_status_t status) {
+    bt_log(DEBUG, "fidl",
+           "Connection receiver closed with error: %s. Ending service advertisement %lu",
+           zx_status_get_string(status), ad_id);
+    OnConnectionReceiverClosed(ad_id);
+  });
 
   current_advertised_.try_emplace(next, std::move(receiver), registration_handle,
                                   std::move(callback));
@@ -755,11 +765,8 @@ void ProfileServer::OnChannelConnected(uint64_t ad_id, bt::l2cap::Channel::WeakP
   it->second.receiver->Connected(peer_id, std::move(fidl_chan), std::move(list));
 }
 
-void ProfileServer::OnConnectionReceiverError(uint64_t ad_id) {
-  bt_log(DEBUG, "fidl", "Connection receiver closed, ending advertisement %lu", ad_id);
-
+void ProfileServer::OnConnectionReceiverClosed(uint64_t ad_id) {
   auto it = current_advertised_.find(ad_id);
-
   if (it == current_advertised_.end() || !adapter().is_alive()) {
     return;
   }
