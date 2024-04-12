@@ -6,6 +6,8 @@
 
 #include <endian.h>
 
+#include <utility>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/defaults.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
@@ -23,13 +25,13 @@ namespace bt::hci {
 Connection::Connection(hci_spec::ConnectionHandle handle,
                        const DeviceAddress& local_address,
                        const DeviceAddress& peer_address,
-                       const Transport::WeakPtr& hci,
+                       Transport::WeakPtr hci,
                        fit::callback<void()> on_disconnection_complete)
     : handle_(handle),
       local_address_(local_address),
       peer_address_(peer_address),
       conn_state_(State::kConnected),
-      hci_(hci),
+      hci_(std::move(hci)),
       weak_self_(this) {
   BT_ASSERT(hci_.is_alive());
 

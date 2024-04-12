@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_EXTENDED_LOW_ENERGY_SCANNER_H
-#define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_EXTENDED_LOW_ENERGY_SCANNER_H
+#ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_EXTENDED_LOW_ENERGY_SCANNER_H_
+#define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_EXTENDED_LOW_ENERGY_SCANNER_H_
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_scanner.h"
 namespace bt::hci {
@@ -48,7 +48,7 @@ class ExtendedLowEnergyScanner final : public LowEnergyScanner {
 
   // Parse out all the advertising reports that came in an HCI LE Extended
   // Advertising Report.
-  std::vector<pw::bluetooth::emboss::LEExtendedAdvertisingReportDataView>
+  static std::vector<pw::bluetooth::emboss::LEExtendedAdvertisingReportDataView>
   ParseAdvertisingReports(const EmbossEventPacket& event);
 
   // Event handler for HCI LE Extended Advertising Report event.
@@ -62,4 +62,4 @@ class ExtendedLowEnergyScanner final : public LowEnergyScanner {
 
 }  // namespace bt::hci
 
-#endif
+#endif  // SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_EXTENDED_LOW_ENERGY_SCANNER_H_
