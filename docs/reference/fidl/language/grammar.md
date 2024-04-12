@@ -223,7 +223,7 @@ the compiler limits the values the `constant` may take:
 ### NOTE 5
 
 The `ordinal-layout` grammar allows any number of members, but strict unions
-specifically must at least one member.
+specifically must have at least one member.
 
 ### NOTE 6
 
