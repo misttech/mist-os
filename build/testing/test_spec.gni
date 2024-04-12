@@ -152,7 +152,13 @@ if (allowed_device_types == []) {
 #     [string] The name of a product bundle describing the system against which
 #     the test should be run (describing the test itself in the case of boot
 #     tests). Associated product bundle artifacts can be looked up with this
-#     name in the product bundle build API module.
+#     name in the product bundle build API module. This value is only respected
+#     when `isolated` is true.
+#
+#   bootup_timeout_secs (optional)
+#     [int] The timeout in seconds the test expects the provided product_bundle
+#     and environment it's run against will take to boot up. This value is only
+#     respected when `isolated` is true.
 #
 #   environments (optional, default: Emu for fuchsia; else a VM)
 #     [list of scopes] Device environments in which the test should run.
@@ -411,7 +417,11 @@ template("test_spec") {
   }
 
   test_spec = {
-    forward_variables_from(invoker, [ "product_bundle" ])
+    forward_variables_from(invoker,
+                           [
+                             "product_bundle",
+                             "bootup_timeout_secs",
+                           ])
     test = {
       forward_variables_from(invoker,
                              [
@@ -429,6 +439,12 @@ template("test_spec") {
                                "build_rule",
                                "has_generated_manifest",
                              ])
+      if (!defined(isolated) || !isolated) {
+        assert(!defined(product_bundle),
+               "product_bundle is only respected if isolated=true.")
+        assert(!defined(bootup_timeout_secs),
+               "bootup_timeout_secs is only respected if isolated=true.")
+      }
       if (defined(_parallel)) {
         parallel = _parallel
       }

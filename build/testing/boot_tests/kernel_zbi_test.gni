@@ -63,6 +63,11 @@ template("_cuckoo_product_bundle") {
       environments = target_environments
       isolated = true
       product_bundle = main_target
+
+      bootup_timeout_secs = default_boot_test_timeout_secs
+      if (defined(invoker.timeout)) {
+        bootup_timeout_secs = invoker.timeout
+      }
     }
   }
 
@@ -199,7 +204,11 @@ template("kernel_zbi_test") {
     cuckoo_target_name = "${target_name}.cuckoo"
     if (default_toolchain == current_toolchain) {
       _cuckoo_product_bundle(cuckoo_target_name) {
-        forward_variables_from(invoker, [ "disabled" ])
+        forward_variables_from(invoker,
+                               [
+                                 "disabled",
+                                 "timeout",
+                               ])
         kernel_zbi = ":$main_target.zbi"
         kernel_image_name = "$main_target"
       }

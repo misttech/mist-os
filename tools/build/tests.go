@@ -22,6 +22,10 @@ type TestSpec struct {
 	// ProductBundle is the name of the product bundle describing the system
 	// against which the test should be run.
 	ProductBundle string `json:"product_bundle,omitempty"`
+
+	// BootupTimeout is the timeout in seconds that the test expects the provided
+	// product bundle and environment it's run against to take to boot up.
+	BootupTimeoutSecs int `json:"bootup_timeout_secs,omitempty"`
 }
 
 // Test encapsulates details about a particular test.

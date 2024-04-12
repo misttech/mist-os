@@ -22,6 +22,10 @@ declare_args() {
 boot_test_success_string =
     "***Boot-test-successful!-MDd7/O65SuVZ23yGAaQG4CedYQGH9E1/58r73pSAVK0=***"
 
+# The default timeout for boot tests, which is also the bootup timeout for
+# cuckoo tests.
+default_boot_test_timeout_secs = 600
+
 _all_emu_types = [
   "QEMU",
   "AEMU",
@@ -52,7 +56,7 @@ template("_boot_test") {
   toolchain = "//build/toolchain:host_${invoker.cpu_for_host}"
   test_script = "$root_out_dir/$main_target.sh"
 
-  timeout_secs = 600
+  timeout_secs = default_boot_test_timeout_secs
   if (defined(invoker.timeout)) {
     if (invoker.timeout != false) {
       timeout_secs = invoker.timeout

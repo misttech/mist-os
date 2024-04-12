@@ -644,6 +644,9 @@ type StartOptions struct {
 
 	// IsBootTest tells whether the provided product bundle is for a boot test.
 	IsBootTest bool
+
+	// BootupTimeout is the timeout to wait for an SSH connection after booting the target.
+	BootupTimeout time.Duration
 }
 
 // StartTargets starts all the targets given the opts.
@@ -657,9 +660,13 @@ func StartTargets(ctx context.Context, opts StartOptions, targets []FuchsiaTarge
 	eg, startCtx := errgroup.WithContext(ctx)
 	for _, t := range targets {
 		t := t
-		// TODO(https://fxbug.dev/322239710): Find a way to set this per product bundle.
+		// TODO(https://fxbug.dev/322239710): Remove once recipes are passing the
+		// bootup-timeout through to botanist.
 		if opts.IsBootTest {
 			t.SetConnectionTimeout(10 * time.Minute)
+		}
+		if opts.BootupTimeout > 0 {
+			t.SetConnectionTimeout(opts.BootupTimeout)
 		}
 		eg.Go(func() error {
 			imgs, closeFunc, err := bootserver.GetImages(startCtx, opts.ImageManifest, bootMode)

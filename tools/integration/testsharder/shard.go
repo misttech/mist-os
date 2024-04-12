@@ -60,6 +60,10 @@ type Shard struct {
 	// ProductBundle is the name of the product bundle describing the system
 	// against which the test should be run.
 	ProductBundle string `json:"product_bundle,omitempty"`
+
+	// BootupTimeoutSecs is the timeout in seconds that the provided product
+	// bundle/environment is expected to take to boot up the target.
+	BootupTimeoutSecs int `json:"bootup_timeout_secs,omitempty"`
 }
 
 // TargetCPU returns the CPU architecture of the target this shard will run against.
@@ -249,10 +253,11 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 			if spec.Test.Isolated {
 				name := fmt.Sprintf("%s-%s", environmentName(e), normalizeTestName(spec.Test.Name))
 				shards = append(shards, &Shard{
-					Name:          name,
-					Tests:         []Test{test},
-					ProductBundle: spec.ProductBundle,
-					Env:           e,
+					Name:              name,
+					Tests:             []Test{test},
+					ProductBundle:     spec.ProductBundle,
+					BootupTimeoutSecs: spec.BootupTimeoutSecs,
+					Env:               e,
 				})
 			} else {
 				tests = append(tests, test)

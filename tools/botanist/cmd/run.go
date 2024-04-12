@@ -107,6 +107,9 @@ type RunCommand struct {
 
 	// When true, upload to resultdb from testrunner.
 	uploadToResultDB bool
+
+	// The timeout to wait for an SSH connection after booting the target.
+	bootupTimeout time.Duration
 }
 
 func (*RunCommand) Name() string {
@@ -146,6 +149,7 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&r.skipSetup, "skip-setup", false, "if set, botanist will not set up a target.")
 	// Temporary flag to enable a soft transition to uploading test results from botanist rather than from the recipe.
 	f.BoolVar(&r.uploadToResultDB, "upload-to-resultdb", false, "if set, test results will be uploaded to ResultDB from testrunner.")
+	f.DurationVar(&r.bootupTimeout, "bootup-timeout", 0, "duration allowed for the command to finish execution, a value of 0 (zero) will fall back to the default.")
 
 	// Parsing of testrunner options.
 	f.StringVar(&r.testrunnerOptions.OutDir, "out-dir", "", "Optional path where a directory containing test results should be created.")
@@ -351,6 +355,7 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 			ProductBundles:    r.productBundles,
 			ProductBundleName: r.productBundleName,
 			IsBootTest:        r.isBootTest,
+			BootupTimeout:     r.bootupTimeout,
 		}
 
 		if err := targets.StartTargets(ctx, startOpts, fuchsiaTargets); err != nil {
