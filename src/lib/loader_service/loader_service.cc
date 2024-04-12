@@ -27,11 +27,7 @@ const std::string& LoaderServiceBase::log_prefix() {
 }
 
 zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>> LoaderServiceBase::Connect() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_ldsvc::Loader>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto [client, server] = *std::move(endpoints);
+  auto [client, server] = fidl::Endpoints<fuchsia_ldsvc::Loader>::Create();
   Bind(std::move(server));
   return zx::ok(std::move(client));
 }

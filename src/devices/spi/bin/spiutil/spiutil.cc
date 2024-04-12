@@ -71,12 +71,7 @@ int main(int argc, char** argv) {
     fprintf(stderr, "component::Connect(%s): %s\n", argv[1], controller.status_string());
     return -1;
   }
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Device>();
-  if (endpoints.is_error()) {
-    fprintf(stderr, "fidl::CreateEndpoints(): %s\n", endpoints.status_string());
-    return -1;
-  }
-  auto& [device, server] = endpoints.value();
+  auto [device, server] = fidl::Endpoints<fuchsia_hardware_spi::Device>::Create();
 
   const fidl::Status result = fidl::WireCall(controller.value())->OpenSession(std::move(server));
   if (!result.ok()) {

@@ -30,12 +30,11 @@ namespace {
 class Fusb302Test : public inspect::InspectTestHelper, public zxtest::Test {
  public:
   void SetUp() override {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    EXPECT_TRUE(endpoints.is_ok());
-    fidl::ClientEnd<fuchsia_hardware_i2c::Device> mock_i2c_client = std::move(endpoints->client);
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
+    fidl::ClientEnd<fuchsia_hardware_i2c::Device> mock_i2c_client = std::move(endpoints.client);
 
     EXPECT_OK(loop_.StartThread());
-    fidl::BindServer<fuchsia_hardware_i2c::Device>(loop_.dispatcher(), std::move(endpoints->server),
+    fidl::BindServer<fuchsia_hardware_i2c::Device>(loop_.dispatcher(), std::move(endpoints.server),
                                                    &mock_i2c_);
     zx::interrupt gpio_interrupt;
     ASSERT_OK(

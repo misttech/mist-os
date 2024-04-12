@@ -172,12 +172,11 @@ class FakeImx227Device : public Imx227Device {
   }
 
   void SetProtocols() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    EXPECT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
 
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), &mock_i2c_);
 
-    i2c_ = ddk::I2cChannel(std::move(endpoints->client));
+    i2c_ = ddk::I2cChannel(std::move(endpoints.client));
     mipi_ = ddk::MipiCsiProtocolClient(mock_mipi_.GetProto());
 
     EXPECT_OK(loop_.StartThread());

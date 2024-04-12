@@ -31,9 +31,7 @@ TEST(ConsoleTestCase, Read) {
   };
   Console::TxSink tx_sink = [](const uint8_t* buffer, size_t length) { return ZX_OK; };
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_pty::Device>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client_end, server_end] = endpoints.value();
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_pty::Device>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   zx::eventpair event1, event2;
@@ -73,9 +71,7 @@ TEST(ConsoleTestCase, Write) {
     return ZX_OK;
   };
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_pty::Device>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client_end, server_end] = endpoints.value();
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_pty::Device>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   zx::eventpair event1, event2;

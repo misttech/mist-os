@@ -112,11 +112,7 @@ zx::result<> DirectoryOpenFunc(zx::unowned_channel dir, fidl::StringView path,
 }
 
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> GetGlobalServiceDirectory() {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   if (zx_status_t status = fdio_service_connect(kServiceDirectory, server.TakeChannel().release());
       status != ZX_OK) {
     return zx::error(status);

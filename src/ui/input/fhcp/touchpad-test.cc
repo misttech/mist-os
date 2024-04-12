@@ -49,12 +49,11 @@ TEST(TouchpadTests, AreaCoverage) {
   ConfigureTouchEvents(input_device_client);
 
   // Get the InputReportsReader client from the InputDevice protocol.
-  auto endpoints = fidl::CreateEndpoints<fir::InputReportsReader>();
-  ASSERT_TRUE(endpoints.is_ok());
+  auto endpoints = fidl::Endpoints<fir::InputReportsReader>::Create();
   ASSERT_EQ(ZX_OK,
-            input_device_client->GetInputReportsReader(std::move(endpoints->server)).status());
+            input_device_client->GetInputReportsReader(std::move(endpoints.server)).status());
 
-  auto reader_client = fidl::WireSyncClient<fir::InputReportsReader>(std::move(endpoints->client));
+  auto reader_client = fidl::WireSyncClient<fir::InputReportsReader>(std::move(endpoints.client));
 
   // The test itself - check for touches in each corner.
   //

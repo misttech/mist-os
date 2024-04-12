@@ -173,12 +173,11 @@ class AcpiDeviceTest : public zxtest::Test, public loop_fixture::RealLoop {
     zx_device_t* dev = HandOffToDdk(std::move(device));
 
     // Bind FIDL device.
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_acpi::Device>();
-    ASSERT_OK(endpoints.status_value());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_acpi::Device>::Create();
 
-    fidl::BindServer(dispatcher(), std::move(endpoints->server),
+    fidl::BindServer(dispatcher(), std::move(endpoints.server),
                      dev->GetDeviceContext<acpi::Device>());
-    fidl_client_.Bind(std::move(endpoints->client), dispatcher());
+    fidl_client_.Bind(std::move(endpoints.client), dispatcher());
   }
 
   acpi::DeviceArgs Args(void* handle) {

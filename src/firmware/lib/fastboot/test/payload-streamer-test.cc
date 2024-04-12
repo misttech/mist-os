@@ -14,9 +14,7 @@ namespace fastboot {
 namespace {
 TEST(PayloadStreamerTest, RegisterVmo) {
   const char data[] = "payload streamer data";
-  auto streamer_endpoints = fidl::CreateEndpoints<fuchsia_paver::PayloadStream>();
-  ASSERT_TRUE(streamer_endpoints.is_ok());
-  auto [client_end, server_end] = std::move(*streamer_endpoints);
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_paver::PayloadStream>::Create();
 
   fidl::WireSyncClient<fuchsia_paver::PayloadStream> client =
       fidl::WireSyncClient(std::move(client_end));
@@ -35,9 +33,7 @@ TEST(PayloadStreamerTest, RegisterVmo) {
 
 TEST(PayloadStreamerTest, RegisterVmoAgainErrorsOut) {
   const char data[] = "payload streamer data";
-  auto streamer_endpoints = fidl::CreateEndpoints<fuchsia_paver::PayloadStream>();
-  ASSERT_TRUE(streamer_endpoints.is_ok());
-  auto [client_end, server_end] = std::move(*streamer_endpoints);
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_paver::PayloadStream>::Create();
 
   fidl::WireSyncClient<fuchsia_paver::PayloadStream> client =
       fidl::WireSyncClient(std::move(client_end));
@@ -66,9 +62,7 @@ TEST(PayloadStreamerTest, RegisterVmoAgainErrorsOut) {
 
 TEST(PayloadStreamerTest, ReadData) {
   const char data[] = "payload streamer data";
-  auto streamer_endpoints = fidl::CreateEndpoints<fuchsia_paver::PayloadStream>();
-  ASSERT_TRUE(streamer_endpoints.is_ok());
-  auto [client_end, server_end] = std::move(*streamer_endpoints);
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_paver::PayloadStream>::Create();
 
   fidl::WireSyncClient<fuchsia_paver::PayloadStream> client =
       fidl::WireSyncClient(std::move(client_end));

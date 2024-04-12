@@ -78,10 +78,9 @@ MockLoaderService::~MockLoaderService() = default;
 
 void MockLoaderService::Init() {
   mock_server_ = std::make_unique<::testing::StrictMock<MockServer>>();
-  auto endpoints = fidl::CreateEndpoints<fuchsia_ldsvc::Loader>();
-  ASSERT_EQ(endpoints.status_value(), ZX_OK);
-  ASSERT_NO_FATAL_FAILURE(mock_server_->Init(std::move(endpoints->server)));
-  mock_client_ = std::move(endpoints->client);
+  auto endpoints = fidl::Endpoints<fuchsia_ldsvc::Loader>::Create();
+  ASSERT_NO_FATAL_FAILURE(mock_server_->Init(std::move(endpoints.server)));
+  mock_client_ = std::move(endpoints.client);
 }
 
 void MockLoaderService::ExpectLoadObject(std::string_view name,

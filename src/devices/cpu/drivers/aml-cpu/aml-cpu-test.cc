@@ -105,11 +105,10 @@ class TestClockDevice : public fidl::testing::WireTestBase<fuchsia_hardware_cloc
   }
 
   fidl::ClientEnd<fuchsia_hardware_clock::Clock> Connect() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_clock::Clock>();
-    EXPECT_OK(endpoints.status_value());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_clock::Clock>::Create();
     binding_group_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                              std::move(endpoints->server), this, fidl::kIgnoreBindingClosure);
-    return std::move(endpoints->client);
+                              std::move(endpoints.server), this, fidl::kIgnoreBindingClosure);
+    return std::move(endpoints.client);
   }
 
   bool enabled() const { return enabled_; }
@@ -136,10 +135,9 @@ class TestPowerDevice : public fidl::WireServer<fuchsia_hardware_power::Device> 
   }
 
   fidl::ClientEnd<fuchsia_hardware_power::Device> Connect() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_power::Device>();
-    EXPECT_OK(endpoints.status_value());
-    ConnectRequest(std::move(endpoints->server));
-    return std::move(endpoints->client);
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_power::Device>::Create();
+    ConnectRequest(std::move(endpoints.server));
+    return std::move(endpoints.client);
   }
 
   void RegisterPowerDomain(RegisterPowerDomainRequestView request,

@@ -125,13 +125,10 @@ class Directory : public zxtest::Test {
         directory_server_(server_loop_.dispatcher()) {}
 
   void SetUp() override {
-    zx::result directory_ends = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(directory_ends.status_value());
-    auto [directory_client_end, directory_server_end] = std::move(directory_ends.value());
+    auto [directory_client_end, directory_server_end] =
+        fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    zx::result node_ends = fidl::CreateEndpoints<fuchsia_io::Node>();
-    ASSERT_OK(node_ends.status_value());
-    auto [node_client_end, node_server_end] = std::move(node_ends.value());
+    auto [node_client_end, node_server_end] = fidl::Endpoints<fuchsia_io::Node>::Create();
 
     zx::event token;
     ASSERT_OK(zx::event::create(0, &token));

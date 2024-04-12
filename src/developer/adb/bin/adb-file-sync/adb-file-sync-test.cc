@@ -79,11 +79,10 @@ class FakeDirectory : public fidl::testing::WireTestBase<fuchsia_io::Directory> 
   }
 
   zx::channel BindServer() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     binding_ref_ = std::make_unique<fidl::ServerBindingRef<fuchsia_io::Directory>>(
-        fidl::BindServer(dispatcher_, std::move(endpoints->server), this));
-    return endpoints->client.TakeChannel();
+        fidl::BindServer(dispatcher_, std::move(endpoints.server), this));
+    return endpoints.client.TakeChannel();
   }
 
   void TearDown() {

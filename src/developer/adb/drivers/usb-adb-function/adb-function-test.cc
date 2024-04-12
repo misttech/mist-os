@@ -155,9 +155,8 @@ class UsbAdbTest : public zxtest::Test {
 
     parent_->AddProtocol(ZX_PROTOCOL_USB_FUNCTION, mock_usb_.GetProto()->ops,
                          mock_usb_.GetProto()->ctx);
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
-    incoming_.SyncCall([server = std::move(endpoints->server)](IncomingNamespace* infra) mutable {
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    incoming_.SyncCall([server = std::move(endpoints.server)](IncomingNamespace* infra) mutable {
       ASSERT_OK(
           infra->outgoing.template AddService<fuchsia_hardware_usb_function::UsbFunctionService>(
               fuchsia_hardware_usb_function::UsbFunctionService::InstanceHandler({
@@ -169,7 +168,7 @@ class UsbAdbTest : public zxtest::Test {
       ASSERT_OK(infra->outgoing.Serve(std::move(server)));
     });
     parent_->AddFidlService(fuchsia_hardware_usb_function::UsbFunctionService::Name,
-                            std::move(endpoints->client));
+                            std::move(endpoints.client));
 
     // Expect calls from UsbAdbDevice initialization
     mock_usb_.ExpectAllocInterface(ZX_OK, 1);

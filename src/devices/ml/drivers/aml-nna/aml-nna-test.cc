@@ -34,9 +34,7 @@ class MockRegistersInternal {
 
   // The caller should set the mock expectations before calling this.
   void CreateDeviceAndVerify(AmlNnaDevice::NnaBlock nna_block) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_registers::Device>();
-    ASSERT_OK(endpoints);
-    auto& [client_end, server_end] = endpoints.value();
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_registers::Device>::Create();
     reset_mock_->Init(std::move(server_end));
 
     ddk::PDevFidl pdev;

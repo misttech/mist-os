@@ -111,29 +111,26 @@ class FakeUsbPhyFidlServer : public FakeUsbPhyServerBase,
 class UsbPhyFidlTest : public UsbPhyTest<FakeUsbPhyFidlServer> {
  public:
   void SetUpAsFragment() {
-    auto io_eps = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(io_eps);
+    auto io_eps = fidl::Endpoints<fuchsia_io::Directory>::Create();
     incoming_.SyncCall([&](IncomingNamespace* ns) {
       ASSERT_OK(ns->outgoing.AddService<fuchsia_hardware_usb_phy::Service>(
                     ns->fake_phy_server_.GetInstanceHandler()),
                 "phy");
-      ASSERT_OK(ns->outgoing.Serve(std::move(io_eps->server)));
+      ASSERT_OK(ns->outgoing.Serve(std::move(io_eps.server)));
     });
-    root_->AddFidlService(fuchsia_hardware_usb_phy::Service::Name, std::move(io_eps->client),
-                          "phy");
+    root_->AddFidlService(fuchsia_hardware_usb_phy::Service::Name, std::move(io_eps.client), "phy");
 
     GetClient("phy");
   }
 
   void SetUpAsParent() {
-    auto io_eps = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(io_eps);
+    auto io_eps = fidl::Endpoints<fuchsia_io::Directory>::Create();
     incoming_.SyncCall([&](IncomingNamespace* ns) {
       ASSERT_OK(ns->outgoing.AddService<fuchsia_hardware_usb_phy::Service>(
           ns->fake_phy_server_.GetInstanceHandler()));
-      ASSERT_OK(ns->outgoing.Serve(std::move(io_eps->server)));
+      ASSERT_OK(ns->outgoing.Serve(std::move(io_eps.server)));
     });
-    root_->AddFidlService(fuchsia_hardware_usb_phy::Service::Name, std::move(io_eps->client));
+    root_->AddFidlService(fuchsia_hardware_usb_phy::Service::Name, std::move(io_eps.client));
 
     GetClient();
   }

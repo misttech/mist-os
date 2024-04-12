@@ -45,23 +45,20 @@ class RootDriver : public fdf::DriverBase,
                     .Build();
 
     // Create endpoints of the `NodeController` for the node.
-    zx::result controller_endpoints =
-        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-    ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed to create controller endpoints: %s",
-                  controller_endpoints.status_string());
+    auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
     zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
     ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed to create node endpoints: %s",
                   node_endpoints.status_string());
 
     fidl::WireResult result = fidl::WireCall(node())->AddChild(
-        args, std::move(controller_endpoints->server), std::move(node_endpoints->server));
+        args, std::move(controller_endpoints.server), std::move(node_endpoints->server));
     if (!result.ok()) {
       FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
       return zx::error(result.status());
     }
 
-    controllers_.emplace_back(std::move(controller_endpoints->client));
+    controllers_.emplace_back(std::move(controller_endpoints.client));
     nodes_.emplace_back(std::move(node_endpoints->client));
 
     return zx::ok();
@@ -91,19 +88,16 @@ class RootDriver : public fdf::DriverBase,
                     .Build();
 
     // Create endpoints of the `NodeController` for the node.
-    zx::result controller_endpoints =
-        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-    ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed to create controller endpoints: %s",
-                  controller_endpoints.status_string());
+    auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
     fidl::WireResult result =
-        fidl::WireCall(nodes_.back())->AddChild(args, std::move(controller_endpoints->server), {});
+        fidl::WireCall(nodes_.back())->AddChild(args, std::move(controller_endpoints.server), {});
     if (!result.ok()) {
       FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
       return zx::error(result.status());
     }
 
-    controllers_.emplace_back(std::move(controller_endpoints->client));
+    controllers_.emplace_back(std::move(controller_endpoints.client));
 
     // TODO(b/313922891): This is a temporary solution for a test to add a driver without disrupting
     // other tests.
@@ -117,20 +111,18 @@ class RootDriver : public fdf::DriverBase,
                          .Build();
 
     // Create endpoints of the `NodeController` for the node.
-    zx::result temp_controller_endpoints =
-        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-    ZX_ASSERT_MSG(temp_controller_endpoints.is_ok(), "Failed to create controller endpoints: %s",
-                  temp_controller_endpoints.status_string());
+    auto temp_controller_endpoints =
+        fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
     fidl::WireResult temp_result =
         fidl::WireCall(nodes_.back())
-            ->AddChild(temp_args, std::move(temp_controller_endpoints->server), {});
+            ->AddChild(temp_args, std::move(temp_controller_endpoints.server), {});
     if (!temp_result.ok()) {
       FDF_SLOG(ERROR, "Failed to add child", KV("status", temp_result.status_string()));
       return zx::error(temp_result.status());
     }
 
-    controllers_.emplace_back(std::move(temp_controller_endpoints->client));
+    controllers_.emplace_back(std::move(temp_controller_endpoints.client));
 
     return zx::ok();
   }

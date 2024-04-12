@@ -101,18 +101,15 @@ class AdbShellTest : public zxtest::Test, public loop_fixture::RealLoop {
   void SetUp() override {
     shell_loop_.StartThread("adb-shell-test-shell");
     incoming_ = std::make_unique<component::OutgoingDirectory>(dispatcher());
-    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_TRUE(svc_endpoints.is_ok());
-    SetupIncomingServices(std::move(svc_endpoints->server));
+    auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    SetupIncomingServices(std::move(svc_endpoints.server));
     adb_ = std::make_unique<adb_shell::AdbShell>(
-        std::move(svc_endpoints->client), shell_loop_.dispatcher(), adb_shell_config::Config());
+        std::move(svc_endpoints.client), shell_loop_.dispatcher(), adb_shell_config::Config());
     ASSERT_NO_FAILURES();
   }
 
   void SetupIncomingServices(fidl::ServerEnd<fuchsia_io::Directory> svc) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
-    auto& [client_end, server_end] = endpoints.value();
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     ASSERT_OK(incoming_->AddUnmanagedProtocol<fuchsia_dash::Launcher>(
         [this](fidl::ServerEnd<fuchsia_dash::Launcher> server_end) {
           fake_dash_launcher_.BindServer(dispatcher(), std::move(server_end));

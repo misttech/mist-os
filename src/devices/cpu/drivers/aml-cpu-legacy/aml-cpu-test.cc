@@ -275,9 +275,8 @@ class AmlCpuBindingTest : public zxtest::Test {
 
     fake_pdev::FakePDevFidl::Config config;
     config.mmios[0] = mmio_.mmio();
-    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(outgoing_endpoints);
-    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+    auto outgoing_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints.server)](
                            IncomingNamespace* infra) mutable {
       infra->pdev_server.SetConfig(std::move(config));
       ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
@@ -286,7 +285,7 @@ class AmlCpuBindingTest : public zxtest::Test {
     });
     ASSERT_NO_FATAL_FAILURE();
     root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                          std::move(outgoing_endpoints->client), "pdev");
+                          std::move(outgoing_endpoints.client), "pdev");
 
     root_->AddProtocol(ZX_PROTOCOL_THERMAL, thermal_device_.proto()->ops,
                        thermal_device_.proto()->ctx, "thermal");
@@ -369,20 +368,18 @@ class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
 };
 
 void AmlCpuTestFixture::SetUp() {
-  auto thermal_eps = fidl::CreateEndpoints<fuchsia_thermal::Device>();
-  ASSERT_OK(thermal_eps.status_value());
+  auto thermal_eps = fidl::Endpoints<fuchsia_thermal::Device>::Create();
 
-  ASSERT_OK(thermal_.Init(std::move(thermal_eps->server)));
-  ThermalSyncClient thermal_client = fidl::WireSyncClient(std::move(thermal_eps->client));
+  ASSERT_OK(thermal_.Init(std::move(thermal_eps.server)));
+  ThermalSyncClient thermal_client = fidl::WireSyncClient(std::move(thermal_eps.client));
 
   dut_ = std::make_unique<AmlCpuTest>(std::move(thermal_client));
 
-  auto cpu_eps = fidl::CreateEndpoints<fuchsia_cpuctrl::Device>();
-  ASSERT_OK(cpu_eps.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(cpu_eps->server), dut_.get());
+  auto cpu_eps = fidl::Endpoints<fuchsia_cpuctrl::Device>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(cpu_eps.server), dut_.get());
   loop_.StartThread("aml-cpu-legacy-test-thread");
 
-  cpu_client_ = CpuCtrlSyncClient(std::move(cpu_eps->client));
+  cpu_client_ = CpuCtrlSyncClient(std::move(cpu_eps.client));
 }
 
 TEST_F(AmlCpuTestFixture, TestGetOperatingPointInfo) {

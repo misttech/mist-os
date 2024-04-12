@@ -381,11 +381,7 @@ class Remote : public HasIo {
   }
 
   zx_status_t Clone(zx_handle_t* out_handle) {
-    zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
-    if (endpoints.is_error()) {
-      return endpoints.status_value();
-    }
-    auto [client_end, server_end] = std::move(endpoints.value());
+    auto [client_end, server_end] = fidl::Endpoints<fio::Node>::Create();
     const fidl::Status result =
         client()->Clone(fio::wire::OpenFlags::kCloneSameRights, std::move(server_end));
     if (!result.ok()) {
@@ -488,11 +484,7 @@ class Pty : public Remote<fuchsia_hardware_pty::Device> {
   }
 
   zx_status_t Clone(zx_handle_t* out_handle) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_unknown::Cloneable>();
-    if (endpoints.is_error()) {
-      return endpoints.status_value();
-    }
-    auto [client_end, server_end] = std::move(endpoints.value());
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_unknown::Cloneable>::Create();
     const fidl::Status result = client()->Clone2(std::move(server_end));
     if (!result.ok()) {
       return result.status();
@@ -1046,11 +1038,7 @@ zx_status_t Remote<Protocol>::VmoGet(zxio_vmo_flags_t zxio_flags, zx_handle_t* o
 template <typename Protocol>
 zx_status_t Remote<Protocol>::Open(uint32_t flags, const char* path, size_t path_len,
                                    zxio_storage_t* storage) {
-  zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
-  if (endpoints.is_error()) {
-    return endpoints.status_value();
-  }
-  auto [client_end, server_end] = std::move(endpoints.value());
+  auto [client_end, server_end] = fidl::Endpoints<fio::Node>::Create();
   const fidl::Status result =
       client()->Open(static_cast<fio::wire::OpenFlags>(flags) | fio::wire::OpenFlags::kDescribe, {},
                      fidl::StringView::FromExternal(path, path_len), std::move(server_end));
@@ -1432,11 +1420,7 @@ zx_status_t Remote<Protocol>::XattrList(void (*callback)(void* context, const ui
     return ZX_ERR_BAD_STATE;
   }
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::ExtendedAttributeIterator>();
-  if (endpoints.is_error()) {
-    return endpoints.error_value();
-  }
-  auto [client_end, server_end] = std::move(endpoints.value());
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::ExtendedAttributeIterator>::Create();
   const fidl::OneWayStatus result = client()->ListExtendedAttributes(std::move(server_end));
   if (!result.ok()) {
     return result.status();

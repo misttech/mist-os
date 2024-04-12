@@ -181,9 +181,8 @@ class FactoryResetTest : public gtest::RealLoopFixture {
     ASSERT_TRUE(dev.is_ok()) << dev.status_string();
     MockAdmin mock_admin;
     fidl::ServerBindingGroup<fuchsia_hardware_power_statecontrol::Admin> binding;
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_power_statecontrol::Admin>();
-    ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-    auto& [admin, server_end] = endpoints.value();
+    auto [admin, server_end] =
+        fidl::Endpoints<fuchsia_hardware_power_statecontrol::Admin>::Create();
     binding.AddBinding(dispatcher(), std::move(server_end), &mock_admin,
                        fidl::kIgnoreBindingClosure);
 

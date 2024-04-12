@@ -51,15 +51,14 @@ class VirtioInputTest : public zxtest::Test {
 
   template <typename HidDeviceType>
   fidl::WireClient<fuchsia_input_report::InputReportsReader> GetReader(HidDeviceType& device) {
-    auto reader_endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-    EXPECT_OK(reader_endpoints.status_value());
+    auto reader_endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
 
     device.SyncCall([&](HidDeviceBase* device) {
       device->GetInputReportsReader(async_get_default_dispatcher(),
-                                    std::move(reader_endpoints->server));
+                                    std::move(reader_endpoints.server));
     });
     auto reader = fidl::WireClient<fuchsia_input_report::InputReportsReader>(
-        std::move(reader_endpoints->client), input_report_loop_.dispatcher());
+        std::move(reader_endpoints.client), input_report_loop_.dispatcher());
     EXPECT_OK(input_report_loop_.RunUntilIdle());
 
     return reader;

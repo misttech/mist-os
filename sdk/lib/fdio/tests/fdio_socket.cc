@@ -121,13 +121,12 @@ class BaseTest : public zxtest::Test {
     ASSERT_OK(zx::socket::create(sock_type, &client_socket, &server_socket_));
     server_.emplace(std::move(client_socket));
 
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_posix_socket::StreamSocket>();
-    ASSERT_OK(endpoints.status_value());
+    auto endpoints = fidl::Endpoints<fuchsia_posix_socket::StreamSocket>::Create();
 
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &server_.value());
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), &server_.value());
     ASSERT_OK(loop_.StartThread("fake-socket-server"));
     ASSERT_OK(
-        fdio_fd_create(endpoints->client.channel().release(), client_fd_.reset_and_get_address()));
+        fdio_fd_create(endpoints.client.channel().release(), client_fd_.reset_and_get_address()));
   }
 
   const zx::socket& server_socket() { return server_socket_; }
@@ -271,15 +270,15 @@ TEST_F(TcpSocketTest, SendmsgNonblockBoundary) {
   const size_t memlength = 65536;
   std::unique_ptr<uint8_t[]> memchunk(new uint8_t[memlength]);
 
-  struct iovec iov[] {
-    {
-        .iov_base = memchunk.get(),
-        .iov_len = memlength,
-    },
-        {
-            .iov_base = memchunk.get(),
-            .iov_len = memlength,
-        },
+  struct iovec iov[]{
+      {
+          .iov_base = memchunk.get(),
+          .iov_len = memlength,
+      },
+      {
+          .iov_base = memchunk.get(),
+          .iov_len = memlength,
+      },
   };
 
   const struct msghdr msg = {
@@ -596,8 +595,8 @@ class TcpSocketTimeoutTest : public TcpSocketTest {
     const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
     const auto timeout_ms = std::chrono::duration_cast<std::chrono::milliseconds>(timeout);
 
-    // TODO(https://fxbug.dev/42116074): Only the lower bound of the elapsed time is checked. The upper bound
-    // check is ignored as the syscall could far miss the defined deadline to return.
+    // TODO(https://fxbug.dev/42116074): Only the lower bound of the elapsed time is checked. The
+    // upper bound check is ignored as the syscall could far miss the defined deadline to return.
     EXPECT_GT(elapsed, timeout - margin, "elapsed=%lld ms (which is not within %lld ms of %lld ms)",
               elapsed_ms.count(), margin.count(), timeout_ms.count());
 

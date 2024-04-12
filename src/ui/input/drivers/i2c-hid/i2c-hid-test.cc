@@ -287,24 +287,22 @@ class I2cHidTest : public zxtest::Test {
     ASSERT_OK(irq.duplicate(ZX_RIGHT_SAME_RIGHTS, &interrupt));
     fake_i2c_hid_.SetInterrupt(std::move(interrupt));
 
-    auto io_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(io_endpoints.status_value());
+    auto io_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    mock_component_.emplace(std::move(irq), std::move(io_endpoints->server));
+    mock_component_.emplace(std::move(irq), std::move(io_endpoints.server));
 
     parent_->AddFidlService(fuchsia_hardware_interrupt::Service::Name,
-                            std::move(io_endpoints->client), "irq001");
+                            std::move(io_endpoints.client), "irq001");
 
     auto client = acpi_device_.CreateClient(loop_.dispatcher());
     ASSERT_OK(client.status_value());
     device_ = new I2cHidbus(parent_.get(), std::move(client.value()));
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    EXPECT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
 
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &fake_i2c_hid_);
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), &fake_i2c_hid_);
 
-    i2c_ = std::move(endpoints->client);
+    i2c_ = std::move(endpoints.client);
     // Each test is responsible for calling Bind().
   }
 
@@ -379,17 +377,15 @@ TEST(I2cHidTest, HidTestReportDescFailureLifetimeTest) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   EXPECT_OK(loop.StartThread());
 
-  auto i2c_endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  EXPECT_TRUE(i2c_endpoints.is_ok());
+  auto i2c_endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
 
-  fidl::BindServer(loop.dispatcher(), std::move(i2c_endpoints->server), &fake_i2c_hid_);
+  fidl::BindServer(loop.dispatcher(), std::move(i2c_endpoints.server), &fake_i2c_hid_);
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_acpi::Device>();
-  ASSERT_OK(endpoints.status_value());
-  endpoints->server.reset();
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_acpi::Device>::Create();
+  endpoints.server.reset();
   device_ = new I2cHidbus(parent.get(),
-                          acpi::Client::Create(fidl::WireSyncClient(std::move(endpoints->client))));
-  channel_ = ddk::I2cChannel(std::move(i2c_endpoints->client));
+                          acpi::Client::Create(fidl::WireSyncClient(std::move(endpoints.client))));
+  channel_ = ddk::I2cChannel(std::move(i2c_endpoints.client));
 
   fake_i2c_hid_.SetHidDescriptorFailure(ZX_ERR_TIMED_OUT);
   ASSERT_OK(device_->Bind(std::move(channel_)));

@@ -60,9 +60,7 @@ void LoaderServiceTest::CreateTestDirectory(const std::vector<TestDirectoryEntry
     ASSERT_NO_FATAL_FAILURE(AddDirectoryEntry(root_dir_, entry));
   }
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   ASSERT_OK(vfs_->ServeDirectory(fbl::RefPtr(root_dir_), std::move(server)));
 
   // Must start fs_loop before fdio_fd_create, since that will attempt to Describe the directory.

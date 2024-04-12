@@ -28,11 +28,10 @@ class MonitorTest : public zxtest::Test {
  public:
   MonitorTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
   void SetUp() override {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_power_button::Monitor>();
-    ASSERT_OK(endpoints.status_value());
+    auto endpoints = fidl::Endpoints<fuchsia_power_button::Monitor>::Create();
 
-    client_.Bind(std::move(endpoints->client), loop_.dispatcher(), &event_handler_);
-    monitor_.Publish()(std::move(endpoints->server));
+    client_.Bind(std::move(endpoints.client), loop_.dispatcher(), &event_handler_);
+    monitor_.Publish()(std::move(endpoints.server));
   }
 
  protected:

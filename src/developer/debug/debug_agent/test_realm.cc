@@ -27,7 +27,7 @@ const std::string kCapabilityRequested = "capability_requested";
 // Helper to simplify request pipelining.
 template <typename Protocol>
 fidl::ServerEnd<Protocol> CreateEndpointsAndBind(fidl::SyncClient<Protocol>& client) {
-  auto [client_end, server_end] = *fidl::CreateEndpoints<Protocol>();
+  auto [client_end, server_end] = fidl::Endpoints<Protocol>::Create();
   client.Bind(std::move(client_end));
   return std::move(server_end);
 }
@@ -206,7 +206,7 @@ fit::result<debug::Status, TestRealmAndOffers> GetTestRealmAndOffers(
     return fit::error(ErrorToStatus(exposed_dir_open_res.error_value()));
   }
 
-  auto [realm_client_end, realm_server_end] = *fidl::CreateEndpoints<fuchsia_component::Realm>();
+  auto [realm_client_end, realm_server_end] = fidl::Endpoints<fuchsia_component::Realm>::Create();
   auto realm_open_res =
       directory->Open({fuchsia_io::OpenFlags(0), fuchsia_io::ModeType(0),
                        fidl::DiscoverableProtocolName<fuchsia_component::Realm>,

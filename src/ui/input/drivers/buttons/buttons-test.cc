@@ -256,13 +256,12 @@ class ButtonsTest : public zxtest::Test {
   }
 
   fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> GetReader() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-    ZX_ASSERT(endpoints.is_ok());
-    auto result = client_->GetInputReportsReader(std::move(endpoints->server));
+    auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
+    auto result = client_->GetInputReportsReader(std::move(endpoints.server));
     ZX_ASSERT(result.ok());
     ZX_ASSERT(client_->GetDescriptor().ok());
-    auto reader = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(
-        std::move(endpoints->client));
+    auto reader =
+        fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(endpoints.client));
     ZX_ASSERT(reader.is_valid());
 
     DrainInitialReport(reader);

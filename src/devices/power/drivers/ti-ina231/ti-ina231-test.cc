@@ -69,11 +69,10 @@ class TiIna231Test : public zxtest::Test {
 
   void SetUp() override {
     root_ = MockDevice::FakeRootParent();
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    EXPECT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
 
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &fake_i2c_);
-    i2c_client_ = std::move(endpoints->client);
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), &fake_i2c_);
+    i2c_client_ = std::move(endpoints.client);
 
     EXPECT_OK(loop_.StartThread());
   }
@@ -111,11 +110,10 @@ TEST_F(TiIna231Test, GetPowerWatts) {
   EXPECT_OK(dut->DdkAdd("ti-ina231"));
   EXPECT_EQ(root()->child_count(), 1);
 
-  auto endpoints = fidl::CreateEndpoints<power_sensor_fidl::Device>();
-  ASSERT_OK(endpoints.status_value());
-  ASSERT_OK(dut->PowerSensorConnectServer(endpoints->server.TakeChannel()));
+  auto endpoints = fidl::Endpoints<power_sensor_fidl::Device>::Create();
+  ASSERT_OK(dut->PowerSensorConnectServer(endpoints.server.TakeChannel()));
   fidl::WireSyncClient client{
-      fidl::ClientEnd<power_sensor_fidl::Device>{std::move(endpoints->client)}};
+      fidl::ClientEnd<power_sensor_fidl::Device>{std::move(endpoints.client)}};
 
   {
     fake_i2c().set_power(4792);
@@ -226,11 +224,10 @@ TEST_F(TiIna231Test, GetVoltageVolts) {
 
   EXPECT_OK(dut->DdkAdd("ti-ina231"));
 
-  auto endpoints = fidl::CreateEndpoints<power_sensor_fidl::Device>();
-  ASSERT_OK(endpoints.status_value());
-  ASSERT_OK(dut->PowerSensorConnectServer(endpoints->server.TakeChannel()));
+  auto endpoints = fidl::Endpoints<power_sensor_fidl::Device>::Create();
+  ASSERT_OK(dut->PowerSensorConnectServer(endpoints.server.TakeChannel()));
   fidl::WireSyncClient client{
-      fidl::ClientEnd<power_sensor_fidl::Device>{std::move(endpoints->client)}};
+      fidl::ClientEnd<power_sensor_fidl::Device>{std::move(endpoints.client)}};
 
   {
     fake_i2c().set_bus_voltage(9200);
@@ -276,11 +273,10 @@ TEST_F(TiIna231Test, GetSensorName) {
 
   EXPECT_OK(dut->DdkAdd("ti-ina231"));
 
-  auto endpoints = fidl::CreateEndpoints<power_sensor_fidl::Device>();
-  ASSERT_OK(endpoints.status_value());
-  ASSERT_OK(dut->PowerSensorConnectServer(endpoints->server.TakeChannel()));
+  auto endpoints = fidl::Endpoints<power_sensor_fidl::Device>::Create();
+  ASSERT_OK(dut->PowerSensorConnectServer(endpoints.server.TakeChannel()));
   fidl::WireSyncClient client{
-      fidl::ClientEnd<power_sensor_fidl::Device>{std::move(endpoints->client)}};
+      fidl::ClientEnd<power_sensor_fidl::Device>{std::move(endpoints.client)}};
 
   {
     auto response = client->GetSensorName();

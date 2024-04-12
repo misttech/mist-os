@@ -81,18 +81,15 @@ zx::result<> TiTca6408aDevice::CreateNode() {
                   .offers2(arena, std::move(offers))
                   .Build();
 
-  zx::result controller_endpoints =
-      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed to create endpoints: %s",
-                controller_endpoints.status_string());
+  auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
   fidl::WireResult result =
-      fidl::WireCall(node())->AddChild(args, std::move(controller_endpoints->server), {});
+      fidl::WireCall(node())->AddChild(args, std::move(controller_endpoints.server), {});
   if (!result.ok()) {
     FDF_LOG(ERROR, "Failed to add child %s", result.status_string());
     return zx::error(result.status());
   }
-  controller_.Bind(std::move(controller_endpoints->client));
+  controller_.Bind(std::move(controller_endpoints.client));
 
   return zx::ok();
 }

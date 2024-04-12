@@ -30,13 +30,12 @@ class PipeIoTest : public ::testing::Test {
   void SetUp() override {
     loop_.StartThread("pipe-io-server");
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>();
-    EXPECT_EQ(endpoints.status_value(), ZX_OK);
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>::Create();
 
-    binding_ = fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &pipe_);
+    binding_ = fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), &pipe_);
     EXPECT_TRUE(binding_.has_value());
 
-    pipe_client_ = fidl::WireSyncClient(std::move(endpoints->client));
+    pipe_client_ = fidl::WireSyncClient(std::move(endpoints.client));
     io_ = std::make_unique<PipeIo>(std::move(pipe_client_), "pipe");
   }
 
@@ -323,13 +322,12 @@ class PipeAutoReaderTest : public gtest::TestLoopFixture {
   void SetUp() override {
     TestLoopFixture::SetUp();
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>();
-    EXPECT_EQ(endpoints.status_value(), ZX_OK);
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>::Create();
 
-    binding_ = fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &pipe_);
+    binding_ = fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), &pipe_);
     EXPECT_TRUE(binding_.has_value());
 
-    pipe_client_ = fidl::WireSyncClient(std::move(endpoints->client));
+    pipe_client_ = fidl::WireSyncClient(std::move(endpoints.client));
 
     loop_.StartThread("pipe-io-server");
   }

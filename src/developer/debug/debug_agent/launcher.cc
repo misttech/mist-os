@@ -66,7 +66,7 @@ void ConnectToAgentAt(const std::string& name,
 
   fuchsia_component_decl::ChildRef child_ref(name, kCollectionName);
 
-  auto [dir_client_end, dir_server_end] = *fidl::CreateEndpoints<fuchsia_io::Directory>();
+  auto [dir_client_end, dir_server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   realm->OpenExposedDir({{.child = child_ref, .exposed_dir = std::move(dir_server_end)}})
       .Then([name, server_end = std::move(server_end), dir_client_end = std::move(dir_client_end),
@@ -97,7 +97,7 @@ class AgentIterator : public fidl::Server<fuchsia_debugger::AgentIterator> {
                                                    async_get_default_dispatcher());
 
       fuchsia_component_decl::CollectionRef collection(kCollectionName);
-      auto [client_end, server_end] = *fidl::CreateEndpoints<fuchsia_component::ChildIterator>();
+      auto [client_end, server_end] = fidl::Endpoints<fuchsia_component::ChildIterator>::Create();
 
       child_iterator_ = fidl::Client(std::move(client_end), async_get_default_dispatcher());
 
@@ -154,7 +154,7 @@ class AgentIterator : public fidl::Server<fuchsia_debugger::AgentIterator> {
     bool completer_called = false;
 
     for (auto it = children.begin(); it != children.end(); ++it) {
-      auto [client_end, server_end] = *fidl::CreateEndpoints<fuchsia_debugger::DebugAgent>();
+      auto [client_end, server_end] = fidl::Endpoints<fuchsia_debugger::DebugAgent>::Create();
 
       if (!completer_called) {
         batch.emplace_back(it->name(), std::move(client_end));
@@ -208,7 +208,7 @@ void DebugAgentLauncher::LaunchDebugAgent(fidl::ServerEnd<fuchsia_debugger::Debu
                                                async_get_default_dispatcher());
 
   auto [controller_client_end, controller_server_end] =
-      *fidl::CreateEndpoints<fuchsia_component::Controller>();
+      fidl::Endpoints<fuchsia_component::Controller>::Create();
 
   fidl::Client<fuchsia_component::Controller> controller(std::move(controller_client_end),
                                                          async_get_default_dispatcher());
@@ -251,7 +251,7 @@ void DebugAgentLauncher::LaunchDebugAgent(fidl::ServerEnd<fuchsia_debugger::Debu
 
               // Otherwise, we need to explicitly start the child.
               auto [exec_controller_client, exec_controller_server] =
-                  *fidl::CreateEndpoints<fuchsia_component::ExecutionController>();
+                  fidl::Endpoints<fuchsia_component::ExecutionController>::Create();
               fidl::Client<fuchsia_component::ExecutionController> execution_controller(
                   std::move(exec_controller_client), async_get_default_dispatcher());
 

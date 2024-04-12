@@ -87,9 +87,7 @@ class TestServer final : public zxio_tests::TestDirectoryServerBase {
 class DirentTest : public zxtest::Test {
  protected:
   void SetUp() final {
-    zx::result endpoints = fidl::CreateEndpoints<fio::Directory>();
-    ASSERT_OK(endpoints.status_value());
-    auto& [client_end, server_end] = endpoints.value();
+    auto [client_end, server_end] = fidl::Endpoints<fio::Directory>::Create();
     ASSERT_OK(zxio_dir_init(&dir_, std::move(client_end)));
     server_ = std::make_unique<TestServer>();
     loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);

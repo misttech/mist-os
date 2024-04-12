@@ -30,9 +30,7 @@ class PtyTestCase : public zxtest::Test {
     zx::result args = PtyServer::Args::Create();
     ASSERT_OK(args.status_value());
     std::shared_ptr server = std::make_shared<PtyServer>(std::move(args.value()), dispatcher());
-    zx::result endpoints = fidl::CreateEndpoints<Device>();
-    ASSERT_OK(endpoints.status_value());
-    auto& [client_end, server_end] = endpoints.value();
+    auto [client_end, server_end] = fidl::Endpoints<Device>::Create();
 
     async::PostTask(dispatcher(),
                     [server = std::move(server), server_end = std::move(server_end)]() mutable {

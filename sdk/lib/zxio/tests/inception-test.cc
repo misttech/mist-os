@@ -113,9 +113,7 @@ class TestDirectoryServer final : public zxio_tests::TestDirectoryServerBase {
 }  // namespace
 
 TEST(CreateWithAllocator, Directory) {
-  zx::result dir_ends = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(dir_ends.status_value());
-  auto [dir_client, dir_server] = std::move(dir_ends.value());
+  auto [dir_client, dir_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   auto node_info = fuchsia_io::wire::NodeInfoDeprecated::WithDirectory({});
 
@@ -150,9 +148,7 @@ TEST(CreateWithAllocator, Directory) {
 }
 
 TEST(CreateWithAllocator, File) {
-  zx::result file_ends = fidl::CreateEndpoints<fuchsia_io::File>();
-  ASSERT_OK(file_ends.status_value());
-  auto [file_client, file_server] = std::move(file_ends.value());
+  auto [file_client, file_server] = fidl::Endpoints<fuchsia_io::File>::Create();
 
   zx::event file_event;
   ASSERT_OK(zx::event::create(0u, &file_event));
@@ -216,9 +212,7 @@ class TestServiceNodeServer : public fidl::testing::WireTestBase<fuchsia_io::Nod
 };
 
 TEST(CreateWithAllocator, Service) {
-  zx::result node_ends = fidl::CreateEndpoints<fuchsia_io::Node>();
-  ASSERT_OK(node_ends.status_value());
-  auto [node_client, node_server] = std::move(node_ends.value());
+  auto [node_client, node_server] = fidl::Endpoints<fuchsia_io::Node>::Create();
 
   auto node_info = fuchsia_io::wire::NodeInfoDeprecated::WithService({});
 
@@ -282,9 +276,7 @@ class TestTtyServer : public fidl::testing::WireTestBase<fuchsia_hardware_pty::D
 };
 
 TEST(CreateWithAllocator, Tty) {
-  zx::result node_ends = fidl::CreateEndpoints<fuchsia_io::Node>();
-  ASSERT_OK(node_ends.status_value());
-  auto [node_client, node_server] = std::move(node_ends.value());
+  auto [node_client, node_server] = fidl::Endpoints<fuchsia_io::Node>::Create();
 
   zx::eventpair event0, event1;
   ASSERT_OK(zx::eventpair::create(0, &event0, &event1));
@@ -327,9 +319,8 @@ TEST(CreateWithAllocator, Tty) {
 }
 
 TEST(CreateWithAllocator, PacketSocket) {
-  zx::result socket_ends = fidl::CreateEndpoints<fuchsia_posix_socket_packet::Socket>();
-  ASSERT_OK(socket_ends.status_value());
-  auto [socket_client, socket_server] = std::move(socket_ends.value());
+  auto [socket_client, socket_server] =
+      fidl::Endpoints<fuchsia_posix_socket_packet::Socket>::Create();
 
   zx::eventpair event0, event1;
   ASSERT_OK(zx::eventpair::create(0, &event0, &event1));
@@ -371,9 +362,7 @@ TEST(CreateWithAllocator, PacketSocket) {
 }
 
 TEST(CreateWithAllocator, RawSocket) {
-  zx::result socket_ends = fidl::CreateEndpoints<fuchsia_posix_socket_raw::Socket>();
-  ASSERT_OK(socket_ends.status_value());
-  auto [socket_client, socket_server] = std::move(socket_ends.value());
+  auto [socket_client, socket_server] = fidl::Endpoints<fuchsia_posix_socket_raw::Socket>::Create();
 
   zx::eventpair event0, event1;
   ASSERT_OK(zx::eventpair::create(0, &event0, &event1));
@@ -415,9 +404,8 @@ TEST(CreateWithAllocator, RawSocket) {
 }
 
 TEST(CreateWithAllocator, SynchronousDatagramSocket) {
-  zx::result socket_ends = fidl::CreateEndpoints<fuchsia_posix_socket::SynchronousDatagramSocket>();
-  ASSERT_OK(socket_ends.status_value());
-  auto [socket_client, socket_server] = std::move(socket_ends.value());
+  auto [socket_client, socket_server] =
+      fidl::Endpoints<fuchsia_posix_socket::SynchronousDatagramSocket>::Create();
 
   zx::eventpair event0, event1;
   ASSERT_OK(zx::eventpair::create(0, &event0, &event1));
@@ -459,9 +447,8 @@ TEST(CreateWithAllocator, SynchronousDatagramSocket) {
 }
 
 TEST(CreateWithAllocator, DatagramSocket) {
-  zx::result socket_ends = fidl::CreateEndpoints<fuchsia_posix_socket::DatagramSocket>();
-  ASSERT_OK(socket_ends.status_value());
-  auto [socket_client, socket_server] = std::move(socket_ends.value());
+  auto [socket_client, socket_server] =
+      fidl::Endpoints<fuchsia_posix_socket::DatagramSocket>::Create();
 
   zx::socket socket, peer;
   ASSERT_OK(zx::socket::create(ZX_SOCKET_DATAGRAM, &socket, &peer));
@@ -492,9 +479,8 @@ TEST(CreateWithAllocator, DatagramSocket) {
 }
 
 TEST(CreateWithAllocator, StreamSocket) {
-  zx::result socket_ends = fidl::CreateEndpoints<fuchsia_posix_socket::StreamSocket>();
-  ASSERT_OK(socket_ends.status_value());
-  auto [socket_client, socket_server] = std::move(socket_ends.value());
+  auto [socket_client, socket_server] =
+      fidl::Endpoints<fuchsia_posix_socket::StreamSocket>::Create();
 
   zx::socket socket, peer;
   ASSERT_OK(zx::socket::create(ZX_SOCKET_STREAM, &socket, &peer));

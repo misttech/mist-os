@@ -27,15 +27,14 @@ class Tmp112DeviceTest : public zxtest::Test {
   Tmp112DeviceTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
 
   void SetUp() override {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    ASSERT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
 
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), &mock_i2c_);
 
     ASSERT_OK(loop_.StartThread());
     root_ = MockDevice::FakeRootParent();
     dev_ =
-        std::make_unique<Tmp112Device>(root_.get(), ddk::I2cChannel(std::move(endpoints->client)));
+        std::make_unique<Tmp112Device>(root_.get(), ddk::I2cChannel(std::move(endpoints.client)));
   }
 
  protected:
@@ -56,15 +55,14 @@ TEST_F(Tmp112DeviceTest, Init) {
 
 TEST_F(Tmp112DeviceTest, GetTemperatureCelsius) {
   mock_i2c_.ExpectWrite({kTemperatureReg}).ExpectReadStop({0x34, 0x12});
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_temperature::Device>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_temperature::Device>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), dev_.get());
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), dev_.get());
   ASSERT_OK(loop.StartThread());
 
   TemperatureClient client;
-  client.Bind(std::move(endpoints->client));
+  client.Bind(std::move(endpoints.client));
   auto result = client->GetTemperatureCelsius();
   EXPECT_OK(result->status);
   EXPECT_TRUE(FloatNear(result->temp, dev_->RegToTemperatureCelsius(0x1234)));

@@ -55,10 +55,9 @@ class BatteryIntegrationTest : public gtest::RealLoopFixture {
 
   void CreateAndConnectToWatcher() {
     watcher_ = std::make_unique<FakeInfoWatcher>();
-    auto endpoints = fidl::CreateEndpoints<fuchsia_power_battery::BatteryInfoWatcher>();
-    EXPECT_EQ(endpoints.status_value(), ZX_OK);
-    fidl::BindServer(dispatcher(), std::move(endpoints->server), watcher_.get());
-    watcher_client_.Bind(std::move(endpoints->client));
+    auto endpoints = fidl::Endpoints<fuchsia_power_battery::BatteryInfoWatcher>::Create();
+    fidl::BindServer(dispatcher(), std::move(endpoints.server), watcher_.get());
+    watcher_client_.Bind(std::move(endpoints.client));
   }
 
   bool WatcherCalled() { return watcher_->called(); }

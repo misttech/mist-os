@@ -61,18 +61,17 @@ class Server final : public fidl::testing::WireTestBase<fuchsia_posix_socket::St
 };
 
 TEST(AtExit, ExitInAccept) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_posix_socket::StreamSocket>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fuchsia_posix_socket::StreamSocket>::Create();
 
   zx::socket client_socket, server_socket;
   ASSERT_OK(zx::socket::create(ZX_SOCKET_STREAM, &client_socket, &server_socket));
 
   // We're going to need the raw handle so we can signal on it and close it.
-  zx_handle_t server_handle = endpoints->server.channel().get();
+  zx_handle_t server_handle = endpoints.server.channel().get();
 
   Server server(server_handle, std::move(server_socket));
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &server);
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), &server);
   ASSERT_OK(loop.StartThread("fake-socket-server"));
 
   const char* argv[] = {"/pkg/bin/accept-child", nullptr};
@@ -82,7 +81,7 @@ TEST(AtExit, ExitInAccept) {
           .h =
               {
                   .id = PA_HND(PA_USER0, 0),
-                  .handle = endpoints->client.channel().release(),
+                  .handle = endpoints.client.channel().release(),
               },
       },
   };

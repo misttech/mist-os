@@ -311,12 +311,11 @@ TEST(FifosReg, AsReceiveTokenType) {
 class Fusb302RegisterTest : public zxtest::Test {
  public:
   void SetUp() override {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    EXPECT_TRUE(endpoints.is_ok());
-    mock_i2c_client_ = std::move(endpoints->client);
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
+    mock_i2c_client_ = std::move(endpoints.client);
 
     EXPECT_OK(loop_.StartThread());
-    fidl::BindServer<fuchsia_hardware_i2c::Device>(loop_.dispatcher(), std::move(endpoints->server),
+    fidl::BindServer<fuchsia_hardware_i2c::Device>(loop_.dispatcher(), std::move(endpoints.server),
                                                    &mock_i2c_);
   }
 

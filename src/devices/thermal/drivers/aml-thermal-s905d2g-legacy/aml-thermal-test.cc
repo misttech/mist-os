@@ -503,10 +503,9 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
   }
 
   fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> BindServer() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_pwm::Pwm>();
-    EXPECT_TRUE(endpoints.is_ok());
-    fidl::BindServer(async_get_default_dispatcher(), std::move(endpoints->server), this);
-    return fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>(std::move(endpoints->client));
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_pwm::Pwm>::Create();
+    fidl::BindServer(async_get_default_dispatcher(), std::move(endpoints.server), this);
+    return fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>(std::move(endpoints.client));
   }
 
   void VerifyAndClear() {

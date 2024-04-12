@@ -141,11 +141,10 @@ class TestTransaction : public fidl::Transaction {
 };
 
 fidl::ClientEnd<fuchsia_component::Realm> DriverRunnerTest::ConnectToRealm() {
-  zx::result realm_endpoints = fidl::CreateEndpoints<fcomponent::Realm>();
-  ZX_ASSERT(ZX_OK == realm_endpoints.status_value());
-  realm_binding_.emplace(dispatcher(), std::move(realm_endpoints->server), &realm_,
+  auto realm_endpoints = fidl::Endpoints<fcomponent::Realm>::Create();
+  realm_binding_.emplace(dispatcher(), std::move(realm_endpoints.server), &realm_,
                          fidl::kIgnoreBindingClosure);
-  return std::move(realm_endpoints->client);
+  return std::move(realm_endpoints.client);
 }
 FakeDriverIndex DriverRunnerTest::CreateDriverIndex() {
   return FakeDriverIndex(dispatcher(), [](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
@@ -310,18 +309,17 @@ DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriver(
       .ns({})
       .numbered_handles(realm().TakeHandles(arena));
 
-  auto controller_endpoints = fidl::CreateEndpoints<frunner::ComponentController>();
-  EXPECT_EQ(ZX_OK, controller_endpoints.status_value());
+  auto controller_endpoints = fidl::Endpoints<frunner::ComponentController>::Create();
   TestTransaction transaction(driver.close);
   {
     fidl::WireServer<frunner::ComponentRunner>::StartCompleter::Sync completer(&transaction);
     fidl::WireRequest<frunner::ComponentRunner::Start> request{
-        start_info_builder.Build(), std::move(controller_endpoints->server)};
+        start_info_builder.Build(), std::move(controller_endpoints.server)};
     static_cast<fidl::WireServer<frunner::ComponentRunner>&>(driver_runner().runner_for_tests())
         .Start(&request, completer);
   }
   RunLoopUntilIdle();
-  return {std::move(started_driver), std::move(controller_endpoints->client)};
+  return {std::move(started_driver), std::move(controller_endpoints.client)};
 }
 zx::result<DriverRunnerTest::StartDriverResult> DriverRunnerTest::StartRootDriver() {
   realm().SetCreateChildHandler(
@@ -448,8 +446,7 @@ std::shared_ptr<CreatedChild> TestDriver::AddChild(std::string_view child_name, 
 std::shared_ptr<CreatedChild> TestDriver::AddChild(fdfw::NodeAddArgs child_args, bool owned,
                                                    bool expect_error,
                                                    fit::function<void()> on_bind) {
-  auto controller_endpoints = fidl::CreateEndpoints<fdfw::NodeController>();
-  ZX_ASSERT(ZX_OK == controller_endpoints.status_value());
+  auto controller_endpoints = fidl::Endpoints<fdfw::NodeController>::Create();
 
   auto child_node_endpoints = fidl::CreateEndpoints<fdfw::Node>();
   ZX_ASSERT(ZX_OK == child_node_endpoints.status_value());
@@ -460,7 +457,7 @@ std::shared_ptr<CreatedChild> TestDriver::AddChild(fdfw::NodeAddArgs child_args,
   }
 
   node_
-      ->AddChild({std::move(child_args), std::move(controller_endpoints->server),
+      ->AddChild({std::move(child_args), std::move(controller_endpoints.server),
                   std::move(child_node_server)})
       .Then([expect_error](fidl::Result<fdfw::Node::AddChild> result) {
         if (expect_error) {
@@ -501,7 +498,7 @@ std::shared_ptr<CreatedChild> TestDriver::AddChild(fdfw::NodeAddArgs child_args,
   };
 
   std::shared_ptr<CreatedChild> child = std::make_shared<CreatedChild>();
-  child->node_controller.emplace(std::move(controller_endpoints->client), dispatcher_,
+  child->node_controller.emplace(std::move(controller_endpoints.client), dispatcher_,
                                  new ControllerEventHandler(child, std::move(on_bind)));
   if (owned) {
     child->node.emplace(std::move(child_node_endpoints->client), dispatcher_,
@@ -523,18 +520,17 @@ fidl::WireClient<fuchsia_device::Controller> DriverRunnerTest::ConnectToDeviceCo
   zx::result dev_res = devfs().Connect(vfs);
   EXPECT_EQ(dev_res.status_value(), ZX_OK);
   fidl::WireClient<fuchsia_io::Directory> dev{std::move(*dev_res), dispatcher()};
-  zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-  EXPECT_EQ(controller_endpoints.status_value(), ZX_OK);
+  auto controller_endpoints = fidl::Endpoints<fuchsia_device::Controller>::Create();
 
   auto device_controller_path = std::string(child_name) + "/device_controller";
   EXPECT_EQ(dev->Open(fuchsia_io::OpenFlags::kNotDirectory, {},
                       fidl::StringView::FromExternal(device_controller_path),
-                      fidl::ServerEnd<fuchsia_io::Node>(controller_endpoints->server.TakeChannel()))
+                      fidl::ServerEnd<fuchsia_io::Node>(controller_endpoints.server.TakeChannel()))
                 .status(),
             ZX_OK);
   EXPECT_TRUE(RunLoopUntilIdle());
 
-  return fidl::WireClient<fuchsia_device::Controller>{std::move(controller_endpoints->client),
+  return fidl::WireClient<fuchsia_device::Controller>{std::move(controller_endpoints.client),
                                                       dispatcher()};
 }
 

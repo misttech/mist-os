@@ -96,11 +96,10 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
     auto service_result = outgoing_.AddService<fuchsia_hardware_pwm::Service>(std::move(handler));
     ZX_ASSERT(service_result.is_ok());
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(endpoints.is_ok());
-    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints.server)).is_ok());
 
-    return std::move(endpoints->client);
+    return std::move(endpoints.client);
   }
 
   void VerifyAndClear() {
@@ -187,16 +186,15 @@ class AmlPwmRegulatorTest : public zxtest::Test {
   }
 
   fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> GetClient(std::string_view name) {
-    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_EQ(ZX_OK, svc_endpoints.status_value());
+    auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
     zx_status_t status = fdio_open_at(outgoing_directory_client_.handle()->get(), "/svc",
                                       static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                      svc_endpoints->server.TakeChannel().release());
+                                      svc_endpoints.server.TakeChannel().release());
     EXPECT_EQ(ZX_OK, status);
 
     auto connect_result = component::ConnectAtMember<fuchsia_hardware_vreg::Service::Vreg>(
-        svc_endpoints->client, name);
+        svc_endpoints.client, name);
     EXPECT_TRUE(connect_result.is_ok());
     return std::move(connect_result.value());
   }

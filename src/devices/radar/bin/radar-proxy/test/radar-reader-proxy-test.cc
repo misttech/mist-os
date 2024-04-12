@@ -459,11 +459,10 @@ class RadarReaderProxyInjectionTest : public RadarReaderProxyTest {
     AddRadarDevice();
 
     {
-      zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReader>();
-      ASSERT_TRUE(endpoints.is_ok());
-      reader_client_.emplace(std::move(endpoints->client), loop_.dispatcher(),
+      auto endpoints = fidl::Endpoints<fuchsia_hardware_radar::RadarBurstReader>::Create();
+      reader_client_.emplace(std::move(endpoints.client), loop_.dispatcher(),
                              fit::bind_member<&RadarReaderProxyInjectionTest::OnBurst>(this));
-      EXPECT_TRUE(dut_client_->Connect(std::move(endpoints->server)).is_ok());
+      EXPECT_TRUE(dut_client_->Connect(std::move(endpoints.server)).is_ok());
     }
 
     {
@@ -481,16 +480,15 @@ class RadarReaderProxyInjectionTest : public RadarReaderProxyTest {
     }
 
     {
-      zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstInjector>();
-      ASSERT_TRUE(endpoints.is_ok());
-      injector_client_.emplace(std::move(endpoints->client), loop_.dispatcher(),
+      auto endpoints = fidl::Endpoints<fuchsia_hardware_radar::RadarBurstInjector>::Create();
+      injector_client_.emplace(std::move(endpoints.client), loop_.dispatcher(),
                                [&](uint32_t bursts_id) {
                                  received_vmo_ids_.push_back(bursts_id);
                                  if (on_bursts_delivered_) {
                                    on_bursts_delivered_();
                                  }
                                });
-      BindInjector(std::move(endpoints->server));
+      BindInjector(std::move(endpoints.server));
     }
   }
 

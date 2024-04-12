@@ -172,10 +172,9 @@ class SerialDeviceTest : public zxtest::Test {
     device_ = new serial::SerialDevice(tester_.root().get());
     ASSERT_OK(device_->Init());
     loop_.StartThread();
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_serial::Device>();
-    ASSERT_OK(endpoints.status_value());
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), device_);
-    fidl_.Bind(std::move(endpoints->client));
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_serial::Device>::Create();
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), device_);
+    fidl_.Bind(std::move(endpoints.client));
   }
 
   void TearDown() override {

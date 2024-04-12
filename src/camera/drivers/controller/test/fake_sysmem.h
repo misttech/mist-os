@@ -28,11 +28,10 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
   }
 
   fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem> Connect() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
-    ZX_ASSERT(endpoints.is_ok());
-    sysmem_bindings_.AddBinding(async_get_default_dispatcher(), std::move(endpoints->server), this,
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_sysmem::Sysmem>::Create();
+    sysmem_bindings_.AddBinding(async_get_default_dispatcher(), std::move(endpoints.server), this,
                                 fidl::kIgnoreBindingClosure);
-    return std::move(endpoints->client);
+    return std::move(endpoints.client);
   }
 
  private:

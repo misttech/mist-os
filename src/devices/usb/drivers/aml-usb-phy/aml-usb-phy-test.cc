@@ -294,15 +294,14 @@ TEST_F(AmlUsbPhyTest, ConnectStatusChanged) {
   });
   CheckDevices(phy, {"xhci"});
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(endpoints.is_ok());
+  auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
   auto status = fdio_open_at(outgoing_.handle()->get(), "/svc",
                              static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                             endpoints->server.TakeChannel().release());
+                             endpoints.server.TakeChannel().release());
   EXPECT_EQ(ZX_OK, status);
 
   auto result = fdf::internal::DriverTransportConnect<fuchsia_hardware_usb_phy::Service::Device>(
-      endpoints->client, "xhci");
+      endpoints.client, "xhci");
   ASSERT_TRUE(result.is_ok());
 
   runtime_.PerformBlockingWork([&result]() {

@@ -144,8 +144,7 @@ class AsyncState {
   AsyncState() : outgoing_(async_get_default_dispatcher()) {}
 
   fidl::ClientEnd<fuchsia_io::Directory> SetUpProtocol() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
     zx::result service_result = outgoing_.AddService<fuchsia_hardware_pci::Service>(
         fuchsia_hardware_pci::Service::InstanceHandler(
@@ -153,8 +152,8 @@ class AsyncState {
                                                fidl::kIgnoreBindingClosure)}));
     ZX_ASSERT(service_result.is_ok());
 
-    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
-    return std::move(endpoints->client);
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints.server)).is_ok());
+    return std::move(endpoints.client);
   }
 
   pci::FakePciProtocol fake_pci;

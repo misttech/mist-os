@@ -24,8 +24,8 @@ zx_status_t VirtioGpu::Start(
     fidl::InterfaceHandle<fuchsia::ui::input3::KeyboardListener> keyboard_listener,
     fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource> mouse_source,
     ::sys::ComponentContext* context, async_dispatcher_t* dispatcher) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_virtualization_hardware::VirtioGpu>();
-  auto [client_end, server_end] = std::move(endpoints.value());
+  auto [client_end, server_end] =
+      fidl::Endpoints<fuchsia_virtualization_hardware::VirtioGpu>::Create();
   fidl::InterfaceRequest<fuchsia::virtualization::hardware::VirtioGpu> gpu_request(
       server_end.TakeChannel());
   gpu_.Bind(std::move(client_end), dispatcher, this);

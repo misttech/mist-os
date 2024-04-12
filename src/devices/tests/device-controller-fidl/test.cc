@@ -48,8 +48,7 @@ TEST_F(DeviceControllerFidl, ControllerTest) {
       device_watcher::RecursiveWaitForFile(root_fd.get(), "sys/test/sample_driver");
   ASSERT_EQ(dev_channel.status_value(), ZX_OK);
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-  ASSERT_EQ(endpoints.status_value(), ZX_OK);
+  auto endpoints = fidl::Endpoints<fuchsia_device::Controller>::Create();
 
   fdio_cpp::UnownedFdioCaller caller(root_fd);
   zx::result channel = component::ConnectAt<fuchsia_device::Controller>(

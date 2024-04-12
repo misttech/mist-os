@@ -95,11 +95,9 @@ zx::result<> MyExampleDriver::Start() {
                     .name(arena, “example_node”)
                     .Build();
 
-  zx::result controller_endpoints =
-        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ZX_ASSERT(controller_endpoints.is_ok());
+  auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
-  auto result = node_->AddChild(args, std::move(controller_endpoints->server), {});
+  auto result = node_->AddChild(args, std::move(controller_endpoints.server), {});
   if (!result.ok()) {
     FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
     return zx::error(result.status());
@@ -120,7 +118,7 @@ node during shutdown:
 void MyExampleDriver::Stop() {
   // controller_endpoints defined in the previous example.
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController>
-       node_controller(controller_endpoints->client);
+       node_controller(controller_endpoints.client);
 
   auto status = node_controller->Remove();
   if (!status.ok()) {

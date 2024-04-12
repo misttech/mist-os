@@ -158,8 +158,7 @@ class NelsonBrownoutProtectionTest : public zxtest::Test {
 
  private:
   void SetupPowerSensorFragment() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     auto power_handler = power_sensor_.SyncCall(&FakePowerSensor::CreateInstanceHandler);
     zx::result service_result = power_outgoing_.SyncCall(
         [handler = std::move(power_handler)](component::OutgoingDirectory* outgoing) mutable {
@@ -167,15 +166,14 @@ class NelsonBrownoutProtectionTest : public zxtest::Test {
         });
     ZX_ASSERT(service_result.is_ok());
     ZX_ASSERT(
-        power_outgoing_.SyncCall(&component::OutgoingDirectory::Serve, std::move(endpoints->server))
+        power_outgoing_.SyncCall(&component::OutgoingDirectory::Serve, std::move(endpoints.server))
             .is_ok());
     fake_parent_->AddFidlService(fuchsia_hardware_power_sensor::Service::Name,
-                                 std::move(endpoints->client), "power-sensor");
+                                 std::move(endpoints.client), "power-sensor");
   }
 
   void SetupCodecFragment() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     ASSERT_OK(audio::SimpleCodecServer::CreateAndAddToDdk<FakeCodec>(fake_parent_.get()));
     auto* child_dev = fake_parent_->GetLatestChild();
     ASSERT_NOT_NULL(child_dev);
@@ -187,15 +185,14 @@ class NelsonBrownoutProtectionTest : public zxtest::Test {
         });
     ZX_ASSERT(service_result.is_ok());
     ZX_ASSERT(
-        codec_outgoing_.SyncCall(&component::OutgoingDirectory::Serve, std::move(endpoints->server))
+        codec_outgoing_.SyncCall(&component::OutgoingDirectory::Serve, std::move(endpoints.server))
             .is_ok());
     fake_parent_->AddFidlService(fuchsia_hardware_audio::CodecService::Name,
-                                 std::move(endpoints->client), "codec");
+                                 std::move(endpoints.client), "codec");
   }
 
   void SetupAlertGpioFragment() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     ASSERT_OK(
         zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &alert_gpio_interrupt_));
     zx::interrupt interrupt;
@@ -208,9 +205,9 @@ class NelsonBrownoutProtectionTest : public zxtest::Test {
         });
     ZX_ASSERT(service_result.is_ok());
     ZX_ASSERT(alert_gpio_outgoing_
-                  .SyncCall(&component::OutgoingDirectory::Serve, std::move(endpoints->server))
+                  .SyncCall(&component::OutgoingDirectory::Serve, std::move(endpoints.server))
                   .is_ok());
-    fake_parent_->AddFidlService(fuchsia_hardware_gpio::Service::Name, std::move(endpoints->client),
+    fake_parent_->AddFidlService(fuchsia_hardware_gpio::Service::Name, std::move(endpoints.client),
                                  "alert-gpio");
   }
 

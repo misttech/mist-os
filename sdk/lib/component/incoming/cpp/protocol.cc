@@ -10,11 +10,7 @@ namespace component {
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> OpenServiceRoot(std::string_view path) {
   // NB: This can't be `return Connect<fuchsia_io::Directory>(path);` because some paths may be both
   // services and directories.
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   return zx::make_result(
       fdio_open(std::string(path).c_str(), static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
                 server.TakeChannel().release()),

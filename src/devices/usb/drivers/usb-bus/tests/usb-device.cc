@@ -263,10 +263,9 @@ class DeviceTest : public zxtest::Test {
       device_ = device.get();
     });
     EXPECT_TRUE(result.is_ok());
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb_device::Device>();
-    ASSERT_OK(endpoints.status_value());
-    fidl::BindServer(dispatcher_->async_dispatcher(), std::move(endpoints->server), device_);
-    fidl_.Bind(std::move(endpoints->client));
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_usb_device::Device>::Create();
+    fidl::BindServer(dispatcher_->async_dispatcher(), std::move(endpoints.server), device_);
+    fidl_.Bind(std::move(endpoints.client));
   }
 
   void TearDown() override {
@@ -868,10 +867,9 @@ TEST(EvilFakeHciDeviceTest, GetConfigurationDescriptorTooShortRejected) {
 
   async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
   std::shared_ptr<MockDevice> root = MockDevice::FakeRootParent();
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb_hci::UsbHci>();
-  ASSERT_OK(endpoints);
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_usb_hci::UsbHci>::Create();
   auto device = fbl::MakeRefCounted<UsbDevice>(root.get(), ddk::UsbHciProtocolClient(hci.proto()),
-                                               std::move(endpoints->client), kDeviceId, kHubId,
+                                               std::move(endpoints.client), kDeviceId, kHubId,
                                                kDeviceSpeed, timer, loop.dispatcher());
   auto result = device->Init(loop.dispatcher());
   ASSERT_EQ(result, ZX_ERR_IO);

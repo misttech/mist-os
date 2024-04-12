@@ -27,7 +27,7 @@ class FlakyI2cDevice : public fake_i2c::FakeI2c {
     count_++;
     // Unique errors below to check for retries.
     switch (count_) {
-      // clang-format off
+        // clang-format off
       case 1: return ZX_ERR_INTERNAL; break;
       case 2: return ZX_ERR_NOT_SUPPORTED; break;
       case 3: return ZX_ERR_NO_RESOURCES; break;
@@ -161,10 +161,9 @@ class I2cFlakyChannelTest : public zxtest::Test {
   I2cFlakyChannelTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) { loop_.StartThread(); }
 
   void SetUp() final {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    ASSERT_OK(endpoints.status_value());
-    i2c_server_.AsyncCall(&Server::BindProtocol, std::move(endpoints->server));
-    i2c_channel_.emplace(std::move(endpoints->client));
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
+    i2c_server_.AsyncCall(&Server::BindProtocol, std::move(endpoints.server));
+    i2c_channel_.emplace(std::move(endpoints.client));
   }
 
   ddk::I2cChannel& i2c_channel() { return i2c_channel_.value(); }
@@ -217,10 +216,9 @@ class I2cChannelTest : public zxtest::Test {
   I2cChannelTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) { loop_.StartThread(); }
 
   void SetUp() final {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    ASSERT_OK(endpoints.status_value());
-    i2c_server_.AsyncCall(&Server::BindProtocol, std::move(endpoints->server));
-    i2c_channel_.emplace(std::move(endpoints->client));
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
+    i2c_server_.AsyncCall(&Server::BindProtocol, std::move(endpoints.server));
+    i2c_channel_.emplace(std::move(endpoints.client));
   }
 
   ddk::I2cChannel& i2c_channel() { return i2c_channel_.value(); }
@@ -330,10 +328,9 @@ class I2cChannelServiceTest : public zxtest::Test {
   I2cChannelServiceTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) { loop_.StartThread(); }
 
   void SetUp() final {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints.status_value());
-    i2c_server_.AsyncCall(&Server::PublishService, std::move(endpoints->server));
-    directory_ = std::move(endpoints->client);
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    i2c_server_.AsyncCall(&Server::PublishService, std::move(endpoints.server));
+    directory_ = std::move(endpoints.client);
   }
 
   async_patterns::TestDispatcherBound<Server>& i2c_server() { return i2c_server_; }

@@ -103,12 +103,8 @@ int MemoryPressureCommand(const fxl::CommandLine& command_line, bool sleep) {
     return 1;
   };
 
-  zx::result endpoints = fidl::CreateEndpoints<sysmem::BufferCollection>();
-  if (endpoints.is_error()) {
-    LogError("Failed to create buffer collection endpoints, error %d\n", endpoints.status_value());
-    return 1;
-  }
-  auto& [client_collection_channel, server_collection] = endpoints.value();
+  auto [client_collection_channel, server_collection] =
+      fidl::Endpoints<sysmem::BufferCollection>::Create();
 
   if (const fidl::OneWayStatus status =
           sysmem_allocator->AllocateNonSharedCollection(std::move(server_collection));

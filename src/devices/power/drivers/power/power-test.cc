@@ -139,10 +139,9 @@ class GenericPowerTest : public zxtest::Test {
   }
 
   fidl::ClientEnd<fuchsia_hardware_power::Device> ConnectDut() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_power::Device>();
-    EXPECT_OK(endpoints.status_value());
-    dut_->GetHandler()(std::move(endpoints->server));
-    return std::move(endpoints->client);
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_power::Device>::Create();
+    dut_->GetHandler()(std::move(endpoints.server));
+    return std::move(endpoints.client);
   }
 
   static void RunSyncClientTask(fit::closure task) {
@@ -344,10 +343,9 @@ TEST_F(GenericPowerTest, FixedVoltageDomain) {
   auto dut_fixed =
       std::make_unique<PowerDevice>(fake_parent_.get(), 1, power_impl_->GetClient(),
                                     std::move(parent_power_client.value()), 1000, 1000, true);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_power::Device>();
-  EXPECT_OK(endpoints.status_value());
-  dut_fixed->GetHandler()(std::move(endpoints->server));
-  fidl::WireSyncClient<fuchsia_hardware_power::Device> dut_client_2(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_power::Device>::Create();
+  dut_fixed->GetHandler()(std::move(endpoints.server));
+  fidl::WireSyncClient<fuchsia_hardware_power::Device> dut_client_2(std::move(endpoints.client));
 
   RunSyncClientTask([&dut_client_2]() {
     fidl::WireResult result = dut_client_2->RegisterPowerDomain(0, 0);

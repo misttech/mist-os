@@ -114,9 +114,7 @@ void MouseDevice::GetInputReport(GetInputReportRequestView request,
 class InputReportReaderTests : public zxtest::Test {
   void SetUp() override {
     ASSERT_EQ(mouse_.Start(), ZX_OK);
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
-    ASSERT_TRUE(endpoints.is_ok());
-    auto [client, server] = std::move(endpoints.value());
+    auto [client, server] = fidl::Endpoints<fuchsia_input_report::InputDevice>::Create();
     auto result = fidl::BindServer(loop_.dispatcher(), std::move(server), &mouse_);
     input_device_ = fidl::WireSyncClient<fuchsia_input_report::InputDevice>(std::move(client));
     ASSERT_EQ(loop_.StartThread("MouseDeviceThread"), ZX_OK);
@@ -134,9 +132,7 @@ TEST_F(InputReportReaderTests, LifeTimeTest) {
   // Get an InputReportsReader.
   fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader;
   {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-    ASSERT_TRUE(endpoints.is_ok());
-    auto [client, server] = std::move(endpoints.value());
+    auto [client, server] = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
     // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
     (void)input_device_->GetInputReportsReader(std::move(server));
     reader = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(client));
@@ -148,9 +144,7 @@ TEST_F(InputReportReaderTests, ReadInputReportsTest) {
   // Get an InputReportsReader.
   fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader;
   {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-    ASSERT_TRUE(endpoints.is_ok());
-    auto [client, server] = std::move(endpoints.value());
+    auto [client, server] = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
     // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
     (void)input_device_->GetInputReportsReader(std::move(server));
     reader = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(client));
@@ -188,9 +182,7 @@ TEST_F(InputReportReaderTests, ReaderAddsRequiredFields) {
   // Get an InputReportsReader.
   fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader;
   {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-    ASSERT_TRUE(endpoints.is_ok());
-    auto [client, server] = std::move(endpoints.value());
+    auto [client, server] = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
     // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
     (void)input_device_->GetInputReportsReader(std::move(server));
     reader = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(client));
@@ -219,9 +211,7 @@ TEST_F(InputReportReaderTests, TwoReaders) {
   // Get the first reader.
   fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader_one;
   {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-    ASSERT_TRUE(endpoints.is_ok());
-    auto [client, server] = std::move(endpoints.value());
+    auto [client, server] = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
     // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
     (void)input_device_->GetInputReportsReader(std::move(server));
     reader_one = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(client));
@@ -231,9 +221,7 @@ TEST_F(InputReportReaderTests, TwoReaders) {
   // Get the second reader.
   fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader_two;
   {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-    ASSERT_TRUE(endpoints.is_ok());
-    auto [client, server] = std::move(endpoints.value());
+    auto [client, server] = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
     // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
     (void)input_device_->GetInputReportsReader(std::move(server));
     reader_two = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(client));
@@ -297,9 +285,7 @@ TEST_F(InputReportReaderTests, ReadInputReportsHangingGetTest) {
   // Get an async InputReportsReader.
   fidl::WireClient<fuchsia_input_report::InputReportsReader> reader;
   {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-    ASSERT_TRUE(endpoints.is_ok());
-    auto [client, server] = std::move(endpoints.value());
+    auto [client, server] = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
     // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
     (void)input_device_->GetInputReportsReader(std::move(server));
     reader.Bind(std::move(client), loop.dispatcher());
@@ -344,9 +330,7 @@ TEST_F(InputReportReaderTests, CloseReaderWithOutstandingRead) {
   // Get an async InputReportsReader.
   fidl::WireClient<fuchsia_input_report::InputReportsReader> reader;
   {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-    ASSERT_TRUE(endpoints.is_ok());
-    auto [client, server] = std::move(endpoints.value());
+    auto [client, server] = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
     // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
     (void)input_device_->GetInputReportsReader(std::move(server));
     reader.Bind(std::move(client), loop.dispatcher());
@@ -367,9 +351,7 @@ TEST_F(InputReportReaderTests, CloseReaderWithOutstandingRead) {
 TEST_F(InputReportReaderTests, MaxUnreadReports) {
   fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader;
   {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-    ASSERT_TRUE(endpoints.is_ok());
-    auto [client, server] = std::move(endpoints.value());
+    auto [client, server] = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
     ASSERT_TRUE(input_device_->GetInputReportsReader(std::move(server)).ok());
     reader = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(client));
     mouse_.WaitForNextReader(zx::duration::infinite());
@@ -411,9 +393,7 @@ TEST_F(InputReportReaderTests, InitialReportTest) {
   // Get an InputReportsReader.
   fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader;
   {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-    ASSERT_TRUE(endpoints.is_ok());
-    auto [client, server] = std::move(endpoints.value());
+    auto [client, server] = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
     // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
     (void)input_device_->GetInputReportsReader(std::move(server));
     reader = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(client));

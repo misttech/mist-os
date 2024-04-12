@@ -22,12 +22,7 @@ int main(int argc, char* argv[]) {
   }
   auto& [memfs, root] = result.value();
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    fprintf(stderr, "Failed to create memfs endpoints: %s\n", endpoints.status_string());
-    return -1;
-  }
-  auto& [memfs_dir, server] = endpoints.value();
+  auto [memfs_dir, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   if (zx_status_t status = memfs->ServeDirectory(std::move(root), std::move(server));
       status != ZX_OK) {
@@ -47,12 +42,7 @@ int main(int argc, char* argv[]) {
   };
 
   for (const auto& [name, rights] : dirs) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (endpoints.is_error()) {
-      fprintf(stderr, "Failed to create endpoints: %s\n", endpoints.status_string());
-      return -1;
-    }
-    auto& [client, node_server] = endpoints.value();
+    auto [client, node_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     fidl::ServerEnd<fuchsia_io::Node> server(node_server.TakeChannel());
     if (fidl::Status result = fidl::WireCall(memfs_dir)->Clone(rights, std::move(server));
         !result.ok()) {

@@ -1137,14 +1137,13 @@ class FastbootRebootTest : public zxtest::Test {
   FastbootRebootTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     loop_.StartThread("fastboot-reboot-test-loop");
 
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    zx::result svc_local = component::ConnectAt<fuchsia_io::Directory>(endpoints->client, "svc");
+    zx::result svc_local = component::ConnectAt<fuchsia_io::Directory>(endpoints.client, "svc");
     ASSERT_OK(svc_local);
 
     svc_local_ = std::move(svc_local.value());
-    mock_.emplace(std::move(endpoints->server), state_);
+    mock_.emplace(std::move(endpoints.server), state_);
   }
 
   fidl::ClientEnd<fuchsia_io::Directory>& svc_chan() { return svc_local_; }
@@ -1305,14 +1304,13 @@ class FastbootFshostTest : public FastbootDownloadTest {
 
   FastbootFshostTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     loop_.StartThread("fastboot-fshost-test-loop");
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    zx::result svc_local = component::ConnectAt<fuchsia_io::Directory>(endpoints->client, "svc");
+    zx::result svc_local = component::ConnectAt<fuchsia_io::Directory>(endpoints.client, "svc");
     ASSERT_OK(svc_local);
 
     svc_local_ = std::move(svc_local.value());
-    mock_.emplace(std::move(endpoints->server), state_);
+    mock_.emplace(std::move(endpoints.server), state_);
   }
 
   fidl::ClientEnd<fuchsia_io::Directory>& svc_chan() { return svc_local_; }
@@ -1530,14 +1528,13 @@ class FastbootBuildInfoTest : public FastbootDownloadTest {
 
   FastbootBuildInfoTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     loop_.StartThread("fastboot-build-info-test-loop");
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    zx::result svc_local = component::ConnectAt<fuchsia_io::Directory>(endpoints->client, "svc");
+    zx::result svc_local = component::ConnectAt<fuchsia_io::Directory>(endpoints.client, "svc");
     ASSERT_OK(svc_local);
 
     svc_local_ = std::move(svc_local.value());
-    mock_.emplace(std::move(endpoints->server));
+    mock_.emplace(std::move(endpoints.server));
   }
 
   fidl::ClientEnd<fuchsia_io::Directory>& svc_chan() { return svc_local_; }

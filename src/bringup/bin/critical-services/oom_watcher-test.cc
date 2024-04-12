@@ -76,11 +76,10 @@ class OomWatcherTest : public zxtest::Test {
     // Give the fake a reference to the loop so it can quit the loop once it
     // receives the shutdown signal from the code under test.
     fake_power_manager_.SetLoop(&loop_);
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_power_statecontrol::Admin>();
-    ASSERT_OK(endpoints.status_value());
-    power_manager_client_ = std::move(endpoints->client);
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_power_statecontrol::Admin>::Create();
+    power_manager_client_ = std::move(endpoints.client);
     binding_ = fidl::ServerBindingRef<fuchsia_hardware_power_statecontrol::Admin>(
-        fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &fake_power_manager_));
+        fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), &fake_power_manager_));
 
     zx::eventpair::create(0, &kernel_oom_event_, &watcher_oom_event_);
     oom_watcher_.WatchForOom(this->loop_.dispatcher(), zx::event(watcher_oom_event_.get()),

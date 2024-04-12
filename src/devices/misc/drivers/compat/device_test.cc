@@ -588,11 +588,10 @@ TEST_F(DeviceTest, TestBind) {
   ASSERT_EQ(ZX_OK, device.Add(&args, &second_device));
   ASSERT_EQ(ZX_OK, second_device->CreateNode());
 
-  auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-  ASSERT_EQ(ZX_OK, dev_endpoints.status_value());
+  auto dev_endpoints = fidl::Endpoints<fuchsia_device::Controller>::Create();
 
-  fidl::BindServer(dispatcher(), std::move(dev_endpoints->server), second_device);
-  fidl::WireClient client{std::move(dev_endpoints->client), dispatcher()};
+  fidl::BindServer(dispatcher(), std::move(dev_endpoints.server), second_device);
+  fidl::WireClient client{std::move(dev_endpoints.client), dispatcher()};
 
   bool callback_called = false;
   client->Bind("gpt.so").Then(
@@ -642,11 +641,10 @@ TEST_F(DeviceTest, TestBindAlreadyBound) {
   second_device->Add(&args, &third_device);
   ASSERT_EQ(ZX_OK, third_device->CreateNode());
 
-  auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-  ASSERT_EQ(ZX_OK, dev_endpoints.status_value());
+  auto dev_endpoints = fidl::Endpoints<fuchsia_device::Controller>::Create();
 
-  fidl::BindServer(dispatcher(), std::move(dev_endpoints->server), second_device);
-  fidl::WireClient client{std::move(dev_endpoints->client), dispatcher()};
+  fidl::BindServer(dispatcher(), std::move(dev_endpoints.server), second_device);
+  fidl::WireClient client{std::move(dev_endpoints.client), dispatcher()};
 
   bool got_reply = false;
   client->Bind("gpt.so").Then(
@@ -684,11 +682,10 @@ TEST_F(DeviceTest, TestRebind) {
 
   bool got_reply = false;
 
-  auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-  ASSERT_EQ(ZX_OK, dev_endpoints.status_value());
+  auto dev_endpoints = fidl::Endpoints<fuchsia_device::Controller>::Create();
 
-  fidl::BindServer(dispatcher(), std::move(dev_endpoints->server), second_device);
-  fidl::WireClient client{std::move(dev_endpoints->client), dispatcher()};
+  fidl::BindServer(dispatcher(), std::move(dev_endpoints.server), second_device);
+  fidl::WireClient client{std::move(dev_endpoints.client), dispatcher()};
 
   client->Rebind("gpt.so").Then(
       [&got_reply](fidl::WireUnownedResult<fuchsia_device::Controller::Rebind>& result) {

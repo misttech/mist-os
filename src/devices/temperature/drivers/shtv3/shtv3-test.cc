@@ -101,12 +101,11 @@ TEST_F(Shtv3Test, ReadTemperature) {
   ASSERT_OK(fdf::RunOnDispatcherSync(
       i2c_loop_.dispatcher(), [this]() { EXPECT_EQ(fake_i2c_->state(), FakeShtv3Device::kIdle); }));
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_temperature::Device>();
-  EXPECT_TRUE(endpoints.is_ok());
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_temperature::Device>::Create();
 
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &dut);
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), &dut);
 
-  fidl::WireClient<fuchsia_hardware_temperature::Device> client(std::move(endpoints->client),
+  fidl::WireClient<fuchsia_hardware_temperature::Device> client(std::move(endpoints.client),
                                                                 loop.dispatcher());
 
   client->GetTemperatureCelsius().Then([&loop](auto& result) {
@@ -130,12 +129,11 @@ TEST_F(Shtv3Test, GetSensorName) {
   Shtv3Device dut(nullptr, std::move(i2c_client_), kSensorName);
   EXPECT_OK(dut.Init());
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_temperature::Device>();
-  EXPECT_TRUE(endpoints.is_ok());
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_temperature::Device>::Create();
 
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &dut);
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), &dut);
 
-  fidl::WireClient<fuchsia_hardware_temperature::Device> client(std::move(endpoints->client),
+  fidl::WireClient<fuchsia_hardware_temperature::Device> client(std::move(endpoints.client),
                                                                 loop.dispatcher());
 
   client->GetSensorName().Then([&](auto& result) {

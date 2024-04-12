@@ -87,9 +87,7 @@ TEST_F(UsbCdcAcmTest, ReadAndWriteTest) {
   zx::result result = component::ConnectAt<fuchsia_hardware_serial::DeviceProxy>(
       fdio_cpp::UnownedFdioCaller(bus_->GetRootFd()).directory(), devpath_.c_str());
   ASSERT_OK(result.status_value());
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_serial::Device>();
-  ASSERT_OK(endpoints);
-  auto& [client_end, server] = endpoints.value();
+  auto [client_end, server] = fidl::Endpoints<fuchsia_hardware_serial::Device>::Create();
   ASSERT_OK(fidl::WireCall(result.value())->GetChannel(std::move(server)));
 
   auto assert_read_with_timeout = [&client_end = client_end](cpp20::span<uint8_t> write_data) {

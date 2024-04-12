@@ -674,12 +674,7 @@ int iochk(int argc, char** argv) {
       return -1;
     }
 
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Session>();
-    if (endpoints.is_error()) {
-      fprintf(stderr, "error: cannot create endpoints for device: %s\n", endpoints.status_string());
-      return endpoints.status_value();
-    }
-    auto& [client, server] = endpoints.value();
+    auto [client, server] = fidl::Endpoints<fuchsia_hardware_block::Session>::Create();
     if (fidl::Status result = fidl::WireCall(ctx.BorrowBlock())->OpenSession(std::move(server));
         !result.ok()) {
       fprintf(stderr, "error: cannot open session for device: %s\n",

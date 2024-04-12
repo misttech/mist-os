@@ -161,13 +161,12 @@ class HidDeviceTest : public zxtest::Test {
   }
 
   void SetupInstanceDriver() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::Device>();
-    ASSERT_OK(endpoints.status_value());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_input::Device>::Create();
 
     ASSERT_OK(device_->CreateInstance(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                      std::move(endpoints->server)));
+                                      std::move(endpoints.server)));
 
-    sync_client_ = fidl::WireSyncClient(std::move(endpoints->client));
+    sync_client_ = fidl::WireSyncClient(std::move(endpoints.client));
 
     RunSyncClientTask([&]() {
       auto result = sync_client_->GetReportsEvent();
@@ -726,14 +725,13 @@ TEST_F(HidDeviceTest, DeviceReportReaderSingleReport) {
 
   fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader> reader;
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::DeviceReportsReader>();
-    ASSERT_OK(endpoints);
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_input::DeviceReportsReader>::Create();
 
     RunSyncClientTask([&]() {
-      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints->server));
+      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints.server));
       ASSERT_OK(result.status());
       reader = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
-          std::move(endpoints->client));
+          std::move(endpoints.client));
     });
   }
 
@@ -764,14 +762,13 @@ TEST_F(HidDeviceTest, DeviceReportReaderDoubleReport) {
 
   fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader> reader;
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::DeviceReportsReader>();
-    ASSERT_OK(endpoints);
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_input::DeviceReportsReader>::Create();
 
     RunSyncClientTask([&]() {
-      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints->server));
+      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints.server));
       ASSERT_OK(result.status());
       reader = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
-          std::move(endpoints->client));
+          std::move(endpoints.client));
     });
   }
 
@@ -807,24 +804,22 @@ TEST_F(HidDeviceTest, DeviceReportReaderTwoClients) {
   fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader> reader1;
   fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader> reader2;
   {
-    zx::result endpoints1 = fidl::CreateEndpoints<fuchsia_hardware_input::DeviceReportsReader>();
-    ASSERT_OK(endpoints1);
+    auto endpoints1 = fidl::Endpoints<fuchsia_hardware_input::DeviceReportsReader>::Create();
 
     RunSyncClientTask([&]() {
-      auto result1 = sync_client_->GetDeviceReportsReader(std::move(endpoints1->server));
+      auto result1 = sync_client_->GetDeviceReportsReader(std::move(endpoints1.server));
       ASSERT_OK(result1.status());
       reader1 = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
-          std::move(endpoints1->client));
+          std::move(endpoints1.client));
     });
 
-    zx::result endpoints2 = fidl::CreateEndpoints<fuchsia_hardware_input::DeviceReportsReader>();
-    ASSERT_OK(endpoints2);
+    auto endpoints2 = fidl::Endpoints<fuchsia_hardware_input::DeviceReportsReader>::Create();
 
     RunSyncClientTask([&]() {
-      auto result2 = sync_client_->GetDeviceReportsReader(std::move(endpoints2->server));
+      auto result2 = sync_client_->GetDeviceReportsReader(std::move(endpoints2.server));
       ASSERT_OK(result2.status());
       reader2 = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
-          std::move(endpoints2->client));
+          std::move(endpoints2.client));
     });
   }
 
@@ -865,14 +860,13 @@ TEST_F(HidDeviceTest, DeviceReportReaderOneAndAHalfReports) {
 
   fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader> reader;
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::DeviceReportsReader>();
-    ASSERT_OK(endpoints);
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_input::DeviceReportsReader>::Create();
 
     RunSyncClientTask([&]() {
-      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints->server));
+      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints.server));
       ASSERT_OK(result.status());
       reader = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
-          std::move(endpoints->client));
+          std::move(endpoints.client));
     });
   }
 
@@ -907,14 +901,13 @@ TEST_F(HidDeviceTest, DeviceReportReaderHangingGet) {
 
   fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader> reader;
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::DeviceReportsReader>();
-    ASSERT_OK(endpoints);
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_input::DeviceReportsReader>::Create();
 
     RunSyncClientTask([&]() {
-      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints->server));
+      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints.server));
       ASSERT_OK(result.status());
       reader = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
-          std::move(endpoints->client));
+          std::move(endpoints.client));
     });
   }
 

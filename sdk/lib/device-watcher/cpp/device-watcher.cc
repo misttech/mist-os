@@ -21,11 +21,7 @@ namespace device_watcher {
 namespace {
 zx::result<fidl::ClientEnd<fuchsia_io::DirectoryWatcher>> Watch(
     fidl::UnownedClientEnd<fuchsia_io::Directory> dir) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::DirectoryWatcher>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::DirectoryWatcher>::Create();
   const fidl::WireResult result =
       fidl::WireCall(dir)->Watch(fuchsia_io::wire::WatchMask::kRemoved, 0, std::move(server));
   if (!result.ok()) {
@@ -240,11 +236,7 @@ zx::result<zx::channel> RecursiveWaitForFile(const char* path, zx::duration time
 
 zx::result<> WatchDirectoryForItems(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
                                     ItemCallback callback) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::DirectoryWatcher>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::DirectoryWatcher>::Create();
 
   auto watch_mask = fuchsia_io::wire::WatchMask::kAdded | fuchsia_io::wire::WatchMask::kExisting;
   const fidl::WireResult result = fidl::WireCall(dir)->Watch(watch_mask, 0, std::move(server));

@@ -126,10 +126,9 @@ class FanControllerTest : public zxtest::Test {
     ASSERT_EQ(vfs_.Serve(dir_, std::move(channel0), fs::VnodeConnectionOptions::ReadOnly()), ZX_OK);
     ASSERT_EQ(fdio_ns_bind(ns_, fan_controller::kFanDirectory, channel1.release()), ZX_OK);
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_thermal::ClientStateConnector>();
-    EXPECT_OK(endpoints);
-    client_state_.emplace(std::move(endpoints->server));
-    client_end_ = std::move(endpoints->client);
+    auto endpoints = fidl::Endpoints<fuchsia_thermal::ClientStateConnector>::Create();
+    client_state_.emplace(std::move(endpoints.server));
+    client_end_ = std::move(endpoints.client);
   }
 
   void TearDown() override {

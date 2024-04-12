@@ -318,8 +318,7 @@ class SpiDeviceTest : public zxtest::Test {
     // TODO(https://fxbug.dev/42075363): Migrate test to use dispatcher integration.
     parent_ = MockDevice::FakeRootParent();
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
     ns_.SyncCall([&](IncomingNamespace* ns) {
       auto service_result = ns->outgoing.AddService<fuchsia_hardware_spiimpl::Service>(
@@ -328,10 +327,10 @@ class SpiDeviceTest : public zxtest::Test {
           }));
       ZX_ASSERT(service_result.is_ok());
 
-      ZX_ASSERT(ns->outgoing.Serve(std::move(endpoints->server)).is_ok());
+      ZX_ASSERT(ns->outgoing.Serve(std::move(endpoints.server)).is_ok());
     });
 
-    parent_->AddFidlService(fuchsia_hardware_spiimpl::Service::Name, std::move(endpoints->client));
+    parent_->AddFidlService(fuchsia_hardware_spiimpl::Service::Name, std::move(endpoints.client));
     SetSpiChannelMetadata(0, kSpiChannels, std::size(kSpiChannels));
     parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kTestBusId, sizeof(kTestBusId));
   }
@@ -415,9 +414,7 @@ TEST_F(SpiDeviceTest, SpiTest) {
   for (auto it = spi_bus->children().begin(); it != spi_bus->children().end(); it++, i++) {
     set_current_test_cs(i);
 
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Device>();
-    ASSERT_OK(endpoints);
-    auto& [client, server] = endpoints.value();
+    auto [client, server] = fidl::Endpoints<fuchsia_hardware_spi::Device>::Create();
     fidl::BindServer(dispatcher_->async_dispatcher(), std::move(server),
                      (*it)->GetDeviceContext<SpiChild>());
 
@@ -837,15 +834,11 @@ TEST_F(SpiDeviceTest, OneClient) {
 
   // OpenSession should fail when another client is connected.
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Controller>();
-    ASSERT_OK(endpoints);
-    auto& [controller, server] = endpoints.value();
+    auto [controller, server] = fidl::Endpoints<fuchsia_hardware_spi::Controller>::Create();
     fidl::BindServer(dispatcher_->async_dispatcher(), std::move(server),
                      spi_child->GetDeviceContext<SpiChild>());
     {
-      zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Device>();
-      ASSERT_OK(endpoints);
-      auto& [device, server] = endpoints.value();
+      auto [device, server] = fidl::Endpoints<fuchsia_hardware_spi::Device>::Create();
       ASSERT_OK(fidl::WireCall(controller)->OpenSession(std::move(server)));
       ASSERT_STATUS(fidl::WireCall(device)->CanAssertCs(), ZX_ERR_PEER_CLOSED);
     }
@@ -856,9 +849,7 @@ TEST_F(SpiDeviceTest, OneClient) {
 
   fidl::ClientEnd<fuchsia_hardware_spi::Device> device;
   while (true) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Controller>();
-    ASSERT_OK(endpoints);
-    auto& [controller, server] = endpoints.value();
+    auto [controller, server] = fidl::Endpoints<fuchsia_hardware_spi::Controller>::Create();
     fidl::BindServer(dispatcher_->async_dispatcher(), std::move(server),
                      spi_child->GetDeviceContext<SpiChild>());
     {
@@ -884,15 +875,11 @@ TEST_F(SpiDeviceTest, OneClient) {
   }
 
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Controller>();
-    ASSERT_OK(endpoints);
-    auto& [controller, server] = endpoints.value();
+    auto [controller, server] = fidl::Endpoints<fuchsia_hardware_spi::Controller>::Create();
     fidl::BindServer(dispatcher_->async_dispatcher(), std::move(server),
                      spi_child->GetDeviceContext<SpiChild>());
     {
-      zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Device>();
-      ASSERT_OK(endpoints);
-      auto& [device, server] = endpoints.value();
+      auto [device, server] = fidl::Endpoints<fuchsia_hardware_spi::Device>::Create();
       ASSERT_OK(fidl::WireCall(controller)->OpenSession(std::move(server)));
       ASSERT_STATUS(fidl::WireCall(device)->CanAssertCs(), ZX_ERR_PEER_CLOSED);
     }

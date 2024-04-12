@@ -116,11 +116,7 @@ zx_status_t InputDeviceAdded(int dirfd, int event, const char* name, void* cooki
   if (controller.is_error()) {
     return controller.error_value();
   }
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::Device>();
-  if (endpoints.is_error()) {
-    return endpoints.error_value();
-  }
-  auto& [device, server] = endpoints.value();
+  auto [device, server] = fidl::Endpoints<fuchsia_hardware_input::Device>::Create();
   const fidl::Status status = fidl::WireCall(controller.value())->OpenSession(std::move(server));
   if (!status.ok()) {
     return status.status();

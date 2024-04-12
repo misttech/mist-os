@@ -50,20 +50,19 @@ class Server final : public fidl::testing::WireTestBase<fuchsia_io::Directory> {
 };
 
 TEST(WatcherTest, WatchInvalidCallback) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   Server server([](fuchsia_io::wire::WatchMask mask, uint32_t options,
                    fidl::ServerEnd<fuchsia_io::DirectoryWatcher> watcher,
                    fidl::WireServer<fuchsia_io::Directory>::WatchCompleter::Sync& completer) {});
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &server);
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), &server);
   ASSERT_OK(loop.StartThread("fake-directory-server"));
 
   fbl::unique_fd directory;
   ASSERT_OK(
-      fdio_fd_create(endpoints->client.channel().release(), directory.reset_and_get_address()));
+      fdio_fd_create(endpoints.client.channel().release(), directory.reset_and_get_address()));
 
   ASSERT_STATUS(fdio_watch_directory(directory.get(), nullptr, ZX_TIME_INFINITE, nullptr),
                 ZX_ERR_INVALID_ARGS);
@@ -72,8 +71,7 @@ TEST(WatcherTest, WatchInvalidCallback) {
 }
 
 TEST(WatcherTest, Smoke) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   Server server([](fuchsia_io::wire::WatchMask mask, uint32_t options,
                    fidl::ServerEnd<fuchsia_io::DirectoryWatcher> watcher,
@@ -103,12 +101,12 @@ TEST(WatcherTest, Smoke) {
         0, bytes, static_cast<uint32_t>(std::distance(std::begin(bytes), it)), nullptr, 0));
   });
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &server);
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), &server);
   ASSERT_OK(loop.StartThread("fake-directory-server"));
 
   fbl::unique_fd directory;
   ASSERT_OK(
-      fdio_fd_create(endpoints->client.channel().release(), directory.reset_and_get_address()));
+      fdio_fd_create(endpoints.client.channel().release(), directory.reset_and_get_address()));
 
   std::vector<std::pair<int, std::string>> events;
   ASSERT_STATUS(fdio_watch_directory(

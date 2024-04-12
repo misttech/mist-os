@@ -40,9 +40,7 @@ TEST(DeviceWatcherTest, Smoke) {
   ASSERT_OK(first->AddEntry("second", std::move(second)));
   ASSERT_OK(first->AddEntry("file", file));
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   fs::ManagedVfs vfs(loop.dispatcher());
   ASSERT_OK(vfs.ServeDirectory(first, std::move(server)));
@@ -79,9 +77,7 @@ TEST(DeviceWatcherTest, WatchDirectory) {
   ASSERT_OK(first->AddEntry(file1_name, file));
   ASSERT_OK(first->AddEntry(file2_name, file));
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   fs::ManagedVfs vfs(loop.dispatcher());
   ASSERT_OK(vfs.ServeDirectory(first, std::move(server)));
@@ -121,9 +117,7 @@ TEST(DeviceWatcherTest, WatchDirectoryTemplate) {
   ASSERT_OK(first->AddEntry(file1_name, file));
   ASSERT_OK(first->AddEntry(file2_name, file));
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   fs::ManagedVfs vfs(loop.dispatcher());
   ASSERT_OK(vfs.ServeDirectory(first, std::move(server)));
@@ -170,9 +164,7 @@ TEST(DeviceWatcherTest, DirWatcherWaitForRemoval) {
   ASSERT_OK(first->AddEntry("second", second));
   ASSERT_OK(first->AddEntry("file", file));
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   fs::ManagedVfs vfs(loop.dispatcher());
   ASSERT_OK(vfs.ServeDirectory(first, std::move(server)));
@@ -216,9 +208,7 @@ TEST(DeviceWatcherTest, DirWatcherVerifyUnowned) {
   auto first = fbl::MakeRefCounted<fs::PseudoDir>();
   ASSERT_OK(first->AddEntry("file", file));
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   fs::ManagedVfs vfs(loop.dispatcher());
   ASSERT_OK(vfs.ServeDirectory(first, std::move(server)));

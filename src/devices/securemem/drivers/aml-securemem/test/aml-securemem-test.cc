@@ -96,10 +96,9 @@ class AmlogicSecureMemTest : public zxtest::Test {
     pdev_.SyncCall(&fake_pdev::FakePDevFidl::SetConfig, std::move(config));
     auto pdev_handler = pdev_.SyncCall(&fake_pdev::FakePDevFidl::GetInstanceHandler,
                                        async_patterns::PassDispatcher);
-    auto pdev_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(pdev_endpoints.is_ok());
+    auto pdev_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                          std::move(pdev_endpoints->client), "pdev");
+                          std::move(pdev_endpoints.client), "pdev");
 
     // Create sysmem fragment
     auto sysmem_handler = sysmem_.SyncCall(&FakeSysmem::CreateInstanceHandler);
@@ -110,14 +109,13 @@ class AmlogicSecureMemTest : public zxtest::Test {
 
     // Create tee fragment
     auto tee_handler = tee_.SyncCall(&FakeTee::CreateInstanceHandler);
-    auto tee_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(tee_endpoints.is_ok());
-    root_->AddFidlService(fuchsia_hardware_tee::Service::Name, std::move(tee_endpoints->client),
+    auto tee_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    root_->AddFidlService(fuchsia_hardware_tee::Service::Name, std::move(tee_endpoints.client),
                           "tee");
 
-    outgoing_.SyncCall([pdev_server = std::move(pdev_endpoints->server),
+    outgoing_.SyncCall([pdev_server = std::move(pdev_endpoints.server),
                         sysmem_server = std::move(sysmem_endpoints->server),
-                        tee_server = std::move(tee_endpoints->server),
+                        tee_server = std::move(tee_endpoints.server),
                         pdev_handler = std::move(pdev_handler),
                         sysmem_handler = std::move(sysmem_handler),
                         tee_handler = std::move(tee_handler)](

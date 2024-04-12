@@ -203,11 +203,10 @@ class TpmTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_tp
   }
 
   fidl::WireSyncClient<fuchsia_tpm::TpmDevice> GetTpmClient() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_tpm::TpmDevice>();
-    ZX_ASSERT(endpoints.status_value() == ZX_OK);
+    auto endpoints = fidl::Endpoints<fuchsia_tpm::TpmDevice>::Create();
     tpm::TpmDevice* tpm = fake_root_->GetLatestChild()->GetDeviceContext<tpm::TpmDevice>();
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), tpm);
-    fidl::WireSyncClient<fuchsia_tpm::TpmDevice> client(std::move(endpoints->client));
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), tpm);
+    fidl::WireSyncClient<fuchsia_tpm::TpmDevice> client(std::move(endpoints.client));
 
     return client;
   }

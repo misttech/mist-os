@@ -91,11 +91,10 @@ TEST_F(IntegrationTest, ParentValuesObserved) {
   child_ref.collection(kCollectionName);
   child_ref.name(child_name);
 
-  auto exposed_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ZX_ASSERT(!exposed_endpoints.is_error());
-  auto exposed_client = std::move(exposed_endpoints->client);
+  auto exposed_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  auto exposed_client = std::move(exposed_endpoints.client);
 
-  realm->OpenExposedDir({child_ref, std::move(exposed_endpoints->server)})
+  realm->OpenExposedDir({child_ref, std::move(exposed_endpoints.server)})
       .ThenExactlyOnce([this](fidl::Result<fuchsia_component::Realm::OpenExposedDir>& result) {
         if (!result.is_ok()) {
           FX_LOGS(ERROR) << "OpenExposedDir failed: " << result.error_value();
@@ -149,11 +148,10 @@ TEST_F(IntegrationTest, DefaultValuesObserved) {
   child_ref.collection(kCollectionName);
   child_ref.name(child_name);
 
-  auto exposed_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ZX_ASSERT(!exposed_endpoints.is_error());
-  auto exposed_client = std::move(exposed_endpoints->client);
+  auto exposed_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  auto exposed_client = std::move(exposed_endpoints.client);
 
-  realm->OpenExposedDir({child_ref, std::move(exposed_endpoints->server)})
+  realm->OpenExposedDir({child_ref, std::move(exposed_endpoints.server)})
       .ThenExactlyOnce([this](fidl::Result<fuchsia_component::Realm::OpenExposedDir>& result) {
         if (!result.is_ok()) {
           FX_LOGS(ERROR) << "OpenExposedDir failed: " << result.error_value();

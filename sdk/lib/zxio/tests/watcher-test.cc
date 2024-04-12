@@ -50,19 +50,18 @@ class Server final : public fidl::testing::WireTestBase<fuchsia_io::Directory> {
 };
 
 TEST(WatcherTest, WatchInvalidCallback) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   Server server([](fuchsia_io::wire::WatchMask mask, uint32_t options,
                    fidl::ServerEnd<fuchsia_io::DirectoryWatcher> watcher,
                    fidl::WireServer<fuchsia_io::Directory>::WatchCompleter::Sync& completer) {});
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &server);
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), &server);
   ASSERT_OK(loop.StartThread("fake-directory-server"));
 
   zxio_storage_t storage;
-  ASSERT_OK(zxio_create(endpoints->client.channel().release(), &storage));
+  ASSERT_OK(zxio_create(endpoints.client.channel().release(), &storage));
   zxio_t* io = &storage.io;
 
   ASSERT_STATUS(zxio_watch_directory(io, nullptr, ZX_TIME_INFINITE, nullptr), ZX_ERR_INVALID_ARGS);
@@ -71,8 +70,7 @@ TEST(WatcherTest, WatchInvalidCallback) {
 }
 
 TEST(WatcherTest, Smoke) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   Server server([](fuchsia_io::wire::WatchMask mask, uint32_t options,
                    fidl::ServerEnd<fuchsia_io::DirectoryWatcher> watcher,
@@ -102,11 +100,11 @@ TEST(WatcherTest, Smoke) {
         0, bytes, static_cast<uint32_t>(std::distance(std::begin(bytes), it)), nullptr, 0));
   });
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &server);
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), &server);
   ASSERT_OK(loop.StartThread("fake-directory-server"));
 
   zxio_storage_t storage;
-  ASSERT_OK(zxio_create(endpoints->client.channel().release(), &storage));
+  ASSERT_OK(zxio_create(endpoints.client.channel().release(), &storage));
   zxio_t* io = &storage.io;
 
   std::vector<std::pair<zxio_watch_directory_event_t, std::string>> events;

@@ -160,11 +160,7 @@ zx_status_t device_init(const fidl::WireSyncClient<peripheral::Device>& client,
 }
 
 zx_status_t device_clear_functions(const fidl::WireSyncClient<peripheral::Device>& client) {
-  zx::result endpoints = fidl::CreateEndpoints<peripheral::Events>();
-  if (endpoints.is_error()) {
-    return endpoints.error_value();
-  }
-  auto& [client_end, server_end] = endpoints.value();
+  auto [client_end, server_end] = fidl::Endpoints<peripheral::Events>::Create();
   auto set_result = client->SetStateChangeListener(std::move(client_end));
   if (set_result.status() != ZX_OK) {
     return set_result.status();

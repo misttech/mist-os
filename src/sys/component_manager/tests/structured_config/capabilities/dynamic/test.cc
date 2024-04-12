@@ -32,19 +32,17 @@ void CheckValues(fidl::SyncClient<test_config::Config>& client, ExpectedValues v
 
 void ConnectAndCheckValues(fidl::SyncClient<fuchsia_component::Realm>& realm,
                            fuchsia_component_decl::ChildRef child_ref, ExpectedValues values) {
-  zx::result exposed_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(exposed_endpoints);
+  auto exposed_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
   {
     fidl::Result result =
-        realm->OpenExposedDir({{std::move(child_ref), std::move(exposed_endpoints->server)}});
+        realm->OpenExposedDir({{std::move(child_ref), std::move(exposed_endpoints.server)}});
     ASSERT_TRUE(result.is_ok());
   }
 
-  zx::result config_endpoints = fidl::CreateEndpoints<test_config::Config>();
-  ASSERT_OK(config_endpoints);
-  ASSERT_OK(component::ConnectAt(exposed_endpoints->client, std::move(config_endpoints->server)));
+  auto config_endpoints = fidl::Endpoints<test_config::Config>::Create();
+  ASSERT_OK(component::ConnectAt(exposed_endpoints.client, std::move(config_endpoints.server)));
 
-  fidl::SyncClient config_client(std::move(config_endpoints->client));
+  fidl::SyncClient config_client(std::move(config_endpoints.client));
   ASSERT_NO_FATAL_FAILURE(CheckValues(config_client, values));
 }
 
@@ -275,22 +273,20 @@ TEST(Collection, CreateChild) {
   }});
   ASSERT_TRUE(result.is_ok(), "%s", result.error_value().FormatDescription().c_str());
 
-  zx::result exposed_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(exposed_endpoints);
+  auto exposed_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
   fuchsia_component_decl::ChildRef child_ref;
   child_ref.collection("collection");
   child_ref.name("test");
   {
     fidl::Result result =
-        client->OpenExposedDir({{child_ref, std::move(exposed_endpoints->server)}});
+        client->OpenExposedDir({{child_ref, std::move(exposed_endpoints.server)}});
     ASSERT_TRUE(result.is_ok());
   }
 
-  zx::result config_endpoints = fidl::CreateEndpoints<test_config::Config>();
-  ASSERT_OK(config_endpoints);
-  ASSERT_OK(component::ConnectAt(exposed_endpoints->client, std::move(config_endpoints->server)));
+  auto config_endpoints = fidl::Endpoints<test_config::Config>::Create();
+  ASSERT_OK(component::ConnectAt(exposed_endpoints.client, std::move(config_endpoints.server)));
 
-  fidl::SyncClient config_client(std::move(config_endpoints->client));
+  fidl::SyncClient config_client(std::move(config_endpoints.client));
   {
     fidl::Result result = config_client->Get();
     ASSERT_TRUE(result.is_ok(), "%s", result.error_value().FormatDescription().c_str());

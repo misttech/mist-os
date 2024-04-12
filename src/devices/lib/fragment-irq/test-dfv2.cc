@@ -27,15 +27,14 @@ class Dfv2Test : public gtest::TestLoopFixture, public fidl::Server<fint::Provid
         outgoing_.AddService<fuchsia_hardware_interrupt::Service>(std::move(handler), "irq001");
     ASSERT_TRUE(result.is_ok());
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_EQ(ZX_OK, endpoints.status_value());
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    ASSERT_EQ(ZX_OK, outgoing_.Serve(std::move(endpoints->server)).status_value());
+    ASSERT_EQ(ZX_OK, outgoing_.Serve(std::move(endpoints.server)).status_value());
 
     std::vector<fcr::ComponentNamespaceEntry> entries;
     entries.emplace_back(fcr::ComponentNamespaceEntry{{
         .path = "/",
-        .directory = std::move(endpoints->client),
+        .directory = std::move(endpoints.client),
     }});
 
     auto ns = fdf::Namespace::Create(entries);

@@ -194,10 +194,9 @@ class SkipBlockTest : public zxtest::Test {
   void InitializeFidlClient() {
     if (!client_) {
       ASSERT_EQ(fake_parent().child_count(), 1);
-      auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_skipblock::SkipBlock>();
-      ASSERT_OK(endpoints.status_value());
-      fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &dev());
-      client_.Bind(std::move(endpoints->client));
+      auto endpoints = fidl::Endpoints<fuchsia_hardware_skipblock::SkipBlock>::Create();
+      fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), &dev());
+      client_.Bind(std::move(endpoints.client));
     }
   }
 

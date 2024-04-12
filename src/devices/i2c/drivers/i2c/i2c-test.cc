@@ -42,12 +42,10 @@ class I2cMetadataTest : public zxtest::Test {
  protected:
   void CreateDevice(fi2c::I2CBusMetadata& metadata) {
     // Setup i2c impl parent
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
-    incoming_.SyncCall(&i2c::FakeIncomingNamespace::AddI2cImplService,
-                       std::move(endpoints->server));
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    incoming_.SyncCall(&i2c::FakeIncomingNamespace::AddI2cImplService, std::move(endpoints.server));
     fake_root_->AddFidlService(fuchsia_hardware_i2cimpl::Service::Name,
-                               std::move(endpoints->client));
+                               std::move(endpoints.client));
 
     // Setup metadata
     fit::result metadata_bytes = fidl::Persist(metadata);

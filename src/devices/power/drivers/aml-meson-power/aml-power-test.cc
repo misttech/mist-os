@@ -135,10 +135,9 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
   }
 
   fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> BindServer() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_pwm::Pwm>();
-    EXPECT_TRUE(endpoints.is_ok());
-    fidl::BindServer(async_get_default_dispatcher(), std::move(endpoints->server), this);
-    return fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>(std::move(endpoints->client));
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_pwm::Pwm>::Create();
+    fidl::BindServer(async_get_default_dispatcher(), std::move(endpoints.server), this);
+    return fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>(std::move(endpoints.client));
   }
 
   void VerifyAndClear() {
@@ -180,11 +179,10 @@ class FakeVregServer final : public fidl::testing::WireTestBase<fuchsia_hardware
   uint32_t voltage_step() const { return voltage_step_; }
 
   fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> BindServer() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_vreg::Vreg>();
-    EXPECT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_vreg::Vreg>::Create();
     binding_ref_ =
-        fidl::BindServer(async_get_default_dispatcher(), std::move(endpoints->server), this);
-    return std::move(endpoints->client);
+        fidl::BindServer(async_get_default_dispatcher(), std::move(endpoints.server), this);
+    return std::move(endpoints.client);
   }
 
  private:

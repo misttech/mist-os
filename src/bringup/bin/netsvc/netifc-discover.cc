@@ -38,13 +38,7 @@ struct Netdevice {
   static std::optional<Info> get_interface_if_matching(
       fidl::ClientEnd<fuchsia_hardware_network::DeviceInstance> instance,
       const std::string& filename) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Device>();
-    if (endpoints.is_error()) {
-      printf("netifc: failed to create netdevice endpoints %s: %s\n", filename.c_str(),
-             endpoints.status_string());
-      return std::nullopt;
-    }
-    auto& [client_end, server_end] = endpoints.value();
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_network::Device>::Create();
 
     {
       fidl::Status result = fidl::WireCall(instance)->GetDevice(std::move(server_end));
@@ -55,13 +49,8 @@ struct Netdevice {
       }
     }
 
-    zx::result watcher_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::PortWatcher>();
-    if (watcher_endpoints.is_error()) {
-      printf("netifc: failed to create netdevice port watcher endpoints %s: %s\n", filename.c_str(),
-             watcher_endpoints.status_string());
-      return std::nullopt;
-    }
-    auto& [watcher_client_end, watcher_server_end] = watcher_endpoints.value();
+    auto [watcher_client_end, watcher_server_end] =
+        fidl::Endpoints<fuchsia_hardware_network::PortWatcher>::Create();
 
     {
       fidl::Status result =
@@ -121,12 +110,8 @@ struct Netdevice {
               return;
           }
 
-          zx::result port_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Port>();
-          if (port_endpoints.is_error()) {
-            printf("netifc: failed to create port endpoints: %s\n", port_endpoints.status_string());
-            return;
-          }
-          auto [port_client_end, port_server_end] = std::move(port_endpoints.value());
+          auto [port_client_end, port_server_end] =
+              fidl::Endpoints<fuchsia_hardware_network::Port>::Create();
           {
             fidl::Status result = fidl::WireCall(dev)->GetPort(port_id, std::move(port_server_end));
             if (!result.ok()) {
@@ -168,14 +153,8 @@ struct Netdevice {
 
           // This is a good candidate port, but we need to retrieve the MAC
           // address.
-          zx::result mac_endpoints =
-              fidl::CreateEndpoints<fuchsia_hardware_network::MacAddressing>();
-          if (mac_endpoints.is_error()) {
-            printf("netifc: failed to create MacAddressing endpoints: %s\n",
-                   mac_endpoints.status_string());
-            return;
-          }
-          auto [mac_client_end, mac_server_end] = std::move(mac_endpoints.value());
+          auto [mac_client_end, mac_server_end] =
+              fidl::Endpoints<fuchsia_hardware_network::MacAddressing>::Create();
           {
             fidl::Status result =
                 fidl::WireCall(port_client_end)->GetMac(std::move(mac_server_end));

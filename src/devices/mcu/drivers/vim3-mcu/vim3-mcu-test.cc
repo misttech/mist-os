@@ -24,13 +24,12 @@ TEST(Vim3McuTest, FanLevel) {
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  EXPECT_TRUE(endpoints.is_ok());
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
 
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), &mock_i2c);
   EXPECT_OK(loop.StartThread());
 
-  ddk::I2cChannel i2c(std::move(endpoints->client));
+  ddk::I2cChannel i2c(std::move(endpoints.client));
   StmMcu device(nullptr, std::move(i2c));
   device.Init();
   mock_i2c.VerifyAndClear();
@@ -49,13 +48,12 @@ TEST(Vim3McuTest, PCIeEnabled) {
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  EXPECT_TRUE(endpoints.is_ok());
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
 
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &mock_i2c);
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), &mock_i2c);
   EXPECT_OK(loop.StartThread());
 
-  ddk::I2cChannel i2c(std::move(endpoints->client));
+  ddk::I2cChannel i2c(std::move(endpoints.client));
   StmMcu device(nullptr, std::move(i2c));
   device.Init();
   mock_i2c.VerifyAndClear();

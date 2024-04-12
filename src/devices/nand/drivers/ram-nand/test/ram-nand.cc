@@ -271,19 +271,18 @@ TEST(RamNandTest, Unlink) {
   NandParams params(kPageSize, kBlockSize, kNumBlocks, 6, 0);
   NandDevice* device(new NandDevice(params, fake_parent.get()));
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_nand::RamNand>();
-  ASSERT_TRUE(endpoints.is_ok());
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_nand::RamNand>::Create();
 
   async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
   loop.StartThread("fidl-thread");
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), device);
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints.server), device);
 
   // We need to DdkAdd the device, as Unlink will call DdkAsyncRemove.
   auto config = BuildConfig();
   ASSERT_OK(device->Bind(config));
   auto* child = fake_parent->GetLatestChild();
 
-  fidl::WireSyncClient client(std::move(endpoints->client));
+  fidl::WireSyncClient client(std::move(endpoints.client));
   {
     auto result = client->Unlink();
     ASSERT_OK(result.status());

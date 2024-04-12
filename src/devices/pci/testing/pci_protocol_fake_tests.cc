@@ -30,14 +30,13 @@ class FakePciProtocolTests : public zxtest::Test {
   void SetUp() final {
     fake_pci_.Reset();
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_pci::Device>();
-    ASSERT_OK(endpoints.status_value());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_pci::Device>::Create();
 
     fidl::BindServer(loop_.dispatcher(),
-                     fidl::ServerEnd<fuchsia_hardware_pci::Device>(endpoints->server.TakeChannel()),
+                     fidl::ServerEnd<fuchsia_hardware_pci::Device>(endpoints.server.TakeChannel()),
                      &fake_pci_);
 
-    pci_ = ddk::Pci(std::move(endpoints->client));
+    pci_ = ddk::Pci(std::move(endpoints.client));
     ASSERT_TRUE(pci_.is_valid());
 
     loop_.StartThread("pci-fidl-server-thread");

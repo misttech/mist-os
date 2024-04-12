@@ -137,9 +137,7 @@ TEST_F(HidDriverTest, BootMouseTest) {
   ASSERT_OK(input_client.status_value());
 
   // Open a FIDL channel to the HID device
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::Device>();
-  ASSERT_OK(endpoints);
-  auto& [device, server] = endpoints.value();
+  auto [device, server] = fidl::Endpoints<fuchsia_hardware_input::Device>::Create();
 
   ASSERT_OK(fidl::WireCall(input_client.value())->OpenSession(std::move(server)));
 
@@ -211,11 +209,10 @@ TEST_F(HidDriverTest, BootMouseTestInputReport) {
   ASSERT_OK(input_client.status_value());
   fidl::WireSyncClient client(std::move(input_client.value()));
 
-  auto reader_endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-  ASSERT_OK(reader_endpoints.status_value());
+  auto reader_endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
   auto reader = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(
-      std::move(reader_endpoints->client));
-  ASSERT_OK(client->GetInputReportsReader(std::move(reader_endpoints->server)).status());
+      std::move(reader_endpoints.client));
+  ASSERT_OK(client->GetInputReportsReader(std::move(reader_endpoints.server)).status());
 
   // Check the Descriptor.
   {

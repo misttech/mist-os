@@ -53,9 +53,7 @@ class LifecycleTest : public zxtest::Test {
     chan_ = fidl::ClientEnd<TestDevice>(std::move(channel.value()));
 
     // Subscribe to the device lifecycle events.
-    auto endpoints = fidl::CreateEndpoints<Lifecycle>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = *std::move(endpoints);
+    auto [local, remote] = fidl::Endpoints<Lifecycle>::Create();
 
     auto result = fidl::WireCall(chan_)->SubscribeToLifecycle(std::move(remote));
     ASSERT_OK(result.status());

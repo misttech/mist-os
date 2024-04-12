@@ -45,9 +45,7 @@ TEST_F(LoaderServiceTest, ConnectBindDone) {
 
   // Should be able to still make new connections.
   {
-    auto endpoints = fidl::CreateEndpoints<fldsvc::Loader>();
-    ASSERT_TRUE(endpoints.is_ok());
-    auto [client_end, server_end] = *std::move(endpoints);
+    auto [client_end, server_end] = fidl::Endpoints<fldsvc::Loader>::Create();
     loader->Bind(std::move(server_end));
     fidl::WireSyncClient<fldsvc::Loader> client(std::move(client_end));
     EXPECT_NO_FATAL_FAILURE(LoadObject(client, "libfoo.so", zx::ok("science")));
@@ -86,9 +84,7 @@ TEST_F(LoaderServiceTest, OpenConnectionsKeepLoaderAlive) {
   loader.reset();
 
   // Should still be able to Clone any open connection.
-  zx::result endpoints = fidl::CreateEndpoints<fldsvc::Loader>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fldsvc::Loader>::Create();
   auto result = client2->Clone(std::move(server));
   ASSERT_TRUE(result.ok());
   ASSERT_OK(result->rv);
@@ -204,9 +200,7 @@ TEST_F(LoaderServiceTest, ClonedConnectionHasDefaultConfig) {
   EXPECT_NO_FATAL_FAILURE(LoadObject(client, "libasan_only.so", zx::ok("lives")));
   EXPECT_NO_FATAL_FAILURE(LoadObject(client, "libno_san.so", zx::ok("matter")));
 
-  zx::result endpoints = fidl::CreateEndpoints<fldsvc::Loader>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client2, server] = endpoints.value();
+  auto [client2, server] = fidl::Endpoints<fldsvc::Loader>::Create();
   auto result = client->Clone(std::move(server));
   ASSERT_TRUE(result.ok());
   ASSERT_OK(result->rv);

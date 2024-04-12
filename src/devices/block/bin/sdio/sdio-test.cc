@@ -19,10 +19,9 @@ namespace {
 class SdioTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_sdio::Device> {
  public:
   SdioTest() : loop_(&kAsyncLoopConfigAttachToCurrentThread), arena_(fdf::Arena('S')) {
-    zx::result endpoints = fidl::CreateEndpoints<Device>();
-    ASSERT_OK(endpoints.status_value());
-    client_ = std::move(endpoints->client);
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), this);
+    auto endpoints = fidl::Endpoints<Device>::Create();
+    client_ = std::move(endpoints.client);
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), this);
     loop_.StartThread("sdio-test-loop");
   }
 

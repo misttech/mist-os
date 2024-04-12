@@ -44,20 +44,18 @@ class RebindChild : public fdf::DriverBase {
                     .Build();
 
     // Create endpoints of the `NodeController` for the node.
-    zx::result controller_endpoints =
-        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-    ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed: %s", controller_endpoints.status_string());
+    auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
     zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
     ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed: %s", node_endpoints.status_string());
 
     fidl::WireResult result = fidl::WireCall(node())->AddChild(
-        args, std::move(controller_endpoints->server), std::move(node_endpoints->server));
+        args, std::move(controller_endpoints.server), std::move(node_endpoints->server));
     if (!result.ok()) {
       FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
       return zx::error(result.status());
     }
-    controller_.Bind(std::move(controller_endpoints->client));
+    controller_.Bind(std::move(controller_endpoints.client));
     node_.Bind(std::move(node_endpoints->client));
     return zx::ok();
   }

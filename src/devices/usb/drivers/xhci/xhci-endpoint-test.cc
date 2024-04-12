@@ -45,10 +45,9 @@ class EndpointHarness : public zxtest::Test {
     EXPECT_OK(ep_->Init(nullptr, nullptr));
 
     // Connect client
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb_endpoint::Endpoint>();
-    ASSERT_TRUE(endpoints.is_ok());
-    ep_->Connect(ep_->dispatcher(), std::move(endpoints->server));
-    client_.Bind(std::move(endpoints->client), loop_.dispatcher(),
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_usb_endpoint::Endpoint>::Create();
+    ep_->Connect(ep_->dispatcher(), std::move(endpoints.server));
+    client_.Bind(std::move(endpoints.client), loop_.dispatcher(),
                  fidl::ObserveTeardown([&]() { sync_completion_signal(&client_unbound_); }));
   }
 

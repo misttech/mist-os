@@ -24,19 +24,18 @@ class PciTest : public zxtest::Test {
   void SetUp() override {
     loop_.StartThread("pci-fidl-server-thread");
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_pci::Device>();
-    EXPECT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_pci::Device>::Create();
 
     fake_pci_ = std::make_unique<pci::FakePciProtocol>();
     fake_pci_->CreateBar(bar_id_, zx_system_get_page_size(), /*is_mmio=*/true);
 
     binding_ = fidl::BindServer(
         loop_.dispatcher(),
-        fidl::ServerEnd<fuchsia_hardware_pci::Device>(endpoints->server.TakeChannel()),
+        fidl::ServerEnd<fuchsia_hardware_pci::Device>(endpoints.server.TakeChannel()),
         std::move(fake_pci_));
     EXPECT_TRUE(binding_.has_value());
 
-    client_ = std::move(endpoints->client);
+    client_ = std::move(endpoints.client);
   }
 
   void TearDown() override { loop_.Shutdown(); }

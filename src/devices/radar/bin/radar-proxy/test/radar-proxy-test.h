@@ -168,25 +168,22 @@ class RadarProxyTest : public zxtest::Test, public RadarDeviceConnector {
     ASSERT_OK(driver_loop_.StartThread("Radar driver"));
 
     {
-      zx::result endpoints =
-          fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReaderProvider>();
-      ASSERT_TRUE(endpoints.is_ok());
+      auto endpoints = fidl::Endpoints<fuchsia_hardware_radar::RadarBurstReaderProvider>::Create();
 
-      dut_client_.Bind(std::move(endpoints->client));
+      dut_client_.Bind(std::move(endpoints.client));
       EXPECT_TRUE(fdf::RunOnDispatcherSync(proxy_loop_.dispatcher(), [&]() {
-                    fidl::BindServer(proxy_loop_.dispatcher(), std::move(endpoints->server), &dut_);
+                    fidl::BindServer(proxy_loop_.dispatcher(), std::move(endpoints.server), &dut_);
                   }).is_ok());
     }
 
     {
-      zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-      ASSERT_TRUE(endpoints.is_ok());
+      auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-      outgoing_client_ = std::move(endpoints->client);
+      outgoing_client_ = std::move(endpoints.client);
       EXPECT_TRUE(fdf::RunOnDispatcherSync(proxy_loop_.dispatcher(), [&]() {
                     outgoing_.emplace(proxy_loop_.dispatcher());
                     EXPECT_TRUE(dut_.AddProtocols(&(*outgoing_)).is_ok());
-                    EXPECT_TRUE(outgoing_->Serve(std::move(endpoints->server)).is_ok());
+                    EXPECT_TRUE(outgoing_->Serve(std::move(endpoints.server)).is_ok());
                   }).is_ok());
     }
   }
@@ -213,13 +210,11 @@ class RadarProxyTest : public zxtest::Test, public RadarDeviceConnector {
 
   void ConnectToFirstRadarDevice(ConnectDeviceCallback connect_device) override {
     if (!provider_connect_fail_) {
-      zx::result endpoints =
-          fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReaderProvider>();
-      ASSERT_TRUE(endpoints.is_ok());
+      auto endpoints = fidl::Endpoints<fuchsia_hardware_radar::RadarBurstReaderProvider>::Create();
 
-      fake_driver_.Bind(std::move(endpoints->server));
+      fake_driver_.Bind(std::move(endpoints.server));
       // This may not succeed if we've told the radar driver to return errors for certain calls.
-      connect_device(std::move(endpoints->client));
+      connect_device(std::move(endpoints.client));
     }
 
     sync_completion_signal(&device_connected_);

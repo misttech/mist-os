@@ -35,11 +35,10 @@ class AmlUartHarness : public zxtest::Test {
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
     state_.set_irq_signaller(config.irqs[0].borrow());
 
-    zx::result pdev = fidl::CreateEndpoints<fuchsia_hardware_platform_device::Device>();
-    ASSERT_OK(pdev);
+    auto pdev = fidl::Endpoints<fuchsia_hardware_platform_device::Device>::Create();
     ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
     incoming_.SyncCall([config = std::move(config),
-                        server = std::move(pdev->server)](IncomingNamespace* infra) mutable {
+                        server = std::move(pdev.server)](IncomingNamespace* infra) mutable {
       infra->pdev_server.SetConfig(std::move(config));
       infra->pdev_server.Connect(std::move(server));
     });
@@ -47,7 +46,7 @@ class AmlUartHarness : public zxtest::Test {
 
     auto uart = std::make_unique<serial::AmlUartV1>(fake_parent_.get());
     zx_status_t status =
-        uart->Init(ddk::PDevFidl(std::move(pdev->client)), kSerialInfo, state_.GetMmio());
+        uart->Init(ddk::PDevFidl(std::move(pdev.client)), kSerialInfo, state_.GetMmio());
     ASSERT_OK(status);
     device_ = uart.get();
     // The AmlUart* is now owned by the fake_ddk.

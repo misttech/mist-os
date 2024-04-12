@@ -167,13 +167,7 @@ zx::result<fidl::ClientEnd<fuchsia_io::Node>> OpenObjectInDirectory(
   flags |= fuchsia_io::wire::OpenFlags::kDescribe;
 
   // Create temporary channel ends to make FIDL call
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
-  if (endpoints.is_error()) {
-    LOG(ERROR, "failed to create channel pair (status: %s)", endpoints.status_string());
-    return endpoints.take_error();
-  }
-
-  auto [client_end, server_end] = std::move(endpoints.value());
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Node>::Create();
 
   auto result = fidl::WireCall(root)->Open(flags, {}, fidl::StringView::FromExternal(path),
                                            std::move(server_end));

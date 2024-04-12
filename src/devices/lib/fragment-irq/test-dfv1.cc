@@ -26,12 +26,11 @@ class Dfv1Test : public gtest::TestLoopFixture, public fidl::Server<fint::Provid
     auto result = outgoing_.AddService<fuchsia_hardware_interrupt::Service>(std::move(handler));
     ASSERT_TRUE(result.is_ok());
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_EQ(ZX_OK, endpoints.status_value());
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    ASSERT_EQ(ZX_OK, outgoing_.Serve(std::move(endpoints->server)).status_value());
+    ASSERT_EQ(ZX_OK, outgoing_.Serve(std::move(endpoints.server)).status_value());
 
-    root_->AddFidlService(fint::Service::Name, std::move(endpoints->client), "irq001");
+    root_->AddFidlService(fint::Service::Name, std::move(endpoints.client), "irq001");
   }
 
   void Get(GetCompleter::Sync& completer) override {

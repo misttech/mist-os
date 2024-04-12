@@ -220,9 +220,7 @@ SerialDeviceTest::~SerialDeviceTest() { device_->DdkRelease(); }
 
 TEST_F(SerialDeviceTest, Read) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_serial::Device>();
-  ASSERT_OK(endpoints);
-  auto& [client_end, server] = endpoints.value();
+  auto [client_end, server] = fidl::Endpoints<fuchsia_hardware_serial::Device>::Create();
   fidl::BindServer(loop.dispatcher(), std::move(server), device());
   fidl::WireClient client(std::move(client_end), loop.dispatcher());
 
@@ -247,9 +245,7 @@ TEST_F(SerialDeviceTest, Read) {
 
 TEST_F(SerialDeviceTest, Write) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_serial::Device>();
-  ASSERT_OK(endpoints);
-  auto& [client_end, server] = endpoints.value();
+  auto [client_end, server] = fidl::Endpoints<fuchsia_hardware_serial::Device>::Create();
   fidl::BindServer(loop.dispatcher(), std::move(server), device());
   fidl::WireClient client(std::move(client_end), loop.dispatcher());
 

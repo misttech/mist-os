@@ -50,9 +50,7 @@ class UsbHidTest : public zxtest::Test {
     zx::result controller =
         component::ConnectAt<fuchsia_hardware_input::Controller>(caller.directory(), devpath_);
     ASSERT_OK(controller);
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::Device>();
-    ASSERT_OK(endpoints);
-    auto& [device, server] = endpoints.value();
+    auto [device, server] = fidl::Endpoints<fuchsia_hardware_input::Device>::Create();
     ASSERT_OK(fidl::WireCall(controller.value())->OpenSession(std::move(server)));
 
     sync_client_ = fidl::WireSyncClient<fuchsia_hardware_input::Device>(std::move(device));
@@ -120,9 +118,7 @@ class UsbHidTest : public zxtest::Test {
     const size_t last_slash = usb_hid_relpath.find_last_of('/');
     const std::string_view suffix = usb_hid_relpath.substr(last_slash + 1);
     std::string ifc_path{usb_hid_relpath.substr(0, last_slash)};
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
-    auto& [client_end, server_end] = endpoints.value();
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     ASSERT_OK(fdio_open_at(caller.directory().channel()->get(), ifc_path.c_str(),
                            static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
                            server_end.TakeChannel().release()));

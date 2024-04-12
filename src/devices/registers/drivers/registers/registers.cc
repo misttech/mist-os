@@ -188,19 +188,16 @@ zx::result<> RegistersDevice::CreateNode(Register<T>& reg) {
                   .properties(arena, std::move(properties))
                   .Build();
 
-  zx::result controller_endpoints =
-      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed to create controller endpoints: %s",
-                controller_endpoints.status_string());
+  auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
   {
     fidl::WireResult result =
-        fidl::WireCall(node())->AddChild(args, std::move(controller_endpoints->server), {});
+        fidl::WireCall(node())->AddChild(args, std::move(controller_endpoints.server), {});
     if (!result.ok()) {
       FDF_LOG(ERROR, "Failed to add child %s", result.FormatDescription().c_str());
       return zx::error(result.status());
     }
   }
-  reg.controller_.Bind(std::move(controller_endpoints->client));
+  reg.controller_.Bind(std::move(controller_endpoints.client));
 
   return zx::ok();
 }

@@ -122,12 +122,8 @@ zx::result<fidl::SyncClient<fuchsia_sysmem2::Allocator>> connect_to_sysmem_drive
 }
 
 zx_status_t verify_connectivity_v2(fidl::SyncClient<fuchsia_sysmem2::Allocator>& allocator) {
-  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollection>();
-  EXPECT_TRUE(collection_endpoints.is_ok());
-  if (!collection_endpoints.is_ok()) {
-    return collection_endpoints.status_value();
-  }
-  auto [collection_client_end, collection_server_end] = std::move(*collection_endpoints);
+  auto [collection_client_end, collection_server_end] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
 
   fuchsia_sysmem2::AllocatorAllocateNonSharedCollectionRequest request;
   request.collection_request().emplace(std::move(collection_server_end));
@@ -171,12 +167,8 @@ make_single_participant_collection_v2() {
     return zx::error(allocator.status_value());
   }
 
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
-  EXPECT_TRUE(token_endpoints.is_ok());
-  if (!token_endpoints.is_ok()) {
-    return zx::error(token_endpoints.status_value());
-  }
-  auto [token_client_end, token_server_end] = std::move(*token_endpoints);
+  auto [token_client_end, token_server_end] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   fuchsia_sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
   allocate_shared_request.token_request() = std::move(token_server_end);
@@ -187,12 +179,8 @@ make_single_participant_collection_v2() {
     return zx::error(new_collection_result.error_value().status());
   }
 
-  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollection>();
-  EXPECT_TRUE(collection_endpoints.is_ok());
-  if (!collection_endpoints.is_ok()) {
-    return zx::error(collection_endpoints.status_value());
-  }
-  auto [collection_client_end, collection_server_end] = std::move(*collection_endpoints);
+  auto [collection_client_end, collection_server_end] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
 
   EXPECT_NE(token_client_end.channel().get(), ZX_HANDLE_INVALID);
   fuchsia_sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
@@ -214,9 +202,7 @@ make_single_participant_collection_v2() {
 fidl::SyncClient<v2::BufferCollectionToken> create_initial_token_v2() {
   zx::result allocator = connect_to_sysmem_service_v2();
   EXPECT_TRUE(allocator.is_ok());
-  zx::result token_endpoints_0 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  EXPECT_TRUE(token_endpoints_0.is_ok());
-  auto& [token_client_0, token_server_0] = token_endpoints_0.value();
+  auto [token_client_0, token_server_0] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
   v2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
   allocate_shared_request.token_request() = std::move(token_server_0);
   EXPECT_TRUE(allocator->AllocateSharedCollection(std::move(allocate_shared_request)).is_ok());
@@ -232,9 +218,8 @@ std::vector<fidl::SyncClient<v2::BufferCollection>> create_clients_v2(uint32_t c
   for (uint32_t i = 0; i < client_count; ++i) {
     auto cur_token = std::move(next_token);
     if (i < client_count - 1) {
-      zx::result token_endpoints = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-      EXPECT_TRUE(token_endpoints.is_ok());
-      auto& [token_client_endpoint, token_server_endpoint] = token_endpoints.value();
+      auto [token_client_endpoint, token_server_endpoint] =
+          fidl::Endpoints<v2::BufferCollectionToken>::Create();
 
       v2::BufferCollectionTokenDuplicateRequest duplicate_request;
       duplicate_request.rights_attenuation_mask() = ZX_RIGHT_SAME_RIGHTS;
@@ -243,9 +228,8 @@ std::vector<fidl::SyncClient<v2::BufferCollection>> create_clients_v2(uint32_t c
 
       next_token = fidl::SyncClient(std::move(token_client_endpoint));
     }
-    zx::result collection_endpoints = fidl::CreateEndpoints<v2::BufferCollection>();
-    EXPECT_TRUE(collection_endpoints.is_ok());
-    auto& [collection_client_endpoint, collection_server_endpoint] = collection_endpoints.value();
+    auto [collection_client_endpoint, collection_server_endpoint] =
+        fidl::Endpoints<v2::BufferCollection>::Create();
 
     v2::AllocatorBindSharedCollectionRequest bind_shared_request;
     bind_shared_request.token() = cur_token.TakeClientEnd();
@@ -265,9 +249,7 @@ std::vector<fidl::SyncClient<v2::BufferCollection>> create_clients_v2(uint32_t c
 
 fidl::SyncClient<v2::BufferCollectionToken> create_token_under_token_v2(
     fidl::SyncClient<v2::BufferCollectionToken>& token_a) {
-  zx::result token_endpoints = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  EXPECT_TRUE(token_endpoints.is_ok());
-  auto& [token_b_client, token_b_server] = token_endpoints.value();
+  auto [token_b_client, token_b_server] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
   v2::BufferCollectionTokenDuplicateRequest duplicate_request;
   duplicate_request.rights_attenuation_mask() = ZX_RIGHT_SAME_RIGHTS;
   duplicate_request.token_request() = std::move(token_b_server);
@@ -279,9 +261,7 @@ fidl::SyncClient<v2::BufferCollectionToken> create_token_under_token_v2(
 
 fidl::SyncClient<v2::BufferCollectionTokenGroup> create_group_under_token_v2(
     fidl::SyncClient<v2::BufferCollectionToken>& token) {
-  zx::result group_endpoints = fidl::CreateEndpoints<v2::BufferCollectionTokenGroup>();
-  EXPECT_TRUE(group_endpoints.is_ok());
-  auto& [group_client, group_server] = group_endpoints.value();
+  auto [group_client, group_server] = fidl::Endpoints<v2::BufferCollectionTokenGroup>::Create();
   v2::BufferCollectionTokenCreateBufferCollectionTokenGroupRequest create_group_request;
   create_group_request.group_request() = std::move(group_server);
   EXPECT_TRUE(token->CreateBufferCollectionTokenGroup(std::move(create_group_request)).is_ok());
@@ -293,9 +273,7 @@ fidl::SyncClient<v2::BufferCollectionTokenGroup> create_group_under_token_v2(
 fidl::SyncClient<v2::BufferCollectionToken> create_token_under_group_v2(
     fidl::SyncClient<v2::BufferCollectionTokenGroup>& group,
     uint32_t rights_attenuation_mask = ZX_RIGHT_SAME_RIGHTS) {
-  zx::result token_endpoints = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  EXPECT_OK(token_endpoints.status_value());
-  auto& [token_client, token_server] = token_endpoints.value();
+  auto [token_client, token_server] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
   v2::BufferCollectionTokenGroupCreateChildRequest create_child_request;
   create_child_request.token_request() = std::move(token_server);
   if (rights_attenuation_mask != ZX_RIGHT_SAME_RIGHTS) {
@@ -326,9 +304,7 @@ void check_group_alive_v2(fidl::SyncClient<v2::BufferCollectionTokenGroup>& grou
 fidl::SyncClient<v2::BufferCollection> convert_token_to_collection_v2(
     fidl::SyncClient<v2::BufferCollectionToken> token) {
   auto allocator = connect_to_sysmem_service_v2();
-  zx::result collection_endpoints = fidl::CreateEndpoints<v2::BufferCollection>();
-  EXPECT_TRUE(collection_endpoints.is_ok());
-  auto& [collection_client, collection_server] = collection_endpoints.value();
+  auto [collection_client, collection_server] = fidl::Endpoints<v2::BufferCollection>::Create();
   v2::AllocatorBindSharedCollectionRequest bind_shared_request;
   bind_shared_request.token() = token.TakeClientEnd();
   bind_shared_request.buffer_collection_request() = std::move(collection_server);
@@ -569,10 +545,7 @@ bool AttachTokenSucceedsV2(
   EXPECT_TRUE(allocator.is_ok());
   IF_FAILURES_RETURN_FALSE();
 
-  zx::result token_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  EXPECT_TRUE(token_endpoints_1.is_ok());
-  IF_FAILURES_RETURN_FALSE();
-  auto [token_client_1, token_server_1] = std::move(*token_endpoints_1);
+  auto [token_client_1, token_server_1] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
 
   // Client 1 creates a token and new LogicalBufferCollection using
   // AllocateSharedCollection().
@@ -581,10 +554,7 @@ bool AttachTokenSucceedsV2(
   EXPECT_TRUE(allocator->AllocateSharedCollection(std::move(allocate_shared_request)).is_ok());
   IF_FAILURES_RETURN_FALSE();
 
-  zx::result token_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  EXPECT_TRUE(token_endpoints_2.is_ok());
-  IF_FAILURES_RETURN_FALSE();
-  auto [token_client_2, token_server_2] = std::move(*token_endpoints_2);
+  auto [token_client_2, token_server_2] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
 
   // Client 1 duplicates its token and gives the duplicate to client 2 (this
   // test is single proc, so both clients are coming from this client
@@ -599,10 +569,7 @@ bool AttachTokenSucceedsV2(
 
   // Client 3 is attached later.
 
-  zx::result collection_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollection>();
-  EXPECT_TRUE(collection_endpoints_1.is_ok());
-  IF_FAILURES_RETURN_FALSE();
-  auto [collection_client_1, collection_server_1] = std::move(*collection_endpoints_1);
+  auto [collection_client_1, collection_server_1] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_1{std::move(collection_client_1)};
 
   EXPECT_NE(token_1.client_end().channel().get(), ZX_HANDLE_INVALID);
@@ -681,10 +648,7 @@ bool AttachTokenSucceedsV2(
   EXPECT_TRUE(allocator_2.is_ok());
   IF_FAILURES_RETURN_FALSE();
 
-  zx::result collection_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollection>();
-  EXPECT_TRUE(collection_endpoints_2.is_ok());
-  IF_FAILURES_RETURN_FALSE();
-  auto [collection_client_2, collection_server_2] = std::move(*collection_endpoints_2);
+  auto [collection_client_2, collection_server_2] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_2{std::move(collection_client_2)};
 
   // Just because we can, perform this sync as late as possible, just before
@@ -765,10 +729,8 @@ bool AttachTokenSucceedsV2(
     collection_3 = {};
     ZX_DEBUG_ASSERT(!collection_3.is_valid());
 
-    zx::result collection_endpoints_3 = fidl::CreateEndpoints<v2::BufferCollection>();
-    EXPECT_TRUE(collection_endpoints_3.is_ok());
-    IF_FAILURES_RETURN();
-    auto [collection_client_3, collection_server_3] = std::move(*collection_endpoints_3);
+    auto [collection_client_3, collection_server_3] =
+        fidl::Endpoints<v2::BufferCollection>::Create();
     collection_3 = fidl::SyncClient(std::move(collection_client_3));
 
     v2::AllocatorBindSharedCollectionRequest bind_shared_request;
@@ -1005,18 +967,16 @@ TEST(Sysmem, VerifyBufferCollectionTokenV2) {
   auto allocator = connect_to_sysmem_driver_v2();
   ASSERT_TRUE(allocator.is_ok());
 
-  auto token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints.is_ok());
-  auto [token_client, token_server] = std::move(*token_endpoints);
+  auto [token_client, token_server] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
   fidl::SyncClient token{std::move(token_client)};
 
   fuchsia_sysmem2::AllocatorAllocateSharedCollectionRequest request;
   request.token_request() = std::move(token_server);
   ASSERT_TRUE(allocator->AllocateSharedCollection(std::move(request)).is_ok());
 
-  auto token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
-  ASSERT_TRUE(token2_endpoints.is_ok());
-  auto [token2_client, token2_server] = std::move(*token2_endpoints);
+  auto [token2_client, token2_server] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
   fidl::SyncClient token2{std::move(token2_client)};
 
   fuchsia_sysmem2::BufferCollectionTokenDuplicateRequest duplicate_request;
@@ -1024,9 +984,8 @@ TEST(Sysmem, VerifyBufferCollectionTokenV2) {
   duplicate_request.token_request() = std::move(token2_server);
   ASSERT_TRUE(token->Duplicate(std::move(duplicate_request)).is_ok());
 
-  auto not_token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
-  ASSERT_TRUE(not_token_endpoints.is_ok());
-  auto [not_token_client, not_token_server] = std::move(*not_token_endpoints);
+  auto [not_token_client, not_token_server] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   ASSERT_TRUE(token->Sync().is_ok());
   ASSERT_TRUE(token2->Sync().is_ok());
@@ -1236,10 +1195,8 @@ TEST(Sysmem, AttachLifetimeTrackingV2) {
     ASSERT_TRUE(!!(pending_signals & ZX_EVENTPAIR_PEER_CLOSED) == (i >= kNumBuffers));
   }
 
-  zx::result attached_token_endpoints =
-      fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
-  ASSERT_TRUE(attached_token_endpoints.is_ok());
-  auto [attached_token_client, attached_token_server] = std::move(*attached_token_endpoints);
+  auto [attached_token_client, attached_token_server] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   fuchsia_sysmem2::BufferCollectionAttachTokenRequest attach_request;
   attach_request.rights_attenuation_mask() = std::numeric_limits<uint32_t>::max();
@@ -1526,9 +1483,8 @@ TEST(Sysmem, BufferNameV2) {
 
 TEST(Sysmem, NoTokenV2) {
   auto allocator = connect_to_sysmem_driver_v2();
-  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollection>();
-  ASSERT_TRUE(collection_endpoints.is_ok());
-  auto [collection_client_end, collection_server_end] = std::move(*collection_endpoints);
+  auto [collection_client_end, collection_server_end] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
   fidl::SyncClient collection{std::move(collection_client_end)};
 
   fuchsia_sysmem2::AllocatorAllocateNonSharedCollectionRequest allocate_non_shared_request;
@@ -1598,9 +1554,7 @@ TEST(Sysmem, NoSyncV2) {
   auto allocator_1 = connect_to_sysmem_driver_v2();
   ASSERT_OK(allocator_1);
 
-  auto token_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints_1);
-  auto [token_client_1, token_server_1] = std::move(*token_endpoints_1);
+  auto [token_client_1, token_server_1] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
   fidl::SyncClient token_1{std::move(token_client_1)};
 
   v2::AllocatorAllocateSharedCollectionRequest request;
@@ -1623,13 +1577,10 @@ TEST(Sysmem, NoSyncV2) {
   fidl::SyncClient<v2::BufferCollection> collection_3;
 
   {
-    auto token_endpoints_3 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-    ASSERT_OK(token_endpoints_3);
-    auto [token_client_3, token_server_3] = std::move(*token_endpoints_3);
+    auto [token_client_3, token_server_3] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
 
-    auto collection_endpoints_3 = fidl::CreateEndpoints<v2::BufferCollection>();
-    ASSERT_OK(collection_endpoints_3);
-    auto [collection_client_3, collection_server_3] = std::move(*collection_endpoints_3);
+    auto [collection_client_3, collection_server_3] =
+        fidl::Endpoints<v2::BufferCollection>::Create();
 
     v2::BufferCollectionTokenDuplicateRequest duplicate_request;
     duplicate_request.rights_attenuation_mask() = ZX_RIGHT_SAME_RIGHTS;
@@ -1652,14 +1603,10 @@ TEST(Sysmem, NoSyncV2) {
     ASSERT_TRUE(collection_3->SetName(std::move(set_name_request)).is_ok());
   }
 
-  auto token_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints_2);
-  auto [token_client_2, token_server_2] = std::move(*token_endpoints_2);
+  auto [token_client_2, token_server_2] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
   fidl::SyncClient token_2{std::move(token_client_2)};
 
-  auto collection_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_OK(collection_endpoints_1);
-  auto [collection_client_1, collection_server_1] = std::move(*collection_endpoints_1);
+  auto [collection_client_1, collection_server_1] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_1{std::move(collection_client_1)};
 
   const char* kClient2Name = "TestClient2";
@@ -1693,9 +1640,7 @@ TEST(Sysmem, NoSyncV2) {
 TEST(Sysmem, MultipleParticipantsV2) {
   auto allocator = connect_to_sysmem_driver_v2();
 
-  auto token_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints_1);
-  auto [token_client_1, token_server_1] = std::move(*token_endpoints_1);
+  auto [token_client_1, token_server_1] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
   fidl::SyncClient token_1{std::move(token_client_1)};
 
   // Client 1 creates a token and new LogicalBufferCollection using
@@ -1704,9 +1649,7 @@ TEST(Sysmem, MultipleParticipantsV2) {
   allocate_shared_request.token_request() = std::move(token_server_1);
   ASSERT_TRUE(allocator->AllocateSharedCollection(std::move(allocate_shared_request)).is_ok());
 
-  auto token_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints_2);
-  auto [token_client_2, token_server_2] = std::move(*token_endpoints_2);
+  auto [token_client_2, token_server_2] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
 
   // Client 1 duplicates its token and gives the duplicate to client 2 (this
   // test is single proc, so both clients are coming from this client
@@ -1717,9 +1660,7 @@ TEST(Sysmem, MultipleParticipantsV2) {
   duplicate_request.token_request() = std::move(token_server_2);
   ASSERT_TRUE(token_1->Duplicate(std::move(duplicate_request)).is_ok());
 
-  auto token_endpoints_3 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints_3);
-  auto [token_client_3, token_server_3] = std::move(*token_endpoints_3);
+  auto [token_client_3, token_server_3] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
 
   // Client 3 is used to test a participant that doesn't set any constraints
   // and only wants a notification that the allocation is done.
@@ -1728,9 +1669,7 @@ TEST(Sysmem, MultipleParticipantsV2) {
   duplicate_request2.token_request() = std::move(token_server_3);
   ASSERT_TRUE(token_1->Duplicate(std::move(duplicate_request2)).is_ok());
 
-  auto collection_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_OK(collection_endpoints_1);
-  auto [collection_client_1, collection_server_1] = std::move(*collection_endpoints_1);
+  auto [collection_client_1, collection_server_1] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_1{std::move(collection_client_1)};
 
   ASSERT_NE(token_1.client_end().channel().get(), ZX_HANDLE_INVALID);
@@ -1808,9 +1747,7 @@ TEST(Sysmem, MultipleParticipantsV2) {
   auto allocator_2 = connect_to_sysmem_driver_v2();
   ASSERT_OK(allocator_2);
 
-  auto collection_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_OK(collection_endpoints_2);
-  auto [collection_client_2, collection_server_2] = std::move(*collection_endpoints_2);
+  auto [collection_client_2, collection_server_2] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_2{std::move(collection_client_2)};
 
   // Just because we can, perform this sync as late as possible, just before
@@ -1838,9 +1775,7 @@ TEST(Sysmem, MultipleParticipantsV2) {
   bind_shared_request2.buffer_collection_request() = std::move(collection_server_2);
   ASSERT_TRUE(allocator_2->BindSharedCollection(std::move(bind_shared_request2)).is_ok());
 
-  auto collection_endpoints_3 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_OK(collection_endpoints_3);
-  auto [collection_client_3, collection_server_3] = std::move(*collection_endpoints_3);
+  auto [collection_client_3, collection_server_3] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_3{std::move(collection_client_3)};
 
   ASSERT_NE(token_client_3.channel().get(), ZX_HANDLE_INVALID);
@@ -1986,27 +1921,21 @@ TEST(Sysmem, MultipleParticipantsV2) {
 TEST(Sysmem, ComplicatedFormatModifiersV2) {
   auto allocator = connect_to_sysmem_driver_v2();
 
-  auto token_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints_1.is_ok());
-  auto [token_client_1, token_server_1] = std::move(*token_endpoints_1);
+  auto [token_client_1, token_server_1] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
   fidl::SyncClient token_1{std::move(token_client_1)};
 
   v2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
   allocate_shared_request.token_request() = std::move(token_server_1);
   ASSERT_TRUE(allocator->AllocateSharedCollection(std::move(allocate_shared_request)).is_ok());
 
-  auto token_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints_2.is_ok());
-  auto [token_client_2, token_server_2] = std::move(*token_endpoints_2);
+  auto [token_client_2, token_server_2] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
 
   v2::BufferCollectionTokenDuplicateRequest duplicate_request;
   duplicate_request.rights_attenuation_mask() = ZX_RIGHT_SAME_RIGHTS;
   duplicate_request.token_request() = std::move(token_server_2);
   ASSERT_TRUE(token_1->Duplicate(std::move(duplicate_request)).is_ok());
 
-  auto collection_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_TRUE(collection_endpoints_1.is_ok());
-  auto [collection_client_1, collection_server_1] = std::move(*collection_endpoints_1);
+  auto [collection_client_1, collection_server_1] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_1{std::move(collection_client_1)};
 
   ASSERT_NE(token_1.client_end().channel().get(), ZX_HANDLE_INVALID);
@@ -2069,9 +1998,7 @@ TEST(Sysmem, ComplicatedFormatModifiersV2) {
   set_constraints_request.constraints() = std::move(constraints_1);
   ASSERT_TRUE(collection_1->SetConstraints(std::move(set_constraints_request)).is_ok());
 
-  auto collection_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_TRUE(collection_endpoints_2.is_ok());
-  auto [collection_client_2, collection_server_2] = std::move(*collection_endpoints_2);
+  auto [collection_client_2, collection_server_2] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_2{std::move(collection_client_2)};
 
   ASSERT_TRUE(collection_1->Sync().is_ok());
@@ -2100,27 +2027,21 @@ TEST(Sysmem, ComplicatedFormatModifiersV2) {
 TEST(Sysmem, MultipleParticipantsColorspaceRankingV2) {
   auto allocator = connect_to_sysmem_driver_v2();
 
-  auto token_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints_1);
-  auto [token_client_1, token_server_1] = std::move(*token_endpoints_1);
+  auto [token_client_1, token_server_1] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
   fidl::SyncClient token_1{std::move(token_client_1)};
 
   v2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
   allocate_shared_request.token_request() = std::move(token_server_1);
   ASSERT_TRUE(allocator->AllocateSharedCollection(std::move(allocate_shared_request)).is_ok());
 
-  auto token_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints_2.is_ok());
-  auto [token_client_2, token_server_2] = std::move(*token_endpoints_2);
+  auto [token_client_2, token_server_2] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
 
   v2::BufferCollectionTokenDuplicateRequest duplicate_request;
   duplicate_request.rights_attenuation_mask() = ZX_RIGHT_SAME_RIGHTS;
   duplicate_request.token_request() = std::move(token_server_2);
   ASSERT_TRUE(token_1->Duplicate(std::move(duplicate_request)).is_ok());
 
-  auto collection_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_TRUE(collection_endpoints_1.is_ok());
-  auto [collection_client_1, collection_server_1] = std::move(*collection_endpoints_1);
+  auto [collection_client_1, collection_server_1] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_1{std::move(collection_client_1)};
 
   ASSERT_NE(token_1.client_end().channel().get(), ZX_HANDLE_INVALID);
@@ -2162,9 +2083,7 @@ TEST(Sysmem, MultipleParticipantsColorspaceRankingV2) {
   set_constraints_request.constraints() = std::move(constraints_1);
   ASSERT_TRUE(collection_1->SetConstraints(std::move(set_constraints_request)).is_ok());
 
-  auto collection_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_TRUE(collection_endpoints_2.is_ok());
-  auto [collection_client_2, collection_server_2] = std::move(*collection_endpoints_2);
+  auto [collection_client_2, collection_server_2] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_2{std::move(collection_client_2)};
 
   ASSERT_TRUE(collection_1->Sync().is_ok());
@@ -2328,9 +2247,7 @@ TEST(Sysmem,
 TEST(Sysmem, DuplicateSyncV2) {
   auto allocator = connect_to_sysmem_driver_v2();
 
-  auto token_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints_1.is_ok());
-  auto [token_client_1, token_server_1] = std::move(*token_endpoints_1);
+  auto [token_client_1, token_server_1] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
   fidl::SyncClient token_1{std::move(token_client_1)};
 
   v2::AllocatorAllocateSharedCollectionRequest allocate_non_shared_request;
@@ -2346,9 +2263,7 @@ TEST(Sysmem, DuplicateSyncV2) {
   ASSERT_EQ(duplicate_result->tokens()->size(), 1);
   auto token_client_2 = std::move(duplicate_result->tokens()->at(0));
 
-  auto collection_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_OK(collection_endpoints_1);
-  auto [collection_client_1, collection_server_1] = std::move(*collection_endpoints_1);
+  auto [collection_client_1, collection_server_1] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_1{std::move(collection_client_1)};
 
   ASSERT_NE(token_1.client_end().channel().get(), ZX_HANDLE_INVALID);
@@ -2380,9 +2295,8 @@ TEST(Sysmem, DuplicateSyncV2) {
   set_constraints_request.constraints() = std::move(constraints_1);
   ASSERT_TRUE(collection_1->SetConstraints(std::move(set_constraints_request)).is_ok());
 
-  auto collection_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_OK(collection_endpoints_2);
-  fidl::SyncClient collection_2{std::move(collection_endpoints_2->client)};
+  auto collection_endpoints_2 = fidl::Endpoints<v2::BufferCollection>::Create();
+  fidl::SyncClient collection_2{std::move(collection_endpoints_2.client)};
 
   fidl::SyncClient token_2{std::move(token_client_2)};
   // Remove write from last token
@@ -2399,16 +2313,15 @@ TEST(Sysmem, DuplicateSyncV2) {
 
   v2::AllocatorBindSharedCollectionRequest bind_shared_request2;
   bind_shared_request2.token() = token_2.TakeClientEnd();
-  bind_shared_request2.buffer_collection_request() = std::move(collection_endpoints_2->server);
+  bind_shared_request2.buffer_collection_request() = std::move(collection_endpoints_2.server);
   ASSERT_TRUE(allocator->BindSharedCollection(std::move(bind_shared_request2)).is_ok());
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request2;
   set_constraints_request2.constraints() = std::move(constraints_2);
   ASSERT_TRUE(collection_2->SetConstraints(std::move(set_constraints_request2)).is_ok());
 
-  auto collection_endpoints_3 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_TRUE(collection_endpoints_3.is_ok());
-  fidl::SyncClient collection_3{std::move(collection_endpoints_3->client)};
+  auto collection_endpoints_3 = fidl::Endpoints<v2::BufferCollection>::Create();
+  fidl::SyncClient collection_3{std::move(collection_endpoints_3.client)};
 
   auto collection_endpoints_4 = fidl::CreateEndpoints<v2::BufferCollection>();
   ASSERT_TRUE(collection_endpoints_4.is_ok());
@@ -2419,7 +2332,7 @@ TEST(Sysmem, DuplicateSyncV2) {
 
   v2::AllocatorBindSharedCollectionRequest bind_shared_request3;
   bind_shared_request3.token() = std::move(duplicate_result_2->tokens()->at(0));
-  bind_shared_request3.buffer_collection_request() = std::move(collection_endpoints_3->server);
+  bind_shared_request3.buffer_collection_request() = std::move(collection_endpoints_3.server);
   ASSERT_TRUE(allocator->BindSharedCollection(std::move(bind_shared_request3)).is_ok());
 
   ASSERT_NE(duplicate_result_2->tokens()->at(1).channel().get(), ZX_HANDLE_INVALID);
@@ -2467,27 +2380,21 @@ TEST(Sysmem, CloseWithOutstandingWaitV2) {
   auto allocator_1 = connect_to_sysmem_driver_v2();
   ASSERT_TRUE(allocator_1.is_ok());
 
-  auto token_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints_1.is_ok());
-  auto [token_client_1, token_server_1] = std::move(*token_endpoints_1);
+  auto [token_client_1, token_server_1] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
   fidl::SyncClient token_1{std::move(token_client_1)};
 
   v2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
   allocate_shared_request.token_request() = std::move(token_server_1);
   ASSERT_TRUE(allocator_1->AllocateSharedCollection(std::move(allocate_shared_request)).is_ok());
 
-  auto token_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints_2.is_ok());
-  auto [token_client_2, token_server_2] = std::move(*token_endpoints_2);
+  auto [token_client_2, token_server_2] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
 
   v2::BufferCollectionTokenDuplicateRequest duplicate_request;
   duplicate_request.rights_attenuation_mask() = ZX_RIGHT_SAME_RIGHTS;
   duplicate_request.token_request() = std::move(token_server_2);
   ASSERT_TRUE(token_1->Duplicate(std::move(duplicate_request)).is_ok());
 
-  auto collection_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_OK(collection_endpoints_1);
-  auto [collection_client_1, collection_server_1] = std::move(*collection_endpoints_1);
+  auto [collection_client_1, collection_server_1] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_1{std::move(collection_client_1)};
 
   ASSERT_NE(token_1.client_end().channel().get(), ZX_HANDLE_INVALID);
@@ -2526,9 +2433,7 @@ TEST(Sysmem, CloseWithOutstandingWaitV2) {
   // Try to wait until the wait has been processed by the server.
   zx_nanosleep(zx_deadline_after(ZX_SEC(5)));
 
-  auto collection_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_TRUE(collection_endpoints_2.is_ok());
-  auto [collection_client_2, collection_server_2] = std::move(*collection_endpoints_2);
+  auto [collection_client_2, collection_server_2] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_2{std::move(collection_client_2)};
 
   ASSERT_TRUE(collection_1->Sync().is_ok());
@@ -2550,9 +2455,7 @@ TEST(Sysmem, CloseWithOutstandingWaitV2) {
 TEST(Sysmem, ConstraintsRetainedBeyondReleaseV2) {
   auto allocator = connect_to_sysmem_driver_v2();
 
-  auto token_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints_1.is_ok());
-  auto [token_client_1, token_server_1] = std::move(*token_endpoints_1);
+  auto [token_client_1, token_server_1] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
   fidl::SyncClient token_1{std::move(token_client_1)};
 
   // Client 1 creates a token and new LogicalBufferCollection using
@@ -2562,9 +2465,7 @@ TEST(Sysmem, ConstraintsRetainedBeyondReleaseV2) {
   ASSERT_TRUE(
       allocator->AllocateSharedCollection(std::move(std::move(allocate_shared_request))).is_ok());
 
-  auto token_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints_2.is_ok());
-  auto [token_client_2, token_server_2] = std::move(*token_endpoints_2);
+  auto [token_client_2, token_server_2] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
 
   // Client 1 duplicates its token and gives the duplicate to client 2 (this
   // test is single proc, so both clients are coming from this client
@@ -2575,9 +2476,7 @@ TEST(Sysmem, ConstraintsRetainedBeyondReleaseV2) {
   duplicate_request.token_request() = std::move(token_server_2);
   ASSERT_TRUE(token_1->Duplicate(std::move(duplicate_request)).is_ok());
 
-  auto collection_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_TRUE(collection_endpoints_1.is_ok());
-  auto [collection_client_1, collection_server_1] = std::move(*collection_endpoints_1);
+  auto [collection_client_1, collection_server_1] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_1{std::move(collection_client_1)};
 
   ASSERT_NE(token_1.client_end().channel().get(), ZX_HANDLE_INVALID);
@@ -2620,9 +2519,7 @@ TEST(Sysmem, ConstraintsRetainedBeyondReleaseV2) {
   auto allocator_2 = connect_to_sysmem_driver_v2();
   ASSERT_TRUE(allocator_2.is_ok());
 
-  auto collection_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_TRUE(collection_endpoints_2.is_ok());
-  auto [collection_client_2, collection_server_2] = std::move(*collection_endpoints_2);
+  auto [collection_client_2, collection_server_2] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_2{std::move(collection_client_2)};
 
   // Just because we can, perform this sync as late as possible, just before
@@ -2901,27 +2798,21 @@ TEST(Sysmem, CpuUsageAndNoBufferMemoryConstraintsV2) {
   auto allocator_1 = connect_to_sysmem_driver_v2();
   ASSERT_TRUE(allocator_1.is_ok());
 
-  auto token_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints_1.is_ok());
-  auto [token_client_1, token_server_1] = std::move(*token_endpoints_1);
+  auto [token_client_1, token_server_1] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
   fidl::SyncClient token_1{std::move(token_client_1)};
 
   v2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
   allocate_shared_request.token_request() = std::move(token_server_1);
   ASSERT_TRUE(allocator_1->AllocateSharedCollection(std::move(allocate_shared_request)).is_ok());
 
-  auto token_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints_2.is_ok());
-  auto [token_client_2, token_server_2] = std::move(*token_endpoints_2);
+  auto [token_client_2, token_server_2] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
 
   v2::BufferCollectionTokenDuplicateRequest duplicate_request;
   duplicate_request.rights_attenuation_mask() = ZX_RIGHT_SAME_RIGHTS;
   duplicate_request.token_request() = std::move(token_server_2);
   ASSERT_TRUE(token_1->Duplicate(std::move(duplicate_request)).is_ok());
 
-  auto collection_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_TRUE(collection_endpoints_1.is_ok());
-  auto [collection_client_1, collection_server_1] = std::move(*collection_endpoints_1);
+  auto [collection_client_1, collection_server_1] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_1{std::move(collection_client_1)};
 
   ASSERT_NE(token_1.client_end().channel().get(), ZX_HANDLE_INVALID);
@@ -2964,9 +2855,7 @@ TEST(Sysmem, CpuUsageAndNoBufferMemoryConstraintsV2) {
   auto allocator_2 = connect_to_sysmem_driver_v2();
   ASSERT_TRUE(allocator_2.is_ok());
 
-  auto collection_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_TRUE(collection_endpoints_2.is_ok());
-  auto [collection_client_2, collection_server_2] = std::move(*collection_endpoints_2);
+  auto [collection_client_2, collection_server_2] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_2{std::move(collection_client_2)};
 
   ASSERT_TRUE(collection_1->Sync().is_ok());
@@ -3253,9 +3142,7 @@ TEST(Sysmem, NoneUsageAndOtherUsageFromSingleParticipantFailsV2) {
 TEST(Sysmem, NoneUsageWithSeparateOtherUsageSucceedsV2) {
   auto allocator = connect_to_sysmem_driver_v2();
 
-  auto token_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_OK(token_endpoints_1);
-  auto [token_client_1, token_server_1] = std::move(*token_endpoints_1);
+  auto [token_client_1, token_server_1] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
   fidl::SyncClient token_1{std::move(token_client_1)};
 
   // Client 1 creates a token and new LogicalBufferCollection using
@@ -3264,9 +3151,7 @@ TEST(Sysmem, NoneUsageWithSeparateOtherUsageSucceedsV2) {
   allocate_shared_request.token_request() = std::move(token_server_1);
   ASSERT_TRUE(allocator->AllocateSharedCollection(std::move(allocate_shared_request)).is_ok());
 
-  auto token_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints_2.is_ok());
-  auto [token_client_2, token_server_2] = std::move(*token_endpoints_2);
+  auto [token_client_2, token_server_2] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
 
   // Client 1 duplicates its token and gives the duplicate to client 2 (this
   // test is single proc, so both clients are coming from this client
@@ -3277,9 +3162,7 @@ TEST(Sysmem, NoneUsageWithSeparateOtherUsageSucceedsV2) {
   duplicate_request.token_request() = std::move(token_server_2);
   ASSERT_TRUE(token_1->Duplicate(std::move(duplicate_request)).is_ok());
 
-  auto collection_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_TRUE(collection_endpoints_1.is_ok());
-  auto [collection_client_1, collection_server_1] = std::move(*collection_endpoints_1);
+  auto [collection_client_1, collection_server_1] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_1{std::move(collection_client_1)};
 
   ASSERT_NE(token_1.client_end().channel().get(), ZX_HANDLE_INVALID);
@@ -3326,9 +3209,7 @@ TEST(Sysmem, NoneUsageWithSeparateOtherUsageSucceedsV2) {
   auto allocator_2 = connect_to_sysmem_driver_v2();
   ASSERT_TRUE(allocator_2.is_ok());
 
-  auto collection_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_TRUE(collection_endpoints_2.is_ok());
-  auto [collection_client_2, collection_server_2] = std::move(*collection_endpoints_2);
+  auto [collection_client_2, collection_server_2] = fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection_2{std::move(collection_client_2)};
 
   // Just because we can, perform this sync as late as possible, just before
@@ -3451,18 +3332,14 @@ TEST(Sysmem, PixelFormatBgr24V2) {
 TEST(Sysmem, ReleaseTokenV2) {
   auto allocator = connect_to_sysmem_driver_v2();
 
-  auto token_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints_1.is_ok());
-  auto [token_client_1, token_server_1] = std::move(*token_endpoints_1);
+  auto [token_client_1, token_server_1] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
   fidl::SyncClient token_1{std::move(token_client_1)};
 
   v2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
   allocate_shared_request.token_request() = std::move(token_server_1);
   ASSERT_TRUE(allocator->AllocateSharedCollection(std::move(allocate_shared_request)).is_ok());
 
-  auto token_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints_2.is_ok());
-  auto [token_client_2, token_server_2] = std::move(*token_endpoints_2);
+  auto [token_client_2, token_server_2] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
   fidl::SyncClient token_2{std::move(token_client_2)};
 
   v2::BufferCollectionTokenDuplicateRequest duplicate_request;
@@ -4076,17 +3953,14 @@ TEST(Sysmem, TooManyFormatsV2) {
   auto allocator = connect_to_sysmem_driver_v2();
   ASSERT_TRUE(allocator.is_ok());
 
-  zx::result token_endpoints = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints.is_ok());
-  auto [token_client_end, token_server_end] = std::move(*token_endpoints);
+  auto [token_client_end, token_server_end] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
 
   v2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
   allocate_shared_request.token_request() = std::move(token_server_end);
   ASSERT_TRUE(allocator->AllocateSharedCollection(std::move(allocate_shared_request)).is_ok());
 
-  zx::result collection_endpoints = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_TRUE(collection_endpoints.is_ok());
-  auto [collection_client_end, collection_server_end] = std::move(*collection_endpoints);
+  auto [collection_client_end, collection_server_end] =
+      fidl::Endpoints<v2::BufferCollection>::Create();
 
   EXPECT_NE(token_client_end.channel().get(), ZX_HANDLE_INVALID);
 
@@ -4132,9 +4006,8 @@ TEST(Sysmem, TooManyFormatsV2) {
 TEST(Sysmem, TooManyBuffersV2) {
   auto allocator = connect_to_sysmem_driver_v2();
 
-  zx::result collection_endpoints = fidl::CreateEndpoints<v2::BufferCollection>();
-  ASSERT_TRUE(collection_endpoints.is_ok());
-  auto [collection_client_end, collection_server_end] = std::move(*collection_endpoints);
+  auto [collection_client_end, collection_server_end] =
+      fidl::Endpoints<v2::BufferCollection>::Create();
   fidl::SyncClient collection{std::move(collection_client_end)};
 
   v2::AllocatorAllocateNonSharedCollectionRequest allocate_non_shared_request;
@@ -4502,9 +4375,7 @@ TEST(Sysmem, SetDispensableV2) {
   for (Variant variant : variants) {
     auto allocator = connect_to_sysmem_driver_v2();
 
-    auto token_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-    ASSERT_TRUE(token_endpoints_1.is_ok());
-    auto [token_client_1, token_server_1] = std::move(*token_endpoints_1);
+    auto [token_client_1, token_server_1] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
     fidl::SyncClient token_1{std::move(token_client_1)};
 
     // Client 1 creates a token and new LogicalBufferCollection using
@@ -4513,9 +4384,7 @@ TEST(Sysmem, SetDispensableV2) {
     allocate_shared_request.token_request() = std::move(token_server_1);
     ASSERT_TRUE(allocator->AllocateSharedCollection(std::move(allocate_shared_request)).is_ok());
 
-    auto token_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
-    ASSERT_TRUE(token_endpoints_2.is_ok());
-    auto [token_client_2, token_server_2] = std::move(*token_endpoints_2);
+    auto [token_client_2, token_server_2] = fidl::Endpoints<v2::BufferCollectionToken>::Create();
     fidl::SyncClient token_2{std::move(token_client_2)};
 
     // Client 1 duplicates its token and gives the duplicate to client 2 (this
@@ -4532,9 +4401,8 @@ TEST(Sysmem, SetDispensableV2) {
     // LogicalBufferCollection.
     ASSERT_TRUE(token_2->SetDispensable().is_ok());
 
-    auto collection_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollection>();
-    ASSERT_TRUE(collection_endpoints_1.is_ok());
-    auto [collection_client_1, collection_server_1] = std::move(*collection_endpoints_1);
+    auto [collection_client_1, collection_server_1] =
+        fidl::Endpoints<v2::BufferCollection>::Create();
     fidl::SyncClient collection_1{std::move(collection_client_1)};
 
     ASSERT_NE(token_1.client_end().channel().get(), ZX_HANDLE_INVALID);
@@ -4570,9 +4438,8 @@ TEST(Sysmem, SetDispensableV2) {
     auto allocator_2 = connect_to_sysmem_driver_v2();
     ASSERT_TRUE(allocator_2.is_ok());
 
-    auto collection_endpoints_2 = fidl::CreateEndpoints<v2::BufferCollection>();
-    ASSERT_TRUE(collection_endpoints_2.is_ok());
-    auto [collection_client_2, collection_server_2] = std::move(*collection_endpoints_2);
+    auto [collection_client_2, collection_server_2] =
+        fidl::Endpoints<v2::BufferCollection>::Create();
     fidl::SyncClient collection_2{std::move(collection_client_2)};
 
     // Just because we can, perform this sync as late as possible, just before
@@ -6361,15 +6228,14 @@ TEST(Sysmem, SetWeakOk_ForChildNodesAlso_AllowsSysmem1Child) {
           child_token_v2.TakeClientEnd().TakeChannel()));
 
   // Convert child_token_v1 into v1 BufferCollection.
-  auto v1_collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_TRUE(v1_collection_endpoints.is_ok());
-  auto child_collection_v1 = fidl::SyncClient(std::move(v1_collection_endpoints->client));
+  auto v1_collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
+  auto child_collection_v1 = fidl::SyncClient(std::move(v1_collection_endpoints.client));
   auto allocator_result = component::Connect<fuchsia_sysmem::Allocator>();
   ASSERT_OK(allocator_result.status_value());
   auto allocator = fidl::SyncClient(std::move(allocator_result.value()));
   fuchsia_sysmem::AllocatorBindSharedCollectionRequest bind_shared_request;
   bind_shared_request.token() = child_token_v1.TakeClientEnd();
-  bind_shared_request.buffer_collection_request() = std::move(v1_collection_endpoints->server);
+  bind_shared_request.buffer_collection_request() = std::move(v1_collection_endpoints.server);
   ASSERT_TRUE(allocator->BindSharedCollection(std::move(bind_shared_request)).is_ok());
 
   auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));

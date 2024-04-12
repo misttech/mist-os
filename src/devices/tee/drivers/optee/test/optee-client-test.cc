@@ -167,9 +167,7 @@ class OpteeClientTest : public OpteeClientTestBase {
 };
 
 TEST_F(OpteeClientTest, OpenSessionsClosedOnClientUnbind) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
-  ASSERT_TRUE(endpoints.is_ok());
-  auto [client_end, server_end] = std::move(endpoints.value());
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_tee::Application>::Create();
   auto optee_client = std::make_unique<OpteeClient>(
       this, fidl::ClientEnd<fuchsia_tee_manager::Provider>(), optee::Uuid{kOpteeOsUuid});
 
@@ -249,9 +247,7 @@ class OpteeClientTestRpmb : public OpteeClientTestBase {
   OpteeClientTestRpmb() : rpmb_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     ASSERT_OK(rpmb_loop_.StartThread());
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
-    ASSERT_TRUE(endpoints.is_ok());
-    auto [client_end, server_end] = std::move(endpoints.value());
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_tee::Application>::Create();
     optee_client_.reset(new OpteeClient(this, fidl::ClientEnd<fuchsia_tee_manager::Provider>(),
                                         optee::Uuid{kOpteeOsUuid}));
     fidl::BindServer(loop_.dispatcher(), std::move(server_end), optee_client_.get());
@@ -855,12 +851,8 @@ class OpteeClientTestWaitQueue : public OpteeClientTestBase {
 };
 
 TEST_F(OpteeClientTestWaitQueue, WakeUpBeforeSleep) {
-  auto endpoints1 = fidl::CreateEndpoints<fuchsia_tee::Application>();
-  auto endpoints2 = fidl::CreateEndpoints<fuchsia_tee::Application>();
-  ASSERT_TRUE(endpoints1.is_ok());
-  ASSERT_TRUE(endpoints2.is_ok());
-  auto [client1_end, server1_end] = std::move(endpoints1.value());
-  auto [client2_end, server2_end] = std::move(endpoints2.value());
+  auto [client1_end, server1_end] = fidl::Endpoints<fuchsia_tee::Application>::Create();
+  auto [client2_end, server2_end] = fidl::Endpoints<fuchsia_tee::Application>::Create();
   auto optee1_client = std::make_unique<OpteeClient>(
       this, fidl::ClientEnd<fuchsia_tee_manager::Provider>(), optee::Uuid{kOpteeOsUuid});
   auto optee2_client = std::make_unique<OpteeClient>(
@@ -954,12 +946,8 @@ TEST_F(OpteeClientTestWaitQueue, WakeUpBeforeSleep) {
 }
 
 TEST_F(OpteeClientTestWaitQueue, SleepWakeup) {
-  auto endpoints1 = fidl::CreateEndpoints<fuchsia_tee::Application>();
-  auto endpoints2 = fidl::CreateEndpoints<fuchsia_tee::Application>();
-  ASSERT_TRUE(endpoints1.is_ok());
-  ASSERT_TRUE(endpoints2.is_ok());
-  auto [client1_end, server1_end] = std::move(endpoints1.value());
-  auto [client2_end, server2_end] = std::move(endpoints2.value());
+  auto [client1_end, server1_end] = fidl::Endpoints<fuchsia_tee::Application>::Create();
+  auto [client2_end, server2_end] = fidl::Endpoints<fuchsia_tee::Application>::Create();
   auto optee1_client = std::make_unique<OpteeClient>(
       this, fidl::ClientEnd<fuchsia_tee_manager::Provider>(), optee::Uuid{kOpteeOsUuid});
   auto optee2_client = std::make_unique<OpteeClient>(

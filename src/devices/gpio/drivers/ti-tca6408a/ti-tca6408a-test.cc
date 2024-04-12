@@ -129,17 +129,16 @@ class TiTca6408aTest : public zxtest::Test {
     ASSERT_TRUE(result.is_ok());
 
     // Connect to GpioImpl.
-    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_EQ(ZX_OK, svc_endpoints.status_value());
+    auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
     zx_status_t status = fdio_open_at(outgoing_directory_client.handle()->get(), "/svc",
                                       static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                      svc_endpoints->server.TakeChannel().release());
+                                      svc_endpoints.server.TakeChannel().release());
     EXPECT_EQ(ZX_OK, status);
 
     auto connect_result =
         fdf::internal::DriverTransportConnect<fuchsia_hardware_gpioimpl::Service::Device>(
-            svc_endpoints->client, component::kDefaultInstance);
+            svc_endpoints.client, component::kDefaultInstance);
     ASSERT_TRUE(connect_result.is_ok());
     gpio_.Bind(std::move(connect_result.value()));
     ASSERT_TRUE(gpio_.is_valid());

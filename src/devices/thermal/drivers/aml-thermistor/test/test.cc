@@ -104,10 +104,9 @@ class ThermistorDeviceTest : public zxtest::Test {
     }
 
     loop_.StartThread();
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_temperature::Device>();
-    ASSERT_OK(endpoints.status_value());
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), thermistor_.get());
-    client_.Bind(std::move(endpoints->client));
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_temperature::Device>::Create();
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), thermistor_.get());
+    client_.Bind(std::move(endpoints.client));
   }
 
  protected:

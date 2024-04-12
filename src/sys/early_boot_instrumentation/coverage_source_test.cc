@@ -250,9 +250,7 @@ class ExtractDebugDataTest : public ::testing::Test {
                                  cpp20::span<zx::eventpair> out_tokens) {
     ASSERT_EQ(publish_info.size(), out_tokens.size());
 
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-    auto& [client_end, server_end] = endpoints.value();
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
     const fidl::OneWayStatus status = svc_stash_->Store(std::move(server_end));
     ASSERT_TRUE(status.ok()) << status.FormatDescription();

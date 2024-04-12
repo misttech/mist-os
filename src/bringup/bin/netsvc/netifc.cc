@@ -91,17 +91,10 @@ zx::result<> open_netdevice(async_dispatcher_t* dispatcher,
                             fidl::ClientEnd<fuchsia_hardware_network::Device> device,
                             fuchsia_hardware_network::wire::PortId port_id,
                             fit::callback<void(zx_status_t)> on_error) {
-  zx::result mac_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::MacAddressing>();
-  if (mac_endpoints.is_error()) {
-    return mac_endpoints.take_error();
-  }
-  auto& [mac_client, mac_server] = mac_endpoints.value();
+  auto [mac_client, mac_server] =
+      fidl::Endpoints<fuchsia_hardware_network::MacAddressing>::Create();
 
-  zx::result port_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Port>();
-  if (port_endpoints.is_error()) {
-    return port_endpoints.take_error();
-  }
-  auto& [port_client, port_server] = port_endpoints.value();
+  auto [port_client, port_server] = fidl::Endpoints<fuchsia_hardware_network::Port>::Create();
 
   {
     fidl::OneWayStatus result = fidl::WireCall(device)->GetPort(port_id, std::move(port_server));

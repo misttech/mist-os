@@ -52,12 +52,11 @@ constexpr auto kVmoFlags = fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kEx
 namespace {
 
 zx::vmo GetVmo(std::string_view path) {
-  zx::result endpoints = fidl::CreateEndpoints<fio::File>();
-  EXPECT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto endpoints = fidl::Endpoints<fio::File>::Create();
   zx_status_t status = fdio_open(path.data(), static_cast<uint32_t>(kOpenFlags),
-                                 endpoints->server.channel().release());
+                                 endpoints.server.channel().release());
   EXPECT_EQ(status, ZX_OK) << zx_status_get_string(status);
-  fidl::WireResult result = fidl::WireCall(endpoints->client)->GetBackingMemory(kVmoFlags);
+  fidl::WireResult result = fidl::WireCall(endpoints.client)->GetBackingMemory(kVmoFlags);
   EXPECT_TRUE(result.ok()) << result.FormatDescription();
   const auto& response = result.value();
   EXPECT_TRUE(response.is_ok()) << zx_status_get_string(response.error_value());
@@ -715,8 +714,7 @@ class DriverTest : public testing::Test {
   std::unique_ptr<compat::Driver> StartDriver(StartDriverArgs args) {
     auto outgoing_dir_endpoints = fidl::CreateEndpoints<fio::Directory>();
     EXPECT_TRUE(outgoing_dir_endpoints.is_ok());
-    auto pkg_endpoints = fidl::CreateEndpoints<fio::Directory>();
-    EXPECT_TRUE(pkg_endpoints.is_ok());
+    auto pkg_endpoints = fidl::Endpoints<fio::Directory>::Create();
     auto svc_endpoints = fidl::CreateEndpoints<fio::Directory>();
     EXPECT_TRUE(svc_endpoints.is_ok());
 
@@ -727,11 +725,11 @@ class DriverTest : public testing::Test {
     zx::result ns_start_result =
         incoming_ns_.SyncCall(&IncomingNamespace::Start, args.v1_driver_path,
                               args.compat_file_response, args.devices, args.expected_profile_role,
-                              std::move(pkg_endpoints->server), std::move(svc_endpoints->server));
+                              std::move(pkg_endpoints.server), std::move(svc_endpoints->server));
     EXPECT_EQ(ZX_OK, ns_start_result.status_value());
 
     auto entry_pkg = frunner::ComponentNamespaceEntry(
-        {.path = std::string("/pkg"), .directory = std::move(pkg_endpoints->client)});
+        {.path = std::string("/pkg"), .directory = std::move(pkg_endpoints.client)});
     auto entry_svc = frunner::ComponentNamespaceEntry(
         {.path = std::string("/svc"), .directory = std::move(svc_endpoints->client)});
     std::vector<frunner::ComponentNamespaceEntry> ns_entries;

@@ -72,13 +72,12 @@ class SshdHostBootItemTest : public gtest::RealLoopFixture {
   void SetUp() override {
     EXPECT_EQ(loop_.StartThread(), ZX_OK);
 
-    auto items_endpoints = fidl::CreateEndpoints<Items>();
-    ASSERT_TRUE(items_endpoints.is_ok());
+    auto items_endpoints = fidl::Endpoints<Items>::Create();
 
     binding_ref_ =
-        fidl::BindServer(loop_.dispatcher(), std::move(items_endpoints->server), &fake_items_);
+        fidl::BindServer(loop_.dispatcher(), std::move(items_endpoints.server), &fake_items_);
 
-    items_client_ = fidl::SyncClient(std::move(items_endpoints->client));
+    items_client_ = fidl::SyncClient(std::move(items_endpoints.client));
   }
 
   void TearDown() override {

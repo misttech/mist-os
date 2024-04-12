@@ -26,12 +26,11 @@ class ControllerDeviceTest : public gtest::TestLoopFixture {
 
     // Create sysmem fragment
     auto sysmem_handler = sysmem_.SyncCall(&FakeSysmem::CreateInstanceHandler);
-    auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(sysmem_endpoints.is_ok());
+    auto sysmem_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name,
-                          std::move(sysmem_endpoints->client), "sysmem");
+                          std::move(sysmem_endpoints.client), "sysmem");
 
-    outgoing_.SyncCall([sysmem_server = std::move(sysmem_endpoints->server),
+    outgoing_.SyncCall([sysmem_server = std::move(sysmem_endpoints.server),
                         sysmem_handler = std::move(sysmem_handler)](
                            component::OutgoingDirectory* outgoing) mutable {
       ZX_ASSERT(outgoing->Serve(std::move(sysmem_server)).is_ok());
@@ -89,11 +88,10 @@ class ControllerDeviceTest : public gtest::TestLoopFixture {
   }
 
   void BindControllerProtocol() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_camera::Device>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), controller_device_);
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_camera::Device>::Create();
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), controller_device_);
 
-    ASSERT_EQ(camera_protocol_.Bind(endpoints->client.TakeChannel()), ZX_OK);
+    ASSERT_EQ(camera_protocol_.Bind(endpoints.client.TakeChannel()), ZX_OK);
     camera_protocol_.set_error_handler(FailErrorHandler);
     camera_protocol_->GetChannel2(controller_protocol_.NewRequest());
     controller_protocol_.set_error_handler(FailErrorHandler);
@@ -124,11 +122,10 @@ TEST_F(ControllerDeviceTest, DdkLifecycle) {
 
 // Verifies GetChannel is not supported.
 TEST_F(ControllerDeviceTest, GetChannel) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_camera::Device>();
-  ASSERT_EQ(endpoints.status_value(), ZX_OK);
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), controller_device_);
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_camera::Device>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), controller_device_);
 
-  ASSERT_EQ(camera_protocol_.Bind(endpoints->client.TakeChannel()), ZX_OK);
+  ASSERT_EQ(camera_protocol_.Bind(endpoints.client.TakeChannel()), ZX_OK);
   camera_protocol_->GetChannel(controller_protocol_.NewRequest().TakeChannel());
   RunLoopUntilIdle();
   WaitForChannelClosure(controller_protocol_.channel());
@@ -137,11 +134,10 @@ TEST_F(ControllerDeviceTest, GetChannel) {
 
 // Verifies that GetChannel2 works correctly.
 TEST_F(ControllerDeviceTest, GetChannel2) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_camera::Device>();
-  ASSERT_EQ(endpoints.status_value(), ZX_OK);
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), controller_device_);
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_camera::Device>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), controller_device_);
 
-  ASSERT_EQ(camera_protocol_.Bind(endpoints->client.TakeChannel()), ZX_OK);
+  ASSERT_EQ(camera_protocol_.Bind(endpoints.client.TakeChannel()), ZX_OK);
   camera_protocol_->GetChannel2(controller_protocol_.NewRequest());
   camera_protocol_.set_error_handler(FailErrorHandler);
   RunLoopUntilIdle();
@@ -149,11 +145,10 @@ TEST_F(ControllerDeviceTest, GetChannel2) {
 
 // Verifies that GetChannel2 can only have one binding.
 TEST_F(ControllerDeviceTest, GetChannel2InvokeTwice) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_camera::Device>();
-  ASSERT_EQ(endpoints.status_value(), ZX_OK);
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), controller_device_);
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_camera::Device>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), controller_device_);
 
-  ASSERT_EQ(camera_protocol_.Bind(endpoints->client.TakeChannel()), ZX_OK);
+  ASSERT_EQ(camera_protocol_.Bind(endpoints.client.TakeChannel()), ZX_OK);
   camera_protocol_->GetChannel2(controller_protocol_.NewRequest());
   RunLoopUntilIdle();
   fuchsia::camera2::hal::ControllerPtr other_controller_protocol;

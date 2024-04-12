@@ -177,14 +177,13 @@ TEST_F(AdcButtonsDeviceTest, GetDescriptorTest) {
 }
 
 TEST_F(AdcButtonsDeviceTest, ReadInputReportsTest) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-  ASSERT_OK(endpoints);
-  auto result = client_->GetInputReportsReader(std::move(endpoints->server));
+  auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
+  auto result = client_->GetInputReportsReader(std::move(endpoints.server));
   ASSERT_TRUE(result.ok());
   // Ensure that the reader has been registered with the client before moving on.
   ASSERT_TRUE(client_->GetDescriptor().ok());
   auto reader =
-      fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(endpoints->client));
+      fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(endpoints.client));
   EXPECT_TRUE(reader.is_valid());
   DrainInitialReport(reader);
 

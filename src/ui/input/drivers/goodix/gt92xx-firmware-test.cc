@@ -250,11 +250,10 @@ class GoodixTest : public zxtest::Test {
     enable_load_firmware = true;
     fidl::ClientEnd reset_gpio_client = reset_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
     fidl::ClientEnd intr_gpio_client = intr_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    EXPECT_TRUE(endpoints.is_ok());
-    fidl::BindServer(fidl_servers_loop_.dispatcher(), std::move(endpoints->server), &i2c_);
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
+    fidl::BindServer(fidl_servers_loop_.dispatcher(), std::move(endpoints.server), &i2c_);
     fake_parent_ = MockDevice::FakeRootParent();
-    device_.emplace(nullptr, std::move(endpoints->client), std::move(intr_gpio_client),
+    device_.emplace(nullptr, std::move(endpoints.client), std::move(intr_gpio_client),
                     std::move(reset_gpio_client), fake_parent_.get());
   }
 

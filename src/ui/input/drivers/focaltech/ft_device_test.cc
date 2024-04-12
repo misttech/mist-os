@@ -184,9 +184,8 @@ class FocaltechTest : public testing::Test {
 
     // I2c fragment
     {
-      auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-      ZX_ASSERT(endpoints.is_ok());
-      incoming_.SyncCall([server = std::move(endpoints->server)](IncomingNamespace* infra) mutable {
+      auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+      incoming_.SyncCall([server = std::move(endpoints.server)](IncomingNamespace* infra) mutable {
         zx::result service_result =
             infra->i2c_fragment_outgoing_.AddService<fuchsia_hardware_i2c::Service>(
                 fuchsia_hardware_i2c::Service::InstanceHandler(
@@ -194,15 +193,14 @@ class FocaltechTest : public testing::Test {
         ZX_ASSERT(service_result.is_ok());
         ZX_ASSERT(infra->i2c_fragment_outgoing_.Serve(std::move(server)).is_ok());
       });
-      fake_parent_->AddFidlService(fuchsia_hardware_i2c::Service::Name,
-                                   std::move(endpoints->client), "i2c");
+      fake_parent_->AddFidlService(fuchsia_hardware_i2c::Service::Name, std::move(endpoints.client),
+                                   "i2c");
     }
 
     // Reset gpio fragment
     {
-      auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-      ZX_ASSERT(endpoints.is_ok());
-      incoming_.SyncCall([server = std::move(endpoints->server)](IncomingNamespace* infra) mutable {
+      auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+      incoming_.SyncCall([server = std::move(endpoints.server)](IncomingNamespace* infra) mutable {
         auto service_result =
             infra->reset_gpio_fragment_outgoing_.AddService<fuchsia_hardware_gpio::Service>(
                 infra->reset_gpio_.CreateInstanceHandler());
@@ -210,14 +208,13 @@ class FocaltechTest : public testing::Test {
         ZX_ASSERT(infra->reset_gpio_fragment_outgoing_.Serve(std::move(server)).is_ok());
       });
       fake_parent_->AddFidlService(fuchsia_hardware_gpio::Service::Name,
-                                   std::move(endpoints->client), "gpio-reset");
+                                   std::move(endpoints.client), "gpio-reset");
     }
 
     // Interrupt gpio fragment
     {
-      auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-      ZX_ASSERT(endpoints.is_ok());
-      incoming_.SyncCall([server = std::move(endpoints->server)](IncomingNamespace* infra) mutable {
+      auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+      incoming_.SyncCall([server = std::move(endpoints.server)](IncomingNamespace* infra) mutable {
         auto service_result =
             infra->interrupt_gpio_fragment_outgoing_.AddService<fuchsia_hardware_gpio::Service>(
                 infra->interrupt_gpio_.CreateInstanceHandler());
@@ -225,7 +222,7 @@ class FocaltechTest : public testing::Test {
         ZX_ASSERT(infra->interrupt_gpio_fragment_outgoing_.Serve(std::move(server)).is_ok());
       });
       fake_parent_->AddFidlService(fuchsia_hardware_gpio::Service::Name,
-                                   std::move(endpoints->client), "gpio-int");
+                                   std::move(endpoints.client), "gpio-int");
     }
 
     zx::interrupt interrupt;
@@ -246,10 +243,9 @@ class FocaltechTest : public testing::Test {
     dut_ = child_->GetDeviceContext<FtDevice>();
     VerifyGpioInit();
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
-    EXPECT_EQ(ZX_OK, endpoints.status_value());
-    fidl::BindServer(dispatcher_->async_dispatcher(), std::move(endpoints->server), dut_);
-    return std::move(std::move(endpoints->client));
+    auto endpoints = fidl::Endpoints<fuchsia_input_report::InputDevice>::Create();
+    fidl::BindServer(dispatcher_->async_dispatcher(), std::move(endpoints.server), dut_);
+    return std::move(std::move(endpoints.client));
   }
 
   void TearDown() override {
@@ -420,12 +416,11 @@ TEST_F(FocaltechTest, Touch) {
 
   fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(CreateDut());
 
-  auto reader_endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-  ASSERT_EQ(ZX_OK, reader_endpoints.status_value());
-  auto result = client->GetInputReportsReader(std::move(reader_endpoints->server));
+  auto reader_endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
+  auto result = client->GetInputReportsReader(std::move(reader_endpoints.server));
   ASSERT_EQ(ZX_OK, result.status());
   auto reader = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(
-      std::move(reader_endpoints->client));
+      std::move(reader_endpoints.client));
 
   ASSERT_EQ(ZX_OK, dut_->WaitForNextReader(zx::duration::infinite()));
 

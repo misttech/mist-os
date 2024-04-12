@@ -66,10 +66,9 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
   }
 
   fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> BindServer() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_pwm::Pwm>();
-    EXPECT_TRUE(endpoints.is_ok());
-    fidl::BindServer(async_get_default_dispatcher(), std::move(endpoints->server), this);
-    return fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>(std::move(endpoints->client));
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_pwm::Pwm>::Create();
+    fidl::BindServer(async_get_default_dispatcher(), std::move(endpoints.server), this);
+    return fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>(std::move(endpoints.client));
   }
 
   void VerifyAndClear() {
@@ -101,10 +100,9 @@ TEST(PwmInitDeviceTest, InitTest) {
   auto wifi_gpio_client = wifi_gpio.SyncCall(&fake_gpio::FakeGpio::Connect);
   auto bt_gpio_client = bt_gpio.SyncCall(&fake_gpio::FakeGpio::Connect);
   // Create a clock connection, but don't connect it to anything.
-  zx::result clock_endpoints = fidl::CreateEndpoints<fuchsia_hardware_clock::Clock>();
-  EXPECT_TRUE(clock_endpoints.is_ok());
-  fidl::ClientEnd<fuchsia_hardware_clock::Clock> clock(std::move(clock_endpoints->client));
-  clock_endpoints->server.Close(ZX_OK);
+  auto clock_endpoints = fidl::Endpoints<fuchsia_hardware_clock::Clock>::Create();
+  fidl::ClientEnd<fuchsia_hardware_clock::Clock> clock(std::move(clock_endpoints.client));
+  clock_endpoints.server.Close(ZX_OK);
 
   pwm.SyncCall(&MockPwmServer::ExpectEnable);
   aml_pwm::mode_config two_timer = {

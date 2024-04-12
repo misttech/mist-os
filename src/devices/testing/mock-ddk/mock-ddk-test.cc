@@ -552,12 +552,11 @@ TEST(MockDdk, SetFidlService) {
     ASSERT_OK(service_result.status_value());
   }
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-  ASSERT_OK(outgoing.Serve(std::move(endpoints->server)).status_value());
+  ASSERT_OK(outgoing.Serve(std::move(endpoints.server)).status_value());
 
-  parent->AddFidlService(fidl_examples_echo::EchoService::Name, std::move(endpoints->client));
+  parent->AddFidlService(fidl_examples_echo::EchoService::Name, std::move(endpoints.client));
 
   // Service is available after being set.
   auto echo_client = test_device->DdkConnectFidlProtocol<fidl_examples_echo::EchoService::Echo>();
@@ -656,8 +655,7 @@ TEST(MockDdk, SetRuntimeService) {
 
   // So we add the necessary service to the parent:
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   auto service_result = outgoing.AddService<fidl_examples_echo::DriverEchoService>(
       fidl_examples_echo::DriverEchoService::InstanceHandler({
@@ -665,9 +663,9 @@ TEST(MockDdk, SetRuntimeService) {
       }));
   EXPECT_OK(service_result.status_value());
 
-  EXPECT_OK(outgoing.Serve(std::move(endpoints->server)).status_value());
+  EXPECT_OK(outgoing.Serve(std::move(endpoints.server)).status_value());
 
-  parent->AddFidlService(fidl_examples_echo::DriverEchoService::Name, std::move(endpoints->client));
+  parent->AddFidlService(fidl_examples_echo::DriverEchoService::Name, std::move(endpoints.client));
 
   // Service is available after being set.
   auto echo_client =

@@ -13,33 +13,30 @@
 namespace fpty = fuchsia_hardware_pty;
 
 TEST(PtyTest, WindowSize) {
-  auto endpoints = fidl::CreateEndpoints<fpty::Device>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fpty::Device>::Create();
 
-  fidl::WireSyncClient client{std::move(endpoints->client)};
+  fidl::WireSyncClient client{std::move(endpoints.client)};
 
   ASSERT_OK(fdio_service_connect(fidl::DiscoverableProtocolDefaultPath<fpty::Device>,
-                                 endpoints->server.channel().release()));
+                                 endpoints.server.channel().release()));
 
-  auto endpoints0 = fidl::CreateEndpoints<fpty::Device>();
-  ASSERT_OK(endpoints0.status_value());
-  auto result0 = client->OpenClient(0, std::move(endpoints0->server));
+  auto endpoints0 = fidl::Endpoints<fpty::Device>::Create();
+  auto result0 = client->OpenClient(0, std::move(endpoints0.server));
   ASSERT_OK(result0.status());
   ASSERT_OK(result0->s);
 
   fbl::unique_fd controlling_client;
-  ASSERT_OK(fdio_fd_create(endpoints0->client.channel().release(),
+  ASSERT_OK(fdio_fd_create(endpoints0.client.channel().release(),
                            controlling_client.reset_and_get_address()));
 
-  auto endpoints1 = fidl::CreateEndpoints<fpty::Device>();
-  ASSERT_OK(endpoints1.status_value());
+  auto endpoints1 = fidl::Endpoints<fpty::Device>::Create();
 
-  auto result1 = client->OpenClient(1, std::move(endpoints1->server));
+  auto result1 = client->OpenClient(1, std::move(endpoints1.server));
   ASSERT_OK(result1.status());
   ASSERT_OK(result1->s);
 
   fbl::unique_fd fd;
-  ASSERT_OK(fdio_fd_create(endpoints1->client.channel().release(), fd.reset_and_get_address()));
+  ASSERT_OK(fdio_fd_create(endpoints1.client.channel().release(), fd.reset_and_get_address()));
 
   struct winsize set_size = {
       .ws_row = 7,

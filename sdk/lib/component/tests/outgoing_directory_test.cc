@@ -106,9 +106,7 @@ class OutgoingDirectoryTest : public gtest::RealLoopFixture {
   static fidl::ClientEnd<fuchsia_io::Directory> GetSvcClientEnd(
       const fidl::ClientEnd<fuchsia_io::Directory>& root,
       fidl::StringView path = kSvcDirectoryPath) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_TRUE(endpoints.is_ok()) << endpoints.status_string();
-    auto& [client_end, server_end] = endpoints.value();
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     fidl::OneWayStatus status =
         fidl::WireCall(root)->Open(fuchsia_io::wire::OpenFlags::kDirectory, {}, path,
                                    fidl::ServerEnd<fuchsia_io::Node>{server_end.TakeChannel()});
@@ -500,8 +498,7 @@ TEST_F(OutgoingDirectoryTest, AddDirectoryAtCanServeADirectory) {
   static constexpr char kTestContent[] = "Hello World!";
 
   fs::ManagedVfs vfs(dispatcher());
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
   auto text_file = fbl::MakeRefCounted<fs::BufferedPseudoFile>(
       /*read_handler=*/[](fbl::String* output) -> zx_status_t {
         *output = kTestContent;
@@ -509,9 +506,9 @@ TEST_F(OutgoingDirectoryTest, AddDirectoryAtCanServeADirectory) {
       });
   auto diagnostics = fbl::MakeRefCounted<fs::PseudoDir>();
   diagnostics->AddEntry(kTestFile, text_file);
-  vfs.ServeDirectory(diagnostics, std::move(endpoints->server));
+  vfs.ServeDirectory(diagnostics, std::move(endpoints.server));
   ASSERT_EQ(GetOutgoingDirectory()
-                ->AddDirectoryAt(std::move(endpoints->client), kTestPath, kTestDirectory)
+                ->AddDirectoryAt(std::move(endpoints.client), kTestPath, kTestDirectory)
                 .status_value(),
             ZX_OK);
 
@@ -557,17 +554,16 @@ TEST_F(OutgoingDirectoryTest, ServeCanYieldMultipleConnections) {
       ZX_OK);
 
   // Setup fuchsia.examples.Echo client
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
   // First |Serve| is invoked as part of test setup, so we'll assert that a
   // subsequent invocation is allowed.
-  ASSERT_EQ(GetOutgoingDirectory()->Serve(std::move(endpoints->server)).status_value(), ZX_OK);
+  ASSERT_EQ(GetOutgoingDirectory()->Serve(std::move(endpoints.server)).status_value(), ZX_OK);
 
   std::vector<fidl::ClientEnd<fuchsia_io::Directory>> root_client_ends;
   // Take client end for channel used during invocation of |Serve| during setup.
   root_client_ends.emplace_back(TakeRootClientEnd());
   // Take client end for channel used during invocation of |Serve| in this function.
-  root_client_ends.emplace_back(std::move(endpoints->client));
+  root_client_ends.emplace_back(std::move(endpoints.client));
 
   while (!root_client_ends.empty()) {
     fidl::ClientEnd root = std::move(root_client_ends.back());
@@ -698,11 +694,10 @@ TEST_F(OutgoingDirectoryTest, CreateFailsIfDispatcherIsNullptr) {
 
 TEST_F(OutgoingDirectoryTest, ServeFailsIfHandleInvalid) {
   component::OutgoingDirectory outgoing_directory(dispatcher());
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
   // Close server end in order to  invalidate channel.
-  endpoints->server.reset();
-  EXPECT_EQ(outgoing_directory.Serve(std::move(endpoints->server)).status_value(),
+  endpoints.server.reset();
+  EXPECT_EQ(outgoing_directory.Serve(std::move(endpoints.server)).status_value(),
             ZX_ERR_BAD_HANDLE);
 }
 
@@ -831,11 +826,10 @@ TEST_F(OutgoingDirectoryTest, AddDirectoryFailsIfRemoteDirInvalid) {
 }
 
 TEST_F(OutgoingDirectoryTest, AddDirectoryFailsIfDirectoryNameIsEmpty) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   EXPECT_EQ(GetOutgoingDirectory()
-                ->AddDirectory(std::move(endpoints->client), /*directory_name=*/"")
+                ->AddDirectory(std::move(endpoints.client), /*directory_name=*/"")
                 .status_value(),
             ZX_ERR_INVALID_ARGS);
 }
@@ -862,10 +856,9 @@ TEST_F(OutgoingDirectoryTest, AddDirectoryFailsIfNameUsedForAddProtocolAt) {
                 .status_value(),
             ZX_OK);
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
   EXPECT_EQ(GetOutgoingDirectory()
-                ->AddDirectory(std::move(endpoints->client), kDirectoryName)
+                ->AddDirectory(std::move(endpoints.client), kDirectoryName)
                 .status_value(),
             ZX_ERR_ALREADY_EXISTS);
 }

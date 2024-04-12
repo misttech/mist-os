@@ -83,8 +83,8 @@ zx_status_t AmlogicSecureMemDevice::Bind() {
   return status;
 }
 
-// TODO(https://fxbug.dev/42112465): Determine if we only ever use mexec to reboot from zedboot into a
-// netboot(ed) image. Iff so, we could avoid some complexity here by not loading aml-securemem in
+// TODO(https://fxbug.dev/42112465): Determine if we only ever use mexec to reboot from zedboot into
+// a netboot(ed) image. Iff so, we could avoid some complexity here by not loading aml-securemem in
 // zedboot, and not handling suspend(mexec) here, and not having UnregisterSecureMem().
 void AmlogicSecureMemDevice::DdkSuspend(ddk::SuspendTxn txn) {
   LOG(DEBUG, "aml-securemem: begin DdkSuspend() - Suspend Reason: %d", txn.suspend_reason());
@@ -239,11 +239,7 @@ AmlogicSecureMemDevice::AmlogicSecureMemDevice(zx_device_t* device)
 zx_status_t AmlogicSecureMemDevice::CreateAndServeSysmemTee() {
   ZX_DEBUG_ASSERT(tee_proto_client_.is_valid());
 
-  zx::result tee_endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
-  if (!tee_endpoints.is_ok()) {
-    return tee_endpoints.status_value();
-  }
-  auto& [tee_client, tee_server] = tee_endpoints.value();
+  auto [tee_client, tee_server] = fidl::Endpoints<fuchsia_tee::Application>::Create();
   sysmem_secure_mem_server_.emplace(async_patterns::PassDispatcher, tee_client.TakeChannel());
 
   const fuchsia_tee::wire::Uuid kSecmemUuid = {
@@ -258,12 +254,8 @@ zx_status_t AmlogicSecureMemDevice::CreateAndServeSysmemTee() {
     }
   }
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::SecureMem>();
-  if (endpoints.is_error()) {
-    LOG(ERROR, "failed to create sysmem tee channels - status: %d", endpoints.status_value());
-    return endpoints.status_value();
-  }
-  auto& [sysmem_secure_mem_client, sysmem_secure_mem_server] = endpoints.value();
+  auto [sysmem_secure_mem_client, sysmem_secure_mem_server] =
+      fidl::Endpoints<fuchsia_sysmem::SecureMem>::Create();
 
   sysmem_secure_mem_server_.AsyncCall(
       &SysmemSecureMemServer::Bind, std::move(sysmem_secure_mem_server),

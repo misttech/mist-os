@@ -399,10 +399,9 @@ TEST_F(Tcs3400Test, GetInputReports) {
     EXPECT_FALSE(response->is_error());
   }
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-  ASSERT_OK(endpoints);
-  fidl::WireSyncClient reader(std::move(endpoints->client));
-  auto result = client->GetInputReportsReader(std::move(endpoints->server));
+  auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
+  fidl::WireSyncClient reader(std::move(endpoints.client));
+  auto result = client->GetInputReportsReader(std::move(endpoints.server));
   ASSERT_OK(result.status());
   device_->WaitForNextReader();
 
@@ -515,10 +514,9 @@ TEST_F(Tcs3400Test, GetMultipleInputReports) {
 
   WaitForConfiguration();
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-  ASSERT_OK(endpoints);
-  fidl::WireSyncClient reader(std::move(endpoints->client));
-  auto result = client->GetInputReportsReader(std::move(endpoints->server));
+  auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
+  fidl::WireSyncClient reader(std::move(endpoints.client));
+  auto result = client->GetInputReportsReader(std::move(endpoints.server));
   ASSERT_OK(result.status());
   device_->WaitForNextReader();
 
@@ -574,10 +572,9 @@ TEST_F(Tcs3400Test, GetInputReportsMultipleReaders) {
 
   fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> readers[kReaderCount];
   for (auto& reader : readers) {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-    ASSERT_OK(endpoints);
-    reader.Bind(std::move(endpoints->client));
-    auto result = client->GetInputReportsReader(std::move(endpoints->server));
+    auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
+    reader.Bind(std::move(endpoints.client));
+    auto result = client->GetInputReportsReader(std::move(endpoints.server));
     ASSERT_OK(result.status());
     device_->WaitForNextReader();
   }
@@ -624,10 +621,9 @@ TEST_F(Tcs3400Test, InputReportSaturatedSensor) {
     EXPECT_FALSE(response->is_error());
   }
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-  ASSERT_OK(endpoints);
-  fidl::WireSyncClient reader(std::move(endpoints->client));
-  auto result = client->GetInputReportsReader(std::move(endpoints->server));
+  auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
+  fidl::WireSyncClient reader(std::move(endpoints.client));
+  auto result = client->GetInputReportsReader(std::move(endpoints.server));
   ASSERT_OK(result.status());
   device_->WaitForNextReader();
 

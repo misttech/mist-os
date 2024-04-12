@@ -27,8 +27,8 @@ VirtioBalloon::VirtioBalloon(const PhysMem& phys_mem)
 
 zx_status_t VirtioBalloon::Start(const zx::guest& guest, ::sys::ComponentContext* context,
                                  async_dispatcher_t* dispatcher) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_virtualization_hardware::VirtioBalloon>();
-  auto [client_end, server_end] = std::move(endpoints.value());
+  auto [client_end, server_end] =
+      fidl::Endpoints<fuchsia_virtualization_hardware::VirtioBalloon>::Create();
   fidl::InterfaceRequest<fuchsia::virtualization::hardware::VirtioBalloon> balloon_request(
       server_end.TakeChannel());
   balloon_.Bind(std::move(client_end), dispatcher, this);

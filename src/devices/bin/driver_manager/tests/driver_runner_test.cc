@@ -1450,15 +1450,14 @@ TEST_F(DriverRunnerTest, ConnectToControllerFidlMethod) {
 
   auto device_controller_1 = ConnectToDeviceController(kChildName);
 
-  zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-  ASSERT_EQ(controller_endpoints.status_value(), ZX_OK);
+  auto controller_endpoints = fidl::Endpoints<fuchsia_device::Controller>::Create();
   fidl::OneWayStatus result =
-      device_controller_1->ConnectToController(std::move(controller_endpoints->server));
+      device_controller_1->ConnectToController(std::move(controller_endpoints.server));
   ASSERT_TRUE(RunLoopUntilIdle());
   ASSERT_EQ(result.status(), ZX_OK);
 
   fidl::WireClient<fuchsia_device::Controller> device_controller_2{
-      std::move(controller_endpoints->client), dispatcher()};
+      std::move(controller_endpoints.client), dispatcher()};
 
   // Verify that the two device controllers connect to the same device server.
   // This is done by verifying the topological paths returned by the device controllers are the

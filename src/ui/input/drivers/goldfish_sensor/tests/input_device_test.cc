@@ -39,13 +39,12 @@ class InputDeviceTest : public ::testing::TestWithParam<bool> {
 
     ASSERT_EQ(fake_parent_->child_count(), 1u);
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
-    ASSERT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_input_report::InputDevice>::Create();
 
-    binding_ = fidl::BindServer(dispatcher_->async_dispatcher(), std::move(endpoints->server),
+    binding_ = fidl::BindServer(dispatcher_->async_dispatcher(), std::move(endpoints.server),
                                 fake_parent_->GetLatestChild()->GetDeviceContext<InputDevice>());
 
-    device_client_.Bind(std::move(endpoints->client));
+    device_client_.Bind(std::move(endpoints.client));
   }
 
   void TearDown() override {
@@ -85,9 +84,8 @@ class TestAccelerationInputDevice : public AccelerationInputDevice {
 using AccelerationInputDeviceTest = InputDeviceTest<TestAccelerationInputDevice>;
 
 TEST_P(AccelerationInputDeviceTest, ReadInputReports) {
-  auto endpoint_result = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-  ASSERT_TRUE(endpoint_result.is_ok());
-  auto [client_end, server_end] = std::move(endpoint_result.value());
+  auto [client_end, server_end] =
+      fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
 
   auto reader_result = device_client_->GetInputReportsReader(std::move(server_end));
   ASSERT_TRUE(reader_result.ok());
@@ -200,9 +198,8 @@ class TestGyroscopeInputDevice : public GyroscopeInputDevice {
 using GyroscopeInputDeviceTest = InputDeviceTest<TestGyroscopeInputDevice>;
 
 TEST_P(GyroscopeInputDeviceTest, ReadInputReports) {
-  auto endpoint_result = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-  ASSERT_TRUE(endpoint_result.is_ok());
-  auto [client_end, server_end] = std::move(endpoint_result.value());
+  auto [client_end, server_end] =
+      fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
 
   auto reader_result = device_client_->GetInputReportsReader(std::move(server_end));
   ASSERT_TRUE(reader_result.ok());
@@ -321,9 +318,8 @@ class TestRgbcLightInputDevice : public RgbcLightInputDevice {
 using RgbcLightInputDeviceTest = InputDeviceTest<TestRgbcLightInputDevice>;
 
 TEST_P(RgbcLightInputDeviceTest, ReadInputReports) {
-  auto endpoint_result = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-  ASSERT_TRUE(endpoint_result.is_ok());
-  auto [client_end, server_end] = std::move(endpoint_result.value());
+  auto [client_end, server_end] =
+      fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
 
   auto reader_result = device_client_->GetInputReportsReader(std::move(server_end));
   ASSERT_TRUE(reader_result.ok());

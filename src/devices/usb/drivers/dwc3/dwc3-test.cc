@@ -90,10 +90,9 @@ TestFixture::TestFixture() {
   config.irqs[0] = {};
   ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
 
-  zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(outgoing_endpoints);
+  auto outgoing_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
   ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
-  incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+  incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints.server)](
                          IncomingNamespace* infra) mutable {
     infra->pdev_server.SetConfig(std::move(config));
     ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
@@ -103,7 +102,7 @@ TestFixture::TestFixture() {
   });
   ASSERT_NO_FATAL_FAILURE();
   mock_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                               std::move(outgoing_endpoints->client));
+                               std::move(outgoing_endpoints.client));
 }
 
 void TestFixture::SetUp() { stuck_reset_test_ = false; }

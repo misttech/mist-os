@@ -60,10 +60,9 @@ class AmlRamDeviceTest : public zxtest::Test {
 
     dmc_offsets_ = g12_dmc_regs;
 
-    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(outgoing_endpoints);
+    auto outgoing_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
-    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints.server)](
                            IncomingNamespace* infra) mutable {
       infra->pdev_server.SetConfig(std::move(config));
       ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
@@ -72,7 +71,7 @@ class AmlRamDeviceTest : public zxtest::Test {
     });
     ASSERT_NO_FATAL_FAILURE();
     fake_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                                 std::move(outgoing_endpoints->client));
+                                 std::move(outgoing_endpoints.client));
 
     EXPECT_OK(amlogic_ram::AmlRam::Create(nullptr, fake_parent_.get()));
   }
@@ -86,11 +85,10 @@ class AmlRamDeviceTest : public zxtest::Test {
     auto* child = fake_parent_->GetLatestChild();
     EXPECT_NOT_NULL(child);
 
-    auto endpoints = fidl::CreateEndpoints<ram_metrics::Device>();
-    EXPECT_TRUE(endpoints.is_ok());
-    binding_ = fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server),
+    auto endpoints = fidl::Endpoints<ram_metrics::Device>::Create();
+    binding_ = fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server),
                                 child->GetDeviceContext<AmlRam>());
-    return std::move(endpoints->client);
+    return std::move(endpoints.client);
   }
 
   void InjectInterrupt() { irq_signaller_->trigger(0, zx::time()); }

@@ -61,14 +61,13 @@ class UsbEndpointClientTest : public zxtest::Test {
     client_ = std::make_unique<usb_endpoint::UsbEndpoint<UsbEndpointClientTest>>(
         usb::EndpointType::BULK, this, std::mem_fn(&UsbEndpointClientTest::Complete));
 
-    auto endpoints = fidl::CreateEndpoints<UsbProtocolType>();
-    ASSERT_OK(endpoints);
+    auto endpoints = fidl::Endpoints<UsbProtocolType>::Create();
     server_ =
-        std::make_unique<FakeUsbServer>(server_loop_.dispatcher(), std::move(endpoints->server));
+        std::make_unique<FakeUsbServer>(server_loop_.dispatcher(), std::move(endpoints.server));
     ASSERT_NOT_NULL(server_);
 
     server_->ExpectConnectToEndpoint(kEpAddr);
-    EXPECT_OK(client_->Init(kEpAddr, endpoints->client, client_loop_.dispatcher()));
+    EXPECT_OK(client_->Init(kEpAddr, endpoints.client, client_loop_.dispatcher()));
   }
 
   void TearDown() override {

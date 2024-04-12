@@ -62,10 +62,9 @@ class AcpiBatteryTest : public InspectTestHelper, public zxtest::Test {
     device_ = ptr->zxdev();
 
     // Start the FIDL server.
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_powersource::Source>();
-    ASSERT_OK(endpoints.status_value());
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), ptr);
-    source_client_.Bind(std::move(endpoints->client));
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_powersource::Source>::Create();
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), ptr);
+    source_client_.Bind(std::move(endpoints.client));
   }
 
   void TearDown() override {

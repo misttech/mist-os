@@ -120,9 +120,8 @@ class RootDeviceTest : public ::testing::Test {
   void SetUp() override {
     ASSERT_EQ(incoming_loop_.StartThread("incoming-ns-thread"), ZX_OK);
 
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    incoming_.SyncCall([server = std::move(endpoints->server)](IncomingNamespace* infra) mutable {
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    incoming_.SyncCall([server = std::move(endpoints.server)](IncomingNamespace* infra) mutable {
       zx::result service_result =
           infra->outgoing_.AddService<fuchsia_hardware_goldfish_pipe::Service>(
               fuchsia_hardware_goldfish_pipe::Service::InstanceHandler({
@@ -133,7 +132,7 @@ class RootDeviceTest : public ::testing::Test {
     });
 
     fake_parent_->AddFidlService(fuchsia_hardware_goldfish_pipe::Service::Name,
-                                 std::move(endpoints->client));
+                                 std::move(endpoints.client));
 
     auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
       auto device = std::make_unique<TestRootDevice>(fake_parent_.get());

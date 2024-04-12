@@ -207,16 +207,15 @@ void FakePciProtocol::AckInterrupt(AckInterruptCompleter::Sync& completer) {
 }
 
 ddk::Pci FakePciProtocol::SetUpFidlServer(async::Loop& loop) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_pci::Device>();
-  ZX_ASSERT(endpoints.is_ok());
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_pci::Device>::Create();
 
   auto fake_pci = std::make_unique<FakePciProtocol>();
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_pci::Device>> binding = fidl::BindServer(
       loop.dispatcher(),
-      fidl::ServerEnd<fuchsia_hardware_pci::Device>(endpoints->server.TakeChannel()), this);
+      fidl::ServerEnd<fuchsia_hardware_pci::Device>(endpoints.server.TakeChannel()), this);
   ZX_ASSERT(binding.has_value());
 
-  ddk::Pci pci = ddk::Pci(std::move(endpoints->client));
+  ddk::Pci pci = ddk::Pci(std::move(endpoints.client));
   ZX_ASSERT(pci.is_valid());
   return pci;
 }

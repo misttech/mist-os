@@ -31,8 +31,8 @@ VirtioMem::VirtioMem(const PhysMem& phys_mem, uint64_t pluggable_block_size, uin
 zx_status_t VirtioMem::Start(const zx::guest& guest, ::sys::ComponentContext* context,
                              async_dispatcher_t* dispatcher, uint64_t plugged_block_size,
                              uint64_t region_size) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_virtualization_hardware::VirtioMem>();
-  auto [client_end, server_end] = std::move(endpoints.value());
+  auto [client_end, server_end] =
+      fidl::Endpoints<fuchsia_virtualization_hardware::VirtioMem>::Create();
   fidl::InterfaceRequest<fuchsia::virtualization::hardware::VirtioMem> mem_request(
       server_end.TakeChannel());
   mem_.Bind(std::move(client_end), dispatcher, this);

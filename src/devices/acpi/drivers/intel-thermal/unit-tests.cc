@@ -59,11 +59,10 @@ class IntelThermalTest : public InspectTestHelper, public zxtest::Test {
     device_ = ptr->zxdev();
 
     // Start the FIDL server.
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_thermal::Device>();
-    ASSERT_OK(endpoints.status_value());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_thermal::Device>::Create();
 
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), ptr);
-    thermal_client_.Bind(std::move(endpoints->client));
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), ptr);
+    thermal_client_.Bind(std::move(endpoints.client));
   }
 
   void TearDown() override {

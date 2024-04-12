@@ -48,11 +48,10 @@ class UsbEndpointServerTest : public zxtest::Test {
     client_loop_.StartThread("client-loop");
     ASSERT_OK(fake_bti_create(fake_bti_.reset_and_get_address()));
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb_endpoint::Endpoint>();
-    ASSERT_TRUE(endpoints.is_ok());
-    ep_ = std::make_unique<FakeEndpoint>(fake_bti_, 0, std::move(endpoints->server));
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_usb_endpoint::Endpoint>::Create();
+    ep_ = std::make_unique<FakeEndpoint>(fake_bti_, 0, std::move(endpoints.server));
 
-    client_.Bind(std::move(endpoints->client), client_loop_.dispatcher(), &event_handler_);
+    client_.Bind(std::move(endpoints.client), client_loop_.dispatcher(), &event_handler_);
   }
 
   void VerifyRegisteredVmos(size_t count) {

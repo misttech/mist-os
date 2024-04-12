@@ -115,11 +115,10 @@ class IncomingNamespace {
     auto service_result = outgoing_.AddService<fuchsia_hardware_rpmb::Service>(std::move(handler));
     ZX_ASSERT(service_result.is_ok());
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(endpoints.is_ok());
-    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints.server)).is_ok());
 
-    return std::move(endpoints->client);
+    return std::move(endpoints.client);
   }
 
   fidl::ClientEnd<fuchsia_io::Directory> ConnectPdev() {
@@ -127,11 +126,10 @@ class IncomingNamespace {
         std::move(pdev_.GetInstanceHandler()));
     ZX_ASSERT(service_result.is_ok());
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(endpoints.is_ok());
-    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints.server)).is_ok());
 
-    return std::move(endpoints->client);
+    return std::move(endpoints.client);
   }
 
   fake_pdev::FakePDevFidl& pdev() { return pdev_; }
@@ -159,11 +157,10 @@ class FakeTeeService : public fidl::WireServer<fuchsia_hardware_tee::DeviceConne
     auto service_result = outgoing_.AddService<fuchsia_hardware_tee::Service>(std::move(handler));
     ZX_ASSERT(service_result.is_ok());
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(endpoints.is_ok());
-    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints.server)).is_ok());
 
-    return std::move(endpoints->client);
+    return std::move(endpoints.client);
   }
 
   void ConnectToApplication(ConnectToApplicationRequestView request,
@@ -287,14 +284,13 @@ TEST_F(FakeDdkOptee, MultiThreadTest) {
   zx_status_t status;
 
   for (auto& i : tee_app_client) {
-    auto tee_endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
-    ASSERT_OK(tee_endpoints.status_value());
+    auto tee_endpoints = fidl::Endpoints<fuchsia_tee::Application>::Create();
 
-    i = std::move(tee_endpoints->client);
+    i = std::move(tee_endpoints.client);
 
     auto result = tee_proto_client_->ConnectToApplication(
         kOpteeOsUuid, fidl::ClientEnd<::fuchsia_tee_manager::Provider>(),
-        std::move(tee_endpoints->server));
+        std::move(tee_endpoints.server));
     ASSERT_OK(result.status());
   }
 
@@ -355,14 +351,13 @@ TEST_F(FakeDdkOptee, TheadLimitCorrectOrder) {
   zx_status_t status;
 
   for (auto& i : tee_app_client) {
-    auto tee_endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
-    ASSERT_OK(tee_endpoints.status_value());
+    auto tee_endpoints = fidl::Endpoints<fuchsia_tee::Application>::Create();
 
-    i = std::move(tee_endpoints->client);
+    i = std::move(tee_endpoints.client);
 
     auto result = tee_proto_client_->ConnectToApplication(
         kOpteeOsUuid, fidl::ClientEnd<::fuchsia_tee_manager::Provider>(),
-        std::move(tee_endpoints->server));
+        std::move(tee_endpoints.server));
     ASSERT_OK(result.status());
   }
 
@@ -428,14 +423,13 @@ TEST_F(FakeDdkOptee, TheadLimitWrongOrder) {
   libsync::Completion smc_sleep_completion;
 
   for (auto& i : tee_app_client) {
-    auto tee_endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
-    ASSERT_OK(tee_endpoints.status_value());
+    auto tee_endpoints = fidl::Endpoints<fuchsia_tee::Application>::Create();
 
-    i = std::move(tee_endpoints->client);
+    i = std::move(tee_endpoints.client);
 
     auto result = tee_proto_client_->ConnectToApplication(
         kOpteeOsUuid, fidl::ClientEnd<::fuchsia_tee_manager::Provider>(),
-        std::move(tee_endpoints->server));
+        std::move(tee_endpoints.server));
     ASSERT_OK(result.status());
   }
 
@@ -529,14 +523,13 @@ TEST_F(FakeDdkOptee, TheadLimitWrongOrderCascade) {
   libsync::Completion smc_sleep_completion2;
 
   for (auto& i : tee_app_client) {
-    auto tee_endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
-    ASSERT_OK(tee_endpoints.status_value());
+    auto tee_endpoints = fidl::Endpoints<fuchsia_tee::Application>::Create();
 
-    i = std::move(tee_endpoints->client);
+    i = std::move(tee_endpoints.client);
 
     auto result = tee_proto_client_->ConnectToApplication(
         kOpteeOsUuid, fidl::ClientEnd<::fuchsia_tee_manager::Provider>(),
-        std::move(tee_endpoints->server));
+        std::move(tee_endpoints.server));
     ASSERT_OK(result.status());
   }
 

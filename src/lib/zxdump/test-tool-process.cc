@@ -139,7 +139,7 @@ class TestToolProcess::SandboxLoop {
     AddSvcEntry<fuchsia_kernel::RootJob, &SandboxLoop::root_job_server_>(*job);
     AddSvcEntry<fuchsia_boot::RootResource, &SandboxLoop::root_resource_server_>(*resource);
 
-    auto [svc_client, svc_server] = *fidl::CreateEndpoints<fuchsia_io::Directory>();
+    auto [svc_client, svc_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     status = vfs_->ServeDirectory(svc_dir_, std::move(svc_server));
     ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
     out_svc = std::move(svc_client);

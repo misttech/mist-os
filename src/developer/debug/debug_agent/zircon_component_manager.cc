@@ -47,7 +47,7 @@ constexpr uint64_t kMaxWaitMsForJobId = 1000;
 // Helper to simplify request pipelining.
 template <typename Protocol>
 fidl::ServerEnd<Protocol> CreateEndpointsAndBind(fidl::Client<Protocol>& client) {
-  auto [client_end, server_end] = *fidl::CreateEndpoints<Protocol>();
+  auto [client_end, server_end] = fidl::Endpoints<Protocol>::Create();
   client.Bind(std::move(client_end), async_get_default_dispatcher());
   return std::move(server_end);
 }

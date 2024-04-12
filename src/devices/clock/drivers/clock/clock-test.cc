@@ -310,14 +310,13 @@ TEST(ClockTest, BanjoPreferredOverFidl) {
                        fdf::WireSyncClient(std::move(clockimpl_endpoints->client)));
   ClockDevice dut(nullptr, std::move(proxy), kTestClockId);
 
-  zx::result clock_endpoints = fidl::CreateEndpoints<fuchsia_hardware_clock::Clock>();
-  ASSERT_TRUE(clock_endpoints.is_ok());
+  auto clock_endpoints = fidl::Endpoints<fuchsia_hardware_clock::Clock>::Create();
 
   fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                   std::move(clock_endpoints->server), &dut);
+                   std::move(clock_endpoints.server), &dut);
 
   fidl::WireClient<fuchsia_hardware_clock::Clock> clock_client(
-      std::move(clock_endpoints->client), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+      std::move(clock_endpoints.client), fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
   clock_client->SetRate(1'000'000).ThenExactlyOnce(
       [&](fidl::WireUnownedResult<fuchsia_hardware_clock::Clock::SetRate>& result) {
@@ -358,15 +357,14 @@ TEST(ClockTest, FallBackToFidl) {
   async_patterns::TestDispatcherBound<ClockDevice> dut(background_dispatcher, std::in_place,
                                                        nullptr, std::move(proxy), kTestClockId);
 
-  zx::result clock_endpoints = fidl::CreateEndpoints<fuchsia_hardware_clock::Clock>();
-  ASSERT_TRUE(clock_endpoints.is_ok());
+  auto clock_endpoints = fidl::Endpoints<fuchsia_hardware_clock::Clock>::Create();
 
   dut.SyncCall([&](ClockDevice* device) {
-    fidl::BindServer(background_dispatcher, std::move(clock_endpoints->server), device);
+    fidl::BindServer(background_dispatcher, std::move(clock_endpoints.server), device);
   });
 
   fidl::WireClient<fuchsia_hardware_clock::Clock> clock_client(
-      std::move(clock_endpoints->client), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+      std::move(clock_endpoints.client), fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
   // Call SetRate on the foreground dispatcher and run until the ClockDevice responds.
   clock_client->SetRate(1'000'000).ThenExactlyOnce(

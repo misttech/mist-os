@@ -186,7 +186,7 @@ void RunUntil(async::Loop* loop, fit::function<bool()> condition,
 template <typename Protocol, typename ServerImpl>
 fidl::ClientEnd<fuchsia_io::Directory> SetupServiceRoot(std::unique_ptr<ServerImpl> impl,
                                                         async_dispatcher_t* dispatcher) {
-  auto [root_client_end, root_server_end] = *fidl::CreateEndpoints<fuchsia_io::Directory>();
+  auto [root_client_end, root_server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   async::PostTask(dispatcher, [dispatcher, impl = std::move(impl),
                                server_end = std::move(root_server_end)]() mutable {
     // |component::OutgoingDirectory| is not thread-safe, so we have to construct and destruct in
@@ -195,10 +195,9 @@ fidl::ClientEnd<fuchsia_io::Directory> SetupServiceRoot(std::unique_ptr<ServerIm
     ASSERT_TRUE(outgoing_dir->AddProtocol<Protocol>(std::move(impl)).is_ok());
     ASSERT_TRUE(outgoing_dir->Serve(std::move(server_end)).is_ok());
     // Defer the destructing until the loop destructs.
-    async::PostTaskForTime(
-        dispatcher, [dir = std::move(outgoing_dir)]() {}, zx::time::infinite());
+    async::PostTaskForTime(dispatcher, [dir = std::move(outgoing_dir)]() {}, zx::time::infinite());
   });
-  auto [svc_client_end, svc_server_end] = *fidl::CreateEndpoints<fuchsia_io::Directory>();
+  auto [svc_client_end, svc_server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   EXPECT_ZX_EQ(fdio_open_at(root_client_end.channel().release(), "svc",
                             static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
                             svc_server_end.channel().release()),

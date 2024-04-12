@@ -412,9 +412,7 @@ void TestDevice::Connect() {
     block_count_ = response.value()->info.block_count;
   }
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Session>();
-  ASSERT_OK(endpoints);
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_block::Session>::Create();
   ASSERT_OK(fidl::WireCall(zxcrypt_block())->OpenSession(std::move(server)));
 
   {

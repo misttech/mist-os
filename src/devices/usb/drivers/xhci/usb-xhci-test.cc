@@ -434,10 +434,9 @@ class XhciMmioHarness : public XhciHarness {
     fake_device_.set_irq_signaller(config.irqs[0].borrow());
     config.use_fake_bti = true;
 
-    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(outgoing_endpoints);
+    auto outgoing_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
-    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints.server)](
                            IncomingNamespace* infra) mutable {
       infra->pdev_server.SetConfig(std::move(config));
       ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
@@ -447,7 +446,7 @@ class XhciMmioHarness : public XhciHarness {
     });
     ASSERT_NO_FATAL_FAILURE();
     root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                          std::move(outgoing_endpoints->client));
+                          std::move(outgoing_endpoints.client));
 
     auto dev =
         std::make_unique<UsbXhci>(root_.get(), ddk_fake::CreateBufferFactory(), loop_.dispatcher());

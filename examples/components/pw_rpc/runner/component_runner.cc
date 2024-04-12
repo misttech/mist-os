@@ -184,9 +184,8 @@ static fidl::Client<fuchsia_logger::LogSink> ConnectLogSink(
         if (!entry.directory().has_value()) {
           continue;
         }
-        auto log_sink_endpoints = fidl::CreateEndpoints<fuchsia_logger::LogSink>();
-        FX_CHECK(log_sink_endpoints.is_ok());
-        auto [log_sink_client_end, log_sink_server_end] = *std::move(log_sink_endpoints);
+        auto [log_sink_client_end, log_sink_server_end] =
+            fidl::Endpoints<fuchsia_logger::LogSink>::Create();
         const zx_handle_t svc_handle = entry.directory()->channel().get();
         if (zx_status_t status = fdio_service_connect_at(
                 svc_handle, "fuchsia.logger.LogSink", log_sink_server_end.TakeChannel().release());

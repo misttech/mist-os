@@ -197,17 +197,16 @@ class AmlGpioTest : public testing::Test {
     ASSERT_NE(node_server_.children().find("aml-gpio"), node_server_.children().cend());
 
     // Connect to the driver through its outgoing directory and get a gpioimpl client.
-    zx::result svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_TRUE(svc_endpoints.is_ok());
+    auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
     EXPECT_EQ(fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
                            static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                           svc_endpoints->server.TakeChannel().release()),
+                           svc_endpoints.server.TakeChannel().release()),
               ZX_OK);
 
     zx::result gpioimpl_client_end =
         fdf::internal::DriverTransportConnect<fuchsia_hardware_gpioimpl::Service::Device>(
-            svc_endpoints->client, component::kDefaultInstance);
+            svc_endpoints.client, component::kDefaultInstance);
     ASSERT_TRUE(gpioimpl_client_end.is_ok());
 
     client_.Bind(*std::move(gpioimpl_client_end), fdf::Dispatcher::GetCurrent()->get());

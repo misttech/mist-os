@@ -370,11 +370,10 @@ class DatagramSocketRouteCacheTest : public zxtest::Test {
     ASSERT_OK(zx::eventpair::create(0u, &error_local_, &error_peer_));
     ASSERT_NO_FATAL_FAILURE(server_.InvalidateClientCache());
 
-    zx::result endpoints = fidl::CreateEndpoints<fsocket::DatagramSocket>();
-    ASSERT_OK(endpoints.status_value());
-    client_ = fidl::WireSyncClient<fsocket::DatagramSocket>{std::move(endpoints->client)};
+    auto endpoints = fidl::Endpoints<fsocket::DatagramSocket>::Create();
+    client_ = fidl::WireSyncClient<fsocket::DatagramSocket>{std::move(endpoints.client)};
 
-    fidl::BindServer(control_loop_.dispatcher(), std::move(endpoints->server), &server_);
+    fidl::BindServer(control_loop_.dispatcher(), std::move(endpoints.server), &server_);
     control_loop_.StartThread("control");
   }
 

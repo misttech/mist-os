@@ -58,11 +58,10 @@ class Gt92xxTest : public zxtest::Test {
     ASSERT_OK(fidl_servers_loop_.StartThread("fidl-servers"));
     fidl::ClientEnd reset_gpio_client = reset_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
     fidl::ClientEnd intr_gpio_client = intr_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    ASSERT_TRUE(endpoints.is_ok());
-    fidl::BindServer(fidl_servers_loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
+    fidl::BindServer(fidl_servers_loop_.dispatcher(), std::move(endpoints.server), &mock_i2c_);
     fake_parent_ = MockDevice::FakeRootParent();
-    device_.emplace(input_report_loop_.dispatcher(), std::move(endpoints->client),
+    device_.emplace(input_report_loop_.dispatcher(), std::move(endpoints.client),
                     std::move(intr_gpio_client), std::move(reset_gpio_client), fake_parent_.get());
     EXPECT_OK(input_report_loop_.RunUntilIdle());
   }
@@ -85,17 +84,15 @@ class Gt92xxTest : public zxtest::Test {
   }
 
   fidl::WireClient<fuchsia_input_report::InputReportsReader> GetReader() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
-    EXPECT_OK(endpoints);
-    fidl::BindServer(input_report_loop_.dispatcher(), std::move(endpoints->server), &*device_);
-    fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(std::move(endpoints->client));
+    auto endpoints = fidl::Endpoints<fuchsia_input_report::InputDevice>::Create();
+    fidl::BindServer(input_report_loop_.dispatcher(), std::move(endpoints.server), &*device_);
+    fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(std::move(endpoints.client));
 
-    auto reader_endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-    EXPECT_OK(reader_endpoints.status_value());
-    auto result = client->GetInputReportsReader(std::move(reader_endpoints->server));
+    auto reader_endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
+    auto result = client->GetInputReportsReader(std::move(reader_endpoints.server));
     EXPECT_TRUE(result.ok());
     auto reader = fidl::WireClient<fuchsia_input_report::InputReportsReader>(
-        std::move(reader_endpoints->client), input_report_loop_.dispatcher());
+        std::move(reader_endpoints.client), input_report_loop_.dispatcher());
     EXPECT_OK(input_report_loop_.RunUntilIdle());
 
     return reader;
@@ -156,10 +153,9 @@ TEST_F(Gt92xxTest, InitForceConfig) {
 TEST_F(Gt92xxTest, TestGetDescriptor) {
   ASSERT_OK(input_report_loop_.StartThread("input-report-loop"));
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
-  ASSERT_OK(endpoints);
-  fidl::BindServer(input_report_loop_.dispatcher(), std::move(endpoints->server), &*device_);
-  fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<fuchsia_input_report::InputDevice>::Create();
+  fidl::BindServer(input_report_loop_.dispatcher(), std::move(endpoints.server), &*device_);
+  fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(std::move(endpoints.client));
 
   auto result = client->GetDescriptor();
   EXPECT_TRUE(result.ok());

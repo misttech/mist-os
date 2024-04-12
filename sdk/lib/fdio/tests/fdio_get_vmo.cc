@@ -175,8 +175,7 @@ TEST(GetVMOTest, Remote) {
   ASSERT_OK(loop.StartThread("fake-filesystem"));
   async_dispatcher_t* dispatcher = loop.dispatcher();
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::File>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fuchsia_io::File>::Create();
 
   Context context = {
       .supports_get_backing_memory = true,
@@ -185,11 +184,10 @@ TEST(GetVMOTest, Remote) {
   create_context_vmo(zx_system_get_page_size(), &context.vmo);
   ASSERT_OK(context.vmo.write("abcd", 0, 4));
 
-  fidl::BindServer(dispatcher, std::move(endpoints->server),
-                   std::make_unique<TestServer>(&context));
+  fidl::BindServer(dispatcher, std::move(endpoints.server), std::make_unique<TestServer>(&context));
 
   int raw_fd = -1;
-  ASSERT_OK(fdio_fd_create(endpoints->client.channel().release(), &raw_fd));
+  ASSERT_OK(fdio_fd_create(endpoints.client.channel().release(), &raw_fd));
   fbl::unique_fd fd(raw_fd);
 
   zx_rights_t expected_rights =
@@ -250,8 +248,7 @@ TEST(MmapFileTest, ProtExecWorks) {
   ASSERT_OK(loop.StartThread("fake-filesystem"));
   async_dispatcher_t* dispatcher = loop.dispatcher();
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::File>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fuchsia_io::File>::Create();
 
   Context context = {
       .supports_get_backing_memory = true,
@@ -260,11 +257,10 @@ TEST(MmapFileTest, ProtExecWorks) {
   create_context_vmo(zx_system_get_page_size(), &context.vmo);
   ASSERT_OK(context.vmo.write("abcd", 0, 4));
 
-  fidl::BindServer(dispatcher, std::move(endpoints->server),
-                   std::make_unique<TestServer>(&context));
+  fidl::BindServer(dispatcher, std::move(endpoints.server), std::make_unique<TestServer>(&context));
 
   int raw_fd = -1;
-  ASSERT_OK(fdio_fd_create(endpoints->client.channel().release(), &raw_fd));
+  ASSERT_OK(fdio_fd_create(endpoints.client.channel().release(), &raw_fd));
   fbl::unique_fd fd(raw_fd);
 
   // Make sure we can obtain an executable VMO from the underlying fd otherwise the test is invalid.

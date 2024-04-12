@@ -179,11 +179,10 @@ void FakeGpio::SetCurrentState(State state) { state_log_.push_back(std::move(sta
 std::vector<State> FakeGpio::GetStateLog() { return state_log_; }
 
 fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> FakeGpio::Connect() {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_gpio::Gpio>();
-  ZX_ASSERT(endpoints.is_ok());
-  bindings_.AddBinding(GetDefaultDispatcher(), std::move(endpoints->server), this,
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_gpio::Gpio>::Create();
+  bindings_.AddBinding(GetDefaultDispatcher(), std::move(endpoints.server), this,
                        fidl::kIgnoreBindingClosure);
-  return std::move(endpoints->client);
+  return std::move(endpoints.client);
 }
 
 fuchsia_hardware_gpio::Service::InstanceHandler FakeGpio::CreateInstanceHandler() {

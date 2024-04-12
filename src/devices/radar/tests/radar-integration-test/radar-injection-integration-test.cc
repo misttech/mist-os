@@ -212,24 +212,22 @@ TEST(RadarInjectionIntegrationTest, InjectBursts) {
       std::move(provider_client_end.value()));
 
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReader>();
-    ASSERT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_radar::RadarBurstReader>::Create();
 
-    const auto result = provider_client->Connect(std::move(endpoints->server));
+    const auto result = provider_client->Connect(std::move(endpoints.server));
     EXPECT_TRUE(result.is_ok());
 
-    reader1.emplace(std::move(endpoints->client), loop.dispatcher(), on_test_event);
+    reader1.emplace(std::move(endpoints.client), loop.dispatcher(), on_test_event);
     EXPECT_NO_FAILURES(reader1->RegisterVmos(10));
   }
 
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReader>();
-    ASSERT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_radar::RadarBurstReader>::Create();
 
-    const auto result = provider_client->Connect(std::move(endpoints->server));
+    const auto result = provider_client->Connect(std::move(endpoints.server));
     EXPECT_TRUE(result.is_ok());
 
-    reader2.emplace(std::move(endpoints->client), loop.dispatcher(), on_test_event);
+    reader2.emplace(std::move(endpoints.client), loop.dispatcher(), on_test_event);
     EXPECT_NO_FAILURES(reader2->RegisterVmos(10));
   }
 
@@ -309,13 +307,12 @@ TEST(RadarInjectionIntegrationTest, BurstsResumedAfterInjectorDisconnects) {
     fidl::SyncClient<fuchsia_hardware_radar::RadarBurstReaderProvider> provider_client(
         std::move(provider_client_end.value()));
 
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReader>();
-    ASSERT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_radar::RadarBurstReader>::Create();
 
-    const auto result = provider_client->Connect(std::move(endpoints->server));
+    const auto result = provider_client->Connect(std::move(endpoints.server));
     EXPECT_TRUE(result.is_ok());
 
-    reader.emplace(std::move(endpoints->client), loop.dispatcher(), on_test_event);
+    reader.emplace(std::move(endpoints.client), loop.dispatcher(), on_test_event);
     EXPECT_NO_FAILURES(reader->RegisterVmos(10));
   }
 

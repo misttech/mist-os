@@ -314,23 +314,20 @@ zx::result<> AmlUsbPhyDevice::CreateNode() {
   auto args =
       fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, kDeviceName).Build();
 
-  zx::result controller_endpoints =
-      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed to create controller endpoints: %s",
-                controller_endpoints.status_string());
+  auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
   zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
   ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed to create node endpoints: %s",
                 node_endpoints.status_string());
 
   {
     fidl::WireResult result = fidl::WireCall(node())->AddChild(
-        args, std::move(controller_endpoints->server), std::move(node_endpoints->server));
+        args, std::move(controller_endpoints.server), std::move(node_endpoints->server));
     if (!result.ok()) {
       FDF_LOG(ERROR, "Failed to add child %s", result.FormatDescription().c_str());
       return zx::error(result.status());
     }
   }
-  controller_.Bind(std::move(controller_endpoints->client));
+  controller_.Bind(std::move(controller_endpoints.client));
   node_.Bind(std::move(node_endpoints->client));
 
   return zx::ok();
@@ -379,17 +376,14 @@ AmlUsbPhyDevice::ChildNode& AmlUsbPhyDevice::ChildNode::operator++() {
                       })
           .Build();
 
-  zx::result controller_endpoints =
-      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed to create controller endpoints: %s",
-                controller_endpoints.status_string());
+  auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
   fidl::WireResult result =
-      parent_->node_->AddChild(args, std::move(controller_endpoints->server), {});
+      parent_->node_->AddChild(args, std::move(controller_endpoints.server), {});
   ZX_ASSERT_MSG(result.ok(), "Failed to add child %s", result.FormatDescription().c_str());
   ZX_ASSERT_MSG(result->is_ok(), "Failed to add child %d",
                 static_cast<uint32_t>(result->error_value()));
-  controller_.Bind(std::move(controller_endpoints->client));
+  controller_.Bind(std::move(controller_endpoints.client));
 
   return *this;
 }

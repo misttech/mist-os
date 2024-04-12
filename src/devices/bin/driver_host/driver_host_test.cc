@@ -57,14 +57,13 @@ class TestFile : public fio::testing::File_TestBase {
  private:
   void GetBackingMemory(fio::VmoFlags flags, GetBackingMemoryCallback callback) override {
     EXPECT_EQ(fio::VmoFlags::READ | fio::VmoFlags::EXECUTE | fio::VmoFlags::PRIVATE_CLONE, flags);
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::File>();
-    ASSERT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_io::File>::Create();
     EXPECT_EQ(ZX_OK, fdio_open(path_.data(),
                                static_cast<uint32_t>(fio::OpenFlags::RIGHT_READABLE |
                                                      fio::OpenFlags::RIGHT_EXECUTABLE),
-                               endpoints->server.channel().release()));
+                               endpoints.server.channel().release()));
 
-    fidl::WireSyncClient<fuchsia_io::File> file(std::move(endpoints->client));
+    fidl::WireSyncClient<fuchsia_io::File> file(std::move(endpoints.client));
     fidl::WireResult result = file->GetBackingMemory(fuchsia_io::wire::VmoFlags(uint32_t(flags)));
     EXPECT_TRUE(result.ok()) << result.FormatDescription();
     auto* res = result.Unwrap();
@@ -144,20 +143,19 @@ class DriverHostTest : public testing::Test {
   StartDriverResult StartDriver(std::vector<fdf::NodeSymbol> symbols = {},
                                 fidl::ClientEnd<fuchsia_driver_framework::Node>* node = nullptr,
                                 zx_status_t expected_epitaph = ZX_OK) {
-    auto pkg_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_TRUE(pkg_endpoints.is_ok());
+    auto pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     EXPECT_TRUE(svc_endpoints.is_ok());
 
     std::vector<frunner::ComponentNamespaceEntry> ns_entries;
-    ns_entries.push_back({{.path = "/pkg", .directory = std::move(pkg_endpoints->client)}});
+    ns_entries.push_back({{.path = "/pkg", .directory = std::move(pkg_endpoints.client)}});
     ns_entries.push_back({{.path = "/svc", .directory = std::move(svc_endpoints->client)}});
 
     TestFile file("/pkg/driver/test_driver.so");
     fidl::Binding<fio::File> file_binding(&file);
     TestDirectory pkg_directory;
     fidl::Binding<fio::Directory> pkg_binding(&pkg_directory);
-    pkg_binding.Bind(pkg_endpoints->server.TakeChannel(), loop_.dispatcher());
+    pkg_binding.Bind(pkg_endpoints.server.TakeChannel(), loop_.dispatcher());
     pkg_directory.SetOpenHandler(
         [this, &file_binding](fio::OpenFlags flags, std::string path, auto object) {
           EXPECT_EQ(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE, flags);
@@ -174,8 +172,7 @@ class DriverHostTest : public testing::Test {
         }},
     };
 
-    auto outgoing_dir_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_TRUE(outgoing_dir_endpoints.is_ok());
+    auto outgoing_dir_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     auto driver_endpoints = fidl::CreateEndpoints<fdh::Driver>();
     EXPECT_TRUE(driver_endpoints.is_ok());
 
@@ -194,7 +191,7 @@ class DriverHostTest : public testing::Test {
           .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
           .program = std::move(dictionary),
           .incoming = std::move(ns_entries),
-          .outgoing_dir = std::move(std::move(outgoing_dir_endpoints->server)),
+          .outgoing_dir = std::move(std::move(outgoing_dir_endpoints.server)),
       }};
       client->Start({std::move(driver_start_args), std::move(driver_endpoints->server)})
           .Then([&](auto result) {
@@ -218,7 +215,7 @@ class DriverHostTest : public testing::Test {
 
     return {
         .driver = std::move(driver_endpoints->client),
-        .outgoing_dir = std::move(outgoing_dir_endpoints->client),
+        .outgoing_dir = std::move(outgoing_dir_endpoints.client),
     };
   }
 
@@ -457,26 +454,24 @@ TEST_F(DriverHostTest, InvalidHandleRights) {
     connected = true;
     return ZX_OK;
   });
-  auto endpoints = fidl::CreateEndpoints<fdf::Node>();
-  ASSERT_TRUE(endpoints.is_ok());
-  auto& client_end = endpoints->client.channel();
+  auto endpoints = fidl::Endpoints<fdf::Node>::Create();
+  auto& client_end = endpoints.client.channel();
   ASSERT_EQ(ZX_OK, client_end.replace(ZX_RIGHT_TRANSFER, &client_end));
   // This should fail when node rights are not ZX_DEFAULT_CHANNEL_RIGHTS.
-  StartDriver({}, &endpoints->client, ZX_ERR_INVALID_ARGS);
+  StartDriver({}, &endpoints.client, ZX_ERR_INVALID_ARGS);
   EXPECT_FALSE(connected);
 }
 
 // Start a driver with an invalid binary.
 TEST_F(DriverHostTest, Start_InvalidBinary) {
-  auto pkg_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(pkg_endpoints.is_ok());
+  auto pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
   std::vector<frunner::ComponentNamespaceEntry> ns_entries;
-  ns_entries.push_back({{.path = "/pkg", .directory = std::move(pkg_endpoints->client)}});
+  ns_entries.push_back({{.path = "/pkg", .directory = std::move(pkg_endpoints.client)}});
   TestFile file("/pkg/driver/test_not_driver.so");
   fidl::Binding<fio::File> file_binding(&file);
   TestDirectory pkg_directory;
   fidl::Binding<fio::Directory> pkg_binding(&pkg_directory);
-  pkg_binding.Bind(pkg_endpoints->server.TakeChannel(), loop().dispatcher());
+  pkg_binding.Bind(pkg_endpoints.server.TakeChannel(), loop().dispatcher());
   pkg_directory.SetOpenHandler(
       [this, &file_binding](fio::OpenFlags flags, std::string path, auto object) {
         EXPECT_EQ(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE, flags);

@@ -363,10 +363,9 @@ class CreateTestBase : public zxtest::Test {
   using ProtocolType = typename NodeServer::_EnclosingProtocol;
 
   void SetUp() final {
-    zx::result node_ends = fidl::CreateEndpoints<ProtocolType>();
-    ASSERT_OK(node_ends.status_value());
-    node_client_end_ = std::move(node_ends->client);
-    node_server_end_ = std::move(node_ends->server);
+    auto node_ends = fidl::Endpoints<ProtocolType>::Create();
+    node_client_end_ = std::move(node_ends.client);
+    node_server_end_ = std::move(node_ends.server);
   }
 
   void TearDown() final { control_loop_.Shutdown(); }

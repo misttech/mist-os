@@ -121,11 +121,7 @@ zx::result<fidl::ClientEnd<fuchsia_hardware_pty::Device>> ConnectToPty(
 
 zx::result<fidl::ClientEnd<fuchsia_hardware_pty::Device>> CreateVirtualConsole(
     const fidl::WireSyncClient<fuchsia_virtualconsole::SessionManager>& session_manager) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_pty::Device>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [client, server] = endpoints.value();
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_pty::Device>::Create();
 
   const fidl::Status result = session_manager->CreateSession(std::move(server));
   if (!result.ok()) {
@@ -249,11 +245,7 @@ std::vector<std::thread> LaunchAutorun(const console_launcher::ConsoleLauncher& 
                                    fidl::ClientEnd<fuchsia_hardware_pty::Device> stdio,
                                    const std::string& term, const std::optional<std::string>& cmd) {
   while (true) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_pty::Device>();
-    if (endpoints.is_error()) {
-      FX_PLOGS(FATAL, endpoints.status_value()) << "failed to create endpoints";
-    }
-    auto& [client, server] = endpoints.value();
+    auto [client, server] = fidl::Endpoints<fuchsia_hardware_pty::Device>::Create();
 
     const fidl::Status result = fidl::WireCall(stdio)->Clone2(
         fidl::ServerEnd<fuchsia_unknown::Cloneable>(server.TakeChannel()));
@@ -517,7 +509,7 @@ int main(int argv, char** argc) {
   for (auto& thread : workers) {
     thread.join();
   }
-  // TODO(https://fxbug.dev/42179909): Hang around. If we exit before archivist has started, our logs
-  // will be lost, and this log is load bearing in shell_disabled_test.
+  // TODO(https://fxbug.dev/42179909): Hang around. If we exit before archivist has started, our
+  // logs will be lost, and this log is load bearing in shell_disabled_test.
   std::promise<void>().get_future().wait();
 }

@@ -93,12 +93,7 @@ class TestDevice final {
   }
 
   fidl::ClientEnd<fuchsia_device::Controller> new_parent_controller() const {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-    if (!endpoints.is_ok()) {
-      FX_PLOGS(ERROR, endpoints.error_value()) << "Failed to create endpoints";
-      return {};
-    }
-    auto& [client, server] = endpoints.value();
+    auto [client, server] = fidl::Endpoints<fuchsia_device::Controller>::Create();
 
     fidl::OneWayStatus status =
         fidl::WireCall(fvm_controller_)->ConnectToController(std::move(server));
@@ -110,12 +105,7 @@ class TestDevice final {
   }
 
   fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> new_parent() const {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
-    if (!endpoints.is_ok()) {
-      FX_PLOGS(ERROR, endpoints.error_value()) << "Failed to create endpoints";
-      return {};
-    }
-    auto& [client, server] = endpoints.value();
+    auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
     fidl::OneWayStatus status =
         fidl::WireCall(fvm_controller_)->ConnectToDeviceFidl(server.TakeChannel());

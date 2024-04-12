@@ -113,9 +113,7 @@ class StubExceptionHandler final : public fidl::WireServer<fuchsia_exception::Ha
 class FakeService {
  public:
   explicit FakeService(async_dispatcher_t* dispatcher) : outgoing_(dispatcher) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
-    auto& [client, server] = endpoints.value();
+    auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
     ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_exception::Handler>(
         [this, dispatcher](fidl::ServerEnd<fuchsia_exception::Handler> request) {

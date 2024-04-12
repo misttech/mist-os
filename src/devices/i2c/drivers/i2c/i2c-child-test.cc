@@ -75,24 +75,22 @@ class I2cChildTest : public zxtest::Test {
   void GetI2cChildClient(const char* name,
                          fidl::WireSyncClient<fuchsia_hardware_i2c::Device>* client,
                          const uint32_t bus_id) {
-    auto io_eps = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(io_eps);
-    namespace_.SyncCall(&FakeIncomingNamespace::AddI2cImplService, std::move(io_eps->server));
-    fake_root_->AddFidlService(fi2cimpl::Service::Name, std::move(io_eps->client));
+    auto io_eps = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    namespace_.SyncCall(&FakeIncomingNamespace::AddI2cImplService, std::move(io_eps.server));
+    fake_root_->AddFidlService(fi2cimpl::Service::Name, std::move(io_eps.client));
 
     SetMetadata(name, bus_id);
 
-    auto i2c_eps = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    ASSERT_OK(i2c_eps.status_value());
+    auto i2c_eps = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
 
-    *client = fidl::WireSyncClient<fuchsia_hardware_i2c::Device>(std::move(i2c_eps->client));
+    *client = fidl::WireSyncClient<fuchsia_hardware_i2c::Device>(std::move(i2c_eps.client));
 
     EXPECT_OK(I2cDevice::Create(nullptr, fake_root_.get()));
     ASSERT_EQ(fake_root_->child_count(), 1);
 
     zx_device_t* i2c_root = fake_root_->GetLatestChild();
     auto* const i2c_child = i2c_root->GetLatestChild()->GetDeviceContext<I2cChild>();
-    i2c_child->Bind(std::move(i2c_eps->server));
+    i2c_child->Bind(std::move(i2c_eps.server));
   }
 
   async_dispatcher_t* dispatcher() { return dispatcher_->async_dispatcher(); }

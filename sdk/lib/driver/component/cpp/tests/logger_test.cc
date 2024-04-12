@@ -104,9 +104,8 @@ TEST(LoggerTest, CreateAndLog) {
   async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   // Setup namespace.
-  auto svc = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  EXPECT_EQ(ZX_OK, svc.status_value());
-  auto ns = fdf::testing::CreateNamespace(std::move(svc->client));
+  auto svc = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  auto ns = fdf::testing::CreateNamespace(std::move(svc.client));
   ASSERT_TRUE(ns.is_ok());
 
   // Setup logger.
@@ -129,7 +128,7 @@ TEST(LoggerTest, CreateAndLog) {
   });
   fidl::Binding<fio::Directory> svc_binding2(&svc_directory2);
 
-  svc_binding2.Bind(svc->server.TakeChannel(), loop.dispatcher());
+  svc_binding2.Bind(svc.server.TakeChannel(), loop.dispatcher());
 
   auto logger = fdf::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, false);
   ASSERT_TRUE(logger.is_ok());
@@ -160,18 +159,17 @@ TEST(LoggerTest, Create_NoLogSink) {
   // Setup namespace.
   auto pkg = fidl::CreateEndpoints<fuchsia_io::Directory>();
   EXPECT_EQ(ZX_OK, pkg.status_value());
-  auto svc = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  EXPECT_EQ(ZX_OK, svc.status_value());
+  auto svc = fidl::Endpoints<fuchsia_io::Directory>::Create();
   fidl::Arena arena;
   fidl::VectorView<frunner::wire::ComponentNamespaceEntry> ns_entries(arena, 2);
   ns_entries[0].Allocate(arena);
   ns_entries[0].set_path(arena, "/pkg").set_directory(std::move(pkg->client));
   ns_entries[1].Allocate(arena);
-  ns_entries[1].set_path(arena, "/svc").set_directory(std::move(svc->client));
+  ns_entries[1].set_path(arena, "/svc").set_directory(std::move(svc.client));
   auto ns = fdf::Namespace::Create(ns_entries);
   ASSERT_TRUE(ns.is_ok());
 
-  svc->server.TakeChannel().reset();
+  svc.server.TakeChannel().reset();
 
   // Setup logger.
   auto logger = fdf::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, true);
@@ -182,9 +180,8 @@ TEST(LoggerTest, SetSeverity) {
   async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   // Setup namespace.
-  auto svc = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  EXPECT_EQ(ZX_OK, svc.status_value());
-  auto ns = fdf::testing::CreateNamespace(std::move(svc->client));
+  auto svc = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  auto ns = fdf::testing::CreateNamespace(std::move(svc.client));
   ASSERT_TRUE(ns.is_ok());
 
   // Setup logger.
@@ -207,7 +204,7 @@ TEST(LoggerTest, SetSeverity) {
   });
   fidl::Binding<fio::Directory> svc_binding2(&svc_directory2);
 
-  svc_binding2.Bind(svc->server.TakeChannel(), loop.dispatcher());
+  svc_binding2.Bind(svc.server.TakeChannel(), loop.dispatcher());
 
   auto logger = fdf::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, false);
   ASSERT_TRUE(logger.is_ok());

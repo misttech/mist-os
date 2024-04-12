@@ -111,12 +111,11 @@ class PerformanceDomainTest : public zxtest::Test {
 };
 
 void PerformanceDomainTest::SetUp() {
-  zx::result cpu_endpoints = fidl::CreateEndpoints<fuchsia_hardware_cpu_ctrl::Device>();
-  ASSERT_OK(cpu_endpoints);
-  fidl::BindServer(loop_.dispatcher(), std::move(cpu_endpoints->server),
+  auto cpu_endpoints = fidl::Endpoints<fuchsia_hardware_cpu_ctrl::Device>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(cpu_endpoints.server),
                    static_cast<fidl::WireServer<cpuctrl::Device>*>(&cpu_));
 
-  pd_.emplace(std::move(cpu_endpoints->client));
+  pd_.emplace(std::move(cpu_endpoints.client));
   ASSERT_OK(loop_.StartThread("performance-domain-test-fidl-thread"));
 }
 

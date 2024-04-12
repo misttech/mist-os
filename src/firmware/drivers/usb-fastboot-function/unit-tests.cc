@@ -113,11 +113,10 @@ class UsbFastbootFunctionTest : public zxtest::Test {
     device_->zxdev()->InitOp();
     ASSERT_OK(device_->zxdev()->WaitUntilInitReplyCalled(zx::time::infinite()));
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_fastboot::FastbootImpl>();
-    ASSERT_OK(endpoints.status_value());
-    client_ = fidl::WireSyncClient(std::move(endpoints->client));
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_fastboot::FastbootImpl>::Create();
+    client_ = fidl::WireSyncClient(std::move(endpoints.client));
     loop_.StartThread("usb-fastboot-function test");
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), device_);
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), device_);
   }
 
   void TearDown() override {
