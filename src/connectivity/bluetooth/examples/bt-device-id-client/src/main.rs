@@ -51,3 +51,45 @@ async fn main() -> Result<(), Error> {
     info!("Example DI client exiting...");
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use async_test_helpers::expect_stream_item;
+    use async_utils::PollExt;
+    use fuchsia_async as fasync;
+    use futures::pin_mut;
+
+    #[test]
+    fn lifetime_of_device_id_request() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let (di_client, mut di_server) =
+            fidl::endpoints::create_proxy_and_stream::<di::DeviceIdentificationMarker>().unwrap();
+        let (fut, _token) = set_device_identification(di_client).expect("can set DI record");
+        pin_mut!(fut);
+        exec.run_until_stalled(&mut fut).expect_pending("waiting for response");
+
+        // Expect the DI server to receive the request.
+        let (_token, responder) = match expect_stream_item(&mut exec, &mut di_server) {
+            Ok(di::DeviceIdentificationRequest::SetDeviceIdentification {
+                records,
+                token,
+                responder,
+            }) => {
+                assert_eq!(records.len(), 1);
+                (token, responder)
+            }
+            x => panic!("Expected DI request, got: {x:?}"),
+        };
+
+        // A response for the request is only expected when the DI advertisement terminates, so we
+        // expect the `fut` to remain active.
+        exec.run_until_stalled(&mut fut).expect_pending("waiting for response");
+
+        // Server terminates the advertisement by responding.
+        let _ = responder.send(Ok(()));
+        let () = exec.run_until_stalled(&mut fut).expect("DI response received");
+    }
+}
