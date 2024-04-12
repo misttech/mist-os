@@ -193,8 +193,32 @@ impl<I: IpTypesIpExt, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
         mut f: impl FnMut(&mut CC, &D) -> Option<R> + 'a,
     ) -> impl Iterator<Item = (Destination<I::Addr, &D>, R)> + 'a {
         let Self { table } = self;
-        // Get all potential routes we could take to reach `address`.
-        table.iter().filter_map(move |entry| {
+
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        enum BroadcastCase<I: IpTypesIpExt> {
+            AllOnes(I::BroadcastMarker),
+            Subnet(I::BroadcastMarker),
+            NotBroadcast,
+        }
+
+        let bound_device_all_ones_broadcast_exemption = core::iter::once_with(move || {
+            // If we're bound to a device and trying to broadcast on the local
+            // network, then provide a matched broadcast route.
+            let local_device = local_device?;
+            let next_hop = I::map_ip::<_, Option<NextHop<I::Addr>>>(
+                address,
+                |address| {
+                    (address == Ipv4::LIMITED_BROADCAST_ADDRESS.get())
+                        .then_some(NextHop::Broadcast(()))
+                },
+                |_address| None,
+            )?;
+            Some(Destination { next_hop, device: local_device })
+        })
+        .filter_map(|x| x);
+
+        let viable_table_entries = table.iter().filter_map(move |entry| {
             let EntryAndGeneration {
                 entry: Entry { subnet, device, gateway, metric: _ },
                 generation: _,
@@ -206,55 +230,62 @@ impl<I: IpTypesIpExt, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
                 return None;
             }
 
-            if !core_ctx.is_ip_device_enabled(device) {
-                return None;
-            }
-
-            f(core_ctx, device).map(|r| {
-                let next_hop = gateway.map_or(
+            let broadcast_case = I::map_ip::<_, BroadcastCase<I>>(
+                (address, *subnet),
+                |(address, subnet)| {
+                    // As per RFC 919 section 7,
+                    //      The address 255.255.255.255 denotes a broadcast on a local hardware
+                    //      network, which must not be forwarded.
+                    if address == Ipv4::LIMITED_BROADCAST_ADDRESS.get() {
+                        BroadcastCase::AllOnes(())
+                    // Or the destination address is the highest address in the subnet.
+                    // Per RFC 922,
+                    //       Since the local network layer can always map an IP address into data
+                    //       link layer address, the choice of an IP "broadcast host number" is
+                    //       somewhat arbitrary.  For simplicity, it should be one not likely to be
+                    //       assigned to a real host.  The number whose bits are all ones has this
+                    //       property; this assignment was first proposed in [6].  In the few cases
+                    //       where a host has been assigned an address with a host-number part of
+                    //       all ones, it does not seem onerous to require renumbering.
+                    // We require that the subnet contain more than one address (i.e. that the
+                    // prefix length is not 32) in order to decide that an address is a subnet
+                    // broadcast address.
+                    } else if subnet.prefix() < Ipv4Addr::BYTES * 8 && subnet.broadcast() == address
                     {
-                        let next_hop = I::map_ip(
-                            (address, *subnet),
-                            |(address, subnet)| {
-                                // As per RFC 919 section 7,
-                                //      The address 255.255.255.255 denotes a broadcast on a local
-                                //      hardware network, which must not be forwarded.
-                                if address == Ipv4::LIMITED_BROADCAST_ADDRESS.get()
-                                    // Or the destination address is the highest address in the
-                                    // subnet.
-                                    // Per RFC 922,
-                                    //       Since the local network layer can always map an IP
-                                    //       address into data link layer address, the choice of an
-                                    //       IP "broadcast host number" is somewhat arbitrary.  For
-                                    //       simplicity, it should be one not likely to be assigned
-                                    //       to a real host.  The number whose bits are all ones has
-                                    //       this property; this assignment was first proposed in
-                                    //       [6].  In the few cases where a host has been assigned
-                                    //       an address with a host-number part of all ones, it does
-                                    //       not seem onerous to require renumbering.
-                                    // We require that the subnet contain more than one address
-                                    // (i.e. that the prefix length is not 32) in order to decide
-                                    // that an address is a subnet broadcast address.
-                                    || subnet.prefix() < Ipv4Addr::BYTES * 8
-                                        && subnet.broadcast() == address
-                                {
-                                    NextHop::Broadcast(())
-                                } else {
-                                    NextHop::RemoteAsNeighbor
-                                }
-                            },
-                            // IPv6 has no notion of "broadcast".
-                            |(_address, _subnet)| NextHop::RemoteAsNeighbor,
-                        );
-                        next_hop
-                    },
-                    // Notably, if the route has a gateway, then
-                    // `NextHop::Broadcast(())` is never yielded.
-                    NextHop::Gateway,
-                );
-                (Destination { next_hop, device }, r)
-            })
-        })
+                        BroadcastCase::Subnet(())
+                    } else {
+                        BroadcastCase::NotBroadcast
+                    }
+                },
+                // IPv6 has no notion of "broadcast".
+                |(_address, _subnet)| BroadcastCase::NotBroadcast,
+            );
+
+            let next_hop = match broadcast_case {
+                // Always broadcast to the all-ones destination.
+                BroadcastCase::AllOnes(marker) => NextHop::Broadcast(marker),
+                // Only broadcast to the subnet broadcast address if the route does not have a
+                // gateway.
+                BroadcastCase::Subnet(marker) => {
+                    gateway.map_or(NextHop::Broadcast(marker), NextHop::Gateway)
+                }
+                BroadcastCase::NotBroadcast => {
+                    gateway.map_or(NextHop::RemoteAsNeighbor, NextHop::Gateway)
+                }
+            };
+
+            Some(Destination { next_hop, device })
+        });
+
+        bound_device_all_ones_broadcast_exemption.chain(viable_table_entries).filter_map(
+            move |destination| {
+                let device = &destination.device;
+                if !core_ctx.is_ip_device_enabled(device) {
+                    return None;
+                }
+                f(core_ctx, device).map(|r| (destination, r))
+            },
+        )
     }
 }
 
@@ -795,16 +826,177 @@ mod tests {
 
                 assert_eq!(
                     table.lookup(&mut core_ctx, None, Ipv4::LIMITED_BROADCAST_ADDRESS.get()),
-                    Some(Destination {
-                        next_hop: NextHop::Gateway(next_hop),
-                        device: device.clone()
-                    })
+                    Some(Destination { next_hop: NextHop::Broadcast(()), device: device.clone() })
                 );
             },
             |(_table, _config, _next_hop)| {
                 // Do nothing since IPv6 doesn't have broadcast.
             },
         );
+    }
+
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+    enum BroadcastCaseNextHop {
+        Neighbor,
+        Gateway,
+    }
+
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+    enum LookupResultNextHop {
+        Neighbor,
+        Gateway,
+        Broadcast,
+    }
+
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+    struct LookupResult {
+        next_hop: LookupResultNextHop,
+        device: MultipleDevicesId,
+    }
+
+    #[test_case::test_matrix(
+        [None, Some(BroadcastCaseNextHop::Neighbor), Some(BroadcastCaseNextHop::Gateway)],
+        [None, Some(MultipleDevicesId::A), Some(MultipleDevicesId::B)]
+    )]
+    fn all_ones_broadcast_lookup(
+        default_route: Option<BroadcastCaseNextHop>,
+        bind_device: Option<MultipleDevicesId>,
+    ) {
+        let mut core_ctx = FakeCtx::default();
+        let expected_lookup_result = match (default_route, bind_device) {
+            // Sending to all-ones with a bound device always results in a broadcast.
+            (_, Some(device)) => {
+                Some(LookupResult { next_hop: LookupResultNextHop::Broadcast, device })
+            }
+            // With no matching route and no bound device, we don't know where to broadcast to,
+            // so the lookup fails.
+            (None, None) => None,
+            (Some(_next_hop), None) => {
+                // Regardless of the default route's configured next hop, sending to all-ones
+                // should result in a broadcast.
+                Some(LookupResult {
+                    next_hop: LookupResultNextHop::Broadcast,
+                    device: MultipleDevicesId::A,
+                })
+            }
+        };
+
+        let mut table = ForwardingTable::<Ipv4, MultipleDevicesId>::default();
+        if let Some(next_hop) = default_route {
+            let entry = Entry {
+                subnet: Subnet::new(Ipv4::UNSPECIFIED_ADDRESS, 0).expect("default subnet"),
+                device: MultipleDevicesId::A,
+                gateway: match next_hop {
+                    BroadcastCaseNextHop::Neighbor => None,
+                    BroadcastCaseNextHop::Gateway => {
+                        Some(SpecifiedAddr::new(net_ip_v4!("192.168.0.1")).unwrap())
+                    }
+                },
+                metric: Metric::ExplicitMetric(RawMetric(0)),
+            };
+            assert_eq!(super::testutil::add_entry(&mut table, entry.clone()), Ok(&entry));
+        }
+
+        let got_lookup_result = table
+            .lookup(&mut core_ctx, bind_device.as_ref(), Ipv4::LIMITED_BROADCAST_ADDRESS.get())
+            .map(|Destination { next_hop, device }| LookupResult {
+                next_hop: match next_hop {
+                    NextHop::RemoteAsNeighbor => LookupResultNextHop::Neighbor,
+                    NextHop::Gateway(_) => LookupResultNextHop::Gateway,
+                    NextHop::Broadcast(()) => LookupResultNextHop::Broadcast,
+                },
+                device,
+            });
+
+        assert_eq!(got_lookup_result, expected_lookup_result);
+    }
+
+    #[test_case::test_matrix(
+        [None, Some(BroadcastCaseNextHop::Neighbor), Some(BroadcastCaseNextHop::Gateway)],
+        [None, Some(BroadcastCaseNextHop::Neighbor), Some(BroadcastCaseNextHop::Gateway)],
+        [None, Some(MultipleDevicesId::A), Some(MultipleDevicesId::B)]
+    )]
+    fn subnet_broadcast_lookup(
+        default_route: Option<BroadcastCaseNextHop>,
+        subnet_route: Option<BroadcastCaseNextHop>,
+        bind_device: Option<MultipleDevicesId>,
+    ) {
+        let mut core_ctx = FakeCtx::default();
+        let expected_lookup_result = match bind_device {
+            // Binding to a device not matching any routes in the table will fail the lookup.
+            Some(MultipleDevicesId::B) | Some(MultipleDevicesId::C) => None,
+            Some(MultipleDevicesId::A) | None => match (default_route, subnet_route) {
+                // No matching routes.
+                (None, None) => None,
+                // The subnet route will take precedence over the default route.
+                (None | Some(_), Some(next_hop)) => {
+                    Some(LookupResult {
+                        device: MultipleDevicesId::A,
+                        next_hop: match next_hop {
+                            // Allow broadcasting when this route is on-link.
+                            BroadcastCaseNextHop::Neighbor => LookupResultNextHop::Broadcast,
+                            // Continue to unicast when the route has a gateway, even though this is
+                            // the subnet's broadcast address.
+                            BroadcastCaseNextHop::Gateway => LookupResultNextHop::Gateway,
+                        },
+                    })
+                }
+                (Some(next_hop), None) => {
+                    Some(LookupResult {
+                        device: MultipleDevicesId::A,
+                        next_hop: match next_hop {
+                            // Since this is just matching the default route, it looks like
+                            // a regular unicast route rather than a broadcast one.
+                            BroadcastCaseNextHop::Neighbor => LookupResultNextHop::Neighbor,
+                            BroadcastCaseNextHop::Gateway => LookupResultNextHop::Gateway,
+                        },
+                    })
+                }
+            },
+        };
+
+        let subnet = net_declare::net_subnet_v4!("192.168.0.0/24");
+        let gateway = SpecifiedAddr::new(net_ip_v4!("192.168.0.1")).unwrap();
+
+        let mut table = ForwardingTable::<Ipv4, MultipleDevicesId>::default();
+        if let Some(next_hop) = default_route {
+            let entry = Entry {
+                subnet: Subnet::new(Ipv4::UNSPECIFIED_ADDRESS, 0).expect("default subnet"),
+                device: MultipleDevicesId::A,
+                gateway: match next_hop {
+                    BroadcastCaseNextHop::Neighbor => None,
+                    BroadcastCaseNextHop::Gateway => Some(gateway),
+                },
+                metric: Metric::ExplicitMetric(RawMetric(0)),
+            };
+            assert_eq!(super::testutil::add_entry(&mut table, entry.clone()), Ok(&entry));
+        }
+
+        if let Some(next_hop) = subnet_route {
+            let entry = Entry {
+                subnet,
+                device: MultipleDevicesId::A,
+                gateway: match next_hop {
+                    BroadcastCaseNextHop::Neighbor => None,
+                    BroadcastCaseNextHop::Gateway => Some(gateway),
+                },
+                metric: Metric::ExplicitMetric(RawMetric(0)),
+            };
+            assert_eq!(super::testutil::add_entry(&mut table, entry.clone()), Ok(&entry));
+        }
+
+        let got_lookup_result = table
+            .lookup(&mut core_ctx, bind_device.as_ref(), subnet.broadcast())
+            .map(|Destination { next_hop, device }| LookupResult {
+                next_hop: match next_hop {
+                    NextHop::RemoteAsNeighbor => LookupResultNextHop::Neighbor,
+                    NextHop::Gateway(_) => LookupResultNextHop::Gateway,
+                    NextHop::Broadcast(()) => LookupResultNextHop::Broadcast,
+                },
+                device,
+            });
+
+        assert_eq!(got_lookup_result, expected_lookup_result);
     }
 
     #[ip_test]
