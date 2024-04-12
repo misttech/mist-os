@@ -34,12 +34,13 @@ async fn explore_over_handles(
     command: Option<String>,
     mut name_infos: Vec<fproc::NameInfo>,
     process_name: String,
+    package_resolver: &crate::package_resolver::PackageResolver,
 ) -> Result<zx::Process, LauncherError> {
     // In addition to tools binaries requested by the user, add the built-in binaries of the
     // debug-dash-launcher package, creating `#!resolve` trampolines for all.
     tool_urls.push("fuchsia-pkg://fuchsia.com/debug-dash-launcher".into());
     let (tools_pkg_dir, tools_path) =
-        trampoline::create_trampolines_from_packages(tool_urls).await?;
+        trampoline::create_trampolines_from_packages(package_resolver, tool_urls).await?;
     layout::add_tools_to_name_infos(tools_pkg_dir, &mut name_infos);
 
     // The dash-launcher can be asked to launch multiple dash processes, each of which can make

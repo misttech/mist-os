@@ -25,7 +25,8 @@
             protocol: [
                 "fuchsia.hardware.pty.Device",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.pkg.PackageResolver",
+                "fuchsia.pkg.PackageResolver-base",
+                "fuchsia.pkg.PackageResolver-full",
                 "fuchsia.process.Launcher",
                 "fuchsia.process.Resolver",
                 "fuchsia.sys2.RealmQuery",

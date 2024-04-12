@@ -5,8 +5,7 @@
 use {
     anyhow::Context,
     fidl::endpoints::{ControlHandle, Responder},
-    fidl_fuchsia_dash::{LauncherControlHandle, LauncherRequest, LauncherRequestStream},
-    fuchsia_async as fasync,
+    fidl_fuchsia_dash as fdash, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_inspect::{component, health::Reporter},
     fuchsia_zircon as zx,
@@ -16,11 +15,12 @@ use {
 
 mod launch;
 mod layout;
+mod package_resolver;
 mod socket;
 mod trampoline;
 
 enum IncomingRequest {
-    Launcher(LauncherRequestStream),
+    Launcher(fdash::LauncherRequestStream),
 }
 
 #[fuchsia::main]
@@ -45,7 +45,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .for_each_concurrent(None, |IncomingRequest::Launcher(mut stream)| async move {
             while let Some(Ok(request)) = stream.next().await {
                 match request {
-                    LauncherRequest::ExploreComponentOverPty {
+                    fdash::LauncherRequest::ExploreComponentOverPty {
                         moniker,
                         pty,
                         tool_urls,
@@ -63,7 +63,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         });
                         let _ = responder.send(result);
                     }
-                    LauncherRequest::ExploreComponentOverSocket {
+                    fdash::LauncherRequest::ExploreComponentOverSocket {
                         moniker,
                         socket,
                         tool_urls,
@@ -81,7 +81,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         });
                         let _ = responder.send(result);
                     }
-                    LauncherRequest::ExplorePackageOverSocket {
+                    fdash::LauncherRequest::ExplorePackageOverSocket {
                         url,
                         subpackages,
                         socket,
@@ -90,6 +90,31 @@ async fn main() -> Result<(), anyhow::Error> {
                         responder,
                     } => {
                         let result = crate::launch::package::explore_over_socket(
+                            fdash::FuchsiaPkgResolver::Full,
+                            &url,
+                            &subpackages,
+                            socket,
+                            tool_urls,
+                            command,
+                        )
+                        .await
+                        .map(|p| {
+                            info!("launched Dash for package {} {}", url, subpackages.join(" "));
+                            notify_on_process_exit(p, responder.control_handle().clone());
+                        });
+                        let _ = responder.send(result);
+                    }
+                    fdash::LauncherRequest::ExplorePackageOverSocket2 {
+                        fuchsia_pkg_resolver,
+                        url,
+                        subpackages,
+                        socket,
+                        tool_urls,
+                        command,
+                        responder,
+                    } => {
+                        let result = crate::launch::package::explore_over_socket(
+                            fuchsia_pkg_resolver,
                             &url,
                             &subpackages,
                             socket,
@@ -111,7 +136,7 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn notify_on_process_exit(process: zx::Process, control_handle: LauncherControlHandle) {
+fn notify_on_process_exit(process: zx::Process, control_handle: fdash::LauncherControlHandle) {
     fasync::Task::spawn(async move {
         let _ = fasync::OnSignals::new(&process, zx::Signals::PROCESS_TERMINATED).await;
         match process.info() {

@@ -6,7 +6,6 @@ use fidl::endpoints::create_proxy;
 use fidl_fuchsia_dash::LauncherError;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_kernel as fkernel;
-use fidl_fuchsia_pkg as fpkg;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl};
 use fuchsia_zircon as zx;
@@ -42,19 +41,13 @@ fn parse_url(url: &str) -> Result<(AbsolutePackageUrl, Option<String>), Launcher
 
 // For each of the given packages, resolve them and create a PkgDir with its URL and DirectoryProxy.
 async fn get_pkg_dirs(
+    package_resolver: &crate::package_resolver::PackageResolver,
     tool_urls: Vec<String>,
-    resolver: &fpkg::PackageResolverProxy,
 ) -> Result<Vec<PkgDir>, LauncherError> {
     let mut dirs: Vec<PkgDir> = vec![];
     for url in tool_urls {
         let (pkg_url, resource) = parse_url(&url)?;
-        let (dir, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .map_err(|_| LauncherError::Internal)?;
-        resolver
-            .resolve(&pkg_url.to_string(), server)
-            .await
-            .map_err(|_| LauncherError::Internal)?
-            .map_err(|_| LauncherError::PackageResolver)?;
+        let dir = package_resolver.resolve(&pkg_url.to_string()).await?;
         dirs.push(PkgDir { pkg_url, dir, resource });
     }
     Ok(dirs)
@@ -282,16 +275,14 @@ async fn make_trampoline_vfs(
 
 // Given the URLs of some packages, return a directory containing their binaries as trampolines.
 pub async fn create_trampolines_from_packages(
+    package_resolver: &crate::package_resolver::PackageResolver,
     pkg_urls: Vec<String>,
 ) -> Result<(Option<fio::DirectoryProxy>, Option<String>), LauncherError> {
     if pkg_urls.is_empty() {
         return Ok((None, None));
     }
 
-    let resolver = connect_to_protocol::<fpkg::PackageResolverMarker>()
-        .map_err(|_| LauncherError::PackageResolver)?;
-
-    let pkg_dirs = get_pkg_dirs(pkg_urls, &resolver).await?;
+    let pkg_dirs = get_pkg_dirs(package_resolver, pkg_urls).await?;
     let trampolines = create_trampolines(&pkg_dirs).await?;
     make_trampoline_vfs(trampolines).await
 }
@@ -377,18 +368,19 @@ mod tests {
             }
         })
         .detach();
+        let resolver = crate::package_resolver::PackageResolver::new_test(resolver);
 
         // Empty package list.
-        assert!(get_pkg_dirs(vec![], &resolver).await.unwrap().is_empty());
+        assert!(get_pkg_dirs(&resolver, vec![]).await.unwrap().is_empty());
 
         // Non-empty package list, but with a malformed URL.
         assert_matches!(
-            get_pkg_dirs(vec!["".to_string()], &resolver).await,
+            get_pkg_dirs(&resolver, vec!["".to_string()]).await,
             Err(LauncherError::BadUrl)
         );
 
         // Valid package list.
-        let v = get_pkg_dirs(vec!["fuchsia-pkg://h/n".to_string()], &resolver).await.unwrap();
+        let v = get_pkg_dirs(&resolver, vec!["fuchsia-pkg://h/n".to_string()]).await.unwrap();
         assert!(v.len() == 1);
         assert_eq!(v[0].pkg_url.host().to_string(), "h".to_string());
         assert_eq!(v[0].pkg_url.name().to_string(), "n".to_string());

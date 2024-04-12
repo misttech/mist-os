@@ -34,6 +34,7 @@
         {
             protocol: "fuchsia.pkg.PackageResolver",
             from: "#mock-resolver",
+            as: "fuchsia.pkg.PackageResolver-full",
             to: "#debug-dash-launcher",
         },
         {

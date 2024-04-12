@@ -429,6 +429,7 @@
                 source_name: "fuchsia.pkg.PackageResolver",
                 capability: "protocol",
                 target_monikers: [
+                    "/core/debug-dash-launcher",
                     "/core/process_resolver",
                 ],
             },

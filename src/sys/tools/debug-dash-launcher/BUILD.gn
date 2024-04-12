@@ -53,6 +53,7 @@ rustc_binary("bin") {
     "src/launch/package.rs",
     "src/layout.rs",
     "src/main.rs",
+    "src/package_resolver.rs",
     "src/socket.rs",
     "src/trampoline.rs",
   ]

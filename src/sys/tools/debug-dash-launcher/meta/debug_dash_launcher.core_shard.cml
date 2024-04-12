@@ -31,6 +31,12 @@
         {
             protocol: "fuchsia.pkg.PackageResolver",
             from: "#pkg-resolver",
+            as: "fuchsia.pkg.PackageResolver-full",
+            to: "#debug-dash-launcher",
+        },
+        {
+            protocol: "fuchsia.pkg.PackageResolver-base",
+            from: "parent",
             to: "#debug-dash-launcher",
         },
         {

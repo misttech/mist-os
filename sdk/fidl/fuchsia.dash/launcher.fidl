@@ -59,6 +59,16 @@ type DashNamespaceLayout = strict enum {
     INSTANCE_NAMESPACE_IS_ROOT = 2;
 };
 
+/// The package resolvers available for resolving package URLs with the `fuchsia-pkg` scheme.
+@available(added=20)
+type FuchsiaPkgResolver = flexible enum : uint32 {
+    /// Resolves base packages from blobfs.
+    BASE = 1;
+    /// Resolves base, cache, or universe packages from blobfs and any configured remote
+    /// repositories.
+    FULL = 2;
+};
+
 @discoverable
 closed protocol Launcher {
     /// Launch a dash process scoped to the component with the given moniker, forwarding the given
@@ -101,6 +111,14 @@ closed protocol Launcher {
     ///
     /// The dash launcher will implicitly create a PTY and transfer bytes between the PTY and
     /// the socket.
+    ///
+    /// Always uses [`fuchsia.dash/FuchsiaPkgResolver.FULL`] to resolve package URLs with scheme
+    /// "fuchsia-pkg".
+    /// Use [`fuchsia.dash/Launcher.ExplorePackageOverSocket2`] instead to pick which resolver to
+    /// use with "fuchsia-pkg" URLs.
+    @available(
+            deprecated=20,
+            note="use ExplorePackageOverSocket2 which has a FuchsiaPkgResolver parameter instead of defaulting to the Full resolver")
     strict ExplorePackageOverSocket(resource struct {
         /// The absolute package URL to resolve.
         /// If `subpackages` is empty the resolved package directory will be loaded into the dash
@@ -117,6 +135,40 @@ closed protocol Launcher {
         /// A list of package URLs whose directories will also be loaded into the dash namespace.
         /// The path preference is determined by the order of this vector.
         tool_urls vector<fuchsia.url.Url>:<MAX_URLS>;
+        /// An optional inline command to run.
+        command string:<MAX, optional>;
+    }) -> () error LauncherError;
+
+    /// Launch a dash process with the indicated [sub]package loaded into the namespace at /pkg,
+    /// forwarding the given stdio socket.
+    ///
+    /// The dash launcher will implicitly create a PTY and transfer bytes between the PTY and
+    /// the socket.
+    @available(added=20)
+    strict ExplorePackageOverSocket2(resource struct {
+        /// The package resolver to use when resolving package URLs (both `url` and `tool_urls`)
+        /// that have the `fuchsia-pkg` scheme.
+        fuchsia_pkg_resolver FuchsiaPkgResolver;
+
+        /// The absolute package URL to resolve.
+        /// If `subpackages` is empty the resolved package directory will be loaded into the dash
+        /// namespace at `/pkg`.
+        /// If `subpackages` is not empty, the package directory of the final subpackage of `url`
+        /// will be loaded into the namespace at `/pkg`.
+        url string:MAX;
+
+        /// The chain of subpackages, if any, of `url` to resolve, in resolution order.
+        /// If `subpackages` is not empty, the package directory of the final subpackage will be
+        /// loaded into the dash namespace at `/pkg`.
+        subpackages vector<string:MAX>:MAX;
+
+        /// The raw socket to connect to the dash process
+        socket zx.Handle:SOCKET;
+
+        /// A list of package URLs whose directories will also be loaded into the dash namespace.
+        /// The path preference is determined by the order of this vector.
+        tool_urls vector<fuchsia.url.Url>:<MAX_URLS>;
+
         /// An optional inline command to run.
         command string:<MAX, optional>;
     }) -> () error LauncherError;

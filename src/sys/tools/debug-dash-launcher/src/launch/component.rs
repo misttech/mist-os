@@ -77,8 +77,17 @@ async fn explore_over_handles(
     // moniker is `./core/foo`, process name is `sh-core-foo`.
     let process_name = format!("sh{}", moniker[1..].replace('/', "-"));
 
-    super::explore_over_handles(stdin, stdout, stderr, tool_urls, command, name_infos, process_name)
-        .await
+    super::explore_over_handles(
+        stdin,
+        stdout,
+        stderr,
+        tool_urls,
+        command,
+        name_infos,
+        process_name,
+        &crate::package_resolver::PackageResolver::new(fdash::FuchsiaPkgResolver::Full)?,
+    )
+    .await
 }
 
 async fn open_outgoing_dir(
