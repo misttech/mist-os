@@ -59,12 +59,11 @@ class Tas27xxTest : public inspect::InspectTestHelper, public zxtest::Test {
   void SetUp() override {
     EXPECT_OK(fidl_servers_loop_.StartThread("fidl-servers"));
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    ASSERT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
 
-    fidl::BindServer(fidl_servers_loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
+    fidl::BindServer(fidl_servers_loop_.dispatcher(), std::move(endpoints.server), &mock_i2c_);
 
-    mock_i2c_client_ = std::move(endpoints->client);
+    mock_i2c_client_ = std::move(endpoints.client);
     fault_gpio_client_ = fault_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
   }
 

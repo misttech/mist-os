@@ -238,21 +238,19 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
   // settings. From here, the fake StreamConfig can be customized before it is enabled.
   std::shared_ptr<FakeStreamConfig> CreateFakeStreamConfig(bool is_input = false) {
     EXPECT_EQ(dispatcher(), test_loop().dispatcher());
-    auto stream_config_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::StreamConfig>();
-    EXPECT_TRUE(stream_config_endpoints.is_ok());
+    auto stream_config_endpoints = fidl::Endpoints<fuchsia_hardware_audio::StreamConfig>::Create();
     auto fake_stream = std::make_shared<FakeStreamConfig>(
-        stream_config_endpoints->server.TakeChannel(),
-        stream_config_endpoints->client.TakeChannel(), dispatcher());
+        stream_config_endpoints.server.TakeChannel(),
+        stream_config_endpoints.client.TakeChannel(), dispatcher());
     fake_stream->set_is_input(is_input);
     return fake_stream;
   }
 
   std::shared_ptr<FakeCodec> CreateFakeCodec(std::optional<bool> is_input = false) {
     EXPECT_EQ(dispatcher(), test_loop().dispatcher());
-    auto codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
-    EXPECT_TRUE(codec_endpoints.is_ok());
+    auto codec_endpoints = fidl::Endpoints<fuchsia_hardware_audio::Codec>::Create();
     auto fake_codec = std::make_shared<FakeCodec>(
-        codec_endpoints->server.TakeChannel(), codec_endpoints->client.TakeChannel(), dispatcher());
+        codec_endpoints.server.TakeChannel(), codec_endpoints.client.TakeChannel(), dispatcher());
     fake_codec->set_is_input(is_input);
     return fake_codec;
   }

@@ -243,9 +243,8 @@ void stress_pcmm(std::vector<zx::vmo>& vmos, std::mutex& vmos_lock,
   zx::time now;
   do {
     now = zx::clock::get_monotonic();
-    auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-    ZX_ASSERT(endpoints.is_ok());
-    auto& [collection_client, collection_server] = endpoints.value();
+    auto [collection_client, collection_server] =
+        fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
     auto allocate_result = allocator->AllocateNonSharedCollection(std::move(collection_server));
     ZX_ASSERT(allocate_result.ok());
     fidl::WireSyncClient collection{std::move(collection_client)};

@@ -299,12 +299,11 @@ FakeAlc5663Hardware CreateFakeAlc5663(async_dispatcher_t* dispatcher) {
       fuchsia_hardware_i2c::Service::InstanceHandler({.device = proto->bind_handler(dispatcher)}));
   ZX_ASSERT(service_result.is_ok());
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ZX_ASSERT(endpoints.is_ok());
-  ZX_ASSERT(result.codec->outgoing().Serve(std::move(endpoints->server)).is_ok());
+  auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  ZX_ASSERT(result.codec->outgoing().Serve(std::move(endpoints.server)).is_ok());
 
   result.fake_parent->AddFidlService(fuchsia_hardware_i2c::Service::Name,
-                                     std::move(endpoints->client), "i2c000");
+                                     std::move(endpoints.client), "i2c000");
 
   // Expose the parent device.
   result.parent = result.fake_parent.get();

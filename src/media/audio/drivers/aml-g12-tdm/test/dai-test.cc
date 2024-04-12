@@ -640,19 +640,17 @@ TEST_F(AmlG12TdmDaiTest, ClientCloseDaiChannel) {
   ASSERT_OK(supported_formats_ring_buffer.status());
   auto supported_formats_dai = client->GetDaiFormats();
   ASSERT_OK(supported_formats_dai.status());
-  auto endpoints3 = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
-  ASSERT_OK(endpoints3.status_value());
+  auto endpoints3 = fidl::Endpoints<fuchsia_hardware_audio::RingBuffer>::Create();
   fidl::Arena allocator;
   fuchsia_hardware_audio::wire::Format ring_buffer_format(allocator);
   ring_buffer_format.set_pcm_format(allocator, GetDefaultPcmFormat());
   fuchsia_hardware_audio::wire::DaiFormat dai_format = GetDefaultDaiFormat();
-  ASSERT_OK(
-      client->CreateRingBuffer(dai_format, ring_buffer_format, std::move(endpoints3->server)));
+  ASSERT_OK(client->CreateRingBuffer(dai_format, ring_buffer_format, std::move(endpoints3.server)));
 
-  auto vmo = fidl::WireCall(endpoints3->client)->GetVmo(8192, 0);
+  auto vmo = fidl::WireCall(endpoints3.client)->GetVmo(8192, 0);
   ASSERT_OK(vmo.status());
 
-  auto start_time = fidl::WireCall(endpoints3->client)->Start();
+  auto start_time = fidl::WireCall(endpoints3.client)->Start();
   ASSERT_OK(start_time.status());
 
   // Close DAI channel.
@@ -691,23 +689,21 @@ TEST_F(AmlG12TdmDaiTest, ClientCloseRingBufferChannel) {
   ASSERT_OK(supported_formats_ring_buffer.status());
   auto supported_formats_dai = client->GetDaiFormats();
   ASSERT_OK(supported_formats_dai.status());
-  auto endpoints3 = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
-  ASSERT_OK(endpoints3.status_value());
+  auto endpoints3 = fidl::Endpoints<fuchsia_hardware_audio::RingBuffer>::Create();
   fidl::Arena allocator;
   fuchsia_hardware_audio::wire::Format ring_buffer_format(allocator);
   ring_buffer_format.set_pcm_format(allocator, GetDefaultPcmFormat());
   fuchsia_hardware_audio::wire::DaiFormat dai_format = GetDefaultDaiFormat();
-  ASSERT_OK(
-      client->CreateRingBuffer(dai_format, ring_buffer_format, std::move(endpoints3->server)));
+  ASSERT_OK(client->CreateRingBuffer(dai_format, ring_buffer_format, std::move(endpoints3.server)));
 
-  auto vmo = fidl::WireCall(endpoints3->client)->GetVmo(8192, 0);
+  auto vmo = fidl::WireCall(endpoints3.client)->GetVmo(8192, 0);
   ASSERT_OK(vmo.status());
 
-  auto start_time = fidl::WireCall(endpoints3->client)->Start();
+  auto start_time = fidl::WireCall(endpoints3.client)->Start();
   ASSERT_OK(start_time.status());
 
   // Close RingBuffer channel.
-  endpoints3->client.reset();
+  endpoints3.client.reset();
 
   dai->WaitUntilStopped();
   dai.release();  // Managed by the DDK.

@@ -42,11 +42,10 @@ class FakeClock : public fidl::testing::WireTestBase<fuchsia_hardware_clock::Clo
 
   bool IsFakeClockEnabled() { return enabled_; }
   fidl::ClientEnd<fuchsia_hardware_clock::Clock> Connect() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_clock::Clock>();
-    ZX_ASSERT(endpoints.is_ok());
-    bindings_.AddBinding(async_get_default_dispatcher(), std::move(endpoints->server), this,
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_clock::Clock>::Create();
+    bindings_.AddBinding(async_get_default_dispatcher(), std::move(endpoints.server), this,
                          fidl::kIgnoreBindingClosure);
-    return std::move(endpoints->client);
+    return std::move(endpoints.client);
   }
 
  protected:
@@ -203,11 +202,8 @@ fidl::WireSyncClient<audio_fidl::StreamConfig> GetStreamClient(
   if (!client_wrap.is_valid()) {
     return {};
   }
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfig>();
-  if (!endpoints.is_ok()) {
-    return {};
-  }
-  auto [stream_channel_local, stream_channel_remote] = *std::move(endpoints);
+  auto [stream_channel_local, stream_channel_remote] =
+      fidl::Endpoints<audio_fidl::StreamConfig>::Create();
   auto result = client_wrap->Connect(std::move(stream_channel_remote));
   if (!result.ok()) {
     return {};
@@ -615,9 +611,7 @@ TEST_F(StreamTest, I2sOutCodecsStartedAndMuted) {
   auto stream_client = GetStreamClient(std::move(endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
-  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints2.status_value());
-  auto [local, remote] = *std::move(endpoints2);
+  auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
   fidl::Arena allocator;
   audio_fidl::wire::Format format(allocator);
@@ -682,9 +676,7 @@ TEST_F(StreamTest, I2sOutCodecsTurnOnDelay) {
   auto stream_client = GetStreamClient(std::move(endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
-  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints2.status_value());
-  auto [local, remote] = *std::move(endpoints2);
+  auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
   fidl::Arena allocator;
   audio_fidl::wire::Format format(allocator);
@@ -804,9 +796,7 @@ TEST_F(StreamTest, I2sOutSetGainState) {
 
   {
     // Now we start the ring buffer so override_mute_ gets cleared.
-    auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = *std::move(endpoints);
+    auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
     fidl::Arena allocator;
     audio_fidl::wire::Format format(allocator);
@@ -1025,9 +1015,7 @@ TEST_F(StreamTest, I2sOutCodecsStop) {
   ASSERT_TRUE(stream_client.is_valid());
 
   // We stop the ring buffer and expect the codecs are stopped.
-  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints2.status_value());
-  auto [local, remote] = *std::move(endpoints2);
+  auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
   fidl::Arena allocator;
   audio_fidl::wire::Format format(allocator);
   audio_fidl::wire::PcmFormat pcm_format = GetDefaultPcmFormat();
@@ -1106,9 +1094,7 @@ TEST_F(StreamTest, I2sOutCodecsChannelsActive) {
   ASSERT_TRUE(stream_client.is_valid());
 
   // We expect the codecs to start/stop.
-  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints2.status_value());
-  auto [local, remote] = *std::move(endpoints2);
+  auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
   fidl::Arena allocator;
   audio_fidl::wire::Format format(allocator);
   audio_fidl::wire::PcmFormat pcm_format = GetDefaultPcmFormat();
@@ -1279,9 +1265,7 @@ TEST_F(StreamTest, I2sOutChangeRate96K) {
 
   // Default sets 48'000.
   {
-    auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = *std::move(endpoints);
+    auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
     fidl::Arena allocator;
     audio_fidl::wire::Format format(allocator);
@@ -1296,9 +1280,7 @@ TEST_F(StreamTest, I2sOutChangeRate96K) {
   }
   // Changes to 96'000.
   {
-    auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = *std::move(endpoints);
+    auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
     fidl::Arena allocator;
     audio_fidl::wire::Format format(allocator);
@@ -1378,9 +1360,7 @@ TEST_F(StreamTest, PcmChangeRates) {
 
   // Default sets 48'000 kHz.
   {
-    auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = *std::move(endpoints);
+    auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
     fidl::Arena allocator;
     audio_fidl::wire::Format format(allocator);
@@ -1392,9 +1372,7 @@ TEST_F(StreamTest, PcmChangeRates) {
 
   // Sets 96'000 kHz.
   {
-    auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = *std::move(endpoints);
+    auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
     fidl::Arena allocator;
     audio_fidl::wire::Format format(allocator);
@@ -1407,9 +1385,7 @@ TEST_F(StreamTest, PcmChangeRates) {
 
   // Sets 16'000 kHz.
   {
-    auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = *std::move(endpoints);
+    auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
     fidl::Arena allocator;
     audio_fidl::wire::Format format(allocator);
@@ -1427,9 +1403,7 @@ TEST_F(StreamTest, PcmChangeRates) {
 
   // Sets 8'000 kHz.
   {
-    auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = *std::move(endpoints);
+    auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
     fidl::Arena allocator;
     audio_fidl::wire::Format format(allocator);
@@ -1494,9 +1468,7 @@ TEST_F(StreamTest, EnableAndMuteChannelsPcm1Channel) {
   mock[0x534].ExpectWrite(0);  // TDMOUT MUTE2.
   mock[0x538].ExpectWrite(0);  // TDMOUT MUTE3.
   {
-    auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = *std::move(endpoints);
+    auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
     fidl::Arena allocator;
     audio_fidl::wire::Format format(allocator);
@@ -1577,9 +1549,7 @@ TEST_F(StreamTest, EnableAndMuteChannelsTdm2Lanes) {
   mock[0x5b4].ExpectWrite(0);  // TDMOUT MUTE2.
   mock[0x5b8].ExpectWrite(0);  // TDMOUT MUTE3.
   {
-    auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = *std::move(endpoints);
+    auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
     fidl::Arena allocator;
     audio_fidl::wire::Format format(allocator);
@@ -1644,9 +1614,7 @@ TEST_F(StreamTest, EnableAndMuteChannelsTdm1Lane) {
   mock[0x5b4].ExpectWrite(0);  // TDMOUT MUTE2.
   mock[0x5b8].ExpectWrite(0);  // TDMOUT MUTE3.
   {
-    auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = *std::move(endpoints);
+    auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
     fidl::Arena allocator;
     audio_fidl::wire::Format format(allocator);
@@ -1884,9 +1852,7 @@ class AmlG12TdmTest : public inspect::InspectTestHelper, public zxtest::Test {
     auto stream_client = GetStreamClient(std::move(endpoints->client));
     ASSERT_TRUE(stream_client.is_valid());
 
-    auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-    ASSERT_OK(endpoints2.status_value());
-    auto [local, remote] = *std::move(endpoints2);
+    auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
     fidl::Arena allocator;
     audio_fidl::wire::Format format(allocator);
@@ -1923,9 +1889,7 @@ class AmlG12TdmTest : public inspect::InspectTestHelper, public zxtest::Test {
     auto stream_client = GetStreamClient(std::move(endpoints->client));
     ASSERT_TRUE(stream_client.is_valid());
 
-    auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-    ASSERT_OK(endpoints2.status_value());
-    auto [local, remote] = *std::move(endpoints2);
+    auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
     fidl::Arena allocator;
     audio_fidl::wire::Format format(allocator);
@@ -2070,9 +2034,7 @@ TEST_F(AmlG12TdmTest, Inspect) {
   auto stream_client = GetStreamClient(std::move(endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
-  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints2.status_value());
-  auto [local, remote] = *std::move(endpoints2);
+  auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
   fidl::Arena allocator;
   audio_fidl::wire::Format format(allocator);
@@ -2135,9 +2097,7 @@ TEST_F(PowerManagementTest, ClockGating) {
   auto stream_client = GetStreamClient(std::move(endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
-  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints2.status_value());
-  auto [local, remote] = *std::move(endpoints2);
+  auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
   fidl::Arena allocator;
   audio_fidl::wire::Format format(allocator);
   audio_fidl::wire::PcmFormat pcm_format = GetDefaultPcmFormat();

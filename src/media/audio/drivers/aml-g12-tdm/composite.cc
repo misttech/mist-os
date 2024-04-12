@@ -27,17 +27,14 @@ zx::result<> Driver::CreateDevfsNode() {
                   .Build();
 
   // Create endpoints of the `NodeController` for the node.
-  zx::result controller_endpoints =
-      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Controller end point creation failed: %s",
-                controller_endpoints.status_string());
+  auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
   zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
   ZX_ASSERT_MSG(node_endpoints.is_ok(), "Node end point creation failed: %s",
                 node_endpoints.status_string());
 
   fidl::WireResult result = fidl::WireCall(node())->AddChild(
-      args, std::move(controller_endpoints->server), std::move(node_endpoints->server));
+      args, std::move(controller_endpoints.server), std::move(node_endpoints->server));
   if (!result.ok()) {
     FDF_SLOG(ERROR, "Call to add child failed", KV("status", result.status_string()));
     return zx::error(result.status());
@@ -46,7 +43,7 @@ zx::result<> Driver::CreateDevfsNode() {
     FDF_SLOG(ERROR, "Failed to add child", KV("error", result.FormatDescription().c_str()));
     return zx::error(ZX_ERR_INTERNAL);
   }
-  controller_.Bind(std::move(controller_endpoints->client));
+  controller_.Bind(std::move(controller_endpoints.client));
   node_.Bind(std::move(node_endpoints->client));
 
   return zx::ok();

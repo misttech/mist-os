@@ -98,14 +98,10 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
 
   bool CreateConsumerUnderTest() {
     // Create a |FakeAudioCore| instance.
-    zx::result audio_core_endpoints = fidl::CreateEndpoints<fuchsia_media::AudioCore>();
-    EXPECT_TRUE(audio_core_endpoints.is_ok());
-    if (!audio_core_endpoints.is_ok()) {
-      return false;
-    }
+    auto audio_core_endpoints = fidl::Endpoints<fuchsia_media::AudioCore>::Create();
 
     fake_audio_core_ =
-        std::make_unique<FakeAudioCore>(dispatcher(), std::move(audio_core_endpoints->server));
+        std::make_unique<FakeAudioCore>(dispatcher(), std::move(audio_core_endpoints.server));
 
     // Create and bind to a |Consumer| instance.
     zx::result audio_consumer_endpoints = fidl::CreateEndpoints<fuchsia_media::AudioConsumer>();
@@ -114,7 +110,7 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
       return false;
     }
 
-    Consumer::CreateAndBind(dispatcher(), std::move(audio_core_endpoints->client),
+    Consumer::CreateAndBind(dispatcher(), std::move(audio_core_endpoints.client),
                             std::move(audio_consumer_endpoints->server));
     RunLoopUntilIdle();
 
@@ -151,24 +147,20 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
         .frames_per_second = frames_per_second,
     }};
 
-    zx::result stream_sink_endpoints = fidl::CreateEndpoints<fuchsia_media::StreamSink>();
-    EXPECT_TRUE(stream_sink_endpoints.is_ok());
-    if (!stream_sink_endpoints.is_ok()) {
-      return false;
-    }
+    auto stream_sink_endpoints = fidl::Endpoints<fuchsia_media::StreamSink>::Create();
 
     fit::result result = consumer_under_test()->CreateStreamSink({{
         .buffers = std::move(buffers),
         .stream_type = std::move(stream_type),
         .compression = nullptr,
-        .stream_sink_request = std::move(stream_sink_endpoints->server),
+        .stream_sink_request = std::move(stream_sink_endpoints.server),
     }});
     EXPECT_TRUE(result.is_ok());
     if (!result.is_ok()) {
       return false;
     }
 
-    stream_sink_under_test_ = fidl::Client(std::move(stream_sink_endpoints->client), dispatcher(),
+    stream_sink_under_test_ = fidl::Client(std::move(stream_sink_endpoints.client), dispatcher(),
                                            &stream_sink_event_handler_);
     RunLoopUntilIdle();
 
@@ -190,16 +182,15 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
   }
 
   void CreateVolumeControl() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_media_audio::VolumeControl>();
-    EXPECT_TRUE(endpoints.is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_media_audio::VolumeControl>::Create();
     EXPECT_TRUE(consumer_under_test()
                     ->BindVolumeControl({{
-                        .volume_control_request = std::move(endpoints->server),
+                        .volume_control_request = std::move(endpoints.server),
                     }})
                     .is_ok());
 
     volume_control_under_test_ =
-        fidl::Client(std::move(endpoints->client), dispatcher(), &volume_control_event_handler_);
+        fidl::Client(std::move(endpoints.client), dispatcher(), &volume_control_event_handler_);
     RunLoopUntilIdle();
 
     fake_gain_control_ = fake_audio_renderer().WasBindGainControlCalled();
@@ -288,18 +279,17 @@ TEST_F(AudioConsumerTests, CreateStreamSinkTwice) {
                                               .channels = kChannels,
                                               .frames_per_second = kFramesPerSecond}};
 
-  zx::result stream_sink_endpoints = fidl::CreateEndpoints<fuchsia_media::StreamSink>();
-  ASSERT_TRUE(stream_sink_endpoints.is_ok());
+  auto stream_sink_endpoints = fidl::Endpoints<fuchsia_media::StreamSink>::Create();
   fit::result result = consumer_under_test()->CreateStreamSink({{
       .buffers = std::move(buffers),
       .stream_type = std::move(stream_type),
       .compression = nullptr,
-      .stream_sink_request = std::move(stream_sink_endpoints->server),
+      .stream_sink_request = std::move(stream_sink_endpoints.server),
   }});
   ASSERT_TRUE(result.is_ok());
 
   auto second_stream_sink_under_test =
-      fidl::Client(std::move(stream_sink_endpoints->client), dispatcher());
+      fidl::Client(std::move(stream_sink_endpoints.client), dispatcher());
   RunLoopUntilIdle();
 
   // Expect that the renderer has not yet been updated, because that operation is pending the
@@ -789,8 +779,7 @@ TEST_F(AudioConsumerTests, RejectCompressed) {
       .frames_per_second = kFramesPerSecond,
   }};
 
-  zx::result stream_sink_endpoints = fidl::CreateEndpoints<fuchsia_media::StreamSink>();
-  EXPECT_TRUE(stream_sink_endpoints.is_ok());
+  auto stream_sink_endpoints = fidl::Endpoints<fuchsia_media::StreamSink>::Create();
 
   auto compression = std::make_unique<fuchsia_media::Compression>();
   compression->type() = fuchsia_media::kAudioEncodingAac;
@@ -799,7 +788,7 @@ TEST_F(AudioConsumerTests, RejectCompressed) {
       .buffers = std::move(buffers),
       .stream_type = std::move(stream_type),
       .compression = std::move(compression),
-      .stream_sink_request = std::move(stream_sink_endpoints->server),
+      .stream_sink_request = std::move(stream_sink_endpoints.server),
   }});
   EXPECT_TRUE(result.is_ok());
 
@@ -808,7 +797,7 @@ TEST_F(AudioConsumerTests, RejectCompressed) {
       [&unbind_status](fidl::UnbindInfo unbind_info) { unbind_status = unbind_info.status(); });
 
   fidl::Client<fuchsia_media::StreamSink> stream_sink = fidl::Client(
-      std::move(stream_sink_endpoints->client), dispatcher(), &stream_sink_event_handler);
+      std::move(stream_sink_endpoints.client), dispatcher(), &stream_sink_event_handler);
 
   RunLoopUntilIdle();
 

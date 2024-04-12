@@ -30,11 +30,8 @@ constexpr float kTestGainStep = 2.f;
 
 fidl::WireSyncClient<audio_fidl::StreamConfig> GetStreamClient(
     fidl::WireSyncClient<audio_fidl::StreamConfigConnector>& client) {
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfig>();
-  if (!endpoints.is_ok()) {
-    return {};
-  }
-  auto [stream_channel_local, stream_channel_remote] = *std::move(endpoints);
+  auto [stream_channel_local, stream_channel_remote] =
+      fidl::Endpoints<audio_fidl::StreamConfig>::Create();
   auto result = client->Connect(std::move(stream_channel_remote));
   if (!result.ok()) {
     return {};

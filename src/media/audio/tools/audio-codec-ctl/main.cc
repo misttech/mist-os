@@ -225,9 +225,7 @@ fidl::SyncClient<fuchsia_hardware_audio::Codec> GetCodecClient(std::string path)
   }
 
   fidl::SyncClient connector_client(std::move(connector.value()));
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
-  ZX_ASSERT(endpoints.is_ok());
-  auto [local, remote] = *std::move(endpoints);
+  auto [local, remote] = fidl::Endpoints<fuchsia_hardware_audio::Codec>::Create();
   auto connect_ret = connector_client->Connect(std::move(remote));
   ZX_ASSERT(connect_ret.is_ok());
   return fidl::SyncClient<fuchsia_hardware_audio::Codec>(std::move(local));
@@ -235,10 +233,8 @@ fidl::SyncClient<fuchsia_hardware_audio::Codec> GetCodecClient(std::string path)
 
 fidl::SyncClient<fuchsia_hardware_audio_signalprocessing::SignalProcessing> GetSignalClient(
     std::string path) {
-  auto endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
-  ZX_ASSERT(endpoints.is_ok());
-  auto [local, remote] = *std::move(endpoints);
+  auto [local, remote] =
+      fidl::Endpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>::Create();
   auto connect_ret = GetCodecClient(path)->SignalProcessingConnect(std::move(remote));
   ZX_ASSERT(connect_ret.is_ok());
   return fidl::SyncClient<fuchsia_hardware_audio_signalprocessing::SignalProcessing>(

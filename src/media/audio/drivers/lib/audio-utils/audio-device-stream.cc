@@ -58,9 +58,8 @@ zx_status_t AudioDeviceStream::Open() {
   }
   fidl::WireSyncClient client{std::move(client_end.value())};
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfig>();
-  ZX_ASSERT(endpoints.is_ok());
-  auto [stream_channel_local, stream_channel_remote] = *std::move(endpoints);
+  auto [stream_channel_local, stream_channel_remote] =
+      fidl::Endpoints<audio_fidl::StreamConfig>::Create();
   auto result = client->Connect(std::move(stream_channel_remote));
   if (result.status() != ZX_OK) {
     printf("client connect failed with error %s\n", result.status_string());
@@ -247,11 +246,7 @@ zx_status_t AudioDeviceStream::SetFormat(uint32_t frames_per_second, uint16_t ch
   frame_rate_ = frames_per_second;
   sample_format_ = sample_format;
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  if (endpoints.is_error()) {
-    return endpoints.error_value();
-  }
-  auto [local, remote] = std::move(endpoints.value());
+  auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
   audio_fidl::wire::PcmFormat pcm_format = {};
   pcm_format.number_of_channels = static_cast<uint8_t>(channel_cnt_);

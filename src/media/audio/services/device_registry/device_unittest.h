@@ -400,10 +400,9 @@ class CodecTest : public DeviceTestBase {
 
  private:
   std::shared_ptr<FakeCodec> MakeFakeCodec(std::optional<bool> is_input = false) {
-    auto codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
-    EXPECT_TRUE(codec_endpoints.is_ok());
+    auto codec_endpoints = fidl::Endpoints<fuchsia_hardware_audio::Codec>::Create();
     auto fake_codec = std::make_shared<FakeCodec>(
-        codec_endpoints->server.TakeChannel(), codec_endpoints->client.TakeChannel(), dispatcher());
+        codec_endpoints.server.TakeChannel(), codec_endpoints.client.TakeChannel(), dispatcher());
     fake_codec->set_is_input(is_input);
     return fake_codec;
   }
@@ -648,11 +647,10 @@ class StreamConfigTest : public DeviceTestBase {
 
  private:
   std::shared_ptr<FakeStreamConfig> MakeFakeStreamConfig(bool is_input = false) {
-    auto stream_config_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::StreamConfig>();
-    EXPECT_TRUE(stream_config_endpoints.is_ok());
+    auto stream_config_endpoints = fidl::Endpoints<fuchsia_hardware_audio::StreamConfig>::Create();
     auto fake_stream = std::make_shared<FakeStreamConfig>(
-        stream_config_endpoints->server.TakeChannel(),
-        stream_config_endpoints->client.TakeChannel(), dispatcher());
+        stream_config_endpoints.server.TakeChannel(),
+        stream_config_endpoints.client.TakeChannel(), dispatcher());
     fake_stream->set_is_input(is_input);
     return fake_stream;
   }

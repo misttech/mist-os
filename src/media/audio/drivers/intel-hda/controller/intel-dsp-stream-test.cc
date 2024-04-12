@@ -24,11 +24,8 @@ static constexpr char kTestProductName[] = "Builtin Headphone Jack";
 
 fidl::WireSyncClient<fuchsia_hardware_audio::Dai> GetDaiClient(
     fidl::WireSyncClient<fuchsia_hardware_audio::DaiConnector>& client) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Dai>();
-  if (!endpoints.is_ok()) {
-    return {};
-  }
-  auto [stream_channel_local, stream_channel_remote] = *std::move(endpoints);
+  auto [stream_channel_local, stream_channel_remote] =
+      fidl::Endpoints<fuchsia_hardware_audio::Dai>::Create();
   ZX_ASSERT(client->Connect(std::move(stream_channel_remote)).ok());
   return fidl::WireSyncClient<fuchsia_hardware_audio::Dai>(std::move(stream_channel_local));
 }

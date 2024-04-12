@@ -49,11 +49,8 @@ fidl::WireSyncClient<audio_fidl::StreamConfig> GetStreamClient(
   if (!client_wrap.is_valid()) {
     return {};
   }
-  zx::result endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfig>();
-  if (!endpoints.is_ok()) {
-    return {};
-  }
-  auto& [stream_channel_local, stream_channel_remote] = endpoints.value();
+  auto [stream_channel_local, stream_channel_remote] =
+      fidl::Endpoints<audio_fidl::StreamConfig>::Create();
   const fidl::OneWayStatus status = client_wrap->Connect(std::move(stream_channel_remote));
   EXPECT_OK(status);
   return fidl::WireSyncClient<audio_fidl::StreamConfig>(std::move(stream_channel_local));
@@ -241,9 +238,8 @@ class BaseUsbAudioTest : public inspect::InspectTestHelper, public zxtest::Test 
 
     root_ = MockDevice::FakeRootParent();
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
-    incoming_.SyncCall([server = std::move(endpoints->server),
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    incoming_.SyncCall([server = std::move(endpoints.server),
                         this](IncomingNamespace<FakeDevType>* infra) mutable {
       infra->fake_dev = std::make_shared<FakeDevType>(root_.get());
       ASSERT_OK(infra->fake_dev->Bind());
@@ -257,7 +253,7 @@ class BaseUsbAudioTest : public inspect::InspectTestHelper, public zxtest::Test 
     });
     ASSERT_EQ(root_->child_count(), 1);
     auto* mock_dev = root_->GetLatestChild();
-    mock_dev->AddFidlService(fuchsia_hardware_usb::UsbService::Name, std::move(endpoints->client));
+    mock_dev->AddFidlService(fuchsia_hardware_usb::UsbService::Name, std::move(endpoints.client));
 
     incoming_.SyncCall([&](IncomingNamespace<FakeDevType>* infra) {
       mock_dev->AddProtocol(ZX_PROTOCOL_USB, infra->fake_dev->proto().ops,
@@ -330,10 +326,9 @@ TEST_F(UsbAudioTest, GetStreamProperties) {
   std::advance(itr, 0);
   UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
-  auto stream_client = GetStreamClient(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<audio_fidl::StreamConfigConnector>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints.client));
 
   auto result = stream_client->GetProperties();
   ASSERT_OK(result.status());
@@ -359,15 +354,13 @@ TEST_F(UsbAudioTest, MultipleStreamConfigClients) {
   std::advance(itr, 0);
   UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  auto endpoints = fidl::Endpoints<audio_fidl::StreamConfigConnector>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), dut);
   fidl::WireSyncClient client_wrap{
-      fidl::ClientEnd<audio_fidl::StreamConfigConnector>{std::move(endpoints->client)}};
+      fidl::ClientEnd<audio_fidl::StreamConfigConnector>{std::move(endpoints.client)}};
   {
-    auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfig>();
-    ASSERT_TRUE(endpoints.is_ok());
-    auto [stream_channel_local, stream_channel_remote] = *std::move(endpoints);
+    auto [stream_channel_local, stream_channel_remote] =
+        fidl::Endpoints<audio_fidl::StreamConfig>::Create();
     ASSERT_OK(client_wrap->Connect(std::move(stream_channel_remote)));
     // To make sure the 1-way Connect call is completed in the StreamConfigConnector server,
     // make a 2-way call. Since StreamConfigConnector does not have a 2-way call, we use
@@ -379,9 +372,8 @@ TEST_F(UsbAudioTest, MultipleStreamConfigClients) {
     ASSERT_OK(result.status());
   }
   {
-    auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfig>();
-    ASSERT_TRUE(endpoints.is_ok());
-    auto [stream_channel_local, stream_channel_remote] = *std::move(endpoints);
+    auto [stream_channel_local, stream_channel_remote] =
+        fidl::Endpoints<audio_fidl::StreamConfig>::Create();
     ASSERT_OK(client_wrap->Connect(std::move(stream_channel_remote)));
     // To make sure the 1-way Connect call is completed in the StreamConfigConnector server,
     // make a 2-way call. Since StreamConfigConnector does not have a 2-way call, we use
@@ -405,10 +397,9 @@ TEST_F(UsbAudioTest, SetAndGetGain) {
   std::advance(itr, 0);
   UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
-  auto stream_client = GetStreamClient(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<audio_fidl::StreamConfigConnector>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints.client));
   ASSERT_TRUE(stream_client.is_valid());
 
   constexpr float kTestGain = -12.f;
@@ -437,10 +428,9 @@ TEST_F(UsbAudioTest, Enumerate) {
   std::advance(itr, 0);
   UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
-  auto stream_client = GetStreamClient(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<audio_fidl::StreamConfigConnector>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints.client));
   ASSERT_TRUE(stream_client.is_valid());
 
   auto ret = stream_client->GetSupportedFormats();
@@ -537,10 +527,9 @@ TEST_F(UsbAudioContinuousFrameRatesTest,
   std::advance(itr, 0);
   UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
-  auto stream_client = GetStreamClient(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<audio_fidl::StreamConfigConnector>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints.client));
   ASSERT_TRUE(stream_client.is_valid());
 
   // We get the formats from the first interface in the descriptor.
@@ -634,16 +623,13 @@ TEST_F(UsbAudioTest, CreateRingBuffer) {
   std::advance(itr, 0);
   UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
-  auto stream_client = GetStreamClient(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<audio_fidl::StreamConfigConnector>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints.client));
   ASSERT_TRUE(stream_client.is_valid());
 
   {
-    auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = std::move(endpoints.value());
+    auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
     fidl::Arena allocator;
     audio_fidl::wire::Format format(allocator);
@@ -670,16 +656,13 @@ TEST_F(UsbAudioTest, DelayInfo) {
   std::advance(itr, 0);
   UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
-  auto stream_client = GetStreamClient(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<audio_fidl::StreamConfigConnector>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints.client));
   ASSERT_TRUE(stream_client.is_valid());
 
   {
-    auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-    ASSERT_OK(endpoints.status_value());
-    auto [local, remote] = std::move(endpoints.value());
+    auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
     fidl::Arena allocator;
     audio_fidl::wire::Format format(allocator);
@@ -706,15 +689,12 @@ TEST_F(UsbAudioTest, DISABLED_RingBufferPropertiesAndStartOk) {
   std::advance(itr, 0);
   UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
-  auto stream_client = GetStreamClient(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<audio_fidl::StreamConfigConnector>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints.client));
   ASSERT_TRUE(stream_client.is_valid());
 
-  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints2.status_value());
-  auto [local, remote] = std::move(endpoints2.value());
+  auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
   fidl::Arena allocator;
   audio_fidl::wire::Format format(allocator);
@@ -771,15 +751,12 @@ TEST_F(UsbAudioTest, DISABLED_RingBufferStartBeforeGetVmo) {
   std::advance(itr, 0);
   UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
-  auto stream_client = GetStreamClient(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<audio_fidl::StreamConfigConnector>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints.client));
   ASSERT_TRUE(stream_client.is_valid());
 
-  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints2.status_value());
-  auto [local, remote] = std::move(endpoints2.value());
+  auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
   fidl::Arena allocator;
   audio_fidl::wire::Format format(allocator);
@@ -804,15 +781,12 @@ TEST_F(UsbAudioTest, DISABLED_RingBufferStartWhileStarted) {
   std::advance(itr, 0);
   UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
-  auto stream_client = GetStreamClient(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<audio_fidl::StreamConfigConnector>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints.client));
   ASSERT_TRUE(stream_client.is_valid());
 
-  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints2.status_value());
-  auto [local, remote] = std::move(endpoints2.value());
+  auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
   fidl::Arena allocator;
   audio_fidl::wire::Format format(allocator);
@@ -866,15 +840,12 @@ TEST_F(UsbAudioTest, DISABLED_RingBufferStopBeforeGetVmo) {
   std::advance(itr, 0);
   UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
-  auto stream_client = GetStreamClient(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<audio_fidl::StreamConfigConnector>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints.client));
   ASSERT_TRUE(stream_client.is_valid());
 
-  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints2.status_value());
-  auto [local, remote] = std::move(endpoints2.value());
+  auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
   fidl::Arena allocator;
   audio_fidl::wire::Format format(allocator);
@@ -898,15 +869,12 @@ TEST_F(UsbAudioTest, RingBufferStopWhileStopped) {
   std::advance(itr, 0);
   UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
-  auto stream_client = GetStreamClient(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<audio_fidl::StreamConfigConnector>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints.client));
   ASSERT_TRUE(stream_client.is_valid());
 
-  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints2.status_value());
-  auto [local, remote] = std::move(endpoints2.value());
+  auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
   fidl::Arena allocator;
   audio_fidl::wire::Format format(allocator);
@@ -936,15 +904,12 @@ TEST_F(UsbAudioTest, Unplug) {
   std::advance(itr, 0);
   UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
-  auto stream_client = GetStreamClient(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<audio_fidl::StreamConfigConnector>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints.client));
   ASSERT_TRUE(stream_client.is_valid());
 
-  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints2.status_value());
-  auto [local, remote] = std::move(endpoints2.value());
+  auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
   fidl::Arena allocator;
   audio_fidl::wire::Format format(allocator);
@@ -996,14 +961,11 @@ TEST_F(UsbAudioTest, GetDriverTransferBytes) {
   std::advance(itr, 0);
   UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
-  auto stream_client = GetStreamClient(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<audio_fidl::StreamConfigConnector>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints.client));
 
-  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints2.status_value());
-  auto [local, remote] = std::move(endpoints2.value());
+  auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
   fidl::Arena allocator;
   audio_fidl::wire::Format format(allocator);
@@ -1028,15 +990,12 @@ TEST_F(UsbAudioTest, VmoSize) {
   std::advance(itr, 0);
   UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
 
-  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
-  ASSERT_OK(endpoints.status_value());
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
-  auto stream_client = GetStreamClient(std::move(endpoints->client));
+  auto endpoints = fidl::Endpoints<audio_fidl::StreamConfigConnector>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints.client));
   ASSERT_TRUE(stream_client.is_valid());
 
-  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
-  ASSERT_OK(endpoints2.status_value());
-  auto [local, remote] = std::move(endpoints2.value());
+  auto [local, remote] = fidl::Endpoints<audio_fidl::RingBuffer>::Create();
 
   fidl::Arena allocator;
   audio_fidl::wire::Format format(allocator);

@@ -97,10 +97,9 @@ class ObserverServerCodecTest : public ObserverServerTest {
  protected:
   std::shared_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
     EXPECT_EQ(dispatcher(), test_loop().dispatcher());
-    auto codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
-    EXPECT_TRUE(codec_endpoints.is_ok());
+    auto codec_endpoints = fidl::Endpoints<fuchsia_hardware_audio::Codec>::Create();
     auto fake_driver = std::make_shared<FakeCodec>(
-        codec_endpoints->server.TakeChannel(), codec_endpoints->client.TakeChannel(), dispatcher());
+        codec_endpoints.server.TakeChannel(), codec_endpoints.client.TakeChannel(), dispatcher());
 
     adr_service_->AddDevice(Device::Create(
         adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,

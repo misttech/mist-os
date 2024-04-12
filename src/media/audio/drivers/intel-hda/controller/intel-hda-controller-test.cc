@@ -51,11 +51,10 @@ class HdaControllerTest : public zxtest::Test, public loop_fixture::RealLoop {
             {.device = pci_.bind_handler(dispatcher())}));
     ZX_ASSERT(service_result.is_ok());
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(endpoints.is_ok());
-    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints.server)).is_ok());
 
-    parent_->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(endpoints->client),
+    parent_->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(endpoints.client),
                             "pci");
   }
 

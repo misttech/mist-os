@@ -32,35 +32,32 @@ class Da7219Test : public zxtest::Test {
     mock_i2c_.ExpectWrite({0x83}).ExpectReadStop({0x02}, ZX_OK);
 
     fake_root_ = MockDevice::FakeRootParent();
-    auto i2c_endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    EXPECT_TRUE(i2c_endpoints.is_ok());
+    auto i2c_endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
 
     EXPECT_OK(loop_client_.StartThread());
     EXPECT_OK(loop_driver_.StartThread());
-    fidl::BindServer(loop_client_.dispatcher(), std::move(i2c_endpoints->server), &mock_i2c_);
+    fidl::BindServer(loop_client_.dispatcher(), std::move(i2c_endpoints.server), &mock_i2c_);
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq_));
     zx::interrupt irq2;
     ASSERT_OK(irq_.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq2));
 
-    core_ = std::make_shared<Core>(std::move(i2c_endpoints->client), std::move(irq2),
+    core_ = std::make_shared<Core>(std::move(i2c_endpoints.client), std::move(irq2),
                                    loop_driver_.dispatcher());
     ASSERT_OK(core_->Initialize());
 
     auto codec_connector_endpoints =
-        fidl::CreateEndpoints<fuchsia_hardware_audio::CodecConnector>();
-    EXPECT_TRUE(codec_connector_endpoints.is_ok());
-    codec_connector_ = fidl::WireSyncClient(std::move(codec_connector_endpoints->client));
+        fidl::Endpoints<fuchsia_hardware_audio::CodecConnector>::Create();
+    codec_connector_ = fidl::WireSyncClient(std::move(codec_connector_endpoints.client));
 
     auto output_device = std::make_unique<Driver>(fake_root_.get(), core_, false);
 
-    fidl::BindServer(core_->dispatcher(), std::move(codec_connector_endpoints->server),
+    fidl::BindServer(core_->dispatcher(), std::move(codec_connector_endpoints.server),
                      output_device.get());
 
-    auto codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
-    EXPECT_TRUE(codec_endpoints.is_ok());
-    codec_ = fidl::WireSyncClient(std::move(codec_endpoints->client));
+    auto codec_endpoints = fidl::Endpoints<fuchsia_hardware_audio::Codec>::Create();
+    codec_ = fidl::WireSyncClient(std::move(codec_endpoints.client));
 
-    auto connect_ret = codec_connector_->Connect(std::move(codec_endpoints->server));
+    auto connect_ret = codec_connector_->Connect(std::move(codec_endpoints.server));
     ASSERT_TRUE(connect_ret.ok());
 
     ASSERT_OK(output_device->DdkAdd(ddk::DeviceAddArgs("DA7219-output")));
@@ -126,19 +123,17 @@ TEST_F(Da7219Test, GetPropertiesIsOutput) {
 
 TEST_F(Da7219Test, GetPropertiesIsInput) {
   auto input_codec_connector_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_audio::CodecConnector>();
-  EXPECT_TRUE(input_codec_connector_endpoints.is_ok());
+      fidl::Endpoints<fuchsia_hardware_audio::CodecConnector>::Create();
   auto input_codec_connector =
-      fidl::WireSyncClient(std::move(input_codec_connector_endpoints->client));
+      fidl::WireSyncClient(std::move(input_codec_connector_endpoints.client));
   auto input_device = std::make_unique<Driver>(fake_root_.get(), core_, true);
-  fidl::BindServer(core_->dispatcher(), std::move(input_codec_connector_endpoints->server),
+  fidl::BindServer(core_->dispatcher(), std::move(input_codec_connector_endpoints.server),
                    input_device.get());
 
-  auto input_codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
-  EXPECT_TRUE(input_codec_endpoints.is_ok());
-  fidl::WireSyncClient input_codec{std::move(input_codec_endpoints->client)};
+  auto input_codec_endpoints = fidl::Endpoints<fuchsia_hardware_audio::Codec>::Create();
+  fidl::WireSyncClient input_codec{std::move(input_codec_endpoints.client)};
 
-  auto connect_ret = input_codec_connector->Connect(std::move(input_codec_endpoints->server));
+  auto connect_ret = input_codec_connector->Connect(std::move(input_codec_endpoints.server));
   ASSERT_TRUE(connect_ret.ok());
 
   ASSERT_OK(input_device->DdkAdd(ddk::DeviceAddArgs("DA7219-input")));
@@ -434,19 +429,17 @@ TEST_F(Da7219Test, PlugDetectNoMicrophoneWatchBeforeReset) {
   mock_i2c_.ExpectWriteStop({0xc2, 0x07}, ZX_OK);  // Clear all.
 
   auto input_codec_connector_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_audio::CodecConnector>();
-  EXPECT_TRUE(input_codec_connector_endpoints.is_ok());
+      fidl::Endpoints<fuchsia_hardware_audio::CodecConnector>::Create();
   auto input_codec_connector =
-      fidl::WireSyncClient(std::move(input_codec_connector_endpoints->client));
+      fidl::WireSyncClient(std::move(input_codec_connector_endpoints.client));
   auto input_device = std::make_unique<Driver>(fake_root_.get(), core_, true);
-  fidl::BindServer(core_->dispatcher(), std::move(input_codec_connector_endpoints->server),
+  fidl::BindServer(core_->dispatcher(), std::move(input_codec_connector_endpoints.server),
                    input_device.get());
 
-  auto input_codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
-  EXPECT_TRUE(input_codec_endpoints.is_ok());
-  fidl::WireSyncClient input_codec{std::move(input_codec_endpoints->client)};
+  auto input_codec_endpoints = fidl::Endpoints<fuchsia_hardware_audio::Codec>::Create();
+  fidl::WireSyncClient input_codec{std::move(input_codec_endpoints.client)};
 
-  auto connect_ret = input_codec_connector->Connect(std::move(input_codec_endpoints->server));
+  auto connect_ret = input_codec_connector->Connect(std::move(input_codec_endpoints.server));
   ASSERT_TRUE(connect_ret.ok());
 
   ASSERT_OK(input_device->DdkAdd(ddk::DeviceAddArgs("DA7219-input")));
@@ -503,19 +496,17 @@ TEST_F(Da7219Test, PlugDetectWithMicrophoneWatchBeforeReset) {
   mock_i2c_.ExpectWriteStop({0xc2, 0x07}, ZX_OK);  // Clear all.
 
   auto input_codec_connector_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_audio::CodecConnector>();
-  EXPECT_TRUE(input_codec_connector_endpoints.is_ok());
+      fidl::Endpoints<fuchsia_hardware_audio::CodecConnector>::Create();
   auto input_codec_connector =
-      fidl::WireSyncClient(std::move(input_codec_connector_endpoints->client));
+      fidl::WireSyncClient(std::move(input_codec_connector_endpoints.client));
   auto input_device = std::make_unique<Driver>(fake_root_.get(), core_, true);
-  fidl::BindServer(core_->dispatcher(), std::move(input_codec_connector_endpoints->server),
+  fidl::BindServer(core_->dispatcher(), std::move(input_codec_connector_endpoints.server),
                    input_device.get());
 
-  auto input_codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
-  EXPECT_TRUE(input_codec_endpoints.is_ok());
-  fidl::WireSyncClient input_codec{std::move(input_codec_endpoints->client)};
+  auto input_codec_endpoints = fidl::Endpoints<fuchsia_hardware_audio::Codec>::Create();
+  fidl::WireSyncClient input_codec{std::move(input_codec_endpoints.client)};
 
-  auto connect_ret = input_codec_connector->Connect(std::move(input_codec_endpoints->server));
+  auto connect_ret = input_codec_connector->Connect(std::move(input_codec_endpoints.server));
   ASSERT_TRUE(connect_ret.ok());
 
   ASSERT_OK(input_device->DdkAdd(ddk::DeviceAddArgs("DA7219-input")));
@@ -550,32 +541,29 @@ TEST_F(Da7219Test, PlugDetectWithMicrophoneWatchBeforeReset) {
 
 TEST_F(Da7219Test, InputSignalProcessingNotSupported) {
   auto input_codec_connector_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_audio::CodecConnector>();
-  EXPECT_TRUE(input_codec_connector_endpoints.is_ok());
+      fidl::Endpoints<fuchsia_hardware_audio::CodecConnector>::Create();
   auto input_codec_connector =
-      fidl::WireSyncClient(std::move(input_codec_connector_endpoints->client));
+      fidl::WireSyncClient(std::move(input_codec_connector_endpoints.client));
   auto input_device = std::make_unique<Driver>(fake_root_.get(), core_, true);
-  fidl::BindServer(core_->dispatcher(), std::move(input_codec_connector_endpoints->server),
+  fidl::BindServer(core_->dispatcher(), std::move(input_codec_connector_endpoints.server),
                    input_device.get());
 
-  auto input_codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
-  EXPECT_TRUE(input_codec_endpoints.is_ok());
-  fidl::WireSyncClient input_codec{std::move(input_codec_endpoints->client)};
+  auto input_codec_endpoints = fidl::Endpoints<fuchsia_hardware_audio::Codec>::Create();
+  fidl::WireSyncClient input_codec{std::move(input_codec_endpoints.client)};
 
-  auto connect_ret = input_codec_connector->Connect(std::move(input_codec_endpoints->server));
+  auto connect_ret = input_codec_connector->Connect(std::move(input_codec_endpoints.server));
   ASSERT_TRUE(connect_ret.ok());
 
   ASSERT_OK(input_device->DdkAdd(ddk::DeviceAddArgs("DA7219-input")));
   input_device.release();
 
   auto signal_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
-  EXPECT_TRUE(signal_endpoints.is_ok());
+      fidl::Endpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>::Create();
   auto signal_connect_ret =
-      input_codec->SignalProcessingConnect(std::move(signal_endpoints->server));
+      input_codec->SignalProcessingConnect(std::move(signal_endpoints.server));
   ASSERT_TRUE(signal_connect_ret.ok());
 
-  fidl::WireSyncClient signal(std::move(signal_endpoints->client));
+  fidl::WireSyncClient signal(std::move(signal_endpoints.client));
 
   auto topologies = signal->GetTopologies();
   ASSERT_EQ(topologies.status(), ZX_ERR_PEER_CLOSED);
@@ -583,12 +571,11 @@ TEST_F(Da7219Test, InputSignalProcessingNotSupported) {
 
 TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainTopology) {
   auto signal_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
-  EXPECT_TRUE(signal_endpoints.is_ok());
-  auto signal_connect_ret = codec_->SignalProcessingConnect(std::move(signal_endpoints->server));
+      fidl::Endpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>::Create();
+  auto signal_connect_ret = codec_->SignalProcessingConnect(std::move(signal_endpoints.server));
   ASSERT_TRUE(signal_connect_ret.ok());
 
-  fidl::WireSyncClient signal(std::move(signal_endpoints->client));
+  fidl::WireSyncClient signal(std::move(signal_endpoints.client));
 
   // 1 gain element.
   auto elements = signal->GetElements();
@@ -615,12 +602,11 @@ TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainTopology) {
 
 TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainSetting) {
   auto signal_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
-  EXPECT_TRUE(signal_endpoints.is_ok());
-  auto signal_connect_ret = codec_->SignalProcessingConnect(std::move(signal_endpoints->server));
+      fidl::Endpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>::Create();
+  auto signal_connect_ret = codec_->SignalProcessingConnect(std::move(signal_endpoints.server));
   ASSERT_TRUE(signal_connect_ret.ok());
 
-  fidl::WireSyncClient signal(std::move(signal_endpoints->client));
+  fidl::WireSyncClient signal(std::move(signal_endpoints.client));
 
   // Set gain to 0dB.
   {
@@ -769,12 +755,11 @@ TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainSetting) {
 
 TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainBadWatchBehavior) {
   auto signal_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
-  EXPECT_TRUE(signal_endpoints.is_ok());
-  auto signal_connect_ret = codec_->SignalProcessingConnect(std::move(signal_endpoints->server));
+      fidl::Endpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>::Create();
+  auto signal_connect_ret = codec_->SignalProcessingConnect(std::move(signal_endpoints.server));
   ASSERT_TRUE(signal_connect_ret.ok());
 
-  fidl::WireSyncClient signal(std::move(signal_endpoints->client));
+  fidl::WireSyncClient signal(std::move(signal_endpoints.client));
 
   // One watch for initial reply.
   auto gain_state = signal->WatchElementState(kHeadphoneGainPeId);

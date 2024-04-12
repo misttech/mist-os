@@ -28,11 +28,7 @@ zx::result<std::unique_ptr<MidiKeyboard>> MidiKeyboard::Create(Tones* owner) {
     if (controller.is_error()) {
       return controller.take_error();
     }
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_midi::Device>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-    auto& [client, server] = endpoints.value();
+    auto [client, server] = fidl::Endpoints<fuchsia_hardware_midi::Device>::Create();
 
     {
       const fidl::Status result =

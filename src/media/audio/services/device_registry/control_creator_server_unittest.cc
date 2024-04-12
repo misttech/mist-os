@@ -52,16 +52,15 @@ TEST_F(ControlCreatorServerCodecTest, CreateControl) {
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
-  auto control_endpoints = fidl::CreateEndpoints<fuchsia_audio_device::Control>();
-  ASSERT_TRUE(control_endpoints.is_ok());
+  auto control_endpoints = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(control_endpoints->client), dispatcher());
+      std::move(control_endpoints.client), dispatcher());
   auto received_callback = false;
 
   control_creator->client()
       ->Create({{
           .token_id = (*adr_service_->devices().begin())->token_id(),
-          .control_server = std::move(control_endpoints->server),
+          .control_server = std::move(control_endpoints.server),
       }})
       .Then([&received_callback](
                 fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) mutable {
@@ -89,16 +88,15 @@ TEST_F(ControlCreatorServerStreamConfigTest, CreateControl) {
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
-  auto control_endpoints = fidl::CreateEndpoints<fuchsia_audio_device::Control>();
-  ASSERT_TRUE(control_endpoints.is_ok());
+  auto control_endpoints = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(control_endpoints->client), dispatcher());
+      std::move(control_endpoints.client), dispatcher());
   auto received_callback = false;
 
   control_creator->client()
       ->Create({{
           .token_id = (*adr_service_->devices().begin())->token_id(),
-          .control_server = std::move(control_endpoints->server),
+          .control_server = std::move(control_endpoints.server),
       }})
       .Then([&received_callback](
                 fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) mutable {
