@@ -448,8 +448,27 @@ class ArmArchVmAspace::ConsistencyManager {
   ConsistencyManager(ArmArchVmAspace& aspace) TA_REQ(aspace.lock_) : aspace_(aspace) {}
   ~ConsistencyManager() {
     Flush();
+
     if (!list_is_empty(&to_free_)) {
       CacheFreePages(&to_free_);
+    }
+  }
+
+  void MapEntry(vaddr_t va, bool terminal) {
+    // We do not need to sync the walker, despite writing a new entry, as this is a
+    // non-terminal entry and so is irrelevant to the walker anyway.
+    if (!terminal) {
+      return;
+    }
+
+    // If we're mapping in the kernel aspace we may access the page shortly. DSB to make sure the
+    // page table walker sees it and ISB to keep the cpu from prefetching through this point.
+    // We do not need to do this for user pages since there will be a synchronization event before
+    // returning back to user space, or in the case of performing a user_copy after this mapping
+    // to the newly mapped page at worst there will be an extraneous page fault.
+    if (aspace_.type_ == ArmAspaceType::kKernel) {
+      __dsb(ARM_MB_ISHST);
+      isb_pending_ = true;
     }
   }
 
@@ -485,6 +504,13 @@ class ArmArchVmAspace::ConsistencyManager {
   // TLB flushes have completed prior to returning to user.
   void Flush() TA_REQ(aspace_.lock_) {
     cm_flush.Add(1);
+
+    // Flush any pending ISBs.
+    if (isb_pending_) {
+      __isb(ARM_MB_SY);
+      isb_pending_ = false;
+    }
+
     if (num_pending_tlbs_ == 0) {
       return;
     }
@@ -552,6 +578,9 @@ class ArmArchVmAspace::ConsistencyManager {
 
   // The aspace we are invalidating TLBs for.
   const ArmArchVmAspace& aspace_;
+
+  // pending ISB
+  bool isb_pending_ = false;
 };
 
 uint64_t ArmArchVmAspace::Tcr() const {
@@ -963,8 +992,10 @@ ssize_t ArmArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, pa
           // mappings as having the AF set.
           pte = page_table_paddr | MMU_PTE_L012_DESCRIPTOR_TABLE | MMU_PTE_ATTR_RES_SOFTWARE_AF;
           update_pte(&page_table[index], pte);
-          // We do not need to sync the walker, despite writing a new entry, as this is a
-          // non-terminal entry and so is irrelevant to the walker anyway.
+
+          // Tell the consistency manager that we've mapped an inner node.
+          cm.MapEntry(vaddr, false);
+
           LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 "\n", page_table, index, pte);
           next_page_table = static_cast<volatile pte_t*>(pt_vaddr);
           break;
@@ -1022,6 +1053,9 @@ ssize_t ArmArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, pa
       }
       LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 " (paddr %#lx)\n", page_table, index, pte, paddr);
       update_pte(&page_table[index], pte);
+
+      // Tell the consistency manager we've mapped a new page.
+      cm.MapEntry(vaddr, true);
     }
     vaddr += chunk_size;
     vaddr_rel += chunk_size;
