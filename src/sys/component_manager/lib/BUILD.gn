@@ -4,7 +4,10 @@
 
 group("non_hermetic_tests") {
   testonly = true
-  deps = [ "logger:tests" ]
+  deps = [
+    "builtins:tests",
+    "logger:tests",
+  ]
 }
 
 group("hermetic_tests") {

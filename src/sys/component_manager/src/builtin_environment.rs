@@ -3,48 +3,31 @@
 // found in the LICENSE file.
 
 #[cfg(target_arch = "aarch64")]
-use crate::builtin::smc_resource::SmcResource;
+use builtins::smc_resource::SmcResource;
 
-#[cfg(target_arch = "x86_64")]
-use crate::builtin::ioport_resource::IoportResource;
 use crate::model::component::WeakComponentInstance;
+#[cfg(target_arch = "x86_64")]
+use builtins::ioport_resource::IoportResource;
 
 use {
     crate::{
         bootfs::BootfsSvc,
         builtin::{
-            arguments::Arguments as BootArguments,
             builtin_resolver::{BuiltinResolver, SCHEME as BUILTIN_SCHEME},
-            cpu_resource::CpuResource,
             crash_introspect::CrashIntrospectSvc,
-            debug_resource::DebugResource,
-            energy_info_resource::EnergyInfoResource,
             factory_items::FactoryItems,
-            framebuffer_resource::FramebufferResource,
             fuchsia_boot_resolver::{FuchsiaBootResolverBuiltinCapability, SCHEME as BOOT_SCHEME},
-            hypervisor_resource::HypervisorResource,
-            info_resource::InfoResource,
-            iommu_resource::IommuResource,
-            irq_resource::IrqResource,
             items::Items,
             kernel_stats::KernelStats,
             log::{ReadOnlyLog, WriteOnlyLog},
-            mexec_resource::MexecResource,
-            mmio_resource::MmioResource,
-            msi_resource::MsiResource,
-            power_resource::PowerResource,
-            profile_resource::ProfileResource,
             realm_builder::{
                 RealmBuilderResolver, RealmBuilderRunnerFactory,
                 RUNNER_NAME as REALM_BUILDER_RUNNER_NAME, SCHEME as REALM_BUILDER_SCHEME,
             },
-            root_job::RootJob,
-            root_resource::RootResource,
             runner::{BuiltinRunner, BuiltinRunnerFactory},
             svc_stash_provider::SvcStashCapability,
             system_controller::SystemController,
             time::{create_utc_clock, UtcTimeMaintainer},
-            vmex_resource::VmexResource,
         },
         capability::{BuiltinCapability, CapabilitySource, DerivedCapability, FrameworkCapability},
         diagnostics::{startup::ComponentEarlyStartupTimeStats, task_metrics::ComponentTreeStats},
@@ -88,6 +71,16 @@ use {
         policy::GlobalPolicyChecker,
     },
     anyhow::{format_err, Context as _, Error},
+    builtins::{arguments::Arguments as BootArguments, root_job::RootJob},
+    builtins::{
+        cpu_resource::CpuResource, debug_resource::DebugResource,
+        energy_info_resource::EnergyInfoResource, framebuffer_resource::FramebufferResource,
+        hypervisor_resource::HypervisorResource, info_resource::InfoResource,
+        iommu_resource::IommuResource, irq_resource::IrqResource, mexec_resource::MexecResource,
+        mmio_resource::MmioResource, msi_resource::MsiResource, power_resource::PowerResource,
+        profile_resource::ProfileResource, root_resource::RootResource,
+        vmex_resource::VmexResource,
+    },
     cm_config::{RuntimeConfig, VmexSource},
     cm_rust::{Availability, RunnerRegistration, UseEventStreamDecl, UseSource},
     cm_types::Name,
