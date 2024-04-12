@@ -11,6 +11,7 @@ pub mod guest;
 
 use std::{borrow::Cow, num::NonZeroU64, ops::DerefMut as _, path::Path, pin::pin};
 
+use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_hardware_network as fnetwork;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_net as fnet;
@@ -21,7 +22,9 @@ use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_neighbor as fnet_neighbor;
+use fidl_fuchsia_net_root as fnet_root;
 use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
+use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_netemul as fnetemul;
@@ -35,10 +38,11 @@ use fuchsia_zircon as zx;
 
 use anyhow::{anyhow, Context as _};
 use futures::{
-    future::{FutureExt as _, TryFutureExt as _},
+    future::{FutureExt as _, LocalBoxFuture, TryFutureExt as _},
     SinkExt as _, StreamExt as _, TryStreamExt as _,
 };
 use net_declare::fidl_subnet;
+use net_types::ip::{GenericOverIp, Ip, IpInvariant};
 
 type Result<T = ()> = std::result::Result<T, anyhow::Error>;
 
@@ -1102,6 +1106,71 @@ impl<'a> TestInterface<'a> {
                     entry, self.endpoint.name
                 )
             })
+    }
+
+    /// Create a root route set authenticated to manage routes through this interface.
+    pub async fn create_authenticated_global_route_set<
+        I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    >(
+        &self,
+    ) -> Result<<I::RouteSetMarker as ProtocolMarker>::Proxy> {
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Out<'a, I: fnet_routes_ext::admin::FidlRouteAdminIpExt>(
+            LocalBoxFuture<'a, <I::RouteSetMarker as ProtocolMarker>::Proxy>,
+        );
+
+        let Out(proxy_fut) = I::map_ip::<_, Out<'_, _>>(
+            IpInvariant(self),
+            |IpInvariant(this)| {
+                Out(this
+                    .get_global_route_set_v4()
+                    .map(|result| result.expect("get global route set"))
+                    .boxed_local())
+            },
+            |IpInvariant(this)| {
+                Out(this
+                    .get_global_route_set_v6()
+                    .map(|result| result.expect("get global route set"))
+                    .boxed_local())
+            },
+        );
+
+        let route_set = proxy_fut.await;
+        let fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id, token } =
+            self.get_authorization().await.expect("get interface grant");
+        fnet_routes_ext::admin::authenticate_for_interface::<I>(
+            &route_set,
+            fnet_interfaces_admin::ProofOfInterfaceAuthorization { interface_id, token },
+        )
+        .await
+        .expect("authentication should not have FIDL error")
+        .expect("authentication should succeed");
+        Ok(route_set)
+    }
+
+    async fn get_global_route_set_v4(&self) -> Result<fnet_routes_admin::RouteSetV4Proxy> {
+        let root_routes = self
+            .realm
+            .connect_to_protocol::<fnet_root::RoutesV4Marker>()
+            .expect("get fuchsia.net.root.RoutesV4");
+        let (route_set, server_end) =
+            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV4Marker>()
+                .expect("creating route set proxy should succeed");
+        root_routes.global_route_set(server_end).expect("calling global_route_set should succeed");
+        Ok(route_set)
+    }
+
+    async fn get_global_route_set_v6(&self) -> Result<fnet_routes_admin::RouteSetV6Proxy> {
+        let root_routes = self
+            .realm
+            .connect_to_protocol::<fnet_root::RoutesV6Marker>()
+            .expect("get fuchsia.net.root.RoutesV6");
+        let (route_set, server_end) =
+            fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV6Marker>()
+                .expect("creating route set proxy should succeed");
+        root_routes.global_route_set(server_end).expect("calling global_route_set should succeed");
+        Ok(route_set)
     }
 
     /// Gets the interface's properties with assigned addresses.

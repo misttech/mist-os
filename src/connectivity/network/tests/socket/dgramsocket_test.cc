@@ -4058,7 +4058,7 @@ TEST_P(DatagramCachedSendSemanticsTest, Ipv6Only) {
 
 class DatagramSendSemanticsSoBroadcastInstance : public DatagramSendSemanticsTestInstance {
  public:
-  DatagramSendSemanticsSoBroadcastInstance(const SocketDomain& domain)
+  explicit DatagramSendSemanticsSoBroadcastInstance(const SocketDomain& domain)
       : DatagramSendSemanticsTestInstance(domain) {}
 
   void SetUpInstance() override {
@@ -4082,6 +4082,14 @@ class DatagramSendSemanticsSoBroadcastInstance : public DatagramSendSemanticsTes
     ASSERT_EQ(addrlen, sizeof(recv_addr_));
 
     ASSERT_TRUE(send_fd_ = fbl::unique_fd(socket(domain_.Get(), SOCK_DGRAM, 0))) << strerror(errno);
+
+    // Bind the sending socket to a device to ensure that the test does not rely
+    // on a default route being installed.
+    const char loopback_name[3] = "lo";
+    EXPECT_EQ(setsockopt(send_fd_.get(), SOL_SOCKET, SO_BINDTODEVICE, &loopback_name,
+                         sizeof(loopback_name)),
+              0)
+        << strerror(errno);
   }
 
   void ToggleOn() {

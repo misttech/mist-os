@@ -133,11 +133,7 @@ func TestNDPIPv6OffLinkRoutePreferences(t *testing.T) {
 	dest := tcpip.AddressWithPrefix{Address: util.Parse("abcd:ee00::"), PrefixLen: 32}.Subnet()
 	r1 := tcpip.Route{Destination: dest, NIC: ifs1.nicid, Gateway: testLinkLocalV6Addr1}
 	r2 := tcpip.Route{Destination: dest, NIC: ifs2.nicid, Gateway: testLinkLocalV6Addr1}
-	broadcastSubnet := util.PointSubnet(header.IPv4Broadcast)
 	expectedRouteTable := []tcpip.Route{
-		{Destination: broadcastSubnet, NIC: ifs1.nicid},
-		{Destination: broadcastSubnet, NIC: ifs2.nicid},
-
 		{Destination: ipv4MulticastSubnet().Subnet(), NIC: ifs1.nicid},
 		{Destination: ipv4MulticastSubnet().Subnet(), NIC: ifs2.nicid},
 
@@ -159,7 +155,7 @@ func TestNDPIPv6OffLinkRoutePreferences(t *testing.T) {
 	}
 
 	// Flip the preferences of r1 and r2.
-	expectedRouteTable[6], expectedRouteTable[7] = expectedRouteTable[7], expectedRouteTable[6]
+	expectedRouteTable[4], expectedRouteTable[5] = expectedRouteTable[5], expectedRouteTable[4]
 	ndpDisp.OnOffLinkRouteUpdated(r2.NIC, r2.Destination, r2.Gateway, header.HighRoutePreference)
 	ndpDisp.OnOffLinkRouteUpdated(r1.NIC, r1.Destination, r1.Gateway, header.LowRoutePreference)
 	waitForEmptyQueue(ndpDisp)

@@ -708,8 +708,8 @@ async fn get_mac(
     Ok((mac_addr, mac_proxy))
 }
 
-/// Adds the IPv4 and IPv6 multicast subnet routes, the IPv6 link-local subnet
-/// route, and the IPv4 limited broadcast subnet route.
+/// Adds the IPv4 and IPv6 multicast subnet routes and the IPv6 link-local
+/// subnet route.
 ///
 /// Note that if an error is encountered while installing a route, any routes
 /// that were successfully installed prior to the error will not be removed.
@@ -717,19 +717,11 @@ async fn add_initial_routes(bindings_ctx: &BindingsCtx, device: &DeviceId<Bindin
     use netstack3_core::routes::{AddableEntry, AddableMetric};
     const LINK_LOCAL_SUBNET: Subnet<Ipv6Addr> = net_declare::net_subnet_v6!("fe80::/64");
 
-    let v4_changes = [
-        AddableEntry::without_gateway(
-            Ipv4::MULTICAST_SUBNET,
-            device.downgrade(),
-            AddableMetric::MetricTracksInterface,
-        ),
-        AddableEntry::without_gateway(
-            crate::bindings::IPV4_LIMITED_BROADCAST_SUBNET,
-            device.downgrade(),
-            AddableMetric::ExplicitMetric(RawMetric(crate::bindings::DEFAULT_LOW_PRIORITY_METRIC)),
-        ),
-    ]
-    .into_iter()
+    let v4_changes = std::iter::once(AddableEntry::without_gateway(
+        Ipv4::MULTICAST_SUBNET,
+        device.downgrade(),
+        AddableMetric::MetricTracksInterface,
+    ))
     .map(|entry| {
         routes::Change::RouteOp(
             routes::RouteOp::Add(entry),

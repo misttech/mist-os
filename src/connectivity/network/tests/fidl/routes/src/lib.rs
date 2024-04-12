@@ -414,6 +414,7 @@ fn new_installed_route<I: fnet_routes_ext::FidlRouteIpExt>(
 }
 
 // Asserts that two vectors contain the same entries, order independent.
+#[track_caller]
 fn assert_eq_unordered<T: Debug + Eq + Hash + PartialEq>(a: Vec<T>, b: Vec<T>) {
     // Converts a `Vec<T>` into a `HashMap` where the key is `T` and the value
     // is the count of occurrences of `T` in the vec.
@@ -429,26 +430,17 @@ fn assert_eq_unordered<T: Debug + Eq + Hash + PartialEq>(a: Vec<T>, b: Vec<T>) {
 // Default metric values used by the netstack when creating implicit routes.
 // See `src/connectivity/network/netstack/netstack.go`.
 const DEFAULT_INTERFACE_METRIC: u32 = 100;
-const DEFAULT_LOW_PRIORITY_METRIC: u32 = 99999;
 
 // The initial IPv4 routes that are installed on the loopback interface.
 fn initial_loopback_routes_v4<N: Netstack>(
     loopback_id: u64,
 ) -> impl Iterator<Item = fnet_routes_ext::InstalledRoute<Ipv4>> {
-    [
-        new_installed_route(
-            net_subnet_v4!("127.0.0.0/8"),
-            loopback_id,
-            DEFAULT_INTERFACE_METRIC,
-            true,
-        ),
-        new_installed_route(
-            net_subnet_v4!("255.255.255.255/32"),
-            loopback_id,
-            DEFAULT_LOW_PRIORITY_METRIC,
-            false,
-        ),
-    ]
+    [new_installed_route(
+        net_subnet_v4!("127.0.0.0/8"),
+        loopback_id,
+        DEFAULT_INTERFACE_METRIC,
+        true,
+    )]
     .into_iter()
     // TODO(https://fxbug.dev/42074061) Unify the loopback routes between
     // Netstack2 and Netstack3
@@ -493,20 +485,12 @@ fn initial_loopback_routes_v6<N: Netstack>(
 fn initial_ethernet_routes_v4(
     ethernet_id: u64,
 ) -> impl Iterator<Item = fnet_routes_ext::InstalledRoute<Ipv4>> {
-    [
-        new_installed_route(
-            net_subnet_v4!("255.255.255.255/32"),
-            ethernet_id,
-            DEFAULT_LOW_PRIORITY_METRIC,
-            false,
-        ),
-        new_installed_route(
-            net_subnet_v4!("224.0.0.0/4"),
-            ethernet_id,
-            DEFAULT_INTERFACE_METRIC,
-            true,
-        ),
-    ]
+    [new_installed_route(
+        net_subnet_v4!("224.0.0.0/4"),
+        ethernet_id,
+        DEFAULT_INTERFACE_METRIC,
+        true,
+    )]
     .into_iter()
 }
 

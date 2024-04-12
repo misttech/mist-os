@@ -776,19 +776,6 @@ async fn test_list_del_routes() {
     };
 
     let expected_routes = [
-        // Automatically installed routes
-        fidl_net_stack::ForwardingEntry {
-            subnet: crate::bindings::IPV4_LIMITED_BROADCAST_SUBNET.into_ext(),
-            device_id: loopback_id.get(),
-            next_hop: None,
-            metric: crate::bindings::DEFAULT_LOW_PRIORITY_METRIC,
-        },
-        fidl_net_stack::ForwardingEntry {
-            subnet: crate::bindings::IPV4_LIMITED_BROADCAST_SUBNET.into_ext(),
-            device_id: if_id.get(),
-            next_hop: None,
-            metric: crate::bindings::DEFAULT_LOW_PRIORITY_METRIC,
-        },
         // route1
         route1_fwd_entry.clone(),
         // route2

@@ -1118,22 +1118,6 @@ func (ifs *ifState) stateChangeLocked(name string, adminUp, linkOnline bool) boo
 				_ = syslog.Errorf("error enabling NIC %s in stack.Stack: %s", name, err)
 			}
 
-			// DHCPv4 sends packets to the IPv4 broadcast address so make sure there is
-			// a valid route to it. This route is only needed for the initial DHCPv4
-			// transaction. Marking the route as dynamic will result in it being removed
-			// when configurations are acquired via DHCPv4, which is okay as following
-			// DHCPv4 requests will be sent directly to the DHCPv4 server instead of
-			// broadcasting it to the whole link.
-			ifs.ns.routeTable.AddRoute(
-				tcpip.Route{Destination: util.PointSubnet(header.IPv4Broadcast), NIC: ifs.nicid},
-				routetypes.MediumPreference,
-				lowPriorityRoute,
-				false, /* metricTracksInterface */
-				true,  /* dynamic */
-				true,  /* enabled */
-				routetypes.GlobalRouteSet(),
-			)
-
 			// Re-enable static routes out this interface.
 			ifs.ns.UpdateRoutesByInterfaceLocked(ifs.nicid, routetypes.ActionEnableStatic)
 			if ifs.mu.dhcp.enabled {

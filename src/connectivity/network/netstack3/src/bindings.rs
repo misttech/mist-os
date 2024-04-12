@@ -66,13 +66,9 @@ use devices::{
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use timers::TimerDispatcher;
 
-use net_declare::net_subnet_v4;
 use net_types::{
     ethernet::Mac,
-    ip::{
-        AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6, Mtu,
-        Subnet,
-    },
+    ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv6, Mtu},
     SpecifiedAddr,
 };
 use netstack3_core::{
@@ -262,14 +258,6 @@ const LOOPBACK_NAME: &'static str = "lo";
 ///     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
 /// ```
 const DEFAULT_LOOPBACK_MTU: Mtu = Mtu::new(65536);
-
-/// Subnet for the IPv4 Limited Broadcast Address.
-const IPV4_LIMITED_BROADCAST_SUBNET: Subnet<Ipv4Addr> = net_subnet_v4!("255.255.255.255/32");
-
-/// The default "Low Priority" metric to use for default routes.
-///
-/// The value is currently kept in sync with the Netstack2 implementation.
-const DEFAULT_LOW_PRIORITY_METRIC: u32 = 99999;
 
 /// Default routing metric for newly created interfaces, if unspecified.
 ///
@@ -884,11 +872,6 @@ async fn add_loopback_routes(bindings_ctx: &BindingsCtx, loopback: &DeviceId<Bin
             Ipv4::MULTICAST_SUBNET,
             loopback.downgrade(),
             AddableMetric::MetricTracksInterface,
-        ),
-        AddableEntry::without_gateway(
-            IPV4_LIMITED_BROADCAST_SUBNET,
-            loopback.downgrade(),
-            AddableMetric::ExplicitMetric(RawMetric(DEFAULT_LOW_PRIORITY_METRIC)),
         ),
     ]
     .into_iter()

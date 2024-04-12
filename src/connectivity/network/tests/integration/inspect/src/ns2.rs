@@ -393,15 +393,6 @@ async fn inspect_routing_table(name: &str) {
         "Dynamic": AnyProperty,
         "Enabled": AnyProperty,
     }));
-    routing_table_assertion.add_child_assertion(tree_assertion!("2": {
-        "Destination": "255.255.255.255/32",
-        "Gateway": "",
-        "NIC": "1",
-        "Metric": "99999",
-        "MetricTracksInterface": "false",
-        "Dynamic": AnyProperty,
-        "Enabled": AnyProperty,
-    }));
 
     let data = get_inspect_data(&diagnostics_dir, "Routes", "routes").await;
     let () = routing_table_assertion

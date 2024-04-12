@@ -4,17 +4,22 @@
 
 #![cfg(test)]
 
-use fidl_fuchsia_net as net;
+use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
+use fidl_fuchsia_net_routes as fnet_routes;
+use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 
-use futures::StreamExt as _;
+use futures::{FutureExt as _, StreamExt as _};
 use net_declare::{net_ip_v4, std_ip_v4};
-use net_types::{ip as net_types_ip, MulticastAddress as _};
-use netemul::RealmUdpSocket as _;
+use net_types::{
+    ip::{self as net_types_ip, Ipv4, Ipv4Addr},
+    MulticastAddress as _,
+};
+use netemul::RealmUdpSocket;
 use netstack_testing_common::{
-    interfaces,
-    realms::{Netstack, NetstackVersion},
+    interfaces::{self, TestInterfaceExt},
+    realms::{Netstack, NetstackVersion, TestSandboxExt},
     setup_network, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
@@ -216,10 +221,10 @@ async fn sends_igmp_reports<N: Netstack>(
         );
     }
 
-    let addr = net::Ipv4Address { addr: INTERFACE_ADDR.octets() };
+    let addr = fnet::Ipv4Address { addr: INTERFACE_ADDR.octets() };
     let _address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
         &iface,
-        net::Subnet { addr: net::IpAddress::Ipv4(addr), prefix_len: 24 },
+        fnet::Subnet { addr: fnet::IpAddress::Ipv4(addr), prefix_len: 24 },
         fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
     )
     .await
@@ -300,4 +305,119 @@ async fn sends_igmp_reports<N: Netstack>(
         })
         .await
         .expect("error getting our expected IGMP report");
+}
+
+#[netstack_test]
+async fn all_ones_broadcast<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("error creating sandbox");
+
+    let name_suffixes = ["a", "b", "c"];
+    let realms = name_suffixes.map(|suffix| {
+        sandbox
+            .create_netstack_realm::<N, _>(format!("{name}_{suffix}"))
+            .unwrap_or_else(|e| panic!("create realm {suffix}: {e:?}"))
+    });
+    let network = sandbox.create_network(name).await.expect("create network");
+
+    let addr_subnets = [
+        net_declare::fidl_subnet!("192.168.0.1/24"),
+        net_declare::fidl_subnet!("192.168.0.2/24"),
+        net_declare::fidl_subnet!("192.168.0.3/24"),
+    ];
+
+    // Keep same as first `addr_subnet`.
+    const SENDER_IP: std::net::IpAddr = net_declare::std_ip!("192.168.0.1");
+
+    const DEFAULT_SUBNET: net_types::ip::Subnet<Ipv4Addr> =
+        net_declare::net_subnet_v4!("0.0.0.0/0");
+
+    let mut ifaces = Vec::new();
+    for (i, realm) in realms.iter().enumerate() {
+        let iface = realm
+            .join_network(&network, format!("{name}_{}", name_suffixes[i]))
+            .await
+            .expect("join network");
+        iface.add_address(addr_subnets[i]).await.expect("add address");
+        iface.apply_nud_flake_workaround().await.expect("apply nud flake workaround");
+        let global_route_set = iface
+            .create_authenticated_global_route_set::<Ipv4>()
+            .await
+            .expect("create authenticated route set");
+
+        // Add an on-link default route so that the netstacks should each be
+        // able to receive broadcasts from each other.
+        let default_route = fnet_routes_ext::Route::<Ipv4> {
+            action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+                outbound_interface: iface.id(),
+                next_hop: None,
+            }),
+            destination: DEFAULT_SUBNET,
+            properties: fnet_routes_ext::RouteProperties {
+                specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
+                    metric: fnet_routes::SpecifiedMetric::InheritedFromInterface(
+                        fnet_routes::Empty,
+                    ),
+                },
+            },
+        };
+        assert!(
+            global_route_set
+                .add_route(&default_route.try_into().expect("convert to FIDL route"))
+                .await
+                .expect("adding default route should not get FIDL error")
+                .expect("adding default route should succeed"),
+            "should have newly-added default route"
+        );
+        ifaces.push(iface);
+    }
+
+    let sending_realm = &realms[0];
+
+    // Using 1024 as arbitrary port for sending/receiving.
+    const PORT: u16 = 1024;
+
+    let make_socket = |realm| async move {
+        let socket = fuchsia_async::net::UdpSocket::bind_in_realm(
+            realm,
+            std::net::SocketAddr::new(std::net::Ipv4Addr::UNSPECIFIED.into(), PORT),
+        )
+        .await
+        .expect("bind in realm");
+        socket.set_broadcast(true).expect("set broadcast");
+        socket
+    };
+
+    let sending_socket = make_socket(sending_realm).await;
+
+    let mut receiving_sockets = Vec::new();
+    for receiving_realm in &realms[1..] {
+        receiving_sockets.push(make_socket(receiving_realm).await);
+    }
+
+    const PAYLOAD: &str = "hello";
+    assert_eq!(
+        sending_socket
+            .send_to(
+                PAYLOAD.as_bytes(),
+                std::net::SocketAddr::new(std::net::Ipv4Addr::BROADCAST.into(), PORT),
+            )
+            .await
+            .expect("send should succeed"),
+        PAYLOAD.len()
+    );
+
+    let mut buf = [0u8; 16];
+
+    for receiving_socket in receiving_sockets {
+        let (n, received_from) = receiving_socket
+            .recv_from(&mut buf)
+            .map(Some)
+            .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT, || None)
+            .await
+            .expect("should not have timed out")
+            .expect("recv_from");
+        assert_eq!(n, PAYLOAD.len());
+        assert_eq!(&buf[..n], PAYLOAD.as_bytes());
+        assert_eq!(received_from, std::net::SocketAddr::new(SENDER_IP, PORT));
+    }
 }

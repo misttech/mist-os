@@ -408,34 +408,27 @@ async fn inspect_routes(name: &str) {
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Routes": {
             "0": {
-                Destination: "255.255.255.255/32",
-                InterfaceId: loopback_id,
-                Gateway: "[NONE]",
-                Metric: 99999u64,
-                MetricTracksInterface: false,
-            },
-            "1": {
                 Destination: "127.0.0.0/8",
                 InterfaceId: loopback_id,
                 Gateway: "[NONE]",
                 Metric: 100u64,
                 MetricTracksInterface: true,
             },
-            "2": {
+            "1": {
                 Destination: "224.0.0.0/4",
                 InterfaceId: loopback_id,
                 Gateway: "[NONE]",
                 Metric: 100u64,
                 MetricTracksInterface: true,
             },
-            "3": {
+            "2": {
                 Destination: "::1/128",
                 InterfaceId: loopback_id,
                 Gateway: "[NONE]",
                 Metric: 100u64,
                 MetricTracksInterface: true,
             },
-            "4": {
+            "3": {
                 Destination: "ff00::/8",
                 InterfaceId: loopback_id,
                 Gateway: "[NONE]",
