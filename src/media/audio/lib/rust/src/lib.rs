@@ -11,8 +11,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 pub mod device;
 pub mod format;
 pub mod format_set;
+pub mod registry;
 
 pub use format::{parse_duration, str_to_clock, Format};
+pub use registry::Registry;
 
 pub async fn stop_listener(
     canceler: ServerEnd<fac::RecordCancelerMarker>,

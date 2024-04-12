@@ -21,8 +21,10 @@ rustc_library("fuchsia-audio") {
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
+    "//src/lib/async-utils",
     "//src/lib/const-unwrap",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
@@ -46,6 +48,7 @@ rustc_library("fuchsia-audio") {
     "src/format.rs",
     "src/format_set.rs",
     "src/lib.rs",
+    "src/registry.rs",
   ]
 }
 
