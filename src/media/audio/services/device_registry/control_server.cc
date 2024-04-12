@@ -252,6 +252,7 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
     ADR_WARN_METHOD() << "device RingBuffer already exists";
     completer.Reply(
         fit::error(fuchsia_audio_device::wire::ControlCreateRingBufferError::kAlreadyAllocated));
+    return;
   }
 
   auto driver_format =
@@ -557,6 +558,7 @@ void ControlServer::CodecStop(CodecStopCompleter::Sync& completer) {
     auto stop_completer = std::move(*codec_stop_completer_);
     codec_stop_completer_.reset();
     stop_completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStopError::kDeviceError));
+    return;
   }
 
   // We need `stop_time` to complete this, so we wait for the Device to notify us. Besides,

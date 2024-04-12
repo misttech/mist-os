@@ -680,18 +680,48 @@ TEST_F(CompositeWarningTest, CreateRingBufferUnsupportedFormat) {
 // CreateRingBufferSizeTooLarge test?
 
 // TODO: negative RingBufferProperties cases?
+// Device with error
 
 // TODO: negative GetVmo cases?
+// Device with error
 
 // TODO: negative SetActiveChannels cases.
+// Device with error
 
 // TODO: negative RingBuffer Start cases.
+// Device with error
 
 // TODO: negative RingBuffer Stop  cases.
+// Device with error
 
 // TODO: negative WatchDelayInfo cases.
+// Device with error
 
 // TODO: negative WatchClockRecoveryPositionInfo cases?
+// Device with error
+
+// Signalprocessing test cases
+//
+// TODO: negative cases for GetTopologies?
+// Device with error
+
+// TODO: negative cases for GetElements?
+// Device with error
+
+// TODO: negative cases for WatchTopology?
+// Device with error
+
+// TODO: negative cases for WatchElementState
+// Device with error
+
+// TODO: negative cases for SetElementState
+// Device with error
+// SetElementState(no-change) should not generate a notification.
+// SetElementState without Control
+
+// TODO: negative cases for SetTopology
+// SetTopology(no-change) should not generate a notification.
+// SetTopology without Control.
 
 ////////////////////
 // StreamConfig tests

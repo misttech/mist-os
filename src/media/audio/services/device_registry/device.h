@@ -204,6 +204,8 @@ class Device : public std::enable_shared_from_this<Device> {
   const std::unordered_set<ElementId>& ring_buffer_endpoint_ids() const {
     return ring_buffer_endpoint_ids_;
   }
+  const std::unordered_set<TopologyId>& topology_ids() const { return topology_ids_; }
+  const std::unordered_set<ElementId>& element_ids() const { return element_ids_; }
 
   bool has_plug_state() const { return plug_state_.has_value(); }
   bool has_gain_state() const { return gain_state_.has_value(); }
@@ -259,6 +261,7 @@ class Device : public std::enable_shared_from_this<Device> {
   void RetrieveSignalProcessingElements();
   void RetrieveCurrentTopology();
   void RetrieveCurrentElementStates();
+  void RetrieveElementState(ElementId element_id);
 
   bool IsFullyInitialized();
   void OnInitializationResponse();
@@ -399,8 +402,11 @@ class Device : public std::enable_shared_from_this<Device> {
   std::unordered_set<ElementId> temp_dai_endpoint_ids_;
   std::unordered_set<ElementId> ring_buffer_endpoint_ids_;
   std::unordered_set<ElementId> temp_ring_buffer_endpoint_ids_;
+  std::unordered_set<ElementId> element_ids_;
+
   std::unordered_map<TopologyId, std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>>
       sig_proc_topology_map_;
+  std::unordered_set<TopologyId> topology_ids_;
   std::optional<TopologyId> current_topology_id_;
 
   bool dai_format_sets_retrieved_ = false;

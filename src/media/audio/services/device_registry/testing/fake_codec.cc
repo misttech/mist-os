@@ -84,6 +84,7 @@ void FakeCodec::DropCodec() {
 }
 
 void FakeCodec::GetHealthState(GetHealthStateCompleter::Sync& completer) {
+  ADR_LOG_METHOD(kLogFakeCodec);
   if (responsive_) {
     if (healthy_.has_value()) {
       completer.Reply(fuchsia_hardware_audio::HealthState{{healthy_.value()}});
@@ -93,7 +94,6 @@ void FakeCodec::GetHealthState(GetHealthStateCompleter::Sync& completer) {
   } else {
     health_completer_.emplace(completer.ToAsync());  // Just pend it; never respond.
   }
-  ADR_LOG_METHOD(kLogFakeCodec) << "exit";
 }
 
 void FakeCodec::SignalProcessingConnect(SignalProcessingConnectRequest& request,
@@ -135,7 +135,6 @@ void FakeCodec::GetProperties(GetPropertiesCompleter::Sync& completer) {
   }
 
   completer.Reply(codec_properties);
-  ADR_LOG_METHOD(kLogFakeCodec) << "exit";
 }
 
 void FakeCodec::GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) {
@@ -151,7 +150,6 @@ void FakeCodec::GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) {
           .bits_per_sample = bits_per_sample_,
       }},
   }));
-  ADR_LOG_METHOD(kLogFakeCodec) << "exit";
 }
 
 bool FakeCodec::CheckDaiFormatSupported(const fuchsia_hardware_audio::DaiFormat& candidate) {
@@ -191,7 +189,6 @@ void FakeCodec::SetDaiFormat(SetDaiFormatRequest& request, SetDaiFormatCompleter
   }
 
   completer.Reply(fit::ok(info));
-  ADR_LOG_METHOD(kLogFakeCodec) << "exit";
 }
 
 void FakeCodec::Start(StartCompleter::Sync& completer) {
@@ -204,7 +201,6 @@ void FakeCodec::Start(StartCompleter::Sync& completer) {
   }
 
   completer.Reply(mono_start_time_.get());
-  ADR_LOG_METHOD(kLogFakeCodec) << "exit";
 }
 
 void FakeCodec::Stop(StopCompleter::Sync& completer) {
@@ -216,7 +212,6 @@ void FakeCodec::Stop(StopCompleter::Sync& completer) {
   }
 
   completer.Reply(mono_stop_time_.get());
-  ADR_LOG_METHOD(kLogFakeCodec) << "exit";
 }
 
 void FakeCodec::Reset(ResetCompleter::Sync& completer) {
@@ -237,7 +232,6 @@ void FakeCodec::Reset(ResetCompleter::Sync& completer) {
   // Reset all signalprocessing Elements and the signalprocessing Topology.
 
   completer.Reply();
-  ADR_LOG_METHOD(kLogFakeCodec) << "exit";
 }
 
 void FakeCodec::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
@@ -256,8 +250,6 @@ void FakeCodec::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
   } else {
     watch_plug_state_completer_ = completer.ToAsync();
   }
-
-  ADR_LOG_METHOD(kLogFakeCodec) << "exit";
 }
 
 void FakeCodec::InjectPluggedAt(zx::time plug_time) {

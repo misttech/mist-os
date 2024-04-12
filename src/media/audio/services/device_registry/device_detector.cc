@@ -111,18 +111,14 @@ void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Dir
       return;
     }
     fidl::Client connector(std::move(client_end.value()), dispatcher_);
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
-    if (!endpoints.is_ok()) {
-      FX_LOGS(ERROR) << "DriverClientFromDevFs: CreateEndpoints failed";
-      return;
-    }
-    auto status = connector->Connect(std::move(endpoints->server));
+    auto [client, server] = fidl::Endpoints<fuchsia_hardware_audio::Codec>::Create();
+    auto status = connector->Connect(std::move(server));
     if (!status.is_ok()) {
       FX_PLOGS(ERROR, status.error_value().status())
           << "Connector/Connect failed for " << device_type;
       return;
     }
-    driver_client = DriverClient::WithCodec(std::move(endpoints->client));
+    driver_client = DriverClient::WithCodec(std::move(client));
   } else if (device_type == fuchsia_audio_device::DeviceType::kComposite) {
     // Composite devices such as aml-g12-tdm are DFv2: we can connect directly to them.
     // TODO(https://fxbug.dev/304551042): Convert VirtualAudioComposite to DFv2; remove 'else'.
@@ -145,18 +141,14 @@ void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Dir
         return;
       }
       fidl::Client connector(std::move(client_end.value()), dispatcher_);
-      auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Composite>();
-      if (!endpoints.is_ok()) {
-        FX_LOGS(ERROR) << "DriverClientFromDevFs: CreateEndpoints failed";
-        return;
-      }
-      auto status = connector->Connect(std::move(endpoints->server));
+      auto [client, server] = fidl::Endpoints<fuchsia_hardware_audio::Composite>::Create();
+      auto status = connector->Connect(std::move(server));
       if (!status.is_ok()) {
         FX_PLOGS(ERROR, status.error_value().status())
             << "Connector/Connect failed for " << device_type;
         return;
       }
-      driver_client = DriverClient::WithComposite(std::move(endpoints->client));
+      driver_client = DriverClient::WithComposite(std::move(client));
     }
   } else if (device_type == fuchsia_audio_device::DeviceType::kInput ||
              device_type == fuchsia_audio_device::DeviceType::kOutput) {
@@ -168,18 +160,14 @@ void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Dir
       return;
     }
     fidl::Client connector(std::move(client_end.value()), dispatcher_);
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::StreamConfig>();
-    if (!endpoints.is_ok()) {
-      FX_LOGS(ERROR) << "DriverClientFromDevFs: CreateEndpoints failed";
-      return;
-    }
-    auto status = connector->Connect(std::move(endpoints->server));
+    auto [client, server] = fidl::Endpoints<fuchsia_hardware_audio::StreamConfig>::Create();
+    auto status = connector->Connect(std::move(server));
     if (!status.is_ok()) {
       FX_PLOGS(ERROR, status.error_value().status())
           << "Connector/Connect failed for " << device_type;
       return;
     }
-    driver_client = DriverClient::WithStreamConfig(std::move(endpoints->client));
+    driver_client = DriverClient::WithStreamConfig(std::move(client));
   } else {
     FX_LOGS(WARNING) << device_type << " device detection not yet supported";
     return;

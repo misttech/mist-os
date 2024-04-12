@@ -321,8 +321,8 @@ class FakeComposite : public std::enable_shared_from_this<FakeComposite>,
   static bool DaiFormatIsSupported(ElementId element_id,
                                    const fuchsia_hardware_audio::DaiFormat& format);
 
-  static void CheckForElementStateCompletion(FakeElementRecord& element_record);
-  void CheckForTopologyCompletion();
+  static void MaybeCompleteWatchElementState(FakeElementRecord& element_record);
+  void MaybeCompleteWatchTopology();
 
   async_dispatcher_t* dispatcher_;
   fidl::ServerEnd<fuchsia_hardware_audio::Composite> server_end_;

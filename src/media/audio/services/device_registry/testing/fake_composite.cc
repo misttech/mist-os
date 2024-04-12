@@ -422,6 +422,7 @@ void FakeComposite::GetDaiFormats(GetDaiFormatsRequest& request,
   if (element_id < kMinDaiElementId || element_id > kMaxDaiElementId) {
     ADR_WARN_METHOD() << "Element " << element_id << " is out of range";
     completer.Reply(fit::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
+    return;
   }
 
   auto dai_format_sets = kDefaultDaiFormatsMap.find(element_id);
@@ -576,7 +577,7 @@ void FakeComposite::WatchElementState(WatchElementStateRequest& request,
 
   element.watch_completer = completer.ToAsync();
 
-  CheckForElementStateCompletion(element);
+  MaybeCompleteWatchElementState(element);
 }
 
 void FakeComposite::SetElementState(SetElementStateRequest& request,
@@ -599,7 +600,7 @@ void FakeComposite::SetElementState(SetElementStateRequest& request,
     element_record.state = request.state();
     element_record.state_has_changed = true;
 
-    CheckForElementStateCompletion(element_record);
+    MaybeCompleteWatchElementState(element_record);
   }
 
   completer.Reply(fit::ok());
@@ -607,6 +608,7 @@ void FakeComposite::SetElementState(SetElementStateRequest& request,
 
 void FakeComposite::InjectElementStateChange(
     ElementId element_id, fuchsia_hardware_audio_signalprocessing::ElementState new_state) {
+  ADR_LOG_METHOD(kLogFakeComposite) << "(" << element_id << ")";
   auto match = elements_.find(element_id);
   ASSERT_NE(match, elements_.end());
   auto& element = match->second;
@@ -614,18 +616,23 @@ void FakeComposite::InjectElementStateChange(
   element.state = std::move(new_state);
   element.state_has_changed = true;
 
-  CheckForElementStateCompletion(element);
+  MaybeCompleteWatchElementState(element);
 }
 
 // static
-void FakeComposite::CheckForElementStateCompletion(FakeElementRecord& element_record) {
+void FakeComposite::MaybeCompleteWatchElementState(FakeElementRecord& element_record) {
   if (element_record.state_has_changed && element_record.watch_completer.has_value()) {
     auto completer = std::move(*element_record.watch_completer);
     element_record.watch_completer.reset();
 
     element_record.state_has_changed = false;
 
+    ADR_LOG_STATIC(kLogFakeComposite)
+        << "About to complete WatchElementState for element_id " << *element_record.element.id();
     completer.Reply(element_record.state);
+  } else {
+    ADR_LOG_STATIC(kLogFakeComposite)
+        << "Not completing WatchElementState for element_id " << *element_record.element.id();
   }
 }
 
@@ -640,7 +647,7 @@ void FakeComposite::WatchTopology(WatchTopologyCompleter::Sync& completer) {
 
   watch_topology_completer_ = completer.ToAsync();
 
-  CheckForTopologyCompletion();
+  MaybeCompleteWatchTopology();
 }
 
 void FakeComposite::SetTopology(SetTopologyRequest& request,
@@ -667,7 +674,7 @@ void FakeComposite::SetTopology(SetTopologyRequest& request,
     topology_id_ = request.topology_id();
     topology_has_changed_ = true;
 
-    CheckForTopologyCompletion();
+    MaybeCompleteWatchTopology();
   }
   completer.Reply(fit::ok());
 }
@@ -679,20 +686,24 @@ void FakeComposite::InjectTopologyChange(std::optional<TopologyId> topology_id) 
   if (topology_has_changed_) {
     topology_id_ = *topology_id;
 
-    CheckForTopologyCompletion();
+    MaybeCompleteWatchTopology();
   } else {
     topology_id_.reset();  // A new `SetTopology` call must be made
   }
 }
 
-void FakeComposite::CheckForTopologyCompletion() {
+void FakeComposite::MaybeCompleteWatchTopology() {
   if (topology_id_.has_value() && topology_has_changed_ && watch_topology_completer_.has_value()) {
     auto completer = std::move(*watch_topology_completer_);
     watch_topology_completer_.reset();
 
     topology_has_changed_ = false;
 
+    ADR_LOG_STATIC(kLogFakeComposite)
+        << "About to complete WatchTopology with topology_id " << *topology_id_;
     completer.Reply(*topology_id_);
+  } else {
+    ADR_LOG_STATIC(kLogFakeComposite) << "Not completing WatchTopology";
   }
 }
 

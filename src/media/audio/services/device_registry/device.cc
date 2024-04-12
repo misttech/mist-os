@@ -207,6 +207,7 @@ void Device::OnRemoval() {
     --initialized_count_;
 
     DropControl();  // Probably unneeded (the Device is going away) but makes unwind "complete".
+    ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver=>DeviceIsRemoved";
     ForEachObserver([](auto obs) { obs->DeviceIsRemoved(); });  // Our control is also an observer.
   }
 
@@ -224,7 +225,6 @@ void Device::OnRemoval() {
 }
 
 void Device::ForEachObserver(fit::function<void(std::shared_ptr<ObserverNotify>)> action) {
-  ADR_LOG_METHOD(kLogNotifyMethods);
   for (auto weak_obs = observers_.begin(); weak_obs < observers_.end(); ++weak_obs) {
     if (auto observer = weak_obs->lock(); observer) {
       action(observer);
@@ -246,6 +246,7 @@ void Device::OnError(zx_status_t error) {
     --initialized_count_;
 
     DropControl();
+    ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver=>DeviceHasError";
     ForEachObserver([](auto obs) { obs->DeviceHasError(); });
   }
   ++unhealthy_count_;
@@ -867,15 +868,8 @@ void Device::RetrieveSignalProcessingState() {
     return;
   }
 
-  auto endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
-  if (!endpoints.is_ok()) {
-    ADR_WARN_METHOD() << "unable to create SignalProcessing endpoints: "
-                      << endpoints.status_string();
-    OnError(endpoints.status_value());
-    return;
-  }
-  auto [sig_proc_client_end, sig_proc_server_end] = std::move(endpoints.value());
+  auto [sig_proc_client_end, sig_proc_server_end] =
+      fidl::Endpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>::Create();
 
   // TODO(https://fxbug.dev/113429): handle command timeouts
 
@@ -984,6 +978,9 @@ void Device::RetrieveSignalProcessingElements() {
               OnError(ZX_ERR_INVALID_ARGS);
               return;
             }
+            for (const auto& [element_id, _] : sig_proc_element_map_) {
+              element_ids_.insert(element_id);
+            }
             RetrieveSignalProcessingTopologies();
 
             if (is_composite()) {
@@ -1029,6 +1026,9 @@ void Device::RetrieveSignalProcessingTopologies() {
           OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
+        for (const auto& [topology_id, _] : sig_proc_topology_map_) {
+          topology_ids_.insert(topology_id);
+        }
 
         SetSignalProcessingSupported(true);
 
@@ -1067,8 +1067,12 @@ void Device::RetrieveCurrentTopology() {
         // Save the topology and notify Observers, but only if this is a change in topology.
         if (!current_topology_id_.has_value() || *current_topology_id_ != new_topology_id) {
           current_topology_id_ = new_topology_id;
+          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver=>TopologyChanged";
           ForEachObserver([new_topology_id](auto obs) { obs->TopologyChanged(new_topology_id); });
         }
+
+        // Register for any future change in topology.
+        RetrieveCurrentTopology();
       });
 }
 
@@ -1080,38 +1084,52 @@ void Device::RetrieveCurrentElementStates() {
   }
   FX_DCHECK(sig_proc_client_->is_valid());
 
-  for (auto& element_pair : sig_proc_element_map_) {
-    const auto& element = element_pair.second.element;
-    (*sig_proc_client_)
-        ->WatchElementState({{.processing_element_id = element_pair.first}})
-        .Then([this, element](
-                  fidl::Result<
-                      fuchsia_hardware_audio_signalprocessing::SignalProcessing::WatchElementState>&
-                      result) {
-          std::string context("signalprocessing::WatchElementState response");
-          if (LogResultFrameworkError(result, context.c_str())) {
-            return;
-          }
-
-          auto element_state = result->state();
-          if (!ValidateElementState(element_state, element)) {
-            OnError(ZX_ERR_INVALID_ARGS);
-            return;
-          }
-          ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
-
-          // Save the state and notify Observers, but only if this is a change in element state.
-          auto element_record = sig_proc_element_map_.find(*element.id());
-          if (!element_record->second.state.has_value() ||
-              *element_record->second.state != element_state) {
-            element_record->second.state = element_state;
-            // Notify any Observers of this change in element state.
-            ForEachObserver([element_id = *element.id(), element_state](auto obs) {
-              obs->ElementStateChanged(element_id, element_state);
-            });
-          }
-        });
+  for (auto& [element_id, _] : sig_proc_element_map_) {
+    RetrieveElementState(element_id);
   }
+}
+
+void Device::RetrieveElementState(ElementId element_id) {
+  auto element_match = sig_proc_element_map_.find(element_id);
+  FX_CHECK(element_match != sig_proc_element_map_.end());
+  auto& element = element_match->second.element;
+
+  (*sig_proc_client_)
+      ->WatchElementState({element_id})
+      .Then([this, element_id,
+             element](fidl::Result<
+                      fuchsia_hardware_audio_signalprocessing::SignalProcessing::WatchElementState>&
+                          result) {
+        std::string context("signalprocessing::WatchElementState response");
+        if (LogResultFrameworkError(result, context.c_str())) {
+          return;
+        }
+
+        auto element_state = result->state();
+        if (!ValidateElementState(element_state, element)) {
+          OnError(ZX_ERR_INVALID_ARGS);
+          return;
+        }
+        ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
+
+        // Save the state and notify Observers, but only if this is a change in element state.
+        auto element_record = sig_proc_element_map_.find(*element.id());
+        if (!element_record->second.state.has_value() ||
+            *element_record->second.state != element_state) {
+          element_record->second.state = element_state;
+          // Notify any Observers of this change in element state.
+          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver=>ElementStateChanged";
+          ForEachObserver([element_id = *element.id(), element_state](auto obs) {
+            obs->ElementStateChanged(element_id, element_state);
+          });
+        } else {
+          ADR_LOG_OBJECT(kLogNotifyMethods)
+              << "Not sending ElementStateChanged: state is unchanged.";
+        }
+
+        // Register for any future change in element state.
+        RetrieveElementState(element_id);
+      });
 }
 
 bool Device::SetTopology(uint64_t topology_id) {
@@ -1322,6 +1340,7 @@ void Device::RetrieveGainState() {
           OnInitializationResponse();
         } else {
           ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchGainState received update";
+          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver=>GainStateChanged";
           ForEachObserver([gain_state = *gain_state_](auto obs) {
             obs->GainStateChanged({{
                 .gain_db = *gain_state.gain_db(),
@@ -1371,6 +1390,7 @@ void Device::RetrieveStreamPlugState() {
           OnInitializationResponse();
         } else {
           ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState received update";
+          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver=>PlugStateChanged";
           ForEachObserver([plug_state = *plug_state_](auto obs) {
             obs->PlugStateChanged(plug_state.plugged().value_or(true)
                                       ? fuchsia_audio_device::PlugState::kPlugged
@@ -1419,6 +1439,7 @@ void Device::RetrieveCodecPlugState() {
           OnInitializationResponse();
         } else {
           ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec::WatchPlugState received update";
+          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver=>PlugStateChanged";
           ForEachObserver([plug_state = *plug_state_](auto obs) {
             obs->PlugStateChanged(plug_state.plugged().value_or(true)
                                       ? fuchsia_audio_device::PlugState::kPlugged
@@ -2281,24 +2302,17 @@ fuchsia_audio_device::ControlCreateRingBufferError Device::ConnectRingBufferFidl
     return fuchsia_audio_device::ControlCreateRingBufferError::kFormatMismatch;
   }
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
-  if (!endpoints.is_ok()) {
-    FX_PLOGS(ERROR, endpoints.status_value())
-        << "CreateEndpoints<fuchsia_hardware_audio::RingBuffer> failed";
-    OnError(endpoints.status_value());
-    return fuchsia_audio_device::ControlCreateRingBufferError::kDeviceError;
-  }
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_audio::RingBuffer>::Create();
 
   if (is_stream_config()) {
-    auto result =
-        (*stream_config_client_)->CreateRingBuffer({driver_format, std::move(endpoints->server)});
+    auto result = (*stream_config_client_)->CreateRingBuffer({driver_format, std::move(server)});
     if (!result.is_ok()) {
       FX_PLOGS(ERROR, result.error_value().status()) << "StreamConfig/CreateRingBuffer failed";
       return fuchsia_audio_device::ControlCreateRingBufferError::kFormatMismatch;
     }
   } else {
     (*composite_client_)
-        ->CreateRingBuffer({element_id, driver_format, std::move(endpoints->server)})
+        ->CreateRingBuffer({element_id, driver_format, std::move(server)})
         .Then([this](fidl::Result<fuchsia_hardware_audio::Composite::CreateRingBuffer>& result) {
           std::string context{"Composite/CreateRingBuffer response"};
           if (LogResultError(result, context.c_str())) {
@@ -2339,14 +2353,13 @@ fuchsia_audio_device::ControlCreateRingBufferError Device::ConnectRingBufferFidl
           .sample_type = *sample_type,
           .channel_count = driver_format.pcm_format()->number_of_channels(),
           .frames_per_second = driver_format.pcm_format()->frame_rate(),
-          // TODO(https://fxbug.dev/42168795): handle .channel_layout, when communicated from
-          // driver.
+          // TODO(https://fxbug.dev/42168795): handle channel_layout when communicated from driver.
       }},
       .driver_format = driver_format,
       .active_channels_bitmask = active_channels_bitmask,
   };
   ring_buffer_record.ring_buffer_client = fidl::Client<fuchsia_hardware_audio::RingBuffer>(
-      std::move(endpoints->client), dispatcher_, ring_buffer_record.ring_buffer_handler.get()),
+      std::move(client), dispatcher_, ring_buffer_record.ring_buffer_handler.get()),
 
   ring_buffer_map_.insert_or_assign(element_id, std::move(ring_buffer_record));
 

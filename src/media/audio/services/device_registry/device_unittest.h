@@ -288,11 +288,14 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     std::optional<zx::time>& codec_stop_time() { return codec_stop_time_; }
     bool codec_stop_failed() const { return codec_stop_failed_; }
 
-    std::optional<TopologyId> topology_id() const { return topology_id_; }
     const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>&
     element_states() const {
       return element_states_;
     }
+    void clear_element_states() { element_states_.clear(); }
+
+    std::optional<TopologyId> topology_id() const { return topology_id_; }
+    void clear_topology_id() { topology_id_.reset(); }
 
    private:
     [[maybe_unused]] DeviceTestBase& parent_;
@@ -416,6 +419,11 @@ class CompositeTest : public DeviceTestBase {
       std::pair<ElementId, std::vector<fuchsia_hardware_audio::SupportedFormats>>>&
   ElementDriverRingBufferFormatSets(const std::shared_ptr<Device>& device) {
     return device->element_driver_ring_buffer_format_sets_;
+  }
+
+  static const std::unordered_map<ElementId, ElementRecord>& signal_processing_elements(
+      std::shared_ptr<Device> device) {
+    return device->sig_proc_element_map_;
   }
 
   std::shared_ptr<FakeComposite> MakeFakeComposite() {

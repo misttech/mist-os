@@ -30,15 +30,14 @@ TEST_F(ControlCreatorServerWarningTest, MissingId) {
   auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
 
-  auto control_endpoints = fidl::CreateEndpoints<fuchsia_audio_device::Control>();
-  ASSERT_TRUE(control_endpoints.is_ok());
+  auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(control_endpoints->client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler_.get());
   auto received_callback = false;
   control_creator->client()
       ->Create({{
           // Missing token_id
-          .control_server = std::move(control_endpoints->server),
+          .control_server = std::move(server),
       }})
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         ASSERT_TRUE(result.is_error());
@@ -86,16 +85,15 @@ TEST_F(ControlCreatorServerCodecWarningTest, BadId) {
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
   ASSERT_TRUE(added_device_id);
-  auto control_endpoints = fidl::CreateEndpoints<fuchsia_audio_device::Control>();
-  ASSERT_TRUE(control_endpoints.is_ok());
+  auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(control_endpoints->client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler_.get());
   received_callback = false;
 
   control_creator->client()
       ->Create({{
           .token_id = *added_device_id - 1,  // Bad token_id
-          .control_server = std::move(control_endpoints->server),
+          .control_server = std::move(server),
       }})
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
@@ -139,10 +137,9 @@ TEST_F(ControlCreatorServerCodecWarningTest, MissingServerEnd) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(added_device_id);
-  auto control_endpoints = fidl::CreateEndpoints<fuchsia_audio_device::Control>();
-  ASSERT_TRUE(control_endpoints.is_ok());
+  auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(control_endpoints->client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler_.get());
   received_callback = false;
 
   control_creator->client()
@@ -197,10 +194,9 @@ TEST_F(ControlCreatorServerCodecWarningTest, BadServerEnd) {
   }
 
   ASSERT_TRUE(added_device_id);
-  auto control_endpoints = fidl::CreateEndpoints<fuchsia_audio_device::Control>();
-  ASSERT_TRUE(control_endpoints.is_ok());
+  auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(control_endpoints->client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler_.get());
   received_callback = false;
 
   control_creator->client()
@@ -256,16 +252,15 @@ TEST_F(ControlCreatorServerCodecWarningTest, IdAlreadyControlled) {
 
   ASSERT_TRUE(added_device_id);
   ASSERT_EQ(ControlServer::count(), 0u);
-  auto control_endpoints = fidl::CreateEndpoints<fuchsia_audio_device::Control>();
-  ASSERT_TRUE(control_endpoints.is_ok());
+  auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_1 = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(control_endpoints->client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler_.get());
   received_callback = false;
 
   control_creator->client()
       ->Create({{
           .token_id = *added_device_id,
-          .control_server = std::move(control_endpoints->server),
+          .control_server = std::move(server),
       }})
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
@@ -276,16 +271,15 @@ TEST_F(ControlCreatorServerCodecWarningTest, IdAlreadyControlled) {
   ASSERT_TRUE(received_callback);
   ASSERT_EQ(ControlServer::count(), 1u);
   EXPECT_TRUE(control_client_1.is_valid());
-  auto control_endpoints2 = fidl::CreateEndpoints<fuchsia_audio_device::Control>();
-  ASSERT_TRUE(control_endpoints.is_ok());
+  auto [client2, server2] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_2 = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(control_endpoints2->client), dispatcher(), control_fidl_handler_.get());
+      std::move(client2), dispatcher(), control_fidl_handler_.get());
   received_callback = false;
 
   control_creator->client()
       ->Create({{
           .token_id = *added_device_id,
-          .control_server = std::move(control_endpoints2->server),
+          .control_server = std::move(server2),
       }})
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
@@ -337,16 +331,15 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, BadId) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(added_device_id);
-  auto control_endpoints = fidl::CreateEndpoints<fuchsia_audio_device::Control>();
-  ASSERT_TRUE(control_endpoints.is_ok());
+  auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(control_endpoints->client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler_.get());
   received_callback = false;
 
   control_creator->client()
       ->Create({{
           .token_id = *added_device_id - 1,  // Bad token_id
-          .control_server = std::move(control_endpoints->server),
+          .control_server = std::move(server),
       }})
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
@@ -392,10 +385,9 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, MissingServerEnd) {
   ASSERT_TRUE(received_callback);
   ASSERT_TRUE(added_device_id);
 
-  auto control_endpoints = fidl::CreateEndpoints<fuchsia_audio_device::Control>();
-  ASSERT_TRUE(control_endpoints.is_ok());
+  auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(control_endpoints->client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler_.get());
   received_callback = false;
 
   control_creator->client()
@@ -450,10 +442,9 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, BadServerEnd) {
   }
 
   ASSERT_TRUE(added_device_id);
-  auto control_endpoints = fidl::CreateEndpoints<fuchsia_audio_device::Control>();
-  ASSERT_TRUE(control_endpoints.is_ok());
+  auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(control_endpoints->client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler_.get());
   received_callback = false;
 
   control_creator->client()
@@ -509,16 +500,15 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, IdAlreadyControlled) {
 
   ASSERT_TRUE(added_device_id);
   ASSERT_EQ(ControlServer::count(), 0u);
-  auto control_endpoints = fidl::CreateEndpoints<fuchsia_audio_device::Control>();
-  ASSERT_TRUE(control_endpoints.is_ok());
+  auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_1 = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(control_endpoints->client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler_.get());
   received_callback = false;
 
   control_creator->client()
       ->Create({{
           .token_id = *added_device_id,
-          .control_server = std::move(control_endpoints->server),
+          .control_server = std::move(server),
       }})
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
@@ -529,16 +519,15 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, IdAlreadyControlled) {
   ASSERT_TRUE(received_callback);
   ASSERT_EQ(ControlServer::count(), 1u);
   EXPECT_TRUE(control_client_1.is_valid());
-  auto control_endpoints2 = fidl::CreateEndpoints<fuchsia_audio_device::Control>();
-  ASSERT_TRUE(control_endpoints2.is_ok());
+  auto [client2, server2] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_2 = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(control_endpoints2->client), dispatcher(), control_fidl_handler_.get());
+      std::move(client2), dispatcher(), control_fidl_handler_.get());
   received_callback = false;
 
   control_creator->client()
       ->Create({{
           .token_id = *added_device_id,
-          .control_server = std::move(control_endpoints2->server),
+          .control_server = std::move(server2),
       }})
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
