@@ -9,7 +9,7 @@
     ],
     program: {
         runner: "rust_test_runner",
-        binary: "bin/netstack_management_integration_test",
+        binary: "bin/policy_management_integration_test",
     },
     use: [
         {

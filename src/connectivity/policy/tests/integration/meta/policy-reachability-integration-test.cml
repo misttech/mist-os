@@ -9,6 +9,6 @@
     ],
     program: {
         runner: "rust_test_runner",
-        binary: "bin/netstack_reachability_integration_test",
+        binary: "bin/policy_reachability_integration_test",
     },
 }

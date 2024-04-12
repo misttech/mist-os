@@ -1,4 +1,4 @@
-# Copyright 2019 The Fuchsia Authors. All rights reserved.
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -9,59 +9,17 @@ import(
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 
-tests = [ "sys" ]
-
 tests_with_err_logs = [
   {
-    label = "bridge"
+    label = "management"
   },
   {
-    label = "dhcp"
-  },
-  {
-    label = "dhcp-client"
-  },
-  {
-    label = "dns"
-  },
-  {
-    label = "fidl"
-  },
-  {
-    label = "forwarding"
-  },
-  {
-    label = "ipv4"
-  },
-  {
-    label = "ipv6"
-  },
-  {
-    label = "product-flow"
-  },
-  {
-    label = "socket"
+    label = "reachability"
   },
 ]
 
-long_tests_with_err_logs = [
-  {
-    label = "multicast-forwarding"
-    long_test = true
-  },
-]
-
-foreach(test, tests) {
-  name = "netstack-${test}-integration-test"
-  fuchsia_test_component_with_expectations(name) {
-    expectations = "expects/${name}.json5"
-    manifest = "meta/${name}.cml"
-    deps = [ test ]
-  }
-}
-
-foreach(test, tests_with_err_logs + long_tests_with_err_logs) {
-  name = "netstack-${test.label}-integration-test"
+foreach(test, tests_with_err_logs) {
+  name = "policy-${test.label}-integration-test"
   fuchsia_test_component(name) {
     manifest = "meta/${name}.cml"
     deps = [ test.label ]
@@ -98,9 +56,9 @@ package_deps = [
   "//src/lib/fake-clock/svc",
 
   # netcfg integration with netstack is tested.
+  ":netcfg-netemul-configs",
   "//src/connectivity/policy/netcfg:component-advanced",
   "//src/connectivity/policy/netcfg:component-basic",
-  "//src/connectivity/policy/tests/integration:netcfg-netemul-configs",
 ]
 
 # RISC-V on Fuchsia does not support Golang.
@@ -112,19 +70,9 @@ if (target_cpu != "riscv64") {
   ]
 }
 
-fuchsia_test_package("netstack-integration-tests") {
-  test_components = []
-  foreach(test, tests) {
-    test_components += [ ":netstack-${test}-integration-test" ]
-  }
-
-  deps = package_deps + [ "//src/lib/testing/expectation:expectation_comparer" ]
-}
-
 err_log_package_deps = []
-long_test_err_log_package_deps = []
-foreach(test, tests_with_err_logs + long_tests_with_err_logs) {
-  name = "netstack-${test.label}-integration-test"
+foreach(test, tests_with_err_logs) {
+  name = "policy-${test.label}-integration-test"
   no_err_logs_package_name = "${name}-no-err-logs"
   fuchsia_test_with_expectations_package(no_err_logs_package_name) {
     test_components = [ ":${name}" ]
@@ -132,12 +80,6 @@ foreach(test, tests_with_err_logs + long_tests_with_err_logs) {
     treatment_of_cases_with_error_logs = "SKIP_CASES_WITH_ERROR_LOGS"
     deps =
         package_deps + [ "//src/lib/testing/expectation:expectation_comparer" ]
-    if (defined(test.long_test) && test.long_test) {
-      test_specs = {
-        # Longer timeout to reduce flake (https://fxbug.dev/42055260)
-        timeout_secs = 720
-      }
-    }
   }
   with_err_logs_package_name = "${name}-with-err-logs"
   fuchsia_test_with_expectations_package(with_err_logs_package_name) {
@@ -150,48 +92,35 @@ foreach(test, tests_with_err_logs + long_tests_with_err_logs) {
       log_settings = {
         max_severity = "ERROR"
       }
-      if (defined(test.long_test) && test.long_test) {
-        # Longer timeout to reduce flake (https://fxbug.dev/42055260)
-        timeout_secs = 720
-      }
     }
   }
-  if (defined(test.long_test) && test.long_test) {
-    long_test_err_log_package_deps += [
-      ":${no_err_logs_package_name}",
-      ":${with_err_logs_package_name}",
-    ]
-  } else {
-    err_log_package_deps += [
-      ":${no_err_logs_package_name}",
-      ":${with_err_logs_package_name}",
-    ]
-  }
+  err_log_package_deps += [
+    ":${no_err_logs_package_name}",
+    ":${with_err_logs_package_name}",
+  ]
 }
 
-# We keep tests that involve the virtualization stack (and especially guest
-# images) restricted to a separate builder.  See https://fxbug.dev/42073933 for
-# more details.
-group("tests-involving-guests") {
+# Note: using configs in tests requires for this path to be added to
+# network/tests/integration/common/src/realms.rs with an enum type.
+resource("netcfg-netemul-configs") {
   testonly = true
-  deps = [ "guest:netstack-guest-integration-tests" ]
+
+  sources = [
+    "management/config/all_delegated.json",
+    "management/config/dhcpv6.json",
+    "management/config/duplicate_names.json",
+    "management/config/empty.json",
+    "management/config/forwarding.json",
+    "management/config/iface_prefix.json",
+    "management/config/packet_filter_ethernet.json",
+    "management/config/packet_filter_wlan.json",
+  ]
+
+  outputs = [ "netcfg/{{source_file_part}}" ]
 }
 
 group("tests") {
   testonly = true
 
-  # See comment above about tests-involving-guests
-  assert_no_deps = [ "guest:netstack-guest-integration-tests" ]
-  deps = [
-           ":netstack-integration-tests",
-           "guest:build-only",
-           "inspect:tests",
-           "macros:netstack_testing_macros_test",
-         ] + err_log_package_deps
-
-  if (!is_coverage) {
-    # TODO(https://fxbug.dev/42055260): Re-enable this test when it passes with
-    # the coverage variant.
-    deps += long_test_err_log_package_deps
-  }
+  deps = err_log_package_deps
 }

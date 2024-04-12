@@ -6,7 +6,7 @@ import("//build/rust/rustc_test.gni")
 
 rustc_test("reachability") {
   edition = "2021"
-  output_name = "netstack_reachability_integration_test"
+  output_name = "policy_reachability_integration_test"
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",

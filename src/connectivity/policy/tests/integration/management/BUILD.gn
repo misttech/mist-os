@@ -6,7 +6,7 @@ import("//build/rust/rustc_test.gni")
 
 rustc_test("management") {
   edition = "2021"
-  output_name = "netstack_management_integration_test"
+  output_name = "policy_management_integration_test"
   deps = [
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
