@@ -40,8 +40,5 @@ pub struct SetUiConfig {
     pub interface: Option<Utf8PathBuf>,
 
     #[serde(default)]
-    pub light_sensor: Option<Utf8PathBuf>,
-
-    #[serde(default)]
     pub agent: Option<Utf8PathBuf>,
 }

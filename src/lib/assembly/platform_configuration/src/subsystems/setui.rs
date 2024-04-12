@@ -42,13 +42,6 @@ impl DefineSubsystemConfiguration<SetUiConfig> for SetUiSubsystem {
                 })?;
             }
 
-            if let Some(light_sensor) = &config.light_sensor {
-                builder.package("setui_service").config_data(FileEntry {
-                    source: light_sensor.clone(),
-                    destination: "light_sensor_configuration.json".into(),
-                })?;
-            }
-
             if let Some(agent) = &config.agent {
                 builder.package("setui_service").config_data(FileEntry {
                     source: agent.clone(),

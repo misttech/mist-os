@@ -17,8 +17,6 @@
             "/pkg/data/input_device_configuration.json",
             "-x",
             "/pkg/data/interface_configuration.json",
-            "-l",
-            "/pkg/data/light_sensor_configuration.json",
             "-h",
             "/pkg/data/light_hardware_configuration.json",
             "-a",
