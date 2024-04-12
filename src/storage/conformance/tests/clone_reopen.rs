@@ -7,7 +7,7 @@ use {
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::TryStreamExt as _,
-    io_conformance_util::{flags::build_flag_combinations, test_harness::TestHarness, *},
+    io_conformance_util::{flags::Rights, test_harness::TestHarness, *},
 };
 
 #[fuchsia::test]
@@ -20,8 +20,7 @@ async fn clone_file_with_same_or_fewer_rights() {
         let file = open_file_with_flags(&test_dir, file_flags, TEST_FILE).await;
 
         // Clone using every subset of flags.
-        for clone_flags in build_flag_combinations(0, file_flags.bits()) {
-            let clone_flags = fio::OpenFlags::from_bits_truncate(clone_flags);
+        for clone_flags in Rights::new(file_flags).valid_combos() {
             let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("create_proxy failed");
             file.clone(clone_flags | fio::OpenFlags::DESCRIBE, server).expect("clone failed");
             let status = get_open_status(&proxy).await;
@@ -70,10 +69,7 @@ async fn clone_file_with_additional_rights() {
         let file = open_file_with_flags(&test_dir, file_flags, TEST_FILE).await;
 
         // Clone using every superset of flags, should fail.
-        for clone_flags in
-            build_flag_combinations(file_flags.bits(), harness.dir_rights.all().bits())
-        {
-            let clone_flags = fio::OpenFlags::from_bits_truncate(clone_flags);
+        for clone_flags in harness.file_rights.valid_combos_with(file_flags) {
             if clone_flags == file_flags {
                 continue;
             }
@@ -95,8 +91,7 @@ async fn clone_directory_with_same_or_fewer_rights() {
         let dir = open_dir_with_flags(&test_dir, dir_flags, "dir").await;
 
         // Clone using every subset of flags.
-        for clone_flags in build_flag_combinations(0, dir_flags.bits()) {
-            let clone_flags = fio::OpenFlags::from_bits_truncate(clone_flags);
+        for clone_flags in Rights::new(dir_flags).valid_combos() {
             let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("create_proxy failed");
             dir.clone(clone_flags | fio::OpenFlags::DESCRIBE, server).expect("clone failed");
             let status = get_open_status(&proxy).await;
@@ -144,10 +139,7 @@ async fn clone_directory_with_additional_rights() {
         let dir = open_dir_with_flags(&test_dir, dir_flags, "dir").await;
 
         // Clone using every superset of flags, should fail.
-        for clone_flags in
-            build_flag_combinations(dir_flags.bits(), harness.dir_rights.all().bits())
-        {
-            let clone_flags = fio::OpenFlags::from_bits_truncate(clone_flags);
+        for clone_flags in harness.dir_rights.valid_combos_with(dir_flags) {
             if clone_flags == dir_flags {
                 continue;
             }

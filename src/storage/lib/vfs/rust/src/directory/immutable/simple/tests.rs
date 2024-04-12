@@ -435,21 +435,15 @@ fn open_subdir_with_posix_flag_rights_expansion() {
 
     // Combinations of flags to test the root directory with.
     let root_flag_combos = build_flag_combinations(
-        fio::OpenFlags::RIGHT_READABLE.bits(),
-        (fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::RIGHT_EXECUTABLE).bits(),
-    )
-    .into_iter()
-    .map(fio::OpenFlags::from_bits_truncate)
-    .collect::<Vec<_>>();
+        fio::OpenFlags::RIGHT_READABLE,
+        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+    );
 
     // Combinations of flags to pass in when opening a subdirectory within the root directory.
     let subdir_flag_combos = build_flag_combinations(
-        fio::OpenFlags::RIGHT_READABLE.bits(),
-        (fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE).bits(),
-    )
-    .into_iter()
-    .map(fio::OpenFlags::from_bits_truncate)
-    .collect::<Vec<_>>();
+        fio::OpenFlags::RIGHT_READABLE,
+        fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE,
+    );
 
     // Validates that POSIX flags passed when opening a subdirectory against the root directory
     // result in the correct expanded rights, and that they do not exceed those of the root.

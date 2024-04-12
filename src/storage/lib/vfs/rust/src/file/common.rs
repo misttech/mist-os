@@ -128,14 +128,12 @@ mod tests {
             .union(fio::OpenFlags::POSIX_WRITABLE)
             .union(fio::OpenFlags::POSIX_EXECUTABLE);
         for open_flags in build_flag_combinations(
-            0,
-            (fio::OpenFlags::RIGHT_READABLE
+            fio::OpenFlags::empty(),
+            fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::RIGHT_EXECUTABLE
-                | ALL_POSIX_FLAGS)
-                .bits(),
+                | ALL_POSIX_FLAGS,
         ) {
-            let open_flags = fio::OpenFlags::from_bits_truncate(open_flags);
             let (readable, writable, executable) = io_flags_to_rights(open_flags);
             // Skip disallowed W+X combinations, and skip combinations without any POSIX flags.
             if (writable && executable) || !open_flags.intersects(ALL_POSIX_FLAGS) {
@@ -148,13 +146,11 @@ mod tests {
     #[test]
     fn new_connection_validate_flags_create() {
         for open_flags in build_flag_combinations(
-            fio::OpenFlags::CREATE.bits(),
-            (fio::OpenFlags::RIGHT_READABLE
+            fio::OpenFlags::CREATE,
+            fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::CREATE_IF_ABSENT)
-                .bits(),
+                | fio::OpenFlags::CREATE_IF_ABSENT,
         ) {
-            let open_flags = fio::OpenFlags::from_bits_truncate(open_flags);
             let (readable, writable, executable) = io_flags_to_rights(open_flags);
             assert_matches!(ncvf(open_flags, readable, writable, executable), Ok(_));
         }
@@ -195,13 +191,11 @@ mod tests {
     #[test]
     fn new_connection_validate_flags_open_rights() {
         for open_flags in build_flag_combinations(
-            0,
-            (fio::OpenFlags::RIGHT_READABLE
+            fio::OpenFlags::empty(),
+            fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_EXECUTABLE)
-                .bits(),
+                | fio::OpenFlags::RIGHT_EXECUTABLE,
         ) {
-            let open_flags = fio::OpenFlags::from_bits_truncate(open_flags);
             let (readable, writable, executable) = io_flags_to_rights(open_flags);
 
             // Ensure all combinations are valid except when both writable and executable are set,
@@ -244,10 +238,9 @@ mod tests {
         #[test]
         fn test_vmo_flags_to_rights() {
             for vmo_flags in build_flag_combinations(
-                0,
-                (fio::VmoFlags::READ | fio::VmoFlags::WRITE | fio::VmoFlags::EXECUTE).bits(),
+                fio::VmoFlags::empty(),
+                fio::VmoFlags::READ | fio::VmoFlags::WRITE | fio::VmoFlags::EXECUTE,
             ) {
-                let vmo_flags = fio::VmoFlags::from_bits_truncate(vmo_flags.into());
                 let rights: fidl::Rights = vmo_flags_to_rights(vmo_flags);
                 assert_eq!(
                     vmo_flags.contains(fio::VmoFlags::READ),
@@ -281,13 +274,11 @@ mod tests {
         #[test]
         fn get_backing_memory_validate_flags_less_rights() {
             for open_flags in build_flag_combinations(
-                0,
-                (fio::OpenFlags::RIGHT_READABLE
+                fio::OpenFlags::empty(),
+                fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::RIGHT_EXECUTABLE)
-                    .bits(),
+                    | fio::OpenFlags::RIGHT_EXECUTABLE,
             ) {
-                let open_flags = fio::OpenFlags::from_bits_truncate(open_flags);
                 let (readable, writable, executable) = io_flags_to_rights(open_flags);
                 let vmo_flags = rights_to_vmo_flags(readable, writable, executable);
 
@@ -328,13 +319,11 @@ mod tests {
         #[test]
         fn get_backing_memory_validate_flags_more_rights() {
             for open_flags in build_flag_combinations(
-                0,
-                (fio::OpenFlags::RIGHT_READABLE
+                fio::OpenFlags::empty(),
+                fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::RIGHT_EXECUTABLE)
-                    .bits(),
+                    | fio::OpenFlags::RIGHT_EXECUTABLE,
             ) {
-                let open_flags = fio::OpenFlags::from_bits_truncate(open_flags);
                 // Ensure we cannot return a VMO with more rights than the connection itself has.
                 let (readable, writable, executable) = io_flags_to_rights(open_flags);
                 if !readable {

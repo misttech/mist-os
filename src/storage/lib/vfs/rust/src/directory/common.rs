@@ -150,13 +150,11 @@ mod tests {
     #[test]
     fn new_connection_validate_flags_posix() {
         for open_flags in build_flag_combinations(
-            0,
-            (fio::OpenFlags::RIGHT_READABLE
+            fio::OpenFlags::empty(),
+            fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::POSIX_EXECUTABLE
-                | fio::OpenFlags::POSIX_WRITABLE)
-                .bits(),
+                | fio::OpenFlags::POSIX_WRITABLE,
         ) {
-            let open_flags = fio::OpenFlags::from_bits_truncate(open_flags);
             let mut expected_rights = open_flags & fio::OpenFlags::RIGHT_READABLE;
             if open_flags.intersects(fio::OpenFlags::POSIX_WRITABLE) {
                 expected_rights |= fio::OpenFlags::RIGHT_WRITABLE
