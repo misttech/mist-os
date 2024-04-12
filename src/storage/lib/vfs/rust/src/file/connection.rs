@@ -497,7 +497,7 @@ enum ConnectionState {
     Alive,
     /// Connection have received Node::Close message and the [`handle_close`] method has been
     /// already called for this connection.
-    Closed,
+    Closed(fio::FileCloseResponder),
     /// Connection has been dropped by the peer or an error has occurred.  [`handle_close`] still
     /// need to be called (though it would not be able to report the status to the peer).
     Dropped,
@@ -539,7 +539,26 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
 
             match state {
                 ConnectionState::Alive => (),
-                ConnectionState::Closed => return,
+                ConnectionState::Closed(responder) => {
+                    async move {
+                        let _ = responder.send({
+                            let result = if self.options.rights.intersects(
+                                fio::Operations::WRITE_BYTES | fio::Operations::UPDATE_ATTRIBUTES,
+                            ) {
+                                self.file.sync(SyncMode::PreClose).await.map_err(Status::into_raw)
+                            } else {
+                                Ok(())
+                            };
+                            // The file gets closed when we drop `self`, so we should do that before
+                            // sending the response.
+                            std::mem::drop(self);
+                            result
+                        });
+                    }
+                    .trace(trace::trace_future_args!(c"storage", c"File::Close"))
+                    .await;
+                    return;
+                }
                 ConnectionState::Dropped => break,
             }
         }
@@ -569,20 +588,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
             }
             fio::FileRequest::Close { responder } => {
-                return async move {
-                    responder.send(
-                        if self.options.rights.intersects(
-                            fio::Operations::WRITE_BYTES | fio::Operations::UPDATE_ATTRIBUTES,
-                        ) {
-                            self.file.sync(SyncMode::PreClose).await.map_err(Status::into_raw)
-                        } else {
-                            Ok(())
-                        },
-                    )?;
-                    Ok(ConnectionState::Closed)
-                }
-                .trace(trace::trace_future_args!(c"storage", c"File::Close"))
-                .await;
+                return Ok(ConnectionState::Closed(responder));
             }
             #[cfg(not(target_os = "fuchsia"))]
             fio::FileRequest::Describe { responder } => {
