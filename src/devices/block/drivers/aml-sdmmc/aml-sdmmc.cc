@@ -439,8 +439,6 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
     }
   }
 
-  // The lease request on the hardware power element remains persistent throughout the lifetime
-  // of this driver.
   fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease_control_client_end;
   zx_status_t status = AcquireLease(hardware_power_lessor_client_, lease_control_client_end);
   if (status != ZX_OK) {
@@ -463,6 +461,11 @@ void AmlSdmmc::AdjustHardwarePowerLevel() {
 
   // TODO(b/330223394): Update power level when ordered to do so by Power Broker via RequiredLevel
   // (instead of monitoring LeaseStatus via the WatchStatus() call).
+  if (!hardware_power_lease_control_client_.is_valid()) {
+    FDF_LOGL(ERROR, logger(),
+             "Invalid hardware power lease control client. Stop monitoring lease status.");
+    return;
+  }
   fidl::Arena<> arena;
   hardware_power_lease_control_client_.buffer(arena)
       ->WatchStatus(last_lease_status)
@@ -584,6 +587,24 @@ void AmlSdmmc::AdjustHardwarePowerLevel() {
             last_lease_status = lease_status;
             // Communicate to Power Broker that the hardware power level has been lowered.
             UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOff);
+
+            // TODO(b/330223394): Revert the following behaviour of releasing and reacquiring the
+            // lease.
+            // Release and reacquire lease on the hardware power element to unblock SAG's Execution
+            // State from going to inactive.
+            hardware_power_lease_control_client_ =
+                fidl::WireClient<fuchsia_power_broker::LeaseControl>();
+
+            fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease_control_client_end;
+            status = AcquireLease(hardware_power_lessor_client_, lease_control_client_end);
+            if (status != ZX_OK) {
+              FDF_LOGL(ERROR, logger(), "Failed to reacquire lease on hardware power: %s",
+                       zx_status_get_string(status));
+              return;
+            }
+            hardware_power_lease_control_client_ =
+                fidl::WireClient<fuchsia_power_broker::LeaseControl>(
+                    std::move(lease_control_client_end), dispatcher());
             break;
           }
           default:

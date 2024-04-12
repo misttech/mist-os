@@ -254,8 +254,11 @@ class FakeLeaseControl : public fidl::Server<fuchsia_power_broker::LeaseControl>
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::LeaseControl> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
 
-  fuchsia_power_broker::LeaseStatus lease_status_ = fuchsia_power_broker::LeaseStatus::kPending;
+  static fuchsia_power_broker::LeaseStatus lease_status_;
 };
+
+fuchsia_power_broker::LeaseStatus FakeLeaseControl::lease_status_ =
+    fuchsia_power_broker::LeaseStatus::kPending;
 
 class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
  public:
