@@ -252,6 +252,7 @@ rustc_test("bt_init_smoke_test_bin") {
   deps = [
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
     "//sdk/fidl/fuchsia.bluetooth.gatt:fuchsia.bluetooth.gatt_rust",
+    "//sdk/fidl/fuchsia.bluetooth.host:fuchsia.bluetooth.host_rust",
     "//sdk/fidl/fuchsia.bluetooth.le:fuchsia.bluetooth.le_rust",
     "//sdk/fidl/fuchsia.bluetooth.rfcomm.test:fuchsia.bluetooth.rfcomm.test_rust",
     "//sdk/fidl/fuchsia.bluetooth.snoop:fuchsia.bluetooth.snoop_rust",
@@ -262,7 +263,6 @@ rustc_test("bt_init_smoke_test_bin") {
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.stash:fuchsia.stash_rust",
     "//src/connectivity/bluetooth/core/bt-gap:test-stash-secure",
-    "//src/connectivity/bluetooth/fidl:host_rust",
     "//src/connectivity/bluetooth/hci/virtual:driver",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/connectivity/bluetooth/testing/realmbuilder-mock-helpers",

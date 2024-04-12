@@ -4,11 +4,6 @@ This directory contains protocols that are internal to the Bluetooth subsystem. 
 are not published in the SDK. No component outside of the //src/connectivity/bluetooth subtree
 is allowed to access or interact with them without an explicit exception.
 
-## host.fidl
-
-This protocol is used between the core bt-gap component and the bt-host devices that it
-manages.
-
 ## lifecycle.fidl
 
 This protocol allows components to query the state of other components' lifecycles.
