@@ -2,55 +2,54 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! This module contains the [`FxUnsealedBlob`] node type used to represent an uncompressed blob
-//! in the process of being written/verified to persistent storage.
+//! Implements fuchsia.fxfs/BlobWriter for writing delivery blobs.
 
 use {
     crate::fuchsia::{
-        directory::FxDirectory, errors::map_to_status, fxblob::directory::BlobDirectory,
-        node::FxNode, volume::FxVolume,
+        directory::FxDirectory, errors::map_to_status, fxblob::BlobDirectory, node::FxNode,
+        volume::FxVolume,
     },
     anyhow::{Context as _, Error},
     delivery_blob::{
         compression::{decode_archive, ChunkInfo, ChunkedDecompressor},
         Type1Blob,
     },
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_fxfs::{BlobWriterMarker, BlobWriterRequest},
+    fidl_fuchsia_fxfs::{BlobWriterRequest, BlobWriterRequestStream},
     fuchsia_hash::Hash,
     fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
     fuchsia_zircon::{self as zx, HandleBased as _, Status},
-    futures::{lock::Mutex as AsyncMutex, try_join, TryStreamExt},
+    futures::{lock::Mutex as AsyncMutex, try_join, TryStreamExt as _},
     fxfs::{
         errors::FxfsError,
         object_handle::{ObjectHandle, WriteObjectHandle},
         object_store::{
             directory::{replace_child_with_object, ReplacedChild},
-            DataObjectHandle, ObjectDescriptor, Timestamp, BLOB_MERKLE_ATTRIBUTE_ID,
+            transaction::{lock_keys, LockKey},
+            DataObjectHandle, HandleOptions, ObjectDescriptor, ObjectStore, Timestamp,
+            BLOB_MERKLE_ATTRIBUTE_ID,
         },
         round::{round_down, round_up},
         serialized_types::BlobMetadata,
     },
     lazy_static::lazy_static,
     std::sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicBool, Ordering},
         Arc,
     },
 };
 
 lazy_static! {
-    pub static ref RING_BUFFER_SIZE: u64 = 64 * (zx::system_get_page_size() as u64);
+    static ref RING_BUFFER_SIZE: u64 = 64 * (zx::system_get_page_size() as u64);
 }
 
 const PAYLOAD_BUFFER_FLUSH_THRESHOLD: usize = 131_072; /* 128 KiB */
 
-/// Represents an RFC-0207 compliant delivery blob that is being written.
-/// The blob cannot be read until writes complete and hash is verified.
-pub struct FxDeliveryBlob {
+/// Represents an RFC-0207 compliant delivery blob that is being written. The blob cannot be read
+/// until writes complete, and the Merkle root has been verified.
+pub struct DeliveryBlobWriter {
     hash: Hash,
     handle: DataObjectHandle<FxVolume>,
-    parent: Arc<BlobDirectory>,
-    open_count: AtomicUsize,
+    parent: Arc<FxDirectory>,
     is_completed: AtomicBool,
     inner: AsyncMutex<Inner>,
 }
@@ -191,23 +190,52 @@ impl Inner {
     }
 }
 
-impl FxDeliveryBlob {
-    pub(crate) fn new(
-        parent: Arc<BlobDirectory>,
-        hash: Hash,
-        handle: DataObjectHandle<FxVolume>,
-    ) -> Arc<Self> {
-        let file = Arc::new(Self {
+impl DeliveryBlobWriter {
+    /// Creates a new object under the |parent| directory that manages writing the blob |hash|.
+    /// After the blob is fully written and verified, it will be linked as an entry under |parent|.
+    /// If this object is dropped before the blob is fully written/verified, it will be tombstoned.
+    pub(crate) async fn new(parent: &Arc<BlobDirectory>, hash: Hash) -> Result<Self, Error> {
+        let parent = parent.directory().clone();
+        let store = parent.store();
+        let keys = lock_keys![LockKey::object(store.store_object_id(), parent.object_id())];
+        let mut transaction =
+            store.filesystem().clone().new_transaction(keys, Default::default()).await?;
+        let handle = ObjectStore::create_object(
+            parent.volume(),
+            &mut transaction,
+            // Checksums are redundant for blobs, which are already content-verified.
+            HandleOptions { skip_checksums: true, ..Default::default() },
+            None,
+            None,
+        )
+        .await?;
+        // Add the object to the graveyard so that it's cleaned up if we crash.
+        store.add_to_graveyard(&mut transaction, handle.object_id());
+        transaction.commit().await?;
+        Ok(Self {
             hash,
             handle,
             parent,
-            open_count: AtomicUsize::new(0),
             is_completed: AtomicBool::new(false),
             inner: Default::default(),
-        });
-        file
+        })
     }
+}
 
+impl Drop for DeliveryBlobWriter {
+    /// Tombstone the object if we didn't finish writing the blob or the hash didn't match.
+    fn drop(&mut self) {
+        if !self.is_completed.load(Ordering::Relaxed) {
+            let store = self.handle.store();
+            store
+                .filesystem()
+                .graveyard()
+                .queue_tombstone_object(store.store_object_id(), self.handle.object_id());
+        }
+    }
+}
+
+impl DeliveryBlobWriter {
     async fn allocate(&self, size: usize) -> Result<(), Error> {
         let size = size as u64;
         let mut range = 0..round_up(size, self.handle.block_size()).ok_or(FxfsError::OutOfRange)?;
@@ -271,55 +299,17 @@ impl FxDeliveryBlob {
             }
         }
 
-        let parent = self.parent().unwrap();
         transaction
             .commit_with_callback(|_| {
                 self.is_completed.store(true, Ordering::Relaxed);
                 // This can't actually add the node to the cache, because it hasn't been created
                 // ever at this point. Passes in None for now as a result.
-                parent.did_add(&name, None);
+                self.parent.did_add(&name, None);
             })
             .await?;
         Ok(())
     }
-}
 
-impl FxNode for FxDeliveryBlob {
-    fn object_id(&self) -> u64 {
-        self.handle.object_id()
-    }
-
-    fn parent(&self) -> Option<Arc<FxDirectory>> {
-        Some(self.parent.directory().clone())
-    }
-
-    fn set_parent(&self, _parent: Arc<FxDirectory>) {
-        unreachable!()
-    }
-
-    fn open_count_add_one(&self) {
-        self.open_count.fetch_add(1, Ordering::Relaxed);
-    }
-
-    fn open_count_sub_one(self: Arc<Self>) {
-        let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
-        assert!(old > 0);
-        let is_completed = self.is_completed.load(Ordering::Relaxed);
-        if old == 1 && !is_completed {
-            let store = self.handle.store();
-            store
-                .filesystem()
-                .graveyard()
-                .queue_tombstone_object(store.store_object_id(), self.object_id());
-        }
-    }
-
-    fn object_descriptor(&self) -> ObjectDescriptor {
-        ObjectDescriptor::File
-    }
-}
-
-impl FxDeliveryBlob {
     async fn truncate(&self, length: u64) -> Result<(), Error> {
         let mut inner = self.inner.lock().await;
         if inner.delivery_size.is_some() {
@@ -434,7 +424,7 @@ impl FxDeliveryBlob {
         Ok(content_len)
     }
 
-    pub async fn get_vmo(&self, size: u64) -> Result<zx::Vmo, Error> {
+    async fn get_vmo(&self, size: u64) -> Result<zx::Vmo, Error> {
         self.truncate(size)
             .await
             .with_context(|| format!("Failed to truncate blob {} to size {}", self.hash, size))?;
@@ -453,7 +443,7 @@ impl FxDeliveryBlob {
         Ok(vmo_dup)
     }
 
-    pub async fn bytes_ready(&self, bytes_written: u64) -> Result<(), Error> {
+    async fn bytes_ready(&self, bytes_written: u64) -> Result<(), Error> {
         // TODO(https://fxbug.dev/42077275): Remove extra copy.
         if bytes_written > *RING_BUFFER_SIZE {
             return Err(FxfsError::OutOfRange).with_context(|| {
@@ -492,13 +482,13 @@ impl FxDeliveryBlob {
         Ok(())
     }
 
-    pub async fn handle_requests(
-        &self,
-        server_end: ServerEnd<BlobWriterMarker>,
+    /// Handle fuchsia.fxfs/BlobWriter requests for this delivery blob.
+    pub(crate) async fn handle_requests(
+        self,
+        mut request_stream: BlobWriterRequestStream,
     ) -> Result<(), Error> {
         let mut latched_error = None;
-        let mut stream = server_end.into_stream()?;
-        while let Some(request) = stream.try_next().await? {
+        while let Some(request) = request_stream.try_next().await? {
             match request {
                 BlobWriterRequest::GetVmo { size, responder } => {
                     let res = match self.get_vmo(size).await {

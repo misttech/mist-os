@@ -1,29 +1,23 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+//! Implements fuchsia.fxfs/BlobReader for reading blobs as VMOs from a [`BlobDirectory`].
+
 use {
-    crate::{
-        fuchsia::errors::map_to_status,
-        fxblob::{
-            blob::FxBlob,
-            directory::{BlobDirectory, Identifier},
-        },
-    },
+    crate::fxblob::directory::BlobDirectory,
     anyhow::Error,
-    fidl_fuchsia_io::{self as fio},
     fuchsia_hash::Hash,
     fuchsia_zircon::{self as zx},
     fxfs::errors::FxfsError,
     std::sync::Arc,
 };
 
-/// Implementation for VMO-backed FIDL interface for reading blobs
 impl BlobDirectory {
+    /// Get a pager-backed VMO for the blob identified by `hash` in this [`BlobDirectory`]. The blob
+    /// cannot be purged until all VMOs returned by this function are destroyed.
     pub async fn get_blob_vmo(self: &Arc<Self>, hash: Hash) -> Result<zx::Vmo, Error> {
-        let id = Identifier::from_hash(hash);
-        let node = self.lookup(fio::OpenFlags::RIGHT_READABLE, id).await.map_err(map_to_status)?;
-        let any_blob = node.clone().into_any();
-        let blob = any_blob.downcast_ref::<FxBlob>().ok_or(FxfsError::Internal)?;
+        let blob = self.open_blob(&hash.into()).await?.ok_or(FxfsError::NotFound)?;
         let vmo = blob.create_child_vmo()?;
         Ok(vmo)
     }

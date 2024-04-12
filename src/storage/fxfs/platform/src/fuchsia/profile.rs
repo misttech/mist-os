@@ -244,7 +244,7 @@ impl ProfileState {
 
                 let file = match local_cache.entry(msg.hash) {
                     Entry::Occupied(entry) => entry.get().clone(),
-                    Entry::Vacant(entry) => match root_dir.open_blob(msg.hash).await {
+                    Entry::Vacant(entry) => match root_dir.lookup_blob(msg.hash).await {
                         Err(e) => {
                             warn!("Failed to open object {} from profile: {:?}", msg.hash, e);
                             continue;
@@ -536,7 +536,7 @@ mod tests {
                 .expect("Root should be BlobDirectory");
             // Ensure that nothing is paged in right now.
             for hash in &hashes {
-                let blob = dir.open_blob(*hash).await.expect("Opening blob");
+                let blob = dir.lookup_blob(*hash).await.expect("Opening blob");
                 assert_eq!(blob.vmo().info().unwrap().committed_bytes, 0);
             }
 
@@ -547,10 +547,13 @@ mod tests {
 
             // Await all data being played back by checking that things have paged in.
             for hash in &hashes {
-                let blob = dir.open_blob(*hash).await.expect("Opening blob");
+                let blob = dir.lookup_blob(*hash).await.expect("Opening blob");
                 while blob.vmo().info().unwrap().committed_bytes == 0 {
                     fasync::Timer::new(Duration::from_millis(25)).await;
                 }
+                // The replay task shouldn't increment the blob's open count. This ensures that we
+                // can still delete blobs while we are replaying a profile.
+                assert!(blob.mark_to_be_purged());
             }
             state.stop_profiler();
         }

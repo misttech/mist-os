@@ -6,18 +6,16 @@
 //! content-addressable blobs.
 
 use {
-    crate::{
+    crate::fuchsia::{
         component::map_to_raw_status,
-        fuchsia::{
-            directory::FxDirectory,
-            fxblob::{blob::FxBlob, writer::FxDeliveryBlob},
-            node::{FxNode, GetResult, OpenedNode},
-            volume::{FxVolume, RootDir},
-        },
+        directory::FxDirectory,
+        fxblob::{blob::FxBlob, writer::DeliveryBlobWriter},
+        node::{FxNode, GetResult, OpenedNode},
+        volume::{FxVolume, RootDir},
     },
-    anyhow::{anyhow, bail, ensure, Error},
+    anyhow::{anyhow, ensure, Context as _, Error},
     async_trait::async_trait,
-    fidl::endpoints::{create_proxy, ClientEnd, Proxy as _, ServerEnd},
+    fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd},
     fidl_fuchsia_fxfs::{
         BlobCreatorRequest, BlobCreatorRequestStream, BlobReaderRequest, BlobReaderRequestStream,
         BlobWriterMarker, CreateBlobError,
@@ -33,11 +31,10 @@ use {
     futures::{FutureExt, TryStreamExt},
     fxfs::{
         errors::FxfsError,
-        log::*,
         object_handle::ReadObjectHandle,
         object_store::{
             self,
-            transaction::{lock_keys, LockKey, Options},
+            transaction::{lock_keys, LockKey},
             HandleOptions, ObjectDescriptor, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID,
         },
         serialized_types::BlobMetadata,
@@ -72,15 +69,18 @@ pub(crate) struct Identifier {
     pub hash: Hash,
 }
 
-impl Identifier {
-    pub fn from_str(string: &str) -> Result<Self, Error> {
+impl TryFrom<&str> for Identifier {
+    type Error = FxfsError;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         Ok(Self {
-            string: string.to_owned(),
-            hash: Hash::from_str(string).map_err(|_| FxfsError::InvalidArgs)?,
+            string: value.to_owned(),
+            hash: Hash::from_str(value).map_err(|_| FxfsError::InvalidArgs)?,
         })
     }
+}
 
-    pub fn from_hash(hash: Hash) -> Self {
+impl From<Hash> for Identifier {
+    fn from(hash: Hash) -> Self {
         Self { string: hash.to_string(), hash }
     }
 }
@@ -102,17 +102,18 @@ impl RootDir for BlobDirectory {
     fn on_open(self: Arc<Self>) {
         fasync::Task::spawn(async move {
             if let Err(e) = self.prefetch_blobs().await {
-                warn!("Failed to prefetch blobs: {:?}", e);
+                tracing::warn!("Failed to prefetch blobs: {:?}", e);
             }
         })
         .detach();
     }
 
+    /// Handle fuchsia.fxfs/BlobCreator requests for this [`BlobDirectory`].
     async fn handle_blob_creator_requests(self: Arc<Self>, mut requests: BlobCreatorRequestStream) {
         while let Ok(Some(request)) = requests.try_next().await {
             match request {
                 BlobCreatorRequest::Create { responder, hash, .. } => {
-                    responder.send(self.create_blob(Hash::from(hash)).await).unwrap_or_else(
+                    responder.send(self.create_blob_writer(Hash::from(hash)).await).unwrap_or_else(
                         |error| {
                             tracing::error!(?error, "failed to send Create response");
                         },
@@ -122,17 +123,13 @@ impl RootDir for BlobDirectory {
         }
     }
 
+    /// Handle fuchsia.fxfs/BlobReader requests for this [`BlobDirectory`].
     async fn handle_blob_reader_requests(self: Arc<Self>, mut requests: BlobReaderRequestStream) {
         while let Ok(Some(request)) = requests.try_next().await {
             match request {
                 BlobReaderRequest::GetVmo { blob_hash, responder } => {
                     responder
-                        .send(
-                            self.clone()
-                                .get_blob_vmo(blob_hash.into())
-                                .await
-                                .map_err(map_to_raw_status),
-                        )
+                        .send(self.get_blob_vmo(blob_hash.into()).await.map_err(map_to_raw_status))
                         .unwrap_or_else(|error| {
                             tracing::error!(?error, "failed to send GetVmo response");
                         });
@@ -179,7 +176,7 @@ impl BlobDirectory {
             let mut num = 0;
             let limit = self.directory.directory().owner().dirent_cache().limit();
             while let Some((name, object_id, _)) = iter.get() {
-                dirents.push((Identifier::from_str(name)?, object_id));
+                dirents.push((name.try_into()?, object_id));
                 iter.advance().await?;
                 num += 1;
                 if num >= limit {
@@ -201,31 +198,34 @@ impl BlobDirectory {
         Ok(())
     }
 
-    pub async fn open_blob(self: &Arc<Self>, hash: Hash) -> Result<Arc<FxBlob>, Error> {
-        self.lookup(fio::OpenFlags::RIGHT_READABLE, Identifier::from_hash(hash))
-            .await?
-            .take()
-            .into_any()
-            .downcast::<FxBlob>()
-            .map_err(|_| FxfsError::Inconsistent.into())
+    /// Attempt to lookup and cache the blob with `id` in this directory.
+    ///
+    /// *WARNING*: Use caution when performing operations on the returned node handle. Unlike
+    /// [`Self::open_blob`], this function doesn't modify the node's open count, so the underlying
+    /// node can still be purged/unlinked even if there are still references to the node.
+    pub(crate) async fn lookup_blob(self: &Arc<Self>, hash: Hash) -> Result<Arc<FxBlob>, Error> {
+        // For simplify lookup logic, we re-use `open_blob` just decrement the open count before
+        // returning the node handle.
+        self.open_blob(&hash.into()).await?.ok_or(FxfsError::NotFound.into()).map(|blob| {
+            let node = blob.take();
+            node.clone().open_count_sub_one();
+            node
+        })
     }
 
-    pub(crate) async fn lookup(
+    /// Attempt to open and cache the blob with `id` in this directory. Returns `Ok(None)` if no
+    /// blob matching `id` was found.
+    pub(crate) async fn open_blob(
         self: &Arc<Self>,
-        flags: fio::OpenFlags,
-        id: Identifier,
-    ) -> Result<OpenedNode<dyn FxNode>, Error> {
+        id: &Identifier,
+    ) -> Result<Option<OpenedNode<FxBlob>>, Error> {
         let store = self.store();
         let fs = store.filesystem();
-
-        // TODO(https://fxbug.dev/42073113): Create the transaction here if we might need to create the object
-        // so that we have a lock in place.
         let keys = lock_keys![LockKey::object(store.store_object_id(), self.directory.object_id())];
-
         // A lock needs to be held over searching the directory and incrementing the open count.
-        let guard = fs.lock_manager().read_lock(keys.clone()).await;
+        let _guard = fs.lock_manager().read_lock(keys.clone()).await;
 
-        let child_node = match self
+        let node = match self
             .directory
             .directory()
             .owner()
@@ -247,53 +247,18 @@ impl BlobDirectory {
                 }
             }
         };
-        match child_node {
-            Some(node) => {
-                ensure!(
-                    !flags.contains(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT),
-                    FxfsError::AlreadyExists
-                );
-                ensure!(!flags.contains(fio::OpenFlags::RIGHT_WRITABLE), FxfsError::AccessDenied);
-                match node.object_descriptor() {
-                    ObjectDescriptor::File => {
-                        ensure!(!flags.contains(fio::OpenFlags::DIRECTORY), FxfsError::NotDir)
-                    }
-                    _ => bail!(FxfsError::Inconsistent),
-                }
-                // TODO(https://fxbug.dev/42073113): Test that we can't open a blob while still writing it.
-                Ok(OpenedNode::new(node))
-            }
-            None => {
-                std::mem::drop(guard);
-
-                ensure!(flags.contains(fio::OpenFlags::CREATE), FxfsError::NotFound);
-                ensure!(flags.contains(fio::OpenFlags::RIGHT_WRITABLE), FxfsError::AccessDenied);
-                let mut transaction = fs.clone().new_transaction(keys, Options::default()).await?;
-
-                let handle = ObjectStore::create_object(
-                    self.volume(),
-                    &mut transaction,
-                    // Checksums are redundant for blobs, which are already content-verified.
-                    HandleOptions { skip_checksums: true, ..Default::default() },
-                    None,
-                    None,
-                )
-                .await?;
-
-                let node = OpenedNode::new(
-                    FxDeliveryBlob::new(self.clone(), id.hash, handle) as Arc<dyn FxNode>
-                );
-
-                // Add the object to the graveyard so that it's cleaned up if we crash.
-                store.add_to_graveyard(&mut transaction, node.object_id());
-
-                // Note that we don't bother notifying watchers yet.  Nothing else should be able to
-                // see this object yet.
-                transaction.commit().await?;
-
-                Ok(node)
-            }
+        let Some(node) = node else {
+            return Ok(None);
+        };
+        if node.object_descriptor() != ObjectDescriptor::File {
+            return Err(FxfsError::Inconsistent)
+                .with_context(|| format!("Blob {} has invalid object descriptor!", id.string));
         }
+        node.into_any()
+            .downcast::<FxBlob>()
+            .map(|node| Some(OpenedNode::new(node)))
+            .map_err(|_| FxfsError::Inconsistent)
+            .with_context(|| format!("Blob {} has incorrect node type!", id.string))
     }
 
     // Attempts to get a node from the node cache. If the node wasn't present in the cache, loads
@@ -368,39 +333,37 @@ impl BlobDirectory {
         }
     }
 
-    async fn create_blob(
+    /// Creates a [`ClientEnd<BlobWriterMarker>`] to write the delivery blob identified by `hash`.
+    /// It is safe to create multiple writers for a given `hash`, however only one will succeed.
+    /// Requests are handled asynchronously on this volume's execution scope.
+    async fn create_blob_writer(
         self: &Arc<Self>,
         hash: Hash,
     ) -> Result<ClientEnd<BlobWriterMarker>, CreateBlobError> {
-        let flags = fio::OpenFlags::CREATE
-            | fio::OpenFlags::CREATE_IF_ABSENT
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::RIGHT_READABLE;
-        let node = match self.lookup(flags, Identifier::from_hash(hash)).await {
-            Ok(node) => node,
-            Err(e) => {
-                if FxfsError::AlreadyExists.matches(&e) {
-                    return Err(CreateBlobError::AlreadyExists);
-                } else {
-                    tracing::error!("lookup failed: {:?}", e);
-                    return Err(CreateBlobError::Internal);
-                }
-            }
-        };
-        let blob = node.downcast::<FxDeliveryBlob>().unwrap_or_else(|_| unreachable!());
-
-        let (client, server_end) = create_proxy::<BlobWriterMarker>().map_err(|e| {
-            tracing::error!("create_proxy failed for the BlobWriter protocol: {:?}", e);
+        let id = hash.into();
+        let blob_exists = self
+            .open_blob(&id)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to lookup blob: {:?}", e);
+                CreateBlobError::Internal
+            })?
+            .is_some();
+        if blob_exists {
+            return Err(CreateBlobError::AlreadyExists);
+        }
+        let (client_end, request_stream) =
+            create_request_stream::<BlobWriterMarker>().map_err(|e| {
+                tracing::error!("Failed to create request stream for BlobWriter: {:?}", e);
+                CreateBlobError::Internal
+            })?;
+        let writer = DeliveryBlobWriter::new(self, hash).await.map_err(|e| {
+            tracing::error!("Failed to create blob writer: {:?}", e);
             CreateBlobError::Internal
         })?;
-        let client_channel = client.into_channel().map_err(|_| {
-            tracing::error!("failed to create client channel");
-            CreateBlobError::Internal
-        })?;
-        let client_end = ClientEnd::new(client_channel.into());
         self.volume().scope().spawn(async move {
-            if let Err(e) = blob.as_ref().handle_requests(server_end).await {
-                tracing::error!("Failed to handle blob writer requests: {}", e);
+            if let Err(e) = writer.handle_requests(request_stream).await {
+                tracing::error!("Failed to handle BlobWriter requests: {}", e);
             }
         });
         return Ok(client_end);

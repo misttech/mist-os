@@ -2223,7 +2223,7 @@ mod tests {
 
             // Ensure that nothing is paged in right now.
             for hash in &hashes {
-                let blob = dir.open_blob(*hash).await.expect("Opening blob");
+                let blob = dir.lookup_blob(*hash).await.expect("Opening blob");
                 assert_eq!(blob.vmo().info().unwrap().committed_bytes, 0);
             }
 
@@ -2231,7 +2231,7 @@ mod tests {
 
             // Await all data being played back by checking that things have paged in.
             for hash in &hashes {
-                let blob = dir.open_blob(*hash).await.expect("Opening blob");
+                let blob = dir.lookup_blob(*hash).await.expect("Opening blob");
                 while blob.vmo().info().unwrap().committed_bytes == 0 {
                     fasync::Timer::new(Duration::from_millis(25)).await;
                 }

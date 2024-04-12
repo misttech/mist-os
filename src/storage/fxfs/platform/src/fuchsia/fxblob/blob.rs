@@ -9,7 +9,7 @@ use {
     crate::fuchsia::{
         directory::FxDirectory,
         errors::map_to_status,
-        node::FxNode,
+        node::{FxNode, OpenedNode},
         pager::{
             default_page_in, MarkDirtyRange, PageInRange, PagerBacked,
             PagerPacketReceiverRegistration,
@@ -107,24 +107,6 @@ impl FxBlob {
         }
     }
 
-    /// Creates an immutable child VMO.
-    pub fn create_child_vmo(&self) -> Result<zx::Vmo, Status> {
-        let child_vmo = self.vmo.create_child(
-            zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE | zx::VmoChildOptions::NO_WRITE,
-            0,
-            self.uncompressed_size,
-        )?;
-        if self.handle.owner().pager().watch_for_zero_children(self).map_err(map_to_status)? {
-            // Take an open count so that we keep this object alive if it is otherwise closed.
-            self.open_count_add_one();
-        }
-        // Only allow read access to the VMO.
-        // TODO(https://fxbug.dev/329429293): Remove when RFC-0238 is implemented.
-        child_vmo.replace_handle(
-            zx::Rights::BASIC | zx::Rights::MAP | zx::Rights::GET_PROPERTY | zx::Rights::READ,
-        )
-    }
-
     pub fn root(&self) -> Hash {
         self.merkle_tree.root()
     }
@@ -137,7 +119,34 @@ impl Drop for FxBlob {
     }
 }
 
-/// Implements VFS pseudo-filesystem entries for blobs.
+impl OpenedNode<FxBlob> {
+    /// Creates a read-only child VMO for this blob backed by the pager. The blob cannot be purged
+    /// until all child VMOs have been destroyed.
+    ///
+    /// *WARNING*: We need to ensure the open count is non-zero before invoking this function, so
+    /// it is only implemented for [`OpenedNode<FxBlob>`]. This prevents the blob from being purged
+    /// before we get a chance to register it with the pager for [`zx::Signals::VMO_ZERO_CHILDREN`].
+    pub fn create_child_vmo(&self) -> Result<zx::Vmo, Status> {
+        let blob = self.0.as_ref();
+        let child_vmo = blob.vmo.create_child(
+            zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE | zx::VmoChildOptions::NO_WRITE,
+            0,
+            blob.uncompressed_size,
+        )?;
+        if blob.handle.owner().pager().watch_for_zero_children(blob).map_err(map_to_status)? {
+            // Take an open count so that we keep this object alive if it is otherwise closed. This
+            // is only valid since we know the current open count is non-zero, otherwise we might
+            // increment the open count after the blob has been purged.
+            blob.open_count_add_one();
+        }
+        // Only allow read access to the VMO.
+        // TODO(https://fxbug.dev/329429293): Remove when RFC-0238 is implemented.
+        child_vmo.replace_handle(
+            zx::Rights::BASIC | zx::Rights::MAP | zx::Rights::GET_PROPERTY | zx::Rights::READ,
+        )
+    }
+}
+
 impl FxNode for FxBlob {
     fn object_id(&self) -> u64 {
         self.handle.object_id()
