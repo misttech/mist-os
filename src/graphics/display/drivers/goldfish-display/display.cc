@@ -715,16 +715,6 @@ void Display::DisplayControllerImplApplyConfiguration(const display_config_t** d
   });
 }
 
-zx_status_t Display::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
-  fbl::AutoLock lock(&lock_);
-  auto result = pipe_->ConnectSysmem(std::move(connection));
-  zx_status_t status = result.status();
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: failed to connect to sysmem: %s", kTag, result.status_string());
-  }
-  return status;
-}
-
 zx_status_t Display::DisplayControllerImplSetBufferCollectionConstraints(
     const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =

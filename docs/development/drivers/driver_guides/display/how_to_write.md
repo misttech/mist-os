@@ -196,11 +196,6 @@ class Device : public DeviceType {
       const uint8_t* raw_eld_list,
       size_t raw_eld_count) {}
 
-  zx_status_t DisplayControllerImplGetSysmemConnection(
-      zx::channel connection) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t collection_id) {
     return ZX_ERR_NOT_SUPPORTED;

@@ -510,13 +510,6 @@ closed protocol DisplayControllerImpl {
         raw_eld vector<uint8>:MAX;
     }) -> ();
 
-    /// Connects the handle to the sysmem service.
-    strict GetSysmemConnection(resource struct {
-        sysmem_handle zx.Handle:CHANNEL;
-    }) -> (struct {
-        s zx.Status;
-    });
-
     /// Conveys the display hardware's limitations on image buffers to sysmem.
     ///
     /// The sysmem BufferCollection imported with `collection_id` will receive

@@ -260,14 +260,4 @@ zx::result<> Driver::SetMinimumRgb(uint8_t minimum_rgb) {
   return zx::make_result(banjo_status);
 }
 
-zx::result<> Driver::GetSysmemConnection(zx::channel sysmem_handle) {
-  if (use_engine_) {
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  ZX_DEBUG_ASSERT(dc_.is_valid());
-  zx_status_t banjo_status = dc_.GetSysmemConnection(std::move(sysmem_handle));
-  return zx::make_result(banjo_status);
-}
-
 }  // namespace display

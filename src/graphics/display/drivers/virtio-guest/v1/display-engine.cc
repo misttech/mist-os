@@ -377,19 +377,6 @@ void DisplayEngine::DisplayControllerImplApplyConfiguration(
   }
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplGetSysmemConnection(zx::channel sysmem_handle) {
-  // We can't use DdkConnectFragmentFidlProtocol here because it wants to create the endpoints but
-  // we only have the server_end here.
-  using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV1;
-  zx_status_t status =
-      device_connect_fragment_fidl_protocol(bus_device_, "sysmem", ServiceMember::ServiceName,
-                                            ServiceMember::Name, sysmem_handle.release());
-  if (status != ZX_OK) {
-    return status;
-  }
-  return ZX_OK;
-}
-
 zx_status_t DisplayEngine::DisplayControllerImplSetBufferCollectionConstraints(
     const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =

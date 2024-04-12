@@ -598,18 +598,6 @@ void DisplayEngine::Deinitialize() {
   hot_plug_detection_.reset();
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
-  fidl::ServerEnd<fuchsia_sysmem::Allocator> allocator_server(std::move(connection));
-  zx::result<> connect_result = incoming_.Connect<fuchsia_hardware_sysmem::Service::AllocatorV1>(
-      std::move(allocator_server), "sysmem");
-  if (connect_result.is_error()) {
-    zxlogf(ERROR, "Failed to connect to sysmem Allocator service: %s",
-           connect_result.status_string());
-    return connect_result.status_value();
-  }
-  return ZX_OK;
-}
-
 zx_status_t DisplayEngine::DisplayControllerImplSetBufferCollectionConstraints(
     const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =

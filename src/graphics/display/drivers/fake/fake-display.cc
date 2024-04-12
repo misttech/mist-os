@@ -409,18 +409,6 @@ void FakeDisplay::DisplayControllerImplApplyConfiguration(
 void FakeDisplay::DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
                                               size_t raw_eld_count) {}
 
-zx_status_t FakeDisplay::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
-  // DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1> can't be used
-  // here becuase it wants to create the endpoints, but in this case we have the server_end only.
-  using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV1;
-  zx_status_t status = device_connect_fragment_fidl_protocol(
-      parent(), "sysmem", ServiceMember::ServiceName, ServiceMember::Name, connection.release());
-  if (status != ZX_OK) {
-    return status;
-  }
-  return ZX_OK;
-}
-
 enum class FakeDisplay::BufferCollectionUsage {
   kPrimaryLayer = 1,
   kCapture = 2,

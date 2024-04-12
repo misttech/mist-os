@@ -73,8 +73,6 @@ class Driver : public ddk::Device<Driver> {
   zx::result<> SetDisplayPower(DisplayId display_id, bool power_on);
   zx::result<> SetMinimumRgb(uint8_t minimum_rgb);
 
-  zx::result<> GetSysmemConnection(zx::channel sysmem_handle);
-
  private:
   // TODO(https://fxbug.dev/325474586): Revisit whether a single arena is the
   // right approach.

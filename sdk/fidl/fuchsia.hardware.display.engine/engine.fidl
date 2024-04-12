@@ -229,11 +229,6 @@ open protocol Engine {
         raw_eld vector<uint8>:MAX;
     }) -> ();
 
-    /// Connects the handle to the sysmem service.
-    flexible GetSysmemConnection(resource struct {
-        sysmem_handle zx.Handle:CHANNEL;
-    }) -> () error zx.Status;
-
     /// Set sysmem buffer collection contraints needed to ensure an image can be
     /// imported with `config` on the imported BufferCollecition with
     /// `collection_id`.
