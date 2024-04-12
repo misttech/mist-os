@@ -498,3 +498,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0240_async_ops_are_on_objects.md
   - title: "RFC-0242: Configuration Capabilities"
     path: /docs/contribute/governance/rfcs/0242_configuration_capabilities.md
+  - title: "RFC-0243: WLAN Roaming"
+    path: /docs/contribute/governance/rfcs/0243_wlan_roaming.md
