@@ -31,8 +31,15 @@ echo \
 ctf_releases = [" \
 > "${DESTINATION}"
 
+echo "Finding CTF releases..."
 for release in $(ls ${PREBUILT_DIR}); do
-  echo "  \"${release}\"," >> "${DESTINATION}"
+  if [ -d "${PREBUILT_DIR}/${release}/linux-x64" ]; then
+    echo "  Have release for ${release}... adding"
+    echo "  \"${release}\"," >> "${DESTINATION}"
+  else
+    echo "  No release for ${release}... skipping"
+  fi
+
 done
 
 echo "]" >> "${DESTINATION}"
