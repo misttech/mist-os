@@ -370,7 +370,7 @@ TEST_F(NetStreamSocketsTest, ShutdownPendingWrite) {
   // All client reads are expected to return here, including the last
   // read on receiving a FIN. Keeping a timeout for unexpected failures.
   timeval tv = {
-      .tv_sec = std::chrono::seconds(kDeprecatedTimeout).count(),
+      .tv_sec = std::chrono::seconds(kPositiveCheckTimeout).count(),
   };
   EXPECT_EQ(setsockopt(client().get(), SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)), 0)
       << strerror(errno);
