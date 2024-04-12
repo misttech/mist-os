@@ -36,6 +36,9 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
         }
         if matches!(context.build_type, BuildType::Eng | BuildType::UserDebug) {
             builder.platform_bundle("ptysvc");
+            builder.platform_bundle("kernel_debug_broker_userdebug");
+        } else {
+            builder.platform_bundle("kernel_debug_broker_user");
         }
 
         match (context.build_type, &config.authorized_ssh_keys_path) {

@@ -145,6 +145,8 @@
             ],
             from: "#kernel_debug_broker",
             to: "#console-launcher",
+            source_availability: "unknown",
+            availability: "optional",
         },
         {
             protocol: [ "fuchsia.virtualconsole.SessionManager" ],

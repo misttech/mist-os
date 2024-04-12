@@ -1,0 +1,17 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    expose: [
+        {
+            protocol: [
+                "fuchsia.kernel.Counter",
+                "fuchsia.kernel.DebugBroker",
+                "fuchsia.tracing.kernel.Controller",
+                "fuchsia.tracing.kernel.Reader",
+            ],
+            from: "void",
+            availability: "optional",
+        },
+    ],
+}

@@ -216,7 +216,6 @@
             protocol: [
                 "fuchsia.boot.RootResource",
                 "fuchsia.device.NameProvider",
-                "fuchsia.kernel.Counter",
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.EnergyInfoResource",
@@ -416,11 +415,13 @@
         // Profiling tests need access to the ktrace data
         {
             protocol: [
+                "fuchsia.kernel.Counter",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
             ],
             from: "parent",
             to: "#test_manager",
+            availability: "same_as_target",
         },
         {
             directory: "dev-topological",

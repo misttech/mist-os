@@ -7,6 +7,7 @@
             protocol: [ "fuchsia.kernel.Counter" ],
             from: "parent",
             to: "#diagnostics",
+            availability: "optional",
         },
     ],
     expose: [

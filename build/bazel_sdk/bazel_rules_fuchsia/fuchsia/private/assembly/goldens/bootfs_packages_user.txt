@@ -31,7 +31,6 @@ gpt
 hid
 hid-input-report
 i2c
-kernel_debug_broker
 ?live-usb
 ?memfs
 ?minfs

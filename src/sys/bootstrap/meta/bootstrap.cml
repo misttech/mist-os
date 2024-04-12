@@ -21,10 +21,6 @@
             url: "fuchsia-boot:///shutdown-shim#meta/shutdown-shim.cm",
         },
         {
-            name: "kernel_debug_broker",
-            url: "fuchsia-boot:///kernel_debug_broker#meta/kernel_debug_broker.cm",
-        },
-        {
             name: "role_manager",
             url: "fuchsia-boot:///role_manager#meta/role_manager.cm",
         },
@@ -67,26 +63,10 @@
         {
             directory: "boot",
             from: "parent",
-            as: "boot-kernel",
-            to: "#kernel_debug_broker",
-            rights: [ "r*" ],
-            subdir: "kernel",
-        },
-        {
-            directory: "boot",
-            from: "parent",
             as: "config-profiles",
             to: "#role_manager",
             rights: [ "r*" ],
             subdir: "config/profiles",
-        },
-        {
-            protocol: [
-                "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.kernel.DebugResource",
-            ],
-            from: "parent",
-            to: "#kernel_debug_broker",
         },
         {
             protocol: [ "fuchsia.boot.WriteOnlyLog" ],
@@ -127,7 +107,6 @@
             from: "#archivist",
             to: [
                 "#critical-services",
-                "#kernel_debug_broker",
                 "#role_manager",
                 "#shutdown_shim",
             ],
@@ -229,15 +208,6 @@
                 "fuchsia.logger.LogSink",
             ],
             from: "#archivist",
-        },
-        {
-            protocol: [
-                "fuchsia.kernel.Counter",
-                "fuchsia.kernel.DebugBroker",
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
-            ],
-            from: "#kernel_debug_broker",
         },
         {
             protocol: [

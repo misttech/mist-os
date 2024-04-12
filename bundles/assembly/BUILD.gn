@@ -105,7 +105,6 @@ assembly_input_bundle("bootstrap") {
   bootfs_packages = [
     "//src/bringup/bin/critical-services:package",
     "//src/bringup/bin/device-name-provider:package",
-    "//src/bringup/bin/kernel_debug_broker:pkg",
     "//src/bringup/bin/paver:package",
     "//src/bringup/bin/sysinfo:package",
     "//src/devices/sysmem/bin/sysmem_connector:pkg",
@@ -409,6 +408,41 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/devices/pwm/bin/pwmctl:bootfs",
     "//src/ui/light/bin/lights-cli:bootfs",
     "//src/zircon/testing/mutex_pi_exerciser:bootfs",
+  ]
+}
+
+# The kernel_debug_broker AIB is included by all eng and userdebug products.
+#
+assembly_input_bundle("kernel_debug_broker_userdebug") {
+  bootfs_packages = [ "//src/bringup/bin/kernel_debug_broker:pkg" ]
+  compiled_packages = [
+    {
+      name = "bootstrap"
+      component_shards = [
+        {
+          component_name = "bootstrap"
+          shards = rebase_path(
+                  [ "//src/bringup/bin/kernel_debug_broker/meta/kernel_debug_broker_userdebug.bootstrap_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
+assembly_input_bundle("kernel_debug_broker_user") {
+  compiled_packages = [
+    {
+      name = "bootstrap"
+      component_shards = [
+        {
+          component_name = "bootstrap"
+          shards = rebase_path(
+                  [ "//src/bringup/bin/kernel_debug_broker/meta/kernel_debug_broker_user.bootstrap_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
   ]
 }
 

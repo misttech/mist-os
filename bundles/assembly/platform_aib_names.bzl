@@ -28,6 +28,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "kernel_anonymous_memory_compression_eager_lru",
     "kernel_contiguous_physical_pages",
     "kernel_args_user",
+    "kernel_debug_broker_user",
     "legacy_power_framework",
     "live_usb",
     "resources",
@@ -44,6 +45,7 @@ BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
     "console_userdebug",
     "kernel_args_eng",
     "kernel_args_userdebug",
+    "kernel_debug_broker_userdebug",
     "netsvc",
     "ptysvc",
 ]

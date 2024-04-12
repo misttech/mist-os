@@ -84,8 +84,6 @@
                 "fuchsia.feedback.DataProvider",
                 "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.kernel.Counter",
-                "fuchsia.kernel.DebugBroker",
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.ProfileResource",
                 "fuchsia.kernel.RootJobForInspect",
@@ -107,7 +105,6 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
-                "fuchsia.tracing.kernel.Controller",
             ],
         },
         {
@@ -163,6 +160,17 @@
             protocol: "fuchsia.hardware.pty.Device",
 
             // The source of this protocol, ptysvc,
+            // may not be available on all products.
+            availability: "optional",
+        },
+        {
+            protocol: [
+                "fuchsia.kernel.Counter",
+                "fuchsia.kernel.DebugBroker",
+                "fuchsia.tracing.kernel.Controller",
+            ],
+
+            // The source of this protocol, kernel_debug_broker,
             // may not be available on all products.
             availability: "optional",
         },

@@ -12,7 +12,10 @@
         args: [ "kcounter" ],
     },
     use: [
-        { protocol: "fuchsia.kernel.Counter" },
+        {
+            protocol: "fuchsia.kernel.Counter",
+            availability: "optional",
+        },
     ],
     expose: [
         {

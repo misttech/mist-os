@@ -195,7 +195,6 @@
         {
             protocol: [
                 "fuchsia.boot.RootResource",
-                "fuchsia.kernel.Counter",
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.EnergyInfoResource",
@@ -418,11 +417,13 @@
         // Profiling tests need access to the ktrace data
         {
             protocol: [
+                "fuchsia.kernel.Counter",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
             ],
             from: "parent",
             to: "#testing",
+            availability: "same_as_target",
         },
 
         // Needed by system-validation-tests

@@ -263,7 +263,6 @@
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.exception.Handler",
-                "fuchsia.kernel.Counter",
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.EnergyInfoResource",
@@ -584,11 +583,13 @@
         // CPU Profiling tests require access to ktrace data to parse results
         {
             protocol: [
+                "fuchsia.kernel.Counter",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
             ],
             from: "parent",
             to: [ "#system-tests" ],
+            availability: "same_as_target",
         },
 
         // CPU Profiling tests require access to the /dev/sys/cpu-trace device

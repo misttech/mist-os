@@ -1,0 +1,48 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "kernel_debug_broker",
+            url: "fuchsia-boot:///kernel_debug_broker#meta/kernel_debug_broker.cm",
+        },
+    ],
+    offer: [
+        {
+            directory: "boot",
+            from: "parent",
+            as: "boot-kernel",
+            to: "#kernel_debug_broker",
+            rights: [ "r*" ],
+            subdir: "kernel",
+        },
+        {
+            protocol: [
+                "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.kernel.DebugResource",
+            ],
+            from: "parent",
+            to: "#kernel_debug_broker",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: "#kernel_debug_broker",
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.kernel.Counter",
+                "fuchsia.kernel.DebugBroker",
+                "fuchsia.tracing.kernel.Controller",
+                "fuchsia.tracing.kernel.Reader",
+            ],
+            from: "#kernel_debug_broker",
+        },
+    ],
+}

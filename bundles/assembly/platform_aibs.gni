@@ -18,6 +18,9 @@ bootstrap_user_platform_aib_names = [
   # The bootstrap feature-set-level
   "bootstrap",
 
+  # Developer
+  "kernel_debug_broker_user",
+
   # Diagnostics
   "console_user",
 
@@ -74,6 +77,7 @@ bootstrap_userdebug_platform_aib_names = [
   "kernel_args_userdebug",
 
   # Developer
+  "kernel_debug_broker_userdebug",
   "netsvc",
   "ptysvc",
 ]
