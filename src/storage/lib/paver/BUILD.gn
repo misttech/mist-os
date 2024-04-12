@@ -97,23 +97,21 @@ source_set("skip-block") {
 # Board specific paver implementations.
 source_set("astro") {
   sources = [ "astro.cc" ]
-  deps = [
+  public_deps = [
     ":paver-core",
+    ":skip-block",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/devices/lib/amlogic",
     "//src/lib/uuid",
     "//src/storage/gpt",
-  ]
-  public_deps = [
-    ":skip-block",
     "//zircon/system/ulib/sysconfig-client:sysconfig-sync-client",
   ]
 }
 
 source_set("sherlock") {
   sources = [ "sherlock.cc" ]
-  deps = [
+  public_deps = [
     ":gpt",
     ":paver-core",
     "//src/devices/lib/amlogic",
@@ -124,7 +122,7 @@ source_set("sherlock") {
 
 source_set("nelson") {
   sources = [ "nelson.cc" ]
-  deps = [
+  public_deps = [
     ":gpt",
     ":paver-core",
     "//src/devices/lib/amlogic",
@@ -135,7 +133,7 @@ source_set("nelson") {
 
 source_set("luis") {
   sources = [ "luis.cc" ]
-  deps = [
+  public_deps = [
     ":gpt",
     ":paver-core",
     "//src/devices/lib/amlogic",
@@ -157,7 +155,7 @@ source_set("vim3") {
 
 source_set("violet") {
   sources = [ "violet.cc" ]
-  deps = [
+  public_deps = [
     ":gpt",
     ":paver-core",
     "//src/lib/uuid",
@@ -170,7 +168,7 @@ source_set("x64") {
     "system_shutdown_state.cc",
     "x64.cc",
   ]
-  deps = [
+  public_deps = [
     ":gpt",
     ":paver-core",
     "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",

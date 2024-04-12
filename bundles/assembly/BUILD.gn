@@ -105,7 +105,6 @@ assembly_input_bundle("bootstrap") {
   bootfs_packages = [
     "//src/bringup/bin/critical-services:package",
     "//src/bringup/bin/device-name-provider:package",
-    "//src/bringup/bin/paver:package",
     "//src/bringup/bin/sysinfo:package",
     "//src/devices/sysmem/bin/sysmem_connector:pkg",
     "//src/diagnostics/archivist:package",
@@ -444,6 +443,11 @@ assembly_input_bundle("kernel_debug_broker_user") {
       ]
     },
   ]
+}
+
+# Legacy AIB for migration purposes.
+assembly_input_bundle("paver_legacy") {
+  bootfs_packages = [ "//src/bringup/bin/paver:package" ]
 }
 
 # The console AIB is included by all eng and userdebug products.

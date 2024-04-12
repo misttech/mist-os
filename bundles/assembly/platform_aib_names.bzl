@@ -31,6 +31,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "kernel_debug_broker_user",
     "legacy_power_framework",
     "live_usb",
+    "paver_legacy",
     "resources",
     "virtcon",
     "virtcon_disable",

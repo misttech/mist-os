@@ -57,6 +57,7 @@ bootstrap_user_platform_aib_names = [
   "fshost_fvm_minfs",
   "fshost_fvm_minfs_migration",
   "fshost_storage",
+  "paver_legacy",
 
   # SWD (Software Delivery)
   "no_update_checker",

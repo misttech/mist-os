@@ -36,7 +36,7 @@ i2c
 ?minfs
 netdevice-migration
 network-device
-paver
+?paver
 pkg-cache
 platform-bus
 power

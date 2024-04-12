@@ -39,7 +39,7 @@ nand-broker
 netdevice-migration
 ?netsvc
 network-device
-paver
+?paver
 pkg-cache
 platform-bus
 power

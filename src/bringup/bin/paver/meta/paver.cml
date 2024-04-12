@@ -5,7 +5,6 @@
     include: [ "syslog/client.shard.cml" ],
     program: {
         runner: "elf",
-        binary: "bin/paver",
         forward_stdout_to: "none",
         forward_stderr_to: "none",
         lifecycle: { stop_event: "notify" },

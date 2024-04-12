@@ -9,20 +9,38 @@
 #include <lib/async-loop/default.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fidl/cpp/wire/server.h>
+#include <zircon/process.h>
 #include <zircon/processargs.h>
 #include <zircon/status.h>
 
 #include "src/storage/lib/paver/abr-client.h"
-#include "src/storage/lib/paver/astro.h"
 #include "src/storage/lib/paver/device-partitioner.h"
+#include "src/storage/lib/paver/pave-logging.h"
+#include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
+
+#if defined(LEGACY_PAVER)
+#include "src/storage/lib/paver/astro.h"
 #include "src/storage/lib/paver/luis.h"
 #include "src/storage/lib/paver/nelson.h"
-#include "src/storage/lib/paver/pave-logging.h"
 #include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/vim3.h"
 #include "src/storage/lib/paver/violet.h"
 #include "src/storage/lib/paver/x64.h"
-#include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
+#elif defined(astro)
+#include "src/storage/lib/paver/astro.h"
+#elif defined(luis)
+#include "src/storage/lib/paver/luis.h"
+#elif defined(nelson)
+#include "src/storage/lib/paver/nelson.h"
+#elif defined(sherlock)
+#include "src/storage/lib/paver/sherlock.h"
+#elif defined(vim3)
+#include "src/storage/lib/paver/vim3.h"
+#elif defined(violet)
+#include "src/storage/lib/paver/violet.h"
+#elif defined(x64)
+#include "src/storage/lib/paver/x64.h"
+#endif
 
 class LifecycleServer final : public fidl::WireServer<fuchsia_process_lifecycle::Lifecycle> {
  public:
@@ -61,22 +79,47 @@ int main(int argc, char** argv) {
   paver::Paver paver;
   paver.set_dispatcher(dispatcher);
 
+#if defined(LEGACY_PAVER)
   // NOTE: Ordering matters!
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::AstroPartitionerFactory>());
-  paver::DevicePartitionerFactory::Register(std::make_unique<paver::NelsonPartitionerFactory>());
-  paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
-  paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
-  paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
-  paver::DevicePartitionerFactory::Register(std::make_unique<paver::VioletPartitionerFactory>());
-  paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
-  paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::AstroAbrClientFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::NelsonPartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::NelsonAbrClientFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::SherlockAbrClientFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::LuisAbrClientFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::Vim3AbrClientFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::VioletPartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::VioletAbrClientFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::X64AbrClientFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
+#elif defined(astro)
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::AstroPartitionerFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::AstroAbrClientFactory>());
+#elif defined(nelson)
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::NelsonPartitionerFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::NelsonAbrClientFactory>());
+#elif defined(sherlock)
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::SherlockAbrClientFactory>());
+#elif defined(luis)
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::LuisAbrClientFactory>());
+#elif defined(vim3)
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::Vim3AbrClientFactory>());
+#elif defined(violet)
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::VioletPartitionerFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::VioletAbrClientFactory>());
+#elif defined(x64)
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::X64AbrClientFactory>());
+#else
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
+#endif
 
   fidl::ServerBindingGroup<fuchsia_paver::Paver> bindings;
   zx::result result = outgoing.AddUnmanagedProtocol<fuchsia_paver::Paver>(

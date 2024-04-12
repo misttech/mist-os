@@ -22,6 +22,11 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             builder.platform_bundle("live_usb");
         }
 
+        // Include legacy paver implementation if the board doesn't include it.
+        if !context.board_info.provides_feature("fuchsia::paver") {
+            builder.platform_bundle("paver_legacy");
+        }
+
         // Build and add the component id index.
         let mut index_builder = ComponentIdIndexBuilder::default();
 
