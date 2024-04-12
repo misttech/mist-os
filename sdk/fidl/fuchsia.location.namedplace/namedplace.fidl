@@ -41,8 +41,8 @@ closed protocol RegulatoryRegionConfigurator {
     /// // We use a single channel to ensure that calls arrive in a
     /// // well-defined order.
     /// service = Open(RegulatoryRegionConfigurator);
-    /// service1.SetRegion("AA");
-    /// service2.SetRegion("BB");
+    /// service.SetRegion("AA");
+    /// service.SetRegion("BB");
     /// ```
     ///
     /// + request `region` the current regulatory region.
