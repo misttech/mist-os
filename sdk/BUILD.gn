@@ -906,16 +906,6 @@ sdk_molecule("driver_host_tools") {
   }
 }
 
-# WARNING (https://fxbug.dev/287395493): the driver SDK will soon be removed.
-# DO NOT ADD anything here!
-sdk_molecule("bind") {
-  deps = [
-    "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_sdk",
-    "//src/devices/bind/fuchsia.test:fuchsia.test_sdk",
-    "//src/devices/bind/fuchsia.usb:fuchsia.usb_sdk",
-  ]
-}
-
 # Controls the maximum number of simultaneous subbuilds.
 pool("subbuild_pool") {
   depth = sdk_max_simultaneous_sub_builds
@@ -926,7 +916,6 @@ pool("subbuild_pool") {
 sdk_molecule("driver_fidl") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_sdk($fidl_toolchain)",
   ]
 }
 
@@ -952,7 +941,6 @@ sdk_molecule("driver_atoms") {
   category = "experimental"
 
   deps = [
-    ":bind",
     ":driver_fidl",
     ":fuchsia_idk_atoms",
     "//sdk/lib/driver/runtime:driver_runtime_cpp_sdk",
