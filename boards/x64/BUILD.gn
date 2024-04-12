@@ -16,15 +16,16 @@ board_configuration("x64") {
   }
 
   provided_features = [
-    "fuchsia::driver_framework_v2_support",
     "fuchsia::wlan_softmac",
     "fuchsia::paravirtualization",
+    "fuchsia::paver",
   ]
 
   input_bundles = [
     ":main_bundle",
     ":prebuilt_codec_runner",
     ":x64_common",
+    ":paver",
     "//boards/emulation/virtio",
   ]
 
@@ -250,4 +251,8 @@ board_input_bundle("x64_common") {
 
 board_input_bundle("prebuilt_codec_runner") {
   base_packages = [ "//src/media/codec/codecs/vaapi:codec_runner_intel_gen" ]
+}
+
+board_input_bundle("paver") {
+  bootfs_packages = [ "//src/bringup/bin/paver:package-x64" ]
 }
