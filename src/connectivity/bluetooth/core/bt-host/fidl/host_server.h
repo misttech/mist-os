@@ -75,6 +75,7 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   ~HostServer() override;
 
   // ::fuchsia::bluetooth::host::Host overrides:
+  void RequestProtocol(::fuchsia::bluetooth::host::ProtocolRequest request) override;
   void WatchState(WatchStateCallback callback) override;
   void SetLocalData(::fuchsia::bluetooth::sys::HostData host_data) override;
   void WatchPeers(WatchPeersCallback callback) override;
@@ -101,17 +102,6 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   void Pair(::fuchsia::bluetooth::PeerId id, ::fuchsia::bluetooth::sys::PairingOptions options,
             PairCallback callback) override;
   void Forget(::fuchsia::bluetooth::PeerId id, ForgetCallback callback) override;
-
-  void RequestLowEnergyCentral(
-      ::fidl::InterfaceRequest<fuchsia::bluetooth::le::Central> central) override;
-  void RequestLowEnergyPeripheral(
-      ::fidl::InterfaceRequest<fuchsia::bluetooth::le::Peripheral> peripheral) override;
-  void RequestGattServer(
-      ::fidl::InterfaceRequest<fuchsia::bluetooth::gatt::Server> server) override;
-  void RequestGatt2Server(
-      ::fidl::InterfaceRequest<fuchsia::bluetooth::gatt2::Server> server) override;
-  void RequestProfile(
-      ::fidl::InterfaceRequest<fuchsia::bluetooth::bredr::Profile> profile) override;
   void Close() override;
   void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
 
@@ -166,7 +156,7 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   // ServerType.
   template <typename ServerType, typename... Args>
   void BindServer(Args... args) {
-    auto server = std::make_unique<ServerType>(adapter()->AsWeakPtr(), std::move(args)...);
+    auto server = std::make_unique<ServerType>(std::move(args)...);
     Server* s = server.get();
     server->set_error_handler([this, s](zx_status_t status) { this->OnConnectionError(s); });
     servers_[server.get()] = std::move(server);

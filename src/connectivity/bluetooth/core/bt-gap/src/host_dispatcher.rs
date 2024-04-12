@@ -11,7 +11,7 @@ use fidl_fuchsia_bluetooth_gatt::Server_Marker;
 use fidl_fuchsia_bluetooth_gatt2::{
     LocalServiceRequest, Server_Marker as Server_Marker2, Server_Proxy,
 };
-use fidl_fuchsia_bluetooth_host::HostProxy;
+use fidl_fuchsia_bluetooth_host::{HostProxy, ProtocolRequest};
 use fidl_fuchsia_bluetooth_le::{CentralMarker, PeripheralMarker};
 use fidl_fuchsia_bluetooth_sys::{
     self as sys, InputCapability, OutputCapability, PairingDelegateProxy,
@@ -636,23 +636,23 @@ impl HostDispatcher {
                 match service {
                     HostService::LeCentral => {
                         let remote = ServerEnd::<CentralMarker>::new(chan.into());
-                        let _ = host.request_low_energy_central(remote);
+                        let _ = host.request_protocol(ProtocolRequest::Central(remote));
                     }
                     HostService::LePeripheral => {
                         let remote = ServerEnd::<PeripheralMarker>::new(chan.into());
-                        let _ = host.request_low_energy_peripheral(remote);
+                        let _ = host.request_protocol(ProtocolRequest::Peripheral(remote));
                     }
                     HostService::LeGatt => {
                         let remote = ServerEnd::<Server_Marker>::new(chan.into());
-                        let _ = host.request_gatt_server_(remote);
+                        let _ = host.request_protocol(ProtocolRequest::GattServer(remote));
                     }
                     HostService::LeGatt2 => {
                         let remote = ServerEnd::<Server_Marker2>::new(chan.into());
-                        let _ = host.request_gatt2_server_(remote);
+                        let _ = host.request_protocol(ProtocolRequest::Gatt2Server(remote));
                     }
                     HostService::Profile => {
                         let remote = ServerEnd::<ProfileMarker>::new(chan.into());
-                        let _ = host.request_profile(remote);
+                        let _ = host.request_protocol(ProtocolRequest::Profile(remote));
                     }
                 }
             }
@@ -801,7 +801,7 @@ impl HostDispatcher {
         let (gatt_server_proxy, remote_gatt_server) = fidl::endpoints::create_proxy()?;
         host_device
             .proxy()
-            .request_gatt2_server_(remote_gatt_server)
+            .request_protocol(ProtocolRequest::Gatt2Server(remote_gatt_server))
             .context(format!("{:?}: failed to open gatt server for bt-host", dbg_ids))?;
         self.spawn_gas_proxy(gatt_server_proxy)
             .await
@@ -1139,7 +1139,10 @@ pub(crate) mod test {
                     info!("Setting Device Class");
                     let _ = responder.send(Ok(()));
                 }
-                Some(Ok(HostRequest::RequestGatt2Server_ { server, .. })) => {
+                Some(Ok(HostRequest::RequestProtocol {
+                    payload: ProtocolRequest::Gatt2Server(server),
+                    ..
+                })) => {
                     // don't respond at all on the server side.
                     info!("Storing Gatt Server");
                     let mut gatt_server = server.into_stream().unwrap();

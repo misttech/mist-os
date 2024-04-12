@@ -20,26 +20,19 @@ open protocol Receiver {
     });
 };
 
+type ProtocolRequest = flexible resource union {
+    1: central server_end:fuchsia.bluetooth.le.Central;
+    2: peripheral server_end:fuchsia.bluetooth.le.Peripheral;
+    3: gatt_server server_end:fuchsia.bluetooth.gatt.Server;
+    4: gatt2_server server_end:fuchsia.bluetooth.gatt2.Server;
+    5: profile server_end:fuchsia.bluetooth.bredr.Profile;
+};
+
 /// Interface for interacting with a Bluetooth host device (bt-host)
 open protocol Host {
-    /// The following methods fulfill a given interface request. bt-host device
-    /// will start processing FIDL messages. If the request cannot be fulfilled,
-    /// the bt-host device will close its end of the given channel.
-    strict RequestLowEnergyCentral(resource struct {
-        central server_end:fuchsia.bluetooth.le.Central;
-    });
-    strict RequestLowEnergyPeripheral(resource struct {
-        peripheral server_end:fuchsia.bluetooth.le.Peripheral;
-    });
-    strict RequestGattServer(resource struct {
-        server server_end:fuchsia.bluetooth.gatt.Server;
-    });
-    strict RequestGatt2Server(resource struct {
-        server server_end:fuchsia.bluetooth.gatt2.Server;
-    });
-    strict RequestProfile(resource struct {
-        profile server_end:fuchsia.bluetooth.bredr.Profile;
-    });
+    /// Fulfills a given protocol request. bt-host will start processing FIDL messages. If the
+    /// request cannot be fulfilled, the bt-host device will close its end of the given channel.
+    flexible RequestProtocol(ProtocolRequest);
 
     /// Shuts down the host, ending all active Bluetooth procedures:
     ///

@@ -8,7 +8,9 @@ use assert_matches::assert_matches;
 use async_helpers::hanging_get::asynchronous as hanging_get;
 use fidl::endpoints::{self, Responder};
 use fidl_fuchsia_bluetooth_gatt2::Server_Request;
-use fidl_fuchsia_bluetooth_host::{HostMarker, HostRequest, HostRequestStream, ReceiverMarker};
+use fidl_fuchsia_bluetooth_host::{
+    HostMarker, HostRequest, HostRequestStream, ProtocolRequest, ReceiverMarker,
+};
 use fidl_fuchsia_bluetooth_sys::{HostInfo as FidlHostInfo, TechnologyType};
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::{Address, HostId, HostInfo};
@@ -68,7 +70,9 @@ async fn handle_host_requests(id: HostId, mut stream: HostRequestStream) {
                 info!("SetLocalName request");
                 assert_matches::assert_matches!(responder.send(Ok(())), Ok(()));
             }
-            HostRequest::RequestGatt2Server_ { server, .. } => {
+            HostRequest::RequestProtocol {
+                payload: ProtocolRequest::Gatt2Server(server), ..
+            } => {
                 info!("RequestGatt2Server request");
                 let mut gatt_server = server.into_stream().unwrap();
                 match gatt_server.next().await {

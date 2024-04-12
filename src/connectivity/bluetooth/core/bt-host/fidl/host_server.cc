@@ -8,6 +8,7 @@
 
 #include <utility>
 
+#include "fuchsia/bluetooth/host/cpp/fidl.h"
 #include "gatt2_server_server.h"
 #include "gatt_server_server.h"
 #include "helpers.h"
@@ -31,6 +32,7 @@ namespace bthost {
 
 namespace fbt = fuchsia::bluetooth;
 namespace fsys = fuchsia::bluetooth::sys;
+namespace fhost = fuchsia::bluetooth::host;
 
 using bt::PeerId;
 using bt::gap::BrEdrSecurityModeToString;
@@ -139,6 +141,32 @@ HostServer::HostServer(zx::channel channel, const bt::gap::Adapter::WeakPtr& ada
 }
 
 HostServer::~HostServer() { Close(); }
+
+void HostServer::RequestProtocol(fhost::ProtocolRequest request) {
+  switch (request.Which()) {
+    case fhost::ProtocolRequest::Tag::kCentral:
+      BindServer<LowEnergyCentralServer>(adapter()->AsWeakPtr(), std::move(request.central()),
+                                         gatt_);
+      break;
+    case fhost::ProtocolRequest::Tag::kPeripheral:
+      BindServer<LowEnergyPeripheralServer>(adapter()->AsWeakPtr(), gatt_,
+                                            std::move(request.peripheral()));
+      break;
+    case fhost::ProtocolRequest::Tag::kGattServer:
+      BindServer<GattServerServer>(gatt_->GetWeakPtr(), std::move(request.gatt_server()));
+      break;
+    case fhost::ProtocolRequest::Tag::kGatt2Server:
+      BindServer<Gatt2ServerServer>(gatt_->GetWeakPtr(), std::move(request.gatt2_server()));
+      break;
+    case fhost::ProtocolRequest::Tag::kProfile:
+      BindServer<ProfileServer>(adapter()->AsWeakPtr(), std::move(request.profile()));
+      break;
+    default:
+      bt_log(WARN, "fidl", "received unknown protocol request");
+      // The unknown protocol will be closed when `request` is destroyed.
+      break;
+  }
+}
 
 void HostServer::WatchState(WatchStateCallback callback) {
   info_getter_.Watch(std::move(callback));
@@ -716,47 +744,6 @@ void HostServer::PairBrEdr(PeerId peer_id, PairCallback callback) {
   bt::gap::BrEdrSecurityRequirements security{.authentication = false, .secure_connections = false};
   BT_ASSERT(adapter()->bredr());
   adapter()->bredr()->Pair(peer_id, security, std::move(on_complete));
-}
-
-void HostServer::RequestLowEnergyCentral(
-    fidl::InterfaceRequest<fuchsia::bluetooth::le::Central> central) {
-  BindServer<LowEnergyCentralServer>(std::move(central), gatt_);
-}
-
-void HostServer::RequestLowEnergyPeripheral(
-    fidl::InterfaceRequest<fuchsia::bluetooth::le::Peripheral> peripheral) {
-  BindServer<LowEnergyPeripheralServer>(gatt_, std::move(peripheral));
-}
-
-void HostServer::RequestGattServer(
-    fidl::InterfaceRequest<fuchsia::bluetooth::gatt::Server> server) {
-  auto self = weak_self_.GetWeakPtr();
-  auto server_ptr = std::make_unique<GattServerServer>(gatt_->GetWeakPtr(), std::move(server));
-  server_ptr->set_error_handler([self, server = server_ptr.get()](zx_status_t status) {
-    if (self.is_alive()) {
-      bt_log(DEBUG, "bt-host", "GATT server disconnected");
-      self->servers_.erase(server);
-    }
-  });
-  servers_[server_ptr.get()] = std::move(server_ptr);
-}
-
-void HostServer::RequestGatt2Server(
-    fidl::InterfaceRequest<fuchsia::bluetooth::gatt2::Server> server) {
-  auto self = weak_self_.GetWeakPtr();
-  auto server_ptr = std::make_unique<Gatt2ServerServer>(gatt_->GetWeakPtr(), std::move(server));
-  server_ptr->set_error_handler([self, server = server_ptr.get()](zx_status_t status) {
-    if (self.is_alive()) {
-      bt_log(DEBUG, "bt-host", "GATT2 server disconnected");
-      self->servers_.erase(server);
-    }
-  });
-  servers_[server_ptr.get()] = std::move(server_ptr);
-}
-
-void HostServer::RequestProfile(
-    fidl::InterfaceRequest<fuchsia::bluetooth::bredr::Profile> profile) {
-  BindServer<ProfileServer>(std::move(profile));
 }
 
 void HostServer::Close() {
