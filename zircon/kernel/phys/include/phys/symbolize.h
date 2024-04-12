@@ -114,10 +114,12 @@ class Symbolize {
     }
   }
 
-  // Print both flavors of backtrace together.
+  // Print both flavors of backtrace together.  If the optional interrupt_pc
+  // argument is supplied, then it's inserted as frame 0 and marked as exact PC
+  // (whereas all frame-pointer and shadow-call-stack frames are marked as RA).
   PHYS_SINGLETHREAD void PrintBacktraces(const FramePointerBacktrace& frame_pointers,
                                          const arch::ShadowCallStackBacktrace& shadow_call_stack,
-                                         unsigned int n = 0);
+                                         ktl::optional<uintptr_t> interrupt_pc = ktl::nullopt);
 
   // Print the trigger markup element for a dumpfile.
   void DumpFile(ktl::string_view announce, size_t size_bytes, ktl::string_view sink_name,

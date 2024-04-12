@@ -118,21 +118,27 @@ void Symbolize::DumpFile(ktl::string_view announce, size_t size_bytes, ktl::stri
 
 void Symbolize::PrintBacktraces(const Symbolize::FramePointerBacktrace& frame_pointers,
                                 const arch::ShadowCallStackBacktrace& shadow_call_stack,
-                                unsigned int n) {
+                                ktl::optional<uintptr_t> interrupt_pc) {
   Context();
-  if (frame_pointers.empty()) {
-    Printf("%s: Frame pointer backtrace is empty!\n", name_);
-  } else {
-    Printf("%s: Backtrace (via frame pointers):\n", name_);
-    BackTrace(frame_pointers, n);
-  }
-  if (BootShadowCallStack::kEnabled) {
-    if (shadow_call_stack.empty()) {
-      Printf("%s: Shadow call stack backtrace is empty!\n", name_);
+
+  // For either kind of backtrace, the interrupt_pc is a special frame #0 if
+  // it's present.  It gets printed after other messages about the backtrace as
+  // a whole, just as if it were stack.front() in a case with no interrupt_pc.
+  auto backtrace = [this, interrupt_pc](const auto& stack, const char* which) PHYS_SINGLETHREAD {
+    Printf("%s: Backtrace (via %s)%s%s\n", name_, which, stack.empty() ? " is empty!" : ":",
+           (stack.empty() && interrupt_pc) ? "  Only the interrupted PC is available:" : "");
+    if (interrupt_pc) {
+      BackTraceFrame(0, *interrupt_pc, true);
+      BackTrace(stack, 1);
     } else {
-      Printf("%s: Backtrace (via shadow call stack):\n", name_);
+      BackTrace(stack, 0);
     }
-    BackTrace(shadow_call_stack, n);
+  };
+
+  backtrace(frame_pointers, "frame pointers");
+
+  if (BootShadowCallStack::kEnabled) {
+    backtrace(shadow_call_stack, "shadow call stack");
   }
 }
 
@@ -268,8 +274,6 @@ void Symbolize::PrintException(uint64_t vector, const char* vector_name,
 
   PrintRegisters(exc);
 
-  BackTraceFrame(0, exc.pc(), true);
-
   // Collect each kind of backtrace if possible.
   FramePointerBacktrace fp_backtrace;
   arch::ShadowCallStackBacktrace scs_backtrace;
@@ -283,7 +287,7 @@ void Symbolize::PrintException(uint64_t vector, const char* vector_name,
   }
 
   // Print whatever we have.
-  PrintBacktraces(fp_backtrace, scs_backtrace);
+  PrintBacktraces(fp_backtrace, scs_backtrace, exc.pc());
 
   PrintStack(exc.sp());
 }
