@@ -6,13 +6,16 @@
 //! among other things, sets the ramdisk_image flag to prevent binding of the on-disk filesystems.)
 
 use {
-    super::{
-        blob_fs_type, data_fs_name, data_fs_spec, data_fs_type, new_builder, volumes_spec,
-        VolumesSpec, DATA_FILESYSTEM_VARIANT,
-    },
     fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio,
     fshost::{AdminProxy, AdminWriteDataFileResult},
+    fshost_test_fixture::disk_builder::VolumesSpec,
     fuchsia_zircon::{self as zx, HandleBased as _},
+};
+
+pub mod config;
+use config::{
+    blob_fs_type, data_fs_name, data_fs_spec, data_fs_type, new_builder, volumes_spec,
+    DATA_FILESYSTEM_VARIANT,
 };
 
 const PAYLOAD: &[u8] = b"top secret stuff";

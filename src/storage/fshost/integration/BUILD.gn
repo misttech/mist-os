@@ -62,82 +62,51 @@ rustc_library("fshost_test_fixture") {
   ]
 }
 
-# Generates an fshost integration test component. Includes the fshost component on which the test
-# is exectuted.
+# Generates an fshost integration test component based on one of the integration test files. The
+# binary also has config.rs included, and a couple of default dependencies, but the rest should be
+# specified as needed for the tests in the file.
 #
-#   extra_deps (optional)
-#     [array] A list of extra deps
+#   data_filesystem_variant (required)
+#     [string] A variant string passed to the integration test harness.
 #
-#   options.data_filesystem_format (required)
+#   data_filesystem_format (required)
 #     [string] The format of the data partition fshost exports. One of "fxfs", "minfs", or "f2fs".
-#              The options scope can also contain additional fshost options if required.
 #
-#   data_filesystem_variant (optional)
-#     [string] A variant string passed to the integration test harness. Defaults to the
-#              data_filesystem_format.
+#   fshost_target (required)
+#     [string] The target for the fshost under test.
 #
-template("fshost_integration_test") {
-  assert(defined(invoker.options), "fshost options not specified")
-  fshost_options = invoker.options
-  if (!defined(invoker.data_filesystem_variant)) {
-    invoker.data_filesystem_variant = fshost_options.data_filesystem_format
-  }
-
-  _fshost_target = "test-fshost-${target_name}"
-  fshost_component_and_config(_fshost_target) {
-    testonly = true
-    options = invoker.options
-    if (!defined(options.use_disk_migration)) {
-      options.use_disk_migration = true
-    }
-  }
-
-  _fshost_component_name = get_label_info(_fshost_target, "name")
+#   source_root (required)
+#     [string] The main file for the integration test. Likely one of the files under "tests".
+#
+#   deps (optional)
+#     [array] Dependencies for the rust test binary.
+#
+template("fshost_integration_test_component") {
+  _fshost_component_name = get_label_info(invoker.fshost_target, "name")
   _test_bin = string_replace(target_name, "-", "_")
   _test_bin = "${_test_bin}_bin"
   rustc_test(_test_bin) {
     edition = "2021"
-    source_root = "tests/fshost_integration_test.rs"
+    source_root = invoker.source_root
     sources = [
-      "tests/fshost_integration_test.rs",
-      "tests/migration.rs",
-      "tests/wipe_storage.rs",
-      "tests/write_data_file.rs",
+      "tests/config.rs",
+      invoker.source_root,
     ]
     rustenv = [
       "FSHOST_COMPONENT_NAME=${_fshost_component_name}",
-      "DATA_FILESYSTEM_FORMAT=${fshost_options.data_filesystem_format}",
+      "DATA_FILESYSTEM_FORMAT=${invoker.data_filesystem_format}",
       "DATA_FILESYSTEM_VARIANT=${invoker.data_filesystem_variant}",
     ]
     features = [
-      fshost_options.data_filesystem_format,
+      invoker.data_filesystem_format,
       invoker.data_filesystem_variant,
     ]
     deps = [
       ":fshost_test_fixture",
-      "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
-      "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
-      "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_rust",
-      "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
-      "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-      "//sdk/lib/device-watcher/rust",
-      "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia",
-      "//src/lib/fuchsia-async",
-      "//src/lib/fuchsia-component",
-      "//src/lib/fuchsia-fs",
-      "//src/lib/zircon/rust:fuchsia-zircon",
-      "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
-      "//src/storage/lib/block_client/rust:remote-block-device",
-      "//src/storage/lib/delivery_blob",
-      "//src/storage/lib/fs_management/rust:fs_management",
-      "//src/sys/pkg/lib/fuchsia-merkle",
-      "//third_party/rust_crates:assert_matches",
-      "//third_party/rust_crates:futures",
-      "//third_party/rust_crates:tracing",
     ]
-    if (defined(invoker.extra_deps)) {
-      deps += invoker.extra_deps
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
     }
   }
 
@@ -171,14 +140,143 @@ template("fshost_integration_test") {
   fuchsia_test_component(target_name) {
     manifest = _manifest
     deps = [
-      ":$_fshost_target",
       ":$_manifest_target",
       ":$_test_bin",
     ]
   }
 }
 
-fshost_integration_test("fshost_integration_tests_fxfs") {
+# Generates an fshost integration test package. Includes the fshost component on which the test is
+# executed.
+#
+#   extra_deps (optional)
+#     [array] A list of extra deps for the general integration test component. These deps are not
+#             added to any of the other components right now. NB: if other test components need
+#             extra deps then come up with a different solution here.
+#
+#   options.data_filesystem_format (required)
+#     [string] The format of the data partition fshost exports. One of "fxfs", "minfs", or "f2fs".
+#              The options scope can also contain additional fshost options if required.
+#
+#   data_filesystem_variant (optional)
+#     [string] A variant string passed to the integration test harness. Defaults to the
+#              data_filesystem_format.
+#
+template("fshost_integration_test_package") {
+  assert(defined(invoker.options), "fshost options not specified")
+  fshost_options = invoker.options
+  if (!defined(invoker.data_filesystem_variant)) {
+    invoker.data_filesystem_variant = fshost_options.data_filesystem_format
+  }
+
+  _fshost_target = "test-fshost-${target_name}"
+  fshost_component_and_config(_fshost_target) {
+    testonly = true
+    options = invoker.options
+    if (!defined(options.use_disk_migration)) {
+      options.use_disk_migration = true
+    }
+  }
+
+  _integration_component_target = "${target_name}_general"
+  fshost_integration_test_component(_integration_component_target) {
+    fshost_target = _fshost_target
+    data_filesystem_format = fshost_options.data_filesystem_format
+    data_filesystem_variant = invoker.data_filesystem_variant
+    source_root = "tests/fshost_integration_test.rs"
+    deps = [
+      "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
+      "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
+      "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+      "//sdk/lib/device-watcher/rust",
+      "//src/lib/fidl/rust/fidl",
+      "//src/lib/fuchsia-async",
+      "//src/lib/fuchsia-component",
+      "//src/lib/fuchsia-fs",
+      "//src/lib/zircon/rust:fuchsia-zircon",
+      "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
+      "//src/storage/lib/delivery_blob",
+      "//src/storage/lib/fs_management/rust:fs_management",
+      "//src/sys/pkg/lib/fuchsia-merkle",
+      "//third_party/rust_crates:assert_matches",
+      "//third_party/rust_crates:futures",
+      "//third_party/rust_crates:tracing",
+    ]
+    if (defined(invoker.extra_deps)) {
+      deps += invoker.extra_deps
+    }
+  }
+
+  _migration_component_target = "${target_name}_migration"
+  fshost_integration_test_component(_migration_component_target) {
+    fshost_target = _fshost_target
+    data_filesystem_format = fshost_options.data_filesystem_format
+    data_filesystem_variant = invoker.data_filesystem_variant
+    source_root = "tests/migration.rs"
+  }
+
+  _wipe_storage_component_target = "${target_name}_wipe_storage"
+  fshost_integration_test_component(_wipe_storage_component_target) {
+    fshost_target = _fshost_target
+    data_filesystem_format = fshost_options.data_filesystem_format
+    data_filesystem_variant = invoker.data_filesystem_variant
+    source_root = "tests/wipe_storage.rs"
+    deps = [
+      "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
+      "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
+      "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_rust",
+      "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+      "//sdk/lib/device-watcher/rust",
+      "//src/lib/fidl/rust/fidl",
+      "//src/lib/fuchsia-fs",
+      "//src/lib/zircon/rust:fuchsia-zircon",
+      "//src/storage/lib/block_client/rust:remote-block-device",
+      "//src/storage/lib/fs_management/rust:fs_management",
+    ]
+  }
+
+  _write_data_file_component_target = "${target_name}_write_data_file"
+  fshost_integration_test_component(_write_data_file_component_target) {
+    fshost_target = _fshost_target
+    data_filesystem_format = fshost_options.data_filesystem_format
+    data_filesystem_variant = invoker.data_filesystem_variant
+    source_root = "tests/write_data_file.rs"
+    deps = [
+      "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
+      "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+      "//src/lib/fuchsia-fs",
+      "//src/lib/zircon/rust:fuchsia-zircon",
+    ]
+  }
+
+  fuchsia_test_package(target_name) {
+    test_specs = {
+      log_settings = {
+        max_severity = "ERROR"
+      }
+    }
+    test_components = [
+      ":$_integration_component_target",
+      ":$_migration_component_target",
+      ":$_wipe_storage_component_target",
+      ":$_write_data_file_component_target",
+    ]
+    deps = [
+      ":$_fshost_target",
+      "//src/storage/testing:storage_driver_test_realm",
+
+      # We need to make sure we have all the filesystems available in the package for various tests
+      # of the migration paths.
+      "//src/storage/blobfs/bin:component",
+      "//src/storage/f2fs/bin:f2fs-component",
+      "//src/storage/fxfs:fxfs_component",
+      "//src/storage/fxfs-crypt",
+      "//src/storage/minfs/bin:minfs-component",
+    ]
+  }
+}
+
+fshost_integration_test_package("fshost_integration_tests_fxfs") {
   data_filesystem_variant = "fxblob"
   options = {
     data_filesystem_format = "fxfs"
@@ -190,28 +288,28 @@ fshost_integration_test("fshost_integration_tests_fxfs") {
   ]
 }
 
-fshost_integration_test("fshost_integration_tests_fxfs_no_fxblob") {
+fshost_integration_test_package("fshost_integration_tests_fxfs_no_fxblob") {
   options = {
     data_filesystem_format = "fxfs"
     fxfs_blob = false
   }
 }
 
-fshost_integration_test("fshost_integration_tests_f2fs") {
+fshost_integration_test_package("fshost_integration_tests_f2fs") {
   options = {
     data_filesystem_format = "f2fs"
     fxfs_blob = false
   }
 }
 
-fshost_integration_test("fshost_integration_tests_minfs") {
+fshost_integration_test_package("fshost_integration_tests_minfs") {
   options = {
     data_filesystem_format = "minfs"
     fxfs_blob = false
   }
 }
 
-fshost_integration_test("fshost_integration_tests_f2fs_no_zxcrypt") {
+fshost_integration_test_package("fshost_integration_tests_f2fs_no_zxcrypt") {
   data_filesystem_variant = "f2fs-no-zxcrypt"
   options = {
     no_zxcrypt = true
@@ -220,7 +318,7 @@ fshost_integration_test("fshost_integration_tests_f2fs_no_zxcrypt") {
   }
 }
 
-fshost_integration_test("fshost_integration_tests_minfs_no_zxcrypt") {
+fshost_integration_test_package("fshost_integration_tests_minfs_no_zxcrypt") {
   data_filesystem_variant = "minfs-no-zxcrypt"
   options = {
     no_zxcrypt = true
@@ -229,26 +327,14 @@ fshost_integration_test("fshost_integration_tests_minfs_no_zxcrypt") {
   }
 }
 
-fuchsia_test_package("fshost_integration_tests") {
-  # Currently required because the data_formatted test causes Fxfs to log:
-  #   ERROR: ... handle_start failed error=Journal replay failed
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  test_components = [
-    ":fshost_integration_tests_fxfs",
-    ":fshost_integration_tests_f2fs",
-    ":fshost_integration_tests_minfs",
-    ":fshost_integration_tests_f2fs_no_zxcrypt",
-    ":fshost_integration_tests_minfs_no_zxcrypt",
-    ":fshost_integration_tests_fxfs_no_fxblob",
-  ]
-  deps = [ "//src/storage/testing:storage_driver_test_realm" ]
-}
-
 group("tests") {
   testonly = true
-  deps = [ ":fshost_integration_tests" ]
+  deps = [
+    ":fshost_integration_tests_f2fs",
+    ":fshost_integration_tests_f2fs_no_zxcrypt",
+    ":fshost_integration_tests_fxfs",
+    ":fshost_integration_tests_fxfs_no_fxblob",
+    ":fshost_integration_tests_minfs",
+    ":fshost_integration_tests_minfs_no_zxcrypt",
+  ]
 }

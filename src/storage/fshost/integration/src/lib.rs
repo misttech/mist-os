@@ -26,6 +26,17 @@ mod mocks;
 
 pub use disk_builder::{write_test_blob, write_test_blob_fxblob};
 
+pub const VFS_TYPE_BLOBFS: u32 = 0x9e694d21;
+pub const VFS_TYPE_MINFS: u32 = 0x6e694d21;
+pub const VFS_TYPE_MEMFS: u32 = 0x3e694d21;
+pub const VFS_TYPE_FXFS: u32 = 0x73667866;
+pub const VFS_TYPE_F2FS: u32 = 0xfe694d21;
+pub const BLOBFS_MAX_BYTES: u64 = 8765432;
+// DATA_MAX_BYTES must be greater than DEFAULT_F2FS_MIN_BYTES
+// (defined in device/constants.rs) to ensure that when f2fs is
+// the data filesystem format, we don't run out of space
+pub const DATA_MAX_BYTES: u64 = 109876543;
+
 pub struct TestFixtureBuilder {
     netboot: bool,
     no_fuchsia_boot: bool,

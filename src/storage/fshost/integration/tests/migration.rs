@@ -31,7 +31,9 @@
 //! filesystems which use zxcrypt, there is a set for both with and without zxcrypt. This covers
 //! all the goal states, so we just need one test for each original state.
 
-use crate::{data_fs_name, data_fs_type, new_builder, volumes_spec, DataSpec, DATA_MAX_BYTES};
+pub mod config;
+use config::{data_fs_name, data_fs_type, new_builder, volumes_spec};
+use fshost_test_fixture::{disk_builder::DataSpec, DATA_MAX_BYTES};
 
 /// f2fs requires more space than other filesystems so we use different values for it..
 fn data_max_bytes() -> u64 {

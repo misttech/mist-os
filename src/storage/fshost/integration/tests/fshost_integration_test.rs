@@ -19,7 +19,7 @@ use {
     fshost_test_fixture::disk_builder::DEFAULT_DATA_VOLUME_SIZE,
     fshost_test_fixture::{
         disk_builder::{DataSpec, VolumesSpec, FVM_SLICE_SIZE},
-        TestFixtureBuilder,
+        BLOBFS_MAX_BYTES, DATA_MAX_BYTES, VFS_TYPE_FXFS, VFS_TYPE_MEMFS, VFS_TYPE_MINFS,
     },
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
@@ -35,68 +35,12 @@ use {
     fidl_fuchsia_update_verify::{BlobfsVerifierMarker, VerifyOptions},
 };
 
-mod migration;
-mod wipe_storage;
-mod write_data_file;
+pub mod config;
 
-const FSHOST_COMPONENT_NAME: &'static str = std::env!("FSHOST_COMPONENT_NAME");
-const DATA_FILESYSTEM_FORMAT: &'static str = std::env!("DATA_FILESYSTEM_FORMAT");
-const DATA_FILESYSTEM_VARIANT: &'static str = std::env!("DATA_FILESYSTEM_VARIANT");
-
-fn new_builder() -> TestFixtureBuilder {
-    TestFixtureBuilder::new(FSHOST_COMPONENT_NAME)
-}
-
-// const VFS_TYPE_FATFS: u32 = 0xce694d21;
-const VFS_TYPE_BLOBFS: u32 = 0x9e694d21;
-const VFS_TYPE_MINFS: u32 = 0x6e694d21;
-const VFS_TYPE_MEMFS: u32 = 0x3e694d21;
-// const VFS_TYPE_FACTORYFS: u32 = 0x1e694d21;
-const VFS_TYPE_FXFS: u32 = 0x73667866;
-const VFS_TYPE_F2FS: u32 = 0xfe694d21;
-const BLOBFS_MAX_BYTES: u64 = 8765432;
-// DATA_MAX_BYTES must be greater than DEFAULT_F2FS_MIN_BYTES
-// (defined in device/constants.rs) to ensure that when f2fs is
-// the data filesystem format, we don't run out of space
-const DATA_MAX_BYTES: u64 = 109876543;
-
-fn blob_fs_type() -> u32 {
-    if DATA_FILESYSTEM_VARIANT == "fxblob" {
-        VFS_TYPE_FXFS
-    } else {
-        VFS_TYPE_BLOBFS
-    }
-}
-
-fn data_fs_type() -> u32 {
-    match DATA_FILESYSTEM_FORMAT {
-        "f2fs" => VFS_TYPE_F2FS,
-        "fxfs" => VFS_TYPE_FXFS,
-        "minfs" => VFS_TYPE_MINFS,
-        _ => panic!("invalid data filesystem format"),
-    }
-}
-
-fn data_fs_name() -> &'static str {
-    match DATA_FILESYSTEM_FORMAT {
-        "f2fs" => "f2fs",
-        "fxfs" => "fxfs",
-        "minfs" => "minfs",
-        _ => panic!("invalid data filesystem format"),
-    }
-}
-
-fn data_fs_zxcrypt() -> bool {
-    !DATA_FILESYSTEM_VARIANT.ends_with("no-zxcrypt")
-}
-
-fn volumes_spec() -> VolumesSpec {
-    VolumesSpec { fxfs_blob: DATA_FILESYSTEM_VARIANT == "fxblob", create_data_partition: true }
-}
-
-fn data_fs_spec() -> DataSpec {
-    DataSpec { format: Some(data_fs_name()), zxcrypt: data_fs_zxcrypt() }
-}
+use config::{
+    blob_fs_type, data_fs_name, data_fs_spec, data_fs_type, data_fs_zxcrypt, new_builder,
+    volumes_spec, DATA_FILESYSTEM_FORMAT, DATA_FILESYSTEM_VARIANT,
+};
 
 #[fuchsia::test]
 async fn blobfs_and_data_mounted() {

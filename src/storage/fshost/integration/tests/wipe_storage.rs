@@ -6,7 +6,6 @@
 //! among other things, sets the ramdisk_image flag to prevent binding of the on-disk filesystems.)
 
 use {
-    crate::{blob_fs_type, data_fs_spec, data_fs_type, new_builder, volumes_spec, VolumesSpec},
     device_watcher::recursive_wait,
     fidl::endpoints::{create_proxy, Proxy as _},
     fidl_fuchsia_fshost as fshost,
@@ -14,10 +13,13 @@ use {
     fidl_fuchsia_hardware_block_partition::PartitionMarker,
     fidl_fuchsia_io as fio,
     fs_management::partition::{find_partition_in, PartitionMatcher},
-    fshost_test_fixture::{write_test_blob, write_test_blob_fxblob},
+    fshost_test_fixture::{disk_builder::VolumesSpec, write_test_blob, write_test_blob_fxblob},
     fuchsia_zircon as zx,
     remote_block_device::{BlockClient, MutableBufferSlice, RemoteBlockClient},
 };
+
+pub mod config;
+use config::{blob_fs_type, data_fs_spec, data_fs_type, new_builder, volumes_spec};
 
 const TEST_BLOB_DATA: [u8; 8192] = [0xFF; 8192];
 // TODO(https://fxbug.dev/42072287): Remove hardcoded paths
