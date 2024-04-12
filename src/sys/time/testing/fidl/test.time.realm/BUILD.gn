@@ -4,24 +4,10 @@
 
 import("//build/fidl/fidl.gni")
 
-# TODO: b/327476961 - Experiment. Added :cpp and :rust group to address the
-# individual generated language versions, but keep non-stuttering references
-# such as //src/sys/time/testing/fidl/test.time:cpp.
-group("cpp") {
-  testonly = true
-  public_deps = [ ":test.time.realm_cpp" ]
-}
-
-group("rust") {
-  testonly = true
-  public_deps = [ ":test.time.realm_rust" ]
-}
-
-fidl("test.time.realm") {
+fidl("fidl") {
+  name = "test.time.realm"
   testonly = true
 
-  # TODO: b/327476961 - Experiment. See if this file naming helps readability.
-  # Each file is named after the protocol it contains.
   sources = [
     "push_source_puppet.test.fidl",
     "realm_factory.test.fidl",

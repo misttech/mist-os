@@ -11,9 +11,9 @@ import("//build/fidl/fidl.gni")
 group("fidl") {
   testonly = true
   deps = [
-    "test.time:cpp",
-    "test.time:rust",
-    "test.time.realm:cpp",
-    "test.time.realm:rust",
+    "test.time:fidl_cpp",
+    "test.time:fidl_rust",
+    "test.time.realm:fidl_cpp",
+    "test.time.realm:fidl_rust",
   ]
 }
