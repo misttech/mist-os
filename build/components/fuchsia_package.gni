@@ -184,8 +184,12 @@ template("fuchsia_package") {
 
     _files = {
       fini_manifest = "$target_out_dir/${target_name}_manifest"
+
+      # LINT.IfChange
       package_out_dir = "$target_out_dir/$target_name"
       package_manifest = "$package_out_dir/package_manifest.json"
+
+      # LINT.ThenChange(//build/packages/exported_fuchsia_package_archive.gni)
     }
 
     main_target_deps = []

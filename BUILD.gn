@@ -74,6 +74,20 @@ declare_args() {
   # "legacy" version of this argument.
   discoverable_package_labels = []
 
+  # If you add labels to this variable the `exported_fuchsia_package_archive()`
+  # targets captured by these labels will be collected and exposed in the
+  # 'package_archives' build api module. Ordinary `fuchsia_package_archive()`
+  # targets are not captured.
+  #
+  # Note: This variable is only used for metadata collection -- any package
+  # labels added here will still need to be included in the build graph
+  # elsewhere.
+  #
+  # It's usually advisable to use labels of well-defined, curated `group()`s of
+  # packages instead of explicitly adding the labels of the
+  # `exported_fuchsia_package_archive()` targets directly.
+  exported_package_labels = []
+
   # These are arguments used by Infra (and 'fx set') to add tests to a build
   # configuration without necessarily adding them to the assembled product, and
   # validating that they only contain tests of the type in their name.
@@ -191,6 +205,7 @@ build_api_module("api") {
     ":images",
     ":licenses",
     ":package-repositories",
+    ":package_archives",
     ":platforms",
     ":prebuilt_binaries",
     ":prebuilt_package_flavors",
@@ -785,6 +800,43 @@ build_api_module("sdk_archives") {
            "//sdk:driver_archive",
            "//sdk:final_fuchsia_idk",
          ] + sdk_archive_labels
+}
+
+# Describes the `exported_package_archive`s labels specified by the gn arg
+# `exported_package_labels` in `$root_build_dir/package_archives.json`.
+#
+# Since some information (like the package's name) cannot be known during the
+# GN gen phase, we instead collect that information during the action/ninja
+# phase, meaning that the full metadata cannot be embed the directly inside
+# `package_archives.json`.
+#
+# Thus, the metadata exposed by this build API module is simply a list of paths
+# to other JSON files; each following this exact schema:
+#
+#   * name
+#     - Required: The name of the archived package.
+#     - Type: string
+#
+#   * label
+#     - Required: GN label of the archived package.
+#     - Type: label_with_toolchain
+#
+#   * path
+#     - Required: Path to the built archive.
+#     - Type: path relative to $root_build_dir
+#
+#   * cpu
+#     - Required: The package's target CPU architecture.
+#     - Type: string
+#
+#   * api_level
+#     - Required: The package's minimum supported API level.
+#     - Type: int
+#
+build_api_module("package_archives") {
+  testonly = true
+  data_keys = [ "exported_package_archives" ]
+  deps = exported_package_labels
 }
 
 # Describes the platforms available for testing, in the file:

@@ -450,7 +450,12 @@ template("package_tool_archive_create") {
   } else {
     archive_name = package_name
   }
+
+  # LINT.IfChange
   archive_out = "${target_out_dir}/${archive_name}.far"
+
+  # LINT.ThenChange(//build/packages/exported_fuchsia_package_archive.gni)
+
   archive_depfile = "${archive_out}.d"
 
   compiled_action(target_name) {
