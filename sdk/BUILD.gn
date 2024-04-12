@@ -925,15 +925,8 @@ pool("subbuild_pool") {
 # DO NOT ADD anything here!
 sdk_molecule("driver_fidl") {
   deps = [
-    "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_sdk($fidl_toolchain)",
   ]
 }
 
@@ -962,22 +955,12 @@ sdk_molecule("driver_atoms") {
     ":bind",
     ":driver_fidl",
     ":fuchsia_idk_atoms",
-    "//sdk/lib/component/incoming/cpp:cpp_sdk",
-    "//sdk/lib/component/outgoing/cpp:cpp_sdk",
-    "//sdk/lib/driver/component/cpp:cpp_sdk",
-    "//sdk/lib/driver/devfs/cpp:cpp_sdk",
     "//sdk/lib/driver/runtime:driver_runtime_cpp_sdk",
     "//sdk/lib/driver/runtime:driver_runtime_sdk",
     "//sdk/lib/driver_component:driver_component",
-    "//sdk/lib/fidl/cpp/wire:wire_sdk",
-    "//sdk/lib/fidl_driver:fidl_driver_natural_sdk",
-    "//sdk/lib/fidl_driver:fidl_driver_sdk",
     "//sdk/lib/input_report_reader:input_report_reader_sdk",
-    "//sdk/lib/inspect/component/cpp:cpp_sdk",
-    "//src/devices/bin/driver_runtime:driver_runtime_sdk",
     "//src/devices/lib/mmio:mmio_sdk",
     "//src/lib/ddk:ddk_metadata_sdk",
-    "//src/lib/fidl/cpp:cpp_sdk",
     "//zircon/system/ulib/hwreg:hwreg_sdk_sdk",
     "//zircon/system/ulib/hwreg-i2c:hwreg-i2c_sdk_sdk",
   ]
