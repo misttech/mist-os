@@ -4,47 +4,15 @@
 
 #include "tools/fidl/fidlc/src/names.h"
 
-#include <zircon/assert.h>
-
 #include <sstream>
+
+#include "tools/fidl/fidlc/src/flat_ast.h"
 
 namespace fidlc {
 
-namespace {
-
-const char* NameNullability(bool is_nullable) { return is_nullable ? "nullable" : "nonnullable"; }
-
-const char* NameNullability(Nullability nullability) {
-  return NameNullability(nullability == Nullability::kNullable);
+std::string NameLibrary(const std::vector<std::string_view>& library_name) {
+  return StringJoin(library_name, ".");
 }
-
-std::string NameSize(uint64_t size) {
-  if (size == std::numeric_limits<uint64_t>::max())
-    return "unbounded";
-  std::ostringstream name;
-  name << size;
-  return name.str();
-}
-
-std::string FormatName(const Name& name, std::string_view library_separator,
-                       std::string_view name_separator) {
-  std::string compiled_name;
-  if (name.library() != nullptr && !name.is_intrinsic()) {
-    compiled_name += LibraryName(name.library()->name, library_separator);
-    compiled_name += name_separator;
-  }
-  compiled_name += name.full_name();
-  return compiled_name;
-}
-
-std::string LengthPrefixedString(std::string_view str) {
-  std::ostringstream out;
-  out << str.length();
-  out << str;
-  return out.str();
-}
-
-}  // namespace
 
 std::string NameHandleSubtype(HandleSubtype subtype) {
   switch (subtype) {
@@ -111,8 +79,6 @@ std::string NameHandleSubtype(HandleSubtype subtype) {
   }
 }
 
-std::string NameHandleRights(RightsWrappedType rights) { return std::to_string(rights); }
-
 std::string NameRawLiteralKind(RawLiteral::Kind kind) {
   switch (kind) {
     case RawLiteral::Kind::kDocComment:
@@ -125,9 +91,7 @@ std::string NameRawLiteralKind(RawLiteral::Kind kind) {
   }
 }
 
-std::string NameFlatName(const Name& name) { return FormatName(name, ".", "/"); }
-
-std::string NameFlatTypeKind(const Type* type) {
+std::string NameTypeKind(const Type* type) {
   switch (type->kind) {
     case Type::Kind::kArray:
       if (static_cast<const ArrayType*>(type)->IsStringArray()) {
@@ -161,7 +125,7 @@ std::string NameFlatTypeKind(const Type* type) {
   }
 }
 
-std::string NameFlatConstantKind(Constant::Kind kind) {
+std::string NameConstantKind(Constant::Kind kind) {
   switch (kind) {
     case Constant::Kind::kIdentifier:
       return "identifier";
@@ -172,76 +136,7 @@ std::string NameFlatConstantKind(Constant::Kind kind) {
   }
 }
 
-std::string NameHandleZXObjType(HandleSubtype subtype) {
-  switch (subtype) {
-    case HandleSubtype::kHandle:
-      return "ZX_OBJ_TYPE_NONE";
-    case HandleSubtype::kBti:
-      return "ZX_OBJ_TYPE_BTI";
-    case HandleSubtype::kChannel:
-      return "ZX_OBJ_TYPE_CHANNEL";
-    case HandleSubtype::kClock:
-      return "ZX_OBJ_TYPE_CLOCK";
-    case HandleSubtype::kEvent:
-      return "ZX_OBJ_TYPE_EVENT";
-    case HandleSubtype::kEventpair:
-      return "ZX_OBJ_TYPE_EVENTPAIR";
-    case HandleSubtype::kException:
-      return "ZX_OBJ_TYPE_EXCEPTION";
-    case HandleSubtype::kFifo:
-      return "ZX_OBJ_TYPE_FIFO";
-    case HandleSubtype::kGuest:
-      return "ZX_OBJ_TYPE_GUEST";
-    case HandleSubtype::kInterrupt:
-      return "ZX_OBJ_TYPE_INTERRUPT";
-    case HandleSubtype::kIob:
-      return "ZX_OBJ_TYPE_IOB";
-    case HandleSubtype::kIommu:
-      return "ZX_OBJ_TYPE_IOMMU";
-    case HandleSubtype::kJob:
-      return "ZX_OBJ_TYPE_JOB";
-    case HandleSubtype::kDebugLog:
-      return "ZX_OBJ_TYPE_LOG";
-    case HandleSubtype::kMsi:
-      return "ZX_OBJ_TYPE_MSI";
-    case HandleSubtype::kPager:
-      return "ZX_OBJ_TYPE_PAGER";
-    case HandleSubtype::kPciDevice:
-      return "ZX_OBJ_TYPE_PCI_DEVICE";
-    case HandleSubtype::kPmt:
-      return "ZX_OBJ_TYPE_PMT";
-    case HandleSubtype::kPort:
-      return "ZX_OBJ_TYPE_PORT";
-    case HandleSubtype::kProcess:
-      return "ZX_OBJ_TYPE_PROCESS";
-    case HandleSubtype::kProfile:
-      return "ZX_OBJ_TYPE_PROFILE";
-    case HandleSubtype::kResource:
-      return "ZX_OBJ_TYPE_RESOURCE";
-    case HandleSubtype::kSocket:
-      return "ZX_OBJ_TYPE_SOCKET";
-    case HandleSubtype::kStream:
-      return "ZX_OBJ_TYPE_STREAM";
-    case HandleSubtype::kSuspendToken:
-      return "ZX_OBJ_TYPE_SUSPEND_TOKEN";
-    case HandleSubtype::kThread:
-      return "ZX_OBJ_TYPE_THREAD";
-    case HandleSubtype::kTimer:
-      return "ZX_OBJ_TYPE_TIMER";
-    case HandleSubtype::kVcpu:
-      return "ZX_OBJ_TYPE_VCPU";
-    case HandleSubtype::kVmar:
-      return "ZX_OBJ_TYPE_VMAR";
-    case HandleSubtype::kVmo:
-      return "ZX_OBJ_TYPE_VMO";
-  }
-}
-
-std::string NameUnionTag(std::string_view union_name, const Union::Member& member) {
-  return std::string(union_name) + "Tag_" + NameIdentifier(member.name);
-}
-
-std::string NameFlatConstant(const Constant* constant) {
+std::string NameConstant(const Constant* constant) {
   switch (constant->kind) {
     case Constant::Kind::kLiteral: {
       auto literal_constant = static_cast<const LiteralConstant*>(constant);
@@ -249,21 +144,21 @@ std::string NameFlatConstant(const Constant* constant) {
     }
     case Constant::Kind::kIdentifier: {
       auto identifier_constant = static_cast<const IdentifierConstant*>(constant);
-      return NameFlatName(identifier_constant->reference.resolved().name());
+      return FullyQualifiedName(identifier_constant->reference.resolved().name());
     }
     case Constant::Kind::kBinaryOperator: {
       return std::string("binary operator");
     }
-  }  // switch
+  }
 }
 
-void NameFlatTypeHelper(std::ostringstream& buf, const Type* type) {
-  buf << NameFlatName(type->name);
+void NameTypeHelper(std::ostringstream& buf, const Type* type) {
+  buf << FullyQualifiedName(type->name);
   switch (type->kind) {
     case Type::Kind::kArray: {
       const auto* array_type = static_cast<const ArrayType*>(type);
       buf << '<';
-      NameFlatTypeHelper(buf, array_type->element_type);
+      NameTypeHelper(buf, array_type->element_type);
       if (*array_type->element_count != SizeValue::Max()) {
         buf << ", ";
         buf << array_type->element_count->value;
@@ -274,7 +169,7 @@ void NameFlatTypeHelper(std::ostringstream& buf, const Type* type) {
     case Type::Kind::kVector: {
       const auto* vector_type = static_cast<const VectorType*>(type);
       buf << '<';
-      NameFlatTypeHelper(buf, vector_type->element_type);
+      NameTypeHelper(buf, vector_type->element_type);
       buf << '>';
       if (vector_type->ElementCount() != SizeValue::Max().value) {
         buf << ':';
@@ -293,7 +188,7 @@ void NameFlatTypeHelper(std::ostringstream& buf, const Type* type) {
     case Type::Kind::kZxExperimentalPointer: {
       const auto* pointer_type = static_cast<const ZxExperimentalPointerType*>(type);
       buf << '<';
-      NameFlatTypeHelper(buf, pointer_type->pointee_type);
+      NameTypeHelper(buf, pointer_type->pointee_type);
       buf << '>';
       break;
     }
@@ -309,13 +204,13 @@ void NameFlatTypeHelper(std::ostringstream& buf, const Type* type) {
       const auto* transport_side = static_cast<const TransportSideType*>(type);
       buf << (transport_side->end == TransportSide::kClient ? "client" : "server");
       buf << ':';
-      buf << NameFlatName(transport_side->protocol_decl->name);
+      buf << FullyQualifiedName(transport_side->protocol_decl->name);
       break;
     }
     case Type::Kind::kBox: {
       const auto* box_type = static_cast<const BoxType*>(type);
       buf << '<';
-      buf << NameFlatName(box_type->boxed_type->name);
+      buf << FullyQualifiedName(box_type->boxed_type->name);
       buf << '>';
       break;
     }
@@ -332,152 +227,16 @@ void NameFlatTypeHelper(std::ostringstream& buf, const Type* type) {
   }
 }
 
-std::string NameFlatType(const Type* type) {
+std::string NameType(const Type* type) {
   std::ostringstream buf;
-  NameFlatTypeHelper(buf, type);
+  NameTypeHelper(buf, type);
   return buf.str();
 }
 
-std::string NameIdentifier(SourceSpan name) { return std::string(name.data()); }
-
-std::string NameLibrary(const std::vector<std::unique_ptr<RawIdentifier>>& components) {
-  std::string id;
-  for (const auto& component : components) {
-    if (!id.empty()) {
-      id.append(".");
-    }
-    id.append(component->span().data());
-  }
-  return id;
-}
-
-std::string NameLibrary(const std::vector<std::string_view>& library_name) {
-  return StringJoin(library_name, ".");
-}
-
-std::string NameLibraryCHeader(const std::vector<std::string_view>& library_name) {
-  return StringJoin(library_name, "/") + "/c/fidl.h";
-}
-
-std::string NameDiscoverable(const Protocol& protocol) {
-  return FormatName(protocol.name, ".", ".");
-}
-
-std::string NameMethod(std::string_view protocol_name, const Protocol::Method& method) {
-  return std::string(protocol_name) + NameIdentifier(method.name);
-}
-
-std::string NameOrdinal(std::string_view method_name) {
-  std::string ordinal_name(method_name);
-  ordinal_name += "Ordinal";
-  return ordinal_name;
-}
-
-std::string NameMessage(std::string_view method_name, MessageKind kind) {
-  std::string message_name(method_name);
-  switch (kind) {
-    case MessageKind::kRequest:
-      message_name += "RequestMessage";
-      break;
-    case MessageKind::kResponse:
-      message_name += "ResponseMessage";
-      break;
-    case MessageKind::kEvent:
-      message_name += "EventMessage";
-      break;
-  }
-  return message_name;
-}
-
-std::string NameTable(std::string_view table_name) { return std::string(table_name) + "Table"; }
-
-std::string NamePointer(std::string_view name) {
-  std::string pointer_name("Pointer");
-  pointer_name += LengthPrefixedString(name);
-  return pointer_name;
-}
-
-std::string NameMembers(std::string_view name) {
-  std::string members_name("Members");
-  members_name += LengthPrefixedString(name);
-  return members_name;
-}
-
-std::string NameFields(std::string_view name) {
-  std::string fields_name("Fields");
-  fields_name += LengthPrefixedString(name);
-  return fields_name;
-}
-
-std::string NameFieldsAltField(std::string_view name, uint32_t field_num) {
-  std::ostringstream fields_alt_field_name;
-  fields_alt_field_name << NameFields(name);
-  fields_alt_field_name << "_field";
-  fields_alt_field_name << field_num;
-  fields_alt_field_name << "_alt_field";
-  return fields_alt_field_name.str();
-}
-
-std::string NameCodedName(const Name& name) { return FormatName(name, "_", "_"); }
-
-std::string NameCodedNullableName(const Name& name) {
-  std::ostringstream nullable_name;
-  nullable_name << NameCodedName(name);
-  nullable_name << "NullableRef";
-  return nullable_name.str();
-}
-
-std::string NameCodedHandle(HandleSubtype subtype, RightsWrappedType rights,
-                            Nullability nullability) {
-  std::string name("Handle");
-  name += NameHandleSubtype(subtype);
-  name += NameHandleRights(rights);
-  name += NameNullability(nullability);
-  return name;
-}
-
-std::string NameCodedProtocolHandle(std::string_view protocol_name, Nullability nullability) {
-  std::string name("Protocol");
-  name += LengthPrefixedString(protocol_name);
-  name += NameNullability(nullability);
-  return name;
-}
-
-std::string NameCodedRequestHandle(std::string_view protocol_name, Nullability nullability) {
-  std::string name("Request");
-  name += LengthPrefixedString(protocol_name);
-  name += NameNullability(nullability);
-  return name;
-}
-
-std::string NameCodedArray(std::string_view element_name, uint64_t size) {
-  std::string name("Array");
-  name += NameSize(size);
-  name += "_";
-  name += LengthPrefixedString(element_name);
-  return name;
-}
-
-std::string NameCodedVector(std::string_view element_name, uint64_t max_size,
-                            Nullability nullability) {
-  std::string name("Vector");
-  name += NameSize(max_size);
-  name += NameNullability(nullability);
-  name += LengthPrefixedString(element_name);
-  return name;
-}
-
-std::string NameCodedString(uint64_t max_size, Nullability nullability) {
-  std::string name("String");
-  name += NameSize(max_size);
-  name += NameNullability(nullability);
-  return name;
-}
-
-std::string NameCodedZxExperimentalPointer(std::string_view pointee_name) {
-  std::string name("ZxExperimentalPointer");
-  name += LengthPrefixedString(pointee_name);
-  return name;
+std::string FullyQualifiedName(const Name& name) {
+  if (name.is_intrinsic())
+    return name.full_name();
+  return NameLibrary(name.library()->name) + "/" + name.full_name();
 }
 
 }  // namespace fidlc

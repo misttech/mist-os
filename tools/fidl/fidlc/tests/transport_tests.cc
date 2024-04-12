@@ -131,7 +131,7 @@ protocol P {
 };
 )FIDL");
   library.UseLibraryFdf();
-  library.ExpectFail(ErrHandleUsedInIncompatibleTransport, "fdf.handle", "Channel", "protocol 'P'");
+  library.ExpectFail(ErrHandleUsedInIncompatibleTransport, "fdf/handle", "Channel", "protocol 'P'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -260,7 +260,7 @@ protocol P {
   });
 };
 )FIDL");
-  library.ExpectFail(ErrHandleUsedInIncompatibleTransport, "example.handle", "Channel",
+  library.ExpectFail(ErrHandleUsedInIncompatibleTransport, "example/handle", "Channel",
                      "protocol 'P'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -269,7 +269,7 @@ TEST(TransportTests, BadDriverHandleInZirconChannel) {
   TestLibrary library;
   library.AddFile("bad/fi-0117.test.fidl");
   library.UseLibraryFdf();
-  library.ExpectFail(ErrHandleUsedInIncompatibleTransport, "fdf.handle", "Channel",
+  library.ExpectFail(ErrHandleUsedInIncompatibleTransport, "fdf/handle", "Channel",
                      "protocol 'Protocol'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }

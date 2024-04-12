@@ -70,7 +70,7 @@ std::string Display(const AttributeArg* a) {
   return a->name.has_value() ? std::string(a->name.value().data()) : "";
 }
 
-std::string Display(const Constant* c) { return NameFlatConstant(c); }
+std::string Display(const Constant* c) { return NameConstant(c); }
 
 std::string Display(Element::Kind k) {
   switch (k) {
@@ -145,7 +145,7 @@ std::string Display(const std::vector<const Decl*>& d) {
   return ss.str();
 }
 
-std::string Display(const Type* t) { return NameFlatType(t); }
+std::string Display(const Type* t) { return NameType(t); }
 
 std::string Display(const Name& n) { return n.full_name(); }
 

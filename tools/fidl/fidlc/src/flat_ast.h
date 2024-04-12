@@ -41,10 +41,6 @@ struct Library;
 struct RawIdentifier;
 struct RawOrdinal64;
 
-// This is needed (for now) to work around declaration order issues.
-std::string LibraryName(const std::vector<std::string_view>& components,
-                        std::string_view separator);
-
 struct Element {
   enum class Kind : uint8_t {
     kAlias,

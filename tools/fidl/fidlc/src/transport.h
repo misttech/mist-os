@@ -9,6 +9,8 @@
 #include <set>
 #include <vector>
 
+#include "tools/fidl/fidlc/src/name.h"
+
 namespace fidlc {
 
 // The class / namespace of the handle, used for compatibility checking with
@@ -19,8 +21,7 @@ enum class HandleClass : uint8_t {
   kBanjo,   // only referenced by client_end / server_end
 };
 
-std::string_view HandleClassName(HandleClass handle_class);
-std::optional<HandleClass> HandleClassFromName(std::string_view name);
+std::optional<HandleClass> HandleClassFromName(const Name& name);
 
 struct Transport {
   enum class Kind : uint8_t {

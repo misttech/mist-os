@@ -245,11 +245,6 @@ void Dependencies::VerifyAllDependenciesWereUsed(const Library& for_library, Rep
   }
 }
 
-std::string LibraryName(const std::vector<std::string_view>& components,
-                        std::string_view separator) {
-  return StringJoin(components, separator);
-}
-
 // static
 std::unique_ptr<Library> Library::CreateRootLibrary() {
   // TODO(https://fxbug.dev/42146818): Because this library doesn't get compiled, we have

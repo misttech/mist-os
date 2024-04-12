@@ -1183,9 +1183,9 @@ void CompileStep::CompileStruct(Struct* struct_declaration) {
       const auto* default_value_type = member.type_ctor->type;
       if (!TypeCanBeConst(default_value_type)) {
         reporter()->Fail(ErrInvalidStructMemberType, struct_declaration->name.span().value(),
-                         NameIdentifier(member.name), default_value_type);
+                         member.name.data(), default_value_type);
       } else if (!ResolveConstant(member.maybe_default_value.get(), default_value_type)) {
-        reporter()->Fail(ErrCouldNotResolveMemberDefault, member.name, NameIdentifier(member.name));
+        reporter()->Fail(ErrCouldNotResolveMemberDefault, member.name, member.name.data());
       }
     }
   }

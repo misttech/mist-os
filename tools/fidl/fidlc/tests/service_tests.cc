@@ -48,15 +48,15 @@ service SomeService {
   const auto& member0 = service->members[0];
   EXPECT_EQ(member0.name.data(), "some_protocol_first_first");
   const auto* type0 = static_cast<const TransportSideType*>(member0.type_ctor->type);
-  EXPECT_EQ(NameFlatName(type0->protocol_decl->name), "example/SomeProtocol1");
+  EXPECT_EQ(FullyQualifiedName(type0->protocol_decl->name), "example/SomeProtocol1");
   const auto& member1 = service->members[1];
   EXPECT_EQ(member1.name.data(), "some_protocol_first_second");
   const auto* type1 = static_cast<const TransportSideType*>(member1.type_ctor->type);
-  EXPECT_EQ(NameFlatName(type1->protocol_decl->name), "example/SomeProtocol1");
+  EXPECT_EQ(FullyQualifiedName(type1->protocol_decl->name), "example/SomeProtocol1");
   const auto& member2 = service->members[2];
   EXPECT_EQ(member2.name.data(), "some_protocol_second");
   const auto* type2 = static_cast<const TransportSideType*>(member2.type_ctor->type);
-  EXPECT_EQ(NameFlatName(type2->protocol_decl->name), "example/SomeProtocol2");
+  EXPECT_EQ(FullyQualifiedName(type2->protocol_decl->name), "example/SomeProtocol2");
 }
 
 TEST(ServiceTests, BadCannotHaveConflictingMembers) {

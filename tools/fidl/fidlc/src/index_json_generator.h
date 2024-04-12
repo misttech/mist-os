@@ -33,7 +33,7 @@ class IndexJSONGenerator : public JsonWriter<IndexJSONGenerator> {
 
   // struct representing an identifier from dependency library referenced in target library
   struct ReferencedIdentifier {
-    explicit ReferencedIdentifier(const Name& name) : identifier(NameFlatName(name)) {
+    explicit ReferencedIdentifier(const Name& name) : identifier(FullyQualifiedName(name)) {
       ZX_ASSERT_MSG(name.span().has_value(), "anonymous name used as an identifier");
       span = name.span().value();
     }

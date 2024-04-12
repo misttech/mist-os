@@ -139,7 +139,7 @@ void JSONGenerator::Generate(const LiteralConstant& value) {
 
 void JSONGenerator::Generate(const Constant& value) {
   GenerateObject([&]() {
-    GenerateObjectMember("kind", NameFlatConstantKind(value.kind), Position::kFirst);
+    GenerateObjectMember("kind", NameConstantKind(value.kind), Position::kFirst);
     GenerateObjectMember("value", value.Value());
     GenerateObjectMember("expression", value.span);
     switch (value.kind) {
@@ -163,7 +163,7 @@ void JSONGenerator::Generate(const Constant& value) {
 
 void JSONGenerator::Generate(const Type* value) {
   GenerateObject([&]() {
-    GenerateObjectMember("kind", NameFlatTypeKind(value), Position::kFirst);
+    GenerateObjectMember("kind", NameTypeKind(value), Position::kFirst);
 
     switch (value->kind) {
       case Type::Kind::kBox: {
@@ -198,7 +198,7 @@ void JSONGenerator::Generate(const Type* value) {
         GenerateObjectMember(
             "rights", static_cast<const NumericConstantValue<uint32_t>*>(type->rights)->value);
         GenerateObjectMember("nullable", type->nullability);
-        GenerateObjectMember("resource_identifier", NameFlatName(type->resource_decl->name));
+        GenerateObjectMember("resource_identifier", FullyQualifiedName(type->resource_decl->name));
         break;
       }
       case Type::Kind::kPrimitive: {
@@ -286,17 +286,17 @@ void JSONGenerator::GenerateDeclName(const Name& name) {
 }
 
 void JSONGenerator::Generate(const Name& name) {
-  // TODO(https://fxbug.dev/42174095): NameFlatName omits the library name for builtins,
-  // since we want error messages to say "uint32" not "fidl/uint32". However,
-  // builtins MAX and HEAD can end up in the JSON IR as identifier constants,
-  // and to satisfy the schema we must produce a proper compound identifier
-  // (with a library name). We should solve this in a cleaner way.
+  // TODO(https://fxbug.dev/42174095): FullyQualifiedName omits the library name
+  // for builtins, since we want errors to say "uint32" not "fidl/uint32".
+  // However, builtins MAX and HEAD can end up in the JSON IR as identifier
+  // constants, and to satisfy the schema we must produce a proper compound
+  // identifier (with a library name). We should solve this in a cleaner way.
   if (name.is_intrinsic() && name.decl_name() == "MAX") {
     EmitString(std::string_view("fidl/MAX"));
   } else if (name.is_intrinsic() && name.decl_name() == "HEAD") {
     EmitString(std::string_view("fidl/HEAD"));
   } else {
-    EmitString(NameFlatName(name));
+    EmitString(FullyQualifiedName(name));
   }
 }
 
@@ -494,7 +494,7 @@ void JSONGenerator::GenerateParameterizedType(TypeKind parent_type_kind, const T
   GenerateObjectPunctuation(position);
   EmitObjectKey(key);
   GenerateObject([&]() {
-    GenerateObjectMember("kind", NameFlatTypeKind(type), Position::kFirst);
+    GenerateObjectMember("kind", NameTypeKind(type), Position::kFirst);
 
     switch (type->kind) {
       case Type::Kind::kArray: {
@@ -860,7 +860,7 @@ void JSONGenerator::Generate(const NewType& value) {
 
 void JSONGenerator::Generate(const Compilation::Dependency& dependency) {
   GenerateObject([&]() {
-    auto library_name = LibraryName(dependency.library->name, ".");
+    auto library_name = NameLibrary(dependency.library->name);
     GenerateObjectMember("name", library_name, Position::kFirst);
     GenerateExternalDeclarationsMember(dependency.declarations);
   });
@@ -874,7 +874,7 @@ void JSONGenerator::GenerateDeclarationsEntry(int count, const Name& name,
   } else {
     EmitObjectSeparator();
   }
-  EmitObjectKey(NameFlatName(name));
+  EmitObjectKey(FullyQualifiedName(name));
   EmitString(decl_kind);
 }
 
@@ -931,7 +931,7 @@ void JSONGenerator::GenerateExternalDeclarationsEntry(
   } else {
     EmitObjectSeparator();
   }
-  EmitObjectKey(NameFlatName(name));
+  EmitObjectKey(FullyQualifiedName(name));
   GenerateObject([&]() {
     GenerateObjectMember("kind", decl_kind, Position::kFirst);
     if (maybe_resourceness) {
@@ -987,7 +987,7 @@ void JSONGenerator::GenerateExternalDeclarationsMember(
 std::ostringstream JSONGenerator::Produce() {
   ResetIndentLevel();
   GenerateObject([&]() {
-    GenerateObjectMember("name", LibraryName(compilation_->library_name, "."), Position::kFirst);
+    GenerateObjectMember("name", NameLibrary(compilation_->library_name), Position::kFirst);
     GenerateObjectMember("platform", compilation_->platform->name());
 
     GenerateObjectPunctuation(Position::kSubsequent);
@@ -1033,7 +1033,7 @@ std::ostringstream JSONGenerator::Produce() {
     std::vector<std::string> declaration_order;
     declaration_order.reserve(compilation_->declaration_order.size());
     for (const auto decl : compilation_->declaration_order) {
-      declaration_order.push_back(NameFlatName(decl->name));
+      declaration_order.push_back(FullyQualifiedName(decl->name));
     }
     GenerateObjectMember("declaration_order", declaration_order);
 

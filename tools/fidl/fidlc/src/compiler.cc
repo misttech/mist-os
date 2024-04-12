@@ -178,7 +178,7 @@ static std::vector<const Struct*> ExternalStructs(const Library* target_library,
                                                   const std::vector<const Protocol*>& protocols) {
   // Ensure deterministic ordering.
   auto ordering = [](const Struct* a, const Struct* b) {
-    return NameFlatName(a->name) < NameFlatName(b->name);
+    return FullyQualifiedName(a->name) < FullyQualifiedName(b->name);
   };
   std::set<const Struct*, decltype(ordering)> external_structs(ordering);
 

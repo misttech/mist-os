@@ -16,7 +16,7 @@ namespace fidlc {
 std::ostringstream IndexJSONGenerator::Produce() {
   ResetIndentLevel();
   GenerateObject([&]() {
-    GenerateObjectMember("name", LibraryName(compilation_->library_name, "."), Position::kFirst);
+    GenerateObjectMember("name", NameLibrary(compilation_->library_name), Position::kFirst);
     GenerateObjectMember("lib_declarations", compilation_->library_declarations);
     GenerateObjectMember("using_declarations", compilation_->using_references);
     GenerateObjectMember("dependencies", compilation_->direct_and_composed_dependencies);
@@ -47,7 +47,7 @@ IndexJSONGenerator::GetDependencyIdentifiers() {
       for (auto& member : enumdecl->members) {
         Name full_name = enumdecl->name.WithMemberName(std::string(member.name.data()));
         auto member_identifier =
-            IndexJSONGenerator::ReferencedIdentifier(NameFlatName(full_name), member.name);
+            IndexJSONGenerator::ReferencedIdentifier(FullyQualifiedName(full_name), member.name);
         identifiers.emplace_back(member_identifier);
       }
     }
@@ -95,26 +95,26 @@ void IndexJSONGenerator::Generate(IndexJSONGenerator::ReferencedIdentifier value
 void IndexJSONGenerator::Generate(std::pair<Library*, SourceSpan> reference) {
   GenerateObject([&]() {
     // for debugging purpose, include the span data
-    GenerateObjectMember("library_name", LibraryName(reference.first->name, "."), Position::kFirst);
+    GenerateObjectMember("library_name", NameLibrary(reference.first->name), Position::kFirst);
     GenerateObjectMember("referenced_at", reference.second);
   });
 }
 
 void IndexJSONGenerator::Generate(const Compilation::Dependency& dependency) {
   GenerateObject([&]() {
-    GenerateObjectMember("library_name", LibraryName(dependency.library->name, "."),
-                         Position::kFirst);
+    GenerateObjectMember("library_name", NameLibrary(dependency.library->name), Position::kFirst);
     GenerateObjectMember("library_location", dependency.library->arbitrary_name_span);
   });
 }
 
 void IndexJSONGenerator::Generate(const Constant& value) {
   GenerateObject([&]() {
-    GenerateObjectMember("type", NameFlatConstantKind(value.kind), Position::kFirst);
+    GenerateObjectMember("type", NameConstantKind(value.kind), Position::kFirst);
     switch (value.kind) {
       case Constant::Kind::kIdentifier: {
         auto identifier = static_cast<const IdentifierConstant*>(&value);
-        GenerateObjectMember("identifier", NameFlatName((identifier->reference.resolved().name())));
+        GenerateObjectMember("identifier",
+                             FullyQualifiedName((identifier->reference.resolved().name())));
         GenerateObjectMember("referenced_at", identifier->reference.span());
         break;
       }
@@ -134,13 +134,13 @@ void IndexJSONGenerator::Generate(const Constant& value) {
 
 void IndexJSONGenerator::Generate(const Const& value) {
   GenerateObject([&]() {
-    GenerateObjectMember("identifier", NameFlatName(value.name), Position::kFirst);
+    GenerateObjectMember("identifier", FullyQualifiedName(value.name), Position::kFirst);
     GenerateObjectMember("location", value.name.span().value());
     GenerateObjectMember("value", value.value);
   });
 }
 
-void IndexJSONGenerator::Generate(const Name& name) { Generate(NameFlatName(name)); }
+void IndexJSONGenerator::Generate(const Name& name) { Generate(FullyQualifiedName(name)); }
 
 void IndexJSONGenerator::Generate(const Enum& value) {
   GenerateObject([&]() {
@@ -224,7 +224,7 @@ void IndexJSONGenerator::Generate(const Struct::Member& value) {
 void IndexJSONGenerator::Generate(const TypeConstructor* value) {
   auto type = value->type;
   GenerateObject([&]() {
-    GenerateObjectMember("kind", NameFlatTypeKind(type), Position::kFirst);
+    GenerateObjectMember("kind", NameTypeKind(type), Position::kFirst);
     // handle the non anonymous type identifier case only for now
     // parameterized types (arrays, vectors) are not handled yet
     if (type->kind == Type::Kind::kIdentifier) {

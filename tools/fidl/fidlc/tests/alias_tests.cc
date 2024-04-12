@@ -67,7 +67,7 @@ alias alias_of_int16 = int16;
 
   auto invocation = msg->members[0].type_ctor->resolved_params;
   ASSERT_NE(invocation.from_alias, nullptr);
-  EXPECT_EQ(NameFlatName(invocation.from_alias->name), "example/alias_of_int16");
+  EXPECT_EQ(FullyQualifiedName(invocation.from_alias->name), "example/alias_of_int16");
   EXPECT_EQ(invocation.element_type_resolved, nullptr);
   EXPECT_EQ(invocation.size_resolved, nullptr);
   EXPECT_EQ(invocation.nullability, Nullability::kNonnullable);
@@ -97,7 +97,7 @@ type Message = struct {
 
   auto invocation = msg->members[0].type_ctor->resolved_params;
   ASSERT_NE(invocation.from_alias, nullptr);
-  EXPECT_EQ(NameFlatName(invocation.from_alias->name), "example/alias_of_int16");
+  EXPECT_EQ(FullyQualifiedName(invocation.from_alias->name), "example/alias_of_int16");
   EXPECT_EQ(invocation.element_type_resolved, nullptr);
   EXPECT_EQ(invocation.size_resolved, nullptr);
   EXPECT_EQ(invocation.nullability, Nullability::kNonnullable);
@@ -190,7 +190,7 @@ alias alias_of_vector_of_string = vector<string>;
 
   auto invocation = msg->members[0].type_ctor->resolved_params;
   ASSERT_NE(invocation.from_alias, nullptr);
-  EXPECT_EQ(NameFlatName(invocation.from_alias->name), "example/alias_of_vector_of_string");
+  EXPECT_EQ(FullyQualifiedName(invocation.from_alias->name), "example/alias_of_vector_of_string");
   EXPECT_EQ(invocation.element_type_resolved, nullptr);
   EXPECT_EQ(invocation.size_resolved, nullptr);
   EXPECT_EQ(invocation.nullability, Nullability::kNonnullable);
@@ -251,7 +251,7 @@ alias alias_of_vector_of_string = vector<string>;
 
   auto invocation = msg->members[0].type_ctor->resolved_params;
   ASSERT_NE(invocation.from_alias, nullptr);
-  EXPECT_EQ(NameFlatName(invocation.from_alias->name), "example/alias_of_vector_of_string");
+  EXPECT_EQ(FullyQualifiedName(invocation.from_alias->name), "example/alias_of_vector_of_string");
   EXPECT_EQ(invocation.element_type_resolved, nullptr);
   EXPECT_NE(invocation.size_resolved, nullptr);
   EXPECT_EQ(invocation.size_resolved->value, 8u);
@@ -290,7 +290,7 @@ alias alias_of_vector_of_string_nullable = vector<string>:optional;
 
   auto invocation = msg->members[0].type_ctor->resolved_params;
   ASSERT_NE(invocation.from_alias, nullptr);
-  EXPECT_EQ(NameFlatName(invocation.from_alias->name),
+  EXPECT_EQ(FullyQualifiedName(invocation.from_alias->name),
             "example/alias_of_vector_of_string_nullable");
   EXPECT_EQ(invocation.element_type_resolved, nullptr);
   EXPECT_EQ(invocation.size_resolved, nullptr);
@@ -322,7 +322,7 @@ alias alias_of_vector_of_string = vector<string>;
 
   auto invocation = msg->members[0].type_ctor->resolved_params;
   ASSERT_NE(invocation.from_alias, nullptr);
-  EXPECT_EQ(NameFlatName(invocation.from_alias->name), "example/alias_of_vector_of_string");
+  EXPECT_EQ(FullyQualifiedName(invocation.from_alias->name), "example/alias_of_vector_of_string");
   EXPECT_EQ(invocation.element_type_resolved, nullptr);
   EXPECT_EQ(invocation.size_resolved, nullptr);
   EXPECT_EQ(invocation.nullability, Nullability::kNullable);

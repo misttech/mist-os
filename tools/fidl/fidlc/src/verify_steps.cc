@@ -9,6 +9,7 @@
 #include "tools/fidl/fidlc/src/attribute_schema.h"
 #include "tools/fidl/fidlc/src/diagnostics.h"
 #include "tools/fidl/fidlc/src/flat_ast.h"
+#include "tools/fidl/fidlc/src/names.h"
 #include "tools/fidl/fidlc/src/transport.h"
 
 namespace fidlc {
@@ -58,12 +59,10 @@ class HandleTransportHelper {
         return Visit(static_cast<const BoxType*>(type)->boxed_type, span);
       case Type::Kind::kHandle: {
         const Resource* resource = static_cast<const HandleType*>(type)->resource_decl;
-        std::string handle_name = LibraryName(resource->name.library()->name, ".") + "." +
-                                  std::string(resource->name.decl_name());
-        std::optional<HandleClass> handle_class = HandleClassFromName(handle_name);
+        std::optional<HandleClass> handle_class = HandleClassFromName(resource->name);
         if (!handle_class.has_value() || !transport_->IsCompatible(handle_class.value())) {
-          reporter_->Fail(ErrHandleUsedInIncompatibleTransport, span, handle_name, transport_->name,
-                          protocol_);
+          reporter_->Fail(ErrHandleUsedInIncompatibleTransport, span,
+                          FullyQualifiedName(resource->name), transport_->name, protocol_);
         }
         return;
       }

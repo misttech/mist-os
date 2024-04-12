@@ -4,26 +4,19 @@
 
 #include "tools/fidl/fidlc/src/transport.h"
 
+#include "tools/fidl/fidlc/src/flat_ast.h"
+
 namespace fidlc {
 
-std::string_view HandleClassName(HandleClass handle_class) {
-  switch (handle_class) {
-    case HandleClass::kZircon:
-      return "zx.Handle";
-    case HandleClass::kDriver:
-      return "fdf.handle";
-    case HandleClass::kBanjo:
-      return "[banjo]";
-  };
-}
-
-std::optional<HandleClass> HandleClassFromName(std::string_view name) {
-  if (name == "zx.Handle") {
+std::optional<HandleClass> HandleClassFromName(const Name& name) {
+  if (name.library()->name.size() != 1)
+    return std::nullopt;
+  auto library = name.library()->name[0];
+  auto decl = name.decl_name();
+  if (library == "zx" && decl == "Handle")
     return HandleClass::kZircon;
-  }
-  if (name == "fdf.handle") {
+  if (library == "fdf" && decl == "handle")
     return HandleClass::kDriver;
-  }
   return std::nullopt;
 }
 
