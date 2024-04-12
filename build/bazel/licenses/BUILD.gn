@@ -13,16 +13,6 @@ import("//build/licenses/generated_licenses_spdx.gni")
 import("//build/security.gni")
 import("//tools/check-licenses/build/license_data.gni")
 
-declare_args() {
-  # Deprecated. No-op.
-  # TODO(https://fxbug.dev/42082793): Remove once unused downstream.
-  generate_legacy_ninja_build_outputs_licenses_spdx = false
-
-  # Deprecated. No-op.
-  # TODO(https://fxbug.dev/42082793): Remove once unused downstream.
-  generate_legacy_ninja_build_outputs_licenses_spdx_from_metadata = true
-}
-
 # TODO(https://fxbug.dev/42068917): We only need to cover bazel inputs that end up in the product,
 # e.g. not tests or build tools. This can be achieved by adding metadata to
 # the bazel inputs list (i.e. converting it into some dictionary) or by
