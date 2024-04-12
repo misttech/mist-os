@@ -3478,6 +3478,7 @@ async fn tcp_icmp_error_v6<N: Netstack>(name: &str, code: Icmpv6DestUnreachableC
         .add_address_and_subnet_route(Ipv6::CLIENT_SUBNET)
         .await
         .expect("configure address");
+    client_interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     let fnet_ext::IpAddress(server_ip) = Ipv6::SERVER_SUBNET.addr.into();
     let fnet_ext::IpAddress(client_ip) = Ipv6::CLIENT_SUBNET.addr.into();
