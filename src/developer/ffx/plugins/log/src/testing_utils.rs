@@ -5,9 +5,10 @@
 // TODO(https://fxbug.dev/42080002): Move this somewhere else and
 // make the logic more generic.
 
-use std::{cell::Cell, future::Future, pin::Pin, rc::Rc};
+use std::{cell::Cell, rc::Rc};
 
 use diagnostics_data::{BuilderArgs, LogsData, LogsDataBuilder, Severity, Timestamp};
+use event_listener::Event;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream, ServerEnd};
 use fidl_fuchsia_developer_ffx::{
     TargetCollectionMarker, TargetCollectionRequest, TargetMarker, TargetRequest,
@@ -17,14 +18,14 @@ use fidl_fuchsia_developer_remotecontrol::{
 };
 use fidl_fuchsia_diagnostics::{
     LogInterestSelector, LogSettingsMarker, LogSettingsRequest, LogSettingsRequestStream,
+    StreamMode,
 };
 use fidl_fuchsia_diagnostics_host::{
     ArchiveAccessorMarker, ArchiveAccessorRequest, ArchiveAccessorRequestStream,
 };
+use fuchsia_async::Task;
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
-    future::{select, Either},
-    stream::FuturesUnordered,
     StreamExt,
 };
 
@@ -56,85 +57,32 @@ impl Default for Configuration {
     }
 }
 
-/// A scoped task executor that receives tasks to run over a channel
-/// and runs them to completion.
-pub struct TaskManager {
-    tasks: FuturesUnordered<Pin<Box<dyn Future<Output = ()>>>>,
-    scheduler: TaskScheduler,
-    receiver: UnboundedReceiver<Pin<Box<dyn Future<Output = ()>>>>,
+pub struct Manager {
+    environment: Environment,
     events_receiver: Option<UnboundedReceiver<TestEvent>>,
 }
 
-impl TaskManager {
-    /// Create a new TaskManager
+impl Manager {
+    /// Create a new Manager
     pub fn new() -> Self {
         Self::new_with_config(Rc::new(Configuration::default()))
     }
 
-    /// Create a new TaskManager
+    /// Create a new Manager
     pub fn new_with_config(config: Rc<Configuration>) -> Self {
-        let (sender, receiver) = unbounded();
         let (events_sender, events_receiver) = unbounded();
         Self {
-            tasks: FuturesUnordered::new(),
-            scheduler: TaskScheduler::new(sender, events_sender, config),
-            receiver,
+            environment: Environment::new(events_sender, config),
             events_receiver: Some(events_receiver),
         }
     }
 
-    pub fn get_scheduler(&self) -> TaskScheduler {
-        self.scheduler.clone()
-    }
-
-    /// Spawn a task onto the task manager
-    pub fn spawn(&self, task: impl Future<Output = ()> + 'static) {
-        self.tasks.push(Box::pin(task));
-    }
-
-    /// Gets the result of executing a future, and sends it on a channel.
-    async fn get_result<T: 'static>(
-        task: impl Future<Output = T> + 'static,
-        sender: UnboundedSender<T>,
-    ) {
-        // Not all tests may care about the return value, and may choose
-        // to drop the receiver.
-        let _ = sender.unbounded_send(task.await);
-    }
-
-    /// Spawns a task onto the task manager, and exposes a channel
-    /// to read its eventual result from.
-    pub fn spawn_result<T: 'static>(
-        &self,
-        task: impl Future<Output = T> + 'static,
-    ) -> UnboundedReceiver<T> {
-        let (sender, receiver) = unbounded();
-        self.spawn(Box::pin(Self::get_result(task, sender)));
-        receiver
+    pub fn get_environment(&self) -> Environment {
+        self.environment.clone()
     }
 
     pub fn take_event_stream(&mut self) -> Option<UnboundedReceiver<TestEvent>> {
         self.events_receiver.take()
-    }
-
-    /// Runs the task manager to completion, consuming the task manager.
-    pub async fn run(self) {
-        let mut receiver = self.receiver;
-        let mut tasks = self.tasks;
-        loop {
-            let pin = Box::pin(tasks.next());
-            match select(receiver.next(), pin).await {
-                Either::Left((Some(task), _)) => {
-                    tasks.push(task);
-                }
-                Either::Right((Some(_), _)) => {
-                    // Nothing to do here
-                }
-                _ => {
-                    break;
-                }
-            }
-        }
     }
 }
 
@@ -146,30 +94,21 @@ pub enum TestEvent {
     /// Log settings connection closed
     LogSettingsConnectionClosed,
     /// Log stream started with a specific mode.
-    Connected(fidl_fuchsia_diagnostics::StreamMode),
+    Connected(StreamMode),
 }
 
-/// A task scheduler that spawns tasks onto the task manager
+/// Holds the test environment.
 #[derive(Clone)]
-pub struct TaskScheduler {
-    sender: UnboundedSender<Pin<Box<dyn Future<Output = ()>>>>,
+pub struct Environment {
     event_sender: UnboundedSender<TestEvent>,
     pub config: Rc<Configuration>,
+    disconnect_event: Rc<Event>,
 }
 
-impl TaskScheduler {
-    /// Create a new TaskScheduler
-    fn new(
-        sender: UnboundedSender<Pin<Box<dyn Future<Output = ()>>>>,
-        event_sender: UnboundedSender<TestEvent>,
-        config: Rc<Configuration>,
-    ) -> Self {
-        Self { sender, event_sender, config }
-    }
-
-    /// Spawn a task onto the task manager
-    fn spawn(&self, task: impl Future<Output = ()> + 'static) {
-        self.sender.unbounded_send(Box::pin(task)).unwrap();
+impl Environment {
+    /// Create a new Environment
+    fn new(event_sender: UnboundedSender<TestEvent>, config: Rc<Configuration>) -> Self {
+        Self { event_sender, config, disconnect_event: Rc::new(Event::new()) }
     }
 
     fn send_event(&mut self, event: TestEvent) {
@@ -177,11 +116,24 @@ impl TaskScheduler {
         // to read the event and choose to close the channel instead.
         let _ = self.event_sender.unbounded_send(event);
     }
+
+    /// Simulates Archivist crashing/disconnecting.  This will only work if there is an active
+    /// connection to Archivist; i.e. callers probably want to call `check_for_message` prior to
+    /// this.
+    pub fn disconnect_target(&self) {
+        self.disconnect_event.notify(usize::MAX);
+    }
+
+    /// Simulates a target reboot.
+    pub fn reboot_target(&self, new_boot_time: u64) {
+        self.config.boot_timestamp.set(new_boot_time);
+        self.disconnect_target();
+    }
 }
 
 async fn handle_archive_accessor(
     mut stream: ArchiveAccessorRequestStream,
-    mut scheduler: TaskScheduler,
+    mut environment: Environment,
 ) {
     while let Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
         parameters,
@@ -189,18 +141,25 @@ async fn handle_archive_accessor(
         responder,
     })) = stream.next().await
     {
-        if scheduler.config.send_mode_event {
-            scheduler.send_event(TestEvent::Connected(parameters.stream_mode.unwrap()));
+        if environment.config.send_mode_event {
+            environment.send_event(TestEvent::Connected(parameters.stream_mode.unwrap()));
         }
         // Ignore the result, because the client may choose to close the channel.
         let _ = responder.send();
         stream
-            .write(serde_json::to_string(&scheduler.config.messages).unwrap().as_bytes())
+            .write(serde_json::to_string(&environment.config.messages).unwrap().as_bytes())
             .unwrap();
+
+        match parameters.stream_mode.unwrap() {
+            StreamMode::Snapshot => {}
+            StreamMode::SnapshotThenSubscribe | StreamMode::Subscribe => {
+                environment.disconnect_event.listen().await
+            }
+        }
     }
 }
 
-async fn handle_log_settings(channel: fidl::Channel, mut scheduler: TaskScheduler) {
+async fn handle_log_settings(channel: fidl::Channel, mut environment: Environment) {
     let mut stream =
         LogSettingsRequestStream::from_channel(fuchsia_async::Channel::from_channel(channel));
     while let Some(Ok(request)) = stream.next().await {
@@ -209,18 +168,18 @@ async fn handle_log_settings(channel: fidl::Channel, mut scheduler: TaskSchedule
                 panic!("fuchsia.diagnostics/LogSettings.RegisterInterest is not supported");
             }
             LogSettingsRequest::SetInterest { selectors, responder } => {
-                scheduler.send_event(TestEvent::SeverityChanged(selectors));
+                environment.send_event(TestEvent::SeverityChanged(selectors));
                 responder.send().unwrap();
             }
         }
     }
-    scheduler.send_event(TestEvent::LogSettingsConnectionClosed);
+    environment.send_event(TestEvent::LogSettingsConnectionClosed);
 }
 
 async fn handle_open_capability(
     capability_name: &str,
     channel: fidl::Channel,
-    scheduler: TaskScheduler,
+    environment: Environment,
 ) {
     let Some(capability_name) = capability_name.strip_prefix("svc/") else {
         panic!("Expected a protocol starting with svc/. Got: {capability_name}");
@@ -229,11 +188,11 @@ async fn handle_open_capability(
         ArchiveAccessorMarker::PROTOCOL_NAME => {
             handle_archive_accessor(
                 ServerEnd::<ArchiveAccessorMarker>::new(channel).into_stream().unwrap(),
-                scheduler.clone(),
+                environment.clone(),
             )
             .await
         }
-        LogSettingsMarker::PROTOCOL_NAME => handle_log_settings(channel, scheduler.clone()).await,
+        LogSettingsMarker::PROTOCOL_NAME => handle_log_settings(channel, environment.clone()).await,
         other => {
             unreachable!("Attempted to connect to {other:?}");
         }
@@ -242,7 +201,7 @@ async fn handle_open_capability(
 
 pub async fn handle_rcs_connection(
     connection: ServerEnd<RemoteControlMarker>,
-    scheduler: TaskScheduler,
+    environment: Environment,
 ) {
     let mut stream = connection.into_stream().unwrap();
     while let Some(Ok(request)) = stream.next().await {
@@ -251,7 +210,7 @@ pub async fn handle_rcs_connection(
                 responder
                     .send(Ok(&IdentifyHostResponse {
                         nodename: Some(NODENAME.into()),
-                        boot_timestamp_nanos: Some(scheduler.config.boot_timestamp.get()),
+                        boot_timestamp_nanos: Some(environment.config.boot_timestamp.get()),
                         ..Default::default()
                     }))
                     .unwrap();
@@ -266,10 +225,11 @@ pub async fn handle_rcs_connection(
             } => {
                 assert_eq!(moniker, rcs::toolbox::MONIKER);
                 assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);
-                let scheduler_2 = scheduler.clone();
-                scheduler.spawn(async move {
-                    handle_open_capability(&capability_name, server_channel, scheduler_2).await
-                });
+                let environment_2 = environment.clone();
+                Task::local(async move {
+                    handle_open_capability(&capability_name, server_channel, environment_2).await
+                })
+                .detach();
                 responder.send(Ok(())).unwrap();
             }
             _ => {
@@ -278,19 +238,19 @@ pub async fn handle_rcs_connection(
         }
     }
 }
-async fn handle_target_connection(connection: ServerEnd<TargetMarker>, scheduler: TaskScheduler) {
+async fn handle_target_connection(connection: ServerEnd<TargetMarker>, environment: Environment) {
     let mut stream = connection.into_stream().unwrap();
     while let Some(Ok(TargetRequest::OpenRemoteControl { remote_control, responder })) =
         stream.next().await
     {
-        scheduler.spawn(handle_rcs_connection(remote_control, scheduler.clone()));
+        Task::local(handle_rcs_connection(remote_control, environment.clone())).detach();
         responder.send(Ok(())).unwrap();
     }
 }
 
 pub async fn handle_target_collection_connection(
     connection: ServerEnd<TargetCollectionMarker>,
-    scheduler: TaskScheduler,
+    environment: Environment,
 ) {
     let mut stream = connection.into_stream().unwrap();
 
@@ -298,7 +258,7 @@ pub async fn handle_target_collection_connection(
         stream.next().await
     {
         assert_eq!(query.string_matcher, Some(NODENAME.into()));
-        scheduler.spawn(handle_target_connection(target_handle, scheduler.clone()));
+        Task::local(handle_target_connection(target_handle, environment.clone())).detach();
         responder.send(Ok(())).unwrap();
     }
 }

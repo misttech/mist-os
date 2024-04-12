@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use event_listener::Event;
 use futures::AsyncWrite;
 use std::cell::RefCell;
 use std::io::Write;
@@ -24,6 +25,7 @@ pub struct TestBuffers {
 #[derive(Clone, Default, Debug)]
 pub struct TestBuffer {
     inner: Rc<RefCell<Vec<u8>>>,
+    event: Rc<Event>,
 }
 
 impl TestBuffers {
@@ -75,10 +77,18 @@ impl TestBuffer {
     pub fn into_string(self) -> String {
         String::from_utf8(self.into_inner()).expect("Valid unicode on output string")
     }
+
+    /// Waits for the buffer to be written to.  This will not return immediately if data is already
+    /// present so this should be called *after* calling `into_inner` or `into_string` and not
+    /// finding the desired results.
+    pub async fn wait_ready(&self) {
+        self.event.listen().await;
+    }
 }
 
 impl Write for TestBuffer {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.event.notify(usize::MAX);
         self.inner.borrow_mut().write(buf)
     }
 

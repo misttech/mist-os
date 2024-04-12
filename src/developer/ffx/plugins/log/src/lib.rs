@@ -377,7 +377,7 @@ fn get_stream_mode(cmd: LogCommand) -> Result<fidl_fuchsia_diagnostics::StreamMo
 mod tests {
     use super::*;
     use crate::testing_utils::{
-        handle_rcs_connection, handle_target_collection_connection, Configuration, TaskManager,
+        handle_rcs_connection, handle_target_collection_connection, Configuration, Manager,
         TestEvent,
     };
     use assert_matches::assert_matches;
@@ -388,7 +388,8 @@ mod tests {
     use fidl_fuchsia_developer_ffx::TargetCollectionMarker;
     use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
     use fidl_fuchsia_diagnostics::StreamMode;
-    use futures::{future::poll_fn, select_biased, Future, FutureExt, StreamExt};
+    use fuchsia_async::Task;
+    use futures::StreamExt;
     use log_command::{
         log_formatter::{LogData, TIMESTAMP_FORMAT},
         parse_seconds_string_as_duration, parse_time, DumpCommand, TimeFormat,
@@ -396,11 +397,7 @@ mod tests {
     use log_symbolizer::{FakeSymbolizerForTest, NoOpSymbolizer};
     use moniker::Moniker;
     use selectors::parse_log_interest_selector;
-    use std::{
-        pin::{pin, Pin},
-        rc::Rc,
-        task::Poll,
-    };
+    use std::rc::Rc;
 
     const TEST_STR: &str = "[1980-01-01 00:00:03.000][ffx] INFO: Hello world 2!\u{1b}[m\n";
 
@@ -445,7 +442,7 @@ mod tests {
             ..LogCommand::default()
         };
         let symbolizer = FakeSymbolizerForTest::new("prefix", vec![]);
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+        let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
@@ -480,26 +477,25 @@ mod tests {
             ],
             ..Default::default()
         }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string().split('\n').collect::<Vec<_>>(),
@@ -523,26 +519,25 @@ mod tests {
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let task_manager = TaskManager::new();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let manager = Manager::new();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(Some(Format::Json), &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
         assert_eq!(
             serde_json::from_str::<LogEntry>(&test_buffers.stdout.into_string()).unwrap(),
             LogEntry {
@@ -576,13 +571,14 @@ mod tests {
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let task_manager = TaskManager::new();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let manager = Manager::new();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
         let mut getter = FakeInstanceGetter::default();
         getter.expected_selector = Some("ambiguous_selector".into());
@@ -590,19 +586,22 @@ mod tests {
             Moniker::try_from("core/some/ambiguous_selector:thing/test").unwrap(),
             Moniker::try_from("core/other/ambiguous_selector:thing/test").unwrap(),
         ];
-        let mut main_result = task_manager.spawn_result(log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            getter,
-        ));
 
-        // Run all tasks until exit.
-        task_manager.run().await;
         // Main should return an error
-        let error = format!("{}", main_result.next().await.unwrap().unwrap_err());
+        let error = format!(
+            "{}",
+            log_main(
+                MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+                rcs_proxy,
+                target_collection_proxy,
+                cmd,
+                Some(symbolizer),
+                getter,
+            )
+            .await
+            .expect_err("log_main succeeded")
+        );
+
         const EXPECTED_INTEREST_ERROR: &str = r#"WARN: One or more of your selectors appears to be ambiguous
 and may not match any components on your system.
 
@@ -632,31 +631,29 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new();
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut manager = Manager::new();
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
         let mut getter = FakeInstanceGetter::default();
         getter.expected_selector = Some("ambiguous_selector".into());
         getter.output = vec![Moniker::try_from("core/some/ambiguous_selector").unwrap()];
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             getter,
-        ));
-
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Main should return OK
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         let severity =
             vec![parse_log_interest_selector("core/some/ambiguous_selector#INFO").unwrap()];
@@ -674,27 +671,28 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let task_manager = TaskManager::new();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let manager = Manager::new();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-        ));
 
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        assert_matches!(main_result.next().await.unwrap(), Err(LogError::DumpWithSinceNow));
+        assert_matches!(
+            log_main(
+                MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+                rcs_proxy,
+                target_collection_proxy,
+                cmd,
+                Some(symbolizer),
+                FakeInstanceGetter::default(),
+            )
+            .await,
+            Err(LogError::DumpWithSinceNow)
+        );
     }
 
     #[fuchsia::test]
@@ -707,27 +705,26 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new();
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut manager = Manager::new();
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string(),
@@ -747,27 +744,26 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new();
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut manager = Manager::new();
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string(),
@@ -788,27 +784,26 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new();
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut manager = Manager::new();
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string(),
@@ -828,7 +823,7 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+        let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
                 moniker: "ffx".into(),
@@ -841,26 +836,25 @@ ffx log --force-select.
             .build()],
             ..Default::default()
         }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string(),
@@ -881,7 +875,7 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+        let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
@@ -916,26 +910,25 @@ ffx log --force-select.
             ],
             ..Default::default()
         }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string(),
@@ -945,22 +938,10 @@ ffx log --force-select.
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
     }
 
-    async fn check_for_message(
-        runner: &mut Pin<&mut impl Future<Output = ()>>,
-        test_buffers: &fho::macro_deps::ffx_writer::TestBuffers,
-        msg: &str,
-    ) {
-        poll_fn(|mut context| {
-            // When in streaming mode, we should never exit.
-            assert_eq!(runner.as_mut().poll(&mut context), Poll::Pending);
-
-            // check messages until we get the Hello World message.
-            if test_buffers.stdout.clone().into_string() == msg {
-                return Poll::Ready(());
-            }
-            Poll::Pending
-        })
-        .await;
+    async fn check_for_message(test_buffers: &fho::macro_deps::ffx_writer::TestBuffers, msg: &str) {
+        while test_buffers.stdout.clone().into_string() != msg {
+            test_buffers.stdout.wait_ready().await;
+        }
     }
 
     #[fuchsia::test]
@@ -979,7 +960,7 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+        let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
                 moniker: "ffx".into(),
@@ -995,17 +976,18 @@ ffx log --force-select.
             send_mode_event: true,
             ..Default::default()
         }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
 
         // Intentionally unused. When in streaming mode, this should never return a value.
-        let _result = task_manager.spawn_result(log_main(
+        let _result = Task::local(log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
@@ -1015,8 +997,7 @@ ffx log --force-select.
         ));
 
         // Run the stream until we get the expected message.
-        let mut runner = pin!(task_manager.run().fuse());
-        check_for_message(&mut runner, &test_buffers, TEST_STR).await;
+        check_for_message(&test_buffers, TEST_STR).await;
 
         // First connection should have used Subscribe mode.
         assert_matches!(
@@ -1024,31 +1005,24 @@ ffx log --force-select.
             Some(TestEvent::Connected(StreamMode::Subscribe))
         );
 
+        environment.reboot_target(42);
+
         // Device is paused when we exit the loop because there's nothing
         // polling the future.
-        assert_matches!(
-            select_biased! {
-                _res = runner => panic!("FIDL server should never exit"),
-                res = event_stream.next() => res,
-            },
-            Some(TestEvent::LogSettingsConnectionClosed)
-        );
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
 
-        scheduler.config.boot_timestamp.set(42);
-        check_for_message(&mut runner, &test_buffers, TEST_STR).await;
+        check_for_message(&test_buffers, TEST_STR).await;
+
         // Second connection has a different timestamp so should be treated
         // as a reboot.
         assert_matches!(
             event_stream.next().await,
             Some(TestEvent::Connected(StreamMode::SnapshotThenSubscribe))
         );
-        assert_matches!(
-            select_biased! {
-                _res = runner => panic!("FIDL server should never exit"),
-                res = event_stream.next() => res,
-            },
-            Some(TestEvent::LogSettingsConnectionClosed)
-        );
+
+        environment.disconnect_target();
+
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
     }
 
     #[fuchsia::test]
@@ -1067,7 +1041,7 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+        let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
                 moniker: "ffx".into(),
@@ -1083,17 +1057,18 @@ ffx log --force-select.
             send_mode_event: true,
             ..Default::default()
         }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
 
         // Intentionally unused. When in streaming mode, this should never return a value.
-        let _result = task_manager.spawn_result(log_main(
+        let _result = Task::local(log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
@@ -1103,47 +1078,41 @@ ffx log --force-select.
         ));
 
         // Run the stream until we get the expected message.
-        let mut runner = pin!(task_manager.run().fuse());
-        check_for_message(&mut runner, &test_buffers, TEST_STR).await;
+        check_for_message(&test_buffers, TEST_STR).await;
 
         // First connection should have used Subscribe mode.
         assert_matches!(
             event_stream.next().await,
             Some(TestEvent::Connected(StreamMode::Subscribe))
         );
+
+        environment.disconnect_target();
+
         // Device is paused when we exit the loop because there's nothing
         // polling the future.
-        assert_matches!(
-            select_biased! {
-                _res = runner => panic!("FIDL server should never exit"),
-                res = event_stream.next() => res,
-            },
-            Some(TestEvent::LogSettingsConnectionClosed)
-        );
-        check_for_message(&mut runner, &test_buffers, TEST_STR).await;
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+
+        // We should reconnect and get another message.
+        check_for_message(&test_buffers, TEST_STR).await;
 
         // Second connection has a matching timestamp to the first one, so we should
         // Subscribe to not repeat messages.
         assert_matches!(
-            select_biased! {
-                _res = runner => panic!("FIDL server should never exit"),
-                res = event_stream.next() => res,
-            },
+            event_stream.next().await,
             Some(TestEvent::Connected(StreamMode::Subscribe))
         );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
 
         // For the third connection, we should get a
         // SnapshotThenSubscribe request because the timestamp
         // changed and it's clear it's actually a separate boot not a disconnect/reconnect
-        scheduler.config.boot_timestamp.set(42);
-        check_for_message(&mut runner, &test_buffers, TEST_STR).await;
+        environment.reboot_target(42);
+
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+
+        check_for_message(&test_buffers, TEST_STR).await;
 
         assert_matches!(
-            select_biased! {
-                _res = runner => panic!("FIDL server should never exit"),
-                res = event_stream.next() => res,
-            },
+            event_stream.next().await,
             Some(TestEvent::Connected(StreamMode::SnapshotThenSubscribe))
         );
     }
@@ -1161,7 +1130,7 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+        let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
@@ -1214,26 +1183,25 @@ ffx log --force-select.
             ],
             ..Default::default()
         }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string(),
@@ -1255,7 +1223,7 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+        let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
@@ -1290,26 +1258,25 @@ ffx log --force-select.
             ],
             ..Default::default()
         }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string(),
@@ -1329,7 +1296,7 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+        let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
                 moniker: "ffx".into(),
@@ -1342,26 +1309,25 @@ ffx log --force-select.
             .build()],
             ..Default::default()
         }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string(),
@@ -1383,7 +1349,7 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+        let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
                 moniker: "ffx".into(),
@@ -1397,26 +1363,25 @@ ffx log --force-select.
             .build()],
             ..Default::default()
         }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string(),
@@ -1435,7 +1400,7 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+        let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
                 moniker: "host/ffx".into(),
@@ -1449,26 +1414,25 @@ ffx log --force-select.
             .build()],
             ..Default::default()
         }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string(),
@@ -1488,7 +1452,7 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+        let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
                 moniker: "host/ffx".into(),
@@ -1502,26 +1466,25 @@ ffx log --force-select.
             .build()],
             ..Default::default()
         }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string(),
@@ -1541,7 +1504,7 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+        let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
                 moniker: "ffx".into(),
@@ -1555,26 +1518,25 @@ ffx log --force-select.
             .build()],
             ..Default::default()
         }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string(),
@@ -1595,27 +1557,26 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new();
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut manager = Manager::new();
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string(),
@@ -1635,7 +1596,7 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+        let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
                 moniker: "ffx".into(),
@@ -1651,26 +1612,25 @@ ffx log --force-select.
             .build()],
             ..Default::default()
         }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string(),
@@ -1691,7 +1651,7 @@ ffx log --force-select.
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+        let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
                 moniker: "ffx".into(),
@@ -1707,26 +1667,25 @@ ffx log --force-select.
             .build()],
             ..Default::default()
         }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
+        let mut event_stream = manager.take_event_stream().unwrap();
+        let environment = manager.get_environment();
+        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
+        Task::local(handle_target_collection_connection(
             target_collection_server,
-            scheduler.clone(),
-        ));
+            environment.clone(),
+        ))
+        .detach();
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(log_main(
+        log_main(
             MachineWriter::<LogEntry>::new_test(None, &test_buffers),
             rcs_proxy,
             target_collection_proxy,
             cmd,
             Some(symbolizer),
             FakeInstanceGetter::default(),
-        ));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
+        )
+        .await
+        .expect("log_main failed");
 
         assert_eq!(
             test_buffers.stdout.into_string(),
