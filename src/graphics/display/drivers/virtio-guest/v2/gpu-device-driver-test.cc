@@ -279,19 +279,7 @@ class FakePciParent : public fidl::WireServer<fuchsia_hardware_pci::Device> {
   fidl::ServerBindingGroup<fuchsia_hardware_pci::Device> binding_group_;
 };
 
-class TestEnvironmentLocal : public fdf_testing::TestEnvironment {
- public:
-  zx::result<> Initialize(fidl::ServerEnd<fuchsia_io::Directory> incoming_directory_server_end) {
-    return fdf_testing::TestEnvironment::Initialize(std::move(incoming_directory_server_end));
-  }
-
-  template <typename InstanceHandler, typename Service>
-  void AddService(InstanceHandler&& handler) {
-    zx::result result =
-        incoming_directory().AddService<Service>(std::forward<InstanceHandler>(handler));
-    EXPECT_TRUE(result.is_ok());
-  }
-};
+using fdf_testing::TestEnvironment;
 
 class VirtioGpuTest : public ::testing::Test {
  public:
@@ -312,21 +300,28 @@ class VirtioGpuTest : public ::testing::Test {
 
     // Setup the test environment.
     zx::result init_result = test_environment_.SyncCall(
-        &TestEnvironmentLocal::Initialize, std::move(start_args->incoming_directory_server));
+        &TestEnvironment::Initialize, std::move(start_args->incoming_directory_server));
     EXPECT_EQ(ZX_OK, init_result.status_value());
 
     auto pci_handler = fake_pci_parent_.SyncCall(&FakePciParent::GetInstanceHandler);
     test_environment_.SyncCall(
-        &TestEnvironmentLocal::AddService<fuchsia_hardware_pci::Service::InstanceHandler,
-                                          fuchsia_hardware_pci::Service>,
+        [](TestEnvironment* env, auto handler) {
+          zx::result result = env->incoming_directory().AddService<fuchsia_hardware_pci::Service>(
+              std::move(handler));
+          EXPECT_TRUE(result.is_ok());
+        },
         std::move(pci_handler));
 
     // Serve Fake Sysmem.
     fuchsia_hardware_sysmem::Service::InstanceHandler sysmem_handler =
         sysmem_server_.SyncCall(&FakeSysmem::GetInstanceHandler);
     test_environment_.SyncCall(
-        &TestEnvironmentLocal::AddService<fuchsia_hardware_sysmem::Service::InstanceHandler,
-                                          fuchsia_hardware_sysmem::Service>,
+        [](TestEnvironment* env, auto handler) {
+          zx::result result =
+              env->incoming_directory().AddService<fuchsia_hardware_sysmem::Service>(
+                  std::move(handler));
+          EXPECT_TRUE(result.is_ok());
+        },
         std::move(sysmem_handler));
 
     // Start driver.
@@ -355,8 +350,8 @@ class VirtioGpuTest : public ::testing::Test {
 
   async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
       env_dispatcher(), std::in_place, std::string("root")};
-  async_patterns::TestDispatcherBound<TestEnvironmentLocal> test_environment_{env_dispatcher(),
-                                                                              std::in_place};
+  async_patterns::TestDispatcherBound<TestEnvironment> test_environment_{env_dispatcher(),
+                                                                         std::in_place};
 
   async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<virtio_display::GpuDeviceDriver>>
       driver_{driver_dispatcher_->async_dispatcher(), std::in_place};

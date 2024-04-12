@@ -38,8 +38,8 @@ namespace fdf_testing {
 //
 // If the dispatcher is a background dispatcher, the suggestion is to wrap this inside of an
 // |async_patterns::TestDispatcherBound|.
-class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
-                 public fidl::WireServer<fuchsia_driver_framework::Node> {
+class TestNode final : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
+                       public fidl::WireServer<fuchsia_driver_framework::Node> {
  public:
   // This can be used to access child nodes that a driver has created.
   using ChildrenMap = std::unordered_map<std::string, TestNode>;

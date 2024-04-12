@@ -173,31 +173,7 @@ class FakeWlanPhyImpl : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl
   void* dummy_ctx_;
 };
 
-class TestNodeLocal : public fdf_testing::TestNode {
- public:
-  TestNodeLocal(std::string name) : fdf_testing::TestNode::TestNode(name) {}
-  size_t GetchildrenCount() { return children().size(); }
-};
-
-class TestEnvironmentLocal : public fdf_testing::TestEnvironment {
- public:
-  zx::result<> Initialize(fidl::ServerEnd<fuchsia_io::Directory> incoming_directory_server_end) {
-    auto result =
-        fdf_testing::TestEnvironment::Initialize(std::move(incoming_directory_server_end));
-    if (result.is_ok()) {
-      FDF_LOG(INFO, "****%s: Test Env is ok***", __func__);
-    } else {
-      FDF_LOG(INFO, "****%s: Test Env is not ok***", __func__);
-    }
-    return result;
-  }
-
-  void AddService(fuchsia_wlan_phyimpl::Service::InstanceHandler&& handler) {
-    zx::result result =
-        incoming_directory().AddService<fuchsia_wlan_phyimpl::Service>(std::move(handler));
-    EXPECT_TRUE(result.is_ok());
-  }
-};
+using fdf_testing::TestEnvironment;
 
 class WlanphyDeviceTest : public ::testing::Test {
  public:
@@ -207,9 +183,8 @@ class WlanphyDeviceTest : public ::testing::Test {
     EXPECT_EQ(ZX_OK, start_args.status_value());
 
     // Start the test environment with incoming directory returned from the start args
-    zx::result init_result =
-        test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
-                                   std::move(start_args->incoming_directory_server));
+    zx::result init_result = test_environment_.SyncCall(
+        &TestEnvironment::Initialize, std::move(start_args->incoming_directory_server));
     EXPECT_EQ(ZX_OK, init_result.status_value());
 
     auto wlanphyimpl = [this](fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end) {
@@ -220,8 +195,13 @@ class WlanphyDeviceTest : public ::testing::Test {
     fuchsia_wlan_phyimpl::Service::InstanceHandler wlanphyimpl_service_handler(
         {.wlan_phy_impl = wlanphyimpl});
 
-    test_environment_.SyncCall(&TestEnvironmentLocal::AddService,
-                               std::move(wlanphyimpl_service_handler));
+    test_environment_.SyncCall(
+        [](TestEnvironment* env, fuchsia_wlan_phyimpl::Service::InstanceHandler&& handler) {
+          zx::result result = env->incoming_directory().AddService<fuchsia_wlan_phyimpl::Service>(
+              std::move(handler));
+          ASSERT_TRUE(result.is_ok());
+        },
+        std::move(wlanphyimpl_service_handler));
 
     // Start the driver. This should setup the devfs connector as well.
     zx::result start_result = runtime_.RunToCompletion(driver_.SyncCall(
@@ -277,11 +257,11 @@ class WlanphyDeviceTest : public ::testing::Test {
   fdf::UnownedSynchronizedDispatcher phy_client_dispatcher_ = runtime_.StartBackgroundDispatcher();
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime_.StartBackgroundDispatcher();
 
-  async_patterns::TestDispatcherBound<TestNodeLocal> node_server_{env_dispatcher(), std::in_place,
-                                                                  std::string("root")};
+  async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
+      env_dispatcher(), std::in_place, std::string("root")};
 
-  async_patterns::TestDispatcherBound<TestEnvironmentLocal> test_environment_{env_dispatcher(),
-                                                                              std::in_place};
+  async_patterns::TestDispatcherBound<TestEnvironment> test_environment_{env_dispatcher(),
+                                                                         std::in_place};
 
   async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<wlanphy::Device>> driver_{
       driver_dispatcher_->async_dispatcher(), std::in_place};

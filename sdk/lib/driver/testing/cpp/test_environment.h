@@ -28,7 +28,7 @@ namespace fdf_testing {
 //
 // If the dispatcher is a background dispatcher, the suggestion is to wrap this inside of an
 // |async_patterns::TestDispatcherBound|.
-class TestEnvironment {
+class TestEnvironment final {
  public:
   explicit TestEnvironment(fdf_dispatcher_t* dispatcher = nullptr);
 

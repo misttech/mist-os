@@ -140,7 +140,6 @@ class FakeFullmacParent : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullm
   }
   void Deauth(DeauthRequestView request, fdf::Arena& arena,
               DeauthCompleter::Sync& completer) override {
-
     EXPECT_EQ(request->has_peer_sta_address(), true);
     EXPECT_EQ(request->has_reason_code(), true);
     completer.buffer(arena).Reply();
@@ -314,24 +313,7 @@ class FakeFullmacParent : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullm
   uint8_t peer_sta_addr_[ETH_ALEN];
 };
 
-class TestNodeLocal : public fdf_testing::TestNode {
- public:
-  TestNodeLocal(std::string name) : fdf_testing::TestNode::TestNode(name) {}
-  size_t GetchildrenCount() { return children().size(); }
-};
-
-class TestEnvironmentLocal : public fdf_testing::TestEnvironment {
- public:
-  zx::result<> Initialize(fidl::ServerEnd<fuchsia_io::Directory> incoming_directory_server_end) {
-    return fdf_testing::TestEnvironment::Initialize(std::move(incoming_directory_server_end));
-  }
-
-  void AddService(fuchsia_wlan_fullmac::Service::InstanceHandler&& handler) {
-    zx::result result =
-        incoming_directory().AddService<fuchsia_wlan_fullmac::Service>(std::move(handler));
-    EXPECT_TRUE(result.is_ok());
-  }
-};
+using fdf_testing::TestEnvironment;
 
 class WlanifDeviceTest : public ::testing::Test {
  public:
@@ -356,8 +338,13 @@ class WlanifDeviceTest : public ::testing::Test {
     fuchsia_wlan_fullmac::Service::InstanceHandler wlanfullmac_service_handler(
         {.wlan_fullmac_impl = wlanfullmacimpl});
 
-    test_environment_.SyncCall(&TestEnvironmentLocal::AddService,
-                               std::move(wlanfullmac_service_handler));
+    test_environment_.SyncCall(
+        [](TestEnvironment* env, fuchsia_wlan_fullmac::Service::InstanceHandler&& handler) {
+          zx::result result = env->incoming_directory().AddService<fuchsia_wlan_fullmac::Service>(
+              std::move(handler));
+          ASSERT_TRUE(result.is_ok());
+        },
+        std::move(wlanfullmac_service_handler));
 
     zx::result start_result =
         runtime_.RunToCompletion(driver_.Start(std::move(start_args->start_args)));
@@ -402,11 +389,11 @@ class WlanifDeviceTest : public ::testing::Test {
   // This dispatcher handles all the FakeFullmacParent related tasks.
   fdf::UnownedSynchronizedDispatcher fullmac_dispatcher_ = runtime_.StartBackgroundDispatcher();
 
-  async_patterns::TestDispatcherBound<TestNodeLocal> node_server_{env_dispatcher(), std::in_place,
-                                                                  std::string("root")};
+  async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
+      env_dispatcher(), std::in_place, std::string("root")};
 
-  async_patterns::TestDispatcherBound<TestEnvironmentLocal> test_environment_{env_dispatcher(),
-                                                                              std::in_place};
+  async_patterns::TestDispatcherBound<TestEnvironment> test_environment_{env_dispatcher(),
+                                                                         std::in_place};
 
   async_patterns::TestDispatcherBound<FakeFullmacParent> fake_wlanfullmac_parent_{
       fullmac_dispatcher(), std::in_place};
