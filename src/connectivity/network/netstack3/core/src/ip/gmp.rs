@@ -461,6 +461,9 @@ struct Transition<S, P: ProtocolSpecific, Actions>(GmpHostState<S, P>, Actions);
 ///
 /// Memberships may be a non-member when joined locally but are not performing
 /// GMP.
+///
+/// Note that the special all-nodes addresses 224.0.0.1 and ff02::1 are modelled
+/// as permanently in `NonMember` state instead of `Idle` state in NS3.
 #[cfg_attr(test, derive(Debug))]
 struct NonMember;
 
@@ -703,15 +706,6 @@ impl<I: Instant, P: ProtocolSpecific> MemberState<I, P> {
 
     /// Performs the "leave group" transition, consuming the state by value, and
     /// returning the next state and a set of actions to execute.
-    ///
-    /// In the [IGMPv2] and [MLD] RFCs, the "leave group" transition moves from
-    /// any state to the Non-Member state. However, we don't allow `MemberState`
-    /// to be in the Non-Member state, so we instead implement `leave_group` by
-    /// consuming the state by value. This ensures that once a group has been
-    /// left, we don't spuriously store state for it.
-    ///
-    /// [IGMPv2]: https://tools.ietf.org/html/rfc2236
-    /// [MLD]: https://tools.ietf.org/html/rfc2710
     fn leave_group(self) -> (MemberState<I, P>, LeaveGroupActions) {
         // Rust can infer these types, but since we're just discarding `_state`,
         // we explicitly make sure it's the state we expect in case we introduce

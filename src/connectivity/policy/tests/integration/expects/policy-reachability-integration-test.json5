@@ -9,16 +9,5 @@
                 "*",
             ],
         },
-        {
-            type: "expect_failure_with_err_logs",
-            matchers: [
-                "test_gateway_goes_down_ns3*",
-                "test_internet_available_ns3*",
-                "test_internet_comes_up_ns3*",
-                "test_internet_goes_down_ns3*",
-                "test_internet_to_gateway_state_ns3",
-                "test_state_ns3*",
-            ],
-        },
     ],
 }

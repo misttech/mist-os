@@ -173,8 +173,21 @@ impl<B: ByteSlice, M: MessageType<B, FixedHeader = Ipv4Addr>> GmpMessage<Ipv4>
 }
 
 impl IpExt for Ipv4 {
-    fn should_perform_gmp(_addr: MulticastAddr<Ipv4Addr>) -> bool {
-        true
+    fn should_perform_gmp(addr: MulticastAddr<Ipv4Addr>) -> bool {
+        // Per [RFC 2236 Section 6]:
+        //
+        //   The all-systems group (address 224.0.0.1) is handled as a special
+        //   case.  The host starts in Idle Member state for that group on every
+        //   interface, never transitions to another state, and never sends a
+        //   report for that group.
+        //
+        // We abide by this requirement by not executing [`Actions`] on these
+        // addresses. Executing [`Actions`] only produces externally-visible side
+        // effects, and is not required to maintain the correctness of the MLD state
+        // machines.
+        //
+        // [RFC 2236 Section 6]: https://datatracker.ietf.org/doc/html/rfc2236
+        addr != Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS
     }
 }
 
@@ -1051,6 +1064,23 @@ mod tests {
     }
 
     #[test]
+    fn test_igmp_integration_always_idle_member() {
+        run_with_many_seeds(|seed| {
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
+            assert_eq!(
+                core_ctx.gmp_join_group(
+                    &mut bindings_ctx,
+                    &FakeDeviceId,
+                    Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS
+                ),
+                GroupJoinResult::Joined(())
+            );
+            assert_eq!(core_ctx.frames().len(), 0);
+            bindings_ctx.timer_ctx().assert_no_timers_installed();
+        });
+    }
+
+    #[test]
     fn test_igmp_integration_not_last_does_not_send_leave() {
         run_with_many_seeds(|seed| {
             let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
@@ -1336,7 +1366,7 @@ mod tests {
         let timer_id = TimerId(TimerIdInner::Ipv4Device(
             Ipv4DeviceTimerId::from(IgmpTimerId::Gmp(GmpDelayedReportTimerId {
                 device: device_id.clone(),
-                group_addr: Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS,
+                group_addr: GROUP_ADDR,
             }))
             .into(),
         ));
@@ -1372,16 +1402,16 @@ mod tests {
                 parse_ip_packet_in_ethernet_frame::<Ipv4>(frame, EthernetFrameLengthCheck::NoCheck)
                     .unwrap();
             assert_eq!(src_mac, local_mac.get());
-            assert_eq!(dst_mac, Mac::from(&Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS));
+            assert_eq!(dst_mac, Mac::from(&GROUP_ADDR));
             assert_eq!(src_ip, MY_ADDR.get());
-            assert_eq!(dst_ip, Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.get());
+            assert_eq!(dst_ip, GROUP_ADDR.get());
             assert_eq!(proto, Ipv4Proto::Igmp);
             assert_eq!(ttl, 1);
             let mut bv = &body[..];
             assert_matches!(
                 IgmpPacket::parse(&mut bv, ()).unwrap(),
                 IgmpPacket::MembershipReportV2(msg) => {
-                    assert_eq!(msg.group_addr(), Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.get());
+                    assert_eq!(msg.group_addr(), GROUP_ADDR.get());
                 }
             );
         };
@@ -1403,16 +1433,14 @@ mod tests {
             assert_matches!(
                 IgmpPacket::parse(&mut bv, ()).unwrap(),
                 IgmpPacket::LeaveGroup(msg) => {
-                    assert_eq!(msg.group_addr(), Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.get());
+                    assert_eq!(msg.group_addr(), GROUP_ADDR.get());
                 }
             );
         };
 
-        // Enable IPv4 and IGMP.
-        //
-        // Should send report for the all-systems multicast group that all
-        // interfaces join.
+        // Enable IPv4 and IGMP, then join `GROUP_ADDR`.
         set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
+        ctx.test_api().join_ip_multicast(&device_id, GROUP_ADDR);
         ctx.bindings_ctx
             .timer_ctx()
             .assert_timers_installed_range([(timer_id.clone(), range.clone())]);
