@@ -83,3 +83,73 @@ async fn main() -> Result<(), Error> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use async_test_helpers::run_while;
+    use async_utils::PollExt;
+    use fidl_fuchsia_bluetooth_sys::{PairingMethod, Peer};
+    use fuchsia_async as fasync;
+    use futures::pin_mut;
+
+    #[fuchsia::test]
+    fn process_pairing_requests() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let (pairing_client, pairing_server) =
+            fidl::endpoints::create_proxy_and_stream::<PairingDelegateMarker>().unwrap();
+        let pairing_fut = process_pairing_events(pairing_server);
+        pin_mut!(pairing_fut);
+        exec.run_until_stalled(&mut pairing_fut).expect_pending("server active");
+
+        // Incoming pairing request - expect the server to receive it and reply positively.
+        let passkey = 123456;
+        let mut request_fut = pairing_client.on_pairing_request(
+            &Peer::default(),
+            PairingMethod::PasskeyComparison,
+            passkey,
+        );
+        let (pairing_result, mut pairing_fut) =
+            run_while(&mut exec, &mut pairing_fut, &mut request_fut);
+
+        let (success, returned_passkey) = pairing_result.expect("successful FIDL request");
+        assert!(success);
+        assert_eq!(returned_passkey, passkey);
+
+        // Incoming normal pairing complete event. Should be received, but no work to be done.
+        let id = fidl_fuchsia_bluetooth::PeerId { value: 123 };
+        pairing_client
+            .on_pairing_complete(&id.into(), /* success*/ true)
+            .expect("successful request");
+        exec.run_until_stalled(&mut pairing_fut).expect_pending("server active");
+
+        // Upstream disconnects.
+        drop(pairing_client);
+        let result = exec.run_until_stalled(&mut pairing_fut).expect("stream terminated");
+        assert!(result.is_ok());
+    }
+
+    #[fuchsia::test]
+    fn process_fastpair_events() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let (provider_client, provider_server) =
+            fidl::endpoints::create_proxy_and_stream::<ProviderWatcherMarker>().unwrap();
+        let provider_fut = process_provider_events(provider_server);
+        pin_mut!(provider_fut);
+        exec.run_until_stalled(&mut provider_fut).expect_pending("server active");
+
+        let id = fidl_fuchsia_bluetooth::PeerId { value: 123 };
+        let mut complete_fut = provider_client.on_pairing_complete(&id);
+        let (result, mut provider_fut) = run_while(&mut exec, &mut provider_fut, &mut complete_fut);
+        // Server should handle the request and respond.
+        assert!(result.is_ok());
+
+        // Upstream disconnects.
+        drop(provider_client);
+        let result = exec.run_until_stalled(&mut provider_fut).expect("stream terminated");
+        assert!(result.is_ok());
+    }
+}

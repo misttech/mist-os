@@ -25,5 +25,8 @@ group("examples") {
 group("tests") {
   testonly = true
 
-  deps = [ "bt-le-battery-monitor:tests" ]
+  deps = [
+    "bt-fastpair-client:tests",
+    "bt-le-battery-monitor:tests",
+  ]
 }
