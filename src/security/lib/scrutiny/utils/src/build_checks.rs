@@ -249,9 +249,10 @@ pub struct ContentCheckSpec {
     pub must_contain: Option<Vec<ContentType>>,
     /// Set of items that must not be present in the target content.
     pub must_not_contain: Option<Vec<ContentType>>,
-    /// The name of a golden file. The directory path it resides in is provided elsewhere.
+    /// The name of possible golden files to match. One match is needed to pass this check.
+    /// The directory path they reside in is provided elsewhere.
     /// The contents of the golden file must match target content as a string.
-    pub matches_golden: Option<String>,
+    pub matches_golden: Option<Vec<String>>,
 }
 
 /// Validates the provided build artifacts according to the provided policy.
@@ -697,40 +698,50 @@ fn file_contents_match_golden(
     golden_files_dir: &str,
 ) -> Vec<ValidationError> {
     let mut errors = Vec::new();
-    if let Some(golden_file_name) = &checks.matches_golden {
-        let golden_path = Path::new(golden_files_dir).join(golden_file_name);
-        match read_to_string(&golden_path) {
-            Ok(golden_contents) => {
-                // Diffs are calculated and reported relative to the golden file.
-                let Changeset { diffs, distance, .. } =
-                    Changeset::new(&golden_contents, content_str, "\n");
-                if distance > 0 {
-                    let mut reported_diffs = String::new();
-                    for diff in diffs {
-                        match diff {
-                            Difference::Same(_) => {}
-                            Difference::Add(ref line) => {
-                                reported_diffs.push_str(&format!("+{}\n", line));
-                            }
-                            Difference::Rem(ref line) => {
-                                reported_diffs.push_str(&format!("-{}\n", line));
+    let mut match_found = false;
+    if let Some(golden_file_names) = &checks.matches_golden {
+        // Only one golden file must match to be successful.
+        for golden_file_name in golden_file_names {
+            let golden_path = Path::new(golden_files_dir).join(golden_file_name);
+            match read_to_string(&golden_path) {
+                Ok(golden_contents) => {
+                    // Diffs are calculated and reported relative to the golden file.
+                    let Changeset { diffs, distance, .. } =
+                        Changeset::new(&golden_contents, content_str, "\n");
+                    if distance == 0 {
+                        match_found = true;
+                    } else if distance > 0 {
+                        let mut reported_diffs = String::new();
+                        for diff in diffs {
+                            match diff {
+                                Difference::Same(_) => {}
+                                Difference::Add(ref line) => {
+                                    reported_diffs.push_str(&format!("+{}\n", line));
+                                }
+                                Difference::Rem(ref line) => {
+                                    reported_diffs.push_str(&format!("-{}\n", line));
+                                }
                             }
                         }
+                        errors.push(ValidationError::ContentGoldenFileMismatch {
+                            golden_path: golden_path.to_string_lossy().to_string(),
+                            content_source: content_source.to_string(),
+                            diffs: reported_diffs,
+                        });
                     }
-                    errors.push(ValidationError::ContentGoldenFileMismatch {
+                }
+                Err(e) => {
+                    errors.push(ValidationError::FailedToOpenGoldenFile {
                         golden_path: golden_path.to_string_lossy().to_string(),
-                        content_source: content_source.to_string(),
-                        diffs: reported_diffs,
+                        error: e.to_string(),
                     });
                 }
             }
-            Err(e) => {
-                errors.push(ValidationError::FailedToOpenGoldenFile {
-                    golden_path: golden_path.to_string_lossy().to_string(),
-                    error: e.to_string(),
-                });
-            }
         }
+    }
+
+    if match_found {
+        return Vec::new();
     }
     errors
 }
@@ -1945,7 +1956,44 @@ mod tests {
         let checks = ContentCheckSpec {
             must_contain: None,
             must_not_contain: None,
-            matches_golden: Some(golden_file.path().display().to_string()),
+            matches_golden: Some(vec![golden_file.path().display().to_string()]),
+        };
+
+        let content_bytes = content_string.as_bytes().to_vec();
+        let content_source = "content_source".to_string();
+
+        let errors = validate_file_contents(
+            &checks,
+            content_bytes,
+            &content_source,
+            std::env::temp_dir().to_str().unwrap(),
+        );
+
+        assert_eq!(errors.len(), 0);
+    }
+
+    #[test]
+    fn test_validate_file_matches_multiple_golden_success() {
+        let content_string = "some content
+        another line of stuff
+        third line";
+
+        // Set up a golden file to have the different than expected contents.
+        let failing_golden_content = "some unexpected content";
+        let mut failing_golden_file = NamedTempFile::new().unwrap();
+        failing_golden_file.write_all(failing_golden_content.as_bytes()).unwrap();
+
+        // Set up a golden file to have the same contents as expected contents.
+        let mut golden_file = NamedTempFile::new().unwrap();
+        golden_file.write_all(content_string.as_bytes()).unwrap();
+
+        let checks = ContentCheckSpec {
+            must_contain: None,
+            must_not_contain: None,
+            matches_golden: Some(vec![
+                failing_golden_file.path().display().to_string(),
+                golden_file.path().display().to_string(),
+            ]),
         };
 
         let content_bytes = content_string.as_bytes().to_vec();
@@ -1966,16 +2014,17 @@ mod tests {
         let content_string = "some content
         another line of stuff
         third line\n";
+
+        // Set up the golden file to have expected contents plus some extra.
         let extra_golden_content = "extra expected content";
-        // Set up the golden file to have the same contents as expected contents.
         let mut golden_file = NamedTempFile::new().unwrap();
         golden_file.write_all(content_string.as_bytes()).unwrap();
-        golden_file.write_all("extra expected content".as_bytes()).unwrap();
+        golden_file.write_all(extra_golden_content.as_bytes()).unwrap();
 
         let checks = ContentCheckSpec {
             must_contain: None,
             must_not_contain: None,
-            matches_golden: Some(golden_file.path().display().to_string()),
+            matches_golden: Some(vec![golden_file.path().display().to_string()]),
         };
 
         let content_bytes = content_string.as_bytes().to_vec();
@@ -2004,6 +2053,69 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_file_matches_multiple_golden_failure() {
+        let content_string = "some content
+        another line of stuff
+        third line\n";
+
+        // Set up the golden file to have expected contents plus some extra.
+        let extra_golden_content = "extra expected content";
+        let mut golden_file = NamedTempFile::new().unwrap();
+        golden_file.write_all(content_string.as_bytes()).unwrap();
+        golden_file.write_all(extra_golden_content.as_bytes()).unwrap();
+
+        // Set up a second golden file with entirely unexpected contents.
+        let second_golden_content = "random unrelated text";
+        let mut second_golden_file = NamedTempFile::new().unwrap();
+        second_golden_file.write_all(second_golden_content.as_bytes()).unwrap();
+
+        let checks = ContentCheckSpec {
+            must_contain: None,
+            must_not_contain: None,
+            matches_golden: Some(vec![
+                golden_file.path().display().to_string(),
+                second_golden_file.path().display().to_string(),
+            ]),
+        };
+
+        let content_bytes = content_string.as_bytes().to_vec();
+        let content_source = "content_source".to_string();
+
+        let errors = validate_file_contents(
+            &checks,
+            content_bytes,
+            &content_source,
+            std::env::temp_dir().to_str().unwrap(),
+        );
+
+        assert_eq!(errors.len(), 2);
+        match &errors[0] {
+            ValidationError::ContentGoldenFileMismatch {
+                golden_path,
+                diffs,
+                content_source: reported_source,
+            } => {
+                assert_eq!(golden_file.path().display().to_string(), *golden_path);
+                assert!(diffs.contains(extra_golden_content));
+                assert_eq!(content_source, *reported_source);
+            }
+            e => assert!(false, "Unexpected error from failure or error case test: {}", e),
+        }
+        match &errors[1] {
+            ValidationError::ContentGoldenFileMismatch {
+                golden_path,
+                diffs,
+                content_source: reported_source,
+            } => {
+                assert_eq!(second_golden_file.path().display().to_string(), *golden_path);
+                assert!(diffs.contains(second_golden_content));
+                assert_eq!(content_source, *reported_source);
+            }
+            e => assert!(false, "Unexpected error from failure or error case test: {}", e),
+        }
+    }
+
+    #[test]
     fn test_validate_file_matches_golden_error_loading_golden() {
         let content_string = "some content
         another line of stuff
@@ -2013,7 +2125,7 @@ mod tests {
         let checks = ContentCheckSpec {
             must_contain: None,
             must_not_contain: None,
-            matches_golden: Some(golden_file_name.to_string()),
+            matches_golden: Some(vec![golden_file_name.to_string()]),
         };
 
         let content_bytes = content_string.as_bytes().to_vec();
