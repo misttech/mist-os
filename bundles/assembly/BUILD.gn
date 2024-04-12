@@ -1634,10 +1634,6 @@ assembly_input_bundle("common_standard") {
                     "//src/sys/cache_manager/meta/cache_manager.core_shard.cml",
                     "//src/sys/pkg/bin/system-updater/meta/system_updater.core_shard.cml",
                     "//src/recovery/factory_reset/meta/factory_reset.core_shard.cml",
-
-                    # TODO(https://fxbug.dev/42160712): only include in eng builds
-                    "//src/sys/test_manager/meta/test_manager.core_shard.cml",
-                    "//src/sys/testing/meta/test_realm.core_shard.cml",
                   ],
                   root_build_dir)
         },
@@ -1883,22 +1879,6 @@ assembly_input_bundle("standard_userdebug_and_eng") {
 assembly_input_bundle("input_group_one") {
   kernel_cmdline = [ "kernel.oom.behavior=reboot" ]
   base_packages = [ "//src/sys/cache_manager" ]
-  compiled_packages = [
-    {
-      name = "core"
-      component_shards = [
-        {
-          component_name = "core"
-          shards = rebase_path(
-                  [
-                    # TODO(https://fxbug.dev/42160712): only include in eng builds
-                    "//src/sys/fuzzing/meta/fuzzing.core-shard.cml",
-                  ],
-                  root_build_dir)
-        },
-      ]
-    },
-  ]
 }
 
 assembly_input_bundle("input_group_two") {
@@ -2250,14 +2230,9 @@ assembly_input_bundle("testing_support") {
           shards = rebase_path(
                   [
                     "//src/performance/experimental/profiler/meta/profiler.core_shard.cml",
-                    # These should only be added by this AIB, because their
-                    # packages are only added by this AIB, however due to many
-                    # routing issues, they are included in a wider set of
-                    # assemblies than just those that include "testing_support"
-                    #
-                    # "//src/sys/test_manager/meta/test_manager.core_shard.cml",
-                    # "//src/sys/fuzzing/meta/fuzzing.core-shard.cml",
-                    # "//src/sys/testing/meta/test_realm.core_shard.cml",
+                    "//src/sys/test_manager/meta/test_manager.core_shard.cml",
+                    "//src/sys/fuzzing/meta/fuzzing.core-shard.cml",
+                    "//src/sys/testing/meta/test_realm.core_shard.cml",
                   ],
                   root_build_dir)
         },
