@@ -504,7 +504,7 @@ TEST(ParsingTests, GoodAttributeValueHasCorrectContents) {
 
   std::unique_ptr<RawAttributeArg> arg = std::move(attribute->args[0]);
   auto arg_value = static_cast<RawLiteralConstant*>(arg->value.get());
-  ASSERT_EQ(static_cast<RawStringLiteral*>(arg_value->literal.get())->MakeContents(), "Bar");
+  ASSERT_EQ(static_cast<RawStringLiteral*>(arg_value->literal.get())->value, "Bar");
 }
 
 TEST(ParsingTests, BadAttributeWithDottedIdentifier) {
@@ -529,12 +529,12 @@ TEST(ParsingTests, GoodAttributeWithMultipleParameters) {
   std::unique_ptr<RawAttributeArg> arg1 = std::move(attribute->args[0]);
   ASSERT_EQ(arg1->maybe_name->span().data(), "bar");
   auto arg1_value = static_cast<RawLiteralConstant*>(arg1->value.get());
-  ASSERT_EQ(static_cast<RawStringLiteral*>(arg1_value->literal.get())->MakeContents(), "Bar");
+  ASSERT_EQ(static_cast<RawStringLiteral*>(arg1_value->literal.get())->value, "Bar");
 
   std::unique_ptr<RawAttributeArg> arg2 = std::move(attribute->args[1]);
   ASSERT_EQ(arg2->maybe_name->span().data(), "zork");
   auto arg2_value = static_cast<RawLiteralConstant*>(arg2->value.get());
-  ASSERT_EQ(static_cast<RawStringLiteral*>(arg2_value->literal.get())->MakeContents(), "Zoom");
+  ASSERT_EQ(static_cast<RawStringLiteral*>(arg2_value->literal.get())->value, "Zoom");
 }
 
 TEST(ParsingTests, GoodSimpleDocComment) {
@@ -554,7 +554,7 @@ TEST(ParsingTests, GoodSimpleDocComment) {
 
   std::unique_ptr<RawAttributeArg> arg = std::move(attribute->args[0]);
   auto arg_value = static_cast<RawLiteralConstant*>(arg->value.get());
-  ASSERT_EQ(static_cast<RawDocCommentLiteral*>(arg_value->literal.get())->MakeContents(),
+  ASSERT_EQ(static_cast<RawDocCommentLiteral*>(arg_value->literal.get())->value,
             " A doc comment\n");
 }
 
@@ -580,7 +580,7 @@ TEST(ParsingTests, GoodMultilineDocCommentHasCorrectContents) {
 
   std::unique_ptr<RawAttributeArg> arg = std::move(attribute->args[0]);
   auto arg_value = static_cast<RawLiteralConstant*>(arg->value.get());
-  ASSERT_EQ(static_cast<RawDocCommentLiteral*>(arg_value->literal.get())->MakeContents(),
+  ASSERT_EQ(static_cast<RawDocCommentLiteral*>(arg_value->literal.get())->value,
             " A\n multiline\n comment!\n");
 }
 

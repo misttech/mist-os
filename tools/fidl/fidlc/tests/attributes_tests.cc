@@ -199,22 +199,22 @@ service ExampleService {
   EXPECT_TRUE(example_const->attributes->Get("doc")->GetArg("value"));
   auto& const_doc_value = static_cast<const DocCommentConstantValue&>(
       example_const->attributes->Get("doc")->GetArg("value")->value->Value());
-  EXPECT_EQ(const_doc_value.MakeContents(), " For EXAMPLE_CONSTANT\n");
+  EXPECT_EQ(const_doc_value.value, " For EXAMPLE_CONSTANT\n");
   EXPECT_TRUE(example_const->attributes->Get("deprecated")->GetArg("value"));
   auto& const_str_value = static_cast<const StringConstantValue&>(
       example_const->attributes->Get("deprecated")->GetArg("value")->value->Value());
-  EXPECT_EQ(const_str_value.MakeContents(), "Note");
+  EXPECT_EQ(const_str_value.value, "Note");
 
   auto example_enum = library.LookupEnum("ExampleEnum");
   ASSERT_NE(example_enum, nullptr);
   EXPECT_TRUE(example_enum->attributes->Get("doc")->GetArg("value"));
   auto& enum_doc_value = static_cast<const DocCommentConstantValue&>(
       example_enum->attributes->Get("doc")->GetArg("value")->value->Value());
-  EXPECT_EQ(enum_doc_value.MakeContents(), " For ExampleEnum\n");
+  EXPECT_EQ(enum_doc_value.value, " For ExampleEnum\n");
   EXPECT_TRUE(example_enum->attributes->Get("deprecated")->GetArg("value"));
   auto& enum_str_value = static_cast<const StringConstantValue&>(
       example_enum->attributes->Get("deprecated")->GetArg("value")->value->Value());
-  EXPECT_EQ(enum_str_value.MakeContents(), "Reason");
+  EXPECT_EQ(enum_str_value.value, "Reason");
   EXPECT_TRUE(example_enum->members.back().attributes->Get("unknown"));
 
   auto example_struct = library.LookupStruct("ExampleStruct");
@@ -222,15 +222,15 @@ service ExampleService {
   EXPECT_TRUE(example_struct->attributes->Get("doc")->GetArg("value"));
   auto& struct_doc_value = static_cast<const DocCommentConstantValue&>(
       example_struct->attributes->Get("doc")->GetArg("value")->value->Value());
-  EXPECT_EQ(struct_doc_value.MakeContents(), " For ExampleStruct\n");
+  EXPECT_EQ(struct_doc_value.value, " For ExampleStruct\n");
   EXPECT_TRUE(example_struct->attributes->Get("max_bytes")->GetArg("value"));
   auto& struct_str_value1 = static_cast<const StringConstantValue&>(
       example_struct->attributes->Get("max_bytes")->GetArg("value")->value->Value());
-  EXPECT_EQ(struct_str_value1.MakeContents(), "1234");
+  EXPECT_EQ(struct_str_value1.value, "1234");
   EXPECT_TRUE(example_struct->attributes->Get("max_handles")->GetArg("value"));
   auto& struct_str_value2 = static_cast<const StringConstantValue&>(
       example_struct->attributes->Get("max_handles")->GetArg("value")->value->Value());
-  EXPECT_EQ(struct_str_value2.MakeContents(), "5678");
+  EXPECT_EQ(struct_str_value2.value, "5678");
 
   auto example_anon = library.LookupTable("CustomName");
   ASSERT_NE(example_anon, nullptr);
@@ -238,7 +238,7 @@ service ExampleService {
 
   auto& generated_name_value = static_cast<const StringConstantValue&>(
       example_anon->attributes->Get("generated_name")->GetArg("value")->value->Value());
-  EXPECT_EQ(generated_name_value.MakeContents(), "CustomName");
+  EXPECT_EQ(generated_name_value.value, "CustomName");
 
   auto example_protocol = library.LookupProtocol("ExampleProtocol");
   ASSERT_NE(example_protocol, nullptr);
@@ -246,22 +246,22 @@ service ExampleService {
   EXPECT_TRUE(example_protocol->attributes->Get("doc")->GetArg("value"));
   auto& protocol_doc_value = static_cast<const DocCommentConstantValue&>(
       example_protocol->attributes->Get("doc")->GetArg("value")->value->Value());
-  EXPECT_EQ(protocol_doc_value.MakeContents(), " For ExampleProtocol\n");
+  EXPECT_EQ(protocol_doc_value.value, " For ExampleProtocol\n");
   EXPECT_TRUE(example_protocol->attributes->Get("transport")->GetArg("value"));
   auto& protocol_str_value = static_cast<const StringConstantValue&>(
       example_protocol->attributes->Get("transport")->GetArg("value")->value->Value());
-  EXPECT_EQ(protocol_str_value.MakeContents(), "Syscall");
+  EXPECT_EQ(protocol_str_value.value, "Syscall");
 
   auto& example_method = example_protocol->methods.front();
   EXPECT_TRUE(example_method.attributes->Get("internal"));
   EXPECT_TRUE(example_method.attributes->Get("doc")->GetArg("value"));
   auto& method_doc_value = static_cast<const DocCommentConstantValue&>(
       example_method.attributes->Get("doc")->GetArg("value")->value->Value());
-  EXPECT_EQ(method_doc_value.MakeContents(), " For ExampleMethod\n");
+  EXPECT_EQ(method_doc_value.value, " For ExampleMethod\n");
   EXPECT_TRUE(example_method.attributes->Get("selector")->GetArg("value"));
   auto& method_str_value = static_cast<const StringConstantValue&>(
       example_method.attributes->Get("selector")->GetArg("value")->value->Value());
-  EXPECT_EQ(method_str_value.MakeContents(), "Bar");
+  EXPECT_EQ(method_str_value.value, "Bar");
 
   auto example_service = library.LookupService("ExampleService");
   ASSERT_NE(example_service, nullptr);
@@ -269,22 +269,22 @@ service ExampleService {
   EXPECT_TRUE(example_service->attributes->Get("doc")->GetArg("value"));
   auto& service_doc_value = static_cast<const DocCommentConstantValue&>(
       example_service->attributes->Get("doc")->GetArg("value")->value->Value());
-  EXPECT_EQ(service_doc_value.MakeContents(), " For ExampleService\n");
+  EXPECT_EQ(service_doc_value.value, " For ExampleService\n");
   EXPECT_TRUE(example_service->attributes->Get("foo")->GetArg("value"));
   auto& service_str_value = static_cast<const StringConstantValue&>(
       example_service->attributes->Get("foo")->GetArg("value")->value->Value());
-  EXPECT_EQ(service_str_value.MakeContents(), "ExampleService");
+  EXPECT_EQ(service_str_value.value, "ExampleService");
 
   auto& example_service_member = example_service->members.front();
   EXPECT_TRUE(example_service_member.attributes->Get("no_doc"));
   EXPECT_TRUE(example_service_member.attributes->Get("doc")->GetArg("value"));
   auto& service_member_doc_value = static_cast<const DocCommentConstantValue&>(
       example_service_member.attributes->Get("doc")->GetArg("value")->value->Value());
-  EXPECT_EQ(service_member_doc_value.MakeContents(), " For ExampleProtocol\n");
+  EXPECT_EQ(service_member_doc_value.value, " For ExampleProtocol\n");
   EXPECT_TRUE(example_service_member.attributes->Get("foo")->GetArg("value"));
   auto& service_member_str_value = static_cast<const StringConstantValue&>(
       example_service_member.attributes->Get("foo")->GetArg("value")->value->Value());
-  EXPECT_EQ(service_member_str_value.MakeContents(), "ExampleProtocol");
+  EXPECT_EQ(service_member_str_value.value, "ExampleProtocol");
 }
 
 TEST(AttributesTests, BadNoAttributeOnUsingNotEventDoc) {
@@ -377,7 +377,7 @@ TEST(AttributesTests, GoodNotTooCloseUnofficialAttribute) {
   EXPECT_TRUE(example_protocol->attributes->Get("duck"));
   auto& struct_str_value1 = static_cast<const StringConstantValue&>(
       example_protocol->attributes->Get("duck")->GetArg("value")->value->Value());
-  EXPECT_EQ(struct_str_value1.MakeContents(), "quack");
+  EXPECT_EQ(struct_str_value1.value, "quack");
 }
 
 // Ensures we detect typos early enough that we still report them, even if there
@@ -1075,7 +1075,7 @@ type MyStruct = struct {};
 
   std::unique_ptr<ConstantValue> resolved_foo;
   EXPECT_TRUE(foo->Value().Convert(ConstantValue::Kind::kString, &resolved_foo));
-  EXPECT_EQ(static_cast<StringConstantValue*>(resolved_foo.get())->MakeContents(), "abc");
+  EXPECT_EQ(static_cast<StringConstantValue*>(resolved_foo.get())->value, "abc");
 
   // Check `bar` arg.
   EXPECT_TRUE(example_struct->attributes->Get("attr")->GetArg("bar"));
@@ -1165,7 +1165,7 @@ type MyStruct = struct {};
 
   std::unique_ptr<ConstantValue> resolved_string;
   EXPECT_TRUE(string_val->Value().Convert(ConstantValue::Kind::kString, &resolved_string));
-  EXPECT_EQ(static_cast<StringConstantValue*>(resolved_string.get())->MakeContents(), "foo");
+  EXPECT_EQ(static_cast<StringConstantValue*>(resolved_string.get())->value, "foo");
 
   // Check `bool` arg.
   EXPECT_TRUE(example_struct->attributes->Get("attr")->GetArg("bool"));
@@ -1436,7 +1436,7 @@ type MyStruct = struct {};
 
   std::unique_ptr<ConstantValue> resolved_string;
   EXPECT_TRUE(string_val->Value().Convert(ConstantValue::Kind::kString, &resolved_string));
-  EXPECT_EQ(static_cast<StringConstantValue*>(resolved_string.get())->MakeContents(), "foo");
+  EXPECT_EQ(static_cast<StringConstantValue*>(resolved_string.get())->value, "foo");
 
   // Check `bool` arg.
   EXPECT_TRUE(example_struct->attributes->Get("attr")->GetArg("bool"));

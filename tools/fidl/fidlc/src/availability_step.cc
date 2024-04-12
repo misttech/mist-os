@@ -274,9 +274,8 @@ std::optional<Platform> AvailabilityStep::GetPlatform(const AttributeArg* maybe_
     return std::nullopt;
   }
   ZX_ASSERT(maybe_arg->value->Value().kind == ConstantValue::Kind::kString);
-  std::string str =
-      static_cast<const StringConstantValue*>(&maybe_arg->value->Value())->MakeContents();
-  auto platform = Platform::Parse(str);
+  auto str = static_cast<const StringConstantValue&>(maybe_arg->value->Value()).value;
+  auto platform = Platform::Parse(std::string(str));
   if (!platform) {
     reporter()->Fail(ErrInvalidPlatform, maybe_arg->value->span, str);
     return std::nullopt;

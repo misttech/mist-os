@@ -563,10 +563,10 @@ Linter::Linter()
         if (element.provenance == RawAttribute::Provenance::kDocComment) {
           auto constant = static_cast<RawLiteralConstant*>(element.args.front()->value.get());
           auto doc_comment = static_cast<RawDocCommentLiteral*>(constant->literal.get());
-          if (re2::RE2::PartialMatch(doc_comment->MakeContents(), *copyright_regex)) {
+          if (re2::RE2::PartialMatch(doc_comment->value, *copyright_regex)) {
             linter.AddFinding(element, check, {}, "change '///' to '//'", "//");
           }
-          if (re2::RE2::PartialMatch(doc_comment->MakeContents(), *todo_regex)) {
+          if (re2::RE2::PartialMatch(doc_comment->value, *todo_regex)) {
             linter.AddFinding(element, todo_check, {}, "change '///' to '//'", "//");
           }
         }

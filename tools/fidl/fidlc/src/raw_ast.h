@@ -112,29 +112,22 @@ struct RawLiteral : public SourceElement {
 
 struct RawDocCommentLiteral final : public RawLiteral {
   explicit RawDocCommentLiteral(const SourceElement& element)
-      : RawLiteral(element, Kind::kDocComment) {}
+      : RawLiteral(element, Kind::kDocComment),
+        value(strip_doc_comment_slashes(element.span().data())) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::string MakeContents() const {
-    if (!has_span() || span().data().empty()) {
-      return "";
-    }
-    return strip_doc_comment_slashes(span().data());
-  }
+  std::string value;
 };
 
 struct RawStringLiteral final : public RawLiteral {
-  explicit RawStringLiteral(const SourceElement& element) : RawLiteral(element, Kind::kString) {}
+  explicit RawStringLiteral(const SourceElement& element)
+      : RawLiteral(element, Kind::kString),
+        value(strip_string_literal_quotes(element.span().data())) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::string MakeContents() const {
-    if (!has_span() || span().data().empty()) {
-      return "";
-    }
-    return strip_string_literal_quotes(span().data());
-  }
+  std::string value;
 };
 
 struct RawNumericLiteral final : public RawLiteral {

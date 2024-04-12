@@ -183,16 +183,16 @@ struct DocCommentConstantValue final : ConstantValue {
       : ConstantValue(ConstantValue::Kind::kDocComment), value(value) {}
 
   friend std::ostream& operator<<(std::ostream& os, const DocCommentConstantValue& v) {
-    return os << v.value.data();
+    return os << v.value;
   }
 
   bool Convert(Kind kind, std::unique_ptr<ConstantValue>* out_value) const override;
-  std::string MakeContents() const;
 
   std::unique_ptr<ConstantValue> Clone() const override {
     return std::make_unique<DocCommentConstantValue>(value);
   }
 
+  // Refers to the std::string owned by the RawDocCommentLiteral.
   std::string_view value;
 };
 
@@ -201,17 +201,16 @@ struct StringConstantValue final : ConstantValue {
       : ConstantValue(ConstantValue::Kind::kString), value(value) {}
 
   friend std::ostream& operator<<(std::ostream& os, const StringConstantValue& v) {
-    os << v.value.data();
-    return os;
+    return os << v.value;
   }
 
   bool Convert(Kind kind, std::unique_ptr<ConstantValue>* out_value) const override;
-  std::string MakeContents() const;
 
   std::unique_ptr<ConstantValue> Clone() const override {
     return std::make_unique<StringConstantValue>(value);
   }
 
+  // Refers to the std::string owned by the RawStringLiteral.
   std::string_view value;
 };
 

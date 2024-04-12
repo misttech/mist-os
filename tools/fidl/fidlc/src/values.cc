@@ -119,13 +119,6 @@ bool DocCommentConstantValue::Convert(Kind kind, std::unique_ptr<ConstantValue>*
   }
 }
 
-std::string DocCommentConstantValue::MakeContents() const {
-  if (value.empty()) {
-    return "";
-  }
-  return strip_doc_comment_slashes(value);
-}
-
 bool StringConstantValue::Convert(Kind kind, std::unique_ptr<ConstantValue>* out_value) const {
   ZX_ASSERT(out_value != nullptr);
   switch (kind) {
@@ -135,13 +128,6 @@ bool StringConstantValue::Convert(Kind kind, std::unique_ptr<ConstantValue>* out
     default:
       return false;
   }
-}
-
-std::string StringConstantValue::MakeContents() const {
-  if (value.empty()) {
-    return "";
-  }
-  return strip_string_literal_quotes(value);
 }
 
 void Constant::ResolveTo(std::unique_ptr<ConstantValue> value, const Type* type) {

@@ -397,14 +397,14 @@ bool CompileStep::ResolveLiteralConstant(LiteralConstant* literal_constant,
       auto doc_comment_literal =
           static_cast<const RawDocCommentLiteral*>(literal_constant->literal);
       literal_constant->ResolveTo(
-          std::make_unique<DocCommentConstantValue>(doc_comment_literal->span().data()),
+          std::make_unique<DocCommentConstantValue>(doc_comment_literal->value),
           typespace()->GetUnboundedStringType());
       return true;
     }
     case RawLiteral::Kind::kString: {
-      literal_constant->ResolveTo(
-          std::make_unique<StringConstantValue>(literal_constant->literal->span().data()),
-          typespace()->GetUnboundedStringType());
+      auto string_literal = static_cast<const RawStringLiteral*>(literal_constant->literal);
+      literal_constant->ResolveTo(std::make_unique<StringConstantValue>(string_literal->value),
+                                  typespace()->GetUnboundedStringType());
       return true;
     }
     case RawLiteral::Kind::kBool: {
@@ -1044,11 +1044,11 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
 void CompileStep::ValidateSelectorAndCalcOrdinal(const Name& protocol_name,
                                                  Protocol::Method* method) {
   std::string selector;
-  auto method_name = std::string(method->name.data());
+  std::string_view method_name = method->name.data();
   if (auto attr = method->attributes->Get("selector")) {
     if (auto arg = attr->GetArg(AttributeArg::kDefaultAnonymousName)) {
       if (auto& constant = arg->value; constant && constant->IsResolved()) {
-        auto value = static_cast<const StringConstantValue&>(constant->Value()).MakeContents();
+        auto value = static_cast<const StringConstantValue&>(constant->Value()).value;
         if (IsValidFullyQualifiedMethodIdentifier(value)) {
           selector = value;
         } else if (IsValidIdentifierComponent(value)) {

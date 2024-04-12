@@ -557,9 +557,9 @@ void ConsumeStep::MaybeOverrideName(AttributeList& attributes, NamingContext* co
   }
   const ConstantValue& value = arg->value->Value();
   ZX_ASSERT(value.kind == ConstantValue::Kind::kString);
-  std::string str = static_cast<const StringConstantValue&>(value).MakeContents();
+  auto str = static_cast<const StringConstantValue&>(value).value;
   if (IsValidIdentifierComponent(str)) {
-    context->set_name_override(std::move(str));
+    context->set_name_override(std::string(str));
   } else {
     reporter()->Fail(ErrInvalidGeneratedName, arg->span);
   }

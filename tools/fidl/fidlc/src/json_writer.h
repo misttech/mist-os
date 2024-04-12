@@ -210,8 +210,9 @@ class JsonWriter {
     os_ << "\"";
   }
 
-  // Emits a string literal given its raw FIDL source (including the quotes).
+  // Emits a string literal given its raw FIDL source.
   void EmitLiteral(std::string_view value) {
+    os_ << "\"";
     for (auto it = value.begin(); it != value.end(); ++it) {
       // FIDL's string literal syntax is similar to JSON's, so we can emit most
       // characters unchanged (including escape sequences \\, \", \n, \r, \t)
@@ -247,6 +248,7 @@ class JsonWriter {
         os_ << buf;
       }
     }
+    os_ << "\"";
   }
 
   template <typename T>

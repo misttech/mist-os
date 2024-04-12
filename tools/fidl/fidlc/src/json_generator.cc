@@ -87,7 +87,7 @@ void JSONGenerator::Generate(const ConstantValue& value) {
     }
     case ConstantValue::Kind::kDocComment: {
       auto& doc_comment_constant = static_cast<const DocCommentConstantValue&>(value);
-      EmitString(doc_comment_constant.MakeContents());
+      EmitString(doc_comment_constant.value);
       break;
     }
     case ConstantValue::Kind::kString: {

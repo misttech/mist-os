@@ -393,7 +393,7 @@ static bool DiscoverableConstraint(Reporter* reporter, ExperimentalFlagSet flags
     return true;
   }
   ZX_ASSERT(arg->value->Value().kind == ConstantValue::Kind::kString);
-  auto name = static_cast<const StringConstantValue&>(arg->value->Value()).MakeContents();
+  auto name = static_cast<const StringConstantValue&>(arg->value->Value()).value;
   if (!IsValidDiscoverableName(name)) {
     return reporter->Fail(ErrInvalidDiscoverableName, arg->span, name);
   }
@@ -406,9 +406,8 @@ static bool TransportConstraint(Reporter* reporter, ExperimentalFlagSet flags,
   ZX_ASSERT(element->kind == Element::Kind::kProtocol);
 
   auto arg = attribute->GetArg(AttributeArg::kDefaultAnonymousName);
-  auto& arg_value = static_cast<const StringConstantValue&>(arg->value->Value());
+  auto value = static_cast<const StringConstantValue&>(arg->value->Value()).value;
 
-  const std::string& value = arg_value.MakeContents();
   if (!Transport::FromTransportName(value)) {
     return reporter->Fail(ErrInvalidTransportType, attribute->span, value,
                           Transport::AllTransportNames());
