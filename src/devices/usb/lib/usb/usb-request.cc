@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/usb/c/banjo.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/phys-iter.h>
 #include <lib/trace/event.h>
 #include <stdint.h>
@@ -19,6 +18,12 @@
 #include <usb/usb.h>
 
 #include "src/devices/usb/lib/usb/align.h"
+
+#ifdef DFV2_COMPAT_LOGGING
+#include <lib/driver/compat/cpp/logging.h>  // nogncheck
+#else
+#include <lib/ddk/debug.h>  // nogncheck
+#endif
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
@@ -70,7 +75,7 @@ __EXPORT zx_status_t usb_request_alloc(usb_request_t** out, uint64_t data_size, 
   if (req_size < sizeof(usb_request_t)) {
     return ZX_ERR_INVALID_ARGS;
   }
-  usb_request_t* req = calloc(1, req_size);
+  usb_request_t* req = static_cast<usb_request_t*>(calloc(1, req_size));
   if (!req) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -109,7 +114,7 @@ __EXPORT zx_status_t usb_request_alloc(usb_request_t** out, uint64_t data_size, 
 __EXPORT zx_status_t usb_request_alloc_vmo(usb_request_t** out, zx_handle_t vmo_handle,
                                            uint64_t vmo_offset, uint64_t length, uint8_t ep_address,
                                            size_t req_size) {
-  usb_request_t* req = calloc(1, req_size);
+  usb_request_t* req = static_cast<usb_request_t*>(calloc(1, req_size));
   if (!req) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -219,7 +224,7 @@ __EXPORT zx_status_t usb_request_set_sg_list(usb_request_t* req, const sg_entry_
     total_length += entry->length;
   }
   size_t num_bytes = sg_count * sizeof(sg_entry_t);
-  req->sg_list = malloc(num_bytes);
+  req->sg_list = static_cast<sg_entry_t*>(malloc(num_bytes));
   if (req->sg_list == NULL) {
     zxlogf(ERROR, "usb_request_set_sg_list: out of memory");
     return ZX_ERR_NO_MEMORY;
@@ -233,14 +238,14 @@ __EXPORT zx_status_t usb_request_set_sg_list(usb_request_t* req, const sg_entry_
 __EXPORT ssize_t usb_request_copy_from(usb_request_t* req, void* data, size_t length,
                                        size_t offset) {
   length = MIN(req_buffer_size(req, offset), length);
-  memcpy(data, req_buffer_virt(req) + offset, length);
+  memcpy(data, static_cast<uint8_t*>(req_buffer_virt(req)) + offset, length);
   return length;
 }
 
 __EXPORT ssize_t usb_request_copy_to(usb_request_t* req, const void* data, size_t length,
                                      size_t offset) {
   length = MIN(req_buffer_size(req, offset), length);
-  memcpy(req_buffer_virt(req) + offset, data, length);
+  memcpy(static_cast<uint8_t*>(req_buffer_virt(req)) + offset, data, length);
   return length;
 }
 
@@ -254,7 +259,8 @@ __EXPORT zx_status_t usb_request_cache_flush(usb_request_t* req, zx_off_t offset
   if (offset + length < offset || offset + length > req->size) {
     return ZX_ERR_OUT_OF_RANGE;
   }
-  return zx_cache_flush(req_buffer_virt(req) + offset, length, ZX_CACHE_FLUSH_DATA);
+  return zx_cache_flush(static_cast<uint8_t*>(req_buffer_virt(req)) + offset, length,
+                        ZX_CACHE_FLUSH_DATA);
 }
 
 __EXPORT zx_status_t usb_request_cache_flush_invalidate(usb_request_t* req, zx_off_t offset,
@@ -262,7 +268,7 @@ __EXPORT zx_status_t usb_request_cache_flush_invalidate(usb_request_t* req, zx_o
   if (offset + length < offset || offset + length > req->size) {
     return ZX_ERR_OUT_OF_RANGE;
   }
-  return zx_cache_flush(req_buffer_virt(req) + offset, length,
+  return zx_cache_flush(static_cast<uint8_t*>(req_buffer_virt(req)) + offset, length,
                         ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
 }
 
@@ -278,7 +284,7 @@ zx_status_t usb_request_physmap(usb_request_t* req, zx_handle_t bti_handle) {
   uint64_t page_length = req->size - page_offset;
   uint64_t pages = USB_ROUNDUP(page_length, kPageSize) / kPageSize;
 
-  zx_paddr_t* paddrs = malloc(pages * sizeof(zx_paddr_t));
+  zx_paddr_t* paddrs = static_cast<zx_paddr_t*>(malloc(pages * sizeof(zx_paddr_t)));
   if (paddrs == NULL) {
     zxlogf(ERROR, "usb_request_physmap: out of memory");
     return ZX_ERR_NO_MEMORY;
@@ -391,10 +397,10 @@ __EXPORT void usb_request_complete_base(usb_request_t* req, zx_status_t status, 
 }
 
 __EXPORT void usb_request_phys_iter_init(phys_iter_t* iter, usb_request_t* req, size_t max_length) {
-  phys_iter_buffer_t buf = {.length = req->header.length,
-                            .vmo_offset = req->offset,
-                            .phys = req->phys_list,
+  phys_iter_buffer_t buf = {.phys = req->phys_list,
                             .phys_count = req->phys_count,
+                            .length = req->header.length,
+                            .vmo_offset = req->offset,
                             .sg_list = (phys_iter_sg_entry_t*)(req->sg_list),
                             .sg_count = req->sg_count};
   phys_iter_init(iter, &buf, max_length);
