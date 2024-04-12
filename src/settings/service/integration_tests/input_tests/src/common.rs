@@ -22,11 +22,7 @@ pub trait Mocks {
     ) -> Result<(), Error>;
 }
 
-pub struct InputTest {
-    // TODO(https://fxbug.dev/332407468): Remove or explain #[allow(dead_code)].
-    #[allow(dead_code)]
-    pub camera_sw_muted: Arc<AtomicBool>,
-}
+pub struct InputTest;
 
 impl InputTest {
     pub async fn create_realm(cam_muted: Arc<AtomicBool>) -> Result<RealmInstance, Error> {
