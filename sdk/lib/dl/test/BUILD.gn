@@ -37,6 +37,7 @@ test("dl-unittests") {
     ]
     deps += [
       "..:runtime",
+      "//sdk/lib/ld/testing",
       "//src/lib/elfldltl/testing",
     ]
 

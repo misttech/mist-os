@@ -41,6 +41,9 @@ inline constexpr int kOpenSymbolScopeMask = OpenSymbolScope::kLocal | OpenSymbol
 inline constexpr int kOpenBindingModeMask = OpenBindingMode::kLazy | OpenBindingMode::kNow;
 inline constexpr int kOpenFlagsMask = OpenFlags::kNoload | OpenFlags::kNodelete;
 
+template <class ModuleType>
+using ModuleList = fbl::DoublyLinkedList<std::unique_ptr<ModuleType>>;
+
 class RuntimeDynamicLinker {
  public:
   using Soname = elfldltl::Soname<>;
@@ -54,6 +57,10 @@ class RuntimeDynamicLinker {
   // if the module was not found.
   ModuleHandle* FindModule(Soname name);
 
+  // Lookup a symbol from the given module, returning a pointer to it in memory,
+  // or an error if not found (ie undefined symbol).
+  fit::result<Error, void*> LookupSymbol(ModuleHandle* module, const char* ref);
+
   template <class OSImpl>
   fit::result<Error, void*> Open(const char* file, int mode) {
     auto already_loaded = CheckOpen(file, mode);
@@ -65,35 +72,32 @@ class RuntimeDynamicLinker {
       return fit::ok(already_loaded.value());
     }
 
-    // TODO(caslyn): Roll up ModuleHandle allocation with LoadModule allocation,
-    // and add comment on the allocation/relationship.
-    fbl::AllocChecker ac;
-    auto module = ModuleHandle::Create(Soname{file}, ac);
-    if (!ac.check()) [[unlikely]] {
-      return Error::OutOfMemory();
-    }
+    // A ModuleHandle for `file` does not yet exist; proceed to loading the
+    // file and all it's dependencies.
 
-    // TODO(https://fxbug.dev/324650368): implement file retrieval interfaces.
     // Use a non-scoped diagnostics object for the main module. Because errors
-    // are generated on this module directly, its name does not need to be
+    // are generated on this module directly, it's name does not need to be
     // prefixed to the error, as is the case using ld::ScopedModuleDiagnostics.
     dl::Diagnostics diag;
-    LoadModule<OSImpl> load_module{std::move(module)};
-    if (!load_module.Load(diag)) [[unlikely]] {
+    auto load_modules = Load<OSImpl>(diag, Soname{file});
+    if (load_modules.is_empty()) [[unlikely]] {
       return diag.take_error();
     }
 
-    // TODO(caslyn): these are actions needed to finish loading the module and
-    // return its reference back to the caller, but are not meant to be invoked
-    // directly by this function. These will be abstracted away eventually.
-    auto loaded_module = std::move(load_module).take_module();
-    ModuleHandle* module_ref = loaded_module.get();
-    loaded_modules_.push_back(std::move(loaded_module));
+    // TODO(caslyn): These are actions needed to return a reference to the main
+    // module back to the caller and add the loaded modules to the dynamic
+    // linker's bookkeeping. This will be abstracted away into another function
+    // eventually.
+    while (!load_modules.is_empty()) {
+      auto load_module = load_modules.pop_front();
+      auto module = std::move(*load_module).take_module();
+      loaded_modules_.push_back(std::move(module));
+    }
 
-    return diag.ok(module_ref);
+    // TODO(caslyn): This assumes the dlopen-ed module is the first module in
+    // loaded_modules_.
+    return diag.ok(&loaded_modules_.front());
   }
-
-  fit::result<Error, void*> LookupSymbol(ModuleHandle* module, const char* ref);
 
  private:
   // Perform basic argument checking and check whether a module for `file` was
@@ -102,10 +106,48 @@ class RuntimeDynamicLinker {
   // a module for `file` was not found.
   fit::result<Error, ModuleHandle*> CheckOpen(const char* file, int mode);
 
+  // Load the main module and all its dependencies, returning the list of all
+  // loaded modules. Starting with the main file that was `dlopen`-ed, a
+  // LoadModule is created for each file that is to be loaded, decoded, and its
+  // dependencies parsed and enqueued to be processed in the same manner.
+  template <class OSImpl>
+  static fbl::DoublyLinkedList<std::unique_ptr<LoadModule<OSImpl>>> Load(Diagnostics& diag,
+                                                                         Soname soname) {
+    // This is the list of modules to load and process. The first module of this
+    // list will always be the main file that was `dlopen`-ed.
+    ModuleList<LoadModule<OSImpl>> pending_modules;
+
+    fbl::AllocChecker ac;
+    auto load_module = LoadModule<OSImpl>::Create(soname, ac);
+    if (!ac.check()) [[unlikely]] {
+      // TODO(caslyn): communicate out of memory error.
+      return {};
+    }
+
+    pending_modules.push_back(std::move(load_module));
+
+    for (auto it = pending_modules.begin(); it != pending_modules.end(); it++) {
+      // TODO(caslyn): support scoped module diagnostics.
+      // ld::ScopedModuleDiagnostics module_diag{diag, module_->name().str()};
+
+      // TODO(caslyn): Eventually Load and Decode will become separate calls.
+      if (!it->Load(diag)) {
+        return {};
+      }
+      // TODO(caslyn): Eventually, EnqueueDeps will be a static function on the
+      // RuntimeDynamicLinker and will pass in the DecodeResult for the loadmodule.
+      if (!it->EnqueueDeps(diag, pending_modules)) {
+        return {};
+      }
+    }
+
+    return pending_modules;
+  }
+
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
   // TODO(https://fxbug.dev/324136831): support startup modules
-  fbl::DoublyLinkedList<std::unique_ptr<ModuleHandle>> loaded_modules_;
+  ModuleList<ModuleHandle> loaded_modules_;
 };
 
 }  // namespace dl

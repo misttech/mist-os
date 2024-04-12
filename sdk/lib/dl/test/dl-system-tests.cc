@@ -30,9 +30,19 @@ fit::result<Error, void*> DlSystemTests::DlOpen(const char* file, int mode) {
   } else {
     std::filesystem::path path;
 #ifdef __Fuchsia__
-    // Use the lib prefix for library paths to the same prefix used in libld,
-    // which generates the testing modules used by libdl.
-    path = std::filesystem::path("test") / "lib" / LD_TEST_LIBPREFIX / file;
+    auto prefix = "";
+    // TODO(https://fxbug.dev/323419430): dlopen shouldn't know if it's loading a
+    // loadable_module or shared library. Shared libraries reside in a
+    // lib/$libprefix directory on instrumented builds; this is a temporary hack
+    // to amend the filepath of a shared library (but not a loadable module) for
+    // an instrumented build so dlopen can locate the file.
+    // Eventually, the mock loader will be primed with the module/shlib files
+    // and this function will only pass `filename` to `TryGetTestLibVmo()` to
+    // retrieve the file from the mock loader.
+    if (std::string{file}.find("module") == std::string::npos) {
+      prefix = LD_TEST_LIBPREFIX;
+    }
+    path = std::filesystem::path("test") / "lib" / prefix / file;
 #else
     path = elfldltl::testing::GetTestDataPath(file);
 #endif

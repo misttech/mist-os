@@ -90,4 +90,47 @@ TYPED_TEST(DlTests, Basic) {
   EXPECT_EQ(func_ptr(), 2);
 }
 
+// TODO(https://fxrev.dev/323419430): expect that libld-dep-a.so was needed.
+TYPED_TEST(DlTests, BasicDep) {
+  if constexpr (!TestFixture::kCanLookUpDeps) {
+    GTEST_SKIP()
+        << "TODO(https://fxbug.dev/324650368): test requires dlopen to locate dependencies.";
+  }
+  auto result = this->DlOpen("basic-dep.module.so", RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
+  EXPECT_TRUE(result.value());
+}
+
+// TODO(https://fxrev.dev/323419430): expect that libld-dep-[a,b,c].so was needed.
+TYPED_TEST(DlTests, IndirectDeps) {
+  if constexpr (!TestFixture::kCanLookUpDeps) {
+    GTEST_SKIP()
+        << "TODO(https://fxbug.dev/324650368): test requires dlopen to locate dependencies.";
+  }
+
+  auto result = this->DlOpen("indirect-deps.module.so", RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
+  EXPECT_TRUE(result.value());
+}
+
+TYPED_TEST(DlTests, MissingDependency) {
+  // To clarify this condition, the test needs to be accurate in that its
+  // searching the correct path for the dependency, but can't find it.
+  if constexpr (!TestFixture::kCanLookUpDeps) {
+    GTEST_SKIP()
+        << "TODO(https://fxbug.dev/324650368): test requires dlopen to locate dependencies.";
+  }
+
+  auto result = this->DlOpen("missing-dep.module.so", RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(result.is_error());
+  // Expect that the dependency lib to missing-dep.module.so cannot be found.
+  if constexpr (TestFixture::kCanMatchExactError) {
+    EXPECT_EQ(result.error_value().take_str(), "cannot open libmissing-dep-dep.so");
+  } else {
+    EXPECT_THAT(
+        result.error_value().take_str(),
+        MatchesRegex(".*libmissing-dep-dep.so:.*(No such file or directory|ZX_ERR_NOT_FOUND)"));
+  }
+}
+
 }  // namespace
