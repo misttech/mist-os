@@ -1528,7 +1528,7 @@ From //out/not-default/args.gn:29
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:101
+From //BUILD.gn:115
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -1536,7 +1536,7 @@ From //out/not-default/args.gn:29
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:101
+From //BUILD.gn:115
 
 ### devicetree_board_driver
 
@@ -2762,7 +2762,7 @@ From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:90
+From //BUILD.gn:104
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -2770,7 +2770,7 @@ From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:90
+From //BUILD.gn:104
 
 ### emu_window_size_height
 
@@ -3175,6 +3175,25 @@ Include a mechanism for the kernel to sample threads and write the results to a 
 
 From //zircon/kernel/params.gni:147
 
+### exported_package_labels
+
+If you add labels to this variable the `exported_fuchsia_package_archive()`
+targets captured by these labels will be collected and exposed in the
+'package_archives' build api module. Ordinary `fuchsia_package_archive()`
+targets are not captured.
+
+Note: This variable is only used for metadata collection -- any package
+labels added here will still need to be included in the build graph
+elsewhere.
+
+It's usually advisable to use labels of well-defined, curated `group()`s of
+packages instead of explicitly adding the labels of the
+`exported_fuchsia_package_archive()` targets directly.
+
+**Current value (from the default):** `[]`
+
+From //BUILD.gn:89
+
 ### extra_bazel_assembly_targets
 
 Extra GN targets to include when Bazel assembly is enabled. This list is
@@ -3474,24 +3493,6 @@ which is a full system image generated for exfiltrating instrumentation data fro
 
 From //build/testing/boot_tests/kernel_zbi_test.gni:17
 
-### generate_legacy_ninja_build_outputs_licenses_spdx
-
-Deprecated. No-op.
-TODO(https://fxbug.dev/42082793): Remove once unused downstream.
-
-**Current value (from the default):** `false`
-
-From //build/bazel/licenses/BUILD.gn:19
-
-### generate_legacy_ninja_build_outputs_licenses_spdx_from_metadata
-
-Deprecated. No-op.
-TODO(https://fxbug.dev/42082793): Remove once unused downstream.
-
-**Current value (from the default):** `true`
-
-From //build/bazel/licenses/BUILD.gn:23
-
 ### generate_licenses_spdx_stubs
 
 When true, generated_licenses_spdx template will generate stub SPDX files
@@ -3694,7 +3695,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:82
+From //BUILD.gn:96
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3702,7 +3703,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:82
+From //BUILD.gn:96
 
 ### host_byteorder
 
@@ -3728,7 +3729,7 @@ From //out/not-default/args.gn:9
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:108
+From //BUILD.gn:122
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3736,7 +3737,7 @@ From //out/not-default/args.gn:9
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:108
+From //BUILD.gn:122
 
 ### host_os
 
@@ -3755,7 +3756,7 @@ From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:96
+From //BUILD.gn:110
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3763,7 +3764,7 @@ From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:96
+From //BUILD.gn:110
 
 ### host_tools_base_path_override
 
@@ -7416,7 +7417,7 @@ From //products/bringup.gni:35
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:118
+From //BUILD.gn:132
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -7424,7 +7425,7 @@ From //products/bringup.gni:35
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:118
+From //BUILD.gn:132
 
 ### sdk_cross_compile_host_tools
 
@@ -7980,7 +7981,7 @@ afterwards.
 
 **Current value (from the default):** `""`
 
-From //BUILD.gn:114
+From //BUILD.gn:128
 
 ### test_package_labels
 
@@ -7993,7 +7994,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:86
+From //BUILD.gn:100
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -8001,7 +8002,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:86
+From //BUILD.gn:100
 
 ### testonly_in_containers
 
