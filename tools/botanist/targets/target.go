@@ -660,6 +660,11 @@ func StartTargets(ctx context.Context, opts StartOptions, targets []FuchsiaTarge
 	eg, startCtx := errgroup.WithContext(ctx)
 	for _, t := range targets {
 		t := t
+		// TODO(https://fxbug.dev/322239710): Remove once recipes are passing the
+		// bootup-timeout through to botanist.
+		if opts.IsBootTest {
+			t.SetConnectionTimeout(10 * time.Minute)
+		}
 		if opts.BootupTimeout > 0 {
 			t.SetConnectionTimeout(opts.BootupTimeout)
 		}
