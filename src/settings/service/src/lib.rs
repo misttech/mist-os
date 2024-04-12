@@ -32,7 +32,6 @@ use settings_storage::device_storage::DeviceStorage;
 use settings_storage::fidl_storage::FidlStorage;
 
 pub use display::display_configuration::DisplayConfiguration;
-pub use display::LightSensorConfig;
 pub use handler::setting_proxy_inspect_info::SettingProxyInspectInfo;
 pub use input::input_device_configuration::InputConfiguration;
 pub use light::light_hardware_configuration::LightHardwareConfiguration;
@@ -178,27 +177,6 @@ impl ServiceConfiguration {
 
     fn set_fidl_interfaces(&mut self, interfaces: HashSet<fidl::Interface>) {
         self.fidl_interfaces = interfaces;
-
-        let display_subinterfaces = [
-            fidl::Interface::Display(fidl::display::InterfaceFlags::LIGHT_SENSOR),
-            fidl::Interface::Display(fidl::display::InterfaceFlags::BASE),
-        ]
-        .into();
-
-        // Consolidate display type.
-        // TODO(https://fxbug.dev/42074066): Remove this special handling once light sensor is its own FIDL
-        // interface.
-        if self.fidl_interfaces.is_superset(&display_subinterfaces) {
-            self.fidl_interfaces = &self.fidl_interfaces - &display_subinterfaces;
-            let inserted = self.fidl_interfaces.insert(fidl::Interface::Display(
-                fidl::display::InterfaceFlags::BASE | fidl::display::InterfaceFlags::LIGHT_SENSOR,
-            ));
-            assert!(
-                inserted,
-                "Cannot insert the display interface twice. Please check the interface \
-                configuration"
-            );
-        }
     }
 
     fn set_controller_flags(&mut self, controller_flags: HashSet<ControllerFlag>) {

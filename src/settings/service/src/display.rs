@@ -5,7 +5,4 @@
 pub mod display_configuration;
 pub mod display_controller;
 mod display_fidl_handler;
-mod light_sensor_config;
 pub mod types;
-
-pub use light_sensor_config::LightSensorConfig;

@@ -7,7 +7,7 @@ use argh::FromArgs;
 use serde::de::DeserializeOwned;
 use settings::{
     AgentConfiguration, DisplayConfiguration, EnabledInterfacesConfiguration, InputConfiguration,
-    LightHardwareConfiguration, LightSensorConfig, ServiceFlags,
+    LightHardwareConfiguration, ServiceFlags,
 };
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -35,10 +35,6 @@ struct TestConfig {
     /// these configurations control which interfaces are enabled.
     #[argh(option, short = 'x')]
     interface_config: Vec<OsString>,
-
-    /// these configurations control specific settings within the light sensor controller.
-    #[argh(option, short = 'l')]
-    light_sensor_config: Vec<OsString>,
 
     /// these configurations control specific settings for light hardware.
     #[argh(option, short = 'h')]
@@ -81,10 +77,6 @@ fn main() -> Result<(), Error> {
 
     for config in test_config.interface_config.into_iter() {
         let _ = read_config::<EnabledInterfacesConfiguration>(&config)?;
-    }
-
-    for config in test_config.light_sensor_config.into_iter() {
-        let _ = read_config::<LightSensorConfig>(&config)?;
     }
 
     for config in test_config.light_hardware_config.into_iter() {

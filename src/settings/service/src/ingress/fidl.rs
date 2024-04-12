@@ -79,7 +79,6 @@ impl From<InterfaceSpec> for Interface {
     }
 }
 
-// TODO(https://fxbug.dev/42074066) Remove light sensor flags after configs updated.
 pub mod display {
     use bitflags::bitflags;
     use serde::Deserialize;
@@ -91,14 +90,12 @@ pub mod display {
         #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct InterfaceFlags: u64 {
             const BASE = 1 << 0;
-            const LIGHT_SENSOR = 1 << 1;
         }
     }
 
     #[derive(Copy, Clone, Deserialize, PartialEq, Eq, Hash, Debug)]
     pub enum InterfaceSpec {
         Base,
-        LightSensor,
     }
 
     impl From<Vec<InterfaceSpec>> for InterfaceFlags {
@@ -107,7 +104,6 @@ pub mod display {
                 flags
                     | match variant {
                         InterfaceSpec::Base => InterfaceFlags::BASE,
-                        InterfaceSpec::LightSensor => InterfaceFlags::LIGHT_SENSOR,
                     }
             })
         }

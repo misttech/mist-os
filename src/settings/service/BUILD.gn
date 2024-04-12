@@ -134,7 +134,6 @@ icu_rustc_library("lib") {
     "src/display/display_configuration.rs",
     "src/display/display_controller.rs",
     "src/display/display_fidl_handler.rs",
-    "src/display/light_sensor_config.rs",
     "src/display/types.rs",
     "src/do_not_disturb.rs",
     "src/do_not_disturb/do_not_disturb_controller.rs",
@@ -429,7 +428,6 @@ resource("sample-setui-config-test-resources") {
     "src/tests/testdata/input_device_configuration.json",
     "src/tests/testdata/interface_configuration.json",
     "src/tests/testdata/light_hardware_configuration.json",
-    "src/tests/testdata/light_sensor_configuration.json",
     "src/tests/testdata/service_flags.json",
   ]
   outputs = [ "data/{{source_file_part}}" ]

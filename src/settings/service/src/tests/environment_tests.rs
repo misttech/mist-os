@@ -149,21 +149,6 @@ async fn test_dependency_generation() {
 }
 
 #[fuchsia::test(allow_stalls = false)]
-async fn test_display_interface_consolidation() {
-    let Environment { entities, .. } =
-        EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
-            .fidl_interfaces(&[
-                fidl::Interface::Display(fidl::display::InterfaceFlags::BASE),
-                fidl::Interface::Display(fidl::display::InterfaceFlags::LIGHT_SENSOR),
-            ])
-            .spawn_nested(ENV_NAME)
-            .await
-            .expect("environment should be built");
-
-    assert!(entities.contains(&Entity::Handler(SettingType::Display)));
-}
-
-#[fuchsia::test(allow_stalls = false)]
 async fn test_job_sourcing() {
     // Create channel to send the current job state.
     let (job_state_tx, mut job_state_rx) = futures::channel::mpsc::unbounded::<channel::State>();
