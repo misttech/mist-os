@@ -6,7 +6,8 @@ use {
     anyhow::{bail, format_err, Result},
     fdio::Namespace,
     fidl::endpoints::{
-        create_endpoints, ClientEnd, DiscoverableProtocolMarker, Proxy, ServiceMarker, ServiceProxy,
+        create_endpoints, ClientEnd, DiscoverableProtocolMarker, Proxy, ServerEnd, ServiceMarker,
+        ServiceProxy,
     },
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_io as fio,
@@ -150,6 +151,16 @@ impl RealmProxyClient {
         self.connect_to_named_protocol::<T>(T::PROTOCOL_NAME).await
     }
 
+    // Connects the `sever_end` to the protocol marked by [T] via the proxy.
+    //
+    // Returns an error if the connection fails.
+    pub async fn connect_server_end_to_protocol<T: DiscoverableProtocolMarker>(
+        &self,
+        server_end: ServerEnd<T>,
+    ) -> Result<(), anyhow::Error> {
+        self.connect_server_end_to_named_protocol::<T>(T::PROTOCOL_NAME, server_end).await
+    }
+
     // Connects to the protocol with the given name, via the proxy.
     //
     // Returns an error if the connection fails.
@@ -158,14 +169,26 @@ impl RealmProxyClient {
         protocol_name: &str,
     ) -> Result<T::Proxy, anyhow::Error> {
         let (client, server) = create_endpoints::<T>();
+        self.connect_server_end_to_named_protocol(protocol_name, server).await?;
+        Ok(client.into_proxy()?)
+    }
+
+    // Connects the `server_end` to the protocol with the given name, via the proxy.
+    //
+    // Returns an error if the connection fails.
+    pub async fn connect_server_end_to_named_protocol<T: DiscoverableProtocolMarker>(
+        &self,
+        protocol_name: &str,
+        server_end: ServerEnd<T>,
+    ) -> Result<(), anyhow::Error> {
         let res =
-            self.inner.connect_to_named_protocol(protocol_name, server.into_channel()).await?;
+            self.inner.connect_to_named_protocol(protocol_name, server_end.into_channel()).await?;
 
         if let Some(op_err) = res.err() {
             bail!("{:?}", op_err);
         }
 
-        Ok(client.into_proxy()?)
+        Ok(())
     }
 
     // Opens the given service capability, via the proxy.
