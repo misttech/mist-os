@@ -332,6 +332,9 @@ impl HostDevice {
                             error!("Failed to persist bonding data: {:#?}", e);
                         }
                     }
+                    HostEvent::_UnknownEvent { ordinal, .. } => {
+                        warn!("Received unknown event with ordinal {ordinal}");
+                    }
                 };
             }
             Err(types::Error::InternalError(format_err!("Host FIDL event stream terminated")))

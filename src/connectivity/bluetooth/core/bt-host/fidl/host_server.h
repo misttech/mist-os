@@ -113,6 +113,7 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   void RequestProfile(
       ::fidl::InterfaceRequest<fuchsia::bluetooth::bredr::Profile> profile) override;
   void Close() override;
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
 
  private:
   // bt::gap::PairingDelegate overrides:

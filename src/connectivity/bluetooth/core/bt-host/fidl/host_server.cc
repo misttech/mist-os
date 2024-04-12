@@ -801,6 +801,10 @@ void HostServer::Close() {
   }
 }
 
+void HostServer::handle_unknown_method(uint64_t ordinal, bool method_has_response) {
+  bt_log(WARN, "fidl", "Received unknown method with ordinal: %lu", ordinal);
+}
+
 bt::sm::IOCapability HostServer::io_capability() const {
   bt_log(DEBUG, "fidl", "I/O capability: %s",
          bt::sm::util::IOCapabilityToString(io_capability_).c_str());
