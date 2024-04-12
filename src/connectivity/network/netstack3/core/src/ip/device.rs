@@ -57,8 +57,8 @@ use crate::{
             router_solicitation::{RsHandler, RsTimerId},
             slaac::{SlaacHandler, SlaacTimerId},
             state::{
-                IpDeviceConfiguration, IpDeviceFlags, IpDeviceState, IpDeviceStateIpExt,
-                Ipv4AddrConfig, Ipv4AddressState, Ipv4DeviceConfiguration,
+                IpDeviceConfiguration, IpDeviceFlags, IpDeviceState, IpDeviceStateBindingsTypes,
+                IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressState, Ipv4DeviceConfiguration,
                 Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState, Ipv6AddrConfig,
                 Ipv6AddrManualConfig, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration,
                 Ipv6DeviceConfigurationAndFlags, Ipv6DeviceState, Lifetime,
@@ -315,7 +315,8 @@ where
 
 /// An extension trait adding IP device properties.
 pub trait IpDeviceIpExt: IpDeviceStateIpExt {
-    type State<I: Instant>: AsRef<IpDeviceState<I, Self>> + AsMut<IpDeviceState<I, Self>>;
+    type State<BT: IpDeviceStateBindingsTypes>: AsRef<IpDeviceState<Self, BT>>
+        + AsMut<IpDeviceState<Self, BT>>;
     type Configuration: AsRef<IpDeviceConfiguration> + Clone;
     type Timer<DeviceId>: Into<IpDeviceTimerId<Self, DeviceId>>
         + From<IpDeviceTimerId<Self, DeviceId>>;
@@ -344,7 +345,7 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt {
 }
 
 impl IpDeviceIpExt for Ipv4 {
-    type State<I: Instant> = Ipv4DeviceState<I>;
+    type State<BT: IpDeviceStateBindingsTypes> = Ipv4DeviceState<BT>;
     type Configuration = Ipv4DeviceConfiguration;
     type Timer<DeviceId> = Ipv4DeviceTimerId<DeviceId>;
     type AssignedWitness = SpecifiedAddr<Ipv4Addr>;
@@ -365,7 +366,7 @@ impl IpDeviceIpExt for Ipv4 {
 }
 
 impl IpDeviceIpExt for Ipv6 {
-    type State<I: Instant> = Ipv6DeviceState<I>;
+    type State<BT: IpDeviceStateBindingsTypes> = Ipv6DeviceState<BT>;
     type Configuration = Ipv6DeviceConfiguration;
     type Timer<DeviceId> = Ipv6DeviceTimerId<DeviceId>;
     type AssignedWitness = Ipv6DeviceAddr;

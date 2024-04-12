@@ -5718,7 +5718,7 @@ mod test {
         unicast = unicast.checked_add(1).unwrap();
         {
             let ip_socket_ctx = core_ctx.inner.inner.get_ref();
-            let device_state: &IpDeviceState<_, I> =
+            let device_state: &IpDeviceState<I, _> =
                 ip_socket_ctx.get_device_state(&FakeDeviceId).as_ref();
             let mut default_hop_limit = device_state.default_hop_limit.write();
             let default_hop_limit = default_hop_limit.deref_mut();
@@ -5859,7 +5859,7 @@ mod test {
     fn multicast_membership_changes<I: Ip + DatagramIpExt<MultipleDevicesId> + TestIpExt>(
         remove_device_b: bool,
     ) {
-        let mut core_ctx = FakeIpSocketCtx::<I, MultipleDevicesId>::new(
+        let mut core_ctx = FakeIpSocketCtx::<I, MultipleDevicesId, _>::new(
             MultipleDevicesId::all().into_iter().map(|device| FakeDeviceConfig {
                 device,
                 local_ips: Default::default(),

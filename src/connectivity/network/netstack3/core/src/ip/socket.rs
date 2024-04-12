@@ -977,15 +977,22 @@ pub(crate) mod testutil {
     #[derive(Derivative, GenericOverIp)]
     #[generic_over_ip(I, Ip)]
     #[derivative(Default(bound = ""))]
-    pub(crate) struct FakeIpSocketCtx<I: IpLayerIpExt + IpDeviceStateIpExt, D> {
+    pub(crate) struct FakeIpSocketCtx<
+        I: IpLayerIpExt + IpDeviceStateIpExt,
+        D,
+        BT: IpDeviceStateBindingsTypes,
+    > {
         pub(crate) table: ForwardingTable<I, D>,
-        device_state: HashMap<D, IpDeviceState<FakeInstant, I>>,
+        device_state: HashMap<D, IpDeviceState<I, BT>>,
         ip_forwarding_ctx: FakeIpForwardingCtx<D>,
         pub(crate) counters: IpCounters<I>,
     }
 
-    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D, BC: FilterBindingsTypes>
-        FilterHandlerProvider<I, BC> for FakeIpSocketCtx<I, D>
+    impl<
+            I: IpLayerIpExt + IpDeviceStateIpExt,
+            D,
+            BC: FilterBindingsTypes + IpDeviceStateBindingsTypes,
+        > FilterHandlerProvider<I, BC> for FakeIpSocketCtx<I, D, BC>
     {
         type Handler<'a> = crate::filter::NoopImpl where Self: 'a;
 
@@ -994,16 +1001,16 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D> CounterContext<IpCounters<I>>
-        for FakeIpSocketCtx<I, D>
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D, BT: IpDeviceStateBindingsTypes>
+        CounterContext<IpCounters<I>> for FakeIpSocketCtx<I, D, BT>
     {
         fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
             cb(&self.counters)
         }
     }
 
-    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D> AsRef<FakeIpDeviceIdCtx<D>>
-        for FakeIpSocketCtx<I, D>
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D, BT: IpDeviceStateBindingsTypes>
+        AsRef<FakeIpDeviceIdCtx<D>> for FakeIpSocketCtx<I, D, BT>
     {
         fn as_ref(&self) -> &FakeIpDeviceIdCtx<D> {
             let FakeIpSocketCtx { device_state: _, table: _, ip_forwarding_ctx, counters: _ } =
@@ -1012,8 +1019,8 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D> AsMut<FakeIpDeviceIdCtx<D>>
-        for FakeIpSocketCtx<I, D>
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D, BT: IpDeviceStateBindingsTypes>
+        AsMut<FakeIpDeviceIdCtx<D>> for FakeIpSocketCtx<I, D, BT>
     {
         fn as_mut(&mut self) -> &mut FakeIpDeviceIdCtx<D> {
             let FakeIpSocketCtx { device_state: _, table: _, ip_forwarding_ctx, counters: _ } =
@@ -1022,13 +1029,17 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D> AsRef<Self> for FakeIpSocketCtx<I, D> {
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D, BT: IpDeviceStateBindingsTypes> AsRef<Self>
+        for FakeIpSocketCtx<I, D, BT>
+    {
         fn as_ref(&self) -> &Self {
             self
         }
     }
 
-    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D> AsMut<Self> for FakeIpSocketCtx<I, D> {
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D, BT: IpDeviceStateBindingsTypes> AsMut<Self>
+        for FakeIpSocketCtx<I, D, BT>
+    {
         fn as_mut(&mut self) -> &mut Self {
             self
         }
@@ -1050,9 +1061,13 @@ pub(crate) mod testutil {
 
     impl<
             I: IpLayerIpExt + IpDeviceStateIpExt,
-            BC: InstantContext + TracingContext + FilterBindingsTypes,
+            BC: InstantContext
+                + TracingContext
+                + FilterBindingsTypes
+                + IpDeviceStateBindingsTypes
+                + 'static,
             DeviceId: FakeFilterDeviceId<BC::DeviceClass>,
-        > TransportIpContext<I, BC> for FakeIpSocketCtx<I, DeviceId>
+        > TransportIpContext<I, BC> for FakeIpSocketCtx<I, DeviceId, BC>
     {
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
             device.map_or(DEFAULT_HOP_LIMITS, |device| {
@@ -1079,8 +1094,11 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpLayerIpExt + IpDeviceStateIpExt, DeviceId: FakeStrongDeviceId>
-        DeviceIdContext<AnyDevice> for FakeIpSocketCtx<I, DeviceId>
+    impl<
+            I: IpLayerIpExt + IpDeviceStateIpExt,
+            DeviceId: FakeStrongDeviceId,
+            BT: IpDeviceStateBindingsTypes,
+        > DeviceIdContext<AnyDevice> for FakeIpSocketCtx<I, DeviceId, BT>
     {
         type DeviceId = <FakeIpDeviceIdCtx<DeviceId> as DeviceIdContext<AnyDevice>>::DeviceId;
         type WeakDeviceId =
@@ -1098,10 +1116,14 @@ pub(crate) mod testutil {
         }
     }
 
-    fn lookup_route<I: IpDeviceStateIpExt, D: FakeStrongDeviceId, Instant: crate::Instant>(
+    fn lookup_route<
+        I: IpDeviceStateIpExt,
+        D: FakeStrongDeviceId,
+        BT: IpDeviceStateBindingsTypes,
+    >(
         table: &ForwardingTable<I, D>,
         ip_forwarding_ctx: &mut FakeIpForwardingCtx<D>,
-        device_state: &HashMap<D, impl AsRef<IpDeviceState<Instant, I>>>,
+        device_state: &HashMap<D, impl AsRef<IpDeviceState<I, BT>>>,
         device: Option<&D>,
         local_ip: Option<IpDeviceAddr<I::Addr>>,
         addr: RoutableIpAddr<I::Addr>,
@@ -1144,9 +1166,9 @@ pub(crate) mod testutil {
 
     impl<
             I: IpLayerIpExt + IpDeviceStateIpExt,
-            BC: InstantContext + TracingContext + FilterBindingsTypes,
+            BC: InstantContext + TracingContext + FilterBindingsTypes + IpDeviceStateBindingsTypes,
             DeviceId: FakeFilterDeviceId<BC::DeviceClass>,
-        > IpSocketContext<I, BC> for FakeIpSocketCtx<I, DeviceId>
+        > IpSocketContext<I, BC> for FakeIpSocketCtx<I, DeviceId, BC>
     {
         fn lookup_route(
             &mut self,
@@ -1171,9 +1193,11 @@ pub(crate) mod testutil {
 
     impl<
             I: IpLayerIpExt + IpDeviceStateIpExt,
-            S: AsRef<FakeIpSocketCtx<I, DeviceId>>
-                + AsMut<FakeIpSocketCtx<I, DeviceId>>
-                + AsRef<FakeIpDeviceIdCtx<DeviceId>>,
+            S: AsRef<
+                    FakeIpSocketCtx<I, DeviceId, FakeBindingsCtx<Id, Event, BindingsCtxState, ()>>,
+                > + AsMut<
+                    FakeIpSocketCtx<I, DeviceId, FakeBindingsCtx<Id, Event, BindingsCtxState, ()>>,
+                > + AsRef<FakeIpDeviceIdCtx<DeviceId>>,
             Id,
             Meta,
             Event: Debug,
@@ -1221,11 +1245,14 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId> FakeIpSocketCtx<I, D> {
+    impl<
+            I: IpLayerIpExt + IpDeviceStateIpExt,
+            D: FakeStrongDeviceId,
+            BT: IpDeviceStateBindingsTypes,
+        > FakeIpSocketCtx<I, D, BT>
+    {
         pub(crate) fn with_devices_state(
-            devices: impl IntoIterator<
-                Item = (D, IpDeviceState<FakeInstant, I>, Vec<SpecifiedAddr<I::Addr>>),
-            >,
+            devices: impl IntoIterator<Item = (D, IpDeviceState<I, BT>, Vec<SpecifiedAddr<I::Addr>>)>,
         ) -> Self {
             let mut table = ForwardingTable::default();
             let mut device_state = HashMap::default();
@@ -1259,7 +1286,7 @@ pub(crate) mod testutil {
             find_devices_with_addr::<I, _, _>(device_state, addr)
         }
 
-        pub(crate) fn get_device_state(&self, device: &D) -> &IpDeviceState<FakeInstant, I> {
+        pub(crate) fn get_device_state(&self, device: &D) -> &IpDeviceState<I, BT> {
             let Self { device_state, table: _, ip_forwarding_ctx: _, counters: _ } = self;
             device_state.get(device).unwrap_or_else(|| panic!("no device {device:?}"))
         }
@@ -1268,9 +1295,9 @@ pub(crate) mod testutil {
     fn find_devices_with_addr<
         I: IpLayerIpExt + IpDeviceStateIpExt,
         D: FakeStrongDeviceId,
-        Instant: crate::Instant,
+        BT: IpDeviceStateBindingsTypes,
     >(
-        device_state: &HashMap<D, impl AsRef<IpDeviceState<Instant, I>>>,
+        device_state: &HashMap<D, impl AsRef<IpDeviceState<I, BT>>>,
         addr: SpecifiedAddr<I::Addr>,
     ) -> impl Iterator<Item = D> + '_ {
         device_state.iter().filter_map(move |(device, state)| {
@@ -1286,9 +1313,9 @@ pub(crate) mod testutil {
     fn multicast_memberships<
         I: IpDeviceStateIpExt,
         D: FakeStrongDeviceId,
-        Instant: crate::Instant,
+        BT: IpDeviceStateBindingsTypes,
     >(
-        device_state: &HashMap<D, impl AsRef<IpDeviceState<Instant, I>>>,
+        device_state: &HashMap<D, impl AsRef<IpDeviceState<I, BT>>>,
     ) -> HashMap<(D, MulticastAddr<I::Addr>), NonZeroUsize> {
         device_state
             .iter()
@@ -1307,8 +1334,8 @@ pub(crate) mod testutil {
     impl<
             I: IpLayerIpExt + IpDeviceStateIpExt,
             D: FakeStrongDeviceId,
-            BC: RngContext + InstantContext<Instant = FakeInstant>,
-        > MulticastMembershipHandler<I, BC> for FakeIpSocketCtx<I, D>
+            BC: RngContext + InstantContext<Instant = FakeInstant> + IpDeviceStateBindingsTypes,
+        > MulticastMembershipHandler<I, BC> for FakeIpSocketCtx<I, D, BC>
     {
         fn join_multicast_group(
             &mut self,
@@ -1753,7 +1780,7 @@ pub(crate) mod testutil {
             } = self;
             let state =
                 device_state.get_mut(device).unwrap_or_else(|| panic!("no device {device:?}"));
-            let state: &IpDeviceState<_, I> = state.as_ref();
+            let state: &IpDeviceState<I, _> = state.as_ref();
             let mut groups = state.multicast_groups.write();
             groups.join_multicast_group(bindings_ctx, addr)
         }
@@ -1778,7 +1805,7 @@ pub(crate) mod testutil {
             } = self;
             let state =
                 device_state.get_mut(device).unwrap_or_else(|| panic!("no device {device:?}"));
-            let state: &IpDeviceState<_, I> = state.as_ref();
+            let state: &IpDeviceState<I, _> = state.as_ref();
             let mut groups = state.multicast_groups.write();
             groups.leave_multicast_group(addr)
         }
@@ -1809,7 +1836,7 @@ pub(crate) mod testutil {
     {
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
             device.map_or(DEFAULT_HOP_LIMITS, |device| {
-                let state: &IpDeviceState<_, I> = self.get_device_state(device).as_ref();
+                let state: &IpDeviceState<I, _> = self.get_device_state(device).as_ref();
                 let hop_limit = state.default_hop_limit.read().clone();
                 HopLimits { unicast: hop_limit, multicast: DEFAULT_HOP_LIMITS.multicast }
             })
@@ -1841,7 +1868,12 @@ pub(crate) mod testutil {
         pub(crate) remote_ips: Vec<A>,
     }
 
-    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId> FakeIpSocketCtx<I, D> {
+    impl<
+            I: IpLayerIpExt + IpDeviceStateIpExt,
+            D: FakeStrongDeviceId,
+            BT: IpDeviceStateBindingsTypes,
+        > FakeIpSocketCtx<I, D, BT>
+    {
         /// Creates a new `FakeIpSocketCtx<Ipv6>` with the given device
         /// configs.
         pub(crate) fn new(

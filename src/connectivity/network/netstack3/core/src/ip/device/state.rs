@@ -120,17 +120,17 @@ pub struct IpDeviceFlags {
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 #[cfg_attr(test, derive(Debug))]
-pub struct IpDeviceState<Instant: crate::Instant, I: IpDeviceStateIpExt> {
+pub struct IpDeviceState<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> {
     /// IP addresses assigned to this device.
     ///
     /// IPv6 addresses may be tentative (performing NDP's Duplicate Address
     /// Detection).
     ///
     /// Does not contain any duplicates.
-    pub addrs: RwLock<IpDeviceAddresses<Instant, I>>,
+    pub addrs: RwLock<IpDeviceAddresses<BT::Instant, I>>,
 
     /// Multicast groups this device has joined.
-    pub multicast_groups: RwLock<MulticastGroupSet<I::Addr, I::GmpState<Instant>>>,
+    pub multicast_groups: RwLock<MulticastGroupSet<I::Addr, I::GmpState<BT::Instant>>>,
 
     /// The default TTL (IPv4) or hop limit (IPv6) for outbound packets sent
     /// over this device.
@@ -286,8 +286,8 @@ impl<BT: IpDeviceStateBindingsTypes> UnlockedAccess<crate::lock_ordering::Routin
     }
 }
 
-impl<Instant: crate::Instant, I: IpDeviceStateIpExt> Default for IpDeviceState<Instant, I> {
-    fn default() -> IpDeviceState<Instant, I> {
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> Default for IpDeviceState<I, BT> {
+    fn default() -> IpDeviceState<I, BT> {
         IpDeviceState {
             addrs: Default::default(),
             multicast_groups: Default::default(),
@@ -352,8 +352,8 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceAddresses<Instant, 
 }
 
 /// The state common to all IPv4 devices.
-pub struct Ipv4DeviceState<I: Instant> {
-    pub(crate) ip_state: IpDeviceState<I, Ipv4>,
+pub struct Ipv4DeviceState<BT: IpDeviceStateBindingsTypes> {
+    pub(crate) ip_state: IpDeviceState<Ipv4, BT>,
     pub(super) config: RwLock<Ipv4DeviceConfiguration>,
 }
 
@@ -375,20 +375,20 @@ impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::IpDeviceCon
     }
 }
 
-impl<I: Instant> Default for Ipv4DeviceState<I> {
-    fn default() -> Ipv4DeviceState<I> {
+impl<BT: IpDeviceStateBindingsTypes> Default for Ipv4DeviceState<BT> {
+    fn default() -> Ipv4DeviceState<BT> {
         Ipv4DeviceState { ip_state: Default::default(), config: Default::default() }
     }
 }
 
-impl<I: Instant> AsRef<IpDeviceState<I, Ipv4>> for Ipv4DeviceState<I> {
-    fn as_ref(&self) -> &IpDeviceState<I, Ipv4> {
+impl<BT: IpDeviceStateBindingsTypes> AsRef<IpDeviceState<Ipv4, BT>> for Ipv4DeviceState<BT> {
+    fn as_ref(&self) -> &IpDeviceState<Ipv4, BT> {
         &self.ip_state
     }
 }
 
-impl<I: Instant> AsMut<IpDeviceState<I, Ipv4>> for Ipv4DeviceState<I> {
-    fn as_mut(&mut self) -> &mut IpDeviceState<I, Ipv4> {
+impl<BT: IpDeviceStateBindingsTypes> AsMut<IpDeviceState<Ipv4, BT>> for Ipv4DeviceState<BT> {
+    fn as_mut(&mut self) -> &mut IpDeviceState<Ipv4, BT> {
         &mut self.ip_state
     }
 }
@@ -640,16 +640,16 @@ impl Ipv6NetworkLearnedParameters {
 }
 
 /// The state common to all IPv6 devices.
-pub struct Ipv6DeviceState<I: Instant> {
+pub struct Ipv6DeviceState<BT: IpDeviceStateBindingsTypes> {
     pub(super) learned_params: RwLock<Ipv6NetworkLearnedParameters>,
     pub(super) route_discovery: Mutex<Ipv6RouteDiscoveryState>,
     pub(super) router_soliciations_remaining: Mutex<Option<NonZeroU8>>,
-    pub(crate) ip_state: IpDeviceState<I, Ipv6>,
+    pub(crate) ip_state: IpDeviceState<Ipv6, BT>,
     pub(crate) config: RwLock<Ipv6DeviceConfiguration>,
 }
 
-impl<I: Instant> Default for Ipv6DeviceState<I> {
-    fn default() -> Ipv6DeviceState<I> {
+impl<BT: IpDeviceStateBindingsTypes> Default for Ipv6DeviceState<BT> {
+    fn default() -> Ipv6DeviceState<BT> {
         Ipv6DeviceState {
             learned_params: Default::default(),
             route_discovery: Default::default(),
@@ -660,14 +660,14 @@ impl<I: Instant> Default for Ipv6DeviceState<I> {
     }
 }
 
-impl<I: Instant> AsRef<IpDeviceState<I, Ipv6>> for Ipv6DeviceState<I> {
-    fn as_ref(&self) -> &IpDeviceState<I, Ipv6> {
+impl<BT: IpDeviceStateBindingsTypes> AsRef<IpDeviceState<Ipv6, BT>> for Ipv6DeviceState<BT> {
+    fn as_ref(&self) -> &IpDeviceState<Ipv6, BT> {
         &self.ip_state
     }
 }
 
-impl<I: Instant> AsMut<IpDeviceState<I, Ipv6>> for Ipv6DeviceState<I> {
-    fn as_mut(&mut self) -> &mut IpDeviceState<I, Ipv6> {
+impl<BT: IpDeviceStateBindingsTypes> AsMut<IpDeviceState<Ipv6, BT>> for Ipv6DeviceState<BT> {
+    fn as_mut(&mut self) -> &mut IpDeviceState<Ipv6, BT> {
         &mut self.ip_state
     }
 }
@@ -679,10 +679,10 @@ impl<BT> IpDeviceStateBindingsTypes for BT where BT: InstantBindingsTypes {}
 /// IPv4 and IPv6 state combined.
 pub(crate) struct DualStackIpDeviceState<BT: IpDeviceStateBindingsTypes> {
     /// IPv4 state.
-    pub ipv4: Ipv4DeviceState<BT::Instant>,
+    pub ipv4: Ipv4DeviceState<BT>,
 
     /// IPv6 state.
-    pub ipv6: Ipv6DeviceState<BT::Instant>,
+    pub ipv6: Ipv6DeviceState<BT>,
 
     /// The device's routing metric.
     pub metric: RawMetric,
@@ -990,16 +990,16 @@ pub(crate) mod testutil {
 
     use net_types::{ip::IpInvariant, Witness as _};
 
-    impl<I: IpDeviceStateIpExt, Instant: crate::Instant> AsRef<Self> for IpDeviceState<Instant, I> {
+    impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> AsRef<Self> for IpDeviceState<I, BT> {
         fn as_ref(&self) -> &Self {
             self
         }
     }
 
-    impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> AsRef<IpDeviceState<BT::Instant, I>>
+    impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> AsRef<IpDeviceState<I, BT>>
         for DualStackIpDeviceState<BT>
     {
-        fn as_ref(&self) -> &IpDeviceState<BT::Instant, I> {
+        fn as_ref(&self) -> &IpDeviceState<I, BT> {
             I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(dual_stack)| &dual_stack.ipv4.ip_state,
@@ -1008,10 +1008,10 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> AsMut<IpDeviceState<BT::Instant, I>>
+    impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> AsMut<IpDeviceState<I, BT>>
         for DualStackIpDeviceState<BT>
     {
-        fn as_mut(&mut self) -> &mut IpDeviceState<BT::Instant, I> {
+        fn as_mut(&mut self) -> &mut IpDeviceState<I, BT> {
             I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(dual_stack)| &mut dual_stack.ipv4.ip_state,
@@ -1021,8 +1021,8 @@ pub(crate) mod testutil {
     }
 
     /// Adds an address and route for the size-1 subnet containing the address.
-    pub(crate) fn add_addr_subnet<A: IpAddress, Instant: crate::Instant>(
-        device_state: &mut IpDeviceState<Instant, A::Version>,
+    pub(crate) fn add_addr_subnet<A: IpAddress, BT: IpDeviceStateBindingsTypes>(
+        device_state: &mut IpDeviceState<A::Version, BT>,
         ip: SpecifiedAddr<A>,
     ) where
         A::Version: IpDeviceStateIpExt,

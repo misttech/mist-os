@@ -318,7 +318,7 @@ impl<
         Accessor: IpDeviceStateContext<I, BC> + GmpQueryHandler<I, BC>,
     > Iterator for FilterPresentWithDevices<I, Devices, Accessor, BC>
 where
-    <I as IpDeviceIpExt>::State<BC::Instant>: 's,
+    <I as IpDeviceIpExt>::State<BC>: 's,
 {
     type Item = (Accessor::DeviceId, I::AddressStatus);
     fn next(&mut self) -> Option<Self::Item> {
