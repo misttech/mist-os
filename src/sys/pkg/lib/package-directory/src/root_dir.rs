@@ -25,19 +25,19 @@ use {
     vfs::{
         common::send_on_open_with_error,
         directory::{
-            entry::{EntryInfo, OpenRequest},
+            entry::{EntryInfo, FlagsOrProtocols, OpenRequest},
             immutable::connection::ImmutableConnection,
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
         immutable_attributes,
         path::Path as VfsPath,
-        ToObjectRequest,
+        ProtocolsExt as _, ToObjectRequest,
     },
 };
 
 #[cfg(feature = "supports_open2")]
-use vfs::{CreationMode, ObjectRequestRef, ProtocolsExt as _};
+use vfs::{CreationMode, ObjectRequestRef};
 
 /// The root directory of Fuchsia package.
 #[derive(Debug)]
@@ -457,12 +457,18 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
         let canonical_path = path.as_ref().strip_suffix('/').unwrap_or_else(|| path.as_ref());
 
         if canonical_path == "meta" {
+            // TODO(https://fxbug.dev/328485661): consider retrieving the merkle root by retrieving
+            // the attribute instead of opening as a file to read the merkle root content.
+            //
             // This branch is done here instead of in MetaAsDir so that Clone'ing MetaAsDir yields
             // MetaAsDir. See the MetaAsDir::open impl for more.
-            return if !protocols.is_dir_allowed() {
+            return if open_meta_as_file(&protocols) {
                 vfs::file::serve(MetaAsFile::new(self), scope, &protocols, object_request)
-            } else {
+            } else if protocols.is_node() || protocols.is_dir_allowed() {
                 MetaAsDir::new(self).open2(scope, VfsPath::dot(), protocols, object_request)
+            } else {
+                // Reject opening as a symlink.
+                Err(zx::Status::WRONG_TYPE)
             };
         }
 
@@ -543,8 +549,28 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
 }
 
 // Behavior copied from pkgfs.
-fn open_meta_as_file(flags: fio::OpenFlags) -> bool {
-    !flags.intersects(fio::OpenFlags::DIRECTORY | fio::OpenFlags::NODE_REFERENCE)
+//
+// "meta" can be opened as a file or directory. To be POSIX compliant, we need to consider the
+// mapping of the POSIX flags and Fuchsia's flags. Consider the scenario where we try to open
+// "meta" before reading it via the POSIX open: `open("meta", O_RDONLY)`. In this case, we want to
+// open "meta" as a file. However, since "meta" supports both the file and directory protocols,
+// there is ambiguity on what it should be opened as.
+//
+// There is a direct mapping between the POSIX `O_DIRECTORY` flag and
+// `fio::OpenFlags::DIRECTORY` (io1) or specifying some `DirectoryProtocolOptions` (io2). However,
+// there is no POSIX equivalent to `fio::OpenFlags::NOT_DIRECTORY` (io1) or
+// `FileProtocolFlags` (io2). To be able to open the node as a file, we need to default to open as
+// a file if no flags or protocols were specified.
+fn open_meta_as_file<'a>(flags_or_protocols: impl Into<FlagsOrProtocols<'a>>) -> bool {
+    match flags_or_protocols.into() {
+        FlagsOrProtocols::Flags(flags) => {
+            !flags.intersects(fio::OpenFlags::DIRECTORY | fio::OpenFlags::NODE_REFERENCE)
+        }
+        FlagsOrProtocols::Protocols(protocols) => {
+            // If no protocol was specified, default to opening as file.
+            protocols.is_any_node_protocol_allowed() || protocols.is_file_allowed()
+        }
+    }
 }
 
 // Open a non-meta file by hash with flags of `OPEN_RIGHT_READABLE | additional_flags` and return
@@ -1057,6 +1083,28 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open_meta_as_node_reference() {
+        let (_env, root_dir) = TestEnv::new().await;
+
+        for path in ["meta", "meta/"] {
+            let (proxy, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
+
+            root_dir.clone().open(
+                ExecutionScope::new(),
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NODE_REFERENCE,
+                VfsPath::validate_and_split(path).unwrap(),
+                server_end.into_channel().into(),
+            );
+
+            // Check that open as a node reference passed by calling `get_attr()` on the proxy.
+            // The returned attributes should indicate the meta is a directory.
+            let (status, attr) = proxy.get_attr().await.expect("get_attr failed");
+            assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
+            assert_eq!(attr.mode & fio::MODE_TYPE_MASK, fio::MODE_TYPE_DIRECTORY);
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_meta_file() {
         let (_env, root_dir) = TestEnv::new().await;
 
@@ -1293,6 +1341,80 @@ mod tests {
                     DirEntry { name: "fuchsia.abi".to_string(), kind: DirentKind::Directory },
                     DirEntry { name: "package".to_string(), kind: DirentKind::File },
                 ]
+            );
+        }
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_meta_as_node_reference() {
+        let (_env, root_dir) = TestEnv::new().await;
+
+        for path in ["meta", "meta/"] {
+            let (proxy, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
+            let scope = ExecutionScope::new();
+            let path = VfsPath::validate_and_split(path).unwrap();
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
+                protocols: Some(fio::NodeProtocols {
+                    node: Some(fio::NodeProtocolFlags::default()),
+                    ..Default::default()
+                }),
+                rights: Some(fio::Operations::GET_ATTRIBUTES),
+                attributes: Some(fio::NodeAttributesQuery::PROTOCOLS),
+                ..Default::default()
+            });
+
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| root_dir.clone().open2(scope, path, protocols, req));
+
+            let event = proxy
+                .take_event_stream()
+                .try_next()
+                .await
+                .expect("take_event_stream failed")
+                .expect("expected an OnRepresentation event");
+            let representation = match event {
+                fio::NodeEvent::OnRepresentation { payload } => payload,
+                fio::NodeEvent::OnOpen_ { .. } => panic!("unexpected OnOpen representation"),
+            };
+            assert_matches!(representation,
+                fio::Representation::Connector(fio::ConnectorInfo {
+                    attributes: Some(node_attributes),
+                    ..
+                })
+                if node_attributes == immutable_attributes!(
+                    fio::NodeAttributesQuery::PROTOCOLS,
+                    Immutable { protocols: fio::NodeProtocolKinds::DIRECTORY }
+                )
+            );
+        }
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_meta_as_symlink_wrong_type() {
+        let (_env, root_dir) = TestEnv::new().await;
+
+        // Opening as symlink should return an error
+        for path in ["meta", "meta/"] {
+            let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>().unwrap();
+            let scope = ExecutionScope::new();
+            let path = VfsPath::validate_and_split(path).unwrap();
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    symlink: Some(fio::SymlinkProtocolFlags::default()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| root_dir.clone().open2(scope, path, protocols, req));
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::WRONG_TYPE, .. })
             );
         }
     }
