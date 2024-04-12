@@ -496,3 +496,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0239_platform_versioning_in_practice.md
   - title: "RFC-0240: Asynchronous operations are on objects"
     path: /docs/contribute/governance/rfcs/0240_async_ops_are_on_objects.md
+  - title: "RFC-0242: Configuration Capabilities"
+    path: /docs/contribute/governance/rfcs/0242_configuration_capabilities.md
