@@ -40,7 +40,7 @@ void Usage() {
 
 Usage: fidlc [--json JSON_PATH]
              [--available PLATFORM:VERSION]
-             [--platform PLATFORM]
+             [--versioned PLATFORM[:VERSION]]
              [--name LIBRARY_NAME]
              [--experimental FLAG_NAME]
              [--werror]
@@ -69,8 +69,9 @@ Options:
     PLATFORM corresponds to a library's `@available(platform="PLATFORM")` attribute,
     or to the library name's first component if the `platform` argument is omitted.
 
- * `--platform PLATFORM`. If present, this flag instructs `fidlc` to validate
-   that the main library being compiled is versioned under PLATFORM.
+ * `--versioned PLATFORM[:VERSION]`. If present, this flag instructs `fidlc` to
+   validate that the main library being compiled is versioned under PLATFORM.
+   If VERSION is provided, also validates that the library is added at VERSION.
    The library's platform is determined as follows:
     * If there are no `@available` attributes, the platform is "unversioned".
     * The platform can be explicit with `@available(platform="PLATFORM")`.
@@ -252,6 +253,25 @@ class ArgvArguments : public Arguments {
   std::unique_ptr<ResponseFileArguments> response_file_;
 };
 
+std::pair<fidlc::Platform, std::optional<fidlc::Version>> ParsePlatformAndVersion(
+    const std::string& arg) {
+  auto colon_idx = arg.find(':');
+  auto platform_str = arg.substr(0, colon_idx);
+  auto platform = fidlc::Platform::Parse(platform_str);
+  if (!platform.has_value())
+    FailWithUsage("Invalid platform name `%s`\n", platform_str.c_str());
+  std::optional<fidlc::Version> version;
+  if (colon_idx != std::string::npos) {
+    auto version_str = arg.substr(colon_idx + 1);
+    version = fidlc::Version::Parse(version_str);
+    if (!version.has_value())
+      FailWithUsage("Invalid version `%s`\n", version_str.c_str());
+    if (platform->is_unversioned())
+      FailWithUsage("Selecting a version for '%s' is not allowed\n", platform_str.c_str());
+  }
+  return {std::move(platform).value(), version};
+}
+
 enum struct Behavior {
   kJSON,
   kIndex,
@@ -299,6 +319,7 @@ void Write(const std::ostringstream& output_stream, const std::string& file_path
 }  // namespace
 
 int compile(fidlc::Reporter* reporter, const std::optional<fidlc::Platform>& expected_platform,
+            std::optional<fidlc::Version> expected_version_added,
             const std::optional<std::string>& expected_library_name,
             const std::string& dep_file_path, const std::vector<std::string>& source_list,
             const std::vector<std::pair<Behavior, std::string>>& outputs,
@@ -366,23 +387,35 @@ int compile(fidlc::Reporter* reporter, const std::optional<fidlc::Platform>& exp
     auto& expected = expected_platform.value();
     if (actual != expected) {
       std::stringstream hint;
+      auto version = expected_version_added.value_or(fidlc::Version::Head()).ToString();
       if (expected.is_unversioned()) {
         hint << "try removing @available attributes";
       } else if (actual.is_unversioned()) {
         if (compilation->library_name[0] == expected.name()) {
-          hint << "try adding `@available(added=HEAD)` on the `library` declaration";
+          hint << "try adding `@available(added=" << version << ")` on the `library` declaration";
         } else {
-          hint << "try adding `@available(platform=\"" << expected.name()
-               << "\", added=HEAD)` on the `library` declaration";
+          hint << "try adding `@available(platform=\"" << expected.name() << "\", added=" << version
+               << ")` on the `library` declaration";
         }
       } else {
         hint << "try changing the library name to start with '" << expected.name()
-             << ".', or use `@available(platform=\"" << expected.name() << "\")`";
+             << ".', or use `@available(platform=\"" << expected.name() << "\", added=" << version
+             << ")`";
       }
       Fail(
           "Library '%s' is versioned under platform '%s', but expected platform '%s' based on the "
-          "--platform flag; %s\n",
+          "--versioned flag; %s\n",
           library_name.c_str(), actual.name().c_str(), expected.name().c_str(), hint.str().c_str());
+    }
+  }
+  if (expected_version_added.has_value()) {
+    auto& actual = compilation->version_added;
+    auto& expected = expected_version_added.value();
+    if (actual != expected) {
+      Fail(
+          "Library '%s' is marked @available(added=%s), but expected @available(added=%s) based on "
+          "the --versioned flag\n",
+          library_name.c_str(), actual.ToString().c_str(), expected.ToString().c_str());
     }
   }
 
@@ -435,6 +468,7 @@ int main(int argc, char* argv[]) {
   }
 
   std::optional<fidlc::Platform> expected_platform;
+  std::optional<fidlc::Version> expected_version_added;
   std::optional<std::string> expected_library_name;
 
   std::string dep_file_path;
@@ -447,74 +481,52 @@ int main(int argc, char* argv[]) {
   fidlc::ExperimentalFlagSet experimental_flags;
   while (args->Remaining()) {
     // Try to parse an output type.
-    std::string behavior_argument = args->Claim();
-    if (behavior_argument == "--help") {
+    std::string flag = args->Claim();
+    if (flag == "--help") {
       Usage();
       exit(0);
-    } else if (behavior_argument == "--json-schema") {
+    } else if (flag == "--json-schema") {
       PrintJsonSchema();
       exit(0);
-    } else if (behavior_argument == "--werror") {
+    } else if (flag == "--werror") {
       warnings_as_errors = true;
-    } else if (behavior_argument.rfind("--format") == 0) {
-      const auto equals = behavior_argument.rfind('=');
+    } else if (flag.rfind("--format") == 0) {
+      const auto equals = flag.rfind('=');
       if (equals == std::string::npos) {
         FailWithUsage("Unknown value for flag `format`\n");
       }
-      const auto format_value = behavior_argument.substr(equals + 1, behavior_argument.length());
+      const auto format_value = flag.substr(equals + 1, flag.length());
       if (format_value != "text" && format_value != "json") {
         FailWithUsage("Unknown value `%s` for flag `format`\n", format_value.c_str());
       }
       format = format_value;
-    } else if (behavior_argument == "--json") {
+    } else if (flag == "--json") {
       std::string path = args->Claim();
       json_path = path;
       outputs.emplace_back(Behavior::kJSON, path);
-    } else if (behavior_argument == "--available") {
-      std::string selection = args->Claim();
-      const auto colon_idx = selection.find(':');
-      if (colon_idx == std::string::npos) {
-        FailWithUsage("Invalid value `%s` for flag `available`\n", selection.c_str());
-      }
-      const auto platform_str = selection.substr(0, colon_idx);
-      const auto version_str = selection.substr(colon_idx + 1);
-      const auto platform = fidlc::Platform::Parse(platform_str);
-      const auto version = fidlc::Version::Parse(version_str);
-      if (!platform.has_value()) {
-        FailWithUsage("Invalid platform name `%s`\n", platform_str.c_str());
-      }
-      if (!version.has_value()) {
-        FailWithUsage("Invalid version `%s`\n", version_str.c_str());
-      }
-      if (platform->is_unversioned()) {
-        FailWithUsage(
-            "Invalid flag `--available %s:%s`; selecting a version for '%s' is not allowed\n",
-            platform_str.c_str(), version_str.c_str(), platform_str.c_str());
-      }
-      version_selection.Insert(platform.value(), version.value());
-    } else if (behavior_argument == "--platform") {
-      const auto platform_str = args->Claim();
-      const auto platform = fidlc::Platform::Parse(platform_str);
-      if (!platform.has_value()) {
-        FailWithUsage("Invalid platform name `%s`\n", platform_str.c_str());
-      }
-      expected_platform = platform.value();
-    } else if (behavior_argument == "--name") {
+    } else if (flag == "--available") {
+      auto [platform, version] = ParsePlatformAndVersion(args->Claim());
+      if (!version.has_value())
+        FailWithUsage("Missing version for flag `available`\n");
+      version_selection.Insert(platform, version.value());
+    } else if (flag == "--versioned") {
+      std::tie(expected_platform, expected_version_added) = ParsePlatformAndVersion(args->Claim());
+    } else if (flag == "--name") {
       expected_library_name = args->Claim();
-    } else if (behavior_argument == "--experimental") {
+    } else if (flag == "--experimental") {
       std::string string = args->Claim();
       auto it = fidlc::kAllExperimentalFlags.find(string);
       if (it == fidlc::kAllExperimentalFlags.end()) {
         FailWithUsage("Unknown experimental flag %s\n", string.c_str());
       }
       experimental_flags.Enable(it->second);
-    } else if (behavior_argument == "--depfile") {
+    } else if (flag == "--depfile") {
       dep_file_path = args->Claim();
-    } else if (behavior_argument == "--files") {
+    } else if (flag == "--files") {
       // Start parsing filenames.
       break;
     } else {
-      FailWithUsage("Unknown argument: %s\n", behavior_argument.c_str());
+      FailWithUsage("Unknown argument: %s\n", flag.c_str());
     }
   }
 
@@ -543,9 +555,9 @@ int main(int argc, char* argv[]) {
   fidlc::Reporter reporter;
   fidlc::VirtualSourceFile virtual_file("generated");
   reporter.set_warnings_as_errors(warnings_as_errors);
-  auto status =
-      compile(&reporter, expected_platform, expected_library_name, dep_file_path, source_list,
-              outputs, source_managers, &virtual_file, &version_selection, experimental_flags);
+  auto status = compile(&reporter, expected_platform, expected_version_added, expected_library_name,
+                        dep_file_path, source_list, outputs, source_managers, &virtual_file,
+                        &version_selection, experimental_flags);
   if (format == "json") {
     reporter.PrintReportsJson();
   } else {

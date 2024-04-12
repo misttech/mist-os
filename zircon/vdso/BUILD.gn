@@ -26,7 +26,7 @@ fidl("zx") {
     "//zircon/tools/zither:tests",
   ]
 
-  platform = "fuchsia"
+  versioned = "fuchsia"
 
   sources = [
     "bti.fidl",

@@ -41,7 +41,7 @@ import("//build/testing/golden_files.gni")
 #    - Type: list(path)
 #
 #  * api, available, excluded_checks, experimental_checks, experimental_flags,
-#    goldens_dir, non_fidl_deps, platform, sdk_category, sdk_area
+#    goldens_dir, non_fidl_deps, sdk_category, sdk_area, versioned
 #    - Optional: See //build/fidl/fidl.gni for a description.
 #
 #  * testonly, visibility, public_deps, applicable_licenses
@@ -116,10 +116,10 @@ template("fidl_library") {
                              "available",
                              "experimental_flags",
                              "non_fidl_deps",
-                             "platform",
                              "public_deps",
                              "sources",
                              "testonly",
+                             "versioned",
                            ])
     visibility = [ ":*" ]
     fidl_target_name = main_target_name
@@ -130,12 +130,12 @@ template("fidl_library") {
     if (!defined(available)) {
       available = [ "fuchsia:$target_api_level" ]
     }
-    if (!defined(platform)) {
-      # TODO(https://fxbug.dev/325669391): Always set a default `platform`.
+    if (!defined(versioned)) {
+      # TODO(https://fxbug.dev/325669391): Always set a default `versioned`.
       if (requires_compatibility_tests && in_fuchsia_namespace) {
-        platform = "fuchsia"
+        versioned = "fuchsia"
       } else if (defined(invoker.testonly) && invoker.testonly) {
-        platform = "unversioned"
+        versioned = "unversioned"
       }
     }
   }
@@ -249,8 +249,12 @@ template("fidl_library") {
   # Enforce compatibility checks for all FIDL libraries included in the IDK with
   # platform `fuchsia`.
   if (requires_compatibility_tests) {
-    assert(!defined(invoker.platform) || invoker.platform == "fuchsia",
-           "Cannot override `platform` for SDK FIDL library $library_name")
+    if (defined(invoker.versioned)) {
+      _platform = string_split(invoker.versioned, ":")
+      _platform = _platform[0]
+    }
+    assert(!defined(invoker.versioned) || _platform == "fuchsia",
+           "Cannot override `versioned` for SDK FIDL library $library_name")
     assert(!defined(invoker.available),
            "Cannot override `available` for SDK FIDL library $library_name")
 
@@ -298,7 +302,7 @@ template("fidl_library") {
         # be true here, but currently it isn't for vendor SDK libraries. Those
         # libraries likely should be excluded in requires_compatibility_tests.
         if (in_fuchsia_namespace) {
-          platform = "fuchsia"
+          versioned = "fuchsia"
         }
 
         available = [ "fuchsia:$level" ]

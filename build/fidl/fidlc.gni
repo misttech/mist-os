@@ -17,9 +17,9 @@ import("//build/fidl/toolchain.gni")
 #   sources (required)
 #   experimental_flags
 #   non_fidl_deps
-#   platform
 #   public_deps
 #   testonly
+#   versioned
 #   visibility
 #
 template("fidlc") {
@@ -91,10 +91,10 @@ template("fidlc") {
       args += [ "--dep-libraries" ] + rebase_path(inputs, root_build_dir)
     }
 
-    if (defined(invoker.platform)) {
+    if (defined(invoker.versioned)) {
       args += [
-        "--platform",
-        invoker.platform,
+        "--versioned",
+        invoker.versioned,
       ]
     }
     foreach(available, invoker.available) {

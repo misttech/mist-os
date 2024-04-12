@@ -451,6 +451,7 @@ std::unique_ptr<Compilation> Libraries::Filter(const VersionSelection* version_s
   auto library = libraries_.back().get();
   auto compilation = std::make_unique<Compilation>();
   compilation->platform = &library->platform.value();
+  compilation->version_added = library->availability.set().ranges().first.pair().first;
   compilation->library_name = library->name;
   compilation->library_declarations = library->library_name_declarations;
   compilation->library_attributes = library->attributes.get();

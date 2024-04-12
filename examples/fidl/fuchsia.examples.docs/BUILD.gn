@@ -39,7 +39,7 @@ fidl("versioning") {
 
   # TODO(https://fxbug.dev/328118770): Example libraries should be named
   # differently to avoid using fake fuchsia API levels.
-  platform = "fuchsia"
+  versioned = "fuchsia"
   available = [ "fuchsia:HEAD" ]
 }
 

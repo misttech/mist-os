@@ -37,9 +37,9 @@ import("//build/fidl/fidlc.gni")
 #   experimental_flags
 #   goldens_dir
 #   non_fidl_deps
-#   platform
 #   public_deps
 #   testonly
+#   versioned
 #   visibility
 #
 template("fidl_ir") {

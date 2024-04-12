@@ -189,6 +189,8 @@ struct Compilation {
 
   // The platform the library is versioned under.
   const Platform* platform;
+  // The version at which the library was added.
+  Version version_added = Version::Head();
   // The target library name and attributes. Note, we purposely do not store a
   // Library* to avoid accidentally reaching into its unfiltered decls.
   std::vector<std::string_view> library_name;

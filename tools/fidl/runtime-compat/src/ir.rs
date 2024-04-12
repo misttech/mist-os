@@ -371,7 +371,7 @@ mod testing {
             ir_path.clone(),
             "--name".to_string(),
             library_name.to_string(),
-            "--platform".to_string(),
+            "--versioned".to_string(),
             "fuchsia".to_string(),
         ];
 

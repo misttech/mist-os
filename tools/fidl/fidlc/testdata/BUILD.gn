@@ -80,7 +80,7 @@ foreach(filename, standalone_libraries) {
     }
 
     if (filename == "versions.test.fidl") {
-      platform = "test"
+      versioned = "test:1"
       available = [
         "fuchsia:HEAD",
         "test:HEAD",

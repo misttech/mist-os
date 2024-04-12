@@ -76,9 +76,10 @@ import("//build/testing/host_test_data.gni")
 #     Boolean flag to generate a LibFuzzer fuzz target for all protocols, used
 #     to ensure fuzzers for golden libraries compile successfully.
 #
-#   platform (optional)
-#     Name of the platform this library is versioned under. This is validated
-#     to match the library's actual platform, which is determined as follows:
+#   versioned (optional)
+#     A string of the form PLATFORM or PLATFORM:VERSION. Validates that the
+#     library is versioned under PLATFORM and added at VERSION (if provided).
+#     The library's actual platform is determined as follows:
 #       * If there are no @available attributes, the platform is "unversioned".
 #       * The platform can be explicit with @available(platform="PLATFORM").
 #       * Otherwise, the platform is the first component of the library name.
@@ -197,7 +198,7 @@ template("fidl") {
     "experimental_flags",
     "goldens_dir",
     "non_fidl_deps",
-    "platform",
+    "versioned",
   ]
   if (is_fidl_toolchain) {
     # Only import the fidl_library template when in the fidl toolchain
