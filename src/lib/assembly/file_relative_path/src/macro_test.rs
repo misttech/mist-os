@@ -286,3 +286,34 @@ fn test_enum_named_simple() {
         }
     )
 }
+
+#[derive(SupportsFileRelativePaths, Debug, Deserialize, Serialize, PartialEq)]
+struct SimpleUnnamed(i64, FileRelativePathBuf);
+
+#[test]
+fn test_simple_unnamed() {
+    let json = serde_json::json!([42, "foo/file_3.txt"]);
+    let parsed: SimpleUnnamed = serde_json::from_value(json).unwrap();
+    let resolved = parsed.resolve_paths_from_file("some/file").unwrap();
+    assert_eq!(
+        resolved,
+        SimpleUnnamed(42, FileRelativePathBuf::Resolved("some/foo/file_3.txt".into()))
+    );
+}
+
+#[derive(SupportsFileRelativePaths, Debug, Deserialize, Serialize, PartialEq)]
+struct NestedUnnamed(i64, #[file_relative_paths] SimpleUnnamed);
+
+#[test]
+fn test_nested_unnamed() {
+    let json = serde_json::json!([42, [84, "bar/other.txt"]]);
+    let parsed: NestedUnnamed = serde_json::from_value(json).unwrap();
+    let resolved = parsed.resolve_paths_from_file("some/file").unwrap();
+    assert_eq!(
+        resolved,
+        NestedUnnamed(
+            42,
+            SimpleUnnamed(84, FileRelativePathBuf::Resolved("some/bar/other.txt".into()))
+        )
+    );
+}

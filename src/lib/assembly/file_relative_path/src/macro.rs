@@ -29,11 +29,12 @@ fn derive_impl(input: DeriveInput) -> proc_macro::TokenStream {
                 handle_struct_with_named_fields(fields, Operation::Resolve),
                 handle_struct_with_named_fields(fields, Operation::MakeFileRelative),
             ),
+            syn::Fields::Unnamed(fields) => (
+                handle_struct_with_unnamed_fields(fields, Operation::Resolve),
+                handle_struct_with_unnamed_fields(fields, Operation::MakeFileRelative),
+            ),
             // Unit structs just are themselves.
             syn::Fields::Unit => (quote! {Self}, quote! {Self}),
-            syn::Fields::Unnamed(_) => {
-                panic!("Structs with unnamed fields are not supported.");
-            }
         },
         syn::Data::Enum(data) => {
             (handle_enum(data, Operation::Resolve), handle_enum(data, Operation::MakeFileRelative))
@@ -80,6 +81,20 @@ fn handle_struct_with_named_fields(fields: &FieldsNamed, operation: Operation) -
         let Self{ #field_names } = self;
         // restructure with result of implementations
         Self { #field_impls }
+      }
+    }
+}
+
+fn handle_struct_with_unnamed_fields(fields: &FieldsUnnamed, operation: Operation) -> TokenStream {
+    let indexes = get_field_indexes(fields);
+    let impls = handle_unnamed_fields(fields, operation);
+
+    quote! {
+      {
+        // destructure
+        let Self( #indexes ) = self;
+        // restructure with result of implementations
+        Self ( #impls )
       }
     }
 }
