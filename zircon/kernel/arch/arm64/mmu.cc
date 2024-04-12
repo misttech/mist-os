@@ -30,7 +30,6 @@
 #include <arch/arm64/hypervisor/el2_state.h>
 #include <arch/aspace.h>
 #include <fbl/auto_lock.h>
-#include <fbl/bits.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/mutex.h>
 #include <ktl/algorithm.h>
@@ -495,9 +494,7 @@ class ArmArchVmAspace::ConsistencyManager {
     DEBUG_ASSERT(IS_PAGE_ALIGNED(va));
     DEBUG_ASSERT(aspace_.IsValidVaddr(va));
 
-    pending_tlbs_[num_pending_tlbs_].terminal = terminal;
-    pending_tlbs_[num_pending_tlbs_].va_shifted = va >> 1;
-    num_pending_tlbs_++;
+    pending_tlbs_[num_pending_tlbs_++] = {va, terminal};
   }
 
   // Performs any pending synchronization of TLBs and page table walkers. Includes the DSB to ensure
@@ -531,9 +528,9 @@ class ArmArchVmAspace::ConsistencyManager {
       }
     } else {
       for (size_t i = 0; i < num_pending_tlbs_; i++) {
-        const vaddr_t va = pending_tlbs_[i].va_shifted << 1;
+        const vaddr_t va = pending_tlbs_[i].va();
         DEBUG_ASSERT(aspace_.IsValidVaddr(va));
-        aspace_.FlushTLBEntry(va, pending_tlbs_[i].terminal);
+        aspace_.FlushTLBEntry(va, pending_tlbs_[i].terminal());
       }
       cm_single_tlb_invalidates.Add(num_pending_tlbs_);
     }
@@ -564,23 +561,32 @@ class ArmArchVmAspace::ConsistencyManager {
 
   // Pending TLBs to flush are stored as 63 bits, with the bottom bit stolen to store the terminal
   // flag. 63 bits is more than enough as these entries are page aligned at the minimum.
-  FBL_BITFIELD_DEF_START(PendingTlbs, uint64_t)
-  FBL_BITFIELD_MEMBER(terminal, 0, 1);
-  FBL_BITFIELD_MEMBER(va_shifted, 1, 63);
-  FBL_BITFIELD_DEF_END();
+  struct PendingTlbs {
+    PendingTlbs() = default;
+    PendingTlbs(uint64_t va, bool terminal) : va_terminal_(va | terminal) {}
 
-  PendingTlbs pending_tlbs_[kMaxPendingTlbs];
+    bool terminal() const { return va_terminal_ & 1; }
+    uint64_t va() const { return va_terminal_ & ~1UL; }
 
-  size_t num_pending_tlbs_ = 0;
+   private:
+    // address[63:1], terminal[0]
+    uint64_t va_terminal_;
+  };
 
-  // vm_page_t's to release to the PMM after the TLB invalidation occurs.
-  list_node to_free_ = LIST_INITIAL_VALUE(to_free_);
+  static_assert(sizeof(PendingTlbs) == 8);
 
   // The aspace we are invalidating TLBs for.
   const ArmArchVmAspace& aspace_;
 
-  // pending ISB
+  // Pending ISB
   bool isb_pending_ = false;
+
+  // vm_page_t's to release to the PMM after the TLB invalidation occurs.
+  list_node to_free_ = LIST_INITIAL_VALUE(to_free_);
+
+  // The main list of pending TLBs.
+  size_t num_pending_tlbs_ = 0;
+  PendingTlbs pending_tlbs_[kMaxPendingTlbs];
 };
 
 uint64_t ArmArchVmAspace::Tcr() const {
