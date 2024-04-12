@@ -235,6 +235,7 @@ sdk_molecule("fuchsia_idk_atoms") {
 sdk_molecule("fuchsia_idk_atoms_for_each_api_level_and_legacy") {
   deps = [
     ":core_cc_prebuilt_libraries",
+    ":core_packages_for_each_api_level_and_legacy",
     ":core_sysroot",
   ]
 }
@@ -541,14 +542,21 @@ sdk_molecule("core_bindlib") {
 
 sdk_molecule("core_packages") {
   deps = [
-    "//src/graphics/magma/tests/integration:magma_conformance_tests_sdk",
-    "//src/graphics/tests/vkreadback:vkreadback_test_sdk",
     "//src/performance/memory/heapdump/collector:collector_sdk",
-
     # TODO(https://fxbug.dev/326231777): Uncomment this once
     # realm_builder_server can build targeting API levels.
     #
     # "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk"
+  ]
+}
+
+# TODO(https://fxbug.dev/310006516): Move the contents of this target to
+# ":core_packages" once downstream customers no longer need them in "API level
+# agnostic" form.
+sdk_molecule("core_packages_for_each_api_level_and_legacy") {
+  deps = [
+    "//src/graphics/magma/tests/integration:magma_conformance_tests_sdk",
+    "//src/graphics/tests/vkreadback:vkreadback_test_sdk",
   ]
 }
 

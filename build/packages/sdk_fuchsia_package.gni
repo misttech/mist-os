@@ -97,6 +97,13 @@ template("sdk_fuchsia_package") {
         override_target_api_level < invoker.api_level_removed
   }
 
+  # Also build it in non-per-API-level contexts, for now.
+  #
+  # TODO(https://fxbug.dev/310006516): Delete API-level-agnostic packages from the IDK.
+  if (override_target_api_level == -1) {
+    package_in_target_api_level = true
+  }
+
   if (package_in_target_api_level && current_toolchain == target_toolchain) {
     assert(defined(invoker.package_label),
            "Must define a package to distribute.")
@@ -254,6 +261,25 @@ template("sdk_fuchsia_package") {
         rebase_path(computed_content_checklist_file, root_build_dir),
         "--output",
         rebase_path(_sdk_package_dir, root_build_dir),
+
+        # In the API-level-agnostic builds, the value of this flag is a bit
+        # strange, and means we say in `meta.json` that the API level is -1.
+        # This is... neither correct nor incorrect.
+        #
+        # It's honestly rather moot, because none of the SDKs actually allow
+        # users to use these packages, yet. Hopefully we'll be able to add
+        # support for API-level-aware package prebuilts right off the bat,
+        # rather than first building support for including an API-level-agnostic
+        # subpackage, and then going back and fixing it.
+        #
+        # Arguably the right thing to do would be to _not_ build the packages in
+        # the API-level-agnostic builds, but then we wouldn't be building them
+        # anywhere, and we'd be in more danger of bitrot on the "packages in the
+        # IDK" work. So for now, we'll continue building them with this strange
+        # metadata quirk.
+        #
+        # TODO(https://fxbug.dev/310006516): Delete this comment once API-level-agnostic
+        # packages are no longer in the IDK.
         "--api-level",
         "${override_target_api_level}",
         "--target-cpu",
