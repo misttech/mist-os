@@ -254,6 +254,15 @@ void AudioCompositeServer::SignalProcessingConnect(
     request.protocol().Close(ZX_ERR_ALREADY_BOUND);
     return;
   }
+
+  // Reset all completion state related to signalprocessing.
+  topology_completer_.completer.reset();
+  topology_completer_.first_response_sent = false;
+  for (auto& element_entry : element_completers_) {
+    element_entry.second.completer.reset();
+    element_entry.second.first_response_sent = false;
+  }
+
   signal_.emplace(dispatcher(), std::move(request.protocol()), this,
                   std::mem_fn(&AudioCompositeServer::OnSignalProcessingClosed));
 }
