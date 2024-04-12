@@ -56,11 +56,10 @@ const_assert!(9223372036854771712 == MAX_FILE_SIZE);
 // The maximum number of transactions that can be in-flight at any time.
 const MAX_IN_FLIGHT_TRANSACTIONS: u64 = 4;
 
-// Start trimming 5 minutes after boot.  The idea here is to wait until the initial flurry of
+// Start trimming 1 hour after boot.  The idea here is to wait until the initial flurry of
 // activity during boot is finished.  This is a rough heuristic and may need to change later if
 // performance is affected.
-// TODO(b/293964968): We probably also want to reschedule trimming, e.g. every day.
-const TRIM_AFTER_BOOT_TIMER: std::time::Duration = std::time::Duration::from_secs(5 * 60);
+const TRIM_AFTER_BOOT_TIMER: std::time::Duration = std::time::Duration::from_secs(60 * 60);
 
 // After the initial trim, perform another trim every 24 hours.
 const TRIM_INTERVAL_TIMER: std::time::Duration = std::time::Duration::from_secs(60 * 60 * 24);
