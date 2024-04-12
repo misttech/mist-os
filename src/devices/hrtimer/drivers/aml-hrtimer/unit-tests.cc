@@ -323,7 +323,7 @@ class FixtureConfig final {
  public:
   static constexpr bool kDriverOnForeground = false;
   static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = false;
+  static constexpr bool kAutoStopDriver = true;
 
   using DriverType = AmlHrtimer;
   using EnvironmentType = TestEnvironment;
@@ -633,7 +633,41 @@ TEST_F(DriverTest, WaitStop) {
   }
 }
 
-TEST_F(DriverTest, CancelOnDriverStop) {
+class FixtureConfigNoAutoStop final {
+ public:
+  static constexpr bool kDriverOnForeground = false;
+  static constexpr bool kAutoStartDriver = true;
+  static constexpr bool kAutoStopDriver = false;
+
+  using DriverType = AmlHrtimer;
+  using EnvironmentType = TestEnvironment;
+};
+
+class DriverTestNoAutoStop : public fdf_testing::DriverTestFixture<FixtureConfigNoAutoStop> {
+ protected:
+  void SetUp() override {
+    zx::result device_result = ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");
+    ASSERT_EQ(ZX_OK, device_result.status_value());
+    client_.Bind(std::move(device_result.value()));
+  }
+
+  void CheckLeaseRequested(size_t timer_id) {
+    RunInEnvironmentTypeContext([](TestEnvironment& env) {
+      ASSERT_FALSE(env.power_broker().GetLeaseRequested());
+      env.platform_device().TriggerAllIrqs();
+    });
+    auto result_start = client_->StartAndWait(
+        {timer_id, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
+    ASSERT_FALSE(result_start.is_error());
+    ASSERT_TRUE(result_start->keep_alive().is_valid());
+    RunInEnvironmentTypeContext(
+        [](TestEnvironment& env) { ASSERT_TRUE(env.power_broker().GetLeaseRequested()); });
+  }
+
+  fidl::SyncClient<fuchsia_hardware_hrtimer::Device> client_;
+};
+
+TEST_F(DriverTestNoAutoStop, CancelOnDriverStop) {
   std::vector<std::thread> threads;
   zx::event events[9];
   // Timers id 0 to 8 inclusive but not 4 support events and wait (via IRQ notification).
@@ -721,7 +755,7 @@ class FixtureConfigNoPower final {
  public:
   static constexpr bool kDriverOnForeground = false;
   static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = false;
+  static constexpr bool kAutoStopDriver = true;
 
   using DriverType = AmlHrtimer;
   using EnvironmentType = TestEnvironmentNoPower;

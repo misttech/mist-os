@@ -69,9 +69,8 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
 
  public:
   BaseDriverTestFixture()
-      : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        env_wrapper_(env_dispatcher_->async_dispatcher(), std::in_place),
-        dut_(&runtime_) {
+      : env_wrapper_(runtime_.StartBackgroundDispatcher()->async_dispatcher(), std::in_place) {
+    dut_.emplace(&runtime_);
     start_args_ = env_wrapper_.SyncCall(&internal::EnvWrapper<EnvironmentType>::Init);
 
     outgoing_directory_client_ =
@@ -89,8 +88,7 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
       ZX_ASSERT_MSG(result.is_ok(), "Failed to StopDriver: %s.", result.status_string());
     }
 
-    env_wrapper_.reset();
-    runtime_.ShutdownAllDispatchers(dut_.GetDispatcher()->get());
+    ShutdownDispatchersAndDestroyDriverImpl();
   }
 
   // Access the driver runtime object. This can be used to create new background dispatchers
@@ -135,13 +133,24 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
     return StartDriverImpl(std::move(args_modifier));
   }
 
-  // Stops the driver.
+  // Stops the driver by calling the driver's PrepareStop hook and waiting for it to complete
   //
   // Enabled only when kAutoStopDriver is false.
   template <bool A = kAutoStopDriver, typename = std::enable_if_t<!A>>
   zx::result<> StopDriver() {
     static_assert(A == kAutoStopDriver, "Do not override the A template parameter.");
     return StopDriverImpl();
+  }
+
+  // Shuts down all of the driver dispatchers, then destroys the driver. This must be called after
+  // having called StopDriver(). This is an optional call, if the user doesn't call this, then it
+  // will happen in the destructor. This calls the DriverBase's Stop hook
+  //
+  // Enabled only when kAutoStopDriver is false.
+  template <bool A = kAutoStopDriver, typename = std::enable_if_t<!A>>
+  void ShutdownDispatchersAndDestroyDriver() {
+    static_assert(A == kAutoStopDriver, "Do not override the A template parameter.");
+    ShutdownDispatchersAndDestroyDriverImpl();
   }
 
   // Runs a task on the dispatcher context of the driver under test. This will be a different
@@ -154,7 +163,9 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
   template <typename T, bool F = kDriverOnForeground, typename = std::enable_if_t<!F>>
   T RunInDriverContext(fit::callback<T(DriverType&)> task) {
     static_assert(F == kDriverOnForeground, "Do not override the F template parameter.");
-    return dut_.RunInDriverContext(std::move(task));
+    ZX_ASSERT_MSG(dut_.has_value(),
+                  "Cannot call RunInDriverContext after ShutdownDispatchersAndDestroyDriverImpl.");
+    return dut_->RunInDriverContext(std::move(task));
   }
 
   // Runs a task on the dispatcher context of the driver under test. This will be a different
@@ -167,7 +178,9 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
   template <bool F = kDriverOnForeground, typename = std::enable_if_t<!F>>
   void RunInDriverContext(fit::callback<void(DriverType&)> task) {
     static_assert(F == kDriverOnForeground, "Do not override the F template parameter.");
-    dut_.RunInDriverContext(std::move(task));
+    ZX_ASSERT_MSG(dut_.has_value(),
+                  "Cannot call RunInDriverContext after ShutdownDispatchersAndDestroyDriverImpl.");
+    dut_->RunInDriverContext(std::move(task));
   }
 
   // Get a pointer to the driver under test.
@@ -176,7 +189,9 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
   template <bool F = kDriverOnForeground, typename = std::enable_if_t<F>>
   DriverType* driver() {
     static_assert(F == kDriverOnForeground, "Do not override the F template parameter.");
-    return dut_.driver();
+    ZX_ASSERT_MSG(dut_.has_value(),
+                  "Cannot call driver after ShutdownDispatchersAndDestroyDriverImpl.");
+    return dut_->driver();
   }
 
   // Runs a task in a background context while running the foreground driver. This must be used
@@ -351,7 +366,9 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
     fdf::DriverStartArgs start_args = std::move(start_args_.value());
     start_args_.reset();
 
-    return dut_.Start(std::move(start_args));
+    ZX_ASSERT_MSG(dut_.has_value(),
+                  "Cannot call StartDriver after ShutdownDispatchersAndDestroyDriverImpl.");
+    return dut_->Start(std::move(start_args));
   }
 
   zx::result<> StopDriverImpl() {
@@ -359,15 +376,30 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
       return zx::error(ZX_ERR_BAD_STATE);
     }
 
-    zx::result prepare_stop_result = dut_.PrepareStop();
+    ZX_ASSERT_MSG(dut_.has_value(),
+                  "Cannot call StopDriver after ShutdownDispatchersAndDestroyDriverImpl.");
+    zx::result prepare_stop_result = dut_->PrepareStop();
     prepare_stop_result_.emplace(prepare_stop_result);
     return prepare_stop_result;
   }
 
+  void ShutdownDispatchersAndDestroyDriverImpl() {
+    ZX_ASSERT_MSG(prepare_stop_result_.has_value(),
+                  "Ensure that StopDriver is called when kAutoStopDriver is false.");
+    if (dut_.has_value()) {
+      env_wrapper_.reset();
+      runtime_.ShutdownAllDispatchers(dut_->GetDispatcher()->get());
+      dut_.reset();
+    }
+  }
+
   fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   async_patterns::TestDispatcherBound<internal::EnvWrapper<EnvironmentType>> env_wrapper_;
-  internal::DriverWrapper<DriverType, kDriverOnForeground> dut_;
+
+  // The dut_ is created through the constructor, and becomes a nullopt through
+  // |ShutdownDispatchersAndDestroyDriverImpl|.
+  std::optional<internal::DriverWrapper<DriverType, kDriverOnForeground>> dut_;
+
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client_;
 
   std::optional<fdf::UnownedSynchronizedDispatcher> bg_task_dispatcher_;

@@ -11,6 +11,8 @@
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 
+extern bool g_driver_stopped;
+
 class TestDriver : public fdf::DriverBase,
                    public fidl::WireServer<fuchsia_driver_component_test::ZirconProtocol>,
                    public fdf::WireServer<fuchsia_driver_component_test::DriverProtocol>,
@@ -23,6 +25,8 @@ class TestDriver : public fdf::DriverBase,
   void Start(fdf::StartCompleter completer) override;
 
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
+
+  void Stop() override;
 
   zx::result<> InitSyncCompat();
   void BeginInitAsyncCompat(fit::callback<void(zx::result<>)> completed);

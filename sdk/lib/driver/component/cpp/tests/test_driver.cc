@@ -6,6 +6,8 @@
 #include <lib/driver/component/cpp/tests/test_driver.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 
+bool g_driver_stopped = false;
+
 void TestDriver::Start(fdf::StartCompleter completer) {
   node_client_.Bind(std::move(node()), dispatcher());
   // Delay the completion to simulate an async workload.
@@ -157,6 +159,8 @@ void TestDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
         zx::msec(100));
   }
 }
+
+void TestDriver::Stop() { g_driver_stopped = true; }
 
 zx::result<> TestDriver::InitSyncCompat() {
   auto result = sync_device_server_.Initialize(incoming(), outgoing(), node_name(), "child",

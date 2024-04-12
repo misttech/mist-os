@@ -229,3 +229,26 @@ TEST_F(FixtureBasedTest, ConnectWithDriverService) {
       });
   ASSERT_EQ(ZX_OK, run_result.status_value());
 }
+
+class ManualStopFixtureConfig final {
+ public:
+  static constexpr bool kDriverOnForeground = true;
+  static constexpr bool kAutoStartDriver = true;
+  static constexpr bool kAutoStopDriver = false;
+
+  using DriverType = TestDriver;
+  using EnvironmentType = FixtureBasedTestEnvironment;
+};
+
+// Demonstrates a test fixture that tests out the manual stop and shutdown feature. Validates by
+// checking the a global that gets set in the driver header.
+class FixtureBasedTestManualStop : public fdf_testing::DriverTestFixture<ManualStopFixtureConfig> {
+};
+
+TEST_F(FixtureBasedTestManualStop, ShutdownAndCheckLogger) {
+  ASSERT_EQ(false, g_driver_stopped);
+  ASSERT_EQ(ZX_OK, StopDriver().status_value());
+  ASSERT_EQ(false, g_driver_stopped);
+  ShutdownDispatchersAndDestroyDriver();
+  ASSERT_EQ(true, g_driver_stopped);
+}
