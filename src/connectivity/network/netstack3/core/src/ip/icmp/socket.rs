@@ -112,7 +112,7 @@ impl<I: IpExt, D: device::WeakId, BT: IcmpEchoBindingsTypes> PartialEq<WeakIcmpS
 impl<I: IpExt, D: device::WeakId, BT: IcmpEchoBindingsTypes> Debug for IcmpSocketId<I, D, BT> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
-        f.debug_tuple("IcmpSocketId").field(&StrongRc::ptr_debug(rc)).finish()
+        f.debug_tuple("IcmpSocketId").field(&StrongRc::debug_id(rc)).finish()
     }
 }
 
@@ -162,7 +162,7 @@ impl<I: IpExt, D: device::WeakId, BT: IcmpEchoBindingsTypes> PartialEq<IcmpSocke
 impl<I: IpExt, D: device::WeakId, BT: IcmpEchoBindingsTypes> Debug for WeakIcmpSocketId<I, D, BT> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
-        f.debug_tuple("WeakIcmpSocketId").field(&rc.ptr_debug()).finish()
+        f.debug_tuple("WeakIcmpSocketId").field(&rc.debug_id()).finish()
     }
 }
 

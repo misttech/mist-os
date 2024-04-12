@@ -974,7 +974,7 @@ impl<I: IpExt, D: device::WeakId, BT: UdpBindingsTypes> PartialEq<WeakUdpSocketI
 impl<I: IpExt, D: device::WeakId, BT: UdpBindingsTypes> Debug for UdpSocketId<I, D, BT> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
-        f.debug_tuple("UdpSocketId").field(&StrongRc::ptr_debug(rc)).finish()
+        f.debug_tuple("UdpSocketId").field(&StrongRc::debug_id(rc)).finish()
     }
 }
 
@@ -1024,7 +1024,7 @@ impl<I: IpExt, D: device::WeakId, BT: UdpBindingsTypes> PartialEq<UdpSocketId<I,
 impl<I: IpExt, D: device::WeakId, BT: UdpBindingsTypes> Debug for WeakUdpSocketId<I, D, BT> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
-        f.debug_tuple("WeakUdpSocketId").field(&rc.ptr_debug()).finish()
+        f.debug_tuple("WeakUdpSocketId").field(&rc.debug_id()).finish()
     }
 }
 

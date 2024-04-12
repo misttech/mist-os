@@ -86,7 +86,7 @@ pub struct DatagramSocketSet<I: IpExt, D: device::WeakId, S: DatagramSocketSpec>
 impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> Debug for DatagramSocketSet<I, D, S> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
-        f.debug_list().entries(rc.keys().map(StrongRc::ptr_debug)).finish()
+        f.debug_list().entries(rc.keys().map(StrongRc::debug_id)).finish()
     }
 }
 

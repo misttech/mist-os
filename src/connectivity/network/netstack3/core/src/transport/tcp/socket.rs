@@ -1749,7 +1749,7 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> TcpSocketId<I, 
 impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Debug for TcpSocketId<I, D, BT> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
-        f.debug_tuple("TcpSocketId").field(&StrongRc::ptr_debug(rc)).finish()
+        f.debug_tuple("TcpSocketId").field(&StrongRc::debug_id(rc)).finish()
     }
 }
 
@@ -1773,7 +1773,7 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Debug
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
-        f.debug_tuple("WeakTcpSocketId").field(&rc.ptr_debug()).finish()
+        f.debug_tuple("WeakTcpSocketId").field(&rc.debug_id()).finish()
     }
 }
 

@@ -116,6 +116,62 @@ mod caller {
     }
 }
 
+mod debug_id {
+    use core::sync::atomic::{AtomicU64, Ordering};
+
+    /// An opaque token to be used for debugging.
+    ///
+    /// The [`Debug`] implementation is guaranteed to produce a unique
+    /// representation for all instances of [`DebugToken`]. When paired with the
+    /// various RC types exposed in the parent module, this ensures that each
+    /// underlying value can be differentiated from one another. This is an
+    /// improvement over, say, using the underlying value's address, which may
+    /// be reused when the underlying value has been dropped.
+    #[derive(Clone)]
+    pub(super) struct DebugToken(u64);
+
+    impl core::fmt::Debug for DebugToken {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+            let DebugToken(inner) = self;
+            write!(f, "{}", inner)
+        }
+    }
+
+    impl Default for DebugToken {
+        fn default() -> Self {
+            static NEXT_TOKEN: AtomicU64 = AtomicU64::new(0);
+            // NB: Fetch add will cause the counter to rollback to 0 if we
+            // happen to exceed `u64::MAX` instantiations. In practice, that's
+            // an impossibility (at 1 billion instantiations per second, the
+            // counter is valid for > 500 years). Spare the CPU cycles and don't
+            // bother attempting to detect/handle overflow.
+            DebugToken(NEXT_TOKEN.fetch_add(1, Ordering::Relaxed))
+        }
+    }
+
+    /// A debug identifier for the RC types exposed in the parent module.
+    ///
+    /// Encompasses the underlying pointer for the RC type, as well as
+    /// (optionally) the globally unique [`DebugToken`].
+    pub(super) enum DebugId<T> {
+        /// Used in contexts that have access to the [`DebugToken`], e.g.
+        /// [`Primary`], [`Strong`], and sometimes [`Weak`] RC types.
+        WithToken { ptr: *const T, token: DebugToken },
+        /// Used in contexts that don't have access to the [`DebugToken`], e.g.
+        /// [`Weak`] RC types that cannot be upgraded.
+        WithoutToken { ptr: *const T },
+    }
+
+    impl<T> core::fmt::Debug for DebugId<T> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+            match self {
+                DebugId::WithToken { ptr, token } => write!(f, "{:?}:{:?}", token, ptr),
+                DebugId::WithoutToken { ptr } => write!(f, "?:{:?}", ptr),
+            }
+        }
+    }
+}
+
 #[derive(Derivative)]
 #[derivative(Debug)]
 struct Inner<T> {
@@ -127,6 +183,7 @@ struct Inner<T> {
     // (i.e. atomicbox) or write unsafe code.
     #[derivative(Debug = "ignore")]
     notifier: crate::Mutex<Option<Box<dyn Notifier<T>>>>,
+    debug_token: debug_id::DebugToken,
 }
 
 impl<T> Inner<T> {
@@ -142,7 +199,8 @@ impl<T> Inner<T> {
         // We cannot destructure `self` by value since `Inner` implements
         // `Drop`. So we must manually drop all the fields but data and then
         // forget self.
-        let Inner { marked_for_destruction, data, callers: holders, notifier } = &mut self;
+        let Inner { marked_for_destruction, data, callers: holders, notifier, debug_token } =
+            &mut self;
 
         // Make sure that `inner` is in a valid state for destruction.
         //
@@ -159,6 +217,7 @@ impl<T> Inner<T> {
             core::ptr::drop_in_place(marked_for_destruction);
             core::ptr::drop_in_place(holders);
             core::ptr::drop_in_place(notifier);
+            core::ptr::drop_in_place(debug_token);
 
             core::mem::ManuallyDrop::take(data)
         };
@@ -174,7 +233,7 @@ impl<T> Inner<T> {
     ///
     /// Panics if notifier is already set.
     fn set_notifier<N: Notifier<T> + 'static>(&self, notifier: N) {
-        let Self { marked_for_destruction: _, callers: _, data: _, notifier: slot } = self;
+        let Self { notifier: slot, .. } = self;
 
         // Using dynamic dispatch to notify allows us to not have to know the
         // notifier that will be used from creation and spread the type on all
@@ -190,7 +249,7 @@ impl<T> Inner<T> {
 
 impl<T> Drop for Inner<T> {
     fn drop(&mut self) {
-        let Inner { marked_for_destruction, data, callers: _, notifier } = self;
+        let Inner { marked_for_destruction, data, callers: _, notifier, debug_token: _ } = self;
         // Take data out of ManuallyDrop in case we panic in pre_drop_check.
         // That'll ensure data is dropped if we hit the panic.
         //
@@ -234,7 +293,8 @@ impl<T> Drop for Primary<T> {
         if !std::thread::panicking() {
             assert_eq!(was_marked, false, "Must not be marked for destruction yet");
 
-            let Inner { marked_for_destruction: _, callers, data: _, notifier: _ } = &*inner;
+            let Inner { marked_for_destruction: _, callers, data: _, notifier: _, debug_token: _ } =
+                &*inner;
 
             // Make sure that this `Primary` is the last thing to hold a strong
             // reference to the underlying data when it is being dropped.
@@ -259,7 +319,8 @@ impl<T> Deref for Primary<T> {
 
     fn deref(&self) -> &T {
         let Self { inner } = self;
-        let Inner { marked_for_destruction: _, data, callers: _, notifier: _ } = &***inner;
+        let Inner { marked_for_destruction: _, data, callers: _, notifier: _, debug_token: _ } =
+            &***inner;
         data
     }
 }
@@ -285,6 +346,7 @@ impl<T> Primary<T> {
                 callers: caller::Callers::default(),
                 data: core::mem::ManuallyDrop::new(data),
                 notifier: crate::Mutex::new(None),
+                debug_token: debug_id::DebugToken::default(),
             })),
         }
     }
@@ -302,6 +364,7 @@ impl<T> Primary<T> {
                 callers: caller::Callers::default(),
                 data: core::mem::ManuallyDrop::new(data_fn(Weak(weak.clone()))),
                 notifier: crate::Mutex::new(None),
+                debug_token: debug_id::DebugToken::default(),
             })),
         }
     }
@@ -309,7 +372,8 @@ impl<T> Primary<T> {
     /// Clones a strongly-held reference.
     #[cfg_attr(feature = "rc-debug-names", track_caller)]
     pub fn clone_strong(Self { inner }: &Self) -> Strong<T> {
-        let Inner { data: _, callers, marked_for_destruction: _, notifier: _ } = &***inner;
+        let Inner { data: _, callers, marked_for_destruction: _, notifier: _, debug_token: _ } =
+            &***inner;
         let caller = callers.insert(Location::caller());
         Strong { inner: alloc::sync::Arc::clone(inner), caller }
     }
@@ -327,10 +391,14 @@ impl<T> Primary<T> {
         alloc::sync::Arc::ptr_eq(this, other)
     }
 
-    /// Returns [`core::fmt::Debug`] implementation that prints the pointer
-    /// address of this [`Primary`].
-    pub fn ptr_debug(Self { inner }: &Self) -> impl core::fmt::Debug {
-        alloc::sync::Arc::as_ptr(inner)
+    /// Returns [`core::fmt::Debug`] implementation that is stable and unique
+    /// for the data held behind this [`Primary`].
+    pub fn debug_id(&self) -> impl core::fmt::Debug {
+        let Self { inner } = self;
+        debug_id::DebugId::WithToken {
+            ptr: alloc::sync::Arc::as_ptr(inner),
+            token: inner.debug_token.clone(),
+        }
     }
 
     fn mark_for_destruction_and_take_inner(mut this: Self) -> alloc::sync::Arc<Inner<T>> {
@@ -415,7 +483,8 @@ pub struct Strong<T> {
 impl<T> Drop for Strong<T> {
     fn drop(&mut self) {
         let Self { inner, caller } = self;
-        let Inner { marked_for_destruction: _, callers, data: _, notifier: _ } = &**inner;
+        let Inner { marked_for_destruction: _, callers, data: _, notifier: _, debug_token: _ } =
+            &**inner;
         caller.release(callers);
     }
 }
@@ -431,7 +500,8 @@ impl<T> Deref for Strong<T> {
 
     fn deref(&self) -> &T {
         let Self { inner, caller: _ } = self;
-        let Inner { marked_for_destruction: _, data, callers: _, notifier: _ } = inner.deref();
+        let Inner { marked_for_destruction: _, data, callers: _, notifier: _, debug_token: _ } =
+            inner.deref();
         data
     }
 }
@@ -455,7 +525,8 @@ impl<T> Clone for Strong<T> {
     #[cfg_attr(feature = "rc-debug-names", track_caller)]
     fn clone(&self) -> Self {
         let Self { inner, caller: _ } = self;
-        let Inner { data: _, marked_for_destruction: _, callers, notifier: _ } = &**inner;
+        let Inner { data: _, marked_for_destruction: _, callers, notifier: _, debug_token: _ } =
+            &**inner;
         let caller = callers.insert(Location::caller());
         Self { inner: alloc::sync::Arc::clone(inner), caller }
     }
@@ -467,15 +538,20 @@ impl<T> Strong<T> {
         Weak(alloc::sync::Arc::downgrade(inner))
     }
 
-    /// Returns [`core::fmt::Debug`] implementation that prints the pointer
-    /// address of this [`Strong`].
-    pub fn ptr_debug(Self { inner, caller: _ }: &Self) -> impl core::fmt::Debug {
-        alloc::sync::Arc::as_ptr(inner)
+    /// Returns [`core::fmt::Debug`] implementation that is stable and unique
+    /// for the data held behind this [`Strong`].
+    pub fn debug_id(&self) -> impl core::fmt::Debug {
+        let Self { inner, caller: _ } = self;
+        debug_id::DebugId::WithToken {
+            ptr: alloc::sync::Arc::as_ptr(inner),
+            token: inner.debug_token.clone(),
+        }
     }
 
     /// Returns true if the inner value has since been marked for destruction.
     pub fn marked_for_destruction(Self { inner, caller: _ }: &Self) -> bool {
-        let Inner { marked_for_destruction, data: _, callers: _, notifier: _ } = inner.as_ref();
+        let Inner { marked_for_destruction, data: _, callers: _, notifier: _, debug_token: _ } =
+            inner.as_ref();
         // `Ordering::Acquire` because we want to synchronize with with the
         // `Ordering::Release` write to `marked_for_destruction` so that all
         // memory writes before the reference was marked for destruction is
@@ -555,11 +631,23 @@ impl<T> Weak<T> {
         this.ptr_eq(other)
     }
 
-    /// Returns [`core::fmt::Debug`] implementation that prints the pointer
-    /// address of this [`Weak`].
-    pub fn ptr_debug(&self) -> impl core::fmt::Debug {
-        let Self(this) = self;
-        this.as_ptr()
+    /// Returns [`core::fmt::Debug`] implementation that is stable and unique
+    /// for the data held behind this [`Weak`].
+    pub fn debug_id(&self) -> impl core::fmt::Debug {
+        match self.upgrade() {
+            Some(strong) => {
+                let Strong { inner, caller: _ } = &strong;
+                debug_id::DebugId::WithToken {
+                    ptr: alloc::sync::Arc::as_ptr(&inner),
+                    token: inner.debug_token.clone(),
+                }
+            }
+            None => {
+                let Self(this) = self;
+                // NB: If we can't upgrade the socket, we can't know the token.
+                debug_id::DebugId::WithoutToken { ptr: this.as_ptr() }
+            }
+        }
     }
 
     /// Attempts to upgrade to a [`Strong`].
@@ -569,7 +657,8 @@ impl<T> Weak<T> {
     pub fn upgrade(&self) -> Option<Strong<T>> {
         let Self(weak) = self;
         let arc = weak.upgrade()?;
-        let Inner { marked_for_destruction, data: _, callers, notifier: _ } = arc.deref();
+        let Inner { marked_for_destruction, data: _, callers, notifier: _, debug_token: _ } =
+            arc.deref();
 
         // `Ordering::Acquire` because we want to synchronize with with the
         // `Ordering::Release` write to `marked_for_destruction` so that all
@@ -600,7 +689,8 @@ impl<T> core::fmt::Debug for DebugReferences<T> {
         let mut f = f.debug_struct("DebugReferences");
         if let Some(inner) = inner.upgrade() {
             let strong_count = alloc::sync::Arc::strong_count(&inner);
-            let Inner { marked_for_destruction, callers, data: _, notifier: _ } = &*inner;
+            let Inner { marked_for_destruction, callers, data: _, notifier: _, debug_token: _ } =
+                &*inner;
             f.field("strong_count", &strong_count)
                 .field("marked_for_destruction", marked_for_destruction)
                 .field("callers", callers)
@@ -764,7 +854,8 @@ mod tests {
         let strong3 = weak.upgrade().unwrap();
 
         let Primary { inner } = &primary;
-        let Inner { marked_for_destruction: _, callers, data: _, notifier: _ } = &***inner;
+        let Inner { marked_for_destruction: _, callers, data: _, notifier: _, debug_token: _ } =
+            &***inner;
 
         let strongs = [strong1, strong2, strong3];
         let _: &Location<'_> = strongs.iter().enumerate().fold(here, |prev, (i, cur)| {
@@ -800,7 +891,8 @@ mod tests {
         assert_eq!(strong1.caller.location, strong2.caller.location);
 
         let Primary { inner } = &primary;
-        let Inner { marked_for_destruction: _, callers, data: _, notifier: _ } = &***inner;
+        let Inner { marked_for_destruction: _, callers, data: _, notifier: _, debug_token: _ } =
+            &***inner;
 
         {
             let callers = callers.callers.lock();
@@ -883,5 +975,44 @@ mod tests {
         let strong = primary.weak.upgrade().unwrap();
         assert_eq!(strong.value, 2);
         assert!(Primary::ptr_eq(&primary, &strong));
+    }
+
+    macro_rules! assert_debug_id_eq {
+        ($id1:expr, $id2:expr) => {
+            assert_eq!(alloc::format!("{:?}", $id1), alloc::format!("{:?}", $id2))
+        };
+    }
+    macro_rules! assert_debug_id_ne {
+        ($id1:expr, $id2:expr) => {
+            assert_ne!(alloc::format!("{:?}", $id1), alloc::format!("{:?}", $id2))
+        };
+    }
+
+    #[test]
+    fn debug_ids_are_stable() {
+        // Verify that transforming a given RC doesn't change it's debug_id.
+        let primary = Primary::new(1);
+        let strong = Primary::clone_strong(&primary);
+        let weak_p = Primary::downgrade(&primary);
+        let weak_s = Strong::downgrade(&strong);
+        let weak_c = weak_p.clone();
+        assert_debug_id_eq!(&primary.debug_id(), &strong.debug_id());
+        assert_debug_id_eq!(&primary.debug_id(), &weak_p.debug_id());
+        assert_debug_id_eq!(&primary.debug_id(), &weak_s.debug_id());
+        assert_debug_id_eq!(&primary.debug_id(), &weak_c.debug_id());
+    }
+
+    #[test]
+    fn debug_ids_are_unique() {
+        // Verify that RCs to different data have different debug_ids.
+        let primary1 = Primary::new(1);
+        let primary2 = Primary::new(1);
+        assert_debug_id_ne!(&primary1.debug_id(), &primary2.debug_id());
+
+        // Verify that dropping an RC does not allow it's debug_id to be reused.
+        let id1 = primary1.debug_id();
+        std::mem::drop(primary1);
+        let primary3 = Primary::new(1);
+        assert_debug_id_ne!(&id1, &primary3.debug_id());
     }
 }
