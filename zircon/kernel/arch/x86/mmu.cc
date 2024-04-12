@@ -782,8 +782,13 @@ zx_status_t X86ArchVmAspace::InitUnified(ArchVmAspaceInterface& shared,
 
   X86ArchVmAspace& sharedX86 = static_cast<X86ArchVmAspace&>(shared);
   X86ArchVmAspace& restrictedX86 = static_cast<X86ArchVmAspace&>(restricted);
+  // Validate that the shared and restricted aspaces are correctly initialized, as this can only be
+  // done on MMU aspaces this tells us it is safe to case.
+  ASSERT(sharedX86.pt_->IsShared());
+  ASSERT(restrictedX86.pt_->IsRestricted());
   zx_status_t status =
-      mmu->InitUnified(this, sharedX86.pt_, sharedX86.base_, sharedX86.size_, restrictedX86.pt_,
+      mmu->InitUnified(this, static_cast<X86PageTableMmu*>(sharedX86.pt_), sharedX86.base_,
+                       sharedX86.size_, static_cast<X86PageTableMmu*>(restrictedX86.pt_),
                        restrictedX86.base_, restrictedX86.size_, test_page_alloc_func_);
   if (status != ZX_OK) {
     return status;
@@ -939,9 +944,11 @@ void X86ArchVmAspace::ContextSwitch(X86ArchVmAspace* old_aspace, X86ArchVmAspace
     // If we are switching to a unified aspace, we need to mark the associated shared and
     // restricted aspaces as active since the last check as well.
     if (aspace->IsUnified()) {
-      X86ArchVmAspace* shared = static_cast<X86ArchVmAspace*>(aspace->pt_->get_shared_pt()->ctx());
+      // Being a unified aspace implies it is an MMU type.
+      X86PageTableMmu* aspace_pt = static_cast<X86PageTableMmu*>(aspace->pt_);
+      X86ArchVmAspace* shared = static_cast<X86ArchVmAspace*>(aspace_pt->get_shared_pt()->ctx());
       X86ArchVmAspace* restricted =
-          static_cast<X86ArchVmAspace*>(aspace->pt_->get_restricted_pt()->ctx());
+          static_cast<X86ArchVmAspace*>(aspace_pt->get_restricted_pt()->ctx());
       shared->active_since_last_check_.store(true, ktl::memory_order_relaxed);
       restricted->active_since_last_check_.store(true, ktl::memory_order_relaxed);
     }

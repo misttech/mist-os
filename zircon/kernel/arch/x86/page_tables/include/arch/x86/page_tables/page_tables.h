@@ -178,6 +178,146 @@ class X86PageTableBase {
   // Returns whether this page table is unified.
   bool IsUnified() const { return role_ == PageTableRole::kUnified; }
 
+  virtual zx_status_t MapPages(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
+                               ExistingEntryAction existing_action, size_t* mapped) = 0;
+  virtual zx_status_t MapPagesContiguous(vaddr_t vaddr, paddr_t paddr, const size_t count,
+                                         uint mmu_flags, size_t* mapped) = 0;
+  virtual zx_status_t UnmapPages(vaddr_t vaddr, const size_t count, EnlargeOperation enlarge,
+                                 size_t* unmapped) = 0;
+  virtual zx_status_t ProtectPages(vaddr_t vaddr, size_t count, uint mmu_flags) = 0;
+  virtual zx_status_t QueryVaddr(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) = 0;
+
+  using NonTerminalAction = ArchVmAspaceInterface::NonTerminalAction;
+  using TerminalAction = ArchVmAspaceInterface::TerminalAction;
+  virtual zx_status_t HarvestAccessed(vaddr_t vaddr, size_t count,
+                                      NonTerminalAction non_terminal_action,
+                                      TerminalAction terminal_action) = 0;
+
+  // Returns 1 for unified page tables and 0 for all other page tables. This establishes an
+  // ordering that is used when the lock_ is acquired. The restricted page table lock is acquired
+  // first, and the unified page table lock is acquired afterwards.
+  uint32_t LockOrder() const { return IsUnified() ? 1 : 0; }
+
+ protected:
+  using page_alloc_fn_t = ArchVmAspaceInterface::page_alloc_fn_t;
+
+  // Initialize an empty page table, assigning this given context to it.
+  zx_status_t Init(void* ctx, page_alloc_fn_t test_paf = nullptr) TA_NO_THREAD_SAFETY_ANALYSIS {
+    test_page_alloc_func_ = test_paf;
+
+    /* allocate a top level page table for the new address space */
+    virt_ = AllocatePageTable();
+    if (!virt_) {
+      return ZX_ERR_NO_MEMORY;
+    }
+
+    phys_ = physmap_to_paddr(virt_);
+    DEBUG_ASSERT(phys_ != 0);
+
+    ctx_ = ctx;
+    pages_ = 1;
+    return ZX_OK;
+  }
+
+  pt_entry_t* AllocatePageTable() {
+    paddr_t pa;
+    vm_page* p;
+    zx_status_t status;
+
+    // The default allocation routine is pmm_alloc_page so test and explicitly call it
+    // to avoid any unnecessary virtual function calls.
+    if (likely(!test_page_alloc_func_)) {
+      status = pmm_alloc_page(0, &p, &pa);
+    } else {
+      status = test_page_alloc_func_(0, &p, &pa);
+    }
+    if (status != ZX_OK) {
+      return nullptr;
+    }
+    p->set_state(vm_page_state::MMU);
+
+    pt_entry_t* page_ptr = static_cast<pt_entry_t*>(paddr_to_physmap(pa));
+    DEBUG_ASSERT(page_ptr);
+
+    arch_zero_page(page_ptr);
+
+    return page_ptr;
+  }
+
+  DISALLOW_COPY_ASSIGN_AND_MOVE(X86PageTableBase);
+
+  fbl::Canary<fbl::magic("X86P")> canary_;
+
+  // The number of times entries in the pml4 are referenced by other page tables.
+  // Unified page tables increment and decrement this value on their associated shared and
+  // restricted page tables, so we must hold the lock_ when doing so.
+  uint32_t num_references_ TA_GUARDED(lock_) = 0;
+
+  // The role this page table plays in unified aspaces, if any. This should only be set by the
+  // Init* functions, and should not be modified anywhere else.
+  PageTableRole role_ = PageTableRole::kIndependent;
+
+  // Page allocate function, overridable for testing.
+  page_alloc_fn_t test_page_alloc_func_ = nullptr;
+
+  // Pointer to the translation table.
+  paddr_t phys_ = 0;
+  pt_entry_t* virt_ = nullptr;
+
+  // Counter of pages allocated to back the translation table.
+  size_t pages_ TA_GUARDED(lock_) = 0;
+
+  // A context structure that may used by a PageTable type above as part of
+  // invalidation.
+  void* ctx_ = nullptr;
+
+  // Lock to protect the mmu code.
+  DECLARE_MUTEX(X86PageTableBase, lockdep::LockFlagsNestable) lock_;
+};
+
+// Implementation of the X86 page table code, that is expected to be derived using the recursive
+// template pattern. The derived class T is expected to implement the following methods:
+//
+// Returns the highest level of the page tables
+// PageTableLevel top_level();
+//
+// Returns true if the given ARCH_MMU_FLAG_* flag combination is valid.
+// bool allowed_flags(uint flags);
+//
+// Returns true if the given paddr is valid
+// bool check_paddr(paddr_t paddr);
+//
+// Returns true if the given vaddr is valid
+// bool check_vaddr(vaddr_t vaddr);
+//
+// Whether the processor supports the page size of this level
+// bool supports_page_size(PageTableLevel level);
+//
+// Return the hardware flags to use on intermediate page tables entries
+// IntermediatePtFlags intermediate_flags();
+//
+// Return the hardware flags to use on terminal page table entries
+// PtFlags terminal_flags(PageTableLevel level, uint flags);
+//
+// Return the hardware flags to use on smaller pages after a splitting a
+// large page with flags |flags|.
+// PtFlags split_flags(PageTableLevel level, PtFlags flags);
+//
+// Execute the given pending invalidation
+// void TlbInvalidate(const PendingTlbInvalidation* pending);
+//
+// Convert PtFlags to ARCH_MMU_* flags.
+// uint pt_flags_to_mmu_flags(PtFlags flags, PageTableLevel level);
+//
+// Returns true if a cache flush is necessary for pagetable changes to be
+// visible to hardware page table walkers. On x86, this is only true for Intel IOMMU page
+// tables when the IOMMU 'caching mode' bit is true.
+// bool needs_cache_flushes();
+template <class T>
+class X86PageTableImpl : public X86PageTableBase {
+ public:
+  X86PageTableImpl() {}
+
   // Accessors for the shared and restricted page tables on a unified page table.
   // We can turn off thread safety analysis as these accessors should only be used on unified page
   // tables, for which both the shared and restricted page table pointers are notionally const.
@@ -191,19 +331,19 @@ class X86PageTableBase {
   }
 
   zx_status_t MapPages(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
-                       ExistingEntryAction existing_action, size_t* mapped) {
+                       ExistingEntryAction existing_action, size_t* mapped) override final {
     canary_.Assert();
 
-    if (!check_vaddr(vaddr))
+    if (!static_cast<T*>(this)->check_vaddr(vaddr))
       return ZX_ERR_INVALID_ARGS;
     for (size_t i = 0; i < count; ++i) {
-      if (!check_paddr(phys[i]))
+      if (!static_cast<T*>(this)->check_paddr(phys[i]))
         return ZX_ERR_INVALID_ARGS;
     }
     if (count == 0)
       return ZX_OK;
 
-    if (!allowed_flags(mmu_flags))
+    if (!static_cast<T*>(this)->allowed_flags(mmu_flags))
       return ZX_ERR_INVALID_ARGS;
 
     __UNINITIALIZED ConsistencyManager cm(this);
@@ -213,7 +353,8 @@ class X86PageTableBase {
 
       MappingCursor cursor(/*paddrs=*/phys, /*paddr_count=*/count, /*page_size=*/PAGE_SIZE,
                            /*vaddr=*/vaddr);
-      zx_status_t status = AddMapping(virt_, mmu_flags, top_level(), existing_action, cursor, &cm);
+      zx_status_t status = AddMapping(virt_, mmu_flags, static_cast<T*>(this)->top_level(),
+                                      existing_action, cursor, &cm);
       cm.Finish();
       if (status != ZX_OK) {
         dprintf(SPEW, "Add mapping failed with err=%d\n", status);
@@ -228,17 +369,17 @@ class X86PageTableBase {
     return ZX_OK;
   }
   zx_status_t MapPagesContiguous(vaddr_t vaddr, paddr_t paddr, const size_t count, uint mmu_flags,
-                                 size_t* mapped) {
+                                 size_t* mapped) override final {
     canary_.Assert();
 
-    if (!check_paddr(paddr))
+    if (!static_cast<T*>(this)->check_paddr(paddr))
       return ZX_ERR_INVALID_ARGS;
-    if (!check_vaddr(vaddr))
+    if (!static_cast<T*>(this)->check_vaddr(vaddr))
       return ZX_ERR_INVALID_ARGS;
     if (count == 0)
       return ZX_OK;
 
-    if (!allowed_flags(mmu_flags))
+    if (!static_cast<T*>(this)->allowed_flags(mmu_flags))
       return ZX_ERR_INVALID_ARGS;
 
     MappingCursor cursor(/*paddrs=*/&paddr, /*paddr_count=*/1, /*page_size=*/count * PAGE_SIZE,
@@ -247,8 +388,8 @@ class X86PageTableBase {
     {
       Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
       DEBUG_ASSERT(virt_);
-      zx_status_t status =
-          AddMapping(virt_, mmu_flags, top_level(), ExistingEntryAction::Error, cursor, &cm);
+      zx_status_t status = AddMapping(virt_, mmu_flags, static_cast<T*>(this)->top_level(),
+                                      ExistingEntryAction::Error, cursor, &cm);
       cm.Finish();
       if (status != ZX_OK) {
         dprintf(SPEW, "Add mapping failed with err=%d\n", status);
@@ -263,10 +404,10 @@ class X86PageTableBase {
     return ZX_OK;
   }
   zx_status_t UnmapPages(vaddr_t vaddr, const size_t count, EnlargeOperation enlarge,
-                         size_t* unmapped) {
+                         size_t* unmapped) override final {
     canary_.Assert();
 
-    if (!check_vaddr(vaddr))
+    if (!static_cast<T*>(this)->check_vaddr(vaddr))
       return ZX_ERR_INVALID_ARGS;
     if (count == 0)
       return ZX_OK;
@@ -280,7 +421,7 @@ class X86PageTableBase {
     {
       Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
       DEBUG_ASSERT(virt_);
-      status = RemoveMapping(virt_, top_level(), enlarge, cursor, &cm);
+      status = RemoveMapping(virt_, static_cast<T*>(this)->top_level(), enlarge, cursor, &cm);
       cm.Finish();
     }
     DEBUG_ASSERT(cursor.size() == 0 || status.is_error());
@@ -290,22 +431,23 @@ class X86PageTableBase {
 
     return status.status_value();
   }
-  zx_status_t ProtectPages(vaddr_t vaddr, size_t count, uint mmu_flags) {
+  zx_status_t ProtectPages(vaddr_t vaddr, size_t count, uint mmu_flags) override final {
     canary_.Assert();
 
-    if (!check_vaddr(vaddr))
+    if (!static_cast<T*>(this)->check_vaddr(vaddr))
       return ZX_ERR_INVALID_ARGS;
     if (count == 0)
       return ZX_OK;
 
-    if (!allowed_flags(mmu_flags))
+    if (!static_cast<T*>(this)->allowed_flags(mmu_flags))
       return ZX_ERR_INVALID_ARGS;
 
     MappingCursor cursor(/*vaddr=*/vaddr, /*size=*/count * PAGE_SIZE);
     __UNINITIALIZED ConsistencyManager cm(this);
     {
       Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
-      zx_status_t status = UpdateMapping(virt_, mmu_flags, top_level(), cursor, &cm);
+      zx_status_t status =
+          UpdateMapping(virt_, mmu_flags, static_cast<T*>(this)->top_level(), cursor, &cm);
       cm.Finish();
       if (status != ZX_OK) {
         return status;
@@ -315,7 +457,7 @@ class X86PageTableBase {
     return ZX_OK;
   }
 
-  zx_status_t QueryVaddr(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) {
+  zx_status_t QueryVaddr(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) override final {
     canary_.Assert();
 
     PageTableLevel ret_level;
@@ -323,7 +465,8 @@ class X86PageTableBase {
     Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
 
     volatile pt_entry_t* last_valid_entry;
-    zx_status_t status = GetMapping(virt_, vaddr, top_level(), &ret_level, &last_valid_entry);
+    zx_status_t status =
+        GetMapping(virt_, vaddr, static_cast<T*>(this)->top_level(), &ret_level, &last_valid_entry);
     if (status != ZX_OK)
       return status;
 
@@ -351,19 +494,17 @@ class X86PageTableBase {
 
     /* converting arch-specific flags to mmu flags */
     if (mmu_flags) {
-      *mmu_flags = pt_flags_to_mmu_flags(*last_valid_entry, ret_level);
+      *mmu_flags = static_cast<T*>(this)->pt_flags_to_mmu_flags(*last_valid_entry, ret_level);
     }
 
     return ZX_OK;
   }
 
-  using NonTerminalAction = ArchVmAspaceInterface::NonTerminalAction;
-  using TerminalAction = ArchVmAspaceInterface::TerminalAction;
   zx_status_t HarvestAccessed(vaddr_t vaddr, size_t count, NonTerminalAction non_terminal_action,
-                              TerminalAction terminal_action) {
+                              TerminalAction terminal_action) override final {
     canary_.Assert();
 
-    if (!check_vaddr(vaddr)) {
+    if (!static_cast<T*>(this)->check_vaddr(vaddr)) {
       return ZX_ERR_INVALID_ARGS;
     }
     if (count == 0) {
@@ -374,40 +515,17 @@ class X86PageTableBase {
     __UNINITIALIZED ConsistencyManager cm(this);
     {
       Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
-      HarvestMapping(virt_, non_terminal_action, terminal_action, top_level(), cursor, &cm);
+      HarvestMapping(virt_, non_terminal_action, terminal_action,
+                     static_cast<T*>(this)->top_level(), cursor, &cm);
       cm.Finish();
     }
     DEBUG_ASSERT(cursor.size() == 0);
     return ZX_OK;
   }
 
-  // Returns 1 for unified page tables and 0 for all other page tables. This establishes an
-  // ordering that is used when the lock_ is acquired. The restricted page table lock is acquired
-  // first, and the unified page table lock is acquired afterwards.
-  uint32_t LockOrder() const { return IsUnified() ? 1 : 0; }
-
  protected:
-  using page_alloc_fn_t = ArchVmAspaceInterface::page_alloc_fn_t;
-
-  // Initialize an empty page table, assigning this given context to it.
   // We disable analysis due to the write to |pages_| tripping it up.  It is safe
   // to write to |pages_| since this is part of object construction.
-  zx_status_t Init(void* ctx, page_alloc_fn_t test_paf = nullptr) TA_NO_THREAD_SAFETY_ANALYSIS {
-    test_page_alloc_func_ = test_paf;
-
-    /* allocate a top level page table for the new address space */
-    virt_ = AllocatePageTable();
-    if (!virt_) {
-      return ZX_ERR_NO_MEMORY;
-    }
-
-    phys_ = physmap_to_paddr(virt_);
-    DEBUG_ASSERT(phys_ != 0);
-
-    ctx_ = ctx;
-    pages_ = 1;
-    return ZX_OK;
-  }
   // Initialize an empty page table and mark it as restricted.
   zx_status_t InitRestricted(void* ctx, page_alloc_fn_t test_paf = nullptr) {
     role_ = PageTableRole::kRestricted;
@@ -425,14 +543,14 @@ class X86PageTableBase {
     }
     role_ = PageTableRole::kShared;
 
-    PageTableLevel top = top_level();
+    PageTableLevel top = static_cast<T*>(this)->top_level();
     const uint start = vaddr_to_index(top, base);
     uint end = vaddr_to_index(top, base + size - 1);
     // Check the end if it fills out the table entry.
     if (page_aligned(top, base + size)) {
       end += 1;
     }
-    IntermediatePtFlags flags = intermediate_flags();
+    IntermediatePtFlags flags = static_cast<T*>(this)->intermediate_flags();
 
     for (uint i = start; i < end; i++) {
       pt_entry_t* pdp = AllocatePageTable();
@@ -452,14 +570,15 @@ class X86PageTableBase {
   // 1) The shared page table must set only |is_shared_| to true.
   // 2) The restricted page table must set only |is_restricted_| to true.
   // 3) Both the shared and restricted page tables must have been initialized prior to this call.
-  zx_status_t InitUnified(void* ctx, X86PageTableBase* shared, vaddr_t shared_base,
-                          size_t shared_size, X86PageTableBase* restricted, vaddr_t restricted_base,
-                          size_t restricted_size, page_alloc_fn_t test_paf = nullptr) {
+  zx_status_t InitUnified(void* ctx, X86PageTableImpl<T>* shared, vaddr_t shared_base,
+                          size_t shared_size, X86PageTableImpl<T>* restricted,
+                          vaddr_t restricted_base, size_t restricted_size,
+                          page_alloc_fn_t test_paf = nullptr) {
     DEBUG_ASSERT(restricted->IsRestricted());
     DEBUG_ASSERT(shared->IsShared());
     // Validate that the shared and restricted page tables do not overlap and do not share a PML4
     // entry.
-    PageTableLevel top = top_level();
+    PageTableLevel top = static_cast<T*>(this)->top_level();
     const uint restricted_start = vaddr_to_index(top, restricted_base);
     uint restricted_end = vaddr_to_index(top, restricted_base + restricted_size - 1);
     if (page_aligned(top, restricted_base + restricted_size)) {
@@ -529,52 +648,9 @@ class X86PageTableBase {
     return DestroyIndividual(base, size);
   }
 
-  // Returns the highest level of the page tables
-  virtual PageTableLevel top_level() = 0;
-  // Returns true if the given ARCH_MMU_FLAG_* flag combination is valid.
-  virtual bool allowed_flags(uint flags) = 0;
-  // Returns true if the given paddr is valid
-  virtual bool check_paddr(paddr_t paddr) = 0;
-  // Returns true if the given vaddr is valid
-  virtual bool check_vaddr(vaddr_t vaddr) = 0;
-  // Whether the processor supports the page size of this level
-  virtual bool supports_page_size(PageTableLevel level) = 0;
-  // Return the hardware flags to use on intermediate page tables entries
-  virtual IntermediatePtFlags intermediate_flags() = 0;
-  // Return the hardware flags to use on terminal page table entries
-  virtual PtFlags terminal_flags(PageTableLevel level, uint flags) = 0;
-  // Return the hardware flags to use on smaller pages after a splitting a
-  // large page with flags |flags|.
-  virtual PtFlags split_flags(PageTableLevel level, PtFlags flags) = 0;
-  // Execute the given pending invalidation
-  virtual void TlbInvalidate(const PendingTlbInvalidation* pending) = 0;
-
-  // Convert PtFlags to ARCH_MMU_* flags.
-  virtual uint pt_flags_to_mmu_flags(PtFlags flags, PageTableLevel level) = 0;
-  // Returns true if a cache flush is necessary for pagetable changes to be
-  // visible to hardware page table walkers. On x86, this is only true for Intel IOMMU page
-  // tables when the IOMMU 'caching mode' bit is true.
-  virtual bool needs_cache_flushes() = 0;
-
-  // Page allocate function, overridable for testing.
-  page_alloc_fn_t test_page_alloc_func_ = nullptr;
-
-  // Pointer to the translation table.
-  paddr_t phys_ = 0;
-  pt_entry_t* virt_ = nullptr;
-
-  // Counter of pages allocated to back the translation table.
-  size_t pages_ TA_GUARDED(lock_) = 0;
-
-  // A context structure that may used by a PageTable type above as part of
-  // invalidation.
-  void* ctx_ = nullptr;
-
-  // Lock to protect the mmu code.
-  DECLARE_MUTEX(X86PageTableBase, lockdep::LockFlagsNestable) lock_;
-
  private:
-  DISALLOW_COPY_ASSIGN_AND_MOVE(X86PageTableBase);
+  DISALLOW_COPY_ASSIGN_AND_MOVE(X86PageTableImpl);
+
   // Utility for managing consistency of the page tables from a cache and TLB
   // point-of-view.  It ensures that memory is not freed while a TLB entry may
   // refer to it, and that changes to the page tables have appropriate visiblity
@@ -598,7 +674,8 @@ class X86PageTableBase {
   // moment.
   class ConsistencyManager {
    public:
-    explicit ConsistencyManager(X86PageTableBase* pt) : pt_(pt), clf_(pt->needs_cache_flushes()) {}
+    explicit ConsistencyManager(X86PageTableImpl<T>* pt)
+        : pt_(pt), clf_(static_cast<T*>(pt)->needs_cache_flushes()) {}
     ~ConsistencyManager() {
       DEBUG_ASSERT(pt_ == nullptr);
 
@@ -630,19 +707,19 @@ class X86PageTableBase {
       AssertHeld(pt_->lock_);
 
       clf_.ForceFlush();
-      if (pt_->needs_cache_flushes()) {
+      if (static_cast<T*>(pt_)->needs_cache_flushes()) {
         // If the hardware needs cache flushes for the tables to be visible,
         // make sure we serialize the flushes before issuing the TLB
         // invalidations.
         arch::DeviceMemoryBarrier();
       }
-      pt_->TlbInvalidate(&tlb_);
+      static_cast<T*>(pt_)->TlbInvalidate(&tlb_);
       if (pt_->IsRestricted() && pt_->referenced_pt_ != nullptr) {
         // TODO(https://fxbug.dev/42083004): This TLB invalidation could be wrapped into the
         // preceding one so long as we built the target mask correctly.
         Guard<Mutex> a{AssertOrderedLock, &pt_->referenced_pt_->lock_,
                        pt_->referenced_pt_->LockOrder()};
-        pt_->referenced_pt_->TlbInvalidate(&tlb_);
+        static_cast<T*>(pt_->referenced_pt_)->TlbInvalidate(&tlb_);
       }
       // Clear out the pending TLB invalidations.
       tlb_.clear();
@@ -652,7 +729,7 @@ class X86PageTableBase {
     void SetFullShootdown() { tlb_.full_shootdown = true; }
 
    private:
-    X86PageTableBase* pt_;
+    X86PageTableImpl<T>* pt_;
 
     // Cache line to flush prior to TLB invalidations
     CacheLineFlusher clf_;
@@ -767,8 +844,8 @@ class X86PageTableBase {
                          ExistingEntryAction existing_action, MappingCursor& cursor,
                          ConsistencyManager* cm) TA_REQ(lock_) {
     DEBUG_ASSERT(table);
-    DEBUG_ASSERT(check_vaddr(cursor.vaddr()));
-    DEBUG_ASSERT(check_paddr(cursor.paddr()));
+    DEBUG_ASSERT(static_cast<T*>(this)->check_vaddr(cursor.vaddr()));
+    DEBUG_ASSERT(static_cast<T*>(this)->check_paddr(cursor.paddr()));
     const vaddr_t start_vaddr = cursor.vaddr();
     // Unified page tables should never be mapping entries directly; rather, their constituent page
     // tables should be mapping entries on their behalf.
@@ -782,7 +859,7 @@ class X86PageTableBase {
 
     auto abort = fit::defer([&]() {
       AssertHeld(lock_);
-      if (level == top_level()) {
+      if (level == static_cast<T*>(this)->top_level()) {
         // Build an unmap cursor. cursor.size should be how much is left to be mapped still.
         MappingCursor unmap_cursor(/*vaddr=*/start_vaddr,
                                    /*size=*/cursor.vaddr() - start_vaddr);
@@ -795,11 +872,11 @@ class X86PageTableBase {
       }
     });
 
-    IntermediatePtFlags interm_flags = intermediate_flags();
-    PtFlags term_flags = terminal_flags(level, mmu_flags);
+    IntermediatePtFlags interm_flags = static_cast<T*>(this)->intermediate_flags();
+    PtFlags term_flags = static_cast<T*>(this)->terminal_flags(level, mmu_flags);
 
     size_t ps = page_size(level);
-    bool level_supports_large_pages = supports_page_size(level);
+    bool level_supports_large_pages = static_cast<T*>(this)->supports_page_size(level);
     uint index = vaddr_to_index(level, cursor.vaddr());
     for (; index != NO_OF_PT_ENTRIES && cursor.size() != 0; ++index) {
       volatile pt_entry_t* e = table + index;
@@ -878,7 +955,8 @@ class X86PageTableBase {
                            ConsistencyManager* cm) TA_REQ(lock_) {
     DEBUG_ASSERT(IS_PAGE_ALIGNED(cursor.size()));
 
-    const PtFlags term_flags = terminal_flags(PageTableLevel::PT_L, mmu_flags);
+    const PtFlags term_flags =
+        static_cast<T*>(this)->terminal_flags(PageTableLevel::PT_L, mmu_flags);
     uint index = vaddr_to_index(PageTableLevel::PT_L, cursor.vaddr());
 
     for (; index != NO_OF_PT_ENTRIES && cursor.size() != 0; ++index) {
@@ -916,8 +994,8 @@ class X86PageTableBase {
   /**
    * @brief Unmaps the range specified by start_cursor.
    *
-   * Level must be top_level() when invoked.  The caller must, even on failure,
-   * free all pages in the |to_free| list and adjust the |pages_| count.
+   * Level must be top_level() when invoked.  The caller must, even on
+   * failure, free all pages in the |to_free| list and adjust the |pages_| count.
    *
    * @param table The top-level paging structure's virtual address.
    * @param start_cursor A cursor describing the range of address space to
@@ -932,7 +1010,7 @@ class X86PageTableBase {
                                  EnlargeOperation enlarge, MappingCursor& cursor,
                                  ConsistencyManager* cm) TA_REQ(lock_) {
     DEBUG_ASSERT(table);
-    DEBUG_ASSERT(check_vaddr(cursor.vaddr()));
+    DEBUG_ASSERT(static_cast<T*>(this)->check_vaddr(cursor.vaddr()));
     // Unified page tables should never be unmapping entries directly; rather, their constituent
     // page tables should be unmapping entries on their behalf.
     DEBUG_ASSERT(!IsUnified());
@@ -1061,8 +1139,8 @@ class X86PageTableBase {
   /**
    * @brief Changes the permissions/caching of the range specified by start_cursor
    *
-   * Level must be top_level() when invoked.  The caller must, even on failure,
-   * free all pages in the |to_free| list and adjust the |pages_| count.
+   * Level must be top_level() when invoked.  The caller must, even on
+   * failure, free all pages in the |to_free| list and adjust the |pages_| count.
    *
    * @param table The top-level paging structure's virtual address.
    * @param start_cursor A cursor describing the range of address space to
@@ -1073,7 +1151,7 @@ class X86PageTableBase {
   zx_status_t UpdateMapping(volatile pt_entry_t* table, uint mmu_flags, PageTableLevel level,
                             MappingCursor& cursor, ConsistencyManager* cm) TA_REQ(lock_) {
     DEBUG_ASSERT(table);
-    DEBUG_ASSERT(check_vaddr(cursor.vaddr()));
+    DEBUG_ASSERT(static_cast<T*>(this)->check_vaddr(cursor.vaddr()));
 
     if (level == PageTableLevel::PT_L) {
       return UpdateMappingL0(table, mmu_flags, cursor, cm);
@@ -1081,7 +1159,7 @@ class X86PageTableBase {
 
     zx_status_t ret = ZX_OK;
 
-    PtFlags term_flags = terminal_flags(level, mmu_flags);
+    PtFlags term_flags = static_cast<T*>(this)->terminal_flags(level, mmu_flags);
 
     size_t ps = page_size(level);
     uint index = vaddr_to_index(level, cursor.vaddr());
@@ -1127,7 +1205,7 @@ class X86PageTableBase {
                               ConsistencyManager* cm) TA_REQ(lock_) {
     DEBUG_ASSERT(IS_PAGE_ALIGNED(cursor.size()));
 
-    PtFlags term_flags = terminal_flags(PageTableLevel::PT_L, mmu_flags);
+    PtFlags term_flags = static_cast<T*>(this)->terminal_flags(PageTableLevel::PT_L, mmu_flags);
 
     uint index = vaddr_to_index(PageTableLevel::PT_L, cursor.vaddr());
     for (; index != NO_OF_PT_ENTRIES && cursor.size() != 0; ++index) {
@@ -1151,8 +1229,8 @@ class X86PageTableBase {
    * harvested, and unaccessed non-terminal entries are unmapped or retained based on the passed in
    * action.
    *
-   * Level must be top_level() when invoked.  The caller must, even on failure,
-   * free all pages in the |to_free| list and adjust the |pages_| count.
+   * Level must be top_level() when invoked.  The caller must, even on
+   * failure, free all pages in the |to_free| list and adjust the |pages_| count.
    *
    * @param table The top-level paging structure's virtual address.
    * @param start_cursor A cursor describing the range of address space to
@@ -1167,7 +1245,7 @@ class X86PageTableBase {
                       TerminalAction terminal_action, PageTableLevel level, MappingCursor& cursor,
                       ConsistencyManager* cm) TA_REQ(lock_) {
     DEBUG_ASSERT(table);
-    DEBUG_ASSERT(check_vaddr(cursor.vaddr()));
+    DEBUG_ASSERT(static_cast<T*>(this)->check_vaddr(cursor.vaddr()));
 
     if (level == PageTableLevel::PT_L) {
       HarvestMappingL0(table, terminal_action, cursor, cm);
@@ -1195,8 +1273,8 @@ class X86PageTableBase {
         // If the request covers the entire large page then harvest the accessed bit, otherwise we
         // just skip it.
         if (vaddr_level_aligned && cursor.size() >= ps) {
-          const uint mmu_flags = pt_flags_to_mmu_flags(pt_val, level);
-          const PtFlags term_flags = terminal_flags(level, mmu_flags);
+          const uint mmu_flags = static_cast<T*>(this)->pt_flags_to_mmu_flags(pt_val, level);
+          const PtFlags term_flags = static_cast<T*>(this)->terminal_flags(level, mmu_flags);
           UpdateEntry(cm, level, cursor.vaddr(), e, paddr_from_pte(level, pt_val),
                       term_flags | X86_MMU_PG_PS, /*was_terminal=*/true, /*exact_flags=*/true);
         }
@@ -1271,7 +1349,7 @@ class X86PageTableBase {
         unmapped = true;
       } else if ((pt_val & X86_MMU_PG_A) && non_terminal_action != NonTerminalAction::Retain) {
         // Since we didn't unmap, we need to unset the accessed flag.
-        const IntermediatePtFlags flags = intermediate_flags();
+        const IntermediatePtFlags flags = static_cast<T*>(this)->intermediate_flags();
         UpdateEntry(cm, level, unmap_vaddr, e, ptable_phys, flags, /*was_terminal=*/false,
                     /*exact_flags=*/true);
         // For the accessed flag to reliably reset we need to ensure that any leaf pages from here
@@ -1295,8 +1373,10 @@ class X86PageTableBase {
       pt_entry_t pt_val = *e;
       if (IS_PAGE_PRESENT(pt_val) && (pt_val & X86_MMU_PG_A)) {
         const paddr_t paddr = paddr_from_pte(PageTableLevel::PT_L, pt_val);
-        const uint mmu_flags = pt_flags_to_mmu_flags(pt_val, PageTableLevel::PT_L);
-        const PtFlags term_flags = terminal_flags(PageTableLevel::PT_L, mmu_flags);
+        const uint mmu_flags =
+            static_cast<T*>(this)->pt_flags_to_mmu_flags(pt_val, PageTableLevel::PT_L);
+        const PtFlags term_flags =
+            static_cast<T*>(this)->terminal_flags(PageTableLevel::PT_L, mmu_flags);
 
         vm_page_t* page = paddr_to_vm_page(paddr);
         // Mappings for physical VMOs do not have pages associated with them and so there's no state
@@ -1381,7 +1461,7 @@ class X86PageTableBase {
     }
 
     paddr_t paddr_base = paddr_from_pte(level, *pte);
-    PtFlags flags = split_flags(level, *pte & X86_LARGE_FLAGS_MASK);
+    PtFlags flags = static_cast<T*>(this)->split_flags(level, *pte & X86_LARGE_FLAGS_MASK);
 
     DEBUG_ASSERT(page_aligned(level, vaddr));
     vaddr_t new_vaddr = vaddr;
@@ -1397,7 +1477,7 @@ class X86PageTableBase {
     }
     DEBUG_ASSERT(new_vaddr == vaddr + page_size(level));
 
-    flags = intermediate_flags();
+    flags = static_cast<T*>(this)->intermediate_flags();
     UpdateEntry(cm, level, vaddr, pte, X86_VIRT_TO_PHYS(m), flags, /*was_terminal=*/true);
     pages_++;
     return ZX_OK;
@@ -1453,31 +1533,6 @@ class X86PageTableBase {
   }
 
   // Allocating a new page table
-  pt_entry_t* AllocatePageTable() {
-    paddr_t pa;
-    vm_page* p;
-    zx_status_t status;
-
-    // The default allocation routine is pmm_alloc_page so test and explicitly call it
-    // to avoid any unnecessary virtual function calls.
-    if (likely(!test_page_alloc_func_)) {
-      status = pmm_alloc_page(0, &p, &pa);
-    } else {
-      status = test_page_alloc_func_(0, &p, &pa);
-    }
-    if (status != ZX_OK) {
-      return nullptr;
-    }
-    p->set_state(vm_page_state::MMU);
-
-    pt_entry_t* page_ptr = static_cast<pt_entry_t*>(paddr_to_physmap(pa));
-    DEBUG_ASSERT(page_ptr);
-
-    arch_zero_page(page_ptr);
-
-    return page_ptr;
-  }
-
   // Release the resources associated with this page table.  |base| and |size|
   // are only used for debug checks that the page tables have no more mappings.
   void DestroyIndividual(vaddr_t base, size_t size) {
@@ -1495,7 +1550,7 @@ class X86PageTableBase {
     if (IsShared()) {
       DEBUG_ASSERT(virt_ != nullptr);
 
-      PageTableLevel top = top_level();
+      PageTableLevel top = static_cast<T*>(this)->top_level();
       pt_entry_t* table = static_cast<pt_entry_t*>(virt_);
       const uint start = vaddr_to_index(top, base);
       uint end = vaddr_to_index(top, base + size - 1);
@@ -1515,7 +1570,7 @@ class X86PageTableBase {
     }
 
     if constexpr (DEBUG_ASSERT_IMPLEMENTED) {
-      PageTableLevel top = top_level();
+      PageTableLevel top = static_cast<T*>(this)->top_level();
       if (virt_) {
         pt_entry_t* table = static_cast<pt_entry_t*>(virt_);
         const uint start = vaddr_to_index(top, base);
@@ -1542,8 +1597,8 @@ class X86PageTableBase {
   void DestroyUnified() {
     DEBUG_ASSERT(IsUnified());
 
-    X86PageTableBase* restricted = nullptr;
-    X86PageTableBase* shared = nullptr;
+    X86PageTableImpl<T>* restricted = nullptr;
+    X86PageTableImpl<T>* shared = nullptr;
     {
       // This lock should be uncontended since Destroy is not supposed to be called in parallel with
       // any other operation, but hold it anyway so we can clear virt_ and attempt to surface any
@@ -1597,26 +1652,15 @@ class X86PageTableBase {
     return (left & no_accessed_dirty_mask) == (right & no_accessed_dirty_mask);
   }
 
-  fbl::Canary<fbl::magic("X86P")> canary_;
-
-  // The number of times entries in the pml4 are referenced by other page tables.
-  // Unified page tables increment and decrement this value on their associated shared and
-  // restricted page tables, so we must hold the lock_ when doing so.
-  uint32_t num_references_ TA_GUARDED(lock_) = 0;
-
-  // The role this page table plays in unified aspaces, if any. This should only be set by the
-  // Init* functions, and should not be modified anywhere else.
-  PageTableRole role_ = PageTableRole::kIndependent;
-
   // A reference to another page table that shares entries with this one.
   // If is_restricted_ is set to true, this references the associated unified page table.
   // If is_unified_ is set to true, this references the associated restricted page table.
   // If neither is true, this is set to null.
-  X86PageTableBase* referenced_pt_ TA_GUARDED(lock_) = nullptr;
+  X86PageTableImpl<T>* referenced_pt_ TA_GUARDED(lock_) = nullptr;
 
   // A reference to a shared page table whose mappings are also present in this page table. This is
   // only set for unified page tables.
-  X86PageTableBase* shared_pt_ TA_GUARDED(lock_) = nullptr;
+  X86PageTableImpl<T>* shared_pt_ TA_GUARDED(lock_) = nullptr;
 };
 
 #endif  // ZIRCON_KERNEL_ARCH_X86_PAGE_TABLES_INCLUDE_ARCH_X86_PAGE_TABLES_PAGE_TABLES_H_

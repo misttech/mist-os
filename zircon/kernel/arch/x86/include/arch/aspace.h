@@ -24,13 +24,13 @@
 constexpr uint16_t MMU_X86_UNUSED_PCID = 0;
 
 // Implementation of page tables used by x86-64 CPUs.
-class X86PageTableMmu final : public X86PageTableBase {
+class X86PageTableMmu final : public X86PageTableImpl<X86PageTableMmu> {
  public:
-  using X86PageTableBase::Destroy;
   using X86PageTableBase::Init;
-  using X86PageTableBase::InitRestricted;
-  using X86PageTableBase::InitShared;
-  using X86PageTableBase::InitUnified;
+  using X86PageTableImpl::Destroy;
+  using X86PageTableImpl::InitRestricted;
+  using X86PageTableImpl::InitShared;
+  using X86PageTableImpl::InitUnified;
 
   // Initialize the kernel page table, assigning the given context to it.
   // This X86PageTable will be special in that its mappings will all have
@@ -41,46 +41,39 @@ class X86PageTableMmu final : public X86PageTableBase {
   // Used for normal MMU page tables so they can share the high kernel mapping
   zx_status_t AliasKernelMappings();
 
- private:
-  using X86PageTableBase::ctx_;
-  using X86PageTableBase::pages_;
-  using X86PageTableBase::phys_;
-  using X86PageTableBase::virt_;
-
-  PageTableLevel top_level() final { return PageTableLevel::PML4_L; }
-  bool allowed_flags(uint flags) final { return (flags & ARCH_MMU_FLAG_PERM_READ); }
-  bool check_paddr(paddr_t paddr) final;
-  bool check_vaddr(vaddr_t vaddr) final;
-  bool supports_page_size(PageTableLevel level) final;
-  IntermediatePtFlags intermediate_flags() final;
-  PtFlags terminal_flags(PageTableLevel level, uint flags) final;
-  PtFlags split_flags(PageTableLevel level, PtFlags flags) final;
-  void TlbInvalidate(const PendingTlbInvalidation* pending) final;
-  uint pt_flags_to_mmu_flags(PtFlags flags, PageTableLevel level) final;
-  bool needs_cache_flushes() final { return false; }
+  PageTableLevel top_level() { return PageTableLevel::PML4_L; }
+  bool allowed_flags(uint flags) { return (flags & ARCH_MMU_FLAG_PERM_READ); }
+  bool check_paddr(paddr_t paddr);
+  bool check_vaddr(vaddr_t vaddr);
+  bool supports_page_size(PageTableLevel level);
+  IntermediatePtFlags intermediate_flags();
+  PtFlags terminal_flags(PageTableLevel level, uint flags);
+  PtFlags split_flags(PageTableLevel level, PtFlags flags);
+  void TlbInvalidate(const PendingTlbInvalidation* pending);
+  uint pt_flags_to_mmu_flags(PtFlags flags, PageTableLevel level);
+  bool needs_cache_flushes() { return false; }
 
   // If true, all mappings will have the global bit set.
   bool use_global_mappings_ = false;
 };
 
 // Implementation of Intel's Extended Page Tables, for use in virtualization.
-class X86PageTableEpt final : public X86PageTableBase {
+class X86PageTableEpt final : public X86PageTableImpl<X86PageTableEpt> {
  public:
-  using X86PageTableBase::Destroy;
   using X86PageTableBase::Init;
+  using X86PageTableImpl::Destroy;
 
- private:
-  PageTableLevel top_level() final { return PageTableLevel::PML4_L; }
-  bool allowed_flags(uint flags) final;
-  bool check_paddr(paddr_t paddr) final;
-  bool check_vaddr(vaddr_t vaddr) final;
-  bool supports_page_size(PageTableLevel level) final;
-  IntermediatePtFlags intermediate_flags() final;
-  PtFlags terminal_flags(PageTableLevel level, uint flags) final;
-  PtFlags split_flags(PageTableLevel level, PtFlags flags) final;
-  void TlbInvalidate(const PendingTlbInvalidation* pending) final;
-  uint pt_flags_to_mmu_flags(PtFlags flags, PageTableLevel level) final;
-  bool needs_cache_flushes() final { return false; }
+  PageTableLevel top_level() { return PageTableLevel::PML4_L; }
+  bool allowed_flags(uint flags);
+  bool check_paddr(paddr_t paddr);
+  bool check_vaddr(vaddr_t vaddr);
+  bool supports_page_size(PageTableLevel level);
+  IntermediatePtFlags intermediate_flags();
+  PtFlags terminal_flags(PageTableLevel level, uint flags);
+  PtFlags split_flags(PageTableLevel level, PtFlags flags);
+  void TlbInvalidate(const PendingTlbInvalidation* pending);
+  uint pt_flags_to_mmu_flags(PtFlags flags, PageTableLevel level);
+  bool needs_cache_flushes() { return false; }
 };
 
 class X86ArchVmAspace final : public ArchVmAspaceInterface {

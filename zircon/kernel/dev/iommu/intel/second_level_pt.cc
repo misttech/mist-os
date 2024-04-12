@@ -74,7 +74,7 @@ void SecondLevelPageTable::Destroy() {
 
   size_t size = valid_vaddr_mask_ + PAGE_SIZE;
   initialized_ = false;
-  X86PageTableBase::Destroy(0, size);
+  X86PageTableImpl::Destroy(0, size);
 }
 
 bool SecondLevelPageTable::allowed_flags(uint flags) {
