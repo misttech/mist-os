@@ -77,56 +77,12 @@ pub(crate) async fn serve_route_set<
         });
 }
 
-pub(crate) async fn serve_provider_v4(
-    stream: fnet_routes_admin::SetProviderV4RequestStream,
-    spawner: TaskWaitGroupSpawner,
-    ctx: &crate::bindings::Ctx,
-) -> Result<(), fidl::Error> {
-    let mut stream = pin!(stream);
-
-    while let Some(req) = stream.try_next().await? {
-        let () = match req {
-            fnet_routes_admin::SetProviderV4Request::NewRouteSet {
-                route_set,
-                control_handle: _,
-            } => {
-                let set_request_stream = route_set.into_stream()?;
-                spawner.spawn(serve_user_route_set::<Ipv4>(ctx.clone(), set_request_stream));
-            }
-        };
-    }
-
-    Ok(())
-}
-
-pub(crate) async fn serve_provider_v6(
-    stream: fnet_routes_admin::SetProviderV6RequestStream,
-    spawner: TaskWaitGroupSpawner,
-    ctx: &crate::bindings::Ctx,
-) -> Result<(), fidl::Error> {
-    let mut stream = pin!(stream);
-
-    while let Some(req) = stream.try_next().await? {
-        let () = match req {
-            fnet_routes_admin::SetProviderV6Request::NewRouteSet {
-                route_set,
-                control_handle: _,
-            } => {
-                let set_request_stream = route_set.into_stream()?;
-                spawner.spawn(serve_user_route_set::<Ipv6>(ctx.clone(), set_request_stream));
-            }
-        };
-    }
-
-    Ok(())
-}
-
 pub(crate) async fn serve_route_table_v4(
     stream: fnet_routes_admin::RouteTableV4RequestStream,
     spawner: TaskWaitGroupSpawner,
     ctx: &crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
 
     while let Some(req) = stream.try_next().await? {
         let () = match req {
@@ -148,7 +104,7 @@ pub(crate) async fn serve_route_table_v6(
     spawner: TaskWaitGroupSpawner,
     ctx: &crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
-    futures::pin_mut!(stream);
+    let mut stream = pin!(stream);
 
     while let Some(req) = stream.try_next().await? {
         let () = match req {
