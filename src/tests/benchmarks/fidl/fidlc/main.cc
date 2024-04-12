@@ -9,7 +9,6 @@
 #include "src/tests/benchmarks/fidl/fidlc/benchmarks.h"
 #include "tools/fidl/fidlc/src/json_generator.h"
 #include "tools/fidl/fidlc/src/lexer.h"
-#include "tools/fidl/fidlc/src/ordinals.h"
 #include "tools/fidl/fidlc/src/parser.h"
 #include "tools/fidl/fidlc/src/source_file.h"
 #include "tools/fidl/fidlc/src/virtual_source_file.h"
@@ -32,7 +31,7 @@ bool RunBenchmark(perftest::RepeatState* state, const char* fidl) {
     fidlc::VirtualSourceFile virtual_file("generated");
     fidlc::Libraries all_libraries(&reporter, &virtual_file);
     fidlc::VersionSelection version_selection;
-    fidlc::Compiler compiler(&all_libraries, &version_selection, fidlc::GetGeneratedOrdinal64,
+    fidlc::Compiler compiler(&all_libraries, &version_selection, fidlc::Sha256MethodHasher,
                              experimental_flags);
     auto ast = parser.Parse();
     bool enable_color = !std::getenv("NO_COLOR") && isatty(fileno(stderr));

@@ -28,7 +28,6 @@ source_set("lib") {
     "src/linting_tree_callbacks.cc",
     "src/name.cc",
     "src/names.cc",
-    "src/ordinals.cc",
     "src/parser.cc",
     "src/raw_ast.cc",
     "src/reference.cc",

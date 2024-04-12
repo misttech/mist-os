@@ -283,8 +283,10 @@ bool ConsumeStep::CreateMethodResult(
   auto ordinal_source = SourceElement(Token(), Token());
   std::vector<Union::Member> result_members;
 
+  using Ordinal = Protocol::Method::ResultUnionOrdinal;
+
   result_members.emplace_back(
-      ConsumeOrdinal(std::make_unique<RawOrdinal64>(ordinal_source, kSuccessOrdinal)),
+      ConsumeOrdinal(std::make_unique<RawOrdinal64>(ordinal_source, Ordinal::kSuccess)),
       std::move(success_variant), success_variant_context->name(),
       std::make_unique<AttributeList>());
 
@@ -298,7 +300,7 @@ bool ConsumeStep::CreateMethodResult(
     ZX_ASSERT_MSG(error_type_ctor != nullptr, "missing err type ctor");
 
     result_members.emplace_back(
-        ConsumeOrdinal(std::make_unique<RawOrdinal64>(ordinal_source, kDomainErrorOrdinal)),
+        ConsumeOrdinal(std::make_unique<RawOrdinal64>(ordinal_source, Ordinal::kDomainError)),
         std::move(error_type_ctor), err_variant_context->name(), std::make_unique<AttributeList>());
   }
 
@@ -306,7 +308,7 @@ bool ConsumeStep::CreateMethodResult(
     std::unique_ptr<TypeConstructor> error_type_ctor = IdentifierTypeForDecl(framework_err_type_);
     ZX_ASSERT_MSG(error_type_ctor != nullptr, "missing framework_err type ctor");
     result_members.emplace_back(
-        ConsumeOrdinal(std::make_unique<RawOrdinal64>(ordinal_source, kFrameworkErrorOrdinal)),
+        ConsumeOrdinal(std::make_unique<RawOrdinal64>(ordinal_source, Ordinal::kFrameworkError)),
         std::move(error_type_ctor), framework_err_variant_context->name(),
         std::make_unique<AttributeList>());
   }
@@ -436,8 +438,7 @@ void ConsumeStep::ConsumeProtocolDeclaration(
       }
     }
     ZX_ASSERT(has_request || has_response);
-    methods.emplace_back(std::move(attributes), strictness,
-                         ConsumeIdentifier(std::move(method->identifier)), method_name, has_request,
+    methods.emplace_back(std::move(attributes), strictness, method_name, has_request,
                          std::move(maybe_request), has_response, std::move(maybe_response),
                          has_error);
   }
@@ -870,12 +871,6 @@ void ConsumeStep::ConsumeNewType(std::unique_ptr<RawTypeDeclaration> type_decl) 
 const RawLiteral* ConsumeStep::ConsumeLiteral(std::unique_ptr<RawLiteral> raw_literal) {
   auto ptr = raw_literal.get();
   library()->raw_literals.push_back(std::move(raw_literal));
-  return ptr;
-}
-
-const RawIdentifier* ConsumeStep::ConsumeIdentifier(std::unique_ptr<RawIdentifier> raw_identifier) {
-  auto ptr = raw_identifier.get();
-  library()->raw_identifiers.push_back(std::move(raw_identifier));
   return ptr;
 }
 

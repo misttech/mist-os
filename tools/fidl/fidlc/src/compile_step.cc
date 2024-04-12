@@ -15,7 +15,6 @@
 #include "tools/fidl/fidlc/src/flat_ast.h"
 #include "tools/fidl/fidlc/src/name.h"
 #include "tools/fidl/fidlc/src/names.h"
-#include "tools/fidl/fidlc/src/ordinals.h"
 #include "tools/fidl/fidlc/src/type_resolver.h"
 
 namespace fidlc {
@@ -930,13 +929,13 @@ static void SetResultUnionFields(Protocol::Method* method) {
   method->result_union = decl;
   for (auto& member : decl->members) {
     switch (member.ordinal->value) {
-      case kSuccessOrdinal:
+      case Protocol::Method::ResultUnionOrdinal::kSuccess:
         method->result_success_type_ctor = member.type_ctor.get();
         break;
-      case kDomainErrorOrdinal:
+      case Protocol::Method::ResultUnionOrdinal::kDomainError:
         method->result_domain_error_type_ctor = member.type_ctor.get();
         break;
-      case kFrameworkErrorOrdinal:
+      case Protocol::Method::ResultUnionOrdinal::kFrameworkError:
         break;
       default:
         ZX_PANIC("unexpected ordinal in result union");
@@ -976,9 +975,9 @@ class PopulateAllMethods {
                           previous_span, canonical_name);
         }
       }
-      if (auto& ordinal = method.generated_ordinal64) {
-        if (auto result = ordinals_.Insert(ordinal->value, method.name); !result.ok()) {
-          reporter_->Fail(ErrDuplicateMethodOrdinal, ordinal->span(), result.previous_occurrence());
+      if (method.ordinal != 0) {
+        if (auto result = ordinals_.Insert(method.ordinal, method.name); !result.ok()) {
+          reporter_->Fail(ErrDuplicateMethodOrdinal, method.name, result.previous_occurrence());
         }
       }
       original_protocol_->all_methods.push_back(
@@ -1042,26 +1041,42 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
   PopulateAllMethods(protocol_declaration, reporter()).Run();
 }
 
-bool CompileStep::ValidateSelectorAndCalcOrdinal(const Name& protocol_name,
+void CompileStep::ValidateSelectorAndCalcOrdinal(const Name& protocol_name,
                                                  Protocol::Method* method) {
-  auto selector = GetSelector(method->attributes.get(), method->name);
-  if (!IsValidIdentifierComponent(selector) && !IsValidFullyQualifiedMethodIdentifier(selector)) {
-    return reporter()->Fail(
-        ErrInvalidSelectorValue,
-        method->attributes->Get("selector")->GetArg(AttributeArg::kDefaultAnonymousName)->span);
+  std::string selector;
+  auto method_name = std::string(method->name.data());
+  if (auto attr = method->attributes->Get("selector")) {
+    if (auto arg = attr->GetArg(AttributeArg::kDefaultAnonymousName)) {
+      if (auto& constant = arg->value; constant && constant->IsResolved()) {
+        auto value = static_cast<const StringConstantValue&>(constant->Value()).MakeContents();
+        if (IsValidFullyQualifiedMethodIdentifier(value)) {
+          selector = value;
+        } else if (IsValidIdentifierComponent(value)) {
+          method_name = value;
+        } else {
+          reporter()->Fail(ErrInvalidSelectorValue, arg->span);
+          return;
+        }
+      }
+    }
   }
   // TODO(https://fxbug.dev/42157659): Remove.
-  auto library_name = library()->name;
-  if (library_name.size() == 2 && library_name[0] == "fuchsia" && library_name[1] == "io" &&
-      selector.find('/') == std::string::npos) {
-    return reporter()->Fail(ErrFuchsiaIoExplicitOrdinals, method->name);
+  if (auto& name = library()->name;
+      selector.empty() && name.size() == 2 && name[0] == "fuchsia" && name[1] == "io") {
+    reporter()->Fail(ErrFuchsiaIoExplicitOrdinals, method->name);
+    return;
   }
-  auto ordinal = std::make_unique<RawOrdinal64>(
-      method_hasher()(library_name, protocol_name.decl_name(), selector, *method->identifier));
-  if (ordinal->value == 0)
-    return reporter()->Fail(ErrGeneratedZeroValueOrdinal, ordinal->span());
-  method->generated_ordinal64 = std::move(ordinal);
-  return true;
+  if (selector.empty()) {
+    selector = NameLibrary(protocol_name.library()->name);
+    selector.push_back('/');
+    selector.append(protocol_name.decl_name());
+    selector.push_back('.');
+    selector.append(method_name);
+    ZX_ASSERT(IsValidFullyQualifiedMethodIdentifier(selector));
+  }
+  method->ordinal = method_hasher()(selector);
+  if (method->ordinal == 0)
+    reporter()->Fail(ErrGeneratedZeroValueOrdinal, method->name);
 }
 
 void CompileStep::ValidatePayload(const TypeConstructor* type_ctor) {

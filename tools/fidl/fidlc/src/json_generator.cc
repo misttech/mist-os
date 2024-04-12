@@ -403,7 +403,7 @@ void JSONGenerator::Generate(const Protocol::MethodWithInfo& method_with_info) {
   ZX_ASSERT(method_with_info.method != nullptr);
   const auto& value = *method_with_info.method;
   GenerateObject([&]() {
-    GenerateObjectMember("ordinal", value.generated_ordinal64, Position::kFirst);
+    GenerateObjectMember("ordinal", value.ordinal, Position::kFirst);
     GenerateObjectMember("name", value.name);
     GenerateObjectMember("strict", value.strictness);
     GenerateObjectMember("location", NameSpan(value.name));

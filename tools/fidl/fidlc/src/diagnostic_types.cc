@@ -10,7 +10,6 @@
 
 #include "tools/fidl/fidlc/src/flat_ast.h"
 #include "tools/fidl/fidlc/src/names.h"
-#include "tools/fidl/fidlc/src/raw_ast.h"
 #include "tools/fidl/fidlc/src/source_span.h"
 
 namespace fidlc {

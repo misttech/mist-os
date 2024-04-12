@@ -18,7 +18,6 @@
 #include "tools/fidl/fidlc/src/findings.h"
 #include "tools/fidl/fidlc/src/flat_ast.h"
 #include "tools/fidl/fidlc/src/json_generator.h"
-#include "tools/fidl/fidlc/src/ordinals.h"
 #include "tools/fidl/fidlc/src/source_file.h"
 #include "tools/fidl/fidlc/src/utils.h"
 #include "tools/fidl/fidlc/src/versioning_types.h"
@@ -66,6 +65,13 @@ class SharedInterface {
   virtual Libraries* all_libraries() = 0;
   virtual VersionSelection* version_selection() = 0;
   virtual ExperimentalFlagSet& experimental_flags() = 0;
+  virtual MethodHasher& method_hasher() = 0;
+
+  // Adds and compiles a library similar to //zircon/vsdo/zx, defining "Handle",
+  // "ObjType", and "Rights".
+  virtual void UseLibraryZx() = 0;
+  // Adds and compiles a library defining fdf.handle and fdf.obj_type.
+  virtual void UseLibraryFdf() = 0;
 
   const std::vector<std::unique_ptr<Diagnostic>>& errors() { return reporter()->errors(); }
   const std::vector<std::unique_ptr<Diagnostic>>& warnings() { return reporter()->warnings(); }
@@ -87,17 +93,13 @@ class SharedAmongstLibraries final : public SharedInterface {
   SharedAmongstLibraries(const SharedAmongstLibraries&) = delete;
   SharedAmongstLibraries(SharedAmongstLibraries&&) = delete;
 
-  // Adds and compiles a library similar to //zircon/vsdo/zx, defining "Handle",
-  // "ObjType", and "Rights".
-  void AddLibraryZx();
-
-  // Adds and compiles a library defining fdf.handle and fdf.obj_type.
-  void AddLibraryFdf();
-
   Reporter* reporter() override { return &reporter_; }
   Libraries* all_libraries() override { return &all_libraries_; }
   VersionSelection* version_selection() override { return &version_selection_; }
   ExperimentalFlagSet& experimental_flags() override { return experimental_flags_; }
+  MethodHasher& method_hasher() override { return method_hasher_; }
+  void UseLibraryZx() override;
+  void UseLibraryFdf() override;
 
   std::vector<std::unique_ptr<SourceFile>>& all_sources_of_all_libraries() {
     return all_sources_of_all_libraries_;
@@ -106,6 +108,7 @@ class SharedAmongstLibraries final : public SharedInterface {
  private:
   Reporter reporter_;
   VirtualSourceFile virtual_file_{"generated"};
+  MethodHasher method_hasher_ = Sha256MethodHasher;
   Libraries all_libraries_;
   std::vector<std::unique_ptr<SourceFile>> all_sources_of_all_libraries_;
   VersionSelection version_selection_;
@@ -151,24 +154,13 @@ class TestLibrary final : public SharedInterface {
 
   ~TestLibrary();
 
-  // Helper for making a single test library depend on library zx, without
-  // requiring an explicit SharedAmongstLibraries.
-  void UseLibraryZx() {
-    ZX_ASSERT_MSG(!compilation_, "must call before compiling");
-    owned_shared_.value().AddLibraryZx();
-  }
-
-  // Helper for making a single test library depend on library fdf, without
-  // requiring an explicit SharedAmongstLibraries.
-  void UseLibraryFdf() {
-    ZX_ASSERT_MSG(!compilation_, "must call before compiling");
-    owned_shared_.value().AddLibraryFdf();
-  }
-
   Reporter* reporter() override { return shared_->reporter(); }
   Libraries* all_libraries() override { return shared_->all_libraries(); }
   VersionSelection* version_selection() override { return shared_->version_selection(); }
   ExperimentalFlagSet& experimental_flags() override { return shared_->experimental_flags(); }
+  MethodHasher& method_hasher() override { return shared_->method_hasher(); }
+  void UseLibraryZx() override { shared_->UseLibraryZx(); }
+  void UseLibraryFdf() override { shared_->UseLibraryFdf(); }
 
   void AddSource(const std::string& filename, const std::string& raw_source_code);
 

@@ -71,7 +71,6 @@ class ConsumeStep : public Compiler::Step {
 
   // Elements stored in the library
   const RawLiteral* ConsumeLiteral(std::unique_ptr<RawLiteral> raw_literal);
-  const RawIdentifier* ConsumeIdentifier(std::unique_ptr<RawIdentifier> raw_identifier);
   const RawOrdinal64* ConsumeOrdinal(std::unique_ptr<RawOrdinal64> raw_ordinal);
 
   // Sets the naming context's generated name override to the @generated_name

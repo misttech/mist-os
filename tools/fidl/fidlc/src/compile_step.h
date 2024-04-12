@@ -87,7 +87,7 @@ class CompileStep : public Compiler::Step {
   bool ValidateBitsMembersAndCalcMask(Bits* bits_decl, MemberType* out_mask);
   template <typename MemberType>
   bool ValidateEnumMembersAndCalcUnknownValue(Enum* enum_decl, MemberType* out_unknown_value);
-  bool ValidateSelectorAndCalcOrdinal(const Name& protocol_name, Protocol::Method* method);
+  void ValidateSelectorAndCalcOrdinal(const Name& protocol_name, Protocol::Method* method);
   void ValidatePayload(const TypeConstructor* type_ctor);
   void ValidateDomainError(const TypeConstructor* type_ctor);
   template <typename DeclType>

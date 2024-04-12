@@ -13,7 +13,6 @@
 #include "tools/fidl/fidlc/src/attribute_schema.h"
 #include "tools/fidl/fidlc/src/experimental_flags.h"
 #include "tools/fidl/fidlc/src/flat_ast.h"
-#include "tools/fidl/fidlc/src/ordinals.h"
 #include "tools/fidl/fidlc/src/reporter.h"
 #include "tools/fidl/fidlc/src/typespace.h"
 #include "tools/fidl/fidlc/src/versioning_types.h"
@@ -22,6 +21,9 @@
 namespace fidlc {
 
 class Libraries;
+
+using MethodHasher = uint64_t (*)(std::string_view);
+uint64_t Sha256MethodHasher(std::string_view selector);
 
 // Compiler consumes File ASTs and produces a compiled Library.
 class Compiler final {
@@ -57,7 +59,7 @@ class Compiler final {
     Typespace* typespace();
     VirtualSourceFile* generated_source_file();
     const VersionSelection* version_selection() { return compiler_->version_selection; }
-    const MethodHasher& method_hasher() { return compiler_->method_hasher_; }
+    MethodHasher method_hasher() { return compiler_->method_hasher_; }
     ExperimentalFlagSet experimental_flags() { return compiler_->experimental_flags_; }
 
     // Returns types that were created in the typespace while compiling this library.

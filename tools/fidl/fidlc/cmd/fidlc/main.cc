@@ -28,7 +28,6 @@
 #include "tools/fidl/fidlc/src/json_schema.h"
 #include "tools/fidl/fidlc/src/lexer.h"
 #include "tools/fidl/fidlc/src/names.h"
-#include "tools/fidl/fidlc/src/ordinals.h"
 #include "tools/fidl/fidlc/src/parser.h"
 #include "tools/fidl/fidlc/src/source_manager.h"
 #include "tools/fidl/fidlc/src/versioning_types.h"
@@ -312,7 +311,7 @@ int compile(fidlc::Reporter* reporter, const std::optional<fidlc::Platform>& exp
     if (source_manager.sources().empty()) {
       continue;
     }
-    fidlc::Compiler compiler(&all_libraries, version_selection, fidlc::GetGeneratedOrdinal64,
+    fidlc::Compiler compiler(&all_libraries, version_selection, fidlc::Sha256MethodHasher,
                              experimental_flags);
     for (const auto& source_file : source_manager.sources()) {
       if (!Parse(*source_file, reporter, &compiler, experimental_flags)) {

@@ -14,26 +14,30 @@
 namespace fidlc {
 namespace {
 
-// Since a number of these tests rely on specific properties of 64b hashes
-// which are computationally prohibitive to reverse engineer, we rely on
-// a stubbed out method hasher `GetGeneratedOrdinal64ForTesting` defined
-// in test_library.h.
+uint64_t FakeMethodHasher(std::string_view selector) {
+  if (selector.find("HashesToZero") != std::string_view::npos)
+    return 0;
+  if (selector.find("Clash") != std::string_view::npos)
+    return 456789;
+  return Sha256MethodHasher(selector);
+}
 
 TEST(OrdinalsTests, BadOrdinalCannotBeZero) {
   TestLibrary library(R"FIDL(
-library methodhasher;
+library example;
 
 protocol Special {
     ThisOneHashesToZero() -> (struct { i int64; });
 };
 )FIDL");
+  library.method_hasher() = FakeMethodHasher;
   library.ExpectFail(ErrGeneratedZeroValueOrdinal);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OrdinalsTests, BadClashingOrdinalValues) {
   TestLibrary library(R"FIDL(
-library methodhasher;
+library example;
 
 using zx;
 
@@ -42,6 +46,7 @@ protocol Special {
     ClashTwo(struct { s string; }) -> (resource struct { r zx.Handle:CHANNEL; });
 };
 )FIDL");
+  library.method_hasher() = FakeMethodHasher;
   library.UseLibraryZx();
   library.ExpectFail(ErrDuplicateMethodOrdinal, "example.fidl:7:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -49,7 +54,7 @@ protocol Special {
 
 TEST(OrdinalsTests, BadClashingOrdinalValuesWithAttribute) {
   TestLibrary library(R"FIDL(
-library methodhasher;
+library example;
 
 using zx;
 
@@ -60,6 +65,7 @@ protocol Special {
     bar(struct { s string; }) -> (resource struct { r zx.Handle:CHANNEL; });
 };
 )FIDL");
+  library.method_hasher() = FakeMethodHasher;
   library.UseLibraryZx();
   library.ExpectFail(ErrDuplicateMethodOrdinal, "example.fidl:8:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -74,16 +80,17 @@ TEST(OrdinalsTests, BadClashingOrdinalBadSelector) {
 
 TEST(OrdinalsTests, GoodAttributeResolvesClashes) {
   TestLibrary library(R"FIDL(
-library methodhasher;
+library example;
 
 using zx;
 
 protocol Special {
-    @selector("ClashOneReplacement")
+    @selector("SomethingElse")
     ClashOne(struct { s string; b bool; }) -> (struct { i int32; });
     ClashTwo(struct { s string; }) -> (resource struct { r zx.Handle:CHANNEL; });
 };
 )FIDL");
+  library.method_hasher() = FakeMethodHasher;
   library.UseLibraryZx();
   ASSERT_COMPILED(library);
 }
@@ -109,7 +116,7 @@ protocol protocol {
   uint64_t expected_hash64 = *(reinterpret_cast<uint64_t*>(digest64)) & 0x7fffffffffffffff;
 
   const Protocol* iface = library.LookupProtocol("protocol");
-  uint64_t actual_hash64 = iface->methods[0].generated_ordinal64->value;
+  uint64_t actual_hash64 = iface->methods[0].ordinal;
   ASSERT_EQ(actual_hash64, expected_hash64) << "Expected 64bits hash is not correct";
 }
 
@@ -130,7 +137,7 @@ protocol at {
   uint64_t expected_hash64 = *(reinterpret_cast<uint64_t*>(digest64)) & 0x7fffffffffffffff;
 
   const Protocol* iface = library.LookupProtocol("at");
-  uint64_t actual_hash64 = iface->methods[0].generated_ordinal64->value;
+  uint64_t actual_hash64 = iface->methods[0].ordinal;
   ASSERT_EQ(actual_hash64, expected_hash64) << "Expected 64bits hash is not correct";
 }
 
@@ -235,38 +242,38 @@ protocol protocol {
   //         hash = hashlib.sha256(fqn.encode()).digest()
   //         print(hash[7::-1].hex())
   //
-  EXPECT_EQ(iface->methods[0].generated_ordinal64->value, 0x3b1625372e15f1aeu);
-  EXPECT_EQ(iface->methods[1].generated_ordinal64->value, 0x4199e504fa71b5a4u);
-  EXPECT_EQ(iface->methods[2].generated_ordinal64->value, 0x247ca8a890628135u);
-  EXPECT_EQ(iface->methods[3].generated_ordinal64->value, 0x64f7c02cfffb7846u);
-  EXPECT_EQ(iface->methods[4].generated_ordinal64->value, 0x20d3f06c598f0cc3u);
-  EXPECT_EQ(iface->methods[5].generated_ordinal64->value, 0x1ce13806085dac7au);
-  EXPECT_EQ(iface->methods[6].generated_ordinal64->value, 0x09e1d4b200770defu);
-  EXPECT_EQ(iface->methods[7].generated_ordinal64->value, 0x53df65d26411d8eeu);
-  EXPECT_EQ(iface->methods[8].generated_ordinal64->value, 0x690c3617405590c7u);
-  EXPECT_EQ(iface->methods[9].generated_ordinal64->value, 0x4ff9ef5fb170f550u);
-  EXPECT_EQ(iface->methods[10].generated_ordinal64->value, 0x1542d4c21d8a6c00u);
-  EXPECT_EQ(iface->methods[11].generated_ordinal64->value, 0x564e9e47f7418e0fu);
-  EXPECT_EQ(iface->methods[12].generated_ordinal64->value, 0x29681e66f3506231u);
-  EXPECT_EQ(iface->methods[13].generated_ordinal64->value, 0x5ee63b26268f7760u);
-  EXPECT_EQ(iface->methods[14].generated_ordinal64->value, 0x256950edf00aac63u);
-  EXPECT_EQ(iface->methods[15].generated_ordinal64->value, 0x6b21c0ff1aa02896u);
-  EXPECT_EQ(iface->methods[16].generated_ordinal64->value, 0x5a54f3dca00089e9u);
-  EXPECT_EQ(iface->methods[17].generated_ordinal64->value, 0x772476706fa4be0eu);
-  EXPECT_EQ(iface->methods[18].generated_ordinal64->value, 0x294e338bf71a773bu);
-  EXPECT_EQ(iface->methods[19].generated_ordinal64->value, 0x5a6aa228cfb68d16u);
-  EXPECT_EQ(iface->methods[20].generated_ordinal64->value, 0x55a09c6b033f3f98u);
-  EXPECT_EQ(iface->methods[21].generated_ordinal64->value, 0x1192d5b856d22cd8u);
-  EXPECT_EQ(iface->methods[22].generated_ordinal64->value, 0x2e68bdea28f9ce7bu);
-  EXPECT_EQ(iface->methods[23].generated_ordinal64->value, 0x4c8ebf26900e4451u);
-  EXPECT_EQ(iface->methods[24].generated_ordinal64->value, 0x3df0dbe9378c4fd3u);
-  EXPECT_EQ(iface->methods[25].generated_ordinal64->value, 0x087268657bb0cad1u);
-  EXPECT_EQ(iface->methods[26].generated_ordinal64->value, 0x0aee6ad161a90ae1u);
-  EXPECT_EQ(iface->methods[27].generated_ordinal64->value, 0x44e6f2282baf727au);
-  EXPECT_EQ(iface->methods[28].generated_ordinal64->value, 0x3e8984f57ab5830du);
-  EXPECT_EQ(iface->methods[29].generated_ordinal64->value, 0x696f9f73a5cabd21u);
-  EXPECT_EQ(iface->methods[30].generated_ordinal64->value, 0x327d7b0d2389e054u);
-  EXPECT_EQ(iface->methods[31].generated_ordinal64->value, 0x54fd307bb5bfab2du);
+  EXPECT_EQ(iface->methods[0].ordinal, 0x3b1625372e15f1aeu);
+  EXPECT_EQ(iface->methods[1].ordinal, 0x4199e504fa71b5a4u);
+  EXPECT_EQ(iface->methods[2].ordinal, 0x247ca8a890628135u);
+  EXPECT_EQ(iface->methods[3].ordinal, 0x64f7c02cfffb7846u);
+  EXPECT_EQ(iface->methods[4].ordinal, 0x20d3f06c598f0cc3u);
+  EXPECT_EQ(iface->methods[5].ordinal, 0x1ce13806085dac7au);
+  EXPECT_EQ(iface->methods[6].ordinal, 0x09e1d4b200770defu);
+  EXPECT_EQ(iface->methods[7].ordinal, 0x53df65d26411d8eeu);
+  EXPECT_EQ(iface->methods[8].ordinal, 0x690c3617405590c7u);
+  EXPECT_EQ(iface->methods[9].ordinal, 0x4ff9ef5fb170f550u);
+  EXPECT_EQ(iface->methods[10].ordinal, 0x1542d4c21d8a6c00u);
+  EXPECT_EQ(iface->methods[11].ordinal, 0x564e9e47f7418e0fu);
+  EXPECT_EQ(iface->methods[12].ordinal, 0x29681e66f3506231u);
+  EXPECT_EQ(iface->methods[13].ordinal, 0x5ee63b26268f7760u);
+  EXPECT_EQ(iface->methods[14].ordinal, 0x256950edf00aac63u);
+  EXPECT_EQ(iface->methods[15].ordinal, 0x6b21c0ff1aa02896u);
+  EXPECT_EQ(iface->methods[16].ordinal, 0x5a54f3dca00089e9u);
+  EXPECT_EQ(iface->methods[17].ordinal, 0x772476706fa4be0eu);
+  EXPECT_EQ(iface->methods[18].ordinal, 0x294e338bf71a773bu);
+  EXPECT_EQ(iface->methods[19].ordinal, 0x5a6aa228cfb68d16u);
+  EXPECT_EQ(iface->methods[20].ordinal, 0x55a09c6b033f3f98u);
+  EXPECT_EQ(iface->methods[21].ordinal, 0x1192d5b856d22cd8u);
+  EXPECT_EQ(iface->methods[22].ordinal, 0x2e68bdea28f9ce7bu);
+  EXPECT_EQ(iface->methods[23].ordinal, 0x4c8ebf26900e4451u);
+  EXPECT_EQ(iface->methods[24].ordinal, 0x3df0dbe9378c4fd3u);
+  EXPECT_EQ(iface->methods[25].ordinal, 0x087268657bb0cad1u);
+  EXPECT_EQ(iface->methods[26].ordinal, 0x0aee6ad161a90ae1u);
+  EXPECT_EQ(iface->methods[27].ordinal, 0x44e6f2282baf727au);
+  EXPECT_EQ(iface->methods[28].ordinal, 0x3e8984f57ab5830du);
+  EXPECT_EQ(iface->methods[29].ordinal, 0x696f9f73a5cabd21u);
+  EXPECT_EQ(iface->methods[30].ordinal, 0x327d7b0d2389e054u);
+  EXPECT_EQ(iface->methods[31].ordinal, 0x54fd307bb5bfab2du);
 }
 
 TEST(OrdinalsTests, GoodHackToRenameFuchsiaIoToFuchsiaIoOneNoSelector) {

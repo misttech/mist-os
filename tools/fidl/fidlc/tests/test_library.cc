@@ -14,7 +14,7 @@
 
 namespace fidlc {
 
-void SharedAmongstLibraries::AddLibraryZx() {
+void SharedAmongstLibraries::UseLibraryZx() {
   TestLibrary zx_lib(this, "zx.fidl", R"FIDL(
 library zx;
 
@@ -43,7 +43,7 @@ resource_definition Handle : uint32 {
   ZX_ASSERT_MSG(zx_lib.Compile(), "failed to compile library zx");
 }
 
-void SharedAmongstLibraries::AddLibraryFdf() {
+void SharedAmongstLibraries::UseLibraryFdf() {
   TestLibrary fdf_lib(this, "fdf.fidl", R"FIDL(
 library fdf;
 
@@ -147,31 +147,11 @@ bool TestLibrary::Parse(std::unique_ptr<File>* out_ast_ptr) {
   return parser.Success();
 }
 
-// See ordinals_tests.cc
-static RawOrdinal64 GetGeneratedOrdinal64ForTesting(
-    const std::vector<std::string_view>& library_name, const std::string_view& protocol_name,
-    const std::string_view& selector_name, const SourceElement& source_element) {
-  static std::map<std::string, uint64_t> special_selectors = {
-      {"ThisOneHashesToZero", 0},
-      {"ClashOne", 456789},
-      {"ClashOneReplacement", 987654},
-      {"ClashTwo", 456789},
-  };
-  if (library_name.size() == 1 && library_name[0] == "methodhasher" &&
-      (protocol_name == "Special" || protocol_name == "SpecialComposed")) {
-    auto it = special_selectors.find(std::string(selector_name));
-    ZX_ASSERT_MSG(it != special_selectors.end(), "only special selectors allowed");
-    return RawOrdinal64(source_element, it->second);
-  }
-  return GetGeneratedOrdinal64(library_name, protocol_name, selector_name, source_element);
-}
-
 // Compiles the library. Must have compiled all dependencies first, using the
 // same SharedAmongstLibraries object for all of them.
 bool TestLibrary::Compile() {
   used_ = true;
-  Compiler compiler(all_libraries(), version_selection(), GetGeneratedOrdinal64ForTesting,
-                    experimental_flags());
+  Compiler compiler(all_libraries(), version_selection(), method_hasher(), experimental_flags());
   for (auto source_file : all_sources_) {
     Lexer lexer(*source_file, reporter());
     Parser parser(&lexer, reporter(), experimental_flags());

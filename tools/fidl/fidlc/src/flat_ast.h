@@ -12,11 +12,9 @@
 #include <zircon/assert.h>
 
 #include <cstdint>
-#include <functional>
 #include <map>
 #include <optional>
 #include <set>
-#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -656,20 +654,17 @@ struct Overlay final : public TypeDecl {
 
 struct Protocol final : public Decl {
   struct Method : public Element {
-    Method(std::unique_ptr<AttributeList> attributes, Strictness strictness,
-           const RawIdentifier* identifier, SourceSpan name, bool has_request,
-           std::unique_ptr<TypeConstructor> maybe_request, bool has_response,
+    Method(std::unique_ptr<AttributeList> attributes, Strictness strictness, SourceSpan name,
+           bool has_request, std::unique_ptr<TypeConstructor> maybe_request, bool has_response,
            std::unique_ptr<TypeConstructor> maybe_response, bool has_error)
         : Element(Element::Kind::kProtocolMethod, std::move(attributes)),
           strictness(strictness),
-          identifier(identifier),
           name(name),
           has_request(has_request),
           maybe_request(std::move(maybe_request)),
           has_response(has_response),
           maybe_response(std::move(maybe_response)),
-          has_error(has_error),
-          generated_ordinal64(nullptr) {
+          has_error(has_error) {
       ZX_ASSERT(this->has_request || this->has_response);
     }
     Method Clone() const;
@@ -681,9 +676,13 @@ struct Protocol final : public Decl {
       return has_request ? Kind::kOneWay : Kind::kEvent;
     }
 
+    enum ResultUnionOrdinal : uint64_t {
+      kSuccess = 1,
+      kDomainError = 2,
+      kFrameworkError = 3,
+    };
+
     Strictness strictness;
-    // Owned by Library::raw_identifiers.
-    const RawIdentifier* identifier;
     SourceSpan name;
     bool has_request;
     std::unique_ptr<TypeConstructor> maybe_request;
@@ -693,7 +692,7 @@ struct Protocol final : public Decl {
     Protocol* owning_protocol = nullptr;
 
     // Set during compilation
-    std::unique_ptr<RawOrdinal64> generated_ordinal64;
+    uint64_t ordinal = 0;
     const Union* result_union = nullptr;
     const TypeConstructor* result_success_type_ctor = nullptr;
     const TypeConstructor* result_domain_error_type_ctor = nullptr;

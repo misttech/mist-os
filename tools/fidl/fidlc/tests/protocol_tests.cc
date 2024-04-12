@@ -556,8 +556,6 @@ protocol D {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-// See GetGeneratedOrdinal64ForTesting in test_library.h
-// See GetGeneratedOrdinal64ForTesting in test_library.h
 TEST(ProtocolTests, BadComposedProtocolsHaveClashingOrdinals) {
   TestLibrary library(R"FIDL(
 library methodhasher;
@@ -571,6 +569,7 @@ protocol Special {
     ClashTwo();
 };
 )FIDL");
+  library.method_hasher() = [](std::string_view selector) -> uint64_t { return 42; };
   library.ExpectFail(ErrDuplicateMethodOrdinal, "example.fidl:5:4");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }

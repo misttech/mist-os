@@ -8,6 +8,9 @@
 
 #include <algorithm>
 
+#define BORINGSSL_NO_CXX
+#include <openssl/sha.h>
+
 #include "tools/fidl/fidlc/src/attribute_schema.h"
 #include "tools/fidl/fidlc/src/availability_step.h"
 #include "tools/fidl/fidlc/src/compile_step.h"
@@ -20,6 +23,25 @@
 #include "tools/fidl/fidlc/src/verify_steps.h"
 
 namespace fidlc {
+
+uint64_t Sha256MethodHasher(std::string_view selector) {
+  uint8_t digest[SHA256_DIGEST_LENGTH];
+  SHA256(reinterpret_cast<const uint8_t*>(selector.data()), selector.size(), digest);
+  // The following dance ensures that we treat the bytes as a little-endian
+  // int64 regardless of host byte order.
+  // clang-format off
+  uint64_t ordinal =
+      static_cast<uint64_t>(digest[0]) |
+      static_cast<uint64_t>(digest[1]) << 8 |
+      static_cast<uint64_t>(digest[2]) << 16 |
+      static_cast<uint64_t>(digest[3]) << 24 |
+      static_cast<uint64_t>(digest[4]) << 32 |
+      static_cast<uint64_t>(digest[5]) << 40 |
+      static_cast<uint64_t>(digest[6]) << 48 |
+      static_cast<uint64_t>(digest[7]) << 56;
+  // clang-format on
+  return ordinal & 0x7fffffffffffffff;
+}
 
 Compiler::Compiler(Libraries* all_libraries, const VersionSelection* version_selection,
                    MethodHasher method_hasher, ExperimentalFlagSet experimental_flags)
