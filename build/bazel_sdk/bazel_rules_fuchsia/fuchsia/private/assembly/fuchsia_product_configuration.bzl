@@ -31,9 +31,15 @@ INPUT_DEVICE_TYPE = struct(
     TOUCHSCREEN = "touchscreen",
 )
 
-def _create_pkg_detail(dep):
+def _create_pkg_detail(dep, relative = None):
     if FuchsiaPackageInfo in dep:
-        return {"manifest": dep[FuchsiaPackageInfo].package_manifest.path}
+        path = ""
+        if relative:
+            path = dep[FuchsiaPackageInfo].package_manifest.path.removeprefix(relative + "/")
+        else:
+            path = dep[FuchsiaPackageInfo].package_manifest.path
+
+        return {"manifest": path}
 
     package = dep[FuchsiaAssembledPackageInfo].package
     configs = dep[FuchsiaAssembledPackageInfo].configs
@@ -57,13 +63,16 @@ def _fuchsia_product_configuration_impl(ctx):
     product_config = json.decode(ctx.attr.product_config)
     product_config_file = ctx.actions.declare_file(ctx.label.name + "_product_config.json")
 
+    relative_base = None
+
+    # If relative_paths is set, relativize paths in the product config relative
+    # to the directory containing the product config.
+    # Otherwise, paths are relative to the execroot.
     if (ctx.attr.relative_paths):
-        # Relativize paths in the product config relative to the directory
-        # containing the product config
-        replace_labels_with_files(product_config, ctx.attr.product_config_labels, relative = product_config_file.dirname)
-    else:
-        # Use absolute paths
-        replace_labels_with_files(product_config, ctx.attr.product_config_labels)
+        relative_base = product_config_file.dirname
+
+    replace_labels_with_files(product_config, ctx.attr.product_config_labels, relative = relative_base)
+
     platform = product_config.get("platform", {})
     build_type = platform.get("build_type")
     product = product_config.get("product", {})
@@ -72,13 +81,13 @@ def _fuchsia_product_configuration_impl(ctx):
     output_files = []
     base_pkg_details = []
     for dep in ctx.attr.base_packages:
-        base_pkg_details.append(_create_pkg_detail(dep))
+        base_pkg_details.append(_create_pkg_detail(dep, relative_base))
         output_files += _collect_file_deps(dep)
     packages["base"] = base_pkg_details
 
     cache_pkg_details = []
     for dep in ctx.attr.cache_packages:
-        cache_pkg_details.append(_create_pkg_detail(dep))
+        cache_pkg_details.append(_create_pkg_detail(dep, relative_base))
         output_files += _collect_file_deps(dep)
     packages["cache"] = cache_pkg_details
     product["packages"] = packages
@@ -187,7 +196,7 @@ def fuchsia_product_configuration(
         base_driver_packages = None,
         ota_configuration = None,
         relative_paths = False,
-        **kwarg):
+        **kwargs):
     """A new implementation of fuchsia_product_configuration that takes raw a json config.
 
     Args:
@@ -215,7 +224,7 @@ def fuchsia_product_configuration(
         cache_packages: Fuchsia packages to be included in cache.
         base_driver_packages: Base driver packages to include in product.
         ota_configuration: OTA configuration to use with the product.
-        **kwarg: Common bazel rule args passed through to the implementation rule.
+        **kwargs: Common bazel rule args passed through to the implementation rule.
     """
 
     json_config = product_config_json
@@ -232,6 +241,6 @@ def fuchsia_product_configuration(
         cache_packages = cache_packages,
         base_driver_packages = base_driver_packages,
         ota_configuration = ota_configuration,
-        relative_paths = False,
-        **kwarg
+        relative_paths = relative_paths,
+        **kwargs
     )
