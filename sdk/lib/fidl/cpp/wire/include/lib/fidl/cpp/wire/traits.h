@@ -350,8 +350,8 @@ constexpr uint32_t ClampedMessageSize() {
       return ZX_CHANNEL_MAX_MSG_BYTES;
     }
   }
-  uint64_t primary = FidlAlign(TypeTraits<FidlType>::kPrimarySize);
-  uint64_t out_of_line = FidlAlign(TypeTraits<FidlType>::kMaxOutOfLine);
+  uint64_t primary = FIDL_ALIGN(TypeTraits<FidlType>::kPrimarySize);
+  uint64_t out_of_line = FIDL_ALIGN(TypeTraits<FidlType>::kMaxOutOfLine);
   uint64_t sum = primary + out_of_line;
   if (sum > ZX_CHANNEL_MAX_MSG_BYTES) {
     return ZX_CHANNEL_MAX_MSG_BYTES;

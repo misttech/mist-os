@@ -785,7 +785,7 @@ zx_status_t PrimaryObjectSize(const fidl_type_t* type, uint32_t buffer_size,
   }
   *out_primary_size = static_cast<uint32_t>(primary_size);
 
-  uint64_t first_out_of_line = FidlAlign(static_cast<uint32_t>(primary_size));
+  uint64_t first_out_of_line = FIDL_ALIGN(static_cast<uint32_t>(primary_size));
   if (unlikely(first_out_of_line > buffer_size)) {
     set_error("Buffer is too small for first inline object");
     return ZX_ERR_BUFFER_TOO_SMALL;

@@ -95,18 +95,6 @@ typedef bool FidlEmpty;
 static const FidlEmpty kFidlEmpty_IsNotEmpty = false;
 static const FidlEmpty kFidlEmpty_IsEmpty = true;
 
-// TODO(https://fxbug.dev/42119024): Remove either this FidlAlign function or the FIDL_ALIGN macro in
-// zircon/fidl.h.
-// clang-format off
-#ifdef __cplusplus
-constexpr
-#endif  // __cplusplus
-static inline uint64_t FidlAlign(uint32_t offset) {
-  const uint64_t alignment_mask = FIDL_ALIGNMENT - 1;
-  return (offset + alignment_mask) & ~alignment_mask;
-}
-// clang-format on
-
 // Determine if the pointer is aligned to |FIDL_ALIGNMENT|.
 static inline bool FidlIsAligned(const uint8_t* ptr) {
   uintptr_t uintptr = (uintptr_t)(ptr);
@@ -297,7 +285,8 @@ static const uint8_t kFidlTypeTable = 9;
 static const uint8_t kFidlTypeXUnion = 10;
 static const uint8_t kFidlTypeUnion = 10;
 
-// TODO(https://fxbug.dev/42119025): Consider starting enum values for FidlCodedPrimitive from 1, not 0.
+// TODO(https://fxbug.dev/42119025): Consider starting enum values for FidlCodedPrimitive from 1,
+// not 0.
 typedef uint8_t FidlCodedPrimitiveSubtype;
 static const uint8_t kFidlCodedPrimitiveSubtype_Bool = 0;
 static const uint8_t kFidlCodedPrimitiveSubtype_Int8 = 1;
@@ -366,9 +355,7 @@ struct fidl_type {
 #endif
 };
 
-#define FIDL_INTERNAL_INHERIT_TYPE_T \
-  final:                             \
-  fidl_type
+#define FIDL_INTERNAL_INHERIT_TYPE_T final : fidl_type
 
 #else  // __cplusplus
 

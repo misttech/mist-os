@@ -13,11 +13,6 @@
 
 static_assert(sizeof(ldmsg_req_t) == 1024, "Loader service requests can be at most 1024 bytes.");
 
-static size_t FidlAlign(size_t offset) {
-  const size_t alignment_mask = FIDL_ALIGNMENT - 1;
-  return (offset + alignment_mask) & ~alignment_mask;
-}
-
 zx_status_t ldmsg_req_encode(uint64_t ordinal, ldmsg_req_t* req, size_t* req_len_out,
                              const char* data, size_t len) {
   fidl_init_txn_header(&req->header, 0, ordinal, 0);
@@ -57,7 +52,7 @@ zx_status_t ldmsg_req_encode(uint64_t ordinal, ldmsg_req_t* req, size_t* req_len
 
   // Make sure to zero out the extra bytes required by alignment constraints.
   size_t req_len_unaligned = sizeof(fidl_message_header_t) + offset + len;
-  *req_len_out = FidlAlign(req_len_unaligned);
+  *req_len_out = FIDL_ALIGN(req_len_unaligned);
   memset((char*)req + req_len_unaligned, 0, *req_len_out - req_len_unaligned);
   return ZX_OK;
 }
@@ -91,7 +86,7 @@ zx_status_t ldmsg_req_decode(ldmsg_req_t* req, size_t req_len, const char** data
 
   size_t size = req->common.string.size;
   if (LDMSG_MAX_PAYLOAD - offset - 1 < size ||
-      req_len != FidlAlign(sizeof(fidl_message_header_t) + offset + size))
+      req_len != FIDL_ALIGN(sizeof(fidl_message_header_t) + offset + size))
     return ZX_ERR_INVALID_ARGS;
 
   // Null terminate the string. The message isn't required to have a null

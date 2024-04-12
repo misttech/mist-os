@@ -58,15 +58,13 @@ bool ComparePayload(const T* actual, size_t actual_size, const T* expected, size
                   << " expected=" << expected[i];
       } else {
         std::cout << std::dec << "element[" << i << "]: " << std::hex << "actual=0x" << +actual[i]
-                  << " "
-                  << "expected=0x" << +expected[i] << "\n";
+                  << " " << "expected=0x" << +expected[i] << "\n";
       }
     }
   }
   if (actual_size != expected_size) {
     pass = false;
-    std::cout << std::dec << "element[...]: "
-              << "actual.size=" << +actual_size << " "
+    std::cout << std::dec << "element[...]: " << "actual.size=" << +actual_size << " "
               << "expected.size=" << +expected_size << "\n";
   }
   return pass;
@@ -220,11 +218,6 @@ bool DecodeFailure(fidl::internal::WireFormatVersion wire_format_version,
     return false;
   }
   return true;
-}
-
-constexpr inline uint64_t FidlAlign(uint32_t offset) {
-  constexpr uint64_t alignment_mask = FIDL_ALIGNMENT - 1;
-  return (offset + alignment_mask) & ~alignment_mask;
 }
 
 }  // namespace llcpp_conformance_utils
