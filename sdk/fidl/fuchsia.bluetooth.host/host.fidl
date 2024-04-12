@@ -68,9 +68,7 @@ open protocol Host {
     });
 
     /// Assigns local data to this host.
-    strict SetLocalData(struct {
-        host_data sys.HostData;
-    });
+    strict SetLocalData(sys.HostData);
 
     /// Monitors updates for connectable peers known to the system. Replies only when
     /// peers have been added, modified, or removed since the most recent call to WatchPeers().
