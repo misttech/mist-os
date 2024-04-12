@@ -270,13 +270,12 @@ class PagingTest : public zxtest::Test {
     root_->AddEntry(kFileDirtyErrName, file_dirty_err_);
 
     // Connect to the root.
-    zx::result directory_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_OK(directory_endpoints.status_value());
-    vfs_->ServeDirectory(root_, std::move(directory_endpoints->server));
+    auto directory_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    vfs_->ServeDirectory(root_, std::move(directory_endpoints.server));
 
     // Convert to an FD.
     int root_dir_fd = -1;
-    EXPECT_OK(fdio_fd_create(directory_endpoints->client.TakeChannel().release(), &root_dir_fd));
+    EXPECT_OK(fdio_fd_create(directory_endpoints.client.TakeChannel().release(), &root_dir_fd));
 
     return root_dir_fd;
   }

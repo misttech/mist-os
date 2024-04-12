@@ -60,10 +60,9 @@ class MountTestTemplate : public testing::Test {
     ASSERT_FALSE(bcache_read_only);
     bcache_ = std::move(bcache);
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    root_client_end_ = std::move(endpoints->client);
-    root_server_end_ = std::move(endpoints->server);
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    root_client_end_ = std::move(endpoints.client);
+    root_server_end_ = std::move(endpoints.server);
     ASSERT_EQ(loop_.StartThread("minfs test dispatcher"), ZX_OK);
   }
 
@@ -105,9 +104,8 @@ class MountTestTemplate : public testing::Test {
   fidl::UnownedClientEnd<fuchsia_io::Directory> root_client_end() { return root_client_end_; }
 
   fidl::ClientEnd<fuchsia_io::Directory> clone_root_client_end() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_EQ(endpoints.status_value(), ZX_OK);
-    auto [clone_root_client_end, clone_root_server_end] = std::move(*endpoints);
+    auto [clone_root_client_end, clone_root_server_end] =
+        fidl::Endpoints<fuchsia_io::Directory>::Create();
     ZX_ASSERT(fidl::WireCall(root_client_end())
                   ->Clone(fio::wire::OpenFlags::kCloneSameRights,
                           fidl::ServerEnd<fuchsia_io::Node>(clone_root_server_end.TakeChannel()))

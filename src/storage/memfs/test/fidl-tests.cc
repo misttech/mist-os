@@ -52,12 +52,11 @@ TEST(FidlTests, TestFidlBasic) {
   ASSERT_EQ(write(fd.get(), data, datalen), datalen);
   fd.reset();
 
-  zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
-  ASSERT_OK(endpoints.status_value());
-  ASSERT_OK(fdio_service_connect("/fidltmp/file-a", endpoints->server.TakeChannel().release()));
+  auto endpoints = fidl::Endpoints<fio::Node>::Create();
+  ASSERT_OK(fdio_service_connect("/fidltmp/file-a", endpoints.server.TakeChannel().release()));
 
   {
-    const fidl::WireResult result = fidl::WireCall(endpoints->client)->Query();
+    const fidl::WireResult result = fidl::WireCall(endpoints.client)->Query();
     ASSERT_OK(result.status());
     const fidl::WireResponse response = result.value();
     const cpp20::span data = response.protocol.get();
@@ -65,11 +64,11 @@ TEST(FidlTests, TestFidlBasic) {
     ASSERT_EQ(protocol, fio::wire::kFileProtocolName);
   }
   const fidl::WireResult describe_result =
-      fidl::WireCall(fidl::UnownedClientEnd<fio::File>(endpoints->client.borrow().channel()))
+      fidl::WireCall(fidl::UnownedClientEnd<fio::File>(endpoints.client.borrow().channel()))
           ->Describe();
   ASSERT_OK(describe_result.status());
   ASSERT_FALSE(describe_result.value().has_observer());
-  endpoints->client.TakeChannel().reset();
+  endpoints.client.TakeChannel().reset();
 
   std::promise<zx_status_t> promise;
   memfs.value()->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
@@ -93,17 +92,16 @@ TEST(FidlTests, TestFidlOpenReadOnly) {
   ASSERT_GE(fd.get(), 0);
   fd.reset();
 
-  zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
-  ASSERT_OK(endpoints.status_value());
+  auto endpoints = fidl::Endpoints<fio::Node>::Create();
   ASSERT_OK(fdio_open("/fidltmp-ro/file-ro",
                       static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable),
-                      endpoints->server.TakeChannel().release()));
+                      endpoints.server.TakeChannel().release()));
 
-  auto result = fidl::WireCall(endpoints->client)->GetFlags();
+  auto result = fidl::WireCall(endpoints.client)->GetFlags();
   ASSERT_OK(result.status());
   ASSERT_OK(result->s);
   ASSERT_EQ(result->flags, fio::wire::OpenFlags::kRightReadable);
-  endpoints->client.TakeChannel().reset();
+  endpoints.client.TakeChannel().reset();
 
   std::promise<zx_status_t> promise;
   memfs.value()->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });

@@ -72,17 +72,16 @@ TEST(Service, ApiTest) {
 }
 
 TEST(Service, ServeDirectory) {
-  zx::result root = fidl::CreateEndpoints<fio::Directory>();
-  ASSERT_OK(root.status_value());
+  auto root = fidl::Endpoints<fio::Directory>::Create();
 
   // open client
   zx::channel c1, c2;
   EXPECT_OK(zx::channel::create(0u, &c1, &c2));
-  EXPECT_OK(fdio_service_connect_at(root->client.borrow().channel()->get(), "abc", c2.release()));
+  EXPECT_OK(fdio_service_connect_at(root.client.borrow().channel()->get(), "abc", c2.release()));
 
   // Close client. We test the semantic that a pending open is processed even if the client has been
   // closed.
-  root->client.reset();
+  root.client.reset();
 
   // serve
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
@@ -95,14 +94,13 @@ TEST(Service, ServeDirectory) {
   });
   directory->AddEntry("abc", vnode);
 
-  EXPECT_OK(vfs.ServeDirectory(directory, std::move(root->server)));
+  EXPECT_OK(vfs.ServeDirectory(directory, std::move(root.server)));
   EXPECT_EQ(ZX_ERR_BAD_STATE, loop.RunUntilIdle());
 }
 
 TEST(Service, ServiceNodeIsNotDirectory) {
   // Set up the server
-  zx::result root = fidl::CreateEndpoints<fio::Directory>();
-  ASSERT_OK(root.status_value());
+  auto root = fidl::Endpoints<fio::Directory>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   fs::SynchronousVfs vfs(loop.dispatcher());
@@ -115,7 +113,7 @@ TEST(Service, ServiceNodeIsNotDirectory) {
     return ZX_OK;
   });
   directory->AddEntry("abc", vnode);
-  ASSERT_OK(vfs.ServeDirectory(directory, std::move(root->server)));
+  ASSERT_OK(vfs.ServeDirectory(directory, std::move(root.server)));
 
   // Call |ValidateOptions| with the directory flag should fail.
   auto result = vnode->ValidateOptions(fs::VnodeConnectionOptions{
@@ -132,7 +130,7 @@ TEST(Service, ServiceNodeIsNotDirectory) {
   loop.StartThread();
 
   auto open_result =
-      fidl::WireCall(root->client)
+      fidl::WireCall(root.client)
           ->Open(fio::wire::OpenFlags::kDescribe | fio::wire::OpenFlags::kDirectory |
                      fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable,
                  {}, fidl::StringView("abc"), std::move(abc->server));
@@ -161,8 +159,7 @@ TEST(Service, ServiceNodeIsNotDirectory) {
 
 TEST(Service, OpeningServiceWithNodeReferenceFlag) {
   // Set up the server
-  zx::result root = fidl::CreateEndpoints<fio::Directory>();
-  ASSERT_OK(root.status_value());
+  auto root = fidl::Endpoints<fio::Directory>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   fs::SynchronousVfs vfs(loop.dispatcher());
@@ -173,14 +170,14 @@ TEST(Service, OpeningServiceWithNodeReferenceFlag) {
     return ZX_OK;
   });
   directory->AddEntry("abc", vnode);
-  ASSERT_OK(vfs.ServeDirectory(directory, std::move(root->server)));
+  ASSERT_OK(vfs.ServeDirectory(directory, std::move(root.server)));
 
   zx::result abc = fidl::CreateEndpoints<fio::Node>();
   ASSERT_OK(abc.status_value());
 
   loop.StartThread();
 
-  ASSERT_OK(fidl::WireCall(root->client)
+  ASSERT_OK(fidl::WireCall(root.client)
                 ->Open(fio::wire::OpenFlags::kNodeReference, {}, fidl::StringView("abc"),
                        std::move(abc->server))
                 .status());

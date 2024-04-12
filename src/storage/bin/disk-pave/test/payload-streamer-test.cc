@@ -18,9 +18,8 @@ constexpr char kFileData[] = "lalalala";
 
 TEST(PayloadStreamerTest, TrivialLifetime) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  auto stream = fidl::CreateEndpoints<fuchsia_paver::PayloadStream>();
-  ASSERT_OK(stream.status_value());
-  disk_pave::PayloadStreamer streamer(std::move(stream->server), fbl::unique_fd());
+  auto stream = fidl::Endpoints<fuchsia_paver::PayloadStream>::Create();
+  disk_pave::PayloadStreamer streamer(std::move(stream.server), fbl::unique_fd());
 }
 
 class PayloadStreamerTest : public zxtest::Test {

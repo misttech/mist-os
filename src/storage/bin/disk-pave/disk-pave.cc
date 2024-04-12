@@ -289,20 +289,11 @@ zx_status_t RealMain(Flags flags) {
 
   switch (flags.cmd) {
     case Command::kFvm: {
-      auto data_sink = fidl::CreateEndpoints<fuchsia_paver::DataSink>();
-      if (data_sink.is_error()) {
-        ERROR("Unable to create channels.\n");
-        return data_sink.status_value();
-      }
-      auto [data_sink_local, data_sink_remote] = std::move(*data_sink);
+      auto [data_sink_local, data_sink_remote] = fidl::Endpoints<fuchsia_paver::DataSink>::Create();
       // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
       (void)paver_client->FindDataSink(std::move(data_sink_remote));
 
-      auto streamer_endpoints = fidl::CreateEndpoints<fuchsia_paver::PayloadStream>();
-      if (streamer_endpoints.is_error()) {
-        return streamer_endpoints.status_value();
-      }
-      auto [client, server] = std::move(*streamer_endpoints);
+      auto [client, server] = fidl::Endpoints<fuchsia_paver::PayloadStream>::Create();
 
       // Launch thread which implements interface.
       async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -341,12 +332,8 @@ zx_status_t RealMain(Flags flags) {
         return ZX_ERR_INVALID_ARGS;
       }
 
-      auto data_sink = fidl::CreateEndpoints<fuchsia_paver::DynamicDataSink>();
-      if (data_sink.is_error()) {
-        ERROR("Unable to create channels.\n");
-        return data_sink.status_value();
-      }
-      auto [data_sink_local, data_sink_remote] = std::move(*data_sink);
+      auto [data_sink_local, data_sink_remote] =
+          fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
 
       auto block_result =
           UseBlockDevice(paver_client, flags.block_device, std::move(data_sink_remote));
@@ -370,12 +357,8 @@ zx_status_t RealMain(Flags flags) {
         return ZX_ERR_INVALID_ARGS;
       }
 
-      auto data_sink = fidl::CreateEndpoints<fuchsia_paver::DynamicDataSink>();
-      if (data_sink.is_error()) {
-        ERROR("Unable to create channels.\n");
-        return data_sink.status_value();
-      }
-      auto [data_sink_local, data_sink_remote] = std::move(*data_sink);
+      auto [data_sink_local, data_sink_remote] =
+          fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
 
       auto block_result =
           UseBlockDevice(paver_client, flags.block_device, std::move(data_sink_remote));
@@ -402,12 +385,7 @@ zx_status_t RealMain(Flags flags) {
     return status;
   }
 
-  auto data_sink_endpoints = fidl::CreateEndpoints<fuchsia_paver::DataSink>();
-  if (data_sink_endpoints.is_error()) {
-    ERROR("Unable to create channels.\n");
-    return data_sink_endpoints.status_value();
-  }
-  auto [data_sink_local, data_sink_remote] = std::move(*data_sink_endpoints);
+  auto [data_sink_local, data_sink_remote] = fidl::Endpoints<fuchsia_paver::DataSink>::Create();
 
   // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
   (void)paver_client->FindDataSink(std::move(data_sink_remote));

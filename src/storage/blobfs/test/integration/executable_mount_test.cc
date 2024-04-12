@@ -35,9 +35,7 @@ zx_rights_t get_rights(const zx::object_base& handle) {
 class ExecutableMountTest : public FdioTest {
  public:
   ExecutableMountTest() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_kernel::VmexResource>();
-    ZX_ASSERT(endpoints.status_value() == ZX_OK);
-    auto [local, remote] = *std::move(endpoints);
+    auto [local, remote] = fidl::Endpoints<fuchsia_kernel::VmexResource>::Create();
 
     zx_status_t status =
         fdio_service_connect("/svc/fuchsia.kernel.VmexResource", remote.TakeChannel().release());

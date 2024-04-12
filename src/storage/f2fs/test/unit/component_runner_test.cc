@@ -30,10 +30,9 @@ class F2fsComponentRunnerTest : public testing::Test {
     ASSERT_TRUE(bc_or.is_ok());
     bcache_ = std::move(*bc_or);
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    root_ = std::move(endpoints->client);
-    server_end_ = std::move(endpoints->server);
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    root_ = std::move(endpoints.client);
+    server_end_ = std::move(endpoints.server);
   }
 
   void StartServe() {
@@ -44,24 +43,22 @@ class F2fsComponentRunnerTest : public testing::Test {
   }
 
   fidl::ClientEnd<fuchsia_io::Directory> GetSvcDir() const {
-    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_EQ(svc_endpoints.status_value(), ZX_OK);
+    auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     auto status = fidl::WireCall(root_)->Open(
         fuchsia_io::wire::OpenFlags::kDirectory, {}, "svc",
-        fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel()));
+        fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints.server.TakeChannel()));
     EXPECT_EQ(status.status(), ZX_OK);
-    return std::move(svc_endpoints->client);
+    return std::move(svc_endpoints.client);
   }
 
   fidl::ClientEnd<fuchsia_io::Directory> GetRootDir() const {
-    auto root_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_EQ(root_endpoints.status_value(), ZX_OK);
+    auto root_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     auto status = fidl::WireCall(root_)->Open(
         fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable |
             fuchsia_io::wire::OpenFlags::kDirectory,
-        {}, "root", fidl::ServerEnd<fuchsia_io::Node>(root_endpoints->server.TakeChannel()));
+        {}, "root", fidl::ServerEnd<fuchsia_io::Node>(root_endpoints.server.TakeChannel()));
     EXPECT_EQ(status.status(), ZX_OK);
-    return std::move(root_endpoints->client);
+    return std::move(root_endpoints.client);
   }
 
   void ResetRootDir() { root_.reset(); }
@@ -157,9 +154,8 @@ TEST_F(F2fsComponentRunnerTest, RequestsBeforeStartupAreQueuedAndServicedAfter) 
 }
 
 TEST_F(F2fsComponentRunnerTest, LifecycleChannelShutsDownRunner) {
-  auto lifecycle_endpoints = fidl::CreateEndpoints<fuchsia_process_lifecycle::Lifecycle>();
-  ASSERT_EQ(lifecycle_endpoints.status_value(), ZX_OK);
-  auto lifecycle = std::move(lifecycle_endpoints->client);
+  auto lifecycle_endpoints = fidl::Endpoints<fuchsia_process_lifecycle::Lifecycle>::Create();
+  auto lifecycle = std::move(lifecycle_endpoints.client);
 
   runner_ = std::make_unique<ComponentRunner>(loop_.dispatcher());
   std::atomic<bool> unmount_callback_called = false;
@@ -169,7 +165,7 @@ TEST_F(F2fsComponentRunnerTest, LifecycleChannelShutsDownRunner) {
     unmount_callback_called = true;
   });
   zx::result status =
-      runner_->ServeRoot(std::move(server_end_), std::move(lifecycle_endpoints->server));
+      runner_->ServeRoot(std::move(server_end_), std::move(lifecycle_endpoints.server));
   ASSERT_EQ(status.status_value(), ZX_OK);
   ASSERT_EQ(loop_.RunUntilIdle(), ZX_OK);
   ASSERT_FALSE(unmount_callback_called);

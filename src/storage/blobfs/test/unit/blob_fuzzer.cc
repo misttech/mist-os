@@ -39,25 +39,23 @@ constexpr uint32_t kBlockSize = 512;
 constexpr uint32_t kNumBlocks = kBlockDeviceSize / kBlockSize;
 
 fidl::ClientEnd<fuchsia_io::Directory> ServeOutgoingDirectory(ComponentRunner& runner) {
-  auto root_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ZX_ASSERT(root_endpoints.is_ok());
+  auto root_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
   auto status = runner.ServeRoot(
-      std::move(root_endpoints->server), fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle>(),
+      std::move(root_endpoints.server), fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle>(),
       fidl::ClientEnd<fuchsia_device_manager::Administrator>(), zx::resource());
   ZX_ASSERT(status.is_ok());
-  return std::move(root_endpoints->client);
+  return std::move(root_endpoints.client);
 }
 
 fidl::ClientEnd<fuchsia_io::Directory> GetRootDirectory(
     fidl::ClientEnd<fuchsia_io::Directory>& outgoing) {
-  auto root_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ZX_ASSERT(root_endpoints.is_ok());
+  auto root_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
   auto status = fidl::WireCall(outgoing)->Open(
       fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable |
           fuchsia_io::wire::OpenFlags::kDirectory,
-      {}, "root", fidl::ServerEnd<fuchsia_io::Node>(root_endpoints->server.TakeChannel()));
+      {}, "root", fidl::ServerEnd<fuchsia_io::Node>(root_endpoints.server.TakeChannel()));
   ZX_ASSERT(status.ok());
-  return std::move(root_endpoints->client);
+  return std::move(root_endpoints.client);
 }
 
 class BlobfsInstance {

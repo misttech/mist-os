@@ -44,14 +44,13 @@ class F2fsComponentTest : public testing::Test {
     ASSERT_FALSE(create_res->is_error())
         << "create error: " << static_cast<uint32_t>(create_res->error_value());
 
-    auto exposed_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_EQ(exposed_endpoints.status_value(), ZX_OK);
+    auto exposed_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     auto open_exposed_res =
-        realm_->OpenExposedDir(kF2fsChildRef, std::move(exposed_endpoints->server));
+        realm_->OpenExposedDir(kF2fsChildRef, std::move(exposed_endpoints.server));
     ASSERT_EQ(open_exposed_res.status(), ZX_OK);
     ASSERT_FALSE(open_exposed_res->is_error())
         << "open exposed dir error: " << static_cast<uint32_t>(open_exposed_res->error_value());
-    exposed_dir_ = std::move(exposed_endpoints->client);
+    exposed_dir_ = std::move(exposed_endpoints.client);
 
     auto startup_client_end =
         component::ConnectAt<fuchsia_fs_startup::Startup>(exposed_dir_.borrow());

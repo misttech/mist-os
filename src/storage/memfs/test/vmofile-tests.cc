@@ -66,8 +66,7 @@ TEST(VmofileTests, test_vmofile_basic) {
   ASSERT_OK(loop.StartThread());
   async_dispatcher_t* dispatcher = loop.dispatcher();
 
-  zx::result directory_endpoints = fidl::CreateEndpoints<fio::Directory>();
-  ASSERT_OK(directory_endpoints.status_value());
+  auto directory_endpoints = fidl::Endpoints<fio::Directory>::Create();
 
   zx::result result = memfs::Memfs::Create(dispatcher, "<tmp>");
   ASSERT_OK(result);
@@ -77,11 +76,11 @@ TEST(VmofileTests, test_vmofile_basic) {
   ASSERT_OK(zx::vmo::create(64, 0, &read_only_vmo));
   ASSERT_OK(read_only_vmo.write("hello, world!", 0, 13));
   ASSERT_OK(vfs->CreateFromVmo(root.get(), "greeting", read_only_vmo.get(), 0, 13));
-  ASSERT_OK(vfs->ServeDirectory(std::move(root), std::move(directory_endpoints->server)));
+  ASSERT_OK(vfs->ServeDirectory(std::move(root), std::move(directory_endpoints.server)));
 
   zx::result node_endpoints = fidl::CreateEndpoints<fio::Node>();
   ASSERT_OK(node_endpoints.status_value());
-  auto open_result = fidl::WireCall(directory_endpoints->client)
+  auto open_result = fidl::WireCall(directory_endpoints.client)
                          ->Open(fio::wire::OpenFlags::kRightReadable, {},
                                 fidl::StringView("greeting"), std::move(node_endpoints->server));
   ASSERT_OK(open_result.status());
@@ -159,8 +158,7 @@ TEST(VmofileTests, test_vmofile_exec) {
   ASSERT_OK(loop.StartThread());
   async_dispatcher_t* dispatcher = loop.dispatcher();
 
-  zx::result directory_endpoints = fidl::CreateEndpoints<fio::Directory>();
-  ASSERT_OK(directory_endpoints.status_value());
+  auto directory_endpoints = fidl::Endpoints<fio::Directory>::Create();
 
   zx::result result = memfs::Memfs::Create(dispatcher, "<tmp>");
   ASSERT_OK(result);
@@ -179,13 +177,13 @@ TEST(VmofileTests, test_vmofile_exec) {
 
     ASSERT_OK(read_exec_vmo.replace_as_executable(response.resource, &read_exec_vmo));
     ASSERT_OK(vfs->CreateFromVmo(root.get(), "read_exec", read_exec_vmo.get(), 0, 13));
-    ASSERT_OK(vfs->ServeDirectory(std::move(root), std::move(directory_endpoints->server)));
+    ASSERT_OK(vfs->ServeDirectory(std::move(root), std::move(directory_endpoints.server)));
   }
 
   zx::result node_endpoints = fidl::CreateEndpoints<fio::Node>();
   ASSERT_OK(node_endpoints.status_value());
   auto open_result =
-      fidl::WireCall(directory_endpoints->client)
+      fidl::WireCall(directory_endpoints.client)
           ->Open(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightExecutable, {},
                  fidl::StringView("read_exec"), std::move(node_endpoints->server));
   ASSERT_OK(open_result.status());

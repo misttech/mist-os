@@ -336,12 +336,7 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
       continue;
     }
 
-    zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-    if (controller_endpoints.is_error()) {
-      ERROR("Failed to create controller endpoints %s\n", controller_endpoints.status_string());
-      continue;
-    }
-    auto& [controller, controller_server] = controller_endpoints.value();
+    auto [controller, controller_server] = fidl::Endpoints<fuchsia_device::Controller>::Create();
     if (fidl::OneWayStatus status = fidl::WireCall(gpt_device.controller)
                                         ->ConnectToController(std::move(controller_server));
         !status.ok()) {

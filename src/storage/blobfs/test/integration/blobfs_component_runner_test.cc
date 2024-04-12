@@ -50,10 +50,9 @@ class BlobfsComponentRunnerTest : public testing::Test {
     device_ = std::make_unique<block_client::FakeBlockDevice>(kNumBlocks, kBlockSize);
     ASSERT_EQ(FormatFilesystem(device_.get(), FilesystemOptions{}), ZX_OK);
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    root_ = std::move(endpoints->client);
-    server_end_ = std::move(endpoints->server);
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    root_ = std::move(endpoints.client);
+    server_end_ = std::move(endpoints.server);
   }
   void TearDown() override {}
 
@@ -66,24 +65,22 @@ class BlobfsComponentRunnerTest : public testing::Test {
   }
 
   fidl::ClientEnd<fuchsia_io::Directory> GetSvcDir() const {
-    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(svc_endpoints.status_value() == ZX_OK);
+    auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     auto status = fidl::WireCall(root_)->Open(
         fuchsia_io::wire::OpenFlags::kDirectory, {}, "svc",
-        fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel()));
+        fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints.server.TakeChannel()));
     ZX_ASSERT(status.status() == ZX_OK);
-    return std::move(svc_endpoints->client);
+    return std::move(svc_endpoints.client);
   }
 
   fidl::ClientEnd<fuchsia_io::Directory> GetRootDir() const {
-    auto root_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(root_endpoints.status_value() == ZX_OK);
+    auto root_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     auto status = fidl::WireCall(root_)->Open(
         fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable |
             fuchsia_io::wire::OpenFlags::kDirectory,
-        {}, "root", fidl::ServerEnd<fuchsia_io::Node>(root_endpoints->server.TakeChannel()));
+        {}, "root", fidl::ServerEnd<fuchsia_io::Node>(root_endpoints.server.TakeChannel()));
     ZX_ASSERT(status.status() == ZX_OK);
-    return std::move(root_endpoints->client);
+    return std::move(root_endpoints.client);
   }
 
   async::Loop loop_;
@@ -96,11 +93,10 @@ class BlobfsComponentRunnerTest : public testing::Test {
 
 TEST_F(BlobfsComponentRunnerTest, ServeAndConfigureStartsBlobfs) {
   FakeDriverManagerAdmin driver_admin;
-  auto admin_endpoints = fidl::CreateEndpoints<fuchsia_device_manager::Administrator>();
-  ASSERT_TRUE(admin_endpoints.is_ok());
-  fidl::BindServer(loop_.dispatcher(), std::move(admin_endpoints->server), &driver_admin);
+  auto admin_endpoints = fidl::Endpoints<fuchsia_device_manager::Administrator>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(admin_endpoints.server), &driver_admin);
 
-  ASSERT_NO_FATAL_FAILURE(StartServe(std::move(admin_endpoints->client)));
+  ASSERT_NO_FATAL_FAILURE(StartServe(std::move(admin_endpoints.client)));
 
   auto svc_dir = GetSvcDir();
   auto client_end = component::ConnectAt<fuchsia_fs_startup::Startup>(svc_dir.borrow());
@@ -145,9 +141,8 @@ TEST_F(BlobfsComponentRunnerTest, ServeAndConfigureStartsBlobfsWithoutDriverMana
 
 TEST_F(BlobfsComponentRunnerTest, RequestsBeforeStartupAreQueuedAndServicedAfter) {
   FakeDriverManagerAdmin driver_admin;
-  auto admin_endpoints = fidl::CreateEndpoints<fuchsia_device_manager::Administrator>();
-  ASSERT_TRUE(admin_endpoints.is_ok());
-  fidl::BindServer(loop_.dispatcher(), std::move(admin_endpoints->server), &driver_admin);
+  auto admin_endpoints = fidl::Endpoints<fuchsia_device_manager::Administrator>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(admin_endpoints.server), &driver_admin);
 
   // Start a call to the filesystem. We expect that this request will be queued and won't return
   // until Configure is called on the runner. Initially, GetSvcDir will fire off an open call on
@@ -171,7 +166,7 @@ TEST_F(BlobfsComponentRunnerTest, RequestsBeforeStartupAreQueuedAndServicedAfter
   ASSERT_EQ(loop_.RunUntilIdle(), ZX_OK);
   ASSERT_FALSE(query_complete);
 
-  ASSERT_NO_FATAL_FAILURE(StartServe(std::move(admin_endpoints->client)));
+  ASSERT_NO_FATAL_FAILURE(StartServe(std::move(admin_endpoints.client)));
   ASSERT_EQ(loop_.RunUntilIdle(), ZX_OK);
   ASSERT_FALSE(query_complete);
 
@@ -198,11 +193,10 @@ TEST_F(BlobfsComponentRunnerTest, RequestsBeforeStartupAreQueuedAndServicedAfter
 
 TEST_F(BlobfsComponentRunnerTest, DoubleShutdown) {
   FakeDriverManagerAdmin driver_admin;
-  auto admin_endpoints = fidl::CreateEndpoints<fuchsia_device_manager::Administrator>();
-  ASSERT_TRUE(admin_endpoints.is_ok());
-  fidl::BindServer(loop_.dispatcher(), std::move(admin_endpoints->server), &driver_admin);
+  auto admin_endpoints = fidl::Endpoints<fuchsia_device_manager::Administrator>::Create();
+  fidl::BindServer(loop_.dispatcher(), std::move(admin_endpoints.server), &driver_admin);
 
-  ASSERT_NO_FATAL_FAILURE(StartServe(std::move(admin_endpoints->client)));
+  ASSERT_NO_FATAL_FAILURE(StartServe(std::move(admin_endpoints.client)));
 
   auto svc_dir = GetSvcDir();
   auto client_end = component::ConnectAt<fuchsia_fs_startup::Startup>(svc_dir.borrow());

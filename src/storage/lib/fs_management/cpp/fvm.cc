@@ -218,12 +218,8 @@ zx::result<bool> PartitionMatches(fidl::UnownedClientEnd<fuchsia_device::Control
             !matcher.detected_formats.empty() || !matcher.labels.empty() ||
             !matcher.parent_device.empty());
 
-  zx::result partition_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_block_partition::Partition>();
-  if (partition_endpoints.is_error()) {
-    return partition_endpoints.take_error();
-  }
-  auto& [partition_client_end, partition_server_end] = partition_endpoints.value();
+  auto [partition_client_end, partition_server_end] =
+      fidl::Endpoints<fuchsia_hardware_block_partition::Partition>::Create();
   if (const fidl::OneWayStatus result =
           fidl::WireCall(channel)->ConnectToDeviceFidl(partition_server_end.TakeChannel());
       !result.ok()) {

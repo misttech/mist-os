@@ -183,18 +183,17 @@ void CloneFdAsReadOnlyHelper(fbl::unique_fd in_fd, fbl::unique_fd* out_fd) {
   fdio_cpp::FdioCaller fdio_caller(std::move(in_fd));
 
   // Clone |in_fd| as read-only; the entire tree under the new connection now becomes read-only
-  zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto endpoints = fidl::Endpoints<fio::Node>::Create();
 
   auto clone_result =
       fidl::WireCall(fdio_caller.borrow_as<fio::Node>())
-          ->Clone(fio::wire::OpenFlags::kRightReadable, std::move(std::move(endpoints->server)));
+          ->Clone(fio::wire::OpenFlags::kRightReadable, std::move(std::move(endpoints.server)));
   ASSERT_EQ(clone_result.status(), ZX_OK);
 
   // Turn the handle back to an fd to test posix functions
   fbl::unique_fd fd = ([&]() -> fbl::unique_fd {
     int tmp_fd = -1;
-    zx_status_t status = fdio_fd_create(endpoints->client.TakeChannel().release(), &tmp_fd);
+    zx_status_t status = fdio_fd_create(endpoints.client.TakeChannel().release(), &tmp_fd);
     EXPECT_GT(tmp_fd, 0);
     EXPECT_EQ(status, ZX_OK);
     return fbl::unique_fd(tmp_fd);
@@ -217,14 +216,13 @@ TEST_P(DirectoryPermissionTest, TestCloneWithBadFlags) {
     // Obtain the underlying connection behind |foo_fd|.
     fdio_cpp::FdioCaller fdio_caller(std::move(foo_fd));
 
-    zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
-    ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+    auto endpoints = fidl::Endpoints<fio::Node>::Create();
 
     auto clone_result =
         fidl::WireCall(fdio_caller.borrow_as<fio::Node>())
-            ->Clone(fio::wire::OpenFlags::kCloneSameRights | right, std::move(endpoints->server));
+            ->Clone(fio::wire::OpenFlags::kCloneSameRights | right, std::move(endpoints.server));
     ASSERT_EQ(clone_result.status(), ZX_OK);
-    auto describe_result = fidl::WireCall(endpoints->client)->Query();
+    auto describe_result = fidl::WireCall(endpoints.client)->Query();
     ASSERT_EQ(describe_result.status(), ZX_ERR_PEER_CLOSED);
   }
 }
@@ -239,15 +237,14 @@ TEST_P(DirectoryPermissionTest, TestCloneCannotIncreaseRights) {
   // Attempt to clone the read-only fd back to read-write.
   fdio_cpp::FdioCaller fdio_caller(std::move(foo_readonly));
 
-  zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto endpoints = fidl::Endpoints<fio::Node>::Create();
 
   auto clone_result =
       fidl::WireCall(fdio_caller.borrow_as<fio::Node>())
           ->Clone(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable,
-                  std::move(endpoints->server));
+                  std::move(endpoints.server));
   ASSERT_EQ(clone_result.status(), ZX_OK);
-  auto describe_result = fidl::WireCall(endpoints->client)->Query();
+  auto describe_result = fidl::WireCall(endpoints.client)->Query();
   ASSERT_EQ(describe_result.status(), ZX_ERR_PEER_CLOSED);
 }
 

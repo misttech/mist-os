@@ -30,10 +30,7 @@ zx::result<> CheckExists(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_d
                          const std::string& path) {
   // Check if the volume exists.  This way, we can return an explicit NOT_FOUND if absent.
   // TODO(https://fxbug.dev/42174810): Check the epitaph of the call to Mount instead.
-  auto endpoints_or = fidl::CreateEndpoints<fuchsia_io::Node>();
-  if (endpoints_or.is_error())
-    return endpoints_or.take_error();
-  auto [client, server] = std::move(*endpoints_or);
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Node>::Create();
   auto res = fidl::WireCall(exposed_dir)
                  ->Open(fuchsia_io::wire::OpenFlags::kNodeReference, {},
                         fidl::StringView::FromExternal(path), std::move(server));

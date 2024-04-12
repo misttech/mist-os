@@ -51,9 +51,7 @@ class FlockTest : public zxtest::Test {
 
  protected:
   fbl::RefPtr<fs::RemoteDir> GetRemoteDir() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_TRUE(endpoints.is_ok());
-    auto [client, server] = *std::move(endpoints);
+    auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     EXPECT_EQ(ZX_OK, fdio_open(kTmpfsPath,
                                static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable |
                                                      fuchsia_io::wire::OpenFlags::kRightExecutable),

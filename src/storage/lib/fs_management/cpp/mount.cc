@@ -185,10 +185,7 @@ zx::result<MountedVolume*> StartedMultiVolumeFilesystem::OpenVolume(
   if (volumes_.find(name) != volumes_.end()) {
     return zx::error(ZX_ERR_ALREADY_BOUND);
   }
-  auto endpoints_or = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints_or.is_error())
-    return endpoints_or.take_error();
-  auto [client, server] = std::move(*endpoints_or);
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   auto res = fs_management::OpenVolume(exposed_dir_, name, std::move(server), std::move(options));
   if (res.is_error()) {
     return res.take_error();
@@ -203,10 +200,7 @@ zx::result<MountedVolume*> StartedMultiVolumeFilesystem::CreateVolume(
   if (volumes_.find(name) != volumes_.end()) {
     return zx::error(ZX_ERR_ALREADY_BOUND);
   }
-  auto endpoints_or = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints_or.is_error())
-    return endpoints_or.take_error();
-  auto [client, server] = std::move(*endpoints_or);
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   auto res = fs_management::CreateVolume(exposed_dir_, name, std::move(server), std::move(options));
   if (res.is_error()) {
     return res.take_error();
@@ -294,11 +288,7 @@ zx::result<StartedSingleVolumeMultiVolumeFilesystem> MountMultiVolumeWithDefault
     return outgoing_dir_or.take_error();
   }
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto [client, server] = std::move(*endpoints);
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   auto volume = OpenVolume(
       *outgoing_dir_or, volume_name, std::move(server),

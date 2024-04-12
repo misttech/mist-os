@@ -33,9 +33,7 @@ class WatcherTest : public zxtest::Test {
   fbl::RefPtr<fs::PseudoDir>& root() { return root_; }
 
   fidl::ClientEnd<fio::DirectoryWatcher> WatchRootDir(fio::WatchMask mask) {
-    auto endpoints = fidl::CreateEndpoints<fio::DirectoryWatcher>();
-    EXPECT_OK(endpoints);
-    auto [client, server] = *std::move(endpoints);
+    auto [client, server] = fidl::Endpoints<fio::DirectoryWatcher>::Create();
     EXPECT_OK(root_->WatchDir(&vfs_, mask, 0, std::move(server)));
     return std::move(client);
   }
