@@ -321,8 +321,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   uint8_t client_minimum_rgb_ = 0;
   sync_completion_t fidl_unbound_;
 
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_;
-
   struct Collections {
     // The BufferCollection ID used in fuchsia.hardware.display.Controller
     // protocol.

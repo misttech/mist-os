@@ -234,11 +234,6 @@ void Client::ImportEvent(ImportEventRequestView request,
 
 void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
                                     ImportBufferCollectionCompleter::Sync& completer) {
-  if (!sysmem_allocator_.is_valid()) {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-    return;
-  }
-
   const display::BufferCollectionId buffer_collection_id =
       ToBufferCollectionId(request->buffer_collection_id);
   // TODO: Switch to .contains() when C++20.
@@ -1475,31 +1470,6 @@ Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) 
                                   std::move(cb));
   // Keep a copy of fidl binding so we can safely unbind from it during shutdown
   binding_state_.SetBound(binding);
-
-  if (zx_status_t status =
-          [&]() {
-            auto [sysmem_allocator_client, sysmem_allocator_server] =
-                fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
-            zx::result<> result =
-                controller_->driver()->GetSysmemConnection(sysmem_allocator_server.TakeChannel());
-            if (result.is_error()) {
-              return result.error_value();
-            }
-            sysmem_allocator_ = fidl::WireSyncClient(std::move(sysmem_allocator_client));
-
-            auto process_name = GetObjectName(zx_process_self());
-
-            // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
-            std::string debug_name = std::string("display[") + process_name + "]";
-            fidl::OneWayStatus status = sysmem_allocator_->SetDebugClientInfo(
-                fidl::StringView::FromExternal(debug_name), GetKoid(zx_process_self()));
-            return status.status();
-          }();
-      status != ZX_OK) {
-    // Not a fatal error, but BufferCollection functions won't work.
-    // TODO(https://fxbug.dev/42108322) TODO: Fail creation once all drivers implement this.
-    zxlogf(ERROR, "GetSysmemConnection failed (continuing) - status: %d", status);
-  }
 
   return fpromise::ok(binding);
 }
