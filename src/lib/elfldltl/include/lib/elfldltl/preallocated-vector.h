@@ -17,6 +17,12 @@ namespace elfldltl {
 // elfldltl::PreallocatedVector<T> wraps a previously allocated but
 // uninitialized span of T with a container interface that looks like a
 // std::vector but provides the container.h API for the allocating methods.
+// For an allocation failure, the Diagnostics object's ResourceLimit<N> method
+// will be called with the error string (the std::string_view parameter).  The
+// methods that usually return void (push_back, emplace_back) instead return
+// bool, with false indicating allocation failure.  The methods that usually
+// return an iterator (emplace, insert) instead return std::optional<iterator>,
+// with std::nullopt indicating allocation failure.
 //
 // This can be default-constructed (with zero capacity) and then move-assigned
 // from another object constructed with storage.  It's usually constructed via
