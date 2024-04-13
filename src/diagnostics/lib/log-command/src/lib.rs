@@ -114,6 +114,16 @@ pub enum SymbolizeMode {
     Classic,
 }
 
+impl SymbolizeMode {
+    pub fn is_prettification_disabled(&self) -> bool {
+        matches!(self, SymbolizeMode::Classic)
+    }
+
+    pub fn is_symbolize_disabled(&self) -> bool {
+        matches!(self, SymbolizeMode::Off)
+    }
+}
+
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(
     subcommand,
