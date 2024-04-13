@@ -5,7 +5,8 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_HCI_VIRTUAL_EMULATOR_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_VIRTUAL_EMULATOR_H_
 
-#include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
+#include <fidl/fuchsia.bluetooth.test/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <fuchsia/hardware/bt/hci/cpp/banjo.h>
 #include <fuchsia/hardware/test/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -26,14 +27,13 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_controller.h"
 #include "src/connectivity/bluetooth/hci/virtual/emulated_peer.h"
-#include "src/connectivity/bluetooth/lib/fidl/hanging_getter.h"
 #include "third_party/pigweed/backends/pw_random/zircon_random_generator.h"
 
 namespace bt_hci_virtual {
 
 enum class Channel : uint8_t { ACL, COMMAND, EMULATOR, ISO, SNOOP };
 
-class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
+class EmulatorDevice : public fidl::Server<fuchsia_bluetooth_test::HciEmulator>,
                        public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
                        public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor>,
                        public fidl::WireServer<fuchsia_hardware_bluetooth::Emulator> {
@@ -73,20 +73,17 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
   }
 
  private:
-  void StartEmulatorInterface(zx::channel chan);
+  void StartEmulatorInterface(fidl::ServerEnd<fuchsia_bluetooth_test::HciEmulator> request);
 
-  // fuchsia::bluetooth::test::HciEmulator overrides:
-  void Publish(fuchsia::bluetooth::test::EmulatorSettings settings,
-               PublishCallback callback) override;
-  void AddLowEnergyPeer(fuchsia::bluetooth::test::LowEnergyPeerParameters params,
-                        fidl::InterfaceRequest<fuchsia::bluetooth::test::Peer> request,
-                        AddLowEnergyPeerCallback callback) override;
-  void AddBredrPeer(fuchsia::bluetooth::test::BredrPeerParameters params,
-                    fidl::InterfaceRequest<fuchsia::bluetooth::test::Peer> request,
-                    AddBredrPeerCallback callback) override;
-  void WatchControllerParameters(WatchControllerParametersCallback callback) override;
-  void WatchLeScanStates(WatchLeScanStatesCallback callback) override;
-  void WatchLegacyAdvertisingStates(WatchLegacyAdvertisingStatesCallback callback) override;
+  // fuchsia_bluetooth_test::HciEmulator overrides:
+  void Publish(PublishRequest& request, PublishCompleter::Sync& completer) override;
+  void AddLowEnergyPeer(AddLowEnergyPeerRequest& request,
+                        AddLowEnergyPeerCompleter::Sync& completer) override;
+  void AddBredrPeer(AddBredrPeerRequest& request, AddBredrPeerCompleter::Sync& completer) override;
+  void WatchControllerParameters(WatchControllerParametersCompleter::Sync& completer) override;
+  void WatchLeScanStates(WatchLeScanStatesCompleter::Sync& completer) override;
+  void WatchLegacyAdvertisingStates(
+      WatchLegacyAdvertisingStatesCompleter::Sync& completer) override;
 
   // fuchsia_hardware_bluetooth::Vendor overrides:
   void GetFeatures(GetFeaturesCompleter::Sync& completer) override;
@@ -105,7 +102,9 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
   void AddPeer(std::unique_ptr<EmulatedPeer> peer);
 
   void OnControllerParametersChanged();
+  void MaybeUpdateControllerParametersChanged();
   void OnLegacyAdvertisingStateChanged();
+  void MaybeUpdateLegacyAdvertisingStates();
 
   // Remove the bt-hci device.
   void UnpublishHci();
@@ -174,15 +173,16 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
 
   // Binding for fuchsia.bluetooth.test.HciEmulator channel. |binding_| is only accessed on
   // |loop_|'s dispatcher.
-  fidl::Binding<fuchsia::bluetooth::test::HciEmulator> binding_;
+  fidl::ServerBindingGroup<fuchsia_bluetooth_test::HciEmulator> bindings_;
 
   // List of active peers that have been registered with us.
   std::unordered_map<bt::DeviceAddress, std::unique_ptr<EmulatedPeer>> peers_;
 
-  bt_lib_fidl::HangingGetter<fuchsia::bluetooth::test::ControllerParameters>
-      controller_parameters_getter_;
-  bt_lib_fidl::HangingVectorGetter<fuchsia::bluetooth::test::LegacyAdvertisingState>
-      legacy_adv_state_getter_;
+  std::optional<fuchsia_bluetooth_test::ControllerParameters> controller_parameters_;
+  std::optional<WatchControllerParametersCompleter::Async> controller_parameters_completer_;
+
+  std::vector<fuchsia_bluetooth_test::LegacyAdvertisingState> legacy_adv_states_;
+  std::queue<WatchLegacyAdvertisingStatesCompleter::Async> legacy_adv_states_completers_;
 
   zx::channel cmd_channel_;
   zx::channel acl_channel_;

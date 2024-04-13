@@ -5,19 +5,17 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_FIDL_HELPERS_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_FIDL_HELPERS_H_
 
-#include <fuchsia/bluetooth/bredr/cpp/fidl.h>
-#include <fuchsia/bluetooth/cpp/fidl.h>
+#include <fidl/fuchsia.bluetooth.bredr/cpp/fidl.h>
 #include <fuchsia/bluetooth/gatt/cpp/fidl.h>
 #include <fuchsia/bluetooth/gatt2/cpp/fidl.h>
 #include <fuchsia/bluetooth/host/cpp/fidl.h>
 #include <fuchsia/bluetooth/le/cpp/fidl.h>
+#include <fuchsia/bluetooth/sys/cpp/fidl.h>
+#include <lib/fidl/cpp/type_converter.h>
+#include <lib/fpromise/result.h>
 
 #include <optional>
 
-#include "fuchsia/bluetooth/sys/cpp/fidl.h"
-#include "lib/fidl/cpp/type_converter.h"
-#include "lib/fidl/cpp/vector.h"
-#include "lib/fpromise/result.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/advertising_data.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/error.h"
@@ -115,8 +113,13 @@ fuchsia::bluetooth::gatt::Error GattErrorToFidl(const bt::att::Error& error);
 // Convert a bt::att::Error to fuchsia.bluetooth.gatt2.Error.
 fuchsia::bluetooth::gatt2::Error AttErrorToGattFidlError(const bt::att::Error& error);
 
+// Convert a fuchsia::bluetooth::Uuid to bt::UUID for old HLCPP FIDL bindings
 bt::UUID UuidFromFidl(const fuchsia::bluetooth::Uuid& input);
+// Convert a bt::UUID to fuchsia::bluetooth::Uuid for old HLCPP FIDL bindings
 fuchsia::bluetooth::Uuid UuidToFidl(const bt::UUID& uuid);
+
+// Convert a fuchsia_bluetooth::Uuid to bt::UUID for new C++ FIDL bindings
+bt::UUID NewUuidFromFidl(const fuchsia_bluetooth::Uuid& input);
 
 // Functions that convert FIDL types to library objects.
 bt::sm::IOCapability IoCapabilityFromFidl(const fuchsia::bluetooth::sys::InputCapability,
@@ -183,6 +186,10 @@ bt::gatt::DescriptorHandle DescriptorHandleFromFidl(uint64_t fidl_gatt_id);
 
 // Constructs a sdp::ServiceRecord from a FIDL ServiceDefinition |definition|
 fpromise::result<bt::sdp::ServiceRecord, fuchsia::bluetooth::ErrorCode>
+ServiceDefinitionToServiceRecord(const fuchsia_bluetooth_bredr::ServiceDefinition& definition);
+
+// Constructs a sdp::ServiceRecord from a FIDL ServiceDefinition |definition|
+fpromise::result<bt::sdp::ServiceRecord, fuchsia::bluetooth::ErrorCode>
 ServiceDefinitionToServiceRecord(const fuchsia::bluetooth::bredr::ServiceDefinition& definition);
 
 bt::gap::BrEdrSecurityRequirements FidlToBrEdrSecurityRequirements(
@@ -241,8 +248,12 @@ bt::StaticPacket<android_hci::AacCodecInformationWriter> FidlToEncoderSettingsAa
     fuchsia::bluetooth::bredr::AudioSamplingFrequency sampling_frequency,
     fuchsia::bluetooth::bredr::AudioChannelMode channel_mode);
 
+// For old HLCPP FIDL bindings
 std::optional<bt::sdp::DataElement> FidlToDataElement(
     const fuchsia::bluetooth::bredr::DataElement& fidl);
+// For new C++ FIDL bindings
+std::optional<bt::sdp::DataElement> NewFidlToDataElement(
+    const fuchsia_bluetooth_bredr::DataElement& fidl);
 
 }  // namespace bthost::fidl_helpers
 

@@ -62,6 +62,7 @@ source_set("helpers") {
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_hlcpp",
+    "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_cpp",
     "//sdk/fidl/fuchsia.bluetooth.gatt:fuchsia.bluetooth.gatt_hlcpp",
     "//sdk/fidl/fuchsia.bluetooth.gatt2:fuchsia.bluetooth.gatt2_hlcpp",
     "//sdk/fidl/fuchsia.bluetooth.host:fuchsia.bluetooth.host_hlcpp",

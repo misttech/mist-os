@@ -36,7 +36,6 @@ namespace fbg = fuchsia::bluetooth::gatt;
 namespace fbg2 = fuchsia::bluetooth::gatt2;
 namespace fbredr = fuchsia::bluetooth::bredr;
 namespace faudio = fuchsia::hardware::audio;
-namespace android_hci = pw::bluetooth::vendor::android_hci;
 
 namespace fuchsia::bluetooth {
 // Make UUIDs equality comparable for advanced testing matchers. ADL rules mandate the namespace.
@@ -157,12 +156,23 @@ TEST(HelpersTest, AdvertisingIntervalFromFidl) {
 }
 
 TEST(HelpersTest, UuidFromFidl) {
+  // Test HLCPP FIDL bindings with fuchsia::bluetooth::Uuid
   fbt::Uuid input;
   input.value = {{0xFB, 0x34, 0x9B, 0x5F, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0x0d,
                   0x18, 0x00, 0x00}};
 
   // We expect the input bytes to be carried over directly.
   bt::UUID output = UuidFromFidl(input);
+  EXPECT_EQ("0000180d-0000-1000-8000-00805f9b34fb", output.ToString());
+  EXPECT_EQ(2u, output.CompactSize());
+
+  // Test new C++ FIDL bindings with fuchsia_bluetooth::Uuid
+  fuchsia_bluetooth::Uuid input2;
+  input2.value({0xFB, 0x34, 0x9B, 0x5F, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0x0d, 0x18,
+                0x00, 0x00});
+
+  // We expect the input bytes to be carried over directly.
+  output = NewUuidFromFidl(input2);
   EXPECT_EQ("0000180d-0000-1000-8000-00805f9b34fb", output.ToString());
   EXPECT_EQ(2u, output.CompactSize());
 }
@@ -358,6 +368,164 @@ TEST(HelpersTest, FidlToDataElementSequenceTest) {
 
   fbredr::DataElement data_element = fbredr::DataElement::WithSequence(std::move(moved));
   std::optional<bt::sdp::DataElement> result = FidlToDataElement(data_element);
+
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(bt::sdp::DataElement::Type::kSequence, result->type());
+  EXPECT_EQ(bt::sdp::DataElement::Size::kNextOne, result->size());
+
+  std::optional<std::vector<bt::sdp::DataElement>> actual =
+      result->Get<std::vector<bt::sdp::DataElement>>();
+  EXPECT_TRUE(actual);
+
+  for (int8_t i = 0; i < size; i++) {
+    EXPECT_EQ(expected[i].Get<int16_t>(), actual.value()[i].Get<int16_t>());
+  }
+}
+
+template <typename T>
+void NewFidlToDataElementIntegerTest(
+    const std::function<fuchsia_bluetooth_bredr::DataElement(T)>& func,
+    bt::sdp::DataElement::Type type) {
+  fuchsia_bluetooth_bredr::DataElement data_element = func(std::numeric_limits<T>::max());
+  std::optional<bt::sdp::DataElement> result = NewFidlToDataElement(data_element);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(type, result->type());
+  EXPECT_EQ(std::numeric_limits<T>::max(), result->Get<T>());
+
+  // result->size() returns an enum member of DataElement::Size indicating the number of bytes
+  uint8_t exponent = static_cast<uint8_t>(result->size());
+  EXPECT_EQ(sizeof(T), std::pow(2, exponent));
+}
+
+TEST(HelpersTest, NewFidlToDataElementInt8Test) {
+  NewFidlToDataElementIntegerTest(std::function(fuchsia_bluetooth_bredr::DataElement::WithInt8),
+                                  bt::sdp::DataElement::Type::kSignedInt);
+}
+
+TEST(HelpersTest, NewFidlToDataElementInt16Test) {
+  NewFidlToDataElementIntegerTest(std::function(fuchsia_bluetooth_bredr::DataElement::WithInt16),
+                                  bt::sdp::DataElement::Type::kSignedInt);
+}
+
+TEST(HelpersTest, NewFidlToDataElementInt32Test) {
+  NewFidlToDataElementIntegerTest(std::function(fuchsia_bluetooth_bredr::DataElement::WithInt32),
+                                  bt::sdp::DataElement::Type::kSignedInt);
+}
+
+TEST(HelpersTest, NewFidlToDataElementInt64Test) {
+  NewFidlToDataElementIntegerTest(std::function(fuchsia_bluetooth_bredr::DataElement::WithInt64),
+                                  bt::sdp::DataElement::Type::kSignedInt);
+}
+
+TEST(HelpersTest, NewFidlToDataElementUint8Test) {
+  NewFidlToDataElementIntegerTest(std::function(fuchsia_bluetooth_bredr::DataElement::WithUint8),
+                                  bt::sdp::DataElement::Type::kUnsignedInt);
+}
+
+TEST(HelpersTest, NewFidlToDataElementUint16Test) {
+  NewFidlToDataElementIntegerTest(std::function(fuchsia_bluetooth_bredr::DataElement::WithUint16),
+                                  bt::sdp::DataElement::Type::kUnsignedInt);
+}
+
+TEST(HelpersTest, NewFidlToDataElementUint32Test) {
+  NewFidlToDataElementIntegerTest(std::function(fuchsia_bluetooth_bredr::DataElement::WithUint32),
+                                  bt::sdp::DataElement::Type::kUnsignedInt);
+}
+
+TEST(HelpersTest, NewFidlToDataElementUint64Test) {
+  NewFidlToDataElementIntegerTest(std::function(fuchsia_bluetooth_bredr::DataElement::WithUint64),
+                                  bt::sdp::DataElement::Type::kUnsignedInt);
+}
+
+TEST(HelpersTest, NewFidlToDataElementEmptyStringTest) {
+  std::vector<uint8_t> data;
+  ASSERT_EQ(0u, data.size());
+
+  fuchsia_bluetooth_bredr::DataElement data_element =
+      fuchsia_bluetooth_bredr::DataElement::WithStr(std::move(data));
+  std::optional<bt::sdp::DataElement> result = NewFidlToDataElement(data_element);
+
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(bt::sdp::DataElement::Type::kString, result->type());
+  EXPECT_EQ("", result->Get<std::string>());
+  EXPECT_EQ(bt::sdp::DataElement::Size::kNextOne, result->size());
+}
+
+TEST(HelpersTest, NewFidlToDataElementStringTest) {
+  std::string expected_str = "foobarbaz";
+  std::vector<uint8_t> data(expected_str.size(), 0);
+  std::memcpy(data.data(), expected_str.data(), expected_str.size());
+
+  fuchsia_bluetooth_bredr::DataElement data_element =
+      fuchsia_bluetooth_bredr::DataElement::WithStr(std::move(data));
+  std::optional<bt::sdp::DataElement> result = NewFidlToDataElement(data_element);
+
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(bt::sdp::DataElement::Type::kString, result->type());
+  EXPECT_EQ(expected_str, result->Get<std::string>());
+  EXPECT_EQ(bt::sdp::DataElement::Size::kNextOne, result->size());
+}
+
+TEST(HelpersTest, NewFidlToDataElementUrlTest) {
+  std::string url = "http://www.google.com";
+  std::string moved = url;
+  fuchsia_bluetooth_bredr::DataElement data_element =
+      fuchsia_bluetooth_bredr::DataElement::WithUrl(std::move(moved));
+  std::optional<bt::sdp::DataElement> result = NewFidlToDataElement(data_element);
+
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(bt::sdp::DataElement::Type::kUrl, result->type());
+  EXPECT_EQ(url, result->GetUrl());
+  EXPECT_EQ(bt::sdp::DataElement::Size::kNextOne, result->size());
+}
+
+TEST(HelpersTest, NewFidlToDataElementBooleanTest) {
+  bool expected = true;
+  bool moved = expected;
+  fuchsia_bluetooth_bredr::DataElement data_element =
+      fuchsia_bluetooth_bredr::DataElement::WithB(std::move(moved));
+  std::optional<bt::sdp::DataElement> result = NewFidlToDataElement(data_element);
+
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(bt::sdp::DataElement::Type::kBoolean, result->type());
+  EXPECT_EQ(expected, result->Get<bool>());
+  EXPECT_EQ(bt::sdp::DataElement::Size::kOneByte, result->size());
+}
+
+TEST(HelpersTest, NewFidlToDataElementUuidTest) {
+  fuchsia_bluetooth::Uuid uuid;
+  uuid.value().fill(123);
+
+  fuchsia_bluetooth_bredr::DataElement data_element =
+      fuchsia_bluetooth_bredr::DataElement::WithUuid(std::move(uuid));
+  std::optional<bt::sdp::DataElement> result = NewFidlToDataElement(data_element);
+
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(bt::sdp::DataElement::Type::kUuid, result->type());
+  EXPECT_EQ(bt::sdp::DataElement::Size::kSixteenBytes, result->size());
+
+  bt::DynamicByteBuffer bytes(16);
+  bytes.Fill(123);
+
+  bt::UUID expected;
+  ASSERT_TRUE(bt::UUID::FromBytes(bytes, &expected));
+  EXPECT_EQ(expected, result->Get<bt::UUID>());
+}
+
+TEST(HelpersTest, NewFidlToDataElementSequenceTest) {
+  int8_t size = 3;
+  std::vector<fidl::Box<::fuchsia_bluetooth_bredr::DataElement>> moved;
+  std::vector<bt::sdp::DataElement> expected;
+
+  for (int16_t i = 0; i < size; i++) {
+    expected.emplace_back(i);
+    moved.push_back(std::make_unique<fuchsia_bluetooth_bredr::DataElement>(
+        fuchsia_bluetooth_bredr::DataElement::WithInt16(std::move(i))));
+  }
+
+  fuchsia_bluetooth_bredr::DataElement data_element =
+      fuchsia_bluetooth_bredr::DataElement::WithSequence(std::move(moved));
+  std::optional<bt::sdp::DataElement> result = NewFidlToDataElement(data_element);
 
   EXPECT_TRUE(result.has_value());
   EXPECT_EQ(bt::sdp::DataElement::Type::kSequence, result->type());
