@@ -230,4 +230,11 @@ TEST(ElfldltlDiagnosticsTests, ExpectedErrorList) {
   expected.FormatError("def ", 456);
 }
 
+TEST(ElfldltlDiagnosticsTests, OutOfMemory) {
+  {
+    ExpectedSingleError expected("cannot allocate ", 723, " bytes for ", "test");
+    expected.OutOfMemory("test", 723);
+  }
+}
+
 }  // namespace

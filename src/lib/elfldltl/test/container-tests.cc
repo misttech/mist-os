@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/alloc-checker-container.h>
 #include <lib/elfldltl/container.h>
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/preallocated-vector.h>
@@ -12,6 +13,7 @@
 #include <array>
 #include <string_view>
 
+#include <fbl/vector.h>
 #include <gtest/gtest.h>
 
 namespace {
@@ -409,6 +411,56 @@ TEST(ElfldltlContainerTests, PreallocatedVectorDynamicExtent) {
     ExpectedSingleError expected("error", ": maximum", 5, " < requested", 6);
     vec.emplace_back(expected, "error", 1);
   }
+}
+
+TEST(ElfldltlAllocCheckerContainerTests, Basic) {
+  std::vector<std::string> errors;
+  auto diag = elfldltl::CollectStringsDiagnostics(errors);
+
+  elfldltl::AllocCheckerContainer<fbl::Vector>::Container<int> list;
+
+  EXPECT_TRUE(list.push_back(diag, ""sv, 1));
+  EXPECT_TRUE(list.push_back(diag, ""sv, 3));
+
+  EXPECT_TRUE(list.insert(diag, ""sv, 1, 2));
+  EXPECT_TRUE(list.insert(diag, ""sv, 0, 0));
+
+  auto expected = {0, 1, 2, 3};
+  EXPECT_TRUE(std::equal(list.begin(), list.end(), expected.begin()));
+  EXPECT_EQ(diag.errors() + diag.warnings(), 0u);
+}
+
+class PartiallyFailingAllocatorTraits : public fbl::DefaultAllocatorTraits {
+ public:
+  static void* Allocate(size_t size) {
+    if (size <= failure_threshold_) {
+      return DefaultAllocatorTraits::Allocate(size);
+    }
+    return nullptr;
+  }
+
+  // Fail all allocations exceeding size "s".
+  static void SetFailureThreshold(size_t s) { failure_threshold_ = s; }
+
+ private:
+  static size_t failure_threshold_;
+};
+
+size_t PartiallyFailingAllocatorTraits::failure_threshold_;
+
+TEST(ElfldltlAllocCheckerContainerTests, FailedAllocation) {
+  std::vector<std::string> errors;
+  auto diag = elfldltl::CollectStringsDiagnostics(errors);
+
+  PartiallyFailingAllocatorTraits::SetFailureThreshold(1 * sizeof(int));
+  elfldltl::AllocCheckerContainer<fbl::Vector, PartiallyFailingAllocatorTraits>::Container<int>
+      list;
+  ASSERT_TRUE(list.reserve(diag, ""sv, 1));
+
+  EXPECT_TRUE(list.push_back(diag, ""sv, 1));
+
+  ExpectedSingleError error("cannot allocate ", 4, " bytes for ", "list");
+  list.push_back(error, "list"sv, 2);
 }
 
 }  // namespace

@@ -102,6 +102,12 @@ namespace elfldltl {
 //
 //    MissingDependency is used when a DT_NEEDED dependency cannot be found.
 //
+// * `bool OutOfMemory(std::string_view error, size_t bytes)`
+//
+//    OutofMemory is used when a memory allocation failure occurs. In contrast
+//    to a ResourceLimit error, an OutOfMemory error arises from memory pressure
+//    on the system instead of a exceeding a predefined fixed limit capacity.
+//
 // * `bool SystemError(std::string_view error, ...)`
 //
 //    SystemError is used when the system cannot fulfill an otherwise valid
@@ -301,6 +307,10 @@ class Diagnostics {
 
   constexpr bool MissingDependency(std::string_view soname) {
     return SystemError("cannot open dependency: ", soname);
+  }
+
+  constexpr bool OutOfMemory(std::string_view error, size_t bytes) {
+    return SystemError("cannot allocate ", bytes, " bytes for ", error);
   }
 
  private:
