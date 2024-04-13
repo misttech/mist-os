@@ -41,6 +41,7 @@ type Binary struct {
 	LlvmProfdata string `json:"llvm_profdata"`
 	LlvmCxxFilt  string `json:"llvm_cxxfilt"`
 	Fvm          string `json:"fvm"`
+	ZbiHostTool  string `json:"zbi_host_tool"`
 }
 
 type Function struct {
@@ -58,7 +59,6 @@ type TestInfo struct {
 	Name       string `json:"name"`
 	ZbiImage   string `json:"zbi_image"`
 	BlockImage string `json:"block_image"`
-	SshKeyFile string `json:"ssh_key,omitempty"`
 }
 
 type Config struct {
@@ -122,7 +122,22 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	i := distro.CreateContext(ctx, device)
+
+	runnerCtx := context.Background()
+	ffxInstance, err := ffxutil.NewFFXInstance(runnerCtx, config.Bin.Ffx, "", os.Environ(), defaultNodename, "", outDir)
+	if err != nil {
+		t.Fatalf("Cannot create Ffx instance. Reason: %s", err)
+	}
+
+	hostPathAuthorizedKeys, err := ffxInstance.GetSshAuthorizedKeys(ctx)
+	if err != nil {
+		t.Fatalf("Cannot get authorized key path. Reason: %s", err)
+	}
+	hostPathSshKey, err := ffxInstance.GetSshPrivateKey(ctx)
+	if err != nil {
+		t.Fatalf("Cannot get private key path. Reason: %s", err)
+	}
+	i := distro.CreateContextWithAuthorizedKeys(ctx, device, config.Bin.ZbiHostTool, hostPathAuthorizedKeys)
 	i.Start()
 	i.WaitForLogMessage("initializing platform")
 	// Component manager starts up.
@@ -153,8 +168,8 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 	var address net.IPAddr = ipv6
 
 	t.Log("Establishing SSH Session.")
-	runnerCtx := context.Background()
-	sshRunner, err = testrunner.NewFuchsiaSSHTester(runnerCtx, address, config.Test.SshKeyFile, outDir, "")
+
+	sshRunner, err = testrunner.NewFuchsiaSSHTester(runnerCtx, address, hostPathSshKey, outDir, "")
 	if err != nil {
 		t.Fatalf("Error initializing Fuchsia SSH Test. Reason: %s", err)
 	}
@@ -167,11 +182,6 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 	// experiment level on the coverage builders, the level should be updated
 	// here as well.
 	ffxExperimentLevel := 1
-
-	ffxInstance, err := ffxutil.NewFFXInstance(runnerCtx, config.Bin.Ffx, "", os.Environ(), defaultNodename, config.Test.SshKeyFile, outDir)
-	if err != nil {
-		t.Fatalf("Cannot create Ffx instance. Reason: %s", err)
-	}
 
 	ffxRunner, err := testrunner.NewFFXTester(runnerCtx, ffxInstance, sshRunner, outDir, ffxExperimentLevel)
 	if err != nil {

@@ -45,9 +45,7 @@ host_test_data("fvm") {
   deps = [ "//src/storage/bin/fvm" ]
 }
 
-host_test_data("ssh_key") {
-  sources = [
-    "//.ssh/pkey",
-    "//.ssh/pkey.pub",
-  ]
+host_test_data("zbi") {
+  sources = [ "$host_out_dir/zbi" ]
+  deps = [ "//zircon/tools/zbi" ]
 }

@@ -37,6 +37,20 @@ func UnpackFrom(t *testing.T, path string, distroParams emulator.DistributionPar
 }
 
 // Creates reimplements emulator.Distribution.
+func (d *Distribution) CreateContextWithAuthorizedKeys(ctx context.Context, fvd *fvdpb.VirtualDevice, hostPathZbiBinary, hostPathAuthorizedKeys string) *Instance {
+	i, err := d.d.CreateContextWithAuthorizedKeys(ctx, fvd, hostPathZbiBinary, hostPathAuthorizedKeys)
+	if err != nil {
+		d.t.Fatal(err)
+	}
+	d.t.Cleanup(func() {
+		if err := d.d.Delete(); err != nil {
+			d.t.Error(err)
+		}
+	})
+	return &Instance{i, d.t}
+}
+
+// Creates reimplements emulator.Distribution.
 func (d *Distribution) CreateContext(ctx context.Context, fvd *fvdpb.VirtualDevice) *Instance {
 	i, err := d.d.CreateContext(ctx, fvd)
 	if err != nil {

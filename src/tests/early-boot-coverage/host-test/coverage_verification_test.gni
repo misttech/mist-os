@@ -113,6 +113,7 @@ template("coverage_verification_test") {
       llvm_cxxfilt = rebase_path("${clang_prefix}/llvm-cxxfilt", root_build_dir)
       fvm = rebase_path(fvm_host_tool, root_build_dir)
       ffx = rebase_path("${host_tools_dir}/ffx", root_build_dir)
+      zbi_host_tool = rebase_path("${host_out_dir}/zbi", root_build_dir)
     }
 
     # Test specific artifacts.
@@ -121,7 +122,6 @@ template("coverage_verification_test") {
       name = invoker.test_uri
       zbi_image = zbi_name
       block_image = block_image
-      ssh_key = rebase_path("//.ssh/pkey", rebase_path(root_build_dir))
     }
 
     # Represents the validation to be performed on the coverage data.
@@ -161,7 +161,7 @@ template("coverage_verification_test") {
                     "//src/developer/ffx/plugins/test:ffx_test_tool_test_data",
                     "//src/tests/early-boot-coverage/host-test:coverage_tools",
                     "//src/tests/early-boot-coverage/host-test:fvm",
-                    "//src/tests/early-boot-coverage/host-test:ssh_key",
+                    "//src/tests/early-boot-coverage/host-test:zbi",
                   ] + extra_deps
     args = [
       "-config",

@@ -15,13 +15,21 @@
                 "llvm_cxxfilt": {
                     "type": "string"
                 },
+                "ffx": {
+                    "type": "string"
+                },
                 "fvm": {
+                    "type": "string"
+                },
+                "zbi_host_tool": {
                     "type": "string"
                 }
             },
             "required": [
                 "llvm_cov",
-                "llvm_profdata"
+                "llvm_profdata",
+                "ffx",
+                "zbi_host_tool"
             ]
         },
         "test": {
@@ -41,10 +49,6 @@
                 "block_image": {
                     "type": "string",
                     "description": "Block image to back a drive.(E.g. FVM, FXFS, etc)"
-                },
-                "ssh_key": {
-                    "type": "string",
-                    "description": "Path to ssh key file to be used for ffx."
                 }
             },
             "required": [
