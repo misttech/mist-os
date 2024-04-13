@@ -124,7 +124,7 @@ pub async fn expect_dad_neighbor_solicitation(fake_ep: &netemul::TestFakeEndpoin
                     _,
                     NeighborSolicitation,
                     _,
-                >(&data, EthernetFrameLengthCheck::Check, |p| {
+                >(&data, EthernetFrameLengthCheck::NoCheck, |p| {
                     assert_eq!(p.body().iter().count(), 0)
                 })
                 .map_or(

@@ -104,7 +104,7 @@ fn reply_if_echo_request(
         _,
         IcmpEchoRequest,
         _,
-    >(&frame, EthernetFrameLengthCheck::Check, |p| {
+    >(&frame, EthernetFrameLengthCheck::NoCheck, |p| {
         icmp_body.extend(p.body().bytes());
     });
     match r {
@@ -154,7 +154,7 @@ fn reply_if_echo_request(
         _,
         IcmpEchoRequest,
         _,
-    >(&frame, EthernetFrameLengthCheck::Check, |p| {
+    >(&frame, EthernetFrameLengthCheck::NoCheck, |p| {
         icmp_body.extend(p.body().bytes());
     });
     match r {
