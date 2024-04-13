@@ -23,6 +23,7 @@
 #include "src/media/audio/services/device_registry/common_unittest.h"
 #include "src/media/audio/services/device_registry/device_unittest.h"
 #include "src/media/audio/services/device_registry/logging.h"
+#include "src/media/audio/services/device_registry/signal_processing_utils_unittest.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_composite.h"
 #include "src/media/audio/services/device_registry/testing/fake_composite_ring_buffer.h"
@@ -1549,80 +1550,66 @@ TEST_F(CompositeTest, GetElements) {
   ASSERT_TRUE(device->info().has_value());
   ASSERT_TRUE(device->info()->signal_processing_elements().has_value());
   auto& elements = device->info()->signal_processing_elements();
-  ASSERT_EQ(elements->size(), 4u);
+  ASSERT_TRUE(elements.has_value());
+  ASSERT_EQ(elements->size(), FakeComposite::kElements.size());
 
-  ASSERT_TRUE(elements->at(0).id().has_value());
+  // Get all the `has_value` checks done in automated fashion upfront.
+  for (const auto& element : *elements) {
+    ASSERT_TRUE(element.id().has_value());
+    ASSERT_TRUE(elements->at(0).type().has_value());
+    ASSERT_TRUE(element.description().has_value());
+    ASSERT_TRUE(element.can_disable().has_value());
+    if (element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint) {
+      ASSERT_TRUE(element.type_specific().has_value());
+      ASSERT_TRUE(element.type_specific()->endpoint().has_value());
+      ASSERT_TRUE(element.type_specific()->endpoint()->type().has_value());
+      ASSERT_TRUE(element.type_specific()->endpoint()->plug_detect_capabilities().has_value());
+    }
+  }
+
   EXPECT_EQ(elements->at(0).id(), FakeComposite::kSourceDaiElementId);
-  ASSERT_TRUE(elements->at(1).id().has_value());
   EXPECT_EQ(elements->at(1).id(), FakeComposite::kDestDaiElementId);
-  ASSERT_TRUE(elements->at(2).id().has_value());
-  EXPECT_EQ(elements->at(2).id(), FakeComposite::kSourceRbElementId);
-  ASSERT_TRUE(elements->at(3).id().has_value());
-  EXPECT_EQ(elements->at(3).id(), FakeComposite::kDestRbElementId);
-
-  ASSERT_TRUE(elements->at(0).type().has_value());
   EXPECT_EQ(elements->at(0).type(),
             fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
-  ASSERT_TRUE(elements->at(1).type().has_value());
   EXPECT_EQ(elements->at(1).type(),
             fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
-  ASSERT_TRUE(elements->at(2).type().has_value());
-  EXPECT_EQ(elements->at(2).type(),
-            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
-  ASSERT_TRUE(elements->at(3).type().has_value());
-  EXPECT_EQ(elements->at(3).type(),
-            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
-
-  ASSERT_TRUE(elements->at(0).type_specific().has_value());
-  ASSERT_TRUE(elements->at(0).type_specific()->endpoint().has_value());
-  ASSERT_TRUE(elements->at(0).type_specific()->endpoint()->type().has_value());
+  EXPECT_FALSE(elements->at(0).can_disable().value());
+  EXPECT_FALSE(elements->at(1).can_disable().value());
+  EXPECT_EQ(*elements->at(0).description(), *FakeComposite::kSourceDaiElement.description());
+  EXPECT_EQ(*elements->at(1).description(), *FakeComposite::kDestDaiElement.description());
   EXPECT_EQ(*elements->at(0).type_specific()->endpoint()->type(),
             fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect);
-  ASSERT_TRUE(elements->at(0).type_specific()->endpoint()->plug_detect_capabilities().has_value());
-  EXPECT_EQ(elements->at(0).type_specific()->endpoint()->plug_detect_capabilities(),
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify);
-  ASSERT_TRUE(elements->at(1).type_specific().has_value());
-  ASSERT_TRUE(elements->at(1).type_specific()->endpoint().has_value());
-  ASSERT_TRUE(elements->at(1).type_specific()->endpoint()->type().has_value());
   EXPECT_EQ(*elements->at(1).type_specific()->endpoint()->type(),
             fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect);
-  ASSERT_TRUE(elements->at(1).type_specific()->endpoint()->plug_detect_capabilities().has_value());
+  EXPECT_EQ(elements->at(0).type_specific()->endpoint()->plug_detect_capabilities(),
+            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify);
   EXPECT_EQ(elements->at(1).type_specific()->endpoint()->plug_detect_capabilities(),
             fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify);
-  ASSERT_TRUE(elements->at(2).type_specific().has_value());
-  ASSERT_TRUE(elements->at(2).type_specific()->endpoint().has_value());
-  ASSERT_TRUE(elements->at(2).type_specific()->endpoint()->type().has_value());
+
+  EXPECT_EQ(elements->at(2).id(), FakeComposite::kSourceRbElementId);
+  EXPECT_EQ(elements->at(3).id(), FakeComposite::kDestRbElementId);
+  EXPECT_EQ(elements->at(2).type(),
+            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
+  EXPECT_EQ(elements->at(3).type(),
+            fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
+  EXPECT_FALSE(elements->at(2).can_disable().value());
+  EXPECT_FALSE(elements->at(3).can_disable().value());
+  EXPECT_EQ(*elements->at(2).description(), *FakeComposite::kSourceRbElement.description());
+  EXPECT_EQ(*elements->at(3).description(), *FakeComposite::kDestRbElement.description());
   EXPECT_EQ(*elements->at(2).type_specific()->endpoint()->type(),
             fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer);
-  ASSERT_TRUE(elements->at(2).type_specific()->endpoint()->plug_detect_capabilities().has_value());
-  EXPECT_EQ(elements->at(2).type_specific()->endpoint()->plug_detect_capabilities(),
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired);
-  ASSERT_TRUE(elements->at(3).type_specific().has_value());
-  ASSERT_TRUE(elements->at(3).type_specific()->endpoint().has_value());
-  ASSERT_TRUE(elements->at(3).type_specific()->endpoint()->type().has_value());
   EXPECT_EQ(*elements->at(3).type_specific()->endpoint()->type(),
             fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer);
-  ASSERT_TRUE(elements->at(3).type_specific()->endpoint()->plug_detect_capabilities().has_value());
+  EXPECT_EQ(elements->at(2).type_specific()->endpoint()->plug_detect_capabilities(),
+            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired);
   EXPECT_EQ(elements->at(3).type_specific()->endpoint()->plug_detect_capabilities(),
             fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired);
 
-  ASSERT_TRUE(elements->at(0).description().has_value());
-  EXPECT_EQ(*elements->at(0).description(), *FakeComposite::kSourceDaiElement.description());
-  ASSERT_TRUE(elements->at(1).description().has_value());
-  EXPECT_EQ(*elements->at(1).description(), *FakeComposite::kDestDaiElement.description());
-  ASSERT_TRUE(elements->at(2).description().has_value());
-  EXPECT_EQ(*elements->at(2).description(), *FakeComposite::kSourceRbElement.description());
-  ASSERT_TRUE(elements->at(3).description().has_value());
-  EXPECT_EQ(*elements->at(3).description(), *FakeComposite::kDestRbElement.description());
-
-  ASSERT_TRUE(elements->at(0).can_disable());
-  EXPECT_FALSE(elements->at(0).can_disable().value());
-  ASSERT_TRUE(elements->at(1).can_disable());
-  EXPECT_FALSE(elements->at(1).can_disable().value());
-  ASSERT_TRUE(elements->at(2).can_disable());
-  EXPECT_FALSE(elements->at(2).can_disable().value());
-  ASSERT_TRUE(elements->at(3).can_disable());
-  EXPECT_FALSE(elements->at(3).can_disable().value());
+  EXPECT_EQ(elements->at(4).id(), FakeComposite::kMuteElementId);
+  EXPECT_EQ(elements->at(4).type(), fuchsia_hardware_audio_signalprocessing::ElementType::kMute);
+  EXPECT_TRUE(elements->at(4).can_disable().value());
+  EXPECT_EQ(*elements->at(4).description(), *FakeComposite::kMuteElement.description());
+  EXPECT_FALSE(elements->at(4).type_specific().has_value());
 }
 
 // Ensure that we captured the full contents of FakeComposite signalprocessing functionality,
@@ -1635,7 +1622,7 @@ TEST_F(CompositeTest, GetTopologies) {
   ASSERT_TRUE(device->info().has_value());
   ASSERT_TRUE(device->info()->signal_processing_elements().has_value());
   auto& topologies = device->info()->signal_processing_topologies();
-  ASSERT_EQ(topologies->size(), 3u);
+  ASSERT_EQ(topologies->size(), FakeComposite::kTopologies.size());
 
   ASSERT_TRUE(topologies->at(0).id().has_value());
   EXPECT_EQ(*topologies->at(0).id(), FakeComposite::kInputOnlyTopologyId);
@@ -1678,110 +1665,108 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_TRUE(AddObserver(device));
 
   const auto& states = notify()->element_states();
-  ASSERT_EQ(states.size(), 4u);
+  ASSERT_EQ(states.size(), FakeComposite::kElements.size());
 
-  ASSERT_TRUE(states.find(FakeComposite::kSourceDaiElementId)->second.type_specific().has_value());
-  const auto& ts_state1 = *states.find(FakeComposite::kSourceDaiElementId)->second.type_specific();
-  ASSERT_EQ(ts_state1.Which(),
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
-  ASSERT_TRUE(ts_state1.endpoint().has_value());
-  ASSERT_TRUE(ts_state1.endpoint()->plug_state().has_value());
-  ASSERT_TRUE(ts_state1.endpoint()->plug_state()->plugged().has_value());
-  EXPECT_TRUE(*ts_state1.endpoint()->plug_state()->plugged());
-  EXPECT_EQ(*ts_state1.endpoint()->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
-  ASSERT_TRUE(states.find(FakeComposite::kSourceDaiElementId)->second.enabled().has_value());
-  EXPECT_TRUE(*states.find(FakeComposite::kSourceDaiElementId)->second.enabled());
-  ASSERT_TRUE(states.find(FakeComposite::kSourceDaiElementId)->second.latency().has_value());
-  ASSERT_EQ(states.find(FakeComposite::kSourceDaiElementId)->second.latency()->Which(),
-            fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime);
-  ASSERT_TRUE(states.find(FakeComposite::kSourceDaiElementId)
-                  ->second.latency()
-                  ->latency_time()
-                  .has_value());
-  EXPECT_EQ(
-      states.find(FakeComposite::kSourceDaiElementId)->second.latency()->latency_time().value(),
-      FakeComposite::kSourceDaiElementLatency.latency_time().value());
-  ASSERT_TRUE(
-      states.find(FakeComposite::kSourceDaiElementId)->second.vendor_specific_data().has_value());
-  ASSERT_EQ(states.find(FakeComposite::kSourceDaiElementId)->second.vendor_specific_data()->size(),
-            8u);
-  EXPECT_EQ(states.find(FakeComposite::kSourceDaiElementId)->second.vendor_specific_data()->at(0),
-            1u);
-  EXPECT_EQ(states.find(FakeComposite::kSourceDaiElementId)->second.vendor_specific_data()->at(7),
-            8u);
+  auto state = states.find(FakeComposite::kSourceDaiElementId)->second;
+  ASSERT_TRUE(state.enabled().has_value());
+  ASSERT_TRUE(state.latency().has_value());
+  ASSERT_TRUE(state.type_specific().has_value());
+  ASSERT_TRUE(state.vendor_specific_data().has_value());
 
-  ASSERT_TRUE(states.find(FakeComposite::kDestDaiElementId)->second.type_specific().has_value());
-  const auto& ts_state2 = *states.find(FakeComposite::kDestDaiElementId)->second.type_specific();
-  ASSERT_EQ(ts_state2.Which(),
-            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
-  ASSERT_TRUE(ts_state2.endpoint().has_value());
-  ASSERT_TRUE(ts_state2.endpoint()->plug_state().has_value());
-  ASSERT_TRUE(ts_state2.endpoint()->plug_state()->plugged().has_value());
-  EXPECT_TRUE(*ts_state2.endpoint()->plug_state()->plugged());
-  EXPECT_EQ(*ts_state2.endpoint()->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
-  ASSERT_TRUE(states.find(FakeComposite::kDestDaiElementId)->second.enabled().has_value());
-  EXPECT_TRUE(*states.find(FakeComposite::kDestDaiElementId)->second.enabled());
-  ASSERT_TRUE(states.find(FakeComposite::kDestDaiElementId)->second.latency().has_value());
-  ASSERT_EQ(states.find(FakeComposite::kDestDaiElementId)->second.latency()->Which(),
+  EXPECT_TRUE(*state.enabled());
+  ASSERT_EQ(state.latency()->Which(),
             fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime);
-  ASSERT_TRUE(
-      states.find(FakeComposite::kDestDaiElementId)->second.latency()->latency_time().has_value());
-  EXPECT_EQ(states.find(FakeComposite::kDestDaiElementId)->second.latency()->latency_time().value(),
+  ASSERT_TRUE(state.latency()->latency_time().has_value());
+  EXPECT_EQ(state.latency()->latency_time().value(),
+            FakeComposite::kSourceDaiElementLatency.latency_time().value());
+  ASSERT_EQ(state.type_specific()->Which(),
+            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
+  const auto& endpt_state1 = state.type_specific()->endpoint();
+  ASSERT_TRUE(endpt_state1.has_value());
+  ASSERT_TRUE(endpt_state1->plug_state().has_value());
+  ASSERT_TRUE(endpt_state1->plug_state()->plugged().has_value());
+  EXPECT_TRUE(*endpt_state1->plug_state()->plugged());
+  EXPECT_EQ(*endpt_state1->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
+  ASSERT_EQ(state.vendor_specific_data()->size(), 8u);
+  EXPECT_EQ(state.vendor_specific_data()->at(0), 1u);
+  EXPECT_EQ(state.vendor_specific_data()->at(7), 8u);
+
+  state = states.find(FakeComposite::kDestDaiElementId)->second;
+  ASSERT_TRUE(state.enabled().has_value());
+  ASSERT_TRUE(state.latency().has_value());
+  ASSERT_TRUE(state.type_specific().has_value());
+  ASSERT_TRUE(state.vendor_specific_data().has_value());
+
+  EXPECT_TRUE(*state.enabled());
+  ASSERT_EQ(state.latency()->Which(),
+            fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime);
+  ASSERT_TRUE(state.latency()->latency_time().has_value());
+  EXPECT_EQ(state.latency()->latency_time().value(),
             FakeComposite::kDestDaiElementLatency.latency_time().value());
-  ASSERT_TRUE(
-      states.find(FakeComposite::kDestDaiElementId)->second.vendor_specific_data().has_value());
-  ASSERT_EQ(states.find(FakeComposite::kDestDaiElementId)->second.vendor_specific_data()->size(),
-            9u);
-  EXPECT_EQ(states.find(FakeComposite::kDestDaiElementId)->second.vendor_specific_data()->at(0),
-            8u);
-  EXPECT_EQ(states.find(FakeComposite::kDestDaiElementId)->second.vendor_specific_data()->at(8),
-            0u);
-
-  ASSERT_TRUE(states.find(FakeComposite::kSourceRbElementId)->second.type_specific().has_value());
-  const auto& ts_state3 = *states.find(FakeComposite::kSourceRbElementId)->second.type_specific();
-  ASSERT_EQ(ts_state3.Which(),
+  ASSERT_EQ(state.type_specific()->Which(),
             fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
-  ASSERT_TRUE(ts_state3.endpoint().has_value());
-  ASSERT_TRUE(ts_state3.endpoint()->plug_state().has_value());
-  ASSERT_TRUE(ts_state3.endpoint()->plug_state()->plugged().has_value());
-  EXPECT_TRUE(*ts_state3.endpoint()->plug_state()->plugged());
-  EXPECT_EQ(*ts_state3.endpoint()->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
-  ASSERT_TRUE(states.find(FakeComposite::kSourceRbElementId)->second.enabled().has_value());
-  EXPECT_TRUE(*states.find(FakeComposite::kSourceRbElementId)->second.enabled());
-  ASSERT_TRUE(states.find(FakeComposite::kSourceRbElementId)->second.latency().has_value());
-  ASSERT_EQ(states.find(FakeComposite::kSourceRbElementId)->second.latency()->Which(),
+  const auto& endpt_state2 = state.type_specific()->endpoint();
+  ASSERT_TRUE(endpt_state2.has_value());
+  ASSERT_TRUE(endpt_state2->plug_state().has_value());
+  ASSERT_TRUE(endpt_state2->plug_state()->plugged().has_value());
+  EXPECT_TRUE(*endpt_state2->plug_state()->plugged());
+  EXPECT_EQ(*endpt_state2->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
+  ASSERT_EQ(state.vendor_specific_data()->size(), 9u);
+  EXPECT_EQ(state.vendor_specific_data()->at(0), 8u);
+  EXPECT_EQ(state.vendor_specific_data()->at(8), 0u);
+
+  state = states.find(FakeComposite::kSourceRbElementId)->second;
+  ASSERT_TRUE(state.enabled().has_value());
+  ASSERT_TRUE(state.latency().has_value());
+  ASSERT_TRUE(state.type_specific().has_value());
+  EXPECT_FALSE(state.vendor_specific_data().has_value());
+
+  EXPECT_TRUE(*state.enabled());
+  ASSERT_EQ(state.latency()->Which(),
             fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyFrames);
   ASSERT_TRUE(states.find(FakeComposite::kSourceRbElementId)
                   ->second.latency()
                   ->latency_frames()
                   .has_value());
-  EXPECT_EQ(
-      states.find(FakeComposite::kSourceRbElementId)->second.latency()->latency_frames().value(),
-      FakeComposite::kSourceRbElementLatency.latency_frames().value());
-  EXPECT_FALSE(
-      states.find(FakeComposite::kSourceRbElementId)->second.vendor_specific_data().has_value());
-
-  ASSERT_TRUE(states.find(FakeComposite::kDestRbElementId)->second.type_specific().has_value());
-  const auto& ts_state4 = *states.find(FakeComposite::kSourceRbElementId)->second.type_specific();
-  ASSERT_EQ(ts_state4.Which(),
+  EXPECT_EQ(state.latency()->latency_frames().value(),
+            FakeComposite::kSourceRbElementLatency.latency_frames().value());
+  ASSERT_EQ(state.type_specific()->Which(),
             fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
-  ASSERT_TRUE(ts_state4.endpoint().has_value());
-  ASSERT_TRUE(ts_state4.endpoint()->plug_state().has_value());
-  ASSERT_TRUE(ts_state4.endpoint()->plug_state()->plugged().has_value());
-  EXPECT_TRUE(*ts_state4.endpoint()->plug_state()->plugged());
-  EXPECT_EQ(*ts_state4.endpoint()->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
-  ASSERT_TRUE(states.find(FakeComposite::kDestRbElementId)->second.enabled().has_value());
-  EXPECT_TRUE(*states.find(FakeComposite::kDestRbElementId)->second.enabled());
-  ASSERT_TRUE(states.find(FakeComposite::kDestRbElementId)->second.latency().has_value());
-  ASSERT_EQ(states.find(FakeComposite::kDestRbElementId)->second.latency()->Which(),
+  const auto& endpt_state3 = state.type_specific()->endpoint();
+  ASSERT_TRUE(endpt_state3.has_value());
+  ASSERT_TRUE(endpt_state3->plug_state().has_value());
+  ASSERT_TRUE(endpt_state3->plug_state()->plugged().has_value());
+  EXPECT_TRUE(*endpt_state3->plug_state()->plugged());
+  EXPECT_EQ(*endpt_state3->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
+
+  state = states.find(FakeComposite::kDestRbElementId)->second;
+  ASSERT_TRUE(state.enabled().has_value());
+  ASSERT_TRUE(state.latency().has_value());
+  ASSERT_TRUE(state.type_specific().has_value());
+  EXPECT_FALSE(state.vendor_specific_data().has_value());
+
+  EXPECT_TRUE(*state.enabled());
+  ASSERT_EQ(state.latency()->Which(),
             fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyFrames);
-  ASSERT_TRUE(
-      states.find(FakeComposite::kDestRbElementId)->second.latency()->latency_frames().has_value());
-  EXPECT_EQ(
-      states.find(FakeComposite::kDestRbElementId)->second.latency()->latency_frames().value(),
-      FakeComposite::kDestRbElementLatency.latency_frames().value());
-  EXPECT_FALSE(
-      states.find(FakeComposite::kDestRbElementId)->second.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.latency()->latency_frames().has_value());
+  EXPECT_EQ(state.latency()->latency_frames().value(),
+            FakeComposite::kDestRbElementLatency.latency_frames().value());
+  ASSERT_EQ(state.type_specific()->Which(),
+            fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
+  const auto& endpt_state4 = state.type_specific()->endpoint();
+  ASSERT_TRUE(endpt_state4.has_value());
+  ASSERT_TRUE(endpt_state4->plug_state().has_value());
+  ASSERT_TRUE(endpt_state4->plug_state()->plugged().has_value());
+  EXPECT_TRUE(*endpt_state4->plug_state()->plugged());
+  EXPECT_EQ(*endpt_state4->plug_state()->plug_state_time(), ZX_TIME_INFINITE_PAST);
+
+  state = states.find(FakeComposite::kMuteElementId)->second;
+  ASSERT_TRUE(state.enabled().has_value());
+  EXPECT_FALSE(state.latency().has_value());
+  EXPECT_FALSE(state.type_specific().has_value());
+  EXPECT_FALSE(state.vendor_specific_data().has_value());
+
+  EXPECT_FALSE(*state.enabled());
 }
 
 TEST_F(CompositeTest, WatchElementStateUpdate) {
@@ -1792,9 +1777,9 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
 
   auto& elements = *device->info()->signal_processing_elements();
   const auto& states = notify()->element_states();
-  ASSERT_EQ(states.size(), 4u);
+  ASSERT_EQ(states.size(), FakeComposite::kElements.size());
 
-  // Determine which states we can change.
+  // Determine which states we can inject change into.
   std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>
       element_states_to_inject;
   auto plug_change_time_to_inject = zx::clock::get_monotonic();
@@ -1803,6 +1788,19 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
     auto match_state = states.find(element_id);
     ASSERT_NE(match_state, states.end());
     auto state = match_state->second;
+
+    // Handle the Mute node
+    if (element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kMute &&
+        element.can_disable().value_or(false)) {
+      // By configuration, our Mute starts disabled (we enable it as our ElementState change).
+      ASSERT_TRUE(state.enabled().has_value());
+      EXPECT_FALSE(*state.enabled());
+      element_states_to_inject.insert_or_assign(
+          element_id, fuchsia_hardware_audio_signalprocessing::ElementState{{.enabled = true}});
+      continue;
+    }
+
+    // Then weed out any non-pluggable elements.
     if (element.type() != fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint ||
         !element.type_specific().has_value() || !element.type_specific()->endpoint().has_value() ||
         element.type_specific()->endpoint()->plug_detect_capabilities() !=
@@ -1851,30 +1849,39 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
   EXPECT_EQ(element_states_to_inject.size(), notify()->element_states().size());
   for (const auto& [element_id, state_received] : notify()->element_states()) {
     // Compare to actual static values we know.
-    ASSERT_TRUE(state_received.type_specific().has_value());
-    ASSERT_TRUE(state_received.type_specific()->endpoint().has_value());
-    ASSERT_TRUE(state_received.type_specific()->endpoint()->plug_state().has_value());
-    ASSERT_TRUE(state_received.type_specific()->endpoint()->plug_state()->plugged().has_value());
-    ASSERT_TRUE(
-        state_received.type_specific()->endpoint()->plug_state()->plug_state_time().has_value());
-    EXPECT_EQ(*state_received.type_specific()->endpoint()->plug_state()->plug_state_time(),
-              plug_change_time_to_inject.get());
+    if (element_id == FakeComposite::kMuteElementId) {
+      EXPECT_FALSE(state_received.type_specific().has_value());
+      ASSERT_TRUE(state_received.enabled().has_value());
+      EXPECT_FALSE(state_received.latency().has_value());
+      EXPECT_FALSE(state_received.vendor_specific_data().has_value());
 
-    ASSERT_TRUE(state_received.enabled().has_value());
-    EXPECT_EQ(state_received.enabled(), true);
+      EXPECT_EQ(state_received.enabled(), true);
+    } else {
+      ASSERT_TRUE(state_received.type_specific().has_value());
+      ASSERT_TRUE(state_received.type_specific()->endpoint().has_value());
+      ASSERT_TRUE(state_received.type_specific()->endpoint()->plug_state().has_value());
+      ASSERT_TRUE(state_received.type_specific()->endpoint()->plug_state()->plugged().has_value());
+      ASSERT_TRUE(
+          state_received.type_specific()->endpoint()->plug_state()->plug_state_time().has_value());
+      EXPECT_EQ(*state_received.type_specific()->endpoint()->plug_state()->plug_state_time(),
+                plug_change_time_to_inject.get());
 
-    ASSERT_TRUE(state_received.latency().has_value());
-    ASSERT_EQ(state_received.latency()->Which(),
-              fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime);
-    EXPECT_EQ(state_received.latency()->latency_time().value(), ZX_USEC(element_id));
+      ASSERT_TRUE(state_received.enabled().has_value());
+      EXPECT_EQ(state_received.enabled(), true);
 
-    ASSERT_TRUE(state_received.vendor_specific_data().has_value());
-    ASSERT_EQ(state_received.vendor_specific_data()->size(), 17u);
-    EXPECT_EQ(state_received.vendor_specific_data()->at(16), 'Z');
+      ASSERT_TRUE(state_received.latency().has_value());
+      ASSERT_EQ(state_received.latency()->Which(),
+                fuchsia_hardware_audio_signalprocessing::Latency::Tag::kLatencyTime);
+      EXPECT_EQ(state_received.latency()->latency_time().value(), ZX_USEC(element_id));
+
+      ASSERT_TRUE(state_received.vendor_specific_data().has_value());
+      ASSERT_EQ(state_received.vendor_specific_data()->size(), 17u);
+      EXPECT_EQ(state_received.vendor_specific_data()->at(16), 'Z');
+    }
 
     // Compare to what we injected.
     ASSERT_FALSE(element_states_to_inject.find(element_id) == element_states_to_inject.end())
-        << "Unexpected WatchElementState response received for element_id " << element_id;
+        << "WatchElementState response received for unknown element_id " << element_id;
     const auto& state_injected = element_states_to_inject.find(element_id)->second;
     EXPECT_EQ(state_received, state_injected);
   }
@@ -1912,6 +1919,59 @@ TEST_F(CompositeTest, WatchTopologyUpdate) {
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->topology_id().has_value());
   EXPECT_EQ(*notify()->topology_id(), FakeComposite::kInputOnlyTopologyId);
+}
+
+TEST_F(CompositeTest, SetTopology) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(SetControl(device));
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify()->topology_id().has_value());
+  TopologyId current_topology_id = *notify()->topology_id();
+
+  TopologyId topology_id_to_set = 0;
+  if (device->topology_ids().size() < 2) {
+    GTEST_SKIP() << "Not enough topologies to run this test case";
+  }
+  for (auto t : device->topology_ids()) {
+    if (t != current_topology_id) {
+      topology_id_to_set = t;
+      break;
+    }
+  }
+
+  EXPECT_EQ(device->SetTopology(topology_id_to_set), ZX_OK);
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify()->topology_id().has_value());
+  EXPECT_EQ(*notify()->topology_id(), topology_id_to_set);
+}
+
+TEST_F(CompositeTest, SetElementState) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(SetControl(device));
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify()->element_states().find(FakeComposite::kMuteElementId) !=
+              notify()->element_states().end());
+  notify()->clear_element_states();
+  fuchsia_hardware_audio_signalprocessing::ElementState state{{.enabled = true}};
+
+  EXPECT_EQ(device->SetElementState(FakeComposite::kMuteElementId, state), ZX_OK);
+
+  RunLoopUntilIdle();
+  ASSERT_FALSE(notify()->element_states().find(FakeComposite::kMuteElementId) ==
+               notify()->element_states().end());
+  auto new_state = notify()->element_states().find(FakeComposite::kMuteElementId)->second;
+  ASSERT_TRUE(new_state.enabled().has_value());
+  EXPECT_EQ(*new_state.enabled(), true);
+  EXPECT_FALSE(new_state.latency().has_value());
+  EXPECT_FALSE(new_state.type_specific().has_value());
+  EXPECT_FALSE(new_state.vendor_specific_data().has_value());
 }
 
 /////////////////////

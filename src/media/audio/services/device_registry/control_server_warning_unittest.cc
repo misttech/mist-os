@@ -679,9 +679,161 @@ TEST_F(ControlServerCodecWarningTest, CreateRingBufferWrongDeviceType) {
   EXPECT_EQ(ControlServer::count(), 1u);
 }
 
-// Add negative test cases for SetTopology and SetElementState (once implemented)
-//
-// TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
+// TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain),
+// including in the FakeCodec test fixture. Then add negative test cases for
+// GetTopologies/GetElements/WatchTopology/WatchElementState, as are in Composite, as well as
+// negative cases for SetTopology/SetElementState.
+
+// Verify WatchTopology if the driver has an error.
+
+// Verify WatchTopology if the driver does not support signalprocessing.
+TEST_F(ControlServerCodecWarningTest, WatchTopologyUnsupported) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()->WatchTopology().Then(
+      [&received_callback](fidl::Result<Control::WatchTopology>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_NOT_SUPPORTED);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  received_callback = false;
+
+  // After this failing call, the binding should not be usable.
+  control->client()->Reset().Then([&received_callback](fidl::Result<Control::Reset>& result) {
+    received_callback = true;
+    ASSERT_TRUE(result.is_error());
+    ASSERT_TRUE(result.error_value().is_framework_error());
+    EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_NOT_SUPPORTED);
+  });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(control->client().is_valid());
+}
+
+// Verify WatchElementState if the driver has an error.
+
+// Verify WatchElementState if the driver does not support signalprocessing.
+TEST_F(ControlServerCodecWarningTest, WatchElementStateUnsupported) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()
+      ->WatchElementState(fuchsia_audio_device::kDefaultDaiInterconnectElementId)
+      .Then([&received_callback](fidl::Result<Control::WatchElementState>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_NOT_SUPPORTED);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  received_callback = false;
+
+  // After this failing call, the binding should not be usable.
+  control->client()->Reset().Then([&received_callback](fidl::Result<Control::Reset>& result) {
+    received_callback = true;
+    ASSERT_TRUE(result.is_error());
+    ASSERT_TRUE(result.error_value().is_framework_error());
+    EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_NOT_SUPPORTED);
+  });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(control->client().is_valid());
+}
+
+// Verify SetTopology if the driver has an error.
+
+// Verify SetTopology if the driver does not support signalprocessing.
+TEST_F(ControlServerCodecWarningTest, SetTopologyUnsupported) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()->SetTopology(0).Then([&received_callback](
+                                             fidl::Result<Control::SetTopology>& result) {
+    received_callback = true;
+    ASSERT_TRUE(result.is_error());
+    ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();
+    EXPECT_EQ(result.error_value().domain_error(), ZX_ERR_NOT_SUPPORTED);
+  });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+}
+
+// Verify SetElementState if the driver has an error.
+
+// Verify SetElementState if the driver does not support signalprocessing.
+TEST_F(ControlServerCodecWarningTest, SetElementStateUnsupported) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()
+      ->SetElementState({fuchsia_audio_device::kDefaultDaiInterconnectElementId, {}})
+      .Then([&received_callback](fidl::Result<Control::SetElementState>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().framework_error();
+        EXPECT_EQ(result.error_value().domain_error(), ZX_ERR_NOT_SUPPORTED);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+}
 
 /////////////////////
 // Composite tests
@@ -1337,6 +1489,225 @@ TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferBadRingBuffer
 //     Note the disabled attempt (for StreamConfig below) to create this.
 // TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferHugeRingBufferMinBytes) {}
 
+// Verify WatchTopology if the driver has an error.
+
+TEST_F(ControlServerCompositeWarningTest, WatchTopologyWhilePending) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback1 = false, received_callback2 = false;
+
+  control->client()->WatchTopology().Then(
+      [&received_callback1](fidl::Result<Control::WatchTopology>& result) {
+        received_callback1 = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback1);
+  received_callback1 = false;
+
+  control->client()->WatchTopology().Then(
+      [&received_callback1](fidl::Result<Control::WatchTopology>& result) {
+        received_callback1 = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_BAD_STATE);
+        // EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(received_callback1);
+
+  control->client()->WatchTopology().Then(
+      [&received_callback2](fidl::Result<Control::WatchTopology>& result) {
+        received_callback2 = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_BAD_STATE);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback2);
+  // After a failing WatchTopology call, the binding should not be usable, so the previous
+  // WatchElementState will complete with a failure.
+  EXPECT_TRUE(received_callback1);
+}
+
+// Verify WatchElementState if the driver has an error.
+
+TEST_F(ControlServerCompositeWarningTest, WatchElementStateUnknownElementId) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto& elements_from_device = element_map(device);
+  ElementId unknown_element_id = 0;
+  while (true) {
+    if (elements_from_device.find(unknown_element_id) == elements_from_device.end()) {
+      break;
+    }
+    ++unknown_element_id;
+  }
+  auto received_callback = false;
+
+  control->client()
+      ->WatchElementState(unknown_element_id)
+      .Then([&received_callback](fidl::Result<Control::WatchElementState>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_INVALID_ARGS);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+
+  // After a failing WatchElementState call, the binding should not be usable.
+  control->client()->Reset().Then([&received_callback](fidl::Result<Control::Reset>& result) {
+    received_callback = true;
+    ASSERT_TRUE(result.is_error());
+    ASSERT_TRUE(result.error_value().is_framework_error());
+    EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS);
+  });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(control->client().is_valid());
+}
+
+TEST_F(ControlServerCompositeWarningTest, WatchElementStateWhilePending) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto& elements_from_device = element_map(device);
+
+  auto element_id = elements_from_device.begin()->first;
+  auto received_callback1 = false, received_callback2 = false;
+
+  control->client()
+      ->WatchElementState(element_id)
+      .Then([&received_callback1](fidl::Result<Control::WatchElementState>& result) {
+        received_callback1 = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback1);
+  received_callback1 = false;
+
+  control->client()
+      ->WatchElementState(element_id)
+      .Then([&received_callback1](fidl::Result<Control::WatchElementState>& result) {
+        received_callback1 = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_BAD_STATE) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(received_callback1);
+
+  control->client()
+      ->WatchElementState(element_id)
+      .Then([&received_callback2](fidl::Result<Control::WatchElementState>& result) {
+        received_callback2 = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_BAD_STATE) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback2);
+  // After a failing WatchElementState call, the binding should not be usable, so the previous
+  // WatchElementState will complete with a failure.
+  EXPECT_TRUE(received_callback1);
+  received_callback1 = false;
+
+  control->client()->Reset().Then([&received_callback1](fidl::Result<Control::Reset>& result) {
+    received_callback1 = true;
+    ASSERT_TRUE(result.is_error());
+    ASSERT_TRUE(result.error_value().is_framework_error()) << result.error_value();
+    EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_BAD_STATE)
+        << result.error_value().framework_error();
+  });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback1);
+  EXPECT_TRUE(control->client().is_valid());
+}
+
+// Verify SetTopology if the driver has an error.
+
+TEST_F(ControlServerCompositeWarningTest, SetTopologyUnknownId) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  const auto& topologies = topology_map(device);
+  TopologyId unknown_topology_id = 0;
+  bool found_an_unknown_topology_id = false;
+  do {
+    if (topologies.find(unknown_topology_id) == topologies.end()) {
+      found_an_unknown_topology_id = true;
+    } else {
+      ++unknown_topology_id;
+    }
+  } while (!found_an_unknown_topology_id);
+  auto received_callback = false;
+
+  control->client()
+      ->SetTopology(unknown_topology_id)
+      .Then([&received_callback](fidl::Result<Control::SetTopology>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().framework_error();
+        EXPECT_EQ(result.error_value().domain_error(), ZX_ERR_INVALID_ARGS);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+}
+
+// Verify SetTopology if the driver does not support signalprocessing.
+
+// Verify SetElementState if the driver has an error.
+
+// Verify SetElementState if the ElementId is unknown.
+
+// Verify SetElementState if the ElementState is invalid.
+//   (missing fields, wrong element type, internally inconsistent values, read-only)
+
 /////////////////////
 // StreamConfig tests
 //
@@ -1513,18 +1884,17 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferWhilePending) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
   auto registry = CreateTestRegistryServer();
+
   auto added_id = WaitForAddedDeviceTokenId(registry->client());
   auto control_creator = CreateTestControlCreatorServer();
   auto control_client = ConnectToControl(control_creator->client(), *added_id);
-  RunLoopUntilIdle();
 
+  RunLoopUntilIdle();
   ASSERT_EQ(ControlServer::count(), 1u);
   auto [ring_buffer_client_end1, ring_buffer_server_end1] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
   auto [ring_buffer_client_end2, ring_buffer_server_end2] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
-
-  bool received_callback_1 = false, received_callback_2 = false;
   auto options = fuchsia_audio_device::RingBufferOptions{{
       .format = fuchsia_audio::Format{{
           .sample_type = fuchsia_audio::SampleType::kInt16,
@@ -1533,6 +1903,8 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferWhilePending) {
       }},
       .ring_buffer_min_bytes = 8192,
   }};
+  bool received_callback_1 = false, received_callback_2 = false;
+
   control_client
       ->CreateRingBuffer({{
           .options = options,
@@ -1582,14 +1954,15 @@ TEST_F(ControlServerStreamConfigWarningTest, DISABLED_CreateRingBufferHugeRingBu
                                          fuchsia_audio_device::DeviceType::kOutput,
                                          DriverClient::WithStreamConfig(fake_driver->Enable())));
   fake_driver->AllocateRingBuffer(8192);
-  RunLoopUntilIdle();
 
+  RunLoopUntilIdle();
   auto registry = CreateTestRegistryServer();
+
   auto added_id = WaitForAddedDeviceTokenId(registry->client());
   auto control_creator = CreateTestControlCreatorServer();
   auto control_client = ConnectToControl(control_creator->client(), *added_id);
-  RunLoopUntilIdle();
 
+  RunLoopUntilIdle();
   ASSERT_EQ(ControlServer::count(), 1u);
   auto [ring_buffer_client_end, ring_buffer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
@@ -1665,6 +2038,7 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferMissingRingBufferSe
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
   auto registry = CreateTestRegistryServer();
+
   auto added_id = WaitForAddedDeviceTokenId(registry->client());
   auto control_creator = CreateTestControlCreatorServer();
   auto control_client = ConnectToControl(control_creator->client(), *added_id);
@@ -1702,6 +2076,7 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferBadRingBufferServer
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
   auto registry = CreateTestRegistryServer();
+
   auto added_id = WaitForAddedDeviceTokenId(registry->client());
   auto control_creator = CreateTestControlCreatorServer();
   auto control_client = ConnectToControl(control_creator->client(), *added_id);
@@ -1736,7 +2111,7 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferBadRingBufferServer
 }
 
 // TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
-//   unhealthy before SetGain. Expect Observer/Control/RingBuffer to drop, Reg/WatchRemoved.
+//   unhealthy before SetGain. Expect Control/Control/RingBuffer to drop, Reg/WatchRemoved.
 
 // TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
 //   unhealthy before CreateRingBuffer. Expect Obs/Ctl to drop, Reg/WatchRemoved.
@@ -1744,6 +2119,7 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferBadRingBufferServer
 TEST_F(ControlServerStreamConfigWarningTest, SetDaiFormatWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
   auto control = CreateTestControlServer(*adr_service_->devices().begin());
 
@@ -1783,6 +2159,7 @@ TEST_F(ControlServerStreamConfigWarningTest, SetDaiFormatWrongDeviceType) {
 TEST_F(ControlServerStreamConfigWarningTest, CodecStartWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
   auto control = CreateTestControlServer(*adr_service_->devices().begin());
 
@@ -1809,6 +2186,7 @@ TEST_F(ControlServerStreamConfigWarningTest, CodecStartWrongDeviceType) {
 TEST_F(ControlServerStreamConfigWarningTest, CodecStopWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
   auto control = CreateTestControlServer(*adr_service_->devices().begin());
 
@@ -1835,6 +2213,7 @@ TEST_F(ControlServerStreamConfigWarningTest, CodecStopWrongDeviceType) {
 TEST_F(ControlServerStreamConfigWarningTest, ResetWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
   auto control = CreateTestControlServer(*adr_service_->devices().begin());
 
@@ -1855,6 +2234,160 @@ TEST_F(ControlServerStreamConfigWarningTest, ResetWrongDeviceType) {
 
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// TODO(https://fxbug.dev/323270827): implement signalprocessing, including in the FakeStreamConfig
+// test fixture. Then add those types of negative test cases for
+// GetTopologies/GetElements/WatchTopology/WatchElementState, as are in Composite, as well as for
+// SetTopology/SetElementState.
+//
+// Verify WatchTopology if the driver does not support signalprocessing.
+TEST_F(ControlServerStreamConfigWarningTest, WatchTopologyUnsupported) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()->WatchTopology().Then(
+      [&received_callback](fidl::Result<Control::WatchTopology>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_NOT_SUPPORTED);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  received_callback = false;
+
+  // After a failing WatchTopology call, the binding should not be usable.
+  control->client()
+      ->SetGain({{fuchsia_audio_device::GainState{{.gain_db = 0}}}})
+      .Then([&received_callback](fidl::Result<Control::SetGain>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_framework_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_NOT_SUPPORTED)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(control->client().is_valid());
+}
+
+// Verify WatchElementState if the driver does not support signalprocessing.
+TEST_F(ControlServerStreamConfigWarningTest, WatchElementStateUnsupported) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()
+      ->WatchElementState(fuchsia_audio_device::kDefaultDaiInterconnectElementId)
+      .Then([&received_callback](fidl::Result<Control::WatchElementState>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        EXPECT_EQ(result.error_value().status(), ZX_ERR_NOT_SUPPORTED);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  received_callback = false;
+
+  // After a failing WatchElementState call, the binding should not be usable.
+  control->client()
+      ->SetGain({{fuchsia_audio_device::GainState{{.gain_db = 0}}}})
+      .Then([&received_callback](fidl::Result<Control::SetGain>& result) {
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_framework_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_NOT_SUPPORTED)
+            << result.error_value();
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(control->client().is_valid());
+}
+
+// Verify SetTopology if the driver does not support signalprocessing.
+TEST_F(ControlServerStreamConfigWarningTest, SetTopologyUnsupported) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()->SetTopology(0).Then([&received_callback](
+                                             fidl::Result<Control::SetTopology>& result) {
+    received_callback = true;
+    ASSERT_TRUE(result.is_error());
+    ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();
+    EXPECT_EQ(result.error_value().domain_error(), ZX_ERR_NOT_SUPPORTED);
+  });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+}
+
+// Verify SetElementState if the driver does not support signalprocessing.
+TEST_F(ControlServerStreamConfigWarningTest, SetElementStateUnsupported) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()
+      ->SetElementState({fuchsia_audio_device::kDefaultDaiInterconnectElementId, {}})
+      .Then([&received_callback](fidl::Result<Control::SetElementState>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().framework_error();
+        EXPECT_EQ(result.error_value().domain_error(), ZX_ERR_NOT_SUPPORTED);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
 }
 
 }  // namespace

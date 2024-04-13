@@ -345,10 +345,6 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveAddThenWatches) {
   EXPECT_NE(*first_added_id, *second_added_id);
 }
 
-// Add cases for info.signalprocessing_topologies and signalprocessing_elements (once implemented).
-//
-// TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
-
 // Client can open an Observer connection on an added Codec device.
 TEST_F(RegistryServerCodecTest, CreateObserver) {
   auto fake_driver = CreateFakeCodecOutput();
@@ -696,10 +692,6 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveAddThenWatches) {
   ASSERT_TRUE(second_added_id);
   EXPECT_NE(*first_added_id, *second_added_id);
 }
-
-// Add cases for info.signalprocessing_topologies and signalprocessing_elements (once implemented).
-//
-// TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
 
 // Client can open an Observer connection on an added Codec device.
 TEST_F(RegistryServerStreamConfigTest, CreateObserver) {

@@ -195,16 +195,20 @@ void FakeComposite::SetupElementsMap() {
                                                         .state = kDestRbElementInitState}});
   elements_.insert({kSourceRbElementId, FakeElementRecord{.element = kSourceRbElement,
                                                           .state = kSourceRbElementInitState}});
+  elements_.insert(
+      {kMuteElementId, FakeElementRecord{.element = kMuteElement, .state = kMuteElementInitState}});
 
   ASSERT_TRUE(elements_.at(kSourceDaiElementId).state_has_changed);
   ASSERT_TRUE(elements_.at(kDestDaiElementId).state_has_changed);
   ASSERT_TRUE(elements_.at(kDestRbElementId).state_has_changed);
   ASSERT_TRUE(elements_.at(kSourceRbElementId).state_has_changed);
+  ASSERT_TRUE(elements_.at(kMuteElementId).state_has_changed);
 
   ASSERT_FALSE(elements_.at(kSourceDaiElementId).watch_completer.has_value());
   ASSERT_FALSE(elements_.at(kDestDaiElementId).watch_completer.has_value());
   ASSERT_FALSE(elements_.at(kDestRbElementId).watch_completer.has_value());
   ASSERT_FALSE(elements_.at(kSourceRbElementId).watch_completer.has_value());
+  ASSERT_FALSE(elements_.at(kMuteElementId).watch_completer.has_value());
 }
 
 void FakeComposite::GetHealthState(GetHealthStateCompleter::Sync& completer) {

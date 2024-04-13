@@ -235,6 +235,12 @@ const fuchsia_hardware_audio_signalprocessing::Element FakeComposite::kDestRbEle
     .can_disable = false,
     .description = "Endpoint::RingBuffer destination element description",
 }};
+const fuchsia_hardware_audio_signalprocessing::Element FakeComposite::kMuteElement{{
+    .id = kMuteElementId,
+    .type = fuchsia_hardware_audio_signalprocessing::ElementType::kMute,
+    .can_disable = true,
+    .description = "Mute element description",
+}};
 
 // ElementStates - note that the two Dai endpoints have vendor_specific_data that can be queried.
 const fuchsia_hardware_audio_signalprocessing::Latency FakeComposite::kSourceDaiElementLatency =
@@ -294,6 +300,9 @@ const fuchsia_hardware_audio_signalprocessing::ElementState FakeComposite::kDest
     .enabled = true,
     .latency = kDestRbElementLatency,
 }};
+const fuchsia_hardware_audio_signalprocessing::ElementState FakeComposite::kMuteElementInitState{{
+    .enabled = false,
+}};
 
 // Element set
 const std::vector<fuchsia_hardware_audio_signalprocessing::Element> FakeComposite::kElements{{
@@ -301,6 +310,7 @@ const std::vector<fuchsia_hardware_audio_signalprocessing::Element> FakeComposit
     kDestDaiElement,
     kSourceRbElement,
     kDestRbElement,
+    kMuteElement,
 }};
 
 // Topologies and element paths
@@ -312,6 +322,14 @@ const fuchsia_hardware_audio_signalprocessing::EdgePair FakeComposite::kTopology
 }};
 const fuchsia_hardware_audio_signalprocessing::EdgePair FakeComposite::kTopologyOutputEdgePair{{
     .processing_element_id_from = kSourceRbElementId,
+    .processing_element_id_to = kDestDaiElementId,
+}};
+const fuchsia_hardware_audio_signalprocessing::EdgePair FakeComposite::kTopologyRbToMuteEdgePair{{
+    .processing_element_id_from = kSourceRbElementId,
+    .processing_element_id_to = kMuteElementId,
+}};
+const fuchsia_hardware_audio_signalprocessing::EdgePair FakeComposite::kTopologyMuteToDaiEdgePair{{
+    .processing_element_id_from = kMuteElementId,
     .processing_element_id_to = kDestDaiElementId,
 }};
 
@@ -335,12 +353,20 @@ const fuchsia_hardware_audio_signalprocessing::Topology FakeComposite::kOutputOn
         kTopologyOutputEdgePair,
     }},
 }};
+const fuchsia_hardware_audio_signalprocessing::Topology FakeComposite::kOutputWithMuteTopology{{
+    .id = kOutputWithMuteTopologyId,
+    .processing_elements_edge_pairs = {{
+        kTopologyRbToMuteEdgePair,
+        kTopologyMuteToDaiEdgePair,
+    }},
+}};
 
 // Topology set
 const std::vector<fuchsia_hardware_audio_signalprocessing::Topology> FakeComposite::kTopologies{{
     kInputOnlyTopology,
     kFullDuplexTopology,
     kOutputOnlyTopology,
+    kOutputWithMuteTopology,
 }};
 
 }  // namespace media_audio

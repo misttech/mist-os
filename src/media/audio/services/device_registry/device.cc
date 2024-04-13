@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 #include <string_view>
 
 #include "src/media/audio/lib/clock/real_clock.h"
@@ -32,6 +33,7 @@
 #include "src/media/audio/services/device_registry/observer_notify.h"
 #include "src/media/audio/services/device_registry/signal_processing_utils.h"
 #include "src/media/audio/services/device_registry/validate.h"
+#include "zircon/types.h"
 
 namespace media_audio {
 
@@ -207,7 +209,7 @@ void Device::OnRemoval() {
     --initialized_count_;
 
     DropControl();  // Probably unneeded (the Device is going away) but makes unwind "complete".
-    ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver=>DeviceIsRemoved";
+    ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => DeviceIsRemoved()" << token_id_ << ")";
     ForEachObserver([](auto obs) { obs->DeviceIsRemoved(); });  // Our control is also an observer.
   }
 
@@ -246,7 +248,7 @@ void Device::OnError(zx_status_t error) {
     --initialized_count_;
 
     DropControl();
-    ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver=>DeviceHasError";
+    ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => DeviceHasError";
     ForEachObserver([](auto obs) { obs->DeviceHasError(); });
   }
   ++unhealthy_count_;
@@ -1051,27 +1053,32 @@ void Device::RetrieveCurrentTopology() {
       .Then([this](fidl::Result<
                    fuchsia_hardware_audio_signalprocessing::SignalProcessing::WatchTopology>&
                        result) {
-        std::string context("signalprocessing::WatchTopology response");
+        TopologyId topology_id = result->topology_id();
+        std::string context("signalprocessing::WatchTopology response: topology_id ");
+        context.append(std::to_string(topology_id));
         if (LogResultFrameworkError(result, context.c_str())) {
           return;
         }
+        ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
 
-        TopologyId new_topology_id = result->topology_id();
-        auto match = sig_proc_topology_map_.find(new_topology_id);
-        if (match == sig_proc_topology_map_.end()) {
-          ADR_WARN_OBJECT() << context << ": topology_id " << new_topology_id << " not found";
+        // Either (a) sig_proc_topology_map_ is incorrect, or (b) the driver is poorly-behaved.
+        if (sig_proc_topology_map_.find(topology_id) == sig_proc_topology_map_.end()) {
+          FX_LOGS(ERROR) << context << ": not found";
           OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
 
         // Save the topology and notify Observers, but only if this is a change in topology.
-        if (!current_topology_id_.has_value() || *current_topology_id_ != new_topology_id) {
-          current_topology_id_ = new_topology_id;
-          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver=>TopologyChanged";
-          ForEachObserver([new_topology_id](auto obs) { obs->TopologyChanged(new_topology_id); });
+        if (!current_topology_id_.has_value() || *current_topology_id_ != topology_id) {
+          FX_LOGS(INFO) << "***** We believe that the topology_id changed from "
+                        << current_topology_id_.value_or(-1) << " to " << topology_id;
+          current_topology_id_ = topology_id;
+          ADR_LOG_OBJECT(kLogNotifyMethods)
+              << "ForEachObserver => TopologyChanged: " << topology_id;
+          ForEachObserver([topology_id](auto obs) { obs->TopologyChanged(topology_id); });
         }
 
-        // Register for any future change in topology.
+        // Register for any future change in topology, whether this was a change or not.
         RetrieveCurrentTopology();
       });
 }
@@ -1100,67 +1107,145 @@ void Device::RetrieveElementState(ElementId element_id) {
              element](fidl::Result<
                       fuchsia_hardware_audio_signalprocessing::SignalProcessing::WatchElementState>&
                           result) {
-        std::string context("signalprocessing::WatchElementState response");
+        std::string context("signalprocessing::WatchElementState response: element_id ");
+        context.append(std::to_string(element_id));
         if (LogResultFrameworkError(result, context.c_str())) {
-          return;
-        }
-
-        auto element_state = result->state();
-        if (!ValidateElementState(element_state, element)) {
-          OnError(ZX_ERR_INVALID_ARGS);
           return;
         }
         ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
 
-        // Save the state and notify Observers, but only if this is a change in element state.
-        auto element_record = sig_proc_element_map_.find(*element.id());
-        if (!element_record->second.state.has_value() ||
-            *element_record->second.state != element_state) {
-          element_record->second.state = element_state;
-          // Notify any Observers of this change in element state.
-          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver=>ElementStateChanged";
-          ForEachObserver([element_id = *element.id(), element_state](auto obs) {
-            obs->ElementStateChanged(element_id, element_state);
-          });
-        } else {
-          ADR_LOG_OBJECT(kLogNotifyMethods)
-              << "Not sending ElementStateChanged: state is unchanged.";
+        // Either (a) sig_proc_topology_map_.at(element_id).element is incorrect, or (b) the driver
+        // is behaving incorrectly.
+        auto element_state = result->state();
+        if (!ValidateElementState(element_state, element)) {
+          FX_LOGS(ERROR) << context << ": not found";
+          OnError(ZX_ERR_INVALID_ARGS);
+          return;
         }
 
-        // Register for any future change in element state.
+        // Save the state and notify Observers, but only if this is a change in element state.
+        auto element_record = sig_proc_element_map_.find(*element.id());
+        if (element_record->second.state.has_value() &&
+            *element_record->second.state == element_state) {
+          ADR_LOG_OBJECT(kLogNotifyMethods)
+              << "Not sending ElementStateChanged: state is unchanged.";
+        } else {
+          FX_LOGS(INFO) << "***** We believe that the state changed for element_id " << element_id;
+
+          element_record->second.state = element_state;
+          // Notify any Observers of this change in element state.
+          ADR_LOG_OBJECT(kLogNotifyMethods)
+              << "ForEachObserver => ElementStateChanged(" << element_id << ")";
+          ForEachObserver([element_id, element_state](auto obs) {
+            obs->ElementStateChanged(element_id, element_state);
+          });
+        }
+
+        // Register for any future change in element state, whether this was a change or not.
         RetrieveElementState(element_id);
       });
 }
 
-bool Device::SetTopology(uint64_t topology_id) {
+// If the method does not return ZX_OK, then the driver was not called.
+zx_status_t Device::SetTopology(uint64_t topology_id) {
   ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-  if (state_ == State::Error || !supports_signalprocessing()) {
-    return false;
+  if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return ZX_ERR_IO;
   }
-  if (!supports_signalprocessing()) {
-    return false;
-  }
-  FX_DCHECK(sig_proc_client_->is_valid());
 
-  if (sig_proc_topology_map_.find(topology_id) == sig_proc_topology_map_.end()) {
-    ADR_WARN_METHOD() << "invalid topology_id";
-    return false;
+  if (!supports_signalprocessing()) {
+    ADR_WARN_METHOD() << "device does not support signalprocessing";
+    return ZX_ERR_NOT_SUPPORTED;
   }
+
+  if (!GetControlNotify()) {
+    ADR_WARN_METHOD() << "Device must be controlled before this method can be called";
+    return ZX_ERR_ACCESS_DENIED;
+  }
+
+  FX_DCHECK(sig_proc_client_->is_valid());
+  if (sig_proc_topology_map_.find(topology_id) == sig_proc_topology_map_.end()) {
+    ADR_WARN_METHOD() << "invalid topology_id " << topology_id;
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // We don't check/prevent "no-change" here, since current_topology_id_ may not reflect in-flight
+  // updates. We update current_topology_id_ and call ObserverNotify::TopologyChanged (or
+  // not, if no change) at only one place: the WatchTopology response handler.
 
   (*sig_proc_client_)
       ->SetTopology(topology_id)
       .Then(
-          [this](
+          [this, topology_id](
               fidl::Result<fuchsia_hardware_audio_signalprocessing::SignalProcessing::SetTopology>&
                   result) {
-            if (LogResultError(result, "SigProc::SetTopology response")) {
+            std::string context("SigProc::SetTopology response: topology_id ");
+            context.append(std::to_string(topology_id));
+            if (LogResultError(result, context.c_str())) {
               return;
             }
-            ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << "SigProc::SetTopology response";
-            // We can expect our WatchTopology call to complete now.
+
+            ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
+            // Our hanging WatchTopology call will complete now, updating topology_id_ and calling
+            // ObserverNotify::TopologyChanged (or not, if no change).
           });
 
-  return true;
+  return ZX_OK;
+}
+
+// If the method does not return ZX_OK, then the driver was not called.
+zx_status_t Device::SetElementState(
+    ElementId element_id,
+    const fuchsia_hardware_audio_signalprocessing::ElementState& element_state) {
+  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
+
+  if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return ZX_ERR_IO;
+  }
+  if (!supports_signalprocessing()) {
+    ADR_WARN_METHOD() << "device does not support signalprocessing";
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  if (!GetControlNotify()) {
+    ADR_WARN_METHOD() << "Device must be controlled before this method can be called";
+    return ZX_ERR_ACCESS_DENIED;
+  }
+
+  FX_DCHECK(sig_proc_client_->is_valid());
+  if (sig_proc_element_map_.find(element_id) == sig_proc_element_map_.end()) {
+    ADR_WARN_METHOD() << "invalid element_id " << element_id;
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (!ValidateElementState(element_state, sig_proc_element_map_.at(element_id).element)) {
+    ADR_WARN_METHOD() << "invalid ElementState for element_id " << element_id;
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // We don't check/prevent "no-change" here, since sig_proc_element_map_ may not reflect in-flight
+  // updates. We update sig_proc_element_map_ and call ObserverNotify::ElementStateChanged (or
+  // not, if no change) at only one place: the WatchElementState response handler.
+
+  (*sig_proc_client_)
+      ->SetElementState({element_id, element_state})
+      .Then([this, element_id](
+                fidl::Result<
+                    fuchsia_hardware_audio_signalprocessing::SignalProcessing::SetElementState>&
+                    result) {
+        std::string context("SigProc::SetElementState response: element_id ");
+        context.append(std::to_string(element_id));
+        if (LogResultError(result, context.c_str())) {
+          return;
+        }
+
+        ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
+        // Our hanging WatchElementState call will complete now, updating our cached state and
+        // calling ObserverNotify::ElementStateChanged (or not, if no change).
+      });
+
+  return ZX_OK;
 }
 
 void Device::RetrieveCodecDaiFormatSets() {
@@ -1340,7 +1425,7 @@ void Device::RetrieveGainState() {
           OnInitializationResponse();
         } else {
           ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchGainState received update";
-          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver=>GainStateChanged";
+          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => GainStateChanged";
           ForEachObserver([gain_state = *gain_state_](auto obs) {
             obs->GainStateChanged({{
                 .gain_db = *gain_state.gain_db(),
@@ -1390,7 +1475,7 @@ void Device::RetrieveStreamPlugState() {
           OnInitializationResponse();
         } else {
           ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState received update";
-          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver=>PlugStateChanged";
+          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => PlugStateChanged";
           ForEachObserver([plug_state = *plug_state_](auto obs) {
             obs->PlugStateChanged(plug_state.plugged().value_or(true)
                                       ? fuchsia_audio_device::PlugState::kPlugged
@@ -1439,7 +1524,7 @@ void Device::RetrieveCodecPlugState() {
           OnInitializationResponse();
         } else {
           ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec::WatchPlugState received update";
-          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver=>PlugStateChanged";
+          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => PlugStateChanged";
           ForEachObserver([plug_state = *plug_state_](auto obs) {
             obs->PlugStateChanged(plug_state.plugged().value_or(true)
                                       ? fuchsia_audio_device::PlugState::kPlugged

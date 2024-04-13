@@ -63,9 +63,9 @@ inline constexpr bool kLogStreamConfigFidlCalls = false;
 inline constexpr bool kLogStreamConfigFidlResponses = false;
 inline constexpr bool kLogStreamConfigFidlResponseValues = false;
 
-inline constexpr bool kLogSignalProcessingFidlCalls = false;
-inline constexpr bool kLogSignalProcessingFidlResponses = false;
-inline constexpr bool kLogSignalProcessingFidlResponseValues = false;
+inline constexpr bool kLogSignalProcessingFidlCalls = true;
+inline constexpr bool kLogSignalProcessingFidlResponses = true;
+inline constexpr bool kLogSignalProcessingFidlResponseValues = true;
 
 inline constexpr bool kLogRingBufferState = false;
 inline constexpr bool kLogRingBufferMethods = false;

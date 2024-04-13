@@ -347,6 +347,26 @@ TEST_F(CodecWarningTest, CreateRingBufferWrongDeviceType) {
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
 
+// GetTopologies on error device
+// GetTopologies (unsupported by driver)
+
+// GetElements on error device
+// GetElements (unsupported by driver)
+
+// WatchTopology on error device
+// WatchTopology (unsupported by driver)
+
+// WatchElementState on error device
+// WatchElementState (unsupported by driver)
+
+// SetTopology on error device
+// SetTopology (unsupported by driver)
+// SetTopology without a Control
+
+// SetElementState on error device
+// SetElementState (unsupported by driver)
+// SetElementState without a Control
+
 ////////////////////
 // Composite tests
 //
@@ -700,28 +720,43 @@ TEST_F(CompositeWarningTest, CreateRingBufferUnsupportedFormat) {
 // TODO: negative WatchClockRecoveryPositionInfo cases?
 // Device with error
 
+////////////////////////////////////////////////////////
 // Signalprocessing test cases
 //
 // TODO: negative cases for GetTopologies?
-// Device with error
+// GetTopologies on error device
 
 // TODO: negative cases for GetElements?
-// Device with error
+// GetElements on error device
 
 // TODO: negative cases for WatchTopology?
-// Device with error
+// WatchTopology on error device
+// WatchTopology while pending
 
 // TODO: negative cases for WatchElementState
-// Device with error
-
-// TODO: negative cases for SetElementState
-// Device with error
-// SetElementState(no-change) should not generate a notification.
-// SetElementState without Control
+// WatchElementState on error device
+// WatchElementState with unknown element_id
+// WatchElementState while pending
 
 // TODO: negative cases for SetTopology
-// SetTopology(no-change) should not generate a notification.
+// SetTopology on error device
 // SetTopology without Control.
+// SetTopology with unknown topology_id
+// Try pipelining a bunch of these calls without waiting and see if errors occur
+
+// TODO: negative cases for SetElementState
+// SetElementState on error device
+// SetElementState without Control
+// SetElementState with unknown element_id
+// SetElementState with invalid state
+// SetElementState when the state can't be changed
+// Try pipelining a bunch of these calls without waiting and see if errors occur
+
+// Move these ideas to device_unittest.cc:
+// SetTopology(no-change) should not generate a notification.
+// SetElementState(no-change) should not generate a notification.
+// Eventually, develop a mechanism in FakeComposite to disable signalprocessing, and test the six
+// methods in that mode as well
 
 ////////////////////
 // StreamConfig tests
@@ -959,5 +994,23 @@ TEST_F(StreamConfigWarningTest, CreateRingBufferTwice) {
 //
 // GetDaiFormats for FakeDriver that fails the GetDaiFormats call
 // GetDaiFormats for FakeDriver that returns bad dai_format_sets
+
+// GetTopologies on error device
+// GetTopologies (unsupported by driver)
+
+// GetElements on error device
+// GetElements (unsupported by driver)
+
+// WatchTopology on error device
+// WatchTopology (unsupported by driver)
+
+// WatchElementState on error device
+// WatchElementState (unsupported by driver)
+
+// SetTopology on error device
+// SetTopology (unsupported by driver)
+
+// SetElementState on error device
+// SetElementState (unsupported by driver)
 
 }  // namespace media_audio

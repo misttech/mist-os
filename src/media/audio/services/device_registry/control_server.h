@@ -78,24 +78,19 @@ class ControlServer
   void CodecStart(CodecStartCompleter::Sync& completer) final;
   void CodecStop(CodecStopCompleter::Sync& completer) final;
 
-  // fuchsia.hardware.audio.signalprocessing support
+  // fuchsia.hardware.audio.signalprocessing.SignalProcessing support
   //
   void GetTopologies(GetTopologiesCompleter::Sync& completer) final;
   void GetElements(GetElementsCompleter::Sync& completer) final;
-  void WatchTopology(WatchTopologyCompleter::Sync& completer) final {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
-  }
+  void WatchTopology(WatchTopologyCompleter::Sync& completer) final;
   void WatchElementState(WatchElementStateRequest& request,
-                         WatchElementStateCompleter::Sync& completer) final {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
-  }
-  void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) final {
-    completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
-  }
+                         WatchElementStateCompleter::Sync& completer) final;
+  void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) final;
   void SetElementState(SetElementStateRequest& request,
-                       SetElementStateCompleter::Sync& completer) final {
-    completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
-  }
+                       SetElementStateCompleter::Sync& completer) final;
+
+  void MaybeCompleteWatchTopology();
+  void MaybeCompleteWatchElementState(ElementId element_id);
 
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }
@@ -123,6 +118,14 @@ class ControlServer
   //
   std::unordered_map<ElementId, SetDaiFormatCompleter::Async> set_dai_format_completers_;
   std::unordered_map<ElementId, CreateRingBufferCompleter::Async> create_ring_buffer_completers_;
+
+  std::optional<TopologyId> topology_id_to_notify_;
+  std::optional<WatchTopologyCompleter::Async> watch_topology_completer_;
+  std::optional<SetTopologyCompleter::Async> set_topology_completer_;
+
+  std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>
+      element_states_to_notify_;
+  std::unordered_map<ElementId, WatchElementStateCompleter::Async> watch_element_state_completers_;
 
   // Locks a weak_ptr ring_buffer_server_ to shared_ptr and returns it, or returns nullptr.
   std::shared_ptr<RingBufferServer> TryGetRingBufferServer(ElementId element_id);

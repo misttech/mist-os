@@ -114,7 +114,11 @@ class Device : public std::enable_shared_from_this<Device> {
 
   bool CompositeReset();
 
-  bool SetTopology(TopologyId topology_id);
+  // These return error codes that can be directly returned to the FIDL client.
+  zx_status_t SetTopology(TopologyId topology_id);
+  zx_status_t SetElementState(
+      ElementId element_id,
+      const fuchsia_hardware_audio_signalprocessing::ElementState& element_state);
 
   struct RingBufferInfo {
     fuchsia_audio::RingBuffer ring_buffer;

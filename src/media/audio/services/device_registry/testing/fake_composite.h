@@ -31,7 +31,7 @@
 
 namespace media_audio {
 
-static constexpr bool kLogFakeComposite = false;
+static constexpr bool kLogFakeComposite = true;
 
 class FakeCompositeRingBuffer;
 
@@ -161,13 +161,16 @@ class FakeComposite : public std::enable_shared_from_this<FakeComposite>,
   static constexpr ElementId kMinRingBufferElementId = kDestRbElementId;
   static constexpr ElementId kMaxRingBufferElementId = kSourceRbElementId;
 
+  static constexpr ElementId kMuteElementId = 4;
+
   static constexpr ElementId kMinElementId = kSourceDaiElementId;
-  static constexpr ElementId kMaxElementId = kSourceRbElementId;
+  static constexpr ElementId kMaxElementId = kMuteElementId;
 
   static const fuchsia_hardware_audio_signalprocessing::Element kSourceDaiElement;
   static const fuchsia_hardware_audio_signalprocessing::Element kDestRbElement;
   static const fuchsia_hardware_audio_signalprocessing::Element kSourceRbElement;
   static const fuchsia_hardware_audio_signalprocessing::Element kDestDaiElement;
+  static const fuchsia_hardware_audio_signalprocessing::Element kMuteElement;
   static const fuchsia_hardware_audio_signalprocessing::Latency kSourceDaiElementLatency;
   static const fuchsia_hardware_audio_signalprocessing::Latency kDestRbElementLatency;
   static const fuchsia_hardware_audio_signalprocessing::Latency kSourceRbElementLatency;
@@ -176,20 +179,25 @@ class FakeComposite : public std::enable_shared_from_this<FakeComposite>,
   static const fuchsia_hardware_audio_signalprocessing::ElementState kDestRbElementInitState;
   static const fuchsia_hardware_audio_signalprocessing::ElementState kSourceRbElementInitState;
   static const fuchsia_hardware_audio_signalprocessing::ElementState kDestDaiElementInitState;
+  static const fuchsia_hardware_audio_signalprocessing::ElementState kMuteElementInitState;
   static const std::vector<fuchsia_hardware_audio_signalprocessing::Element> kElements;
 
   // For min/max checks based on ranges, keep this range contiguous.
   static constexpr TopologyId kInputOnlyTopologyId = 10;
   static constexpr TopologyId kFullDuplexTopologyId = 11;
   static constexpr TopologyId kOutputOnlyTopologyId = 12;
+  static constexpr TopologyId kOutputWithMuteTopologyId = 13;
   static constexpr TopologyId kMinTopologyId = kInputOnlyTopologyId;
-  static constexpr TopologyId kMaxTopologyId = kOutputOnlyTopologyId;
+  static constexpr TopologyId kMaxTopologyId = kOutputWithMuteTopologyId;
 
   static const fuchsia_hardware_audio_signalprocessing::EdgePair kTopologyInputEdgePair;
   static const fuchsia_hardware_audio_signalprocessing::EdgePair kTopologyOutputEdgePair;
+  static const fuchsia_hardware_audio_signalprocessing::EdgePair kTopologyRbToMuteEdgePair;
+  static const fuchsia_hardware_audio_signalprocessing::EdgePair kTopologyMuteToDaiEdgePair;
   static const fuchsia_hardware_audio_signalprocessing::Topology kInputOnlyTopology;
   static const fuchsia_hardware_audio_signalprocessing::Topology kFullDuplexTopology;
   static const fuchsia_hardware_audio_signalprocessing::Topology kOutputOnlyTopology;
+  static const fuchsia_hardware_audio_signalprocessing::Topology kOutputWithMuteTopology;
   static const std::vector<fuchsia_hardware_audio_signalprocessing::Topology> kTopologies;
 
   FakeComposite(zx::channel server_end, zx::channel client_end, async_dispatcher_t* dispatcher);

@@ -616,31 +616,274 @@ void ControlServer::Reset(ResetCompleter::Sync& completer) {
   completer.Reply(fit::success(fuchsia_audio_device::ControlResetResponse{}));
 }
 
-// fuchsia.hardware.audio.signalprocessing support
+// fuchsia.hardware.audio.signalprocessing.SignalProcessing support
 //
 void ControlServer::GetTopologies(GetTopologiesCompleter::Sync& completer) {
-  ADR_WARN_METHOD() << kClassName << "(" << this << ")::" << __func__
-                    << ": signalprocessing not supported";
-  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+  ADR_LOG_METHOD(kLogControlServerMethods);
+
+  if (device_has_error_) {
+    ADR_WARN_METHOD() << "Device has error";
+    completer.Reply(zx::error(ZX_ERR_INTERNAL));
+    return;
+  }
+
+  FX_CHECK(device_);
+  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+    ADR_WARN_METHOD() << "This device_type does not support " << __func__;
+    completer.Reply(zx::error(ZX_ERR_WRONG_TYPE));
+    return;
+  }
+
+  if (!device_->supports_signalprocessing()) {
+    ADR_LOG_METHOD(kLogControlServerMethods || kLogSignalProcessingFidlCalls)
+        << "This driver does not support signalprocessing";
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
+
+  FX_CHECK(device_->info().has_value() &&
+           device_->info()->signal_processing_topologies().has_value() &&
+           !device_->info()->signal_processing_topologies()->empty());
+  completer.Reply(zx::success(*device_->info()->signal_processing_topologies()));
 }
 
-void ControlServer::GetElements(GetElementsCompleter::Sync& completer) {
-  ADR_WARN_METHOD() << kClassName << "(" << this << ")::" << __func__
-                    << ": signalprocessing not supported";
-  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+void ControlServer::WatchTopology(WatchTopologyCompleter::Sync& completer) {
+  ADR_LOG_METHOD(kLogControlServerMethods);
+
+  if (device_has_error_) {
+    ADR_WARN_METHOD() << "Device has error";
+    completer.Close(ZX_ERR_INTERNAL);
+    return;
+  }
+
+  FX_CHECK(device_);
+  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+    ADR_WARN_METHOD() << "This device_type does not support " << __func__;
+    completer.Close(ZX_ERR_WRONG_TYPE);
+    return;
+  }
+
+  if (!device_->supports_signalprocessing()) {
+    ADR_LOG_METHOD(kLogControlServerMethods || kLogSignalProcessingFidlCalls)
+        << "This driver does not support signalprocessing";
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+
+  if (watch_topology_completer_) {
+    ADR_WARN_METHOD() << "previous `WatchTopology` request has not yet completed";
+    completer.Close(ZX_ERR_BAD_STATE);
+    return;
+  }
+
+  FX_CHECK(!watch_topology_completer_.has_value());
+  watch_topology_completer_ = completer.ToAsync();
+  FX_CHECK(watch_topology_completer_.has_value());
+  MaybeCompleteWatchTopology();
 }
 
-// For now, don't do anything with this.
+void ControlServer::SetTopology(SetTopologyRequest& request,
+                                SetTopologyCompleter::Sync& completer) {
+  ADR_LOG_METHOD(kLogControlServerMethods);
+
+  if (device_has_error_) {
+    ADR_WARN_METHOD() << "Device has error";
+    completer.Reply(zx::error(ZX_ERR_INTERNAL));
+    return;
+  }
+
+  FX_CHECK(device_);
+  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+    ADR_WARN_METHOD() << "unsupported method for this device_type";
+    completer.Reply(zx::error(ZX_ERR_WRONG_TYPE));
+    return;
+  }
+
+  if (!device_->supports_signalprocessing()) {
+    ADR_LOG_METHOD(kLogControlServerMethods || kLogSignalProcessingFidlCalls)
+        << "This driver does not support signalprocessing";
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
+
+  if (device_->topology_ids().find(request.topology_id()) == device_->topology_ids().end()) {
+    ADR_WARN_METHOD() << "Unknown topology_id " << request.topology_id();
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
+  if (auto status = device_->SetTopology(request.topology_id()); status == ZX_OK) {
+    ADR_LOG_METHOD(kLogControlServerMethods || kLogSignalProcessingFidlCalls)
+        << "SetTopology succeeded";
+    completer.Reply(zx::ok());
+  } else {
+    ADR_LOG_METHOD(kLogControlServerMethods || kLogSignalProcessingFidlCalls)
+        << "SetTopology failed: " << status;
+    completer.Reply(zx::error(status));
+  }
+}
+
 void ControlServer::TopologyChanged(TopologyId topology_id) {
   ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods)
       << "(topology_id " << topology_id << ")";
+
+  topology_id_to_notify_ = topology_id;
+  MaybeCompleteWatchTopology();
 }
 
-// For now, don't do anything with this.
+void ControlServer::MaybeCompleteWatchTopology() {
+  if (watch_topology_completer_ && topology_id_to_notify_) {
+    ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods)
+        << "completing(" << *topology_id_to_notify_ << ")";
+    auto completer = std::move(*watch_topology_completer_);
+    watch_topology_completer_.reset();
+
+    auto new_topology_id = *topology_id_to_notify_;
+    topology_id_to_notify_.reset();
+
+    completer.Reply({new_topology_id});
+  } else {
+    ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods) << "NOT completing";
+  }
+}
+
+void ControlServer::GetElements(GetElementsCompleter::Sync& completer) {
+  ADR_LOG_METHOD(kLogObserverServerMethods);
+
+  if (device_has_error_) {
+    ADR_WARN_METHOD() << "Device has error";
+    completer.Reply(zx::error(ZX_ERR_INTERNAL));
+    return;
+  }
+
+  FX_CHECK(device_);
+  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+    ADR_WARN_METHOD() << "This device_type does not support " << __func__;
+    completer.Reply(zx::error(ZX_ERR_WRONG_TYPE));
+    return;
+  }
+
+  if (!device_->supports_signalprocessing()) {
+    ADR_LOG_METHOD(kLogControlServerMethods || kLogSignalProcessingFidlCalls)
+        << "This driver does not support signalprocessing";
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
+
+  FX_CHECK(device_->info().has_value() &&
+           device_->info()->signal_processing_elements().has_value() &&
+           !device_->info()->signal_processing_elements()->empty());
+  completer.Reply(zx::success(*device_->info()->signal_processing_elements()));
+}
+
+void ControlServer::WatchElementState(WatchElementStateRequest& request,
+                                      WatchElementStateCompleter::Sync& completer) {
+  ADR_LOG_METHOD(kLogControlServerMethods);
+
+  if (device_has_error_) {
+    ADR_WARN_METHOD() << "Device has error";
+    completer.Close(ZX_ERR_INTERNAL);
+    return;
+  }
+
+  FX_CHECK(device_);
+  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+    ADR_WARN_METHOD() << "This device_type does not support " << __func__;
+    completer.Close(ZX_ERR_WRONG_TYPE);
+    return;
+  }
+
+  if (!device_->supports_signalprocessing()) {
+    ADR_LOG_METHOD(kLogControlServerMethods || kLogSignalProcessingFidlCalls)
+        << "This driver does not support signalprocessing";
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+
+  if (device_->element_ids().find(request.processing_element_id()) ==
+      device_->element_ids().end()) {
+    ADR_WARN_METHOD() << "Unknown element_id " << request.processing_element_id();
+    completer.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
+  ElementId element_id = request.processing_element_id();
+  if (watch_element_state_completers_.find(element_id) != watch_element_state_completers_.end()) {
+    ADR_WARN_METHOD() << "previous `WatchElementState(" << element_id
+                      << ")` request has not yet completed";
+    completer.Close(ZX_ERR_BAD_STATE);
+    return;
+  }
+
+  watch_element_state_completers_.insert({element_id, completer.ToAsync()});
+  MaybeCompleteWatchElementState(element_id);
+}
+
+void ControlServer::SetElementState(SetElementStateRequest& request,
+                                    SetElementStateCompleter::Sync& completer) {
+  ADR_LOG_METHOD(kLogControlServerMethods)
+      << "(element_id " << request.processing_element_id() << ")";
+
+  if (device_has_error_) {
+    ADR_WARN_METHOD() << "Device has error";
+    completer.Reply(zx::error(ZX_ERR_INTERNAL));
+    return;
+  }
+
+  FX_CHECK(device_);
+  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+    ADR_WARN_METHOD() << "unsupported method for this device_type";
+    completer.Reply(zx::error(ZX_ERR_WRONG_TYPE));
+    return;
+  }
+
+  if (!device_->supports_signalprocessing()) {
+    ADR_LOG_METHOD(kLogControlServerMethods || kLogSignalProcessingFidlCalls)
+        << "This driver does not support signalprocessing";
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
+
+  if (device_->element_ids().find(request.processing_element_id()) ==
+      device_->element_ids().end()) {
+    ADR_WARN_METHOD() << "Unknown element_id " << request.processing_element_id();
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
+  if (auto status = device_->SetElementState(request.processing_element_id(), request.state());
+      status == ZX_OK) {
+    completer.Reply(zx::ok());
+  } else {
+    completer.Reply(zx::error(status));
+  }
+}
+
 void ControlServer::ElementStateChanged(
     ElementId element_id, fuchsia_hardware_audio_signalprocessing::ElementState element_state) {
   ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods)
       << "(element_id " << element_id << ")";
+
+  element_states_to_notify_.insert_or_assign(element_id, element_state);
+  MaybeCompleteWatchElementState(element_id);
+}
+
+// If we have an outstanding hanging-get and a state-change, respond with the state change.
+void ControlServer::MaybeCompleteWatchElementState(ElementId element_id) {
+  if (watch_element_state_completers_.find(element_id) != watch_element_state_completers_.end() &&
+      element_states_to_notify_.find(element_id) != element_states_to_notify_.end()) {
+    ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods) << element_id << ": completing";
+    auto completer = std::move(watch_element_state_completers_.find(element_id)->second);
+    watch_element_state_completers_.erase(element_id);
+
+    auto new_element_state = element_states_to_notify_.find(element_id)->second;
+    element_states_to_notify_.erase(element_id);
+
+    completer.Reply({new_element_state});
+  } else {
+    ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods)
+        << element_id << ": NOT completing";
+  }
 }
 
 }  // namespace media_audio
