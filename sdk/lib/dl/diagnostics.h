@@ -100,9 +100,12 @@ class Diagnostics : public elfldltl::Diagnostics<DiagnosticsReport, DiagnosticsF
     return {};
   }
 
-  // Reports an out of memory error and makes it safe to destroy this object,
-  // as in DiagnosticsReport.
-  auto OutOfMemory() { return report().OutOfMemory(); }
+  // Sets an OutOfMemory error on the diagnostics object and returns the
+  // reported error back to the caller.
+  auto OutOfMemory(std::string_view error, size_t bytes) {
+    Base::OutOfMemory(error, bytes);
+    return take_error();
+  }
 };
 
 }  // namespace dl

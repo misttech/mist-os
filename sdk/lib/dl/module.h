@@ -5,6 +5,7 @@
 #ifndef LIB_DL_MODULE_H_
 #define LIB_DL_MODULE_H_
 
+#include <lib/elfldltl/alloc-checker-container.h>
 #include <lib/elfldltl/dynamic.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/memory.h>
@@ -18,12 +19,14 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/intrusive_double_list.h>
+#include <fbl/vector.h>
 
 #include "diagnostics.h"
 
 namespace dl {
 
 using Elf = elfldltl::Elf<>;
+using Soname = elfldltl::Soname<>;
 
 // TODO(https://fxbug.dev/324136435): These KMax* variables are copied from
 // //sdk/lib/ld/startup-load.h, we should share these symbols instead.
@@ -58,7 +61,6 @@ static_assert(kMaxPhdrs > kMaxSegments);
 class ModuleHandle : public fbl::DoublyLinkedListable<std::unique_ptr<ModuleHandle>> {
  public:
   using Addr = Elf::Addr;
-  using Soname = elfldltl::Soname<>;
   using SymbolInfo = elfldltl::SymbolInfo<Elf>;
   using AbiModule = ld::AbiModule<>;
 
@@ -104,18 +106,17 @@ class ModuleHandle : public fbl::DoublyLinkedListable<std::unique_ptr<ModuleHand
   AbiModule abi_module_;
 };
 
-using LoadModuleBase = ld::LoadModule<ld::DecodedModuleInMemory<>>;
-
-// TODO(https://fxbug.dev/324136435): Replace the code and functions copied from
-// ld::LoadModule to use them directly; then continue to use methods directly
-// from the //sdk/lib/ld public API, refactoring them into shared code as needed.
+// Use a AllocCheckerContainer that supports fallible allocations; methods return
+// a boolean value to signify allocation success or failure.
+template <typename T>
+using Vector = elfldltl::AllocCheckerContainer<fbl::Vector>::Container<T>;
 
 // LoadModule is the temporary data structure created to load a file; a
 // LoadModule is created when a file needs to be loaded, and is destroyed after
 // the file module and all its dependencies have been loaded, decoded, symbols
 // resolved, and relro protected.
 template <class OSImpl>
-class LoadModule : public LoadModuleBase,
+class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
                    public fbl::DoublyLinkedListable<std::unique_ptr<LoadModule<OSImpl>>> {
  public:
   using Loader = typename OSImpl::Loader;
@@ -123,8 +124,12 @@ class LoadModule : public LoadModuleBase,
   using Relro = typename Loader::Relro;
   using Phdr = Elf::Phdr;
   using Dyn = Elf::Dyn;
-  using Soname = elfldltl::Soname<>;
   using LoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StaticVector<kMaxSegments>::Container>;
+
+  // This is the observer used to collect DT_NEEDED offsets from the dynamic phdr.
+  static const constexpr std::string_view kNeededError{"DT_NEEDED offsets"};
+  using NeededObserver = elfldltl::DynamicValueCollectionObserver<  //
+      Elf, elfldltl::ElfDynTag::kNeeded, Vector<size_type>, kNeededError>;
 
   // The LoadModule::Create(...) creates and takes temporary ownership of the
   // ModuleHandle for the file in order to set information on the data structure
@@ -146,7 +151,7 @@ class LoadModule : public LoadModuleBase,
     }
     std::unique_ptr<LoadModule> load_module{new (ac) LoadModule};
     if (!ac.check()) [[unlikely]] {
-      caller_ac.arm(sizeof(ModuleHandle), false);
+      caller_ac.arm(sizeof(LoadModule), false);
       return nullptr;
     }
     load_module->set_name(name);
@@ -157,7 +162,7 @@ class LoadModule : public LoadModuleBase,
     load_module->module_ = std::move(module);
 
     // Signal to the caller all allocations have succeeded.
-    caller_ac.arm(sizeof(ModuleHandle), true);
+    caller_ac.arm(sizeof(LoadModule), true);
     return std::move(load_module);
   }
 
@@ -170,11 +175,12 @@ class LoadModule : public LoadModuleBase,
 
   // Retrieve the file and load it into the system image, then decode the phdrs
   // to metadata to attach to the ABI module and store the information needed
-  // for dependency parsing.
-  bool Load(Diagnostics& diag) {
+  // for dependency parsing. Decode the module's dependencies (if any), and
+  // return a vector their so names.
+  std::optional<Vector<Soname>> Load(Diagnostics& diag) {
     auto file = OSImpl::RetrieveFile(diag, module_->name().str());
     if (!file) [[unlikely]] {
-      return false;
+      return std::nullopt;
     }
 
     // Read the file header and program headers into stack buffers and map in
@@ -183,75 +189,43 @@ class LoadModule : public LoadModuleBase,
     Loader loader;
     auto headers = decoded().LoadFromFile(diag, loader, *std::move(file));
     if (!headers) [[unlikely]] {
-      return false;
+      return std::nullopt;
     }
-    auto& [ehdr_owner, phdrs_owner] = *headers;
-    cpp20::span<const Phdr> phdrs = phdrs_owner;
+
+    Vector<size_type> needed_offsets;
+    // TODO(https://fxbug.dev/331421403): TLS is not supported yet.
+    size_type max_tls_modid = 0;
+    if (!decoded().DecodeFromMemory(  //
+            diag, loader.memory(), loader.page_size(), *headers, max_tls_modid,
+            elfldltl::DynamicRelocationInfoObserver(decoded().reloc_info()),
+            NeededObserver(needed_offsets))) [[unlikely]] {
+      return std::nullopt;
+    }
 
     // After successfully loading the file, finalize the module's mapping by
     // calling `Commit` on the loader. Save the returned relro capability
     // that will be used to apply relro protections later.
-    // TODO(https://fxbug.dev/323418587): For now, pass an empty relro_bounds.
-    // This will eventually take the decoded relro_phdr.
-    loader_relro_ = std::move(loader).Commit(LoadInfo::Region{});
+    loader_relro_ = std::move(loader).Commit(decoded().relro_bounds());
 
-    // Now that the file is in memory, we can decode the phdrs.
-    std::optional<Phdr> dyn_phdr;
-    if (!elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(dyn_phdr))) {
-      return false;
+    // TODO(https://fxbug.dev/324136435): The code that parses the names from
+    // the symbol table be shared with <lib/ld/remote-decoded-module.h>.
+    if (Vector<Soname> needed_names;
+        needed_names.reserve(diag, kNeededError, needed_offsets.size())) [[likely]] {
+      for (size_type offset : needed_offsets) {
+        std::string_view name = this->symbol_info().string(offset);
+        if (name.empty()) [[unlikely]] {
+          diag.FormatError("DT_NEEDED has DT_STRTAB offset ", offset, " with DT_STRSZ ",
+                           this->symbol_info().strtab().size());
+          return std::nullopt;
+        }
+        if (!needed_names.push_back(diag, kNeededError, Soname{name})) [[unlikely]] {
+          return std::nullopt;
+        }
+      }
+      return std::move(needed_names);
     }
 
-    // TODO(caslyn): Use ld::DecodeFromMemory with a
-    // elfldltl::DynamicValueCollectionObserver so that we collect the needed
-    // entries into an fbl::Vector<size_type> in one pass. Have this Load
-    // function return the std::optional result of that to pass to EnqueueDeps.
-    // From the dynamic phdr, decode the metadata and dependency information.
-    auto memory = ld::ModuleMemory{decoded().module()};
-    auto dyn = DecodeModuleDynamic(
-        decoded().module(), diag, memory, dyn_phdr,
-        elfldltl::DynamicRelocationInfoObserver(decoded().reloc_info()),
-        elfldltl::DynamicTagCountObserver<Elf, elfldltl::ElfDynTag::kNeeded>(needed_count_));
-    if (dyn.is_error()) [[unlikely]] {
-      return {};
-    }
-
-    dynamic_ = dyn.value();
-
-    return true;
-  }
-
-  // TODO(caslyn): This will become a method on the RuntimeDynamicLinker.
-  // It also needs to handle if the module is already loaded.
-  bool EnqueueDeps(Diagnostics& diag, fbl::DoublyLinkedList<std::unique_ptr<LoadModule>>& modules) {
-    auto needed_count = needed_count_;
-
-    auto handle_needed = [&](std::string_view soname_str) {
-      assert(needed_count > 0);
-      Soname soname{soname_str};
-
-      // Check if this dependency was already added to the modules list.
-      if (std::find(modules.begin(), modules.end(), soname) != modules.end()) {
-        return true;
-      }
-
-      fbl::AllocChecker ac;
-      auto load_module = LoadModule<OSImpl>::Create(soname, ac);
-      if (!ac.check()) [[unlikely]] {
-        // TODO(caslyn): communicate out of memory error.
-        return false;
-      }
-
-      // TOOD(https://fxrev.dev/323419430): Add new module to current module's dependency list.
-
-      modules.push_back(std::move(load_module));
-
-      return --needed_count > 0;
-    };
-
-    auto observer = elfldltl::DynamicNeededObserver(symbol_info(), handle_needed);
-    auto memory = ld::ModuleMemory{decoded().module()};
-    elfldltl::DecodeDynamic(diag, memory, dynamic_, observer);
-    return true;
+    return std::nullopt;
   }
 
  private:
@@ -260,11 +234,6 @@ class LoadModule : public LoadModuleBase,
 
   std::unique_ptr<ModuleHandle> module_;
   Relro loader_relro_;
-  // TODO(caslyn): These are stored here for now, for convenience. After
-  // dependency enqueueing and sharing code with //sdk/lib/ld, we will be able
-  // to see more clearly how best to pass these values around.
-  cpp20::span<const Dyn> dynamic_;
-  size_t needed_count_ = 0;
 };
 
 }  // namespace dl

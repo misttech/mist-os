@@ -118,30 +118,46 @@ class RuntimeDynamicLinker {
     ModuleList<LoadModule<OSImpl>> pending_modules;
 
     fbl::AllocChecker ac;
-    auto load_module = LoadModule<OSImpl>::Create(soname, ac);
+    auto main_module = LoadModule<OSImpl>::Create(soname, ac);
     if (!ac.check()) [[unlikely]] {
-      // TODO(caslyn): communicate out of memory error.
+      diag.OutOfMemory("LoadModule", sizeof(LoadModule<OSImpl>));
       return {};
     }
 
-    pending_modules.push_back(std::move(load_module));
+    pending_modules.push_back(std::move(main_module));
 
+    // TODO(https://fxrev.dev/333573264): This needs to handle if a dep is
+    // already loaded.
+    // Iterate over the pending modules that need to be loaded and dependencies
+    // enqueued, appending each new dependency to the pending_modules list so
+    // it can eventually be loaded and processed.
     for (auto it = pending_modules.begin(); it != pending_modules.end(); it++) {
       // TODO(caslyn): support scoped module diagnostics.
       // ld::ScopedModuleDiagnostics module_diag{diag, module_->name().str()};
 
-      // TODO(caslyn): Eventually Load and Decode will become separate calls.
-      if (!it->Load(diag)) {
+      auto result = it->Load(diag);
+      if (!result) {
         return {};
       }
-      // TODO(caslyn): Eventually, EnqueueDeps will be a static function on the
-      // RuntimeDynamicLinker and will pass in the DecodeResult for the loadmodule.
-      if (!it->EnqueueDeps(diag, pending_modules)) {
-        return {};
+
+      for (const auto& needed_entry : *result) {
+        // Skip if this dependency was already added to the pending_modules list.
+        if (std::find(pending_modules.begin(), pending_modules.end(), needed_entry) !=
+            pending_modules.end()) {
+          continue;
+        }
+
+        fbl::AllocChecker ac;
+        auto load_module = LoadModule<OSImpl>::Create(needed_entry, ac);
+        if (!ac.check()) [[unlikely]] {
+          diag.OutOfMemory("LoadModule", sizeof(LoadModule<OSImpl>));
+          return {};
+        }
+        pending_modules.push_back(std::move(load_module));
       }
     }
 
-    return pending_modules;
+    return std::move(pending_modules);
   }
 
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
