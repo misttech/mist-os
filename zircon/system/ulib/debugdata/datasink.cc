@@ -48,12 +48,11 @@ struct __llvm_profile_header {
 #include <profile/InstrProfData.inc>
 };
 
-// TODO(b/42086151): The layout of the profiles defined in InstrProfData.inc has changed via
-// https://reviews.llvm.org/D138846.
-// llvm_profile_header_v8 and llvm_profile_data_format_v8 defines the layout of the
-// profiles that have profile version 8 and below. Remove these after Rust toolchain switches to the
-// profile version 9 and above.
-struct llvm_profile_header_v8 {
+// llvm_profile_header_v9 and llvm_profile_data_format_v9 define the layout of the
+// profiles that have profile version 9.
+// TODO(b/42086151): Remove these after Rust toolchain switches to the
+// profile version 10 and above.
+struct llvm_profile_header_v9 {
   uint64_t Magic;
   uint64_t Version;
   uint64_t BinaryIdsSize;
@@ -61,20 +60,25 @@ struct llvm_profile_header_v8 {
   uint64_t PaddingBytesBeforeCounters;
   uint64_t NumCounters;
   uint64_t PaddingBytesAfterCounters;
+  uint64_t NumBitmapBytes;
+  uint64_t PaddingBytesAfterBitmapBytes;
   uint64_t NamesSize;
   uint64_t CountersDelta;
+  uint64_t BitmapDelta;
   uint64_t NamesDelta;
   uint64_t ValueKindLast;
 };
 
-struct llvm_profile_data_format_v8 {
+struct llvm_profile_data_format_v9 {
   uint64_t NameRef;
   uint64_t FuncHash;
   IntPtrT CounterPtr;
+  IntPtrT BitmapPtr;
   IntPtrT FunctionPointer;
   IntPtrT Values;
   uint32_t NumCounters;
   uint16_t NumValueSites;
+  uint32_t NumBitmapBytes;
 };
 
 std::error_code ReadFile(const fbl::unique_fd& fd, uint8_t* data, size_t size) {
@@ -147,29 +151,29 @@ fbl::String JoinPath(std::string_view parent, std::string_view child) {
   return fbl::String::Concat({parent, child});
 }
 
-// TODO(https://fxbug.dev/42086151): Remove this function after Rust toolchain switches to the
-// raw profile version 9 and above.
-bool ProfilesCompatibleVersion8(const uint8_t* dst, const uint8_t* src) {
-  const llvm_profile_header_v8* src_header = reinterpret_cast<const llvm_profile_header_v8*>(src);
-  const llvm_profile_header_v8* dst_header = reinterpret_cast<const llvm_profile_header_v8*>(dst);
+// TODO(https://fxbug.dev/333945525): Remove this function after Rust toolchain switches to the
+// raw profile version 10 and above.
+bool ProfilesCompatibleVersion9(const uint8_t* dst, const uint8_t* src) {
+  const llvm_profile_header_v9* src_header = reinterpret_cast<const llvm_profile_header_v9*>(src);
+  const llvm_profile_header_v9* dst_header = reinterpret_cast<const llvm_profile_header_v9*>(dst);
 
   if (src_header->NumData != dst_header->NumData ||
       src_header->NumCounters != dst_header->NumCounters ||
       src_header->NamesSize != dst_header->NamesSize)
     return false;
 
-  const llvm_profile_data_format_v8* src_data_start =
-      reinterpret_cast<const llvm_profile_data_format_v8*>(src + sizeof(*src_header));
-  src_data_start = reinterpret_cast<const llvm_profile_data_format_v8*>(
+  const llvm_profile_data_format_v9* src_data_start =
+      reinterpret_cast<const llvm_profile_data_format_v9*>(src + sizeof(*src_header));
+  src_data_start = reinterpret_cast<const llvm_profile_data_format_v9*>(
       reinterpret_cast<const uint8_t*>(src_data_start) + src_header->BinaryIdsSize);
-  const llvm_profile_data_format_v8* src_data_end = src_data_start + src_header->NumData;
-  const llvm_profile_data_format_v8* dst_data_start =
-      reinterpret_cast<const llvm_profile_data_format_v8*>(dst + sizeof(*dst_header));
-  dst_data_start = reinterpret_cast<const llvm_profile_data_format_v8*>(
+  const llvm_profile_data_format_v9* src_data_end = src_data_start + src_header->NumData;
+  const llvm_profile_data_format_v9* dst_data_start =
+      reinterpret_cast<const llvm_profile_data_format_v9*>(dst + sizeof(*dst_header));
+  dst_data_start = reinterpret_cast<const llvm_profile_data_format_v9*>(
       reinterpret_cast<const uint8_t*>(dst_data_start) + dst_header->BinaryIdsSize);
-  const llvm_profile_data_format_v8* dst_data_end = dst_data_start + dst_header->NumData;
+  const llvm_profile_data_format_v9* dst_data_end = dst_data_start + dst_header->NumData;
 
-  for (const llvm_profile_data_format_v8 *src_data = src_data_start, *dst_data = dst_data_start;
+  for (const llvm_profile_data_format_v9 *src_data = src_data_start, *dst_data = dst_data_start;
        src_data < src_data_end && dst_data < dst_data_end; ++src_data, ++dst_data) {
     if (src_data->NameRef != dst_data->NameRef || src_data->FuncHash != dst_data->FuncHash ||
         src_data->NumCounters != dst_data->NumCounters)
@@ -187,11 +191,11 @@ bool ProfilesCompatible(const uint8_t* dst, const uint8_t* src) {
   if (src_header->Magic != dst_header->Magic || src_header->Version != dst_header->Version)
     return false;
 
-  // Check that raw profiles use version 8 and above because older versions are not supported.
-  ZX_ASSERT(src_header->Version >= 8 && dst_header->Version >= 8);
+  // Check that raw profiles use version 9 and above because older versions are not supported.
+  ZX_ASSERT(src_header->Version >= 9 && dst_header->Version >= 9);
 
-  if (src_header->Version == 8 && dst_header->Version == 8)
-    return ProfilesCompatibleVersion8(dst, src);
+  if (src_header->Version == 9 && dst_header->Version == 9)
+    return ProfilesCompatibleVersion9(dst, src);
 
   if (src_header->NumData != dst_header->NumData ||
       src_header->NumCounters != dst_header->NumCounters ||
@@ -219,29 +223,29 @@ bool ProfilesCompatible(const uint8_t* dst, const uint8_t* src) {
   return true;
 }
 
-// TODO(https://fxbug.dev/42086151): Remove this function after Rust toolchain switches to the
-// raw profile version 9 and above.
-uint8_t* MergeProfilesVersion8(uint8_t* dst, const uint8_t* src) {
-  const llvm_profile_header_v8* src_header = reinterpret_cast<const llvm_profile_header_v8*>(src);
-  const llvm_profile_data_format_v8* src_data_start =
-      reinterpret_cast<const llvm_profile_data_format_v8*>(src + sizeof(*src_header));
-  src_data_start = reinterpret_cast<const llvm_profile_data_format_v8*>(
+// TODO(https://fxbug.dev/333945525): Remove this function after Rust toolchain switches to the
+// raw profile version 10 and above.
+uint8_t* MergeProfilesVersion9(uint8_t* dst, const uint8_t* src) {
+  const llvm_profile_header_v9* src_header = reinterpret_cast<const llvm_profile_header_v9*>(src);
+  const llvm_profile_data_format_v9* src_data_start =
+      reinterpret_cast<const llvm_profile_data_format_v9*>(src + sizeof(*src_header));
+  src_data_start = reinterpret_cast<const llvm_profile_data_format_v9*>(
       reinterpret_cast<const uint8_t*>(src_data_start) + src_header->BinaryIdsSize);
-  const llvm_profile_data_format_v8* src_data_end = src_data_start + src_header->NumData;
+  const llvm_profile_data_format_v9* src_data_end = src_data_start + src_header->NumData;
   const uint64_t* src_counters_start = reinterpret_cast<const uint64_t*>(src_data_end);
   uintptr_t src_counters_delta = src_header->CountersDelta;
 
-  llvm_profile_header_v8* dst_header = reinterpret_cast<llvm_profile_header_v8*>(dst);
-  llvm_profile_data_format_v8* dst_data_start =
-      reinterpret_cast<llvm_profile_data_format_v8*>(dst + sizeof(*dst_header));
-  dst_data_start = reinterpret_cast<llvm_profile_data_format_v8*>(
+  llvm_profile_header_v9* dst_header = reinterpret_cast<llvm_profile_header_v9*>(dst);
+  llvm_profile_data_format_v9* dst_data_start =
+      reinterpret_cast<llvm_profile_data_format_v9*>(dst + sizeof(*dst_header));
+  dst_data_start = reinterpret_cast<llvm_profile_data_format_v9*>(
       reinterpret_cast<uint8_t*>(dst_data_start) + dst_header->BinaryIdsSize);
-  llvm_profile_data_format_v8* dst_data_end = dst_data_start + dst_header->NumData;
+  llvm_profile_data_format_v9* dst_data_end = dst_data_start + dst_header->NumData;
   uint64_t* dst_counters_start = reinterpret_cast<uint64_t*>(dst_data_end);
   uintptr_t dst_counters_delta = dst_header->CountersDelta;
 
-  const llvm_profile_data_format_v8* src_data = src_data_start;
-  llvm_profile_data_format_v8* dst_data = dst_data_start;
+  const llvm_profile_data_format_v9* src_data = src_data_start;
+  llvm_profile_data_format_v9* dst_data = dst_data_start;
 
   for (; src_data < src_data_end && dst_data < dst_data_end; src_data++, dst_data++) {
     const uint64_t* src_counters =
@@ -263,8 +267,8 @@ uint8_t* MergeProfilesVersion8(uint8_t* dst, const uint8_t* src) {
 // Note that this function does not check whether the profiles are compatible.
 uint8_t* MergeProfiles(uint8_t* dst, const uint8_t* src) {
   const __llvm_profile_header* src_header = reinterpret_cast<const __llvm_profile_header*>(src);
-  if (src_header->Version <= 8)
-    return MergeProfilesVersion8(dst, src);
+  if (src_header->Version == 9)
+    return MergeProfilesVersion9(dst, src);
 
   const __llvm_profile_data* src_data_start =
       reinterpret_cast<const __llvm_profile_data*>(src + sizeof(*src_header));
