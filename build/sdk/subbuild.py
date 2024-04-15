@@ -311,6 +311,10 @@ def main():
         ):
             return 1
 
+    # Touch the sentinel file in the build directory to force any non-hermetic
+    # build rules to rebuild.
+    (build_dir / "force_nonhermetic_rebuild").touch()
+
     # Adjust the NINJA_STATUS environment variable before launching Ninja
     # in order to add a prefix distinguishing its build actions from
     # the top-level ones.
