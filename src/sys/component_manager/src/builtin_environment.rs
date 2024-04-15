@@ -27,7 +27,9 @@ use {
             time::{create_utc_clock, UtcTimeMaintainer},
         },
         capability::{BuiltinCapability, CapabilitySource, DerivedCapability, FrameworkCapability},
-        diagnostics::{startup::ComponentEarlyStartupTimeStats, task_metrics::ComponentTreeStats},
+        diagnostics::{
+            lifecycle::ComponentEarlyStartupTimeStats, task_metrics::ComponentTreeStats,
+        },
         framework::{
             binder::BinderFrameworkCapability,
             factory::{FactoryCapabilityHost, FactoryFrameworkCapability},
