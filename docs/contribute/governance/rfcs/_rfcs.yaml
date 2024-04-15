@@ -3149,10 +3149,10 @@
   area: ['Component Framework']
   issue: ['']
   gerrit_change_id: ['986276']
-  status: 'Pending'
+  status: 'Accepted'
   reviewers: ['aaronwood@google.com', 'geb@google.com', 'markdittmer@google.com', 'surajmalhotra@google.com', 'wittrock@google.com']
   submitted: '2024-02-05'
-  reviewed: '2024-05-11'
+  reviewed: '2024-04-11'
 
 - name: 'RFC-0243'
   title: 'WLAN Roaming'
