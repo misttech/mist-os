@@ -144,7 +144,7 @@ void Symbolize::PrintBacktraces(const Symbolize::FramePointerBacktrace& frame_po
 }
 
 void Symbolize::PrintStack(uintptr_t sp, ktl::optional<size_t> max_size_bytes) {
-  const size_t configured_max = gBootOptions->phys_print_stack_max;
+  const size_t configured_max = gBootOptions ? gBootOptions->phys_print_stack_max : 1024;
   auto maybe_dump_stack = [max = max_size_bytes.value_or(configured_max), sp,
                            this](const auto& stack) -> bool {
     if (!stack.boot_stack.IsOnStack(sp)) {
