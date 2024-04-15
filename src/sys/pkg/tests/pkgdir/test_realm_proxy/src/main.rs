@@ -96,8 +96,8 @@ async fn serve_factory(
                 }
                 // TODO(https://fxbug.dev/329496030): We have to use this factory method instead
                 // of creating a Capability::Directory directly - see the bug for details.
-                let (my_dictionary_proxy, server) = endpoints::create_proxy().unwrap();
-                let () = factory.create_dictionary(server).await?;
+                let my_dictionary_proxy = factory.create_dictionary().await?;
+                let my_dictionary_proxy = my_dictionary_proxy.into_proxy().unwrap();
                 let value =
                     factory.create_directory(client_end.into_channel().into()).await.unwrap();
                 my_dictionary_proxy.insert("pkg", value).await?.unwrap();

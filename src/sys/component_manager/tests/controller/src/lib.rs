@@ -340,10 +340,6 @@ pub async fn start_with_dict() {
         .connect_to_protocol_at_exposed_dir::<fsandbox::FactoryMarker>()
         .expect("failed to connect to fuchsia.component.sandbox.Factory");
 
-    // Create a Dictionary that will be passed to StartChild, containing an Open capability for the Echo protocol.
-    let (dictionary_client, dictionary_server) =
-        create_proxy::<fsandbox::DictionaryMarker>().unwrap();
-
     // StartChild dictionary entries must be Open capabilities.
     // TODO(https://fxbug.dev/319542502): Consider using the external Router type, once it exists
     let (echo_openable_client, mut echo_openable_stream) =
@@ -392,7 +388,8 @@ pub async fn start_with_dict() {
         .await
         .expect("failed to call CreateOpen");
 
-    let () = factory.create_dictionary(dictionary_server).await.unwrap();
+    let dictionary_client = factory.create_dictionary().await.unwrap();
+    let dictionary_client = dictionary_client.into_proxy().unwrap();
     dictionary_client
         .insert("fidl.examples.routing.echo.Echo", fsandbox::Capability::Open(echo_open_cap_client))
         .await

@@ -52,13 +52,10 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                     //
                     // ... code to serve echo here ...
 
-                    let (echo_sender_client, echo_sender_server) =
-                        endpoints::create_endpoints::<fsandbox::SenderMarker>();
                     let (echo_receiver_client, echo_receiver_stream) =
                         endpoints::create_request_stream::<fsandbox::ReceiverMarker>()?;
                     let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>()?;
-                    let () =
-                        factory.create_sender(echo_receiver_client, echo_sender_server).await?;
+                    let echo_sender_client = factory.create_sender(echo_receiver_client).await?;
                     my_dictionary_proxy
                         .insert("reverse-echo", fsandbox::Capability::Sender(echo_sender_client))
                         .await?

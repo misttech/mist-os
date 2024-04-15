@@ -174,13 +174,14 @@ open protocol Factory {
     /// Creates a `Sender` from a client served `Receiver`.
     flexible CreateSender(resource struct {
         receiver client_end:Receiver;
-        sender server_end:Sender;
-    }) -> ();
+    }) -> (resource struct {
+        sender client_end:Sender;
+    });
 
     /// Creates a new empty [`Dictionary`].
-    flexible CreateDictionary(resource struct {
-        server_end server_end:Dictionary;
-    }) -> ();
+    flexible CreateDictionary() -> (resource struct {
+        dictionary client_end:Dictionary;
+    });
 
     /// Creates an [`Open`] capability that issues Open calls on
     /// an another [`Openable`].
