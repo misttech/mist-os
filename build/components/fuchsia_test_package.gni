@@ -157,7 +157,6 @@ template("fuchsia_test_package") {
         testonly = true
         data_deps = [
           ":${test_target}_script_gen",
-          "//src/developer/ffx:test_data($host_toolchain)",
           host_test_component_target,
           test_pilot_target,
         ]
