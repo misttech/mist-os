@@ -70,5 +70,35 @@
                 },
             ],
         },
+
+        // Checks involving the config data package.
+        {
+            source: {
+                StaticPackages: "config-data",
+            },
+            file_checks: [
+                // Ensure enable_dynamic_configuration is true for userdebug builds.
+                // This allows pkg-resolver to add or rewrite TUF repository rules.
+                {
+                    source: {
+                        PackageFar: [
+                            "meta/data/pkg-resolver/enable_dynamic_config.json",
+                            "meta/data/pkg-resolver/config.json",
+                        ],
+                    },
+                    state: "Present",
+                    content_checks: {
+                        must_contain: [
+                            {
+                                JsonKeyValue: [
+                                    "enable_dynamic_configuration",
+                                    "true",
+                                ],
+                            },
+                        ],
+                    },
+                },
+            ],
+        },
     ],
 }
