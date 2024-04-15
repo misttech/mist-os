@@ -4,7 +4,7 @@
 
 use {
     crate::model::{
-        actions::{Action, ActionKey, ActionSet, ShutdownAction, ShutdownType},
+        actions::{shutdown::do_shutdown, Action, ActionKey, ActionSet, ShutdownType},
         component::instance::InstanceState,
         component::ComponentInstance,
         error::{ActionError, UnresolveActionError},
@@ -40,8 +40,14 @@ impl Action for UnresolveAction {
 // Implement the UnresolveAction by resetting the state from unresolved to unresolved and emitting
 // an Unresolved event. Unresolve the component's resolved children if any.
 async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ActionError> {
-    // Shut down the component, preventing new starts or resolves during the UnresolveAction.
-    ActionSet::register(component.clone(), ShutdownAction::new(ShutdownType::Instance)).await?;
+    // We want to shut down the component without invoking a full shutdown action, as the
+    // unresolved state of a component is viewed as unreachable from the shutdown state by the
+    // actions system.
+    //
+    // TODO(fxbug.dev/TODO): refactor shutdown such that the component is not put in an
+    // InstanceState::Shutdown when invoked from here. This will allow us to remove
+    // UnresolvedInstanceState from InstanceState::Shutdown.
+    do_shutdown(component, ShutdownType::Instance).await?;
 
     if !component.lock_state().await.is_shut_down() {
         return Err(

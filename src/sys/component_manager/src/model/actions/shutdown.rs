@@ -260,7 +260,7 @@ impl ShutdownJob {
     }
 }
 
-async fn do_shutdown(
+pub async fn do_shutdown(
     component: &Arc<ComponentInstance>,
     shutdown_type: ShutdownType,
 ) -> Result<(), ActionError> {
