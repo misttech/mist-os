@@ -21,20 +21,6 @@ rustc_binary("stub_inspect_component_bin") {
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
-rustc_binary("log_and_exit_component_bin") {
-  testonly = true
-  output_name = "log_and_exit"
-  edition = "2021"
-  source_root = "src/log_and_exit.rs"
-  deps = [
-    "//src/lib/fuchsia",
-    "//third_party/rust_crates:tracing",
-  ]
-
-  sources = [ "src/log_and_exit.rs" ]
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
-}
-
 rustc_binary("log_on_interest_bin") {
   testonly = true
   output_name = "log_on_interest"
@@ -64,13 +50,6 @@ fuchsia_component("component_with_children") {
   testonly = true
   deps = [ ":stub_inspect_component_bin" ]
   manifest = "meta/component_with_children.cml"
-}
-
-fuchsia_component("log_and_exit_component") {
-  testonly = true
-  component_name = "log-and-exit"
-  deps = [ ":log_and_exit_component_bin" ]
-  manifest = "meta/log-and-exit.cml"
 }
 
 fuchsia_component("log_on_interest_component") {
@@ -110,7 +89,6 @@ group("components") {
   testonly = true
   deps = [
     ":component_with_children",
-    ":log_and_exit_component",
     ":log_on_interest_component",
     ":socket-puppet",
     ":stub_inspect_component",

@@ -2,35 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    constants::*,
-    test_topology::{self, expose_test_realm_protocol},
-    utils,
-};
-use component_events::{events::*, matcher::*};
+use crate::test_topology;
 use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::{ArchiveReader, Data, Logs, RetryConfig};
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
+use fidl_fuchsia_archivist_test as ftest;
+use fidl_fuchsia_archivist_test::LogPuppetLogRequest;
+use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, Severity};
 use fuchsia_async as fasync;
-use fuchsia_component_test::ScopedInstanceFactory;
 use futures::StreamExt;
 
-const LOG_AND_EXIT_COMPONENT: &str = "log_and_exit";
+const HELLO_WORLD: &str = "Hello, world!";
 
 #[fuchsia::test]
 async fn test_logs_lifecycle() {
-    let (builder, test_realm) = test_topology::create(test_topology::Options::default())
-        .await
-        .expect("create base topology");
-    test_topology::add_collection(&test_realm, "coll").await.unwrap();
+    let mut puppets = Vec::with_capacity(12);
+    for i in 0..50 {
+        puppets.push(test_topology::PuppetDeclBuilder::new(format!("puppet{i}")).into());
+    }
+    let realm = test_topology::create_realm(ftest::RealmOptions {
+        puppets: Some(puppets),
+        ..Default::default()
+    })
+    .await
+    .expect("create base topology");
 
-    // Currently RealmBuilder doesn't support to expose a capability from framework, therefore we
-    // manually update the decl that the builder creates.
-    expose_test_realm_protocol(&builder, &test_realm).await;
-    let realm = builder.build().await.unwrap();
-    let accessor =
-        realm.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
+    let accessor = realm.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
 
     let mut reader = ArchiveReader::new();
     reader
@@ -46,52 +42,33 @@ async fn test_logs_lifecycle() {
         }
     });
 
-    let moniker = "coll:log_and_exit";
-
-    let mut event_stream = EventStream::open().await.unwrap();
     reader.retry(RetryConfig::EMPTY);
-    for i in 1..50 {
-        // launch our child, wait for it to exit, and destroy (so all its outgoing log connections
-        // are processed) before asserting on its logs
-        let realm_proxy =
-            realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
-        let mut instance = ScopedInstanceFactory::new("coll")
-            .with_realm_proxy(realm_proxy)
-            .new_named_instance(LOG_AND_EXIT_COMPONENT, LOG_AND_EXIT_COMPONENT_URL)
-            .await
-            .unwrap();
-        let _ = instance.connect_to_protocol_at_exposed_dir::<fcomponent::BinderMarker>().unwrap();
+    for i in 0..50 {
+        let puppet_name = format!("puppet{i}");
+        let puppet = test_topology::connect_to_puppet(&realm, &puppet_name).await.unwrap();
+        let request = LogPuppetLogRequest {
+            severity: Some(Severity::Info),
+            message: Some(HELLO_WORLD.to_string()),
+            ..Default::default()
+        };
+        puppet.log(&request).await.expect("Log succeeds");
 
-        utils::wait_for_component_stopped_event(
-            realm.root.child_name(),
-            &format!("coll:{LOG_AND_EXIT_COMPONENT}"),
-            ExitStatusMatcher::Clean,
-            &mut event_stream,
-        )
-        .await;
-
-        check_message(&moniker, subscription.next().await.unwrap());
+        check_message(&puppet_name, subscription.next().await.unwrap());
 
         reader.with_minimum_schema_count(i);
         let all_messages = reader.snapshot::<Logs>().await.unwrap();
 
         for message in all_messages {
-            check_message(&moniker, message);
+            check_message("puppet", message);
         }
-
-        let waiter = instance.take_destroy_waiter();
-        drop(instance);
-        waiter.await.unwrap();
     }
 }
 
-fn check_message(expected_moniker: &str, message: Data<Logs>) {
-    assert_eq!(message.moniker, expected_moniker,);
-    assert_eq!(message.metadata.component_url, Some(LOG_AND_EXIT_COMPONENT_URL.to_string()));
-
+fn check_message(expected_moniker_prefix: &str, message: Data<Logs>) {
+    assert!(message.moniker.starts_with(expected_moniker_prefix));
     assert_data_tree!(message.payload.unwrap(), root: {
         message: {
-            value: "Hello, world!",
+            value: HELLO_WORLD,
         }
     });
 }

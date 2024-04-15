@@ -36,21 +36,6 @@ pub(crate) async fn wait_for_component_to_crash(moniker: &str) {
         .unwrap();
 }
 
-pub(crate) async fn wait_for_component_stopped_event(
-    instance_child_name: &str,
-    component: &str,
-    status_match: ExitStatusMatcher,
-    event_stream: &mut EventStream,
-) {
-    let moniker_for_match = format!("./realm_builder:{instance_child_name}/test/{component}");
-    EventMatcher::ok()
-        .stop(Some(status_match))
-        .moniker(moniker_for_match)
-        .wait::<Stopped>(event_stream)
-        .await
-        .unwrap();
-}
-
 /// Extension methods on LogSettingsProxy.
 #[async_trait::async_trait]
 pub(crate) trait LogSettingsExt {

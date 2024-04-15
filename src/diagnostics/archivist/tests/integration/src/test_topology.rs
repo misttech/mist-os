@@ -7,7 +7,6 @@ use crate::constants;
 use anyhow::{Context, Error, Result};
 use fidl::endpoints::{create_endpoints, DiscoverableProtocolMarker, ProtocolMarker};
 use fidl_fuchsia_archivist_test as ftest;
-use fidl_fuchsia_component_decl as fdecl;
 use fidl_fuchsia_testing_harness as fharness;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component_test::{
@@ -195,29 +194,6 @@ pub async fn add_eager_child(
         )
         .await?;
     Ok(child_ref)
-}
-
-pub async fn add_collection(test_realm: &SubRealmBuilder, name: &str) -> Result<(), Error> {
-    let mut decl = test_realm.get_realm_decl().await?;
-    decl.collections.push(cm_rust::CollectionDecl {
-        name: name.parse().unwrap(),
-        durability: fdecl::Durability::Transient,
-        environment: None,
-        allowed_offers: cm_types::AllowedOffers::StaticOnly,
-        allow_long_names: false,
-        persistent_storage: None,
-    });
-    test_realm.replace_realm_decl(decl).await?;
-    test_realm
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
-                .from(Ref::child("archivist"))
-                .to(Ref::collection(name)),
-        )
-        .await?;
-    Ok(())
 }
 
 pub async fn expose_test_realm_protocol(builder: &RealmBuilder, test_realm: &SubRealmBuilder) {
