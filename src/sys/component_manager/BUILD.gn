@@ -131,7 +131,6 @@ rustc_binary("bin") {
     "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:zerocopy",
   ]
 
   sources = [
@@ -141,12 +140,8 @@ rustc_binary("bin") {
     "src/bootfs.rs",
     "src/builtin/builtin_resolver.rs",
     "src/builtin/builtin_runner.rs",
-    "src/builtin/capability.rs",
     "src/builtin/crash_introspect.rs",
-    "src/builtin/factory_items.rs",
     "src/builtin/fuchsia_boot_resolver.rs",
-    "src/builtin/items.rs",
-    "src/builtin/kernel_stats.rs",
     "src/builtin/log.rs",
     "src/builtin/mod.rs",
     "src/builtin/realm_builder.rs",

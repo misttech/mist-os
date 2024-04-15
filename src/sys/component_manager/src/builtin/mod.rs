@@ -4,12 +4,8 @@
 
 pub mod builtin_resolver;
 pub mod builtin_runner;
-pub mod capability;
 pub mod crash_introspect;
-pub mod factory_items;
 pub mod fuchsia_boot_resolver;
-pub mod items;
-pub mod kernel_stats;
 pub mod log;
 pub mod realm_builder;
 pub mod runner;

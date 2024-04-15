@@ -15,10 +15,7 @@ use {
         builtin::{
             builtin_resolver::{BuiltinResolver, SCHEME as BUILTIN_SCHEME},
             crash_introspect::CrashIntrospectSvc,
-            factory_items::FactoryItems,
             fuchsia_boot_resolver::{FuchsiaBootResolverBuiltinCapability, SCHEME as BOOT_SCHEME},
-            items::Items,
-            kernel_stats::KernelStats,
             log::{ReadOnlyLog, WriteOnlyLog},
             realm_builder::{
                 RealmBuilderResolver, RealmBuilderRunnerFactory,
@@ -74,9 +71,10 @@ use {
     builtins::{arguments::Arguments as BootArguments, root_job::RootJob},
     builtins::{
         cpu_resource::CpuResource, debug_resource::DebugResource,
-        energy_info_resource::EnergyInfoResource, framebuffer_resource::FramebufferResource,
-        hypervisor_resource::HypervisorResource, info_resource::InfoResource,
-        iommu_resource::IommuResource, irq_resource::IrqResource, mexec_resource::MexecResource,
+        energy_info_resource::EnergyInfoResource, factory_items::FactoryItems,
+        framebuffer_resource::FramebufferResource, hypervisor_resource::HypervisorResource,
+        info_resource::InfoResource, iommu_resource::IommuResource, irq_resource::IrqResource,
+        items::Items, kernel_stats::KernelStats, mexec_resource::MexecResource,
         mmio_resource::MmioResource, msi_resource::MsiResource, power_resource::PowerResource,
         profile_resource::ProfileResource, root_resource::RootResource,
         vmex_resource::VmexResource,

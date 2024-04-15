@@ -14,6 +14,7 @@ rustc_library("builtins") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
@@ -30,10 +31,11 @@ rustc_library("builtins") {
   test_deps = [
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:zerocopy",
   ]
 
   sources = [
@@ -41,12 +43,15 @@ rustc_library("builtins") {
     "src/cpu_resource.rs",
     "src/debug_resource.rs",
     "src/energy_info_resource.rs",
+    "src/factory_items.rs",
     "src/framebuffer_resource.rs",
     "src/hypervisor_resource.rs",
     "src/info_resource.rs",
     "src/iommu_resource.rs",
     "src/ioport_resource.rs",
     "src/irq_resource.rs",
+    "src/items.rs",
+    "src/kernel_stats.rs",
     "src/lib.rs",
     "src/mexec_resource.rs",
     "src/mmio_resource.rs",

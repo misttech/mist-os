@@ -6,6 +6,7 @@ pub mod arguments;
 pub mod cpu_resource;
 pub mod debug_resource;
 pub mod energy_info_resource;
+pub mod factory_items;
 pub mod framebuffer_resource;
 pub mod hypervisor_resource;
 pub mod info_resource;
@@ -13,6 +14,8 @@ pub mod iommu_resource;
 #[cfg(target_arch = "x86_64")]
 pub mod ioport_resource;
 pub mod irq_resource;
+pub mod items;
+pub mod kernel_stats;
 pub mod mexec_resource;
 pub mod mmio_resource;
 pub mod msi_resource;
