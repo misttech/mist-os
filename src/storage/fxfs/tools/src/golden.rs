@@ -7,8 +7,9 @@ use {
     anyhow::{bail, ensure, Context, Error},
     chrono::Local,
     fxfs::{
-        filesystem::{mkfs_with_default, FxFilesystem, SyncOptions},
-        serialized_types::LATEST_VERSION,
+        filesystem::{mkfs_with_volume, FxFilesystem, OpenFxFilesystem, SyncOptions},
+        object_store::ObjectStore,
+        serialized_types::{Version, LATEST_VERSION},
     },
     fxfs_crypto::Crypt,
     fxfs_insecure_crypto::InsecureCrypt,
@@ -28,6 +29,11 @@ const EXPECTED_FILE_CONTENT: &[u8; 8] = b"content.";
 const FXFS_GOLDEN_IMAGE_DIR: &str = "src/storage/fxfs/testdata";
 const FXFS_GOLDEN_IMAGE_MANIFEST: &str = "golden_image_manifest.json";
 const PROJECT_ID: u64 = 4;
+const DEFAULT_VOLUME: &str = "default";
+const UNENCRYPTED_VOLUME: &str = "unencrypted";
+const CHECK_FILE_PATH: &str = "some/test_file.txt";
+const CHECK_FILE_CONTENT: &[u8; 6] = &[0, 1, 2, 3, 4, 5];
+const SECOND_VOLUME_VERSION: Version = Version { major: 38, minor: 0 };
 
 /// Uses FUCHSIA_DIR environment variable to generate a path to the expected location of golden
 /// images. Note that we do this largely for ergonomics because this binary is typically invoked
@@ -67,6 +73,40 @@ async fn save_device(device: Arc<dyn Device>, path: &Path) -> Result<(), Error> 
     Ok(())
 }
 
+async fn activity_in_volume(fs: &OpenFxFilesystem, vol: &Arc<ObjectStore>) -> Result<(), Error> {
+    ops::mkdir(fs, vol, Path::new("some")).await?;
+    // Apply limit to project id and apply that both to the "some" directory to have it get applied
+    // everywhere else.
+    ops::set_project_limit(vol, PROJECT_ID, 102400, 1024).await?;
+    ops::set_project_for_node(vol, PROJECT_ID, &Path::new("some")).await?;
+
+    ops::put(fs, vol, &Path::new("some/file.txt"), EXPECTED_FILE_CONTENT.to_vec()).await?;
+    ops::put(fs, vol, &Path::new("some/deleted.txt"), EXPECTED_FILE_CONTENT.to_vec()).await?;
+    // Compact here and below so that there are some persistent files added.
+    fs.journal().compact().await?;
+    ops::unlink(fs, vol, &Path::new("some/deleted.txt")).await?;
+    ops::put(fs, vol, &Path::new("some/fsverity.txt"), EXPECTED_FILE_CONTENT.to_vec()).await?;
+    ops::enable_verity(vol, &Path::new("some/fsverity.txt")).await?;
+
+    fs.journal().compact().await?;
+
+    ops::set_extended_attribute_for_node(
+        vol,
+        &Path::new("some"),
+        b"security.selinux",
+        b"test value",
+    )
+    .await?;
+    ops::set_extended_attribute_for_node(
+        vol,
+        &Path::new("some/file.txt"),
+        b"user.hash",
+        b"different value",
+    )
+    .await?;
+    Ok(())
+}
+
 /// Create a new golden image (at the current version).
 pub async fn create_image() -> Result<(), Error> {
     let path = golden_image_dir()?.join(latest_image_filename());
@@ -75,49 +115,28 @@ pub async fn create_image() -> Result<(), Error> {
     {
         let device_holder = DeviceHolder::new(FakeDevice::new(IMAGE_BLOCKS, IMAGE_BLOCK_SIZE));
         let device = device_holder.clone();
-        mkfs_with_default(device_holder, Some(crypt.clone())).await?;
+        mkfs_with_volume(device_holder, DEFAULT_VOLUME, Some(crypt.clone())).await?;
         device.reopen(false);
         save_device(device, path.as_path()).await?;
     }
     let device_holder = DeviceHolder::new(load_device(&path)?);
     let device = device_holder.clone();
     let fs = FxFilesystem::open(device_holder).await?;
-    let vol = ops::open_volume(&fs, crypt.clone()).await?;
-    ops::mkdir(&fs, &vol, Path::new("some")).await?;
-    // Apply limit to project id and apply that both to the "some" directory to have it get applied
-    // everywhere else.
-    ops::set_project_limit(&vol, PROJECT_ID, 102400, 1024).await?;
-    ops::set_project_for_node(&vol, PROJECT_ID, &Path::new("some")).await?;
-
-    ops::put(&fs, &vol, &Path::new("some/file.txt"), EXPECTED_FILE_CONTENT.to_vec()).await?;
-    ops::put(&fs, &vol, &Path::new("some/fsverity.txt"), EXPECTED_FILE_CONTENT.to_vec()).await?;
-    ops::enable_verity(&vol, &Path::new("some/fsverity.txt")).await?;
-    ops::put(&fs, &vol, &Path::new("some/deleted.txt"), EXPECTED_FILE_CONTENT.to_vec()).await?;
-    ops::unlink(&fs, &vol, &Path::new("some/deleted.txt")).await?;
-
-    ops::set_extended_attribute_for_node(
-        &vol,
-        &Path::new("some"),
-        b"security.selinux",
-        b"test value",
-    )
-    .await?;
-    ops::set_extended_attribute_for_node(
-        &vol,
-        &Path::new("some/file.txt"),
-        b"user.hash",
-        b"different value",
-    )
-    .await?;
+    let default_vol = ops::open_volume(&fs, DEFAULT_VOLUME, Some(crypt.clone())).await?;
+    let unencrypted_vol = ops::create_volume(&fs, UNENCRYPTED_VOLUME, None).await?;
+    for (vol, msg) in [(&default_vol, "default volume"), (&unencrypted_vol, "unencrypted volume")] {
+        activity_in_volume(&fs, vol).await.context(msg)?;
+    }
 
     // Write enough stuff to the journal (journal::BLOCK_SIZE per sync) to ensure we would fill
     // the disk without reclaim of both journal and file data.
     let num_iters = 2000;
     let before_generation = fs.super_block_header().generation;
     for _i in 0..num_iters {
-        ops::put(&fs, &vol, &Path::new("some/repeat.txt"), EXPECTED_FILE_CONTENT.to_vec()).await?;
+        ops::put(&fs, &default_vol, &Path::new("some/repeat.txt"), EXPECTED_FILE_CONTENT.to_vec())
+            .await?;
         fs.sync(SyncOptions { flush_device: true, precondition: None }).await?;
-        ops::unlink(&fs, &vol, &Path::new("some/repeat.txt")).await?;
+        ops::unlink(&fs, &default_vol, &Path::new("some/repeat.txt")).await?;
         fs.sync(SyncOptions { flush_device: true, precondition: None }).await?;
     }
     // Ensure that we have reclaimed the journal at least once.
@@ -149,6 +168,32 @@ pub async fn create_image() -> Result<(), Error> {
     Ok(())
 }
 
+async fn check_volume(
+    fs: &OpenFxFilesystem,
+    vol: &Arc<ObjectStore>,
+    version: &Version,
+) -> Result<(), Error> {
+    if ops::get(&vol, &Path::new("some/file.txt")).await? != EXPECTED_FILE_CONTENT.to_vec() {
+        bail!("Expected file content incorrect.");
+    }
+    if version.major >= FSVERITY_VERSION_START {
+        if ops::get(&vol, &Path::new("some/fsverity.txt")).await? != EXPECTED_FILE_CONTENT.to_vec()
+        {
+            bail!("Expected fsverity content incorrect.");
+        }
+    }
+    if ops::get(&vol, &Path::new("some/deleted.txt")).await.is_ok() {
+        bail!("Found deleted file.");
+    }
+
+    // Make sure after writing a new file (using the latest format), the filesystem remains
+    // valid.
+    let mut content = vec![0u8; 6];
+    content.copy_from_slice(CHECK_FILE_CONTENT);
+    ops::put(&fs, &vol, &Path::new(CHECK_FILE_PATH), content).await?;
+    Ok(())
+}
+
 /// Validates an image by looking for expected data and performing an fsck.
 async fn check_image(path: &Path) -> Result<(), Error> {
     let crypt: Arc<dyn Crypt> = Arc::new(InsecureCrypt::new());
@@ -158,41 +203,34 @@ async fn check_image(path: &Path) -> Result<(), Error> {
         ops::fsck(&fs, true).await.context("fsck failed")?;
         fs.journal().super_block_header().earliest_version
     };
-    {
-        let device = DeviceHolder::new(load_device(path)?);
-        let fs = FxFilesystem::open(device).await?;
-        let vol = ops::open_volume(&fs, crypt.clone()).await?;
-        if ops::get(&vol, &Path::new("some/file.txt")).await? != EXPECTED_FILE_CONTENT.to_vec() {
-            bail!("Expected file content incorrect.");
-        }
-        if version.major >= FSVERITY_VERSION_START {
-            if ops::get(&vol, &Path::new("some/fsverity.txt")).await?
-                != EXPECTED_FILE_CONTENT.to_vec()
-            {
-                bail!("Expected fsverity content incorrect.");
-            }
-        }
-        if ops::get(&vol, &Path::new("some/deleted.txt")).await.is_ok() {
-            bail!("Found deleted file.");
-        }
 
-        // Make sure after writing a new file (using the latest format), the filesystem remains
-        // valid.
-        let new_file = Path::new("some/test_file.txt");
-        let content = vec![0, 1, 2, 3, 4, 5];
-        ops::put(&fs, &vol, &new_file, content.clone()).await?;
-        fs.close().await?;
+    let device = DeviceHolder::new(load_device(path)?);
+    let fs = FxFilesystem::open(device).await?;
+    let mut volumes = vec![(DEFAULT_VOLUME, Some(crypt.clone()))];
+    if version >= SECOND_VOLUME_VERSION {
+        volumes.push((UNENCRYPTED_VOLUME, None));
+    }
+    for (vol_name, vol_crypt) in volumes.clone() {
+        let vol = ops::open_volume(&fs, vol_name, vol_crypt)
+            .await
+            .context(format!("Opening {}", vol_name))?;
+        check_volume(&fs, &vol, &version).await.context(format!("Checking {}", vol_name))?;
+    }
+    fs.close().await?;
 
-        let device = fs.take_device().await;
-        device.reopen(false);
-        let fs = FxFilesystem::open(device).await?;
-        ops::fsck(&fs, true).await.context("fsck failed")?;
-        let vol = ops::open_volume(&fs, crypt.clone()).await?;
-        if &ops::get(&vol, &new_file).await? != &content {
+    let device = fs.take_device().await;
+    device.reopen(false);
+    let fs = FxFilesystem::open(device).await?;
+    ops::fsck(&fs, true).await.context("fsck failed")?;
+    for (vol_name, vol_crypt) in volumes {
+        let vol = ops::open_volume(&fs, vol_name, vol_crypt).await.context(vol_name)?;
+        if &ops::get(&vol, &Path::new(CHECK_FILE_PATH)).await?.as_slice()
+            != &CHECK_FILE_CONTENT.as_slice()
+        {
             bail!("Unexpected file content in new file");
         }
-        fs.close().await
     }
+    fs.close().await
 }
 
 pub async fn check_images(image_root: Option<String>) -> Result<(), Error> {

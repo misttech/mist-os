@@ -6,7 +6,7 @@ use {
     anyhow::Error,
     argh::FromArgs,
     fxfs::{
-        filesystem::{mkfs_with_default, FxFilesystem, FxFilesystemBuilder},
+        filesystem::{mkfs_with_volume, FxFilesystem, FxFilesystemBuilder},
         fsck,
     },
     fxfs_crypto::Crypt,
@@ -15,6 +15,8 @@ use {
     storage_device::{file_backed_device::FileBackedDevice, DeviceHolder},
     tools::ops,
 };
+
+const DEFAULT_VOLUME: &str = "default";
 
 #[cfg(target_os = "linux")]
 use {
@@ -207,7 +209,7 @@ async fn main() -> Result<(), Error> {
                         512,
                     ));
                     let fs = FxFilesystem::open(device).await?;
-                    let vol = ops::open_volume(&fs, crypt.clone()).await?;
+                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, Some(crypt.clone())).await?;
                     ops::unlink(&fs, &vol, &Path::new(&rmargs.path)).await?;
                     fs.close().await?;
                     let result = ops::fsck(&fs, args.verbose).await?;
@@ -220,7 +222,7 @@ async fn main() -> Result<(), Error> {
                         512,
                     ));
                     let fs = FxFilesystemBuilder::new().read_only(true).open(device).await?;
-                    let vol = ops::open_volume(&fs, crypt).await?;
+                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, Some(crypt)).await?;
                     let data = ops::get(&vol, &Path::new(&getargs.src)).await?;
                     let mut reader = std::io::Cursor::new(&data);
                     let mut writer = std::fs::File::create(getargs.dst)?;
@@ -233,7 +235,7 @@ async fn main() -> Result<(), Error> {
                         512,
                     ));
                     let fs = FxFilesystem::open(device).await?;
-                    let vol = ops::open_volume(&fs, crypt.clone()).await?;
+                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, Some(crypt.clone())).await?;
                     let mut data = Vec::new();
                     std::fs::File::open(&putargs.src)?.read_to_end(&mut data)?;
                     ops::put(&fs, &vol, &Path::new(&putargs.dst), data).await?;
@@ -246,7 +248,7 @@ async fn main() -> Result<(), Error> {
                         std::fs::OpenOptions::new().read(true).write(true).open(cmd.file)?,
                         512,
                     ));
-                    mkfs_with_default(device, Some(crypt)).await?;
+                    mkfs_with_volume(device, DEFAULT_VOLUME, Some(crypt)).await?;
                     Ok(())
                 }
                 ImageSubCommand::Fsck(_) => {
@@ -269,7 +271,7 @@ async fn main() -> Result<(), Error> {
                         512,
                     ));
                     let fs = FxFilesystemBuilder::new().read_only(true).open(device).await?;
-                    let vol = ops::open_volume(&fs, crypt).await?;
+                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, Some(crypt)).await?;
                     let dir = ops::walk_dir(&vol, &Path::new(&lsargs.path)).await?;
                     ops::print_ls(&dir).await?;
                     Ok(())
@@ -280,7 +282,7 @@ async fn main() -> Result<(), Error> {
                         512,
                     ));
                     let fs = FxFilesystem::open(device).await?;
-                    let vol = ops::open_volume(&fs, crypt.clone()).await?;
+                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, Some(crypt.clone())).await?;
                     ops::mkdir(&fs, &vol, &Path::new(&mkdirargs.path)).await?;
                     fs.close().await?;
                     ops::fsck(&fs, args.verbose).await?;
@@ -292,7 +294,7 @@ async fn main() -> Result<(), Error> {
                         512,
                     ));
                     let fs = FxFilesystem::open(device).await?;
-                    let vol = ops::open_volume(&fs, crypt.clone()).await?;
+                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, Some(crypt.clone())).await?;
                     ops::unlink(&fs, &vol, &Path::new(&rmdirargs.path)).await?;
                     fs.close().await?;
                     ops::fsck(&fs, args.verbose).await?;

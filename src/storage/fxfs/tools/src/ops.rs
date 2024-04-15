@@ -23,8 +23,6 @@ use {
     std::{io::Write, ops::Deref, path::Path, sync::Arc},
 };
 
-const DEFAULT_VOLUME: &str = "default";
-
 pub async fn print_ls(dir: &Directory<ObjectStore>) -> Result<(), Error> {
     const DATE_FMT: &str = "%b %d %Y %T+00";
     let layer_set = dir.store().tree().layer_set();
@@ -78,13 +76,24 @@ pub async fn print_ls(dir: &Directory<ObjectStore>) -> Result<(), Error> {
     Ok(())
 }
 
+/// Make a volume
+pub async fn create_volume(
+    fs: &OpenFxFilesystem,
+    name: &str,
+    crypt: Option<Arc<dyn Crypt>>,
+) -> Result<Arc<ObjectStore>, Error> {
+    let root_volume = root_volume(fs.deref().clone()).await?;
+    root_volume.new_volume(name, crypt).await
+}
+
 /// Opens a volume on a device and returns a Directory to it's root.
 pub async fn open_volume(
     fs: &OpenFxFilesystem,
-    crypt: Arc<dyn Crypt>,
+    name: &str,
+    crypt: Option<Arc<dyn Crypt>>,
 ) -> Result<Arc<ObjectStore>, Error> {
     let root_volume = root_volume(fs.deref().clone()).await?;
-    root_volume.volume(DEFAULT_VOLUME, Some(crypt)).await.map(|v| v.into())
+    root_volume.volume(name, crypt).await.map(|v| v.into())
 }
 
 /// Walks a directory path from a given root.

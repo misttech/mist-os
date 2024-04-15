@@ -829,11 +829,12 @@ pub async fn mkfs(device: DeviceHolder) -> Result<(), Error> {
     fs.close().await
 }
 
-/// Helper method for making a new filesystem with a default volume.
+/// Helper method for making a new filesystem with a single named volume.
 /// This shouldn't be used in production; instead volumes should be created with the Volumes
 /// protocol.
-pub async fn mkfs_with_default(
+pub async fn mkfs_with_volume(
     device: DeviceHolder,
+    volume_name: &str,
     crypt: Option<Arc<dyn Crypt>>,
 ) -> Result<(), Error> {
     let fs = FxFilesystem::new_empty(device).await?;
@@ -841,7 +842,7 @@ pub async fn mkfs_with_default(
         // expect instead of propagating errors here, since otherwise we could drop |fs| before
         // close is called, which leads to confusing and unrelated error messages.
         let root_volume = root_volume(fs.clone()).await.expect("Open root_volume failed");
-        root_volume.new_volume("default", crypt).await.expect("Create volume failed");
+        root_volume.new_volume(volume_name, crypt).await.expect("Create volume failed");
     }
     fs.close().await?;
     Ok(())
