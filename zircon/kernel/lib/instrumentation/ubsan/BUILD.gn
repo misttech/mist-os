@@ -19,7 +19,10 @@ source_set("runtime") {
     # The former could be addressed via `#pragma clang attribute`, but the
     # latter cannot be.
     configs -= [ "//build/config/sanitizers:ubsan" ]
-    sources = [ "runtime.cc" ]
+    sources = [
+      "runtime.cc",
+      "ubsan-types.h",
+    ]
     deps = [
       "..:headers",
       "//zircon/kernel/lib/crashlog",
