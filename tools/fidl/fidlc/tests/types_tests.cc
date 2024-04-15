@@ -685,7 +685,7 @@ type Foo = struct {
 };
 )FIDL");
 
-  library.ExpectFail(ErrNameNotFound, "FrameworkErr", "example");
+  library.ExpectFail(ErrNameNotFound, "FrameworkErr", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -698,7 +698,7 @@ type Foo = struct {
 };
 )FIDL");
 
-  library.ExpectFail(ErrNameNotFound, "FrameworkErr", "fidl");
+  library.ExpectFail(ErrNameNotFound, "FrameworkErr", "library 'fidl'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

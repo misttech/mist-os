@@ -860,8 +860,7 @@ void JSONGenerator::Generate(const NewType& value) {
 
 void JSONGenerator::Generate(const Compilation::Dependency& dependency) {
   GenerateObject([&]() {
-    auto library_name = NameLibrary(dependency.library->name);
-    GenerateObjectMember("name", library_name, Position::kFirst);
+    GenerateObjectMember("name", dependency.library->name, Position::kFirst);
     GenerateExternalDeclarationsMember(dependency.declarations);
   });
 }
@@ -987,7 +986,7 @@ void JSONGenerator::GenerateExternalDeclarationsMember(
 std::ostringstream JSONGenerator::Produce() {
   ResetIndentLevel();
   GenerateObject([&]() {
-    GenerateObjectMember("name", NameLibrary(compilation_->library_name), Position::kFirst);
+    GenerateObjectMember("name", compilation_->library_name, Position::kFirst);
     GenerateObjectMember("platform", compilation_->platform->name());
 
     GenerateObjectPunctuation(Position::kSubsequent);

@@ -27,8 +27,8 @@
       "library_location": {
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/struct_default_value_enum_library_reference/dependent.test.fidl",
-        "data": "library test.dependent",
-        "start_offset": 0,
+        "data": "test.dependent",
+        "start_offset": 8,
         "end_offset": 22
       }
     }

@@ -27,8 +27,8 @@
       "library_location": {
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/transitive_dependencies/middle.test.fidl",
-        "data": "library test.middle",
-        "start_offset": 0,
+        "data": "test.middle",
+        "start_offset": 8,
         "end_offset": 19
       }
     }

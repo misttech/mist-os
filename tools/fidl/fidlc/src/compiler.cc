@@ -103,14 +103,13 @@ VirtualSourceFile* Compiler::Step::generated_source_file() {
 bool Libraries::Insert(std::unique_ptr<Library> library) {
   auto [_, inserted] = libraries_by_name_.try_emplace(library->name, library.get());
   if (!inserted) {
-    return reporter_->Fail(ErrMultipleLibrariesWithSameName, library->arbitrary_name_span,
-                           library->name);
+    return reporter_->Fail(ErrMultipleLibrariesWithSameName, library->name_spans[0], library->name);
   }
   libraries_.push_back(std::move(library));
   return true;
 }
 
-Library* Libraries::Lookup(const std::vector<std::string_view>& library_name) const {
+Library* Libraries::Lookup(std::string_view library_name) const {
   auto iter = libraries_by_name_.find(library_name);
   return iter == libraries_by_name_.end() ? nullptr : iter->second;
 }
@@ -453,7 +452,7 @@ std::unique_ptr<Compilation> Libraries::Filter(const VersionSelection* version_s
   compilation->platform = &library->platform.value();
   compilation->version_added = library->availability.set().ranges().first.pair().first;
   compilation->library_name = library->name;
-  compilation->library_declarations = library->library_name_declarations;
+  compilation->library_declarations = library->name_spans;
   compilation->library_attributes = library->attributes.get();
   filter_declarations(&compilation->declarations, library->declarations);
   compilation->external_structs = ExternalStructs(library, compilation->declarations.protocols);

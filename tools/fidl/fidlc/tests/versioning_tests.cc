@@ -24,9 +24,7 @@ TEST(VersioningTests, GoodUnversionedPlatformOneComponent) {
 library example;
 )FIDL");
   ASSERT_COMPILED(library);
-
-  auto example = library.LookupLibrary("example");
-  EXPECT_TRUE(example->platform.value().is_unversioned());
+  EXPECT_TRUE(library.platform().is_unversioned());
 }
 
 TEST(VersioningTests, GoodUnversionedPlatformTwoComponents) {
@@ -34,9 +32,7 @@ TEST(VersioningTests, GoodUnversionedPlatformTwoComponents) {
 library example.something;
 )FIDL");
   ASSERT_COMPILED(library);
-
-  auto example = library.LookupLibrary("example.something");
-  EXPECT_TRUE(example->platform.value().is_unversioned());
+  EXPECT_TRUE(library.platform().is_unversioned());
 }
 
 TEST(VersioningTests, GoodImplicitPlatformOneComponent) {
@@ -46,10 +42,8 @@ library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
   ASSERT_COMPILED(library);
-
-  auto example = library.LookupLibrary("example");
-  EXPECT_EQ(example->platform, Platform::Parse("example").value());
-  EXPECT_FALSE(example->platform.value().is_unversioned());
+  EXPECT_EQ(library.platform(), Platform::Parse("example").value());
+  EXPECT_FALSE(library.platform().is_unversioned());
 }
 
 TEST(VersioningTests, GoodImplicitPlatformTwoComponents) {
@@ -59,10 +53,8 @@ library example.something;
 )FIDL");
   library.SelectVersion("example", "HEAD");
   ASSERT_COMPILED(library);
-
-  auto example = library.LookupLibrary("example.something");
-  EXPECT_EQ(example->platform, Platform::Parse("example").value());
-  EXPECT_FALSE(example->platform.value().is_unversioned());
+  EXPECT_EQ(library.platform(), Platform::Parse("example").value());
+  EXPECT_FALSE(library.platform().is_unversioned());
 }
 
 TEST(VersioningTests, GoodExplicitPlatform) {
@@ -72,10 +64,8 @@ library example;
 )FIDL");
   library.SelectVersion("someplatform", "HEAD");
   ASSERT_COMPILED(library);
-
-  auto example = library.LookupLibrary("example");
-  EXPECT_EQ(example->platform, Platform::Parse("someplatform").value());
-  EXPECT_FALSE(example->platform.value().is_unversioned());
+  EXPECT_EQ(library.platform(), Platform::Parse("someplatform").value());
+  EXPECT_FALSE(library.platform().is_unversioned());
 }
 
 TEST(VersioningTests, BadInvalidPlatform) {
@@ -96,7 +86,7 @@ TEST(VersioningTests, BadReservedPlatform) {
 TEST(VersioningTests, BadExplicitPlatformNoVersionSelected) {
   TestLibrary library;
   library.AddFile("bad/fi-0201.test.fidl");
-  library.ExpectFail(ErrPlatformVersionNotSelected, "test.bad.fi0201",
+  library.ExpectFail(ErrPlatformVersionNotSelected, "library 'test.bad.fi0201'",
                      Platform::Parse("foo").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -106,7 +96,7 @@ TEST(VersioningTests, BadImplicitPlatformNoVersionSelected) {
 @available(added=1)
 library example.something;
 )FIDL");
-  library.ExpectFail(ErrPlatformVersionNotSelected, "example.something",
+  library.ExpectFail(ErrPlatformVersionNotSelected, "library 'example.something'",
                      Platform::Parse("example").value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -938,7 +928,7 @@ resource_definition Resource : uint32 {
   library.SelectVersion("example", "1");
   ASSERT_COMPILED(library);
 
-  auto& unfiltered_decls = library.LookupLibrary("example")->declaration_order;
+  auto& unfiltered_decls = library.all_libraries()->Lookup("example")->declaration_order;
   auto& filtered_decls = library.declaration_order();
   // Because everything has the same availability, nothing gets split.
   EXPECT_EQ(unfiltered_decls.size(), filtered_decls.size());
@@ -3360,8 +3350,8 @@ type Foo = struct {
     dep dependency.Foo;
 };
 )FIDL");
-  example.ExpectFail(ErrNameNotFound, "Foo", "dependency");
-  example.ExpectFail(ErrNameNotFound, "Foo", "dependency");
+  example.ExpectFail(ErrNameNotFound, "Foo", "library 'dependency'");
+  example.ExpectFail(ErrNameNotFound, "Foo", "library 'dependency'");
   ASSERT_COMPILER_DIAGNOSTICS(example);
 }
 

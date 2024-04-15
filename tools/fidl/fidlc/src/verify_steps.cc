@@ -141,7 +141,7 @@ void VerifyAttributesStep::RunImpl() {
 }
 
 void VerifyDependenciesStep::RunImpl() {
-  library()->dependencies.VerifyAllDependenciesWereUsed(*library(), reporter());
+  library()->dependencies.VerifyAllDependenciesWereUsed(library(), reporter());
 }
 
 }  // namespace fidlc

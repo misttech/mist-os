@@ -62,7 +62,7 @@ type MyStruct = struct {
     field int64 = A;
 };
 )FIDL");
-  library.ExpectFail(ErrNameNotFound, "A", "example");
+  library.ExpectFail(ErrNameNotFound, "A", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -201,7 +201,7 @@ type MyStruct = struct {
     field MyEnum = A;
 };
 )FIDL");
-  library.ExpectFail(ErrNameNotFound, "A", "example");
+  library.ExpectFail(ErrNameNotFound, "A", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

@@ -245,6 +245,11 @@ std::uint32_t string_literal_length(std::string_view str);
 // because canonicalize returns "foo_bar" for both.
 std::string canonicalize(std::string_view identifier);
 
+// Returns the first component of a name with 0 or more dots, e.g. "foo.bar" -> "foo".
+inline std::string_view FirstComponent(std::string_view name) {
+  return name.substr(0, name.find('.'));
+}
+
 std::string StringJoin(const std::vector<std::string_view>& strings, std::string_view separator);
 
 // Used by fidl-lint FormatFindings, and for testing,

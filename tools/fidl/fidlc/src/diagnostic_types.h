@@ -33,7 +33,6 @@ std::string Display(SourceSpan s);
 std::string Display(Token::KindAndSubkind t);
 std::string Display(Openness o);
 std::string Display(Protocol::Method::Kind k);
-std::string Display(const std::vector<std::string_view>& library_name);
 std::string Display(const Attribute* a);
 std::string Display(const AttributeArg* a);
 std::string Display(const Constant* c);

@@ -78,8 +78,9 @@ class SharedInterface {
   std::vector<Diagnostic*> Diagnostics() { return reporter()->Diagnostics(); }
   void set_warnings_as_errors(bool value) { reporter()->set_warnings_as_errors(value); }
   void PrintReports() { reporter()->PrintReports(/*enable_color=*/false); }
-  void SelectVersion(const std::string& platform, std::string_view version) {
-    version_selection()->Insert(Platform::Parse(platform).value(), Version::Parse(version).value());
+  void SelectVersion(std::string platform, std::string_view version) {
+    version_selection()->Insert(Platform::Parse(std::move(platform)).value(),
+                                Version::Parse(version).value());
   }
   void EnableFlag(ExperimentalFlag flag) { experimental_flags().Enable(flag); }
 };
@@ -211,13 +212,6 @@ class TestLibrary final : public SharedInterface {
     return out.str();
   }
 
-  // Note: We don't provide a convenient library() method because inspecting a
-  // Library is usually the wrong thing to do in tests. What usually matters is
-  // the Compilation, for which we provide compilation() and helpers like
-  // LookupStruct() etc. However, sometimes tests really need to get a Library*
-  // (e.g. to construct Name::Key), hence this method.
-  const Library* LookupLibrary(std::string_view name);
-
   const Bits* LookupBits(std::string_view name);
   const Const* LookupConstant(std::string_view name);
   const Enum* LookupEnum(std::string_view name);
@@ -243,21 +237,15 @@ class TestLibrary final : public SharedInterface {
   const Findings& findings() const { return findings_; }
   const std::vector<std::string>& lints() const { return lints_; }
 
-  const Compilation* compilation() const {
-    ZX_ASSERT_MSG(compilation_, "must compile successfully before accessing compilation");
-    return compilation_.get();
-  }
-
+  std::string_view name() const { return compilation_->library_name; }
+  const Platform& platform() const { return *compilation_->platform; }
   const AttributeList* attributes() { return compilation_->library_attributes; }
-
   const std::vector<const Struct*>& external_structs() const {
     return compilation_->external_structs;
   }
-
   const std::vector<const Decl*>& declaration_order() const {
     return compilation_->declaration_order;
   }
-
   const std::vector<Compilation::Dependency>& direct_and_composed_dependencies() const {
     return compilation_->direct_and_composed_dependencies;
   }

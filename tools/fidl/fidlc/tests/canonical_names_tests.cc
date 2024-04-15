@@ -593,7 +593,7 @@ TEST(CanonicalNamesTests, BadInconsistentTypeSpelling) {
       auto fidl = s.str();
       SCOPED_TRACE(fidl);
       TestLibrary library(fidl);
-      library.ExpectFail(ErrNameNotFound, use_name, "example");
+      library.ExpectFail(ErrNameNotFound, use_name, "library 'example'");
       ASSERT_COMPILER_DIAGNOSTICS(library);
     }
   }
@@ -613,7 +613,7 @@ TEST(CanonicalNamesTests, BadInconsistentConstSpelling) {
       << "const EXAMPLE bool = " << use_name << ";";
     auto fidl = s.str();
     TestLibrary library(fidl);
-    library.ExpectFail(ErrNameNotFound, use_name, "example");
+    library.ExpectFail(ErrNameNotFound, use_name, "library 'example'");
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }

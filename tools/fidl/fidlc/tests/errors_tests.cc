@@ -133,7 +133,7 @@ TEST(ErrorsTests, BadErrorUnknownIdentifier) {
   TestLibrary library;
   library.AddFile("bad/fi-0052.test.fidl");
 
-  library.ExpectFail(ErrNameNotFound, "ParsingError", "test.bad.fi0052");
+  library.ExpectFail(ErrNameNotFound, "ParsingError", "library 'test.bad.fi0052'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

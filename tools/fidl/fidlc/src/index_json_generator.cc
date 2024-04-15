@@ -16,7 +16,7 @@ namespace fidlc {
 std::ostringstream IndexJSONGenerator::Produce() {
   ResetIndentLevel();
   GenerateObject([&]() {
-    GenerateObjectMember("name", NameLibrary(compilation_->library_name), Position::kFirst);
+    GenerateObjectMember("name", compilation_->library_name, Position::kFirst);
     GenerateObjectMember("lib_declarations", compilation_->library_declarations);
     GenerateObjectMember("using_declarations", compilation_->using_references);
     GenerateObjectMember("dependencies", compilation_->direct_and_composed_dependencies);
@@ -95,15 +95,15 @@ void IndexJSONGenerator::Generate(IndexJSONGenerator::ReferencedIdentifier value
 void IndexJSONGenerator::Generate(std::pair<Library*, SourceSpan> reference) {
   GenerateObject([&]() {
     // for debugging purpose, include the span data
-    GenerateObjectMember("library_name", NameLibrary(reference.first->name), Position::kFirst);
+    GenerateObjectMember("library_name", reference.first->name, Position::kFirst);
     GenerateObjectMember("referenced_at", reference.second);
   });
 }
 
 void IndexJSONGenerator::Generate(const Compilation::Dependency& dependency) {
   GenerateObject([&]() {
-    GenerateObjectMember("library_name", NameLibrary(dependency.library->name), Position::kFirst);
-    GenerateObjectMember("library_location", dependency.library->arbitrary_name_span);
+    GenerateObjectMember("library_name", dependency.library->name, Position::kFirst);
+    GenerateObjectMember("library_location", dependency.library->name_spans[0]);
   });
 }
 

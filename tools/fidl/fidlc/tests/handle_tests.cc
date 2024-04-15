@@ -162,7 +162,7 @@ type MyStruct = struct {
 )FIDL");
   library.UseLibraryZx();
 
-  library.ExpectFail(ErrNameNotFound, "ZIPPY", "example");
+  library.ExpectFail(ErrNameNotFound, "ZIPPY", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -178,8 +178,8 @@ type MyStruct = struct {
 )FIDL");
   library.UseLibraryZx();
 
-  library.ExpectFail(ErrNameNotFound, "handle", "example");
-  library.ExpectFail(ErrNameNotFound, "vmo", "example");
+  library.ExpectFail(ErrNameNotFound, "handle", "library 'example'");
+  library.ExpectFail(ErrNameNotFound, "vmo", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -278,7 +278,7 @@ type MyStruct = resource struct {
     h handle;
 };
 )FIDL");
-  library.ExpectFail(ErrNameNotFound, "handle", "example");
+  library.ExpectFail(ErrNameNotFound, "handle", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -290,8 +290,8 @@ type MyStruct = resource struct {
     h handle:VMO;
 };
 )FIDL");
-  library.ExpectFail(ErrNameNotFound, "handle", "example");
-  library.ExpectFail(ErrNameNotFound, "VMO", "example");
+  library.ExpectFail(ErrNameNotFound, "handle", "library 'example'");
+  library.ExpectFail(ErrNameNotFound, "VMO", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -305,8 +305,8 @@ type MyStruct = resource struct {
     h my_handle:VMO;
 };
 )FIDL");
-  library.ExpectFail(ErrNameNotFound, "handle", "example");
-  library.ExpectFail(ErrNameNotFound, "VMO", "example");
+  library.ExpectFail(ErrNameNotFound, "handle", "library 'example'");
+  library.ExpectFail(ErrNameNotFound, "VMO", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

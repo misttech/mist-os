@@ -92,30 +92,28 @@ constexpr ErrorDef<39, Name, std::string_view> ErrDeclNameConflictsWithLibraryIm
     "library under a different name.");
 constexpr ErrorDef<40> ErrFilesDisagreeOnLibraryName(
     "Two files in the library disagree about the name of the library");
-constexpr ErrorDef<41, std::vector<std::string_view>> ErrMultipleLibrariesWithSameName(
+constexpr ErrorDef<41, std::string_view> ErrMultipleLibrariesWithSameName(
     "There are multiple libraries named '{0}'");
-constexpr ErrorDef<42, std::vector<std::string_view>> ErrDuplicateLibraryImport(
+constexpr ErrorDef<42, std::string_view> ErrDuplicateLibraryImport(
     "Library {0} already imported. Did you require it twice?");
-constexpr ErrorDef<43, std::vector<std::string_view>> ErrConflictingLibraryImport(
+constexpr ErrorDef<43, std::string_view> ErrConflictingLibraryImport(
     "import of library '{0}' conflicts with another library import");
-constexpr ErrorDef<44, std::vector<std::string_view>, std::string_view>
-    ErrConflictingLibraryImportAlias(
-        "import of library '{0}' under alias '{1}' conflicts with another library import");
+constexpr ErrorDef<44, std::string_view, std::string_view> ErrConflictingLibraryImportAlias(
+    "import of library '{0}' under alias '{1}' conflicts with another library import");
 constexpr ErrorDef<45> ErrAttributesNotAllowedOnLibraryImport(
     "attributes and doc comments are not allowed on `using` statements");
-constexpr ErrorDef<46, std::vector<std::string_view>> ErrUnknownLibrary(
+constexpr ErrorDef<46, std::string_view> ErrUnknownLibrary(
     "Could not find library named {0}. Did you include its sources with --files?");
 constexpr RetiredDef<47> ErrProtocolComposedMultipleTimes;
 constexpr ErrorDef<48> ErrOptionalTableMember("Table members cannot be optional");
 constexpr ErrorDef<49> ErrOptionalUnionMember("Union members cannot be optional");
 constexpr ErrorDef<50> ErrDeprecatedStructDefaults(
     "Struct defaults are deprecated and should not be used (see RFC-0160)");
-constexpr ErrorDef<51, std::vector<std::string_view>, std::vector<std::string_view>>
-    ErrUnknownDependentLibrary(
-        "Unknown dependent library {0} or reference to member of "
-        "library {1}. Did you require it with `using`?");
-constexpr ErrorDef<52, std::string_view, std::vector<std::string_view>> ErrNameNotFound(
-    "cannot find '{0}' in library '{1}'");
+constexpr ErrorDef<51, std::string_view, std::string_view> ErrUnknownDependentLibrary(
+    "Unknown dependent library {0} or reference to member of "
+    "library {1}. Did you require it with `using`?");
+constexpr ErrorDef<52, std::string_view, const Library *> ErrNameNotFound(
+    "cannot find '{0}' in {1}");
 constexpr ErrorDef<53, const Decl *> ErrCannotReferToMember("cannot refer to member of {0}");
 constexpr ErrorDef<54, const Decl *, std::string_view> ErrMemberNotFound("{0} has no member '{1}'");
 constexpr ErrorDef<55, const Element *, VersionRange, Platform, const Element *>
@@ -299,7 +297,7 @@ constexpr ErrorDef<149> ErrPlatformNotOnLibrary(
     "the argument 'platform' can only be used on the library's @available attribute");
 constexpr ErrorDef<150> ErrLibraryAvailabilityMissingAdded(
     "missing 'added' argument on the library's @available attribute");
-constexpr ErrorDef<151, std::vector<std::string_view>> ErrMissingLibraryAvailability(
+constexpr ErrorDef<151, std::string_view> ErrMissingLibraryAvailability(
     "to use the @available attribute here, you must also annotate the "
     "`library {0};` declaration in one of the library's files");
 constexpr ErrorDef<152, std::string_view> ErrInvalidPlatform(
@@ -352,9 +350,8 @@ constexpr RetiredDef<176> ErrHandleSubtypeMustReferToResourceSubtype;
 constexpr ErrorDef<177, Name> ErrResourceRightsPropertyMustReferToBits(
     "the rights property must be a uint32 or a uint32-based bits, "
     "but wasn't defined as such in resource {0}");
-constexpr ErrorDef<178, std::vector<std::string_view>, std::vector<std::string_view>>
-    ErrUnusedImport(
-        "Library {0} imports {1} but does not use it. Either use {1}, or remove import.");
+constexpr ErrorDef<178, const Library *, const Library *> ErrUnusedImport(
+    "{0} imports {1} but does not use it; either use it or remove the import");
 constexpr ErrorDef<179, Name> ErrNewTypeCannotHaveConstraint(
     "{0} is a newtype, which cannot carry constraints");
 constexpr ErrorDef<180, Name> ErrExperimentalZxCTypesDisallowed(
@@ -395,8 +392,8 @@ constexpr ErrorDef<198> ErrOverlayMustBeValue("overlays must be value (not resou
 constexpr ErrorDef<199> ErrOverlayMemberMustBeValue("overlays may not contain resource members",
                                                     {.documented = false});
 constexpr RetiredDef<200> ErrOverlayMustNotContainReserved;
-constexpr ErrorDef<201, std::vector<std::string_view>, Platform> ErrPlatformVersionNotSelected(
-    "library '{0}' belongs to platform '{1}', but no version was selected for it; "
+constexpr ErrorDef<201, const Library *, Platform> ErrPlatformVersionNotSelected(
+    "{0} belongs to platform '{1}', but no version was selected for it; "
     "please choose a version N by passing `--available {1}:N`");
 constexpr RetiredDef<202> ErrTransitionalNotAllowed;
 constexpr ErrorDef<203> ErrRemovedAndReplaced(

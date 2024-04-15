@@ -493,7 +493,7 @@ using dependency;
 
 type Example = struct { s string:dependency.MAX; };
 )FIDL");
-  library.ExpectFail(ErrNameNotFound, "MAX", "dependency");
+  library.ExpectFail(ErrNameNotFound, "MAX", "library 'dependency'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

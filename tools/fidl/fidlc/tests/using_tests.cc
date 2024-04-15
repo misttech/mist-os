@@ -109,7 +109,7 @@ type Foo = struct {
     dep dependent.Bar;
 };
 )FIDL");
-  library.ExpectFail(ErrNameNotFound, "dependent", "example");
+  library.ExpectFail(ErrNameNotFound, "dependent", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -140,7 +140,7 @@ type Foo = struct {
     dep1 dependent.Bar;
 };
 )FIDL");
-  library.ExpectFail(ErrNameNotFound, "dependent", "example");
+  library.ExpectFail(ErrNameNotFound, "dependent", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -282,7 +282,7 @@ library dependent;
   TestLibrary library(&shared);
   library.AddFile("bad/fi-0178.test.fidl");
 
-  library.ExpectFail(ErrUnusedImport, "test.bad.fi0178", "dependent");
+  library.ExpectFail(ErrUnusedImport, "library 'test.bad.fi0178'", "library 'dependent'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -305,7 +305,7 @@ TEST(UsingTests, BadTooManyProvidedLibraries) {
 
   auto unused = shared.all_libraries()->Unused();
   ASSERT_EQ(unused.size(), 1u);
-  ASSERT_EQ(NameLibrary((*unused.begin())->name), "not.used");
+  ASSERT_EQ((*unused.begin())->name, "not.used");
 }
 
 TEST(UsingTests, BadLibraryDeclarationNameCollision) {

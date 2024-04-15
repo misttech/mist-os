@@ -110,7 +110,7 @@ class Libraries {
   bool Insert(std::unique_ptr<Library> library);
 
   // Lookup a library by its |library_name|, or returns null if none is found.
-  Library* Lookup(const std::vector<std::string_view>& library_name) const;
+  Library* Lookup(std::string_view library_name) const;
 
   // Removes a library that was inserted before.
   //
@@ -151,7 +151,7 @@ class Libraries {
   Reporter* reporter_;
   std::unique_ptr<Library> root_library_;
   std::vector<std::unique_ptr<Library>> libraries_;
-  std::map<std::vector<std::string_view>, Library*> libraries_by_name_;
+  std::map<std::string_view, Library*> libraries_by_name_;
   Typespace typespace_;
   AttributeSchemaMap attribute_schemas_;
 
@@ -193,7 +193,7 @@ struct Compilation {
   Version version_added = Version::Head();
   // The target library name and attributes. Note, we purposely do not store a
   // Library* to avoid accidentally reaching into its unfiltered decls.
-  std::vector<std::string_view> library_name;
+  std::string_view library_name;
   // Location where the target library is defined.
   std::vector<SourceSpan> library_declarations;
   // Stores all library references defined with using directives.

@@ -59,10 +59,6 @@ std::string Display(Protocol::Method::Kind i) {
   }
 }
 
-std::string Display(const std::vector<std::string_view>& library_name) {
-  return NameLibrary(library_name);
-}
-
 std::string Display(const Attribute* a) { return std::string(a->name.data()); }
 
 std::string Display(const AttributeArg* a) {

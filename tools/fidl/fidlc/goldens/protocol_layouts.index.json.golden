@@ -27,8 +27,8 @@
       "library_location": {
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/protocol_layouts/imported.test.fidl",
-        "data": "library test.protocollayouts.imported",
-        "start_offset": 0,
+        "data": "test.protocollayouts.imported",
+        "start_offset": 8,
         "end_offset": 37
       }
     }

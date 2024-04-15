@@ -27,8 +27,8 @@
       "library_location": {
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/placement_of_attributes/exampleusing.test.fidl",
-        "data": "library test.exampleusing",
-        "start_offset": 0,
+        "data": "test.exampleusing",
+        "start_offset": 8,
         "end_offset": 25
       }
     }

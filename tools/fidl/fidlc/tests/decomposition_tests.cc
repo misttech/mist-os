@@ -74,20 +74,19 @@ std::string ScrubJson(const std::string& json) {
 }
 
 // Platform name and library name for all test libraries in this file.
-const std::string kPlatformName = "example";
-const std::vector<std::string_view> kLibraryName = {kPlatformName};
+const char* kLibraryName = "example";
 
 // Helper function to implement ASSERT_EQUIVALENT.
 void AssertEquivalent(const std::string& left_fidl, const std::string& right_fidl,
                       std::string_view version) {
   TestLibrary left_lib(left_fidl);
-  left_lib.SelectVersion(kPlatformName, version);
+  left_lib.SelectVersion(kLibraryName, version);
   ASSERT_COMPILED(left_lib);
-  ASSERT_EQ(left_lib.compilation()->library_name, kLibraryName);
+  ASSERT_EQ(left_lib.name(), kLibraryName);
   TestLibrary right_lib(right_fidl);
-  right_lib.SelectVersion(kPlatformName, version);
+  right_lib.SelectVersion(kLibraryName, version);
   ASSERT_COMPILED(right_lib);
-  ASSERT_EQ(right_lib.compilation()->library_name, kLibraryName);
+  ASSERT_EQ(right_lib.name(), kLibraryName);
   auto left_json = ScrubJson(left_lib.GenerateJSON());
   auto right_json = ScrubJson(right_lib.GenerateJSON());
   if (left_json != right_json) {

@@ -64,7 +64,7 @@ bool Element::IsAnonymousLayout() const {
 std::string_view Element::GetName() const {
   switch (kind) {
     case Kind::kLibrary:
-      ZX_PANIC("should not call GetName() on a library element");
+      return static_cast<const Library*>(this)->name;
     case Kind::kBits:
     case Kind::kBuiltin:
     case Kind::kConst:
@@ -192,8 +192,7 @@ Dependencies::RegisterResult Dependencies::Register(
   refs_.push_back(std::make_unique<LibraryRef>(span, dep_library));
   LibraryRef* ref = refs_.back().get();
 
-  const std::vector<std::string_view> name =
-      maybe_alias ? std::vector{maybe_alias->span().data()} : dep_library->name;
+  auto name = maybe_alias ? maybe_alias->span().data() : dep_library->name;
   auto iter = by_filename_.find(filename);
   if (iter == by_filename_.end()) {
     iter = by_filename_.emplace(filename, std::make_unique<PerFile>()).first;
@@ -209,23 +208,23 @@ Dependencies::RegisterResult Dependencies::Register(
   return RegisterResult::kSuccess;
 }
 
-bool Dependencies::Contains(std::string_view filename, const std::vector<std::string_view>& name) {
+bool Dependencies::Contains(std::string_view filename, std::string_view library_name) {
   const auto iter = by_filename_.find(filename);
   if (iter == by_filename_.end()) {
     return false;
   }
   const PerFile& per_file = *iter->second;
-  return per_file.refs.find(name) != per_file.refs.end();
+  return per_file.refs.find(library_name) != per_file.refs.end();
 }
 
 Library* Dependencies::LookupAndMarkUsed(std::string_view filename,
-                                         const std::vector<std::string_view>& name) const {
+                                         std::string_view library_name) const {
   auto iter1 = by_filename_.find(filename);
   if (iter1 == by_filename_.end()) {
     return nullptr;
   }
 
-  auto iter2 = iter1->second->refs.find(name);
+  auto iter2 = iter1->second->refs.find(library_name);
   if (iter2 == iter1->second->refs.end()) {
     return nullptr;
   }
@@ -235,11 +234,11 @@ Library* Dependencies::LookupAndMarkUsed(std::string_view filename,
   return ref->library;
 }
 
-void Dependencies::VerifyAllDependenciesWereUsed(const Library& for_library, Reporter* reporter) {
+void Dependencies::VerifyAllDependenciesWereUsed(const Library* for_library, Reporter* reporter) {
   for (const auto& [filename, per_file] : by_filename_) {
     for (const auto& [name, ref] : per_file->refs) {
       if (!ref->used) {
-        reporter->Fail(ErrUnusedImport, ref->span, for_library.name, ref->library->name);
+        reporter->Fail(ErrUnusedImport, ref->span, for_library, ref->library);
       }
     }
   }
@@ -252,7 +251,7 @@ std::unique_ptr<Library> Library::CreateRootLibrary() {
   // availabilities). Perhaps we could make the root library less special and
   // compile it as well. That would require addressing circularity issues.
   auto library = std::make_unique<Library>();
-  library->name = {"fidl"};
+  library->name = "fidl";
   library->platform = Platform::Unversioned();
   library->availability.Init({.added = Version::Head()});
   library->availability.Inherit(Availability::Unbounded());

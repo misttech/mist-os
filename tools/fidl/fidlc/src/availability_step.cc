@@ -180,8 +180,7 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
     if (library_platform.is_unversioned()) {
       reporter()->Fail(ErrReservedPlatform, attribute->span, library_platform);
     } else if (!version_selection()->Contains(library_platform)) {
-      reporter()->Fail(ErrPlatformVersionNotSelected, attribute->span, library()->name,
-                       library_platform);
+      reporter()->Fail(ErrPlatformVersionNotSelected, attribute->span, library(), library_platform);
     }
     if (!init_args.added) {
       // Return early to avoid letting the -inf from Availability::Unbounded()
@@ -264,7 +263,7 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
 }
 
 Platform AvailabilityStep::GetDefaultPlatform() {
-  auto platform = Platform::Parse(std::string(library()->name.front()));
+  auto platform = Platform::Parse(std::string(FirstComponent(library()->name)));
   ZX_ASSERT_MSG(platform, "library component should be valid platform");
   return platform.value();
 }

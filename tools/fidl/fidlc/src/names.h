@@ -12,7 +12,6 @@
 
 namespace fidlc {
 
-std::string NameLibrary(const std::vector<std::string_view>& library_name);
 std::string NameHandleSubtype(HandleSubtype subtype);
 std::string NameRawLiteralKind(RawLiteral::Kind kind);
 std::string NameConstantKind(Constant::Kind kind);

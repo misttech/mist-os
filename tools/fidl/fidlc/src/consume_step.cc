@@ -25,27 +25,13 @@ ConsumeStep::ConsumeStep(Compiler* compiler, std::unique_ptr<File> file)
 
 void ConsumeStep::RunImpl() {
   // All fidl files in a library should agree on the library name.
-  std::vector<std::string_view> new_name;
-  for (const auto& part : file_->library_decl->path->components) {
-    new_name.push_back(part->span().data());
+  if (auto name = file_->library_decl->path->ToString(); library()->name.empty()) {
+    library()->name = std::move(name);
+  } else if (name != library()->name) {
+    reporter()->Fail(ErrFilesDisagreeOnLibraryName, file_->library_decl->path->span());
+    return;
   }
-  if (library()->name.empty()) {
-    library()->name = new_name;
-    library()->arbitrary_name_span = file_->library_decl->span();
-  } else {
-    if (new_name != library()->name) {
-      reporter()->Fail(ErrFilesDisagreeOnLibraryName,
-                       file_->library_decl->path->components[0]->span());
-      return;
-    }
-    // Prefer setting arbitrary_name_span to a file which has attributes on the
-    // library declaration, if any do, since it's conventional to put all
-    // library attributes and the doc comment in a single file (overview.fidl).
-    if (library()->attributes->Empty() && file_->library_decl->attributes) {
-      library()->arbitrary_name_span = file_->library_decl->span();
-    }
-  }
-  library()->library_name_declarations.emplace_back(file_->library_decl->path->span());
+  library()->name_spans.emplace_back(file_->library_decl->path->span());
 
   ConsumeAttributeList(std::move(file_->library_decl->attributes), &library()->attributes);
 
@@ -192,15 +178,10 @@ void ConsumeStep::ConsumeUsing(std::unique_ptr<RawUsing> using_directive) {
     return;
   }
 
-  std::vector<std::string_view> library_name;
-  for (const auto& component : using_directive->using_path->components) {
-    library_name.push_back(component->span().data());
-  }
-
+  auto library_name = using_directive->using_path->ToString();
   Library* dep_library = all_libraries()->Lookup(library_name);
   if (!dep_library) {
-    reporter()->Fail(ErrUnknownLibrary, using_directive->using_path->components[0]->span(),
-                     library_name);
+    reporter()->Fail(ErrUnknownLibrary, using_directive->using_path->span(), library_name);
     return;
   }
 

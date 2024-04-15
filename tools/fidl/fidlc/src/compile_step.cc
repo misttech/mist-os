@@ -14,7 +14,6 @@
 #include "tools/fidl/fidlc/src/experimental_flags.h"
 #include "tools/fidl/fidlc/src/flat_ast.h"
 #include "tools/fidl/fidlc/src/name.h"
-#include "tools/fidl/fidlc/src/names.h"
 #include "tools/fidl/fidlc/src/type_resolver.h"
 
 namespace fidlc {
@@ -1061,13 +1060,12 @@ void CompileStep::ValidateSelectorAndCalcOrdinal(const Name& protocol_name,
     }
   }
   // TODO(https://fxbug.dev/42157659): Remove.
-  if (auto& name = library()->name;
-      selector.empty() && name.size() == 2 && name[0] == "fuchsia" && name[1] == "io") {
+  if (selector.empty() && library()->name == "fuchsia.io") {
     reporter()->Fail(ErrFuchsiaIoExplicitOrdinals, method->name);
     return;
   }
   if (selector.empty()) {
-    selector = NameLibrary(protocol_name.library()->name);
+    selector.append(protocol_name.library()->name);
     selector.push_back('/');
     selector.append(protocol_name.decl_name());
     selector.push_back('.');

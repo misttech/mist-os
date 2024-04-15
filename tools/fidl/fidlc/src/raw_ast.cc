@@ -28,6 +28,17 @@ void RawCompoundIdentifier::Accept(TreeVisitor* visitor) const {
   }
 }
 
+std::string RawCompoundIdentifier::ToString() const {
+  std::string str;
+  str.reserve(span().data().size());
+  for (auto it = components.begin(); it != components.end(); ++it) {
+    if (it != components.begin())
+      str.push_back('.');
+    str.append((*it)->span().data());
+  }
+  return str;
+}
+
 void RawDocCommentLiteral::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
 }

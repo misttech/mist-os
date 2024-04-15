@@ -27,8 +27,8 @@
       "library_location": {
         "is_virtual": false,
         "file": "../../zircon/vdso/overview.fidl",
-        "data": "@available(platform=\"fuchsia\", added=7)\nlibrary zx",
-        "start_offset": 164,
+        "data": "zx",
+        "start_offset": 212,
         "end_offset": 214
       }
     }

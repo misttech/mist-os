@@ -213,14 +213,7 @@ void AttributeSchema::ResolveArgs(CompileStep* step, Attribute* attribute) const
 }
 
 static bool RefersToHead(const std::vector<std::string_view>& components, const Decl* head_decl) {
-  auto head_name = head_decl->name.decl_name();
-  if (components.size() == 1 && components[0] == head_name) {
-    return true;
-  }
-  auto& library_name = head_decl->name.library()->name;
-  return components.size() == library_name.size() + 1 &&
-         std::equal(library_name.begin(), library_name.end(), components.begin()) &&
-         components.back() == head_name;
+  return components.size() == 1 && components[0] == head_decl->name.decl_name();
 }
 
 bool AttributeArgSchema::TryResolveAsHead(CompileStep* step, Reference& reference) const {

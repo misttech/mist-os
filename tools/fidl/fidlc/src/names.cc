@@ -10,10 +10,6 @@
 
 namespace fidlc {
 
-std::string NameLibrary(const std::vector<std::string_view>& library_name) {
-  return StringJoin(library_name, ".");
-}
-
 std::string NameHandleSubtype(HandleSubtype subtype) {
   switch (subtype) {
     case HandleSubtype::kHandle:
@@ -236,7 +232,7 @@ std::string NameType(const Type* type) {
 std::string FullyQualifiedName(const Name& name) {
   if (name.is_intrinsic())
     return name.full_name();
-  return NameLibrary(name.library()->name) + "/" + name.full_name();
+  return name.library()->name + "/" + name.full_name();
 }
 
 }  // namespace fidlc

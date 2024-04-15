@@ -1695,7 +1695,7 @@ library example;
 @foo(nonexistent)
 type MyStruct = struct {};
 )FIDL");
-  library.ExpectFail(ErrNameNotFound, "nonexistent", "example");
+  library.ExpectFail(ErrNameNotFound, "nonexistent", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -1707,7 +1707,7 @@ library example;
 type MyStruct = struct {};
 )FIDL");
   library.AddAttributeSchema("foo").AddArg("value", AttributeArgSchema(ConstantValue::Kind::kBool));
-  library.ExpectFail(ErrNameNotFound, "nonexistent", "example");
+  library.ExpectFail(ErrNameNotFound, "nonexistent", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -1721,7 +1721,7 @@ type MyStruct = struct {};
   library.AddAttributeSchema("foo")
       .AddArg("first", AttributeArgSchema(ConstantValue::Kind::kBool))
       .AddArg("second", AttributeArgSchema(ConstantValue::Kind::kBool));
-  library.ExpectFail(ErrNameNotFound, "nonexistent", "example");
+  library.ExpectFail(ErrNameNotFound, "nonexistent", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -1859,7 +1859,7 @@ TEST(AttributesTests, BadLibraryReferencesNonexistentConst) {
 @foo(nonexistent)
 library example;
 )FIDL");
-  library.ExpectFail(ErrNameNotFound, "nonexistent", "example");
+  library.ExpectFail(ErrNameNotFound, "nonexistent", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

@@ -27,8 +27,8 @@
       "library_location": {
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/error_syntax/parent.test.fidl",
-        "data": "library test.errorsyntax.parent",
-        "start_offset": 165,
+        "data": "test.errorsyntax.parent",
+        "start_offset": 173,
         "end_offset": 196
       }
     }

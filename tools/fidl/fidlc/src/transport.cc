@@ -9,9 +9,7 @@
 namespace fidlc {
 
 std::optional<HandleClass> HandleClassFromName(const Name& name) {
-  if (name.library()->name.size() != 1)
-    return std::nullopt;
-  auto library = name.library()->name[0];
+  auto& library = name.library()->name;
   auto decl = name.decl_name();
   if (library == "zx" && decl == "Handle")
     return HandleClass::kZircon;

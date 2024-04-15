@@ -37,8 +37,8 @@
       "library_location": {
         "is_virtual": false,
         "file": "../../sdk/fidl/fdf/handle.fidl",
-        "data": "library fdf",
-        "start_offset": 164,
+        "data": "fdf",
+        "start_offset": 172,
         "end_offset": 175
       }
     },
@@ -47,8 +47,8 @@
       "library_location": {
         "is_virtual": false,
         "file": "../../zircon/vdso/overview.fidl",
-        "data": "@available(platform=\"fuchsia\", added=7)\nlibrary zx",
-        "start_offset": 164,
+        "data": "zx",
+        "start_offset": 212,
         "end_offset": 214
       }
     }

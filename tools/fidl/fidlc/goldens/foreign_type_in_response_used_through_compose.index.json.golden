@@ -27,8 +27,8 @@
       "library_location": {
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/foreign_type_in_response_used_through_compose/bottom.test.fidl",
-        "data": "library test.bottom",
-        "start_offset": 0,
+        "data": "test.bottom",
+        "start_offset": 8,
         "end_offset": 19
       }
     },
@@ -37,8 +37,8 @@
       "library_location": {
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/foreign_type_in_response_used_through_compose/middle.test.fidl",
-        "data": "library test.middle",
-        "start_offset": 0,
+        "data": "test.middle",
+        "start_offset": 8,
         "end_offset": 19
       }
     }

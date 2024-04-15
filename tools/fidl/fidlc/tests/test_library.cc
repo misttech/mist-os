@@ -209,18 +209,6 @@ bool TestLibrary::Lint(LintArgs args) {
   return passed;
 }
 
-const Library* TestLibrary::LookupLibrary(std::string_view name) {
-  std::vector<std::string_view> parts;
-  size_t dot_idx = 0;
-  for (size_t i = 0; dot_idx != std::string::npos; i = dot_idx + 1) {
-    dot_idx = name.find('.', i);
-    parts.push_back(name.substr(i, dot_idx));
-  }
-  auto library = all_libraries()->Lookup(parts);
-  ZX_ASSERT_MSG(library, "library not found");
-  return library;
-}
-
 const Bits* TestLibrary::LookupBits(std::string_view name) {
   for (const auto& bits_decl : compilation_->declarations.bits) {
     if (bits_decl->name.decl_name() == name) {

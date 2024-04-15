@@ -820,17 +820,16 @@ class Dependencies {
                           const std::unique_ptr<RawIdentifier>& maybe_alias);
 
   // Returns true if this dependency set contains a library with the given name and filename.
-  bool Contains(std::string_view filename, const std::vector<std::string_view>& name);
+  bool Contains(std::string_view filename, std::string_view library_name);
 
   // Looks up a dependency by filename (within the importing library, since
   // "using" statements are file-scoped) and name (of the imported library).
   // Also marks the library as used. Returns null if no library is found.
-  Library* LookupAndMarkUsed(std::string_view filename,
-                             const std::vector<std::string_view>& name) const;
+  Library* LookupAndMarkUsed(std::string_view filename, std::string_view library_name) const;
 
   // VerifyAllDependenciesWereUsed reports an error for each dependency imported
   // with `using` that was never used in the file.
-  void VerifyAllDependenciesWereUsed(const Library& for_library, Reporter* reporter);
+  void VerifyAllDependenciesWereUsed(const Library* for_library, Reporter* reporter);
 
   // Returns all the dependencies.
   const std::set<Library*>& all() const { return dependencies_aggregate_; }
@@ -858,7 +857,7 @@ class Dependencies {
   // Per-file information about imports.
   struct PerFile {
     // References to dependencies, keyed by library name or by alias.
-    std::map<std::vector<std::string_view>, LibraryRef*> refs;
+    std::map<std::string_view, LibraryRef*> refs;
     // Set containing ref->library for every ref in |refs|.
     std::set<Library*> libraries;
   };
@@ -906,12 +905,8 @@ struct Library final : public Element {
     std::vector<std::unique_ptr<Overlay>> overlays;
   };
 
-  std::vector<std::string_view> name;
-  // There is no unique SourceSpan for a library's name since it can be declared
-  // in multiple files, but we store an arbitrary one to use in error messages.
-  SourceSpan arbitrary_name_span;
-  // stores all library name declaration location
-  std::vector<SourceSpan> library_name_declarations;
+  std::string name;
+  std::vector<SourceSpan> name_spans;
   // Set during AvailabilityStep.
   std::optional<Platform> platform;
   Dependencies dependencies;
@@ -924,7 +919,6 @@ struct Library final : public Element {
   // Library because there is no unique ownership (e.g. multiple Table::Member
   // instances can point to the same RawOrdinal64 after decomposition).
   std::vector<std::unique_ptr<RawLiteral>> raw_literals;
-  std::vector<std::unique_ptr<RawIdentifier>> raw_identifiers;
   std::vector<std::unique_ptr<RawOrdinal64>> raw_ordinals;
 };
 

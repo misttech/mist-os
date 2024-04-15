@@ -308,7 +308,7 @@ class ResolveStep::Lookup final {
  public:
   Lookup(ResolveStep* step, const Reference& ref) : step_(step), ref_(ref) {}
 
-  const Library* TryLibrary(const std::vector<std::string_view>& name) {
+  const Library* TryLibrary(std::string_view name) {
     auto root_library = step_->all_libraries()->root_library();
     if (name == root_library->name) {
       return root_library;
@@ -342,7 +342,7 @@ class ResolveStep::Lookup final {
     if (auto key = TryDecl(library, name)) {
       return key;
     }
-    reporter()->Fail(ErrNameNotFound, ref_.span(), name, library->name);
+    reporter()->Fail(ErrNameNotFound, ref_.span(), name, library);
     return std::nullopt;
   }
 
@@ -494,25 +494,32 @@ void ResolveStep::ParseSourcedReference(Reference& ref, Context context) {
       } else if (context.allow_contextual) {
         ref.MarkContextual();
       } else {
-        reporter()->Fail(ErrNameNotFound, ref.span(), components[0], library()->name);
+        reporter()->Fail(ErrNameNotFound, ref.span(), components[0], library());
       }
       break;
     }
     case 2: {
       if (auto key = lookup.TryDecl(library(), components[0])) {
         ref.SetKey(key.value().Member(components[1]));
-      } else if (auto dep_library = lookup.TryLibrary({components[0]})) {
+      } else if (auto dep_library = lookup.TryLibrary(components[0])) {
         if (auto key = lookup.MustDecl(dep_library, components[1])) {
           ref.SetKey(key.value());
         }
       } else {
-        reporter()->Fail(ErrNameNotFound, ref.span(), components[0], library()->name);
+        reporter()->Fail(ErrNameNotFound, ref.span(), components[0], library());
       }
       break;
     }
     default: {
-      std::vector<std::string_view> long_library_name(components.begin(), components.end() - 1);
-      std::vector<std::string_view> short_library_name(components.begin(), components.end() - 2);
+      std::string long_library_name;
+      size_t prev_size;
+      for (auto it = components.begin(); it != components.end() - 1; ++it) {
+        prev_size = long_library_name.size();
+        if (it != components.begin())
+          long_library_name.push_back('.');
+        long_library_name.append(*it);
+      }
+      auto short_library_name = std::string_view(long_library_name.data(), prev_size);
       if (auto dep_library = lookup.TryLibrary(long_library_name)) {
         if (auto key = lookup.MustDecl(dep_library, components.back())) {
           ref.SetKey(key.value());
@@ -589,13 +596,13 @@ void ResolveStep::ResolveContextualReference(Reference& ref, Context context) {
   auto name = ref.contextual().name;
   auto subtype_enum = context.maybe_resource_subtype;
   if (!subtype_enum) {
-    reporter()->Fail(ErrNameNotFound, ref.span(), name, library()->name);
+    reporter()->Fail(ErrNameNotFound, ref.span(), name, library());
     return;
   }
   Lookup lookup(this, ref);
   auto member = lookup.TryMember(subtype_enum, name);
   if (!member) {
-    reporter()->Fail(ErrNameNotFound, ref.span(), name, library()->name);
+    reporter()->Fail(ErrNameNotFound, ref.span(), name, library());
     return;
   }
   ref.ResolveTo(Reference::Target(member, subtype_enum));
@@ -636,7 +643,7 @@ Decl* ResolveStep::LookupDeclByKey(const Reference& ref, Context context) {
     }
     // TODO(https://fxbug.dev/42146818): Provide a nicer error message in the case where a
     // decl with that name does exist, but in a different version range.
-    reporter()->Fail(ErrNameNotFound, ref.span(), key.decl_name, key.library->name);
+    reporter()->Fail(ErrNameNotFound, ref.span(), key.decl_name, key.library);
     return nullptr;
   }
   // Case #2: source and target libraries are versioned in different platforms.
@@ -649,7 +656,7 @@ Decl* ResolveStep::LookupDeclByKey(const Reference& ref, Context context) {
   }
   // TODO(https://fxbug.dev/42146818): Provide a nicer error message in the case where
   // a decl with that name does exist, but in a different version range.
-  reporter()->Fail(ErrNameNotFound, ref.span(), key.decl_name, key.library->name);
+  reporter()->Fail(ErrNameNotFound, ref.span(), key.decl_name, key.library);
   return nullptr;
 }
 

@@ -187,7 +187,7 @@ protocol at {
     all();
 };
 )FIDL");
-  library.ExpectFail(ErrNameNotFound, "nonexistent", "not.important");
+  library.ExpectFail(ErrNameNotFound, "nonexistent", "library 'not.important'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -312,7 +312,7 @@ protocol DirectoryAdmin {
     compose Directory;
 };
 )FIDL");
-  library.ExpectFail(ErrNameNotFound, "Id", "example");
+  library.ExpectFail(ErrNameNotFound, "Id", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

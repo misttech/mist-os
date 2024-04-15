@@ -27,7 +27,6 @@
 #include "tools/fidl/fidlc/src/json_generator.h"
 #include "tools/fidl/fidlc/src/json_schema.h"
 #include "tools/fidl/fidlc/src/lexer.h"
-#include "tools/fidl/fidlc/src/names.h"
 #include "tools/fidl/fidlc/src/parser.h"
 #include "tools/fidl/fidlc/src/source_manager.h"
 #include "tools/fidl/fidlc/src/versioning_types.h"
@@ -368,14 +367,14 @@ int compile(fidlc::Reporter* reporter, const std::optional<fidlc::Platform>& exp
       } else {
         library_names.append(", ");
       }
-      library_names.append(fidlc::NameLibrary(library->name));
+      library_names.append(library->name);
     }
     library_names.append("\n");
     Fail("Unused libraries provided via --files: %s", library_names.c_str());
   }
 
   auto compilation = all_libraries.Filter(version_selection);
-  auto library_name = fidlc::NameLibrary(compilation->library_name);
+  auto library_name = std::string(compilation->library_name);
 
   if (expected_library_name.has_value() && library_name != *expected_library_name) {
     Fail("Found `library %s;`, but expected `library %s;` based on the --name flag\n",
@@ -391,7 +390,7 @@ int compile(fidlc::Reporter* reporter, const std::optional<fidlc::Platform>& exp
       if (expected.is_unversioned()) {
         hint << "try removing @available attributes";
       } else if (actual.is_unversioned()) {
-        if (compilation->library_name[0] == expected.name()) {
+        if (fidlc::FirstComponent(compilation->library_name) == expected.name()) {
           hint << "try adding `@available(added=" << version << ")` on the `library` declaration";
         } else {
           hint << "try adding `@available(platform=\"" << expected.name() << "\", added=" << version

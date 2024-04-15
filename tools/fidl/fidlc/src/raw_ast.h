@@ -93,6 +93,7 @@ struct RawCompoundIdentifier final : public SourceElement {
       : SourceElement(element), components(std::move(components)) {}
 
   void Accept(TreeVisitor* visitor) const;
+  std::string ToString() const;
 
   std::vector<std::unique_ptr<RawIdentifier>> components;
 };

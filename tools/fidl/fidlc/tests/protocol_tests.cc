@@ -430,7 +430,7 @@ protocol Child {
     compose MissingParent;
 };
 )FIDL");
-  library.ExpectFail(ErrNameNotFound, "MissingParent", "example");
+  library.ExpectFail(ErrNameNotFound, "MissingParent", "library 'example'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

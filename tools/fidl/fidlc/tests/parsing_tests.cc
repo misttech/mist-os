@@ -26,7 +26,6 @@ library 0fidl.test.badcompoundidentifier;
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-// Test that library name formatting checks are done in the parser
 TEST(ParsingTests, BadLibraryNameTest) {
   TestLibrary library;
   library.AddFile("bad/fi-0011.noformat.test.fidl");
@@ -34,8 +33,51 @@ TEST(ParsingTests, BadLibraryNameTest) {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-// Test that otherwise reserved words can be appropriately parsed when context
-// is clear.
+TEST(ParsingTests, GoodSpacesAroundDotsLibraryName) {
+  TestLibrary library(R"FIDL(
+library foo . bar;
+)FIDL");
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.name(), "foo.bar");
+}
+
+TEST(ParsingTests, GoodSpacesAroundDotsMemberName) {
+  TestLibrary library(R"FIDL(
+library example;
+
+type Foo = enum : fidl . uint32 {
+  A = 42;
+};
+const VALUE Foo = Foo . A;
+)FIDL");
+  ASSERT_COMPILED(library);
+  auto constant = library.LookupConstant("VALUE");
+  EXPECT_NE(constant, nullptr);
+  EXPECT_EQ(constant->value->Value().kind, ConstantValue::Kind::kUint32);
+  EXPECT_EQ(static_cast<const NumericConstantValue<uint32_t>&>(constant->value->Value()).value,
+            42u);
+}
+
+TEST(ParsingTests, GoodSpacesAroundDotsImport) {
+  SharedAmongstLibraries shared;
+  TestLibrary dependency(&shared, "dependency.fidl", R"FIDL(
+library foo . bar . qux;
+
+type Type = struct {};
+const VALUE uint32 = 42;
+)FIDL");
+  ASSERT_COMPILED(dependency);
+  TestLibrary library(&shared, "example.fidl", R"FIDL(
+library example;
+
+using foo  .  bar  .  qux;
+alias Type = foo. bar. qux. Type;
+const VALUE uint32 = foo .bar .qux .VALUE;
+)FIDL");
+  ASSERT_COMPILED(library);
+}
+
+// Test that otherwise reserved words can be appropriately parsed when context is clear.
 TEST(ParsingTests, GoodParsingReservedWordsInStructTest) {
   TestLibrary library(R"FIDL(
 library example;
