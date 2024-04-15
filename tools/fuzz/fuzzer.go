@@ -131,10 +131,6 @@ func (f *Fuzzer) AbsPath(relpath string) string {
 			f.pkg, f.component, strings.TrimPrefix(relpath, "tmp/"))
 	}
 
-	if strings.HasPrefix(relpath, "pkg/") {
-		return fmt.Sprintf("/pkgfs/packages/%s/0/%s", f.pkg, relpath[4:])
-	}
-
 	if strings.HasPrefix(relpath, "data/") {
 		return fmt.Sprintf("/data/r/sys/fuchsia.com:%s:0#meta:%s/%s",
 			f.pkg, f.manifest, relpath[5:])
