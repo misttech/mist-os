@@ -20,12 +20,21 @@ config("default") {
 }
 
 variant("lto") {
-  common_flags = [
-    "-flto",
+  common_flags = [ "-flto" ]
 
-    # Enable whole-program devirtualization and virtual constant propagation.
-    "-fwhole-program-vtables",
-  ]
+  if (!is_fuchsia) {
+    common_flags += [
+      # Enable whole-program devirtualization and virtual constant propagation.
+      #
+      # TODO(https://fxbug.dev/42075686): Currently fuchsia does not support WPD
+      # because the patches supporting WPD and relative vtables have been
+      # reverted from upstream. Since relative vtables aren't subject to WPD,
+      # this flag is not needed for fuchsia. What limiting this to !is_fuchsia
+      # allows is for me to reland the relevant patches and make debugging
+      # easier once we roll those changes back in.
+      "-fwhole-program-vtables",
+    ]
+  }
 
   # TODO(https://fxbug.dev/42061844): Temporarily disable branch funneling on lto. Branch
   # funneling likely generates bad code involving return values not propagated
