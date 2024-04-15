@@ -105,5 +105,6 @@ void PhysMain(void* fdt, arch::EarlyTicks ticks) {
     boot.Log();
     boot.Boot();
   }
-  __UNREACHABLE;
+
+  abort();
 }
