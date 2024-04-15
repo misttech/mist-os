@@ -1,0 +1,305 @@
+{
+  // This is a checked-in VSCode workspace configuration file that can be used
+  // instead of directly opening $MISTOS_DIR in VSCode.
+  //
+  // It's an opt-in workspace configuration that contains settings for:
+  //  - vscode itself
+  //  - LSP settings for working correctly with the fuchsia.git checkout
+  //  - etc.
+  //
+  // In terms of precedence, VSCode uses the following order in which settings
+  // are applied (merged together).
+  //
+  //  0) default settings
+  //  1) user's settings
+  //  2) remote machine settings
+  //  3) workspace settings  (this file)
+  //  4) workspace folder settings
+  //
+  //
+  // For details, see:
+  // https://code.visualstudio.com/docs/getstarted/settings#_settings-precedence
+
+
+  ////////
+  // VSCode Workspace Contents
+  //
+  // These are the workspace folders, and general VSCode workspace
+  // configuration itself.
+  //
+  // See https://code.visualstudio.com/docs/editor/workspaces for more
+  // information on this section of the file.
+  "folders": [
+    {
+      // The whole project directory.
+      "path": "."
+    }
+  ],
+
+  ////////
+  // Recommended Extensions for VSCode and Fuchsia
+  //
+  "extensions": {
+    "recommendations": [
+      // The official LSP for Rust, rust-analyzer.
+      "rust-lang.rust-analyzer",
+
+      // The Python extensions
+      "ms-python.python",
+      "ms-python.mypy-type-checker",
+      "ms-python.black-formatter",
+
+      // The GN language server from Microsoft
+      "msedge-dev.gnls",
+
+      // The official Clang LSP for C/C++.
+      "llvm-vs-code-extensions.vscode-clangd",
+
+      // Supports inserting and formatting C/C++ include guards as required
+      // in Fuchsia.
+      "akiramiyakoda.cppincludeguard",
+
+      // Adds JSON5 syntax highlighting (including *.cml files).
+      "mrmlnc.vscode-json5",
+
+      // Adds coverage gutters for `fx coverage`.
+      "ryanluker.vscode-coverage-gutters",
+    ],
+
+    "unwantedRecommendations": [
+      // Conflicts with vscode-clangd intellisense, and vscode-clangd is the
+      // preferred C++ extension.
+      "ms-vscode.cpptools",
+
+      // Redundant and conflicts with gnls, which is preferred.
+      "npclaudiu.vscode-gn",
+
+      // Redundant and conflicts with gnls, which is preferred.
+      "persidskiy.vscode-gnformat",
+    ]
+  },
+
+
+  "settings": {
+    ////////
+    // Extra file associations (patterns to languages)
+    "files.associations": {
+      "*.cml": "json5",
+      "*.inc": "cpp",
+
+      // Golden files
+      "*.c.golden": "c",
+      "*.cc.golden": "cpp",
+      "*.cml.golden": "json5",
+      "*.dart.golden": "dart",
+      "*.fidl.golden": "fidl",
+      "*.gn.golden": "gn",
+      "*.go.golden": "go",
+      "*.h.golden": "cpp",
+      "*.json.golden": "json",
+      "*.md.golden": "markdown",
+      "*.rs.golden": "rust",
+      "*.yaml.golden": "yaml",
+    },
+
+    ////////
+    // C/C++
+
+    // Formats C/C++ include guards to match Fuchsia style.
+    "C/C++ Include Guard.Comment Style": "Line",
+    "C/C++ Include Guard.Macro Type": "Filepath",
+    "C/C++ Include Guard.Suffix": "_",
+    "C/C++ Include Guard.Spaces After Endif": 2,
+
+    ////////
+    // Bazel
+    //
+    "bazel.enableCodeLens": true,
+    // See: https://github.com/bazelbuild/vscode-bazel/issues/236
+    //"bazel.executable": "${workspaceFolder}/tools/devshell/bazel",
+
+    ////////
+    // Python
+    //
+    "[python]": {
+      "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "black-formatter.args": [
+      "--config",
+      "${workspaceFolder}/pyproject.toml"
+    ],
+
+    ////////
+    // VSCode file exclusions
+    //
+
+    // Files that are marked as hidden in the Workspace Explorer.
+    "files.exclude": {
+      "**/.DS_Store": true,
+      "**/.cipd": true,
+      "**/.git": true,
+      "**/__pycache__": true,
+    },
+    // sub repos managed by jiri are listed in .gitignore, so make sure that
+    // they are not hidden.
+    "explorer.excludeGitIgnore": false,
+
+    // Files that are excluded from file-watching notifications.
+    "files.watcherExclude": {
+      "**/.DS_Store": true,
+      "**/.cipd": true,
+      ".jiri_root/goma_cache/**": true,
+      ".jiri_root/update_history*/**": true,
+      "out/**": true,
+      ".cache/**": true,
+    },
+
+    // Files that are excluded from search and quick open (^P).
+    // This significantly speeds up search and avoids polluting results with
+    // build output, third party code, and prebuilt binaries.
+    "search.exclude": {
+      // Don't exclude local files used for overrides
+      "local/**": false,
+
+      // There are some files in third_party we want to be accessible from search.
+      // Due to https://github.com/Microsoft/vscode/issues/869 we can't use a
+      // blanket exclude and then "un-exclude" the files we want, so instead we
+      // list out all the third_party projects here.  This list should be
+      // updated from time to time. If you want a path inside third_party to be
+      // included in search, modify this list and leave a comment so that future
+      // updates don't clobber your change.
+      "third_party/abseil-cpp/**": true,
+      "third_party/acpica/**": true,
+      "third_party/alacritty/**": true,
+      "third_party/android/**": true,
+      // antlion hosts connectivity end-to-end Python tests.
+      "third_party/antlion/**": false,
+      "third_party/bazel_platforms/**": true,
+      "third_party/bazel_rules_cc/**": true,
+      "third_party/bazel_rules_go/**": true,
+      "third_party/bazel_rules_license/**": true,
+      "third_party/bazel_rules_proto/**": true,
+      "third_party/bazel_rules_python/**": true,
+      "third_party/bazel_rules_rust/**": true,
+      "third_party/bazel_skylib/**": true,
+      "third_party/bcmdhd/**": true,
+      "third_party/boringssl/**": true,
+      "third_party/chre/**": true,
+      "third_party/chromiumos-xorg-conf/**": true,
+      "third_party/cobalt/**": true,
+      "third_party/cobalt_config/**": true,
+      "third_party/colorama/**": true,
+      "third_party/crashpad/**": true,
+      "third_party/curl/**": true,
+      "third_party/dart-pkg/**": true,
+      "third_party/double-conversion/**": true,
+      "third_party/etnaviv_gpu_tests/**": true,
+      "third_party/expat/**": true,
+      "third_party/flatbuffers/**": true,
+      "third_party/fmtlib/**": true,
+      "third_party/freetype2/**": true,
+      "third_party/gflags/**": true,
+      "third_party/gfxstream/**": true,
+      "third_party/github.com/**": true,
+      "third_party/glfw/**": true,
+      "third_party/glm/**": true,
+      "third_party/glog/**": true,
+      "third_party/glslang/**": true,
+      "third_party/go/**": true,
+      "third_party/golibs/**": true,
+      "third_party/googletest/**": true,
+      "third_party/gperftools/**": true,
+      "third_party/grpc/**": true,
+      "third_party/gvisor_syscall_tests/**": true,
+      "third_party/icu/**": true,
+      "third_party/imgtec-pvr-rgx-km/**": true,
+      "third_party/inih/**": true,
+      "third_party/intel/**": true,
+      "third_party/iperf/**": true,
+      "third_party/jellyfish/**": true,
+      "third_party/jinja2/**": true,
+      "third_party/json5.vim/**": true,
+      "third_party/libc-tests/**": true,
+      "third_party/libffi/**": true,
+      "third_party/libpcap/**": true,
+      "third_party/libpng/**": true,
+      "third_party/libxml2/**": true,
+      "third_party/linux-syscall-support/**": true,
+      "third_party/llvm-libc/**": true,
+      "third_party/luci-go/**": true,
+      "third_party/lz4/**": true,
+      "third_party/mako/**": true,
+      "third_party/markupsafe/**": true,
+      "third_party/mesa/**": true,
+      "third_party/micro-ecc/**": true,
+      "third_party/mini_chromium/**": true,
+      "third_party/mobly/**": true,
+      "third_party/modinv/**": true,
+      "third_party/modp_b64/**": true,
+      "third_party/nlassert/**": true,
+      "third_party/nlio/**": true,
+      "third_party/ogg/**": true,
+      "third_party/OpenCL-Headers/**": true,
+      "third_party/OpenCL-ICD-Loader/**": true,
+      "third_party/openssh-portable/**": true,
+      "third_party/openssl-ecjpake/**": true,
+      "third_party/openthread/**": true,
+      "third_party/openweave-core/**": true,
+      "third_party/opus/**": true,
+      "third_party/parameterized/**": true,
+      "third_party/pciids/**": true,
+      "third_party/perfetto/**": true,
+      "third_party/pigweed/**": true,
+      "third_party/protobuf/**": true,
+      "third_party/pyjson5/**": true,
+      "third_party/pylibs/**": true,
+      "third_party/pypng/**": true,
+      "third_party/python_portpicker/**": true,
+      "third_party/pytoml/**": true,
+      "third_party/pyyaml/**": true,
+      "third_party/quickjs/**": true,
+      "third_party/rapidjson/**": true,
+      "third_party/re2/**": true,
+      // We want to include the files directly in third_party/rust_crates.
+      // Also, files under third_party/rust_crates/{compat,empty} are not copied from upstream.
+      "third_party/rust_crates/ask2patch/**": true,
+      "third_party/rust_crates/forks/**": true,
+      "third_party/rust_crates/mirrors/**": true,
+      "third_party/rust_crates/vendor/**": true,
+      "third_party/sbase/**": true,
+      "third_party/scudo/**": true,
+      "third_party/shaderc/**": true,
+      "third_party/spirv-cross/**": true,
+      "third_party/spirv-headers/**": true,
+      "third_party/spirv-tools/**": true,
+      "third_party/syzkaller/**": true,
+      "third_party/tcpdump/**": true,
+      "third_party/tink/**": true,
+      "third_party/tpm2-tss/**": true,
+      "third_party/ubpf/**": true,
+      "third_party/vboot_reference/**": true,
+      "third_party/Vulkan-Headers/**": true,
+      "third_party/Vulkan-Loader/**": true,
+      "third_party/Vulkan-Tools/**": true,
+      "third_party/Vulkan-Utility-Libraries/**": true,
+      "third_party/Vulkan-ValidationLayers/**": true,
+      "third_party/wayland/**": true,
+      "third_party/yxml/**": true,
+      "third_party/zlib/**": true,
+      "third_party/zstd/**": true,
+    },
+    "search.useIgnoreFiles": true,
+    // Don't follow symlinks (into other parts of the tree)
+    "search.followSymlinks": false,
+
+    ////////
+    // Code coverage
+    "coverage-gutters.coverageBaseDir": ".",
+    "coverage-gutters.showLineCoverage": true,
+    "coverage-gutters.coverageFileNames": [ "lcov.info" ],
+
+    // Disable task auto-detection for supported project configuration files
+    // (e.g. NPM's project.json). This significantly speeds up task running.
+    "task.autoDetect": "off",
+  },
+}
