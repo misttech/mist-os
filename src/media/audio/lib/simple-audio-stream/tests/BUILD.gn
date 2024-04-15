@@ -13,7 +13,6 @@ test("sa-unittest-bin") {
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
     "//sdk/lib/inspect/testing/cpp:zxtest",
-    "//src/devices/lib/dev-operation",
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",
     "//src/lib/ddktl",

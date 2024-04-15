@@ -49,6 +49,7 @@ source_set("shared") {
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
     "//sdk/fidl/fuchsia.hardware.midi:fuchsia.hardware.midi_cpp",
     "//sdk/fidl/fuchsia.hardware.usb:fuchsia.hardware.usb_cpp",
+    "//src/devices/lib/dev-operation",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/usb/lib/usb",
