@@ -14,6 +14,7 @@ rustc_binary("bin") {
   deps = [
     "//sdk/fidl/fuchsia.bluetooth.fastpair:fuchsia.bluetooth.fastpair_rust",
     "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_rust",
+    "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",

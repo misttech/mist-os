@@ -178,8 +178,9 @@ async fn watch_peers(harness: HostHarness) -> Result<(), Error> {
             harness.notify_state_changed();
         }
         for id in removed.into_iter() {
-            if harness.write_state().peers.remove(&id.into()).is_none() {
-                warn!(?id, "HostHarness: Removed id that wasn't present");
+            let id = id.into();
+            if harness.write_state().peers.remove(&id).is_none() {
+                warn!(%id, "HostHarness: Removed id that wasn't present");
             }
         }
     }

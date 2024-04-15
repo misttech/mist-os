@@ -199,7 +199,7 @@ impl ScoConnector {
         codecs: Vec<CodecId>,
     ) -> impl Future<Output = Result<ScoConnection, ScoConnectError>> + 'static {
         let params = self.parameters_for_codecs(codecs);
-        info!("Initiating SCO connection for {}: {:?}", peer_id, &params);
+        info!(%peer_id, ?params, "Initiating SCO connection");
 
         let proxy = self.proxy.clone();
         async move {
@@ -215,10 +215,10 @@ impl ScoConnector {
                     // Return early if there is a FIDL issue, or we succeeded.
                     Err(ScoConnectError::Fidl { .. }) | Ok(_) => return result,
                     // Otherwise continue to try the next params.
-                    Err(e) => debug!(?peer_id, ?param, ?e, "Connection failed, trying next set.."),
+                    Err(e) => debug!(%peer_id, ?param, ?e, "Connection failed, trying next set.."),
                 }
             }
-            info!(?peer_id, "Exhausted SCO connection parameters");
+            info!(%peer_id, "Exhausted SCO connection parameters");
             Err(ScoConnectError::ScoFailed)
         }
     }
@@ -229,7 +229,7 @@ impl ScoConnector {
         codecs: Vec<CodecId>,
     ) -> impl Future<Output = Result<ScoConnection, ScoConnectError>> + 'static {
         let params = self.parameters_for_codecs(codecs);
-        info!("Accepting SCO connection for {}: {:?}.", peer_id, &params);
+        info!(%peer_id, ?params, "Accepting SCO connection");
 
         let proxy = self.proxy.clone();
         Self::setup_sco_connection(proxy, peer_id, ScoInitiatorRole::Accept, params)

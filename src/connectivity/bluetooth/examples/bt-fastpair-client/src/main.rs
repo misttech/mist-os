@@ -11,6 +11,7 @@ use fidl_fuchsia_bluetooth_sys::{
     InputCapability, OutputCapability, PairingDelegateMarker, PairingDelegateRequest,
     PairingDelegateRequestStream, PairingMarker,
 };
+use fuchsia_bluetooth::types::PeerId;
 use fuchsia_component::client::connect_to_protocol;
 use futures::{select, stream::TryStreamExt, FutureExt};
 use std::pin::pin;
@@ -20,7 +21,7 @@ async fn process_provider_events(mut stream: ProviderWatcherRequestStream) -> Re
     while let Some(request) = stream.try_next().await? {
         let (id, responder) = request.into_on_pairing_complete().expect("only one method");
         let _ = responder.send();
-        info!(?id, "Successful Fast Pair pairing");
+        info!(id = %PeerId::from(id), "Successful Fast Pair pairing");
     }
     info!("Provider service ended");
     Ok(())
@@ -40,7 +41,7 @@ async fn process_pairing_events(mut stream: PairingDelegateRequestStream) -> Res
                 let _ = responder.send(true, displayed_passkey);
             }
             PairingDelegateRequest::OnPairingComplete { id, success, .. } => {
-                info!(?id, "Normal pairing complete (success = {})", success);
+                info!(id = %PeerId::from(id), "Normal pairing complete (success = {})", success);
             }
             _ => {}
         }

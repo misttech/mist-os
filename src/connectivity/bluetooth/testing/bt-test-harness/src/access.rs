@@ -98,8 +98,9 @@ async fn update_peer_state(harness: &AccessHarness) -> Result<(), Error> {
         let _ = harness.write_state().peers.insert(peer.id, peer);
     }
     for id in removed.into_iter() {
-        if harness.write_state().peers.remove(&id.into()).is_none() {
-            warn!(?id, "Unknown peer removed from peer state");
+        let id = id.into();
+        if harness.write_state().peers.remove(&id).is_none() {
+            warn!(%id, "Unknown peer removed from peer state");
         }
     }
     harness.notify_state_changed();

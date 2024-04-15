@@ -208,7 +208,7 @@ impl Hfp {
                 })
                 .is_some()
             {
-                info!(?id, "Search returned AudioGateway, skipping");
+                info!(%id, "Search returned AudioGateway, skipping");
                 return Ok(());
             }
         }
