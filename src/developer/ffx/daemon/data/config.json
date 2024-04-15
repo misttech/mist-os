@@ -11,12 +11,6 @@
         },
         "timeout": 500
     },
-    "fastboot": {
-        "flash": {
-            "min_timeout_secs": 60,
-            "timeout_rate": 5
-        }
-    },
     "ssh": {
         "auth-sock": [
             "$SSH_AUTH_SOCK"

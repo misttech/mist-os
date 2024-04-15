@@ -75,7 +75,7 @@ When updating, please add the value in alphabetical order.
 :                                         : device. Defaults to `60` seconds   :
 | `fastboot.flash.timeout_rate`           | The timeout rate in mb/s when      |
 :                                         : communicating with the target      :
-:                                         : device. Defaults to `5` MB/sec     :
+:                                         : device. Defaults to `2` MB/sec     :
 | `fastboot.reboot.reconnect_timeout`     | Timeout in seconds to wait for     |
 :                                         : target after a reboot to fastboot  :
 :                                         : mode. Defaults to `10` seconds     :

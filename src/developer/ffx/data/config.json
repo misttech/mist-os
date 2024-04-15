@@ -16,6 +16,12 @@
         "rotations": 5,
         "rotate_size": 104857600
     },
+    "fastboot": {
+        "flash": {
+            "min_timeout_secs": 60,
+            "timeout_rate": 2
+        }
+    },
     "proxy": {
         "timeout_secs": 10.0
     },
