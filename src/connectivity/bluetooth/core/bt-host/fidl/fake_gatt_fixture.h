@@ -9,13 +9,13 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/fake_layer.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/loop_fixture.h"
 
 namespace bt::fidl::testing {
 
 // Provides a common GTest harness base class for clients of the GATT layer and emulation of
 // ATT behavior.
-class FakeGattFixture : public ::gtest::TestLoopFixture {
+class FakeGattFixture : public bt::testing::TestLoopFixture {
  public:
   FakeGattFixture();
   ~FakeGattFixture() override = default;

@@ -6,7 +6,6 @@
 
 #include "fuchsia/bluetooth/gatt2/cpp/fidl.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/fake_gatt_fixture.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace bthost {
 

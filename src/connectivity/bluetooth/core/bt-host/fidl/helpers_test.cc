@@ -26,8 +26,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sco/sco.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/sdp.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/loop_fixture.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace fble = fuchsia::bluetooth::le;
 namespace fbt = fuchsia::bluetooth;
@@ -75,7 +75,7 @@ const fsys::PeerKey kTestKeyFidl{
 };
 const fsys::Ltk kTestLtkFidl{.key = kTestKeyFidl, .ediv = 0, .rand = 0};
 
-class HelpersTestWithLoop : public ::gtest::TestLoopFixture {
+class HelpersTestWithLoop : public bt::testing::TestLoopFixture {
  public:
   pw::async::Dispatcher& pw_dispatcher() { return pw_dispatcher_; }
 

@@ -7,13 +7,14 @@
 
 #include <gtest/gtest.h>
 
+#include "pw_async_fuchsia/dispatcher.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/fake_adapter.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/loop_fixture.h"
 
 namespace bt::fidl::testing {
 
-class FakeAdapterTestFixture : public ::gtest::TestLoopFixture {
+class FakeAdapterTestFixture : public bt::testing::TestLoopFixture {
  public:
   FakeAdapterTestFixture() = default;
   ~FakeAdapterTestFixture() override = default;

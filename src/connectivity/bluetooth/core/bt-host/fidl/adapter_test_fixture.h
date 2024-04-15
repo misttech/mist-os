@@ -13,14 +13,14 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fake_l2cap.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/controller_test.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_controller.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/loop_fixture.h"
 
 namespace bthost::testing {
 
 // This test fixture provides an instance of the Bluetooth stack with mock data plane (L2CAP) and
 // GATT test doubles. The fixture is backed by a FakeController and an event loop which can be used
 // to test interactions with the Bluetooth controller.
-class AdapterTestFixture : public ::gtest::TestLoopFixture,
+class AdapterTestFixture : public bt::testing::TestLoopFixture,
                            public bt::testing::ControllerTest<bt::testing::FakeController> {
  public:
   AdapterTestFixture()
