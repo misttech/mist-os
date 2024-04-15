@@ -44,7 +44,8 @@ fn default_repository_port() -> u32 {
 #[derive(FromArgs)]
 /// ffx Remote forwarding.
 struct Funnel {
-    /// the level to log at.
+    /// sets the log level for  output (default = Error). Other
+    /// possible values are Info, Debug, Warn, and Trace
     #[argh(option, short = 'l', default = "default_log_level()")]
     log_level: LevelFilter,
 
