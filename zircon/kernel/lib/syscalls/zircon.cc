@@ -125,18 +125,19 @@ zx_status_t sys_eventpair_create(uint32_t options, zx_handle_t* out0, zx_handle_
 // zx_status_t zx_debuglog_create
 zx_status_t sys_debuglog_create(zx_handle_t rsrc, uint32_t options, zx_handle_t* out) {
   LTRACEF("options 0x%x\n", options);
-
   // To support allowing the libc dynamic linker to emit log messages even
   // before process bootstrap is complete, we allow creating a debuglog with
   // options == 0 (write-only) without yet having a valid `rsrc` handle.
   // Otherwise, we should require a valid `rsrc` handle.
   // Inversely: if a resource handle is given, or if `options` is nonzero,
-  // require that `rsrc` be a valid root resource handle.
-  if (rsrc != ZX_HANDLE_INVALID || options != 0) {
-    // TODO(https://fxbug.dev/42105834): finer grained validation
-    zx_status_t status = validate_resource(rsrc, ZX_RSRC_KIND_ROOT);
-    if (status != ZX_OK)
+  // require that `rsrc` be a valid debuglog resource handle.
+  if (rsrc != ZX_HANDLE_INVALID) {
+    if (zx_status_t status = validate_resource_kind_base(rsrc, ZX_RSRC_KIND_SYSTEM,
+                                                         ZX_RSRC_SYSTEM_DEBUGLOG_BASE) != ZX_OK)
       return status;
+  } else {
+    if (options != 0)
+      return ZX_ERR_BAD_HANDLE;
   }
 
   // Ensure only valid options were given provided. The only valid flag is currently

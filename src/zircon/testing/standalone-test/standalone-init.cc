@@ -76,6 +76,17 @@ zx::unowned_resource GetSystemResource() {
   return system_resource.borrow();
 }
 
+zx::result<zx::resource> GetSystemResourceWithBase(zx::unowned_resource& system_resource,
+                                                   uint64_t base) {
+  zx::resource new_resource;
+  const zx_status_t status = zx::resource::create(*system_resource, ZX_RSRC_KIND_SYSTEM, base, 1,
+                                                  nullptr, 0, &new_resource);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(std::move(new_resource));
+}
+
 // This overrides a weak definition in libc, replacing the hook that's
 // ordinarily defined by fdio.  The retain attribute makes sure that linker
 // doesn't decide it can elide this definition and let libc use its weak one.

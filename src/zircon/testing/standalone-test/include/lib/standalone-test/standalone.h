@@ -7,7 +7,9 @@
 
 #include <lib/zx/channel.h>
 #include <lib/zx/resource.h>
+#include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
+#include <zircon/syscalls/resource.h>
 
 #include <string>
 #include <string_view>
@@ -30,6 +32,9 @@ zx::unowned_resource GetIrqResource();
 zx::unowned_resource GetMmioResource();
 zx::unowned_resource GetSystemResource();
 
+// Creates and returns upon success a specific system resource given a |base|.
+zx::result<zx::resource> GetSystemResourceWithBase(zx::unowned_resource& system_resource,
+                                                   uint64_t base);
 zx::unowned_vmo GetVmo(std::string_view name);
 zx::unowned_channel GetNsDir(std::string_view name);
 

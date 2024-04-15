@@ -35,7 +35,7 @@ closed protocol Debuglog {
     ///
     /// ## Rights
     ///
-    /// *resource* must have resource kind `ZX_RSRC_KIND_ROOT`.
+    /// *resource* must have resource kind `ZX_RSRC_KIND_SYSTEM` and base `ZX_RSRC_SYSTEM_DEBUGLOG_BASE`.
     ///
     /// ## Return value
     ///
@@ -48,17 +48,14 @@ closed protocol Debuglog {
     ///
     /// `ZX_ERR_INVALID_ARGS`  *options* contained a value not understood by the kernel
     ///
-    /// `ZX_ERR_WRONG_TYPE`  *resource* was not of the kind `ZX_RSRC_KIND_ROOT`.
+    /// `ZX_ERR_WRONG_TYPE`  *resource* was not of the kind `ZX_RSRC_KIND_SYSTEM` and base `ZX_RSRC_SYSTEM_DEBUGLOG_BASE`.
     ///
     /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory.
     ///
     /// ## See also
     ///
-    ///  - [`zx_debuglog_read()`]
-    ///  - [`zx_debuglog_write()`]
-    ///
-    /// [`zx_debuglog_read()`]: debuglog_read.md
-    /// [`zx_debuglog_write()`]: debuglog_write.md
+    ///  - [`zx_debuglog_read()`](https://fuchsia.dev/reference/syscalls/debuglog_read)
+    ///  - [`zx_debuglog_write()`](https://fuchsia.dev/reference/syscalls/debuglog_write)
     strict Create(resource struct {
         resource Handle:RESOURCE;
         options uint32;
@@ -119,13 +116,9 @@ closed protocol Debuglog {
     ///
     ///  - [`fuchsia.boot.WriteOnlyLog`](https://fuchsia.dev/reference/fidl/fuchsia.boot#WriteOnlyLog)
     ///
-    ///  - [`zx_debug_write()`]
-    ///  - [`zx_debuglog_create()`]
-    ///  - [`zx_debuglog_read()`]
-    ///
-    /// [`zx_debug_write()`]: debug_write.md
-    /// [`zx_debuglog_create()`]: debuglog_create.md
-    /// [`zx_debuglog_read()`]: debuglog_read.md
+    ///  - [`zx_debug_write()`](https://fuchsia.dev/reference/syscalls/debug_write)
+    ///  - [`zx_debuglog_create()`](https://fuchsia.dev/reference/syscalls/debuglog_create)
+    ///  - [`zx_debuglog_read()`](https://fuchsia.dev/reference/syscalls/debuglog_read)
     strict Write(resource struct {
         handle Handle:LOG;
         options uint32;
@@ -229,11 +222,8 @@ closed protocol Debuglog {
     ///
     ///  - [`fuchsia.boot.ReadOnlyLog`](https://fuchsia.dev/reference/fidl/fuchsia.boot#ReadOnlyLog)
     ///
-    ///  - [`zx_debuglog_create()`]
-    ///  - [`zx_debuglog_write()`]
-    ///
-    /// [`zx_debuglog_create()`]: debuglog_create.md
-    /// [`zx_debuglog_write()`]: debuglog_write.md
+    ///  - [`zx_debuglog_create()`](https://fuchsia.dev/reference/syscalls/debuglog_create)
+    ///  - [`zx_debuglog_write()`](https://fuchsia.dev/reference/syscalls/debuglog_write)
     strict Read(resource struct {
         handle Handle:LOG;
         options uint32;

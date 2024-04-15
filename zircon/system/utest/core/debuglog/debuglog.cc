@@ -13,8 +13,14 @@ namespace {
 
 TEST(DebugLogTest, WriteRead) {
   zx_handle_t log_handle = 0;
-  ASSERT_OK(
-      zx_debuglog_create(standalone::GetRootResource()->get(), ZX_LOG_FLAG_READABLE, &log_handle));
+  zx::unowned_resource system_resource = standalone::GetSystemResource();
+
+  zx::result<zx::resource> result =
+      standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_DEBUGLOG_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource debuglog_resource = std::move(result.value());
+
+  ASSERT_OK(zx_debuglog_create(debuglog_resource.get(), ZX_LOG_FLAG_READABLE, &log_handle));
 
   // Ensure something is written.
   static const char kTestMsg[] = "Debuglog test message.\n";
@@ -38,35 +44,44 @@ TEST(DebugLogTest, WriteRead) {
 
 TEST(DebugLogTest, InvalidOptions) {
   zx_handle_t log_handle = 0;
+  zx::unowned_resource system_resource = standalone::GetSystemResource();
+
+  zx::result<zx::resource> result =
+      standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_DEBUGLOG_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource debuglog_resource = std::move(result.value());
 
   // Ensure giving invalid options returns an error.
-  EXPECT_EQ(zx_debuglog_create(standalone::GetRootResource()->get(), 1, &log_handle),
-            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(zx_debuglog_create(debuglog_resource.get(), 1, &log_handle), ZX_ERR_INVALID_ARGS);
   EXPECT_EQ(log_handle, 0);
 
-  EXPECT_EQ(zx_debuglog_create(standalone::GetRootResource()->get(), 1 | ZX_LOG_FLAG_READABLE,
-                               &log_handle),
+  EXPECT_EQ(zx_debuglog_create(debuglog_resource.get(), 1 | ZX_LOG_FLAG_READABLE, &log_handle),
             ZX_ERR_INVALID_ARGS);
   EXPECT_EQ(log_handle, 0);
 }
 
 TEST(DebugLogTest, InvalidHandleAllowedOnlyForWrite) {
   zx_handle_t log_handle = 0;
+  zx::unowned_resource system_resource = standalone::GetSystemResource();
 
-  // Requesting a read-write handle with a valid root resource should work
-  ASSERT_OK(
-      zx_debuglog_create(standalone::GetRootResource()->get(), ZX_LOG_FLAG_READABLE, &log_handle));
+  zx::result<zx::resource> result =
+      standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_DEBUGLOG_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource debuglog_resource = std::move(result.value());
+
+  // Requesting a read-write handle with a valid debuglog resource should work
+  ASSERT_OK(zx_debuglog_create(debuglog_resource.get(), ZX_LOG_FLAG_READABLE, &log_handle));
   ASSERT_OK(zx_handle_close(log_handle));
   log_handle = ZX_HANDLE_INVALID;
 
-  // Requesting a write-only handle with an invalid root resource should work,
+  // Requesting a write-only handle with an invalid resource should work,
   // since the dynamic linker needs to be able to log something somewhere when
   // it can't bootstrap a process
   ASSERT_OK(zx_debuglog_create(ZX_HANDLE_INVALID, 0, &log_handle));
   ASSERT_OK(zx_handle_close(log_handle));
   log_handle = ZX_HANDLE_INVALID;
 
-  // But requesting a read-write handle with an invalid root resource represents
+  // But requesting a read-write handle with an invalid resource represents
   // an information leak, so the kernel checks the first arg, and if it's not a
   // valid handle, then we get an error
   EXPECT_EQ(zx_debuglog_create(ZX_HANDLE_INVALID, ZX_LOG_FLAG_READABLE, &log_handle),
@@ -75,8 +90,14 @@ TEST(DebugLogTest, InvalidHandleAllowedOnlyForWrite) {
 
 TEST(DebugLogTest, MaxMessageSize) {
   zx_handle_t log_handle = ZX_HANDLE_INVALID;
-  ASSERT_OK(
-      zx_debuglog_create(standalone::GetRootResource()->get(), ZX_LOG_FLAG_READABLE, &log_handle));
+  zx::unowned_resource system_resource = standalone::GetSystemResource();
+
+  zx::result<zx::resource> result =
+      standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_DEBUGLOG_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource debuglog_resource = std::move(result.value());
+
+  ASSERT_OK(zx_debuglog_create(debuglog_resource.get(), ZX_LOG_FLAG_READABLE, &log_handle));
 
   // msg is too large and should be truncated.
   char msg[ZX_LOG_RECORD_DATA_MAX + 1];
