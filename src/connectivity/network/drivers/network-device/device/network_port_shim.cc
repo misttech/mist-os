@@ -4,21 +4,18 @@
 
 #include "network_port_shim.h"
 
-#include "mac_addr_shim.h"
-
 namespace network {
 
 namespace netdev = fuchsia_hardware_network;
 
-void NetworkPortShim::Bind(ddk::NetworkPortProtocolClient client_impl, fdf_dispatcher_t* dispatcher,
-                           fdf::ServerEnd<netdriver::NetworkPort> server_end) {
-  std::unique_ptr<NetworkPortShim> impl(new NetworkPortShim(client_impl, dispatcher));
-
-  fdf::BindServer(impl->dispatcher_, std::move(server_end), std::move(impl));
-}
-
-NetworkPortShim::NetworkPortShim(ddk::NetworkPortProtocolClient impl, fdf_dispatcher_t* dispatcher)
-    : impl_(impl), dispatcher_(dispatcher) {}
+NetworkPortShim::NetworkPortShim(ddk::NetworkPortProtocolClient impl, fdf_dispatcher_t* dispatcher,
+                                 fdf::ServerEnd<netdriver::NetworkPort> server_end,
+                                 fit::callback<void(NetworkPortShim*)>&& on_unbound)
+    : impl_(impl),
+      dispatcher_(dispatcher),
+      on_unbound_(std::move(on_unbound)),
+      binding_(dispatcher, std::move(server_end), this,
+               std::mem_fn(&NetworkPortShim::OnPortUnbound)) {}
 
 void NetworkPortShim::GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) {
   port_base_info_t info;
@@ -79,13 +76,24 @@ void NetworkPortShim::GetMac(fdf::Arena& arena, GetMacCompleter::Sync& completer
     return;
   }
 
-  MacAddrShim::Bind(dispatcher_, mac_addr, std::move(endpoints->server));
+  // MacAddrShim must be created on the same dispatcher that it's served on. Since the GetMac
+  // request is already served on that dispatcher it's safe to directly construct it here.
+  auto mac_addr_shim = std::make_unique<MacAddrShim>(
+      dispatcher_, mac_addr, std::move(endpoints->server),
+      [this](MacAddrShim* mac_addr_shim) { mac_addr_shims_.erase(*mac_addr_shim); });
+  mac_addr_shims_.push_front(std::move(mac_addr_shim));
 
   completer.buffer(arena).Reply(std::move(endpoints->client));
 }
 
 void NetworkPortShim::Removed(fdf::Arena& arena, RemovedCompleter::Sync& completer) {
   impl_.Removed();
+}
+
+void NetworkPortShim::OnPortUnbound(fidl::UnbindInfo info) {
+  if (on_unbound_) {
+    on_unbound_(this);
+  }
 }
 
 }  // namespace network

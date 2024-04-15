@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.hardware.network.driver/cpp/driver/wire.h>
 #include <fuchsia/hardware/network/driver/cpp/banjo.h>
 
-#include <optional>
+#include <fbl/intrusive_double_list.h>
 
 namespace network {
 
@@ -20,12 +20,12 @@ namespace netdriver = fuchsia_hardware_network_driver;
 // port speaks FIDL. This type translates calls from from netdevice into the parent from FIDL to
 // Banjo. The MacAddr protocol does not have corresponding Ifc protocol in the other direction so
 // this type only needs to work in one direction.
-class MacAddrShim : public fdf::WireServer<netdriver::MacAddr> {
+class MacAddrShim : public fdf::WireServer<netdriver::MacAddr>,
+                    public fbl::DoublyLinkedListable<std::unique_ptr<MacAddrShim>> {
  public:
-  static void Bind(fdf_dispatcher_t* dispatcher, ddk::MacAddrProtocolClient client_impl,
-                   fdf::ServerEnd<netdriver::MacAddr> server_end);
-
-  explicit MacAddrShim(ddk::MacAddrProtocolClient impl);
+  MacAddrShim(fdf_dispatcher_t* dispatcher, ddk::MacAddrProtocolClient client_impl,
+              fdf::ServerEnd<netdriver::MacAddr> server_end,
+              fit::callback<void(MacAddrShim*)>&& on_unbound);
 
   void SetMode(netdriver::wire::MacAddrSetModeRequest* request, fdf::Arena& arena,
                SetModeCompleter::Sync& completer) override;
@@ -33,7 +33,11 @@ class MacAddrShim : public fdf::WireServer<netdriver::MacAddr> {
   void GetAddress(fdf::Arena& arena, GetAddressCompleter::Sync& completer) override;
 
  private:
+  void OnMacAddrUnbound(fidl::UnbindInfo info);
+
   ddk::MacAddrProtocolClient impl_;
+  fit::callback<void(MacAddrShim*)> on_unbound_;
+  fdf::ServerBinding<netdriver::MacAddr> binding_;
 };
 
 }  // namespace network

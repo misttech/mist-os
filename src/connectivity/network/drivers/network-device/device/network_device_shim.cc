@@ -12,7 +12,6 @@
 #include <fbl/auto_lock.h>
 
 #include "log.h"
-#include "network_port_shim.h"
 
 namespace network {
 
@@ -29,46 +28,60 @@ zx::result<fdf::ClientEnd<netdriver::NetworkDeviceImpl>> NetworkDeviceShim::Bind
     return endpoints.take_error();
   }
   {
-    fbl::AutoLock lock(&binding_lock_);
+    fbl::AutoLock lock(&lock_);
     binding_ = fdf::BindServer(dispatchers_.shim_->get(), std::move(endpoints->server), this,
                                [this](NetworkDeviceShim*, fidl::UnbindInfo info,
                                       fdf::ServerEnd<netdriver::NetworkDeviceImpl>) {
-                                 // It's not safe to hold the lock during the call to
-                                 // on_teardown_complete_. The NetworkDeviceShim could potentially
-                                 // be deleted in the callback which would mean that when the
-                                 // autolock destructs and tries to unlock the mutex the mutex has
-                                 // already been destroyed. Instead move the callback to a local
-                                 // variable and use that if available.
-                                 fit::callback<void()> on_teardown_complete;
-                                 {
-                                   fbl::AutoLock lock(&binding_lock_);
-                                   binding_.reset();
-                                   on_teardown_complete = std::move(on_teardown_complete_);
-                                 }
-                                 if (on_teardown_complete) {
-                                   on_teardown_complete();
-                                 }
+                                 lock_.Acquire();
+                                 binding_.reset();
+                                 MaybeFinishTeardown();
                                });
   }
   return zx::ok(std::move(endpoints->client));
 }
 
+NetworkDeviceShim::~NetworkDeviceShim() {
+  ZX_ASSERT_MSG(!binding_.has_value(), "NetworkDeviceShim destroyed before server unbound");
+  ZX_ASSERT_MSG(network_port_shims_.is_empty(),
+                "NetworkDeviceShim destroyed before all port shims destroyed");
+}
+
 NetworkDeviceImplBinder::Synchronicity NetworkDeviceShim::Teardown(
     fit::callback<void()>&& on_teardown_complete) {
-  fbl::AutoLock lock(&binding_lock_);
-  if (binding_.has_value()) {
+  fbl::AutoLock lock(&lock_);
+  if (binding_.has_value() || !network_port_shims_.is_empty()) {
     ZX_ASSERT(!on_teardown_complete_);
+    // When Teardown is called all ports should already be removed or be in the process of being
+    // removed. All that needs to be done is store the callback and unbind the server.
     on_teardown_complete_ = std::move(on_teardown_complete);
-    // Make sure that unbinding happens asynchronously. Because the shim dispatchers are created
-    // with an owner that's separate from the dispatcher that calls this method there is a chance
-    // that the unbinding could get inlined if called directly. The FIDL part of the unbinding will
-    // deadlock if that happens.
-    async::PostTask(dispatchers_.shim_->async_dispatcher(),
-                    [binding = std::move(binding_)]() mutable { binding->Unbind(); });
+    if (binding_.has_value()) {
+      // Make sure that unbinding happens asynchronously. Because the shim dispatchers are created
+      // with an owner that's separate from the dispatcher that calls this method there is a chance
+      // that the unbinding could get inlined if called directly. The FIDL part of the unbinding
+      // will deadlock if that happens.
+      async::PostTask(dispatchers_.shim_->async_dispatcher(),
+                      [binding = std::move(binding_)]() mutable { binding->Unbind(); });
+    }
     return Synchronicity::Async;
   }
   // Nothing to tear down, completed synchronously.
   return Synchronicity::Sync;
+}
+
+void NetworkDeviceShim::MaybeFinishTeardown() {
+  // It's not safe to hold the lock during the call to on_teardown_complete_. The NetworkDeviceShim
+  // could potentially be deleted in the callback which would mean that when the autolock destructs
+  // and tries to unlock the mutex the mutex has already been destroyed. Instead move the callback
+  // to a local variable and use that if available.
+  fit::callback<void()> on_teardown_complete;
+  if (on_teardown_complete_ && !binding_.has_value() && network_port_shims_.is_empty()) {
+    // Everything is torn down, tear down is complete.
+    on_teardown_complete = std::move(on_teardown_complete_);
+  }
+  lock_.Release();
+  if (on_teardown_complete) {
+    on_teardown_complete();
+  }
 }
 
 void NetworkDeviceShim::Init(netdriver::wire::NetworkDeviceImplInitRequest* request,
@@ -289,16 +302,6 @@ void NetworkDeviceShim::NetworkDeviceIfcAddPort(uint8_t port_id,
                                                 const network_port_protocol_t* port,
                                                 network_device_ifc_add_port_callback callback,
                                                 void* cookie) {
-  ddk::NetworkPortProtocolClient impl(port);
-  zx::result endpoints = fdf::CreateEndpoints<netdriver::NetworkPort>();
-  if (endpoints.is_error()) {
-    LOGF_ERROR("failed to create endpoints: %s", endpoints.status_string());
-    callback(cookie, ZX_ERR_NO_RESOURCES);
-    return;
-  }
-
-  NetworkPortShim::Bind(impl, dispatchers_.port_->get(), std::move(endpoints->server));
-
   if (!device_ifc_.is_valid()) {
     LOGF_ERROR("invalid device interface, adding port before Init called?");
     callback(cookie, ZX_ERR_BAD_STATE);
@@ -310,24 +313,51 @@ void NetworkDeviceShim::NetworkDeviceIfcAddPort(uint8_t port_id,
     return;
   }
 
-  fdf::Arena arena('NETD');
-  device_ifc_.buffer(arena)
-      ->AddPort(port_id, std::move(endpoints->client))
-      .Then([callback, cookie](auto& result) {
-        if (!result.ok()) {
-          LOGF_ERROR("AddPort failed: %s", result.FormatDescription().c_str());
-          callback(cookie, result.status());
-        } else {
-          callback(cookie, result.value().status);
-        }
-      });
+  // The NetworkPortShim constructor has to run on the same dispatcher that it's binding to. The
+  // binding object in the port only allows access from that one dispatcher.
+  async::PostTask(dispatchers_.port_->async_dispatcher(), [callback, cookie, port = *port, port_id,
+                                                           this]() mutable {
+    zx::result endpoints = fdf::CreateEndpoints<netdriver::NetworkPort>();
+    if (endpoints.is_error()) {
+      LOGF_ERROR("failed to create endpoints: %s", endpoints.status_string());
+      callback(cookie, ZX_ERR_NO_RESOURCES);
+      return;
+    }
+
+    ddk::NetworkPortProtocolClient impl(&port);
+    std::unique_ptr port_shim = std::make_unique<NetworkPortShim>(
+        impl, dispatchers_.port_->get(), std::move(endpoints->server),
+        [this](NetworkPortShim* port_shim) {
+          lock_.Acquire();
+          network_port_shims_.erase(*port_shim);
+          MaybeFinishTeardown();
+        });
+
+    fdf::Arena arena('NETD');
+    device_ifc_.buffer(arena)
+        ->AddPort(port_id, std::move(endpoints->client))
+        .Then([callback, cookie, this, port_shim = std::move(port_shim)](auto& result) mutable {
+          if (!result.ok()) {
+            LOGF_ERROR("AddPort failed: %s", result.FormatDescription().c_str());
+            callback(cookie, result.status());
+          } else if (result.value().status != ZX_OK) {
+            callback(cookie, result.value().status);
+          } else {
+            {
+              fbl::AutoLock lock(&lock_);
+              network_port_shims_.push_front(std::move(port_shim));
+            }
+            callback(cookie, ZX_OK);
+          }
+        });
+  });
 }
 
 void NetworkDeviceShim::NetworkDeviceIfcRemovePort(uint8_t port_id) {
   fdf::Arena arena('NETD');
   fidl::OneWayStatus status = device_ifc_.buffer(arena)->RemovePort(port_id);
   if (!status.ok()) {
-    LOGF_ERROR("PortStatusChanged error: %s", status.status_string());
+    LOGF_ERROR("RemovePort error: %s", status.status_string());
   }
 }
 
@@ -395,7 +425,8 @@ void NetworkDeviceShim::NetworkDeviceIfcCompleteTx(const tx_result_t* tx_list, s
 }
 
 void NetworkDeviceShim::NetworkDeviceIfcSnoop(const rx_buffer_t* rx_list, size_t rx_count) {
-  // TODO(https://fxbug.dev/42119287): Not implemented in netdev, implement here as well when needed.
+  // TODO(https://fxbug.dev/42119287): Not implemented in netdev, implement here as well when
+  // needed.
 }
 
 }  // namespace network

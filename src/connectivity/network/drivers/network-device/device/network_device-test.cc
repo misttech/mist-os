@@ -3507,5 +3507,34 @@ TEST_F(NetworkDeviceShimTest, GetMac) {
   ASSERT_OK(mac.status());
 }
 
+TEST_F(NetworkDeviceShimTest, TeardownAndThenPortClientUnbinds) {
+  // Verify asynchronous Teardown when a port client is still bound during the teardown call and
+  // later unbound.
+  ASSERT_OK(InitImpl());
+
+  fdf::WireSyncClient<netdriver::NetworkPort> port_client;
+  ifc_.add_port_ = [&](netdriver::wire::NetworkDeviceIfcAddPortRequest* request, fdf::Arena& arena,
+                       FakeNetworkDeviceIfc::AddPortCompleter::Sync& completer) {
+    port_client.Bind(std::move(request->port));
+    completer.buffer(arena).Reply(ZX_OK);
+  };
+
+  banjo::FakeNetworkPortImpl port;
+  auto port_proto = port.protocol();
+  ASSERT_OK(AddPortSync(12, &port_proto));
+
+  fdf::Arena arena('NETD');
+  auto mac = port_client.buffer(arena)->GetMac();
+  ASSERT_OK(mac.status());
+
+  libsync::Completion teardown_complete;
+  ASSERT_EQ(shim_->Teardown([&] { teardown_complete.Signal(); }),
+            NetworkDeviceImplBinder::Synchronicity::Async);
+  ASSERT_FALSE(teardown_complete.signaled());
+  // Unbinding the client (by destroying it) should trigger port removal and complete the teardown.
+  port_client = {};
+  teardown_complete.Wait();
+}
+
 }  // namespace testing
 }  // namespace network

@@ -6,14 +6,13 @@
 
 namespace network {
 
-void MacAddrShim::Bind(fdf_dispatcher_t* dispatcher, ddk::MacAddrProtocolClient client_impl,
-                       fdf::ServerEnd<netdriver::MacAddr> server_end) {
-  std::unique_ptr impl = std::make_unique<MacAddrShim>(client_impl);
-
-  fdf::BindServer(dispatcher, std::move(server_end), std::move(impl));
-}
-
-MacAddrShim::MacAddrShim(ddk::MacAddrProtocolClient impl) : impl_(impl) {}
+MacAddrShim::MacAddrShim(fdf_dispatcher_t* dispatcher, ddk::MacAddrProtocolClient client_impl,
+                         fdf::ServerEnd<netdriver::MacAddr> server_end,
+                         fit::callback<void(MacAddrShim*)>&& on_unbound)
+    : impl_(client_impl),
+      on_unbound_(std::move(on_unbound)),
+      binding_(dispatcher, std::move(server_end), this,
+               std::mem_fn(&MacAddrShim::OnMacAddrUnbound)) {}
 
 void MacAddrShim::SetMode(netdriver::wire::MacAddrSetModeRequest* request, fdf::Arena& arena,
                           SetModeCompleter::Sync& completer) {
@@ -47,6 +46,12 @@ void MacAddrShim::GetAddress(fdf::Arena& arena, GetAddressCompleter::Sync& compl
   fuchsia_net::wire::MacAddress mac;
   std::copy(std::begin(addr.octets), std::end(addr.octets), mac.octets.begin());
   completer.buffer(arena).Reply(mac);
+}
+
+void MacAddrShim::OnMacAddrUnbound(fidl::UnbindInfo info) {
+  if (on_unbound_) {
+    on_unbound_(this);
+  }
 }
 
 }  // namespace network

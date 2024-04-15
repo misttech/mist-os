@@ -10,8 +10,10 @@
 
 #include <optional>
 
+#include <fbl/intrusive_double_list.h>
 #include <fbl/mutex.h>
 
+#include "network_port_shim.h"
 #include "public/network_device.h"
 
 namespace network {
@@ -28,6 +30,7 @@ class NetworkDeviceShim : public fdf::WireServer<netdriver::NetworkDeviceImpl>,
                           public NetworkDeviceImplBinder {
  public:
   NetworkDeviceShim(ddk::NetworkDeviceImplProtocolClient impl, const ShimDispatchers& dispatchers);
+  ~NetworkDeviceShim() override;
 
   // NetworkDeviceImplBinder implementation
   zx::result<fdf::ClientEnd<netdriver::NetworkDeviceImpl>> Bind() override;
@@ -60,11 +63,15 @@ class NetworkDeviceShim : public fdf::WireServer<netdriver::NetworkDeviceImpl>,
   void NetworkDeviceIfcSnoop(const rx_buffer_t* rx_list, size_t rx_count);
 
  private:
+  using NetworkPortShimList = fbl::SizedDoublyLinkedList<std::unique_ptr<NetworkPortShim>>;
+
+  void MaybeFinishTeardown() __TA_REQUIRES(lock_) __TA_RELEASE(lock_);
+
   ddk::NetworkDeviceImplProtocolClient impl_;
-  std::optional<fdf::ServerBindingRef<netdriver::NetworkDeviceImpl>> binding_
-      __TA_GUARDED(binding_lock_);
-  fit::callback<void()> on_teardown_complete_ __TA_GUARDED(binding_lock_);
-  fbl::Mutex binding_lock_;
+  std::optional<fdf::ServerBindingRef<netdriver::NetworkDeviceImpl>> binding_ __TA_GUARDED(lock_);
+  fit::callback<void()> on_teardown_complete_ __TA_GUARDED(lock_);
+  NetworkPortShimList network_port_shims_ __TA_GUARDED(lock_);
+  fbl::Mutex lock_;
 
   const ShimDispatchers dispatchers_;
   fdf::WireSharedClient<netdriver::NetworkDeviceIfc> device_ifc_;
