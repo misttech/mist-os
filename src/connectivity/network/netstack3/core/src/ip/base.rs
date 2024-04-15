@@ -400,17 +400,11 @@ impl<S: PartialEq, W: PartialEq + PartialEq<S>> PartialEq for EitherDeviceId<S, 
     }
 }
 
-impl<S: Id, W: Id> EitherDeviceId<&'_ S, &'_ W> {
-    pub(crate) fn as_strong_ref<
-        'a,
-        CC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>,
-    >(
-        &'a self,
-        core_ctx: &CC,
-    ) -> Option<Cow<'a, CC::DeviceId>> {
+impl<S: Id, W: crate::device::WeakId<Strong = S>> EitherDeviceId<&'_ S, &'_ W> {
+    pub(crate) fn as_strong_ref<'a>(&'a self) -> Option<Cow<'a, S>> {
         match self {
             EitherDeviceId::Strong(s) => Some(Cow::Borrowed(s)),
-            EitherDeviceId::Weak(w) => core_ctx.upgrade_weak_device_id(w).map(Cow::Owned),
+            EitherDeviceId::Weak(w) => w.upgrade().map(Cow::Owned),
         }
     }
 }
@@ -428,23 +422,19 @@ impl<S, W> EitherDeviceId<S, W> {
     }
 }
 
-impl<S: Id, W: Id> EitherDeviceId<S, W> {
-    pub(crate) fn as_strong<'a, CC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>>(
-        &'a self,
-        core_ctx: &CC,
-    ) -> Option<Cow<'a, CC::DeviceId>> {
+impl<S: crate::device::StrongId<Weak = W>, W: crate::device::WeakId<Strong = S>>
+    EitherDeviceId<S, W>
+{
+    pub(crate) fn as_strong<'a>(&'a self) -> Option<Cow<'a, S>> {
         match self {
             EitherDeviceId::Strong(s) => Some(Cow::Borrowed(s)),
-            EitherDeviceId::Weak(w) => core_ctx.upgrade_weak_device_id(w).map(Cow::Owned),
+            EitherDeviceId::Weak(w) => w.upgrade().map(Cow::Owned),
         }
     }
 
-    pub(crate) fn as_weak<'a, CC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>>(
-        &'a self,
-        core_ctx: &CC,
-    ) -> Cow<'a, CC::WeakDeviceId> {
+    pub(crate) fn as_weak<'a>(&'a self) -> Cow<'a, W> {
         match self {
-            EitherDeviceId::Strong(s) => Cow::Owned(core_ctx.downgrade_device_id(s)),
+            EitherDeviceId::Strong(s) => Cow::Owned(s.downgrade()),
             EitherDeviceId::Weak(w) => Cow::Borrowed(w),
         }
     }
@@ -3194,8 +3184,6 @@ impl<
 pub(crate) mod testutil {
     use super::*;
 
-    use alloc::collections::HashSet;
-
     use derivative::Derivative;
     use net_types::ip::IpInvariant;
 
@@ -3211,14 +3199,6 @@ pub(crate) mod testutil {
     {
         type DeviceId = D;
         type WeakDeviceId = D::Weak;
-
-        fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
-            self.get_ref().as_ref().downgrade_device_id(device_id)
-        }
-
-        fn upgrade_weak_device_id(&self, device_id: &Self::WeakDeviceId) -> Option<Self::DeviceId> {
-            self.get_ref().as_ref().upgrade_weak_device_id(device_id)
-        }
     }
 
     impl<Outer, Inner: DeviceIdContext<AnyDevice>> DeviceIdContext<AnyDevice>
@@ -3226,14 +3206,6 @@ pub(crate) mod testutil {
     {
         type DeviceId = Inner::DeviceId;
         type WeakDeviceId = Inner::WeakDeviceId;
-
-        fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
-            self.inner.downgrade_device_id(device_id)
-        }
-
-        fn upgrade_weak_device_id(&self, device_id: &Self::WeakDeviceId) -> Option<Self::DeviceId> {
-            self.inner.upgrade_weak_device_id(device_id)
-        }
     }
 
     #[derive(Debug, GenericOverIp)]
@@ -3330,36 +3302,11 @@ pub(crate) mod testutil {
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
-    pub(crate) struct FakeIpDeviceIdCtx<D> {
-        devices_removed: HashSet<D>,
-    }
-
-    impl<D: Eq + Hash> FakeIpDeviceIdCtx<D> {
-        pub(crate) fn set_device_removed(&mut self, device: D, removed: bool) {
-            let Self { devices_removed } = self;
-            let _existed: bool = if removed {
-                devices_removed.insert(device)
-            } else {
-                devices_removed.remove(&device)
-            };
-        }
-    }
+    pub(crate) struct FakeIpDeviceIdCtx<D>(PhantomData<D>);
 
     impl<DeviceId: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeIpDeviceIdCtx<DeviceId> {
         type DeviceId = DeviceId;
         type WeakDeviceId = FakeWeakDeviceId<DeviceId>;
-
-        fn downgrade_device_id(&self, device_id: &DeviceId) -> FakeWeakDeviceId<DeviceId> {
-            FakeWeakDeviceId(device_id.clone())
-        }
-
-        fn upgrade_weak_device_id(
-            &self,
-            FakeWeakDeviceId(device_id): &FakeWeakDeviceId<DeviceId>,
-        ) -> Option<DeviceId> {
-            let Self { devices_removed } = self;
-            (!devices_removed.contains(&device_id)).then(|| device_id.clone())
-        }
     }
 
     impl<

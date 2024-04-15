@@ -52,7 +52,7 @@ use crate::{
     },
     convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
-    device::{self, AnyDevice, DeviceIdContext, WeakId},
+    device::{self, AnyDevice, DeviceIdContext, StrongId as _, WeakId},
     error::{ExistsError, LocalAddressError, ZonedAddressError},
     inspect::{Inspector, InspectorDeviceExt},
     ip::{
@@ -1885,7 +1885,7 @@ where
         None => (None, bound_device.clone().map(EitherDeviceId::Weak)),
     };
 
-    let weak_device = device.map(|d| d.as_weak(core_ctx).into_owned());
+    let weak_device = device.map(|d| d.as_weak().into_owned());
     let port = match port {
         None => {
             match algorithm::simple_randomized_port_alloc(
@@ -3311,7 +3311,7 @@ where
         new_device: Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
     ) -> Result<(), SetDeviceError> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        let weak_device = new_device.as_ref().map(|d| core_ctx.downgrade_device_id(d));
+        let weak_device = new_device.as_ref().map(|d| d.downgrade());
         core_ctx.with_socket_mut_transport_demux(id, move |core_ctx, socket_state| {
             debug!("set device on {id:?} to {new_device:?}");
             let TcpSocketState { socket_state, ip_options: _ } = socket_state;
@@ -3441,9 +3441,7 @@ where
                                 } => {
                                     let other_demux_id =
                                         core_ctx.into_other_demux_socket_id(id.clone());
-                                    let old_device = device
-                                        .as_ref()
-                                        .and_then(|d| core_ctx.upgrade_weak_device_id(d));
+                                    let old_device = device.as_ref().and_then(|d| d.upgrade());
                                     let old_weak_device = device.clone();
                                     core_ctx.with_both_demux_mut(|demux, other_demux| {
                                         Self::set_device_listener(

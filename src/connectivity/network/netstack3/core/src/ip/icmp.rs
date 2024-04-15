@@ -51,7 +51,7 @@ use crate::{
     },
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
-    device::{self, AnyDevice, DeviceIdContext, FrameDestination},
+    device::{self, AnyDevice, DeviceIdContext, FrameDestination, StrongId as _, WeakId as _},
     filter::{MaybeTransportPacket, TransportPacketSerializer},
     ip::{
         device::{
@@ -1053,7 +1053,7 @@ impl<
                 let id = echo_reply.message().id();
                 let meta = echo_reply.parse_metadata();
                 buffer.undo_parse(meta);
-                let device = core_ctx.downgrade_device_id(device);
+                let device = device.downgrade();
                 receive_icmp_echo_reply(core_ctx, bindings_ctx, src_ip, dst_ip, id, buffer, device);
             }
             Icmpv4Packet::TimestampRequest(timestamp_request) => {
@@ -1846,7 +1846,7 @@ impl<
                     let id = echo_reply.message().id();
                     let meta = echo_reply.parse_metadata();
                     buffer.undo_parse(meta);
-                    let device = core_ctx.downgrade_device_id(device);
+                    let device = device.downgrade();
                     receive_icmp_echo_reply(
                         core_ctx,
                         bindings_ctx,
@@ -2991,10 +2991,8 @@ fn receive_icmp_echo_reply<
             return;
         }
     };
-    core_ctx.with_icmp_ctx_and_sockets_mut(|device_ctx, sockets| {
-        if let Some((id, strong_device)) =
-            NonZeroU16::new(id).zip(device_ctx.upgrade_weak_device_id(&device))
-        {
+    core_ctx.with_icmp_ctx_and_sockets_mut(|_core_ctx, sockets| {
+        if let Some((id, strong_device)) = NonZeroU16::new(id).zip(device.upgrade()) {
             let mut addrs_to_search = AddrVecIter::<I, CC::WeakDeviceId, IcmpAddrSpec>::with_device(
                 ConnIpAddr { local: (dst_ip, id), remote: (src_ip, ()) }.into(),
                 device,

@@ -41,7 +41,7 @@ use crate::{
     convert::BidirectionalConverter,
     counters::Counter,
     data_structures::socketmap::{IterShadows as _, SocketMap, Tagged},
-    device::{self, AnyDevice, DeviceIdContext},
+    device::{self, AnyDevice, DeviceIdContext, StrongId as _},
     error::{LocalAddressError, SocketError, ZonedAddressError},
     inspect::{Inspector, InspectorDeviceExt},
     ip::{
@@ -1342,7 +1342,7 @@ fn receive_ip_packet<
 
     let dst_port = packet.dst_port();
     let recipients = StateContext::<I, _>::with_bound_state_context(core_ctx, |core_ctx| {
-        let device_weak = core_ctx.downgrade_device_id(device);
+        let device_weak = device.downgrade();
         DatagramBoundStateContext::with_bound_sockets(core_ctx, |_core_ctx, bound_sockets| {
             lookup(bound_sockets, (src_ip, src_port), (dst_ip, dst_port), device_weak)
                 .map(|result| match result {
@@ -2480,14 +2480,17 @@ mod tests {
         },
         device::{
             loopback::{LoopbackCreationProperties, LoopbackDevice},
-            testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
+            testutil::{
+                FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
+                MultipleDevicesId,
+            },
             DeviceId,
         },
         error::RemoteAddressError,
         ip::{
             device::state::IpDeviceStateIpExt,
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx, FakeFilterDeviceId},
-            testutil::{DualStackSendIpPacketMeta, FakeIpDeviceIdCtx},
+            testutil::DualStackSendIpPacketMeta,
             ResolveRouteError, SendIpPacketMeta,
         },
         socket::{self, datagram::MulticastInterfaceSelector, StrictlyZonedAddr},
@@ -2515,9 +2518,33 @@ mod tests {
         src_port: Option<NonZeroU16>,
     }
 
+    impl<D: FakeStrongDeviceId> FakeUdpCoreCtx<D> {
+        fn new_with_device<I: TestIpExt>(device: D) -> Self {
+            Self::with_local_remote_ip_addrs_and_device(
+                vec![local_ip::<I>()],
+                vec![remote_ip::<I>()],
+                device,
+            )
+        }
+    }
+
     impl FakeUdpCoreCtx<FakeDeviceId> {
         fn new_fake_device<I: TestIpExt>() -> Self {
-            Self::with_local_remote_ip_addrs(vec![local_ip::<I>()], vec![remote_ip::<I>()])
+            Self::new_with_device::<I>(FakeDeviceId)
+        }
+    }
+
+    impl<Outer: Default, D: FakeStrongDeviceId> Wrapped<Outer, FakeUdpInnerCoreCtx<D>> {
+        fn with_local_remote_ip_addrs_and_device<A: Into<SpecifiedAddr<IpAddr>>>(
+            local_ips: Vec<A>,
+            remote_ips: Vec<A>,
+            device: D,
+        ) -> Self {
+            Self::with_state(FakeDualStackIpSocketCtx::new([FakeDeviceConfig {
+                device,
+                local_ips,
+                remote_ips,
+            }]))
         }
     }
 
@@ -2526,11 +2553,7 @@ mod tests {
             local_ips: Vec<A>,
             remote_ips: Vec<A>,
         ) -> Self {
-            Self::with_state(FakeDualStackIpSocketCtx::new([FakeDeviceConfig {
-                device: FakeDeviceId,
-                local_ips,
-                remote_ips,
-            }]))
+            Self::with_local_remote_ip_addrs_and_device(local_ips, remote_ips, FakeDeviceId)
         }
     }
 
@@ -3413,12 +3436,6 @@ mod tests {
         );
     }
 
-    fn set_device_removed<I: TestIpExt>(core_ctx: &mut UdpFakeDeviceCoreCtx, device_removed: bool) {
-        let core_ctx: &mut FakeCoreCtx<_, _, _> = core_ctx.as_mut();
-        let core_ctx: &mut FakeIpDeviceIdCtx<_> = core_ctx.get_mut().as_mut();
-        core_ctx.set_device_removed(FakeDeviceId, device_removed);
-    }
-
     #[ip_test]
     #[test_case(
         true,
@@ -3429,14 +3446,16 @@ mod tests {
         expected: Result<(), ConnectError>,
     ) {
         set_logger_for_test();
-        let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
+        let device = FakeReferencyDeviceId::default();
+        let mut ctx =
+            FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::new_with_device::<I>(device.clone()));
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
 
         let unbound = api.create();
-        api.set_device(&unbound, Some(&FakeDeviceId)).unwrap();
+        api.set_device(&unbound, Some(&device)).unwrap();
 
         if remove_device {
-            set_device_removed::<I>(api.core_ctx(), remove_device);
+            device.mark_removed();
         }
 
         let remote_ip = remote_ip::<I>();
@@ -3727,11 +3746,13 @@ mod tests {
     #[ip_test]
     fn test_send_udp_conn_device_removed<I: Ip + TestIpExt>() {
         set_logger_for_test();
-        let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
+        let device = FakeReferencyDeviceId::default();
+        let mut ctx =
+            FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::new_with_device::<I>(device.clone()));
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let remote_ip = remote_ip::<I>();
         let socket = api.create();
-        api.set_device(&socket, Some(&FakeDeviceId)).unwrap();
+        api.set_device(&socket, Some(&device)).unwrap();
         api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into())
             .expect("connect failed");
 
@@ -3744,7 +3765,9 @@ mod tests {
                 )))),
             ),
         ] {
-            set_device_removed::<I>(api.core_ctx(), device_removed);
+            if device_removed {
+                device.mark_removed();
+            }
 
             assert_eq!(api.send(&socket, Buf::new(Vec::new(), ..)), expected_res)
         }
@@ -5019,13 +5042,15 @@ mod tests {
 
     #[ip_test]
     fn test_multicast_membership_with_removed_device<I: Ip + TestIpExt>() {
-        let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
+        let device = FakeReferencyDeviceId::default();
+        let mut ctx =
+            FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::new_with_device::<I>(device.clone()));
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
 
         let unbound = api.create();
-        api.set_device(&unbound, Some(&FakeDeviceId)).unwrap();
+        api.set_device(&unbound, Some(&device)).unwrap();
 
-        set_device_removed::<I>(api.core_ctx(), true);
+        device.mark_removed();
 
         let group = I::get_multicast_addr(4);
         assert_eq!(

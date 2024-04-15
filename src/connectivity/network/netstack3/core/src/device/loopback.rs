@@ -111,15 +111,6 @@ impl DeviceStateSpec for LoopbackDevice {
 impl<BT: BindingsTypes, L> DeviceIdContext<LoopbackDevice> for CoreCtx<'_, BT, L> {
     type DeviceId = LoopbackDeviceId<BT>;
     type WeakDeviceId = LoopbackWeakDeviceId<BT>;
-    fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
-        device_id.downgrade()
-    }
-    fn upgrade_weak_device_id(
-        &self,
-        weak_device_id: &Self::WeakDeviceId,
-    ) -> Option<Self::DeviceId> {
-        weak_device_id.upgrade()
-    }
 }
 
 /// Properties used to create a loopback device.

@@ -71,7 +71,10 @@ pub(crate) mod testutil {
     use super::*;
     use crate::{
         context::testutil::FakeCoreCtx,
-        device::{testutil::FakeWeakDeviceId, DeviceIdContext, Id, StrongId},
+        device::{
+            testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
+            DeviceIdContext, Id, StrongId,
+        },
     };
 
     /// A fake [`LinkDevice`].
@@ -115,11 +118,15 @@ pub(crate) mod testutil {
     }
 
     /// A fake ID identifying a [`FakeLinkDevice`].
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
     pub(crate) struct FakeLinkDeviceId;
 
     impl StrongId for FakeLinkDeviceId {
         type Weak = FakeWeakDeviceId<Self>;
+
+        fn downgrade(&self) -> Self::Weak {
+            FakeWeakDeviceId(*self)
+        }
     }
 
     impl Id for FakeLinkDeviceId {
@@ -131,17 +138,11 @@ pub(crate) mod testutil {
     impl<S, M> DeviceIdContext<FakeLinkDevice> for FakeCoreCtx<S, M, FakeLinkDeviceId> {
         type DeviceId = FakeLinkDeviceId;
         type WeakDeviceId = FakeWeakDeviceId<FakeLinkDeviceId>;
+    }
 
-        fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
-            FakeWeakDeviceId(device_id.clone())
-        }
-
-        fn upgrade_weak_device_id(
-            &self,
-            weak_device_id: &Self::WeakDeviceId,
-        ) -> Option<Self::DeviceId> {
-            let FakeWeakDeviceId(id) = weak_device_id;
-            Some(id.clone())
+    impl FakeStrongDeviceId for FakeLinkDeviceId {
+        fn is_alive(&self) -> bool {
+            true
         }
     }
 }

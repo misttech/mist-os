@@ -32,7 +32,7 @@ use crate::{
     algorithm::ProtocolFlowId,
     context::{ReferenceNotifiers, RngContext},
     convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter},
-    device::{self, AnyDevice, DeviceIdContext},
+    device::{self, AnyDevice, DeviceIdContext, StrongId as _, WeakId as _},
     error::ExistsError,
     error::{LocalAddressError, NotFoundError, RemoteAddressError, SocketError, ZonedAddressError},
     filter::TransportPacketSerializer,
@@ -597,7 +597,7 @@ fn leave_all_joined_groups<A: IpAddress, BC, CC: MulticastMembershipHandler<A::V
     memberships: MulticastMemberships<A, CC::WeakDeviceId>,
 ) {
     for (addr, device) in memberships {
-        let Some(device) = core_ctx.upgrade_weak_device_id(&device) else {
+        let Some(device) = device.upgrade() else {
             continue;
         };
         core_ctx.leave_multicast_group(bindings_ctx, &device, addr)
@@ -2377,7 +2377,7 @@ fn listen_inner<
         .ok_or(LocalAddressError::FailedToAllocateLocalPort)?;
         let (addr, device, identifier) =
             try_pick_bound_address::<I, _, _, _>(addr, device, core_ctx, identifier)?;
-        let weak_device = device.map(|d| d.as_weak(core_ctx).into_owned());
+        let weak_device = device.map(|d| d.as_weak().into_owned());
 
         BoundStateHandler::<_, S, _>::try_insert_listener(
             bound,
@@ -2466,7 +2466,7 @@ fn listen_inner<
                     .ok_or(LocalAddressError::FailedToAllocateLocalPort)?;
                     let (_addr, device, identifier) =
                         try_pick_bound_address::<I, _, _, _>(None, device, core_ctx, identifier)?;
-                    let weak_device = device.map(|d| d.as_weak(core_ctx).into_owned());
+                    let weak_device = device.map(|d| d.as_weak().into_owned());
 
                     BoundStateHandler::<_, S, _>::try_insert_listener(
                         &mut bound_pair,
@@ -4060,7 +4060,7 @@ fn set_bound_device_single_stack<
 
     match params {
         SetBoundDeviceParameters::Listener { ip, device } => {
-            let new_device = new_device.map(|d| core_ctx.downgrade_device_id(d));
+            let new_device = new_device.map(|d| d.downgrade());
             let old_addr = ListenerAddr { ip: ip.clone(), device: device.clone() };
             let new_addr = ListenerAddr { ip: ip.clone(), device: new_device.clone() };
             let entry = sockets
@@ -4207,7 +4207,7 @@ pub(crate) fn set_device<
         match state {
             SocketState::Unbound(state) => {
                 let UnboundSocketState { ref mut device, sharing: _, ip_options: _ } = state;
-                *device = new_device.map(|d| core_ctx.downgrade_device_id(d));
+                *device = new_device.map(|d| d.downgrade());
                 Ok(())
             }
             SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
@@ -4332,13 +4332,13 @@ pub(crate) fn set_device<
                             this: S::make_bound_socket_map_id(id),
                             other: core_ctx.to_other_bound_socket_id(id),
                         };
-                        core_ctx.with_both_bound_sockets_mut(|core_ctx, bound, other_bound| {
+                        core_ctx.with_both_bound_sockets_mut(|_core_ctx, bound, other_bound| {
                             set_bound_device_listener_both_stacks(
                                 device,
                                 identifier,
                                 PairedSocketMapMut { bound, other_bound },
                                 socket_id,
-                                new_device.map(|d| core_ctx.downgrade_device_id(d)),
+                                new_device.map(|d| d.downgrade()),
                             )
                         })
                     }
@@ -4510,13 +4510,13 @@ pub(crate) fn set_multicast_membership<
 
         let ip_options = get_options_mut(core_ctx, state);
 
-        let Some(strong_interface) = interface.as_strong(core_ctx) else {
+        let Some(strong_interface) = interface.as_strong() else {
             return Err(SetMulticastMembershipError::DeviceDoesNotExist);
         };
 
         let change = ip_options
             .multicast_memberships
-            .apply_membership_change(multicast_group, &interface.as_weak(core_ctx), want_membership)
+            .apply_membership_change(multicast_group, &interface.as_weak(), want_membership)
             .ok_or(if want_membership {
                 SetMulticastMembershipError::GroupAlreadyJoined
             } else {
@@ -4684,7 +4684,7 @@ pub(crate) fn get_ip_hop_limits<
 ) -> HopLimits {
     core_ctx.with_socket_state(id, |core_ctx, state| {
         let (options, device) = get_options_device(core_ctx, state);
-        let device = device.as_ref().and_then(|d| core_ctx.upgrade_weak_device_id(d));
+        let device = device.as_ref().and_then(|d| d.upgrade());
         DatagramBoundStateContext::<I, _, _>::with_transport_context(core_ctx, |core_ctx| {
             options.hop_limits.get_limits_with_defaults(
                 &TransportIpContext::<I, _>::get_default_hop_limits(core_ctx, device.as_ref()),
@@ -4781,7 +4781,7 @@ pub(crate) fn with_other_stack_ip_options_and_default_hop_limits<
 ) -> Result<R, NotDualStackCapableError> {
     core_ctx.with_socket_state(id, |core_ctx, state| {
         let (options, device) = get_options_device(core_ctx, state);
-        let device = device.as_ref().and_then(|d| core_ctx.upgrade_weak_device_id(d));
+        let device = device.as_ref().and_then(|d| d.upgrade());
         match DatagramBoundStateContext::<I, _, _>::dual_stack_context(core_ctx) {
             MaybeDualStack::NotDualStack(_) => Err(NotDualStackCapableError),
             MaybeDualStack::DualStack(ds) => {
@@ -4967,13 +4967,16 @@ mod test {
     use crate::{
         context::testutil::{FakeBindingsCtx, FakeCtxWithCoreCtx, Wrapped, WrappedFakeCoreCtx},
         data_structures::socketmap::SocketMap,
-        device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
+        device::testutil::{
+            FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
+            MultipleDevicesId,
+        },
         ip::{
             device::state::{IpDeviceState, IpDeviceStateIpExt},
             socket::testutil::{
                 FakeDeviceConfig, FakeDualStackIpSocketCtx, FakeFilterDeviceId, FakeIpSocketCtx,
             },
-            testutil::{DualStackSendIpPacketMeta, FakeIpDeviceIdCtx},
+            testutil::DualStackSendIpPacketMeta,
             IpLayerIpExt, DEFAULT_HOP_LIMITS,
         },
         socket::{
@@ -5689,12 +5692,13 @@ mod test {
     }
 
     #[ip_test]
-    fn set_get_device_hop_limits<I: Ip + DatagramIpExt<FakeDeviceId> + IpLayerIpExt>() {
+    fn set_get_device_hop_limits<I: Ip + DatagramIpExt<FakeReferencyDeviceId> + IpLayerIpExt>() {
+        let device = FakeReferencyDeviceId::default();
         let mut core_ctx = FakeCoreCtx::<I, _> {
             outer: FakeSocketsState::default(),
             inner: WrappedFakeCoreCtx::with_inner_and_outer_state(
                 FakeDualStackIpSocketCtx::new([FakeDeviceConfig::<_, SpecifiedAddr<I::Addr>> {
-                    device: FakeDeviceId,
+                    device: device.clone(),
                     local_ips: Default::default(),
                     remote_ips: Default::default(),
                 }]),
@@ -5704,14 +5708,14 @@ mod test {
         let mut bindings_ctx = FakeBindingsCtx::default();
 
         let unbound = create(&mut core_ctx, ());
-        set_device(&mut core_ctx, &mut bindings_ctx, &unbound, Some(&FakeDeviceId)).unwrap();
+        set_device(&mut core_ctx, &mut bindings_ctx, &unbound, Some(&device)).unwrap();
 
         let HopLimits { mut unicast, multicast } = DEFAULT_HOP_LIMITS;
         unicast = unicast.checked_add(1).unwrap();
         {
             let ip_socket_ctx = core_ctx.inner.inner.get_ref();
             let device_state: &IpDeviceState<I, _> =
-                ip_socket_ctx.get_device_state(&FakeDeviceId).as_ref();
+                ip_socket_ctx.get_device_state(&device).as_ref();
             let mut default_hop_limit = device_state.default_hop_limit.write();
             let default_hop_limit = default_hop_limit.deref_mut();
             assert_ne!(*default_hop_limit, unicast);
@@ -5723,8 +5727,7 @@ mod test {
         );
 
         // If the device is removed, use default hop limits.
-        AsMut::<FakeIpDeviceIdCtx<_>>::as_mut(&mut core_ctx.inner.inner.get_mut())
-            .set_device_removed(FakeDeviceId, true);
+        device.mark_removed();
         assert_eq!(get_ip_hop_limits(&mut core_ctx, &bindings_ctx, &unbound), DEFAULT_HOP_LIMITS);
     }
 
@@ -5848,11 +5851,13 @@ mod test {
     #[ip_test]
     #[test_case(true; "remove device b")]
     #[test_case(false; "dont remove device b")]
-    fn multicast_membership_changes<I: Ip + DatagramIpExt<MultipleDevicesId> + TestIpExt>(
+    fn multicast_membership_changes<I: Ip + DatagramIpExt<FakeReferencyDeviceId> + TestIpExt>(
         remove_device_b: bool,
     ) {
-        let mut core_ctx = FakeIpSocketCtx::<I, MultipleDevicesId, _>::new(
-            MultipleDevicesId::all().into_iter().map(|device| FakeDeviceConfig {
+        let device_a = FakeReferencyDeviceId::default();
+        let device_b = FakeReferencyDeviceId::default();
+        let mut core_ctx = FakeIpSocketCtx::<I, FakeReferencyDeviceId, _>::new(
+            [device_a.clone(), device_b.clone()].into_iter().map(|device| FakeDeviceConfig {
                 device,
                 local_ips: Default::default(),
                 remote_ips: Default::default(),
@@ -5865,32 +5870,32 @@ mod test {
         assert_eq!(
             memberships.apply_membership_change(
                 multicast_addr1,
-                &FakeWeakDeviceId(MultipleDevicesId::A),
+                &FakeWeakDeviceId(device_a.clone()),
                 true /* want_membership */
             ),
             Some(MulticastMembershipChange::Join),
         );
-        core_ctx.join_multicast_group(&mut bindings_ctx, &MultipleDevicesId::A, multicast_addr1);
+        core_ctx.join_multicast_group(&mut bindings_ctx, &device_a, multicast_addr1);
 
         let multicast_addr2 = I::get_multicast_addr(2);
         assert_eq!(
             memberships.apply_membership_change(
                 multicast_addr2,
-                &FakeWeakDeviceId(MultipleDevicesId::B),
+                &FakeWeakDeviceId(device_b.clone()),
                 true /* want_membership */
             ),
             Some(MulticastMembershipChange::Join),
         );
-        core_ctx.join_multicast_group(&mut bindings_ctx, &MultipleDevicesId::B, multicast_addr2);
+        core_ctx.join_multicast_group(&mut bindings_ctx, &device_b, multicast_addr2);
 
         for (device, addr, expected) in [
-            (MultipleDevicesId::A, multicast_addr1, true),
-            (MultipleDevicesId::A, multicast_addr2, false),
-            (MultipleDevicesId::B, multicast_addr1, false),
-            (MultipleDevicesId::B, multicast_addr2, true),
+            (&device_a, multicast_addr1, true),
+            (&device_a, multicast_addr2, false),
+            (&device_b, multicast_addr1, false),
+            (&device_b, multicast_addr2, true),
         ] {
             assert_eq!(
-                core_ctx.get_device_state(&device).multicast_groups.read().contains(&addr),
+                core_ctx.get_device_state(device).multicast_groups.read().contains(&addr),
                 expected,
                 "device={:?}, addr={}",
                 device,
@@ -5899,23 +5904,22 @@ mod test {
         }
 
         if remove_device_b {
-            AsMut::<FakeIpDeviceIdCtx<_>>::as_mut(&mut core_ctx)
-                .set_device_removed(MultipleDevicesId::B, true);
+            device_b.mark_removed();
         }
 
         leave_all_joined_groups(&mut core_ctx, &mut bindings_ctx, memberships);
         for (device, addr, expected) in [
-            (MultipleDevicesId::A, multicast_addr1, false),
-            (MultipleDevicesId::A, multicast_addr2, false),
-            (MultipleDevicesId::B, multicast_addr1, false),
+            (&device_a, multicast_addr1, false),
+            (&device_a, multicast_addr2, false),
+            (&device_b, multicast_addr1, false),
             // Should not attempt to leave the multicast group on the device if
             // the device looks like it was removed. Note that although we mark
             // the device as removed, we do not destroy its state so we can
             // inspect it here.
-            (MultipleDevicesId::B, multicast_addr2, remove_device_b),
+            (&device_b, multicast_addr2, remove_device_b),
         ] {
             assert_eq!(
-                core_ctx.get_device_state(&device).multicast_groups.read().contains(&addr),
+                core_ctx.get_device_state(device).multicast_groups.read().contains(&addr),
                 expected,
                 "device={:?}, addr={}",
                 device,

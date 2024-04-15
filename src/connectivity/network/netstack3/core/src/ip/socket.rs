@@ -17,7 +17,7 @@ use thiserror::Error;
 
 use crate::{
     context::{CounterContext, InstantContext, NonTestCtxMarker, TracingContext},
-    device::{AnyDevice, DeviceIdContext},
+    device::{AnyDevice, DeviceIdContext, StrongId as _, WeakId as _},
     filter::{
         FilterBindingsTypes, FilterHandler as _, FilterHandlerProvider, TransportPacketSerializer,
     },
@@ -396,7 +396,7 @@ where
         proto: I::Proto,
     ) -> Result<IpSock<I, CC::WeakDeviceId>, IpSockCreationError> {
         let device = if let Some(device) = device.as_ref() {
-            if let Some(device) = device.as_strong_ref(self) {
+            if let Some(device) = device.as_strong_ref() {
                 Some(device)
             } else {
                 return Err(IpSockCreationError::Route(ResolveRouteError::Unreachable));
@@ -433,7 +433,7 @@ where
         })
         .as_ref()
         .or(device)
-        .map(|d| self.downgrade_device_id(d));
+        .map(|d| d.downgrade());
 
         let definition =
             IpSockDefinition { local_ip: src_addr, remote_ip, device: socket_device, proto };
@@ -514,7 +514,7 @@ where
     let IpSock { definition: IpSockDefinition { remote_ip, local_ip, device, proto } } = socket;
 
     let device = if let Some(device) = device {
-        let Some(device) = core_ctx.upgrade_weak_device_id(device) else {
+        let Some(device) = device.upgrade() else {
             return Err((body, ResolveRouteError::Unreachable.into()));
         };
         Some(device)
@@ -578,7 +578,7 @@ impl<
         let IpSockDefinition { remote_ip, local_ip, device, proto: _ } = &ip_sock.definition;
         let device = device
             .as_ref()
-            .map(|d| self.upgrade_weak_device_id(d).ok_or(ResolveRouteError::Unreachable))
+            .map(|d| d.upgrade().ok_or(ResolveRouteError::Unreachable))
             .transpose()?;
 
         let ResolvedRoute { src_addr: _, local_delivery_device: _, device, next_hop: _ } = self
@@ -1077,17 +1077,6 @@ pub(crate) mod testutil {
         type DeviceId = <FakeIpDeviceIdCtx<DeviceId> as DeviceIdContext<AnyDevice>>::DeviceId;
         type WeakDeviceId =
             <FakeIpDeviceIdCtx<DeviceId> as DeviceIdContext<AnyDevice>>::WeakDeviceId;
-
-        fn downgrade_device_id(&self, device_id: &DeviceId) -> FakeWeakDeviceId<DeviceId> {
-            self.ip_forwarding_ctx.downgrade_device_id(device_id)
-        }
-
-        fn upgrade_weak_device_id(
-            &self,
-            device_id: &FakeWeakDeviceId<DeviceId>,
-        ) -> Option<DeviceId> {
-            self.ip_forwarding_ctx.upgrade_weak_device_id(device_id)
-        }
     }
 
     fn lookup_route<
@@ -1612,17 +1601,6 @@ pub(crate) mod testutil {
     {
         type DeviceId = DeviceId;
         type WeakDeviceId = DeviceId::Weak;
-
-        fn downgrade_device_id(&self, device_id: &DeviceId) -> Self::WeakDeviceId {
-            self.ip_forwarding_ctx.downgrade_device_id(device_id)
-        }
-
-        fn upgrade_weak_device_id(
-            &self,
-            device_id: &FakeWeakDeviceId<DeviceId>,
-        ) -> Option<DeviceId> {
-            self.ip_forwarding_ctx.upgrade_weak_device_id(device_id)
-        }
     }
 
     impl<

@@ -25,7 +25,7 @@ use thiserror::Error;
 use crate::{
     context::{CounterContext, CtxPair},
     convert::BidirectionalConverter as _,
-    device,
+    device::{self, StrongId as _, WeakId as _},
     error::NotFoundError,
     filter::TransportPacketSerializer,
     ip::{
@@ -221,7 +221,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
 
     let mut addrs_to_search = AddrVecIter::<WireI, CC::WeakDeviceId, TcpPortSpec>::with_device(
         conn_addr.into(),
-        core_ctx.downgrade_device_id(incoming_device),
+        incoming_device.downgrade(),
     );
 
     let found_socket = loop {
@@ -620,7 +620,7 @@ where
 
     let mut confirm_reachable = || {
         let remote_ip = *ip_sock.remote_ip();
-        let device = ip_sock.device().and_then(|weak| core_ctx.upgrade_weak_device_id(weak));
+        let device = ip_sock.device().and_then(|weak| weak.upgrade());
         <DC as TransportIpContext<WireI, _>>::confirm_reachable_with_destination(
             core_ctx,
             bindings_ctx,
@@ -746,7 +746,7 @@ where
             // conflicting connection was found.
             *addrs_to_search = AddrVecIter::<WireI, CC::WeakDeviceId, TcpPortSpec>::with_device(
                 conn_addr.into(),
-                core_ctx.downgrade_device_id(incoming_device),
+                incoming_device.downgrade(),
             );
             false
         }

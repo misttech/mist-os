@@ -670,22 +670,6 @@ impl<'a, Config, BC: BindingsContext, L> DeviceIdContext<AnyDevice>
 {
     type DeviceId = <CoreCtx<'a, BC, L> as DeviceIdContext<AnyDevice>>::DeviceId;
     type WeakDeviceId = <CoreCtx<'a, BC, L> as DeviceIdContext<AnyDevice>>::WeakDeviceId;
-
-    fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
-        let Self { config: _, core_ctx } = self;
-        <CoreCtx<'a, BC, L> as DeviceIdContext<AnyDevice>>::downgrade_device_id(core_ctx, device_id)
-    }
-
-    fn upgrade_weak_device_id(
-        &self,
-        weak_device_id: &Self::WeakDeviceId,
-    ) -> Option<Self::DeviceId> {
-        let Self { config: _, core_ctx } = self;
-        <CoreCtx<'a, BC, L> as DeviceIdContext<AnyDevice>>::upgrade_weak_device_id(
-            core_ctx,
-            weak_device_id,
-        )
-    }
 }
 
 impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacContext<BC>

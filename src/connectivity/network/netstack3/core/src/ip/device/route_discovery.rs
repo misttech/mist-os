@@ -275,7 +275,7 @@ mod tests {
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
-            testutil::{FakeDeviceId, FakeWeakDeviceId},
+            testutil::FakeDeviceId,
             DeviceId, FrameDestination,
         },
         ip::{
@@ -311,17 +311,6 @@ mod tests {
         type DeviceId = <FakeIpDeviceIdCtx<FakeDeviceId> as DeviceIdContext<AnyDevice>>::DeviceId;
         type WeakDeviceId =
             <FakeIpDeviceIdCtx<FakeDeviceId> as DeviceIdContext<AnyDevice>>::WeakDeviceId;
-
-        fn downgrade_device_id(&self, device_id: &FakeDeviceId) -> FakeWeakDeviceId<FakeDeviceId> {
-            self.ip_device_id_ctx.downgrade_device_id(device_id)
-        }
-
-        fn upgrade_weak_device_id(
-            &self,
-            device_id: &FakeWeakDeviceId<FakeDeviceId>,
-        ) -> Option<FakeDeviceId> {
-            self.ip_device_id_ctx.upgrade_weak_device_id(device_id)
-        }
     }
 
     impl<C> Ipv6DiscoveredRoutesContext<C> for FakeWithDiscoveredRoutesMutCtx {

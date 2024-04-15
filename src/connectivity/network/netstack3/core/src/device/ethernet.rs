@@ -1919,30 +1919,11 @@ mod tests {
     impl DeviceIdContext<EthernetLinkDevice> for FakeCoreCtx {
         type DeviceId = FakeDeviceId;
         type WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>;
-        fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
-            self.inner.downgrade_device_id(device_id)
-        }
-        fn upgrade_weak_device_id(
-            &self,
-            weak_device_id: &Self::WeakDeviceId,
-        ) -> Option<Self::DeviceId> {
-            self.inner.upgrade_weak_device_id(weak_device_id)
-        }
     }
 
     impl DeviceIdContext<EthernetLinkDevice> for FakeInnerCtx {
         type DeviceId = FakeDeviceId;
         type WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>;
-        fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
-            FakeWeakDeviceId(device_id.clone())
-        }
-        fn upgrade_weak_device_id(
-            &self,
-            weak_device_id: &Self::WeakDeviceId,
-        ) -> Option<Self::DeviceId> {
-            let FakeWeakDeviceId(id) = weak_device_id;
-            Some(id.clone())
-        }
     }
 
     impl CounterContext<ArpCounters> for FakeCoreCtx {

@@ -76,15 +76,6 @@ impl<A> AsRef<Never> for UninstantiableWrapper<A> {
 impl<D: Device, C: DeviceIdContext<D>> DeviceIdContext<D> for UninstantiableWrapper<C> {
     type DeviceId = C::DeviceId;
     type WeakDeviceId = C::WeakDeviceId;
-    fn downgrade_device_id(&self, _device_id: &Self::DeviceId) -> Self::WeakDeviceId {
-        self.uninstantiable_unreachable()
-    }
-    fn upgrade_weak_device_id(
-        &self,
-        _weak_device_id: &Self::WeakDeviceId,
-    ) -> Option<Self::DeviceId> {
-        self.uninstantiable_unreachable()
-    }
 }
 
 impl<T, BT, C> CoreTimerContext<T, BT> for UninstantiableWrapper<C>

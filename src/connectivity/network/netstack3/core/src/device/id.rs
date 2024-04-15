@@ -28,21 +28,29 @@ pub trait Id: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static {
     fn is_loopback(&self) -> bool;
 }
 
-/// A marker for a Strong device reference.
+/// A strong device reference.
 ///
-/// Types marked with [`StrongId`] indicates that the referenced device is alive
-/// while the type exists.
+/// [`StrongId`] indicates that the referenced device is alive while the
+/// instance exists.
 pub trait StrongId: Id {
     /// The weak version of this identifier.
     type Weak: WeakId<Strong = Self>;
+
+    /// Returns a weak ID for this strong ID.
+    fn downgrade(&self) -> Self::Weak;
 }
 
-/// A marker for a Weak device reference.
+/// A weak device reference.
 ///
-/// This is the weak marker equivalent of [`StrongId`].
+/// This is the weak reference equivalent of [`StrongId`].
 pub trait WeakId: Id + PartialEq<Self::Strong> {
     /// The strong version of this identifier.
     type Strong: StrongId<Weak = Self>;
+
+    /// Attempts to upgrade this weak ID to a strong ID.
+    ///
+    /// Returns `None` if the resource has been destroyed.
+    fn upgrade(&self) -> Option<Self::Strong>;
 }
 
 /// A weak ID identifying a device.
@@ -161,6 +169,10 @@ impl<BT: DeviceLayerTypes> Id for WeakDeviceId<BT> {
 
 impl<BT: DeviceLayerTypes> WeakId for WeakDeviceId<BT> {
     type Strong = DeviceId<BT>;
+
+    fn upgrade(&self) -> Option<Self::Strong> {
+        self.upgrade()
+    }
 }
 
 impl<BT: DeviceLayerTypes> Debug for WeakDeviceId<BT> {
@@ -363,6 +375,10 @@ impl<BT: DeviceLayerTypes> Id for DeviceId<BT> {
 
 impl<BT: DeviceLayerTypes> StrongId for DeviceId<BT> {
     type Weak = WeakDeviceId<BT>;
+
+    fn downgrade(&self) -> Self::Weak {
+        self.downgrade()
+    }
 }
 
 impl<BT: DeviceLayerTypes> Debug for DeviceId<BT> {
@@ -438,6 +454,10 @@ impl<T: DeviceStateSpec, BT: DeviceLayerTypes> Id for BaseWeakDeviceId<T, BT> {
 
 impl<T: DeviceStateSpec, BT: DeviceLayerTypes> WeakId for BaseWeakDeviceId<T, BT> {
     type Strong = BaseDeviceId<T, BT>;
+
+    fn upgrade(&self) -> Option<Self::Strong> {
+        self.upgrade()
+    }
 }
 
 impl<T: DeviceStateSpec, BT: DeviceLayerTypes> BaseWeakDeviceId<T, BT> {
@@ -522,6 +542,10 @@ impl<T: DeviceStateSpec, BT: DeviceLayerTypes> Id for BaseDeviceId<T, BT> {
 
 impl<T: DeviceStateSpec, BT: DeviceLayerTypes> StrongId for BaseDeviceId<T, BT> {
     type Weak = BaseWeakDeviceId<T, BT>;
+
+    fn downgrade(&self) -> Self::Weak {
+        self.downgrade()
+    }
 }
 
 impl<T: DeviceStateSpec, BT: DeviceLayerTypes> BaseDeviceId<T, BT> {

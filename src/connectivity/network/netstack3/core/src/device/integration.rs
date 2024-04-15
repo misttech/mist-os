@@ -813,16 +813,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
 impl<BT: BindingsTypes, L> DeviceIdContext<EthernetLinkDevice> for CoreCtx<'_, BT, L> {
     type DeviceId = EthernetDeviceId<BT>;
     type WeakDeviceId = EthernetWeakDeviceId<BT>;
-    fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
-        device_id.downgrade()
-    }
-
-    fn upgrade_weak_device_id(
-        &self,
-        weak_device_id: &Self::WeakDeviceId,
-    ) -> Option<Self::DeviceId> {
-        weak_device_id.upgrade()
-    }
 }
 
 impl<'a, CC: DeviceIdContext<EthernetLinkDevice> + CounterContext<DeviceCounters>>
@@ -830,18 +820,6 @@ impl<'a, CC: DeviceIdContext<EthernetLinkDevice> + CounterContext<DeviceCounters
 {
     type DeviceId = CC::DeviceId;
     type WeakDeviceId = CC::WeakDeviceId;
-    fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
-        let Self { core_ctx, device_id: _ } = self;
-        CC::downgrade_device_id(core_ctx, device_id)
-    }
-
-    fn upgrade_weak_device_id(
-        &self,
-        weak_device_id: &Self::WeakDeviceId,
-    ) -> Option<Self::DeviceId> {
-        let Self { core_ctx, device_id: _ } = self;
-        CC::upgrade_weak_device_id(core_ctx, weak_device_id)
-    }
 }
 
 impl<BC: socket::DeviceSocketBindingsContext<DeviceId<BC>> + DeviceLayerEventDispatcher>
@@ -926,14 +904,6 @@ impl<BC: DeviceLayerTypes + socket::DeviceSocketBindingsContext<DeviceId<BC>>>
 impl<BC: BindingsContext, L> DeviceIdContext<AnyDevice> for CoreCtx<'_, BC, L> {
     type DeviceId = DeviceId<BC>;
     type WeakDeviceId = WeakDeviceId<BC>;
-
-    fn downgrade_device_id(&self, device_id: &DeviceId<BC>) -> WeakDeviceId<BC> {
-        device_id.downgrade()
-    }
-
-    fn upgrade_weak_device_id(&self, weak_device_id: &WeakDeviceId<BC>) -> Option<DeviceId<BC>> {
-        weak_device_id.upgrade()
-    }
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetRxDequeue>>

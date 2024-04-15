@@ -44,7 +44,7 @@ use crate::{
     device::{
         self,
         link::{LinkAddress, LinkDevice, LinkUnicastAddress},
-        AnyDevice, DeviceIdContext, StrongId,
+        AnyDevice, DeviceIdContext, StrongId, WeakId as _,
     },
     error::AddressResolutionFailed,
     socket::address::SocketIpAddr,
@@ -1929,7 +1929,7 @@ impl<
             CC::WeakDeviceId,
         >,
     ) {
-        let Some(device_id) = self.upgrade_weak_device_id(&device_id) else {
+        let Some(device_id) = device_id.upgrade() else {
             return;
         };
         match timer_type {
@@ -2715,18 +2715,6 @@ mod tests {
     impl<I: Ip> DeviceIdContext<FakeLinkDevice> for FakeCoreCtxImpl<I> {
         type DeviceId = FakeLinkDeviceId;
         type WeakDeviceId = FakeWeakDeviceId<FakeLinkDeviceId>;
-
-        fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
-            FakeWeakDeviceId(device_id.clone())
-        }
-
-        fn upgrade_weak_device_id(
-            &self,
-            weak_device_id: &Self::WeakDeviceId,
-        ) -> Option<Self::DeviceId> {
-            let FakeWeakDeviceId(id) = weak_device_id;
-            Some(id.clone())
-        }
     }
 
     impl<I: Ip> NudContext<I, FakeLinkDevice, FakeBindingsCtxImpl<I>> for FakeCoreCtxImpl<I> {
