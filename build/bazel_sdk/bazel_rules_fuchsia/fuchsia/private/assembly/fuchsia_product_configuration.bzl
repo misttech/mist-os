@@ -224,6 +224,8 @@ def fuchsia_product_configuration(
         cache_packages: Fuchsia packages to be included in cache.
         base_driver_packages: Base driver packages to include in product.
         ota_configuration: OTA configuration to use with the product.
+        relative_paths: Whether to generate an Assembly product configuration
+            with relative path, so it can be relocated.
         **kwargs: Common bazel rule args passed through to the implementation rule.
     """
 
