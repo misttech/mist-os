@@ -15,7 +15,6 @@ use fidl_fuchsia_audio_device as fadevice;
 use fidl_fuchsia_hardware_audio as fhaudio;
 use fuchsia_audio::{
     device::{DevfsSelector, RegistrySelector, Selector},
-    format_set::PcmFormatSet,
     stop_listener, Format,
 };
 use fuchsia_component::client::connect_to_protocol_at_path;
@@ -30,22 +29,8 @@ const SECONDS_PER_NANOSECOND: f64 = 1.0 / 10_u64.pow(9) as f64;
 // TODO(https://fxbug.dev/317991807): Remove #[async_trait] when supported by compiler.
 #[async_trait]
 pub trait DeviceControl {
-    async fn get_properties(&mut self) -> Result<Properties, Error>;
-    async fn get_supported_formats(&mut self) -> Result<SupportedFormats, Error>;
-    async fn watch_gain_state(&mut self) -> Result<fhaudio::GainState, Error>;
-    async fn watch_plug_state(&mut self) -> Result<fhaudio::PlugState, Error>;
     async fn create_ring_buffer(&mut self, format: Format) -> Result<Box<dyn RingBuffer>, Error>;
     fn set_gain(&mut self, gain_state: fhaudio::GainState) -> Result<(), Error>;
-}
-
-pub enum Properties {
-    StreamConfig(fhaudio::StreamProperties),
-    Composite(fhaudio::CompositeProperties),
-}
-
-pub struct SupportedFormats {
-    ring_buffer: Vec<PcmFormatSet>,
-    dai: Vec<fhaudio::DaiSupportedFormats>,
 }
 
 pub struct StreamConfigDevice {
@@ -54,50 +39,6 @@ pub struct StreamConfigDevice {
 
 #[async_trait]
 impl DeviceControl for StreamConfigDevice {
-    async fn get_properties(&mut self) -> Result<Properties, Error> {
-        let response = self
-            .proxy
-            .get_properties()
-            .await
-            .map_err(|e| anyhow!("Failed to get StreamConfig properties: {e}"))?;
-
-        Ok(Properties::StreamConfig(response))
-    }
-
-    async fn get_supported_formats(&mut self) -> Result<SupportedFormats, Error> {
-        let supported_formats = self
-            .proxy
-            .get_supported_formats()
-            .await
-            .map_err(|e| anyhow!("Could not query streamconfig supported formats: {e}"))?
-            .into_iter()
-            .map(PcmFormatSet::try_from)
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|err| anyhow!("Invalid supported format: {}", err))?;
-
-        Ok(SupportedFormats { ring_buffer: supported_formats, dai: vec![] })
-    }
-
-    async fn watch_gain_state(&mut self) -> Result<fhaudio::GainState, Error> {
-        let response = self
-            .proxy
-            .watch_gain_state()
-            .await
-            .map_err(|e| anyhow!("Could not query streamconfig gain state: {e}"))?;
-
-        Ok(response)
-    }
-
-    async fn watch_plug_state(&mut self) -> Result<fhaudio::PlugState, Error> {
-        let response = self
-            .proxy
-            .watch_plug_state()
-            .await
-            .map_err(|e| anyhow!("Could not query streamconfig plug state: {e}"))?;
-
-        Ok(response)
-    }
-
     async fn create_ring_buffer(&mut self, format: Format) -> Result<Box<dyn RingBuffer>, Error> {
         let (ring_buffer_proxy, ring_buffer_server) =
             create_proxy::<fhaudio::RingBufferMarker>().unwrap();
@@ -113,33 +54,11 @@ impl DeviceControl for StreamConfigDevice {
 }
 
 pub struct CompositeDevice {
-    pub proxy: fhaudio::CompositeProxy,
+    pub _proxy: fhaudio::CompositeProxy,
 }
 
 #[async_trait]
 impl DeviceControl for CompositeDevice {
-    async fn get_properties(&mut self) -> Result<Properties, Error> {
-        let response = self
-            .proxy
-            .get_properties()
-            .await
-            .map_err(|e| anyhow!("Failed to get Composite properties: {e}"))?;
-
-        Ok(Properties::Composite(response))
-    }
-
-    async fn get_supported_formats(&mut self) -> Result<SupportedFormats, Error> {
-        Err(anyhow!("Supported formats for Composite devices not yet supported yet in ffx audio."))
-    }
-
-    async fn watch_gain_state(&mut self) -> Result<fhaudio::GainState, Error> {
-        Err(anyhow!("watch gain state for Composite devices not supported yet in ffx audio."))
-    }
-
-    async fn watch_plug_state(&mut self) -> Result<fhaudio::PlugState, Error> {
-        Err(anyhow!("watch plug state for Composite devices not supported yet in ffx audio."))
-    }
-
     async fn create_ring_buffer(&mut self, _format: Format) -> Result<Box<dyn RingBuffer>, Error> {
         Err(anyhow!("Creating ring buffers for Composite devices not supported yet in ffx audio."))
     }
@@ -149,23 +68,6 @@ impl DeviceControl for CompositeDevice {
             "Setting gain not supported for Composite devices not supported yet in ffx audio."
         ))
     }
-}
-
-fn validate_format(
-    requested_format: Format,
-    supported_formats: SupportedFormats,
-) -> Result<(), ControllerError> {
-    if !supported_formats
-        .ring_buffer
-        .iter()
-        .any(|pcm_format_set| pcm_format_set.supports(&requested_format))
-    {
-        return Err(ControllerError::new(
-            fac::Error::InvalidArguments,
-            format!("Requested format not supported."),
-        ));
-    }
-    Ok(())
 }
 
 /// Connects to the device protocol for a device in devfs.
@@ -191,7 +93,7 @@ pub fn connect_to_devfs(devfs: DevfsSelector) -> Result<Box<dyn DeviceControl>, 
                 connect_to_protocol_at_path::<fhaudio::CompositeMarker>(protocol_path.as_str())
                     .context("Failed to connect to Composite")?;
 
-            Ok(Box::new(CompositeDevice { proxy }))
+            Ok(Box::new(CompositeDevice { _proxy: proxy }))
         }
         _ => Err(anyhow!("Unsupported DeviceType for connect_to_device_controller()")),
     }
@@ -214,50 +116,6 @@ impl Device {
         Ok(Self { device_controller })
     }
 
-    pub async fn get_info(&mut self) -> Result<fac::DeviceInfo, Error> {
-        let properties = self.device_controller.get_properties().await?;
-
-        match properties {
-            Properties::StreamConfig(stream_properties) => {
-                let supported_formats =
-                    self.device_controller.get_supported_formats().await.ok().map(
-                        |supported_formats| {
-                            supported_formats.ring_buffer.into_iter().map(Into::into).collect()
-                        },
-                    );
-
-                let gain_state = self.device_controller.watch_gain_state().await.ok();
-                let plug_state = self.device_controller.watch_plug_state().await.ok();
-                Ok(fac::DeviceInfo::StreamConfig(fac::StreamConfigDeviceInfo {
-                    stream_properties: Some(stream_properties),
-                    supported_formats,
-                    gain_state,
-                    plug_state,
-                    ..Default::default()
-                }))
-            }
-            Properties::Composite(composite_properties) => {
-                let (supported_ring_buffer_formats, supported_dai_formats) =
-                    self.device_controller.get_supported_formats().await.ok().map_or(
-                        (None, None),
-                        |supported_formats| {
-                            let ring_buffer =
-                                supported_formats.ring_buffer.into_iter().map(Into::into).collect();
-                            let dai = supported_formats.dai;
-                            (Some(ring_buffer), Some(dai))
-                        },
-                    );
-
-                Ok(fac::DeviceInfo::Composite(fac::CompositeDeviceInfo {
-                    composite_properties: Some(composite_properties),
-                    supported_dai_formats,
-                    supported_ring_buffer_formats,
-                    ..Default::default()
-                }))
-            }
-        }
-    }
-
     pub fn set_gain(&mut self, gain_state: fhaudio::GainState) -> Result<(), Error> {
         self.device_controller
             .set_gain(gain_state)
@@ -270,9 +128,6 @@ impl Device {
     ) -> Result<fac::PlayerPlayResponse, ControllerError> {
         let spec = socket.read_header().await?;
         let format = Format::from(spec);
-
-        let supported_formats = self.device_controller.get_supported_formats().await?;
-        validate_format(format, supported_formats)?;
 
         let ring_buffer = self.device_controller.create_ring_buffer(format).await?;
 
@@ -432,9 +287,6 @@ impl Device {
         duration: Option<Duration>,
         cancel_server: Option<ServerEnd<fac::RecordCancelerMarker>>,
     ) -> Result<fac::RecorderRecordResponse, ControllerError> {
-        let supported_formats = self.device_controller.get_supported_formats().await?;
-        validate_format(format, supported_formats)?;
-
         let ring_buffer = self.device_controller.create_ring_buffer(format).await?;
 
         // Hardware might not use all bytes in vmo. Only want to read frames hardware will write to.

@@ -12,6 +12,7 @@ use ffx_audio_listdevices_args::ListDevicesCommand;
 use fho::{FfxMain, FfxTool, MachineWriter};
 use fidl_fuchsia_audio_device as fadevice;
 use fidl_fuchsia_io as fio;
+use fuchsia_audio::Registry;
 
 #[derive(FfxTool)]
 pub struct ListDevicesTool {
@@ -29,7 +30,8 @@ impl FfxMain for ListDevicesTool {
     type Writer = MachineWriter<ListResult>;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        let selectors = get_devices(&self.dev_class, self.registry.as_ref()).await?;
+        let registry = self.registry.map(Registry::new);
+        let selectors = get_devices(&self.dev_class, registry.as_ref()).await?;
         device_list_untagged(selectors, writer)
     }
 }

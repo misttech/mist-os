@@ -7,9 +7,12 @@ use ffx_command::FfxContext;
 use fidl_fuchsia_audio_device as fadevice;
 use fidl_fuchsia_hardware_audio as fhaudio;
 use fidl_fuchsia_io as fio;
-use fuchsia_audio::device::{
-    DevfsSelector, HardwareType as HardwareDeviceType, Info as DeviceInfo, Selector,
-    Type as DeviceType,
+use fuchsia_audio::{
+    device::{
+        DevfsSelector, HardwareType as HardwareDeviceType, Info as DeviceInfo, Selector,
+        Type as DeviceType,
+    },
+    Registry,
 };
 use serde::{Serialize, Serializer};
 use std::fmt::Display;
@@ -194,20 +197,18 @@ impl Display for ListResult {
 
 /// Returns a list of devices on the target.
 ///
-/// If the target is running audio_device_registry, i.e. when the `registry` protocol
-/// is served and calls on it succeed, this method returns registry devices.
+/// If the target is running audio_device_registry, i.e. when `registry` is Some, this method
+/// returns registry devices.
 ///
 /// Otherwise, this method returns devices from devfs.
 pub async fn get_devices(
     dev_class: &fio::DirectoryProxy,
-    registry: Option<&fadevice::RegistryProxy>,
+    registry: Option<&Registry>,
 ) -> fho::Result<Devices> {
     // Try the registry first.
     if let Some(registry) = registry {
-        if let Ok(mut infos) = fuchsia_audio::device::list_registry(registry).await {
-            infos.sort_by_key(|info| info.token_id());
-            return Ok(Devices::Registry(infos));
-        }
+        let infos = registry.get_all().await.into_values().collect();
+        return Ok(Devices::Registry(infos));
     }
 
     // Fall back to devfs.

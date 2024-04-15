@@ -4,12 +4,27 @@
 
 //! Helpers to serialize fuchsia_audio types with serde.
 
+use fidl_fuchsia_audio_device as fadevice;
 use fuchsia_audio::{
-    device::{ClockDomain, GainCapabilities, GainState},
+    dai::{DaiFormatSet, DaiFrameFormat, DaiSampleFormat},
+    device::{ClockDomain, GainCapabilities, GainState, PlugEvent, PlugState},
     format::SampleType,
     format_set::{ChannelAttributes, ChannelSet, PcmFormatSet},
 };
-use serde::{ser::SerializeSeq, Serialize, Serializer};
+use fuchsia_zircon_types as zx_types;
+use serde::{
+    ser::{SerializeMap, SerializeSeq},
+    Serialize, Serializer,
+};
+use std::collections::BTreeMap;
+
+/// Serialize an value that can be converted to a string to the string.
+pub fn serialize_tostring<S>(value: &impl ToString, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&value.to_string())
+}
 
 /// Serialize an optional value that can be converted to a string to either the string, or none.
 pub fn serialize_option_tostring<S>(
@@ -107,23 +122,42 @@ pub struct PcmFormatSetDef {
     pub frame_rates: Vec<u32>,
 }
 
-pub fn serialize_option_vec_pcmformatset<S>(
-    format_sets: &Option<Vec<PcmFormatSet>>,
+pub fn serialize_vec_pcmformatset<S>(
+    pcm_format_sets: &Vec<PcmFormatSet>,
     serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    let Some(format_sets) = format_sets else { return serializer.serialize_none() };
-
     #[derive(Serialize)]
     struct Wrapper<'a>(#[serde(with = "PcmFormatSetDef")] &'a PcmFormatSet);
 
-    let mut seq = serializer.serialize_seq(Some(format_sets.len()))?;
-    for format_set in format_sets {
-        seq.serialize_element(&Wrapper(format_set))?;
+    let mut seq = serializer.serialize_seq(Some(pcm_format_sets.len()))?;
+    for pcm_format_set in pcm_format_sets {
+        seq.serialize_element(&Wrapper(pcm_format_set))?;
     }
     seq.end()
+}
+
+pub fn serialize_option_map_pcmformatset<S>(
+    format_set_map: &Option<BTreeMap<fadevice::ElementId, Vec<PcmFormatSet>>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let Some(format_set_map) = format_set_map else { return serializer.serialize_none() };
+
+    #[derive(Serialize)]
+    struct Wrapper<'a>(
+        #[serde(serialize_with = "serialize_vec_pcmformatset")] &'a Vec<PcmFormatSet>,
+    );
+
+    let mut map = serializer.serialize_map(Some(format_set_map.len()))?;
+    for (key, value) in format_set_map {
+        map.serialize_entry(key, &Wrapper(value))?;
+    }
+    map.end()
 }
 
 // Mirror type for serialization.
@@ -176,4 +210,78 @@ where
         seq.serialize_element(&Wrapper(attributes))?;
     }
     seq.end()
+}
+
+// Mirror type for serialization.
+// This exists to avoid the fuchsia-audio library from depending on serde.
+#[derive(Serialize)]
+#[serde(remote = "DaiFormatSet")]
+pub struct DaiFormatSetDef {
+    number_of_channels: Vec<u32>,
+    #[serde(serialize_with = "serialize_vec_tostring")]
+    sample_formats: Vec<DaiSampleFormat>,
+    #[serde(serialize_with = "serialize_vec_tostring")]
+    frame_formats: Vec<DaiFrameFormat>,
+    frame_rates: Vec<u32>,
+    bits_per_slot: Vec<u8>,
+    bits_per_sample: Vec<u8>,
+}
+
+pub fn serialize_vec_daiformatset<S>(
+    dai_format_sets: &Vec<DaiFormatSet>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    #[derive(Serialize)]
+    struct Wrapper<'a>(#[serde(with = "DaiFormatSetDef")] &'a DaiFormatSet);
+
+    let mut seq = serializer.serialize_seq(Some(dai_format_sets.len()))?;
+    for dai_format_set in dai_format_sets {
+        seq.serialize_element(&Wrapper(dai_format_set))?;
+    }
+    seq.end()
+}
+
+pub fn serialize_option_map_daiformatset<S>(
+    format_set_map: &Option<BTreeMap<fadevice::ElementId, Vec<DaiFormatSet>>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let Some(format_set_map) = format_set_map else { return serializer.serialize_none() };
+
+    #[derive(Serialize)]
+    struct Wrapper<'a>(
+        #[serde(serialize_with = "serialize_vec_daiformatset")] &'a Vec<DaiFormatSet>,
+    );
+
+    let mut map = serializer.serialize_map(Some(format_set_map.len()))?;
+    for (key, value) in format_set_map {
+        map.serialize_entry(key, &Wrapper(value))?;
+    }
+    map.end()
+}
+
+// Mirror type for serialization.
+// This exists to avoid the fuchsia-audio library from depending on serde.
+#[derive(Serialize)]
+#[serde(remote = "PlugEvent")]
+pub struct PlugEventDef {
+    #[serde(serialize_with = "serialize_tostring")]
+    pub state: PlugState,
+    pub time: zx_types::zx_time_t,
+}
+
+pub fn serialize_option_plugevent<S>(
+    plug_event: &Option<PlugEvent>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let Some(plug_event) = plug_event else { return serializer.serialize_none() };
+    PlugEventDef::serialize(plug_event, serializer)
 }

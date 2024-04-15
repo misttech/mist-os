@@ -34,6 +34,12 @@ impl Registry {
         self.devices_initialized.wait().await;
         self.devices.lock().await.get(&token_id).cloned()
     }
+
+    /// Returns information about all devices in the registry.
+    pub async fn get_all(&self) -> BTreeMap<fadevice::TokenId, DeviceInfo> {
+        self.devices_initialized.wait().await;
+        self.devices.lock().await.clone()
+    }
 }
 
 /// Watches devices added to and removed from the registry and updates

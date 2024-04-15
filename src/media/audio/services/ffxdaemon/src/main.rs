@@ -22,7 +22,6 @@ use fuchsia_async as fasync;
 use fuchsia_audio::{device::Selector, Format};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{component, health::Reporter};
-use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
 use std::time::Duration;
 use tracing::error;
@@ -180,34 +179,6 @@ async fn serve_device_control(mut stream: fac::DeviceControlRequestStream) -> Re
     while let Ok(Some(request)) = stream.try_next().await {
         let request_name = request.method_name();
         let request_result = match request {
-            fac::DeviceControlRequest::GetDeviceInfo { payload, responder } => {
-                let selector: Selector = payload
-                    .device
-                    .ok_or(anyhow!("No device specified"))?
-                    .try_into()
-                    .map_err(|msg| anyhow!("invalid selector: {msg}"))?;
-
-                let mut device = device::Device::new_from_selector(selector)?;
-
-                let info = device.get_info().await;
-                match info {
-                    Ok(info) => {
-                        let response = fac::DeviceControlGetDeviceInfoResponse {
-                            device_info: Some(info),
-                            ..Default::default()
-                        };
-                        responder
-                            .send(Ok(response))
-                            .map_err(|e| anyhow!("Error sending response: {e}"))
-                    }
-                    Err(e) => {
-                        println!("Could not connect to device. {e}");
-                        responder
-                            .send(Err(zx::Status::INTERNAL.into_raw()))
-                            .map_err(|e| anyhow!("Error sending response: {e}"))
-                    }
-                }
-            }
             fac::DeviceControlRequest::DeviceSetGainState { payload, responder } => {
                 let selector = payload
                     .device

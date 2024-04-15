@@ -9,58 +9,6 @@ using fuchsia.hardware.audio;
 using fuchsia.io;
 using zx;
 
-/// Maximum number of audio devices in the system at any time.
-const MAX_COUNT_DEVICES uint32 = 256;
-
-/// Information about a device.
-type DeviceInfo = flexible union {
-    /// Device supports the fuchsia.hardware.audio/StreamConfig protocol.
-    1: stream_config StreamConfigDeviceInfo;
-
-    /// Device supports the fuchsia.hardware.audio/Composite protocol.
-    2: composite CompositeDeviceInfo;
-};
-
-/// Information about a device that supports the fuchsia.hardware.audio/StreamConfig protocol.
-type StreamConfigDeviceInfo = table {
-    /// Top level static properties of the stream.
-    ///
-    /// Required.
-    1: stream_properties fuchsia.hardware.audio.StreamProperties;
-
-    /// Supported formats.
-    ///
-    /// Required.
-    2: supported_formats
-            vector<fuchsia.hardware.audio.SupportedFormats>:fuchsia.hardware.audio.MAX_COUNT_FORMATS;
-
-    /// Gain state.
-    ///
-    /// Required.
-    3: gain_state fuchsia.hardware.audio.GainState;
-
-    /// Plug state.
-    ///
-    /// Required.
-    4: plug_state fuchsia.hardware.audio.PlugState;
-};
-
-/// Information about a device that supports the fuchsia.hardware.audio/Composite protocol.
-type CompositeDeviceInfo = table {
-    /// Top level static properties of the stream.
-    ///
-    /// Required.
-    1: composite_properties fuchsia.hardware.audio.CompositeProperties;
-
-    /// Supported DAI Formats
-    2: supported_dai_formats
-            vector<fuchsia.hardware.audio.DaiSupportedFormats>:fuchsia.hardware.audio.MAX_COUNT_FORMATS;
-
-    /// Supported ring buffer formats.
-    3: supported_ring_buffer_formats
-            vector<fuchsia.hardware.audio.SupportedFormats>:fuchsia.hardware.audio.MAX_COUNT_FORMATS;
-};
-
 /// Identifies which device to retrieve information about.
 type DeviceSelector = flexible union {
     /// Driver node in devfs, e.g. `/dev/class/audio-input/3d99d780`.
@@ -78,20 +26,6 @@ type DeviceSelector = flexible union {
 /// Enumerate, query, and control audio devices from clients.
 @discoverable
 open protocol DeviceControl {
-    /// Returns details about a specific audio device.
-    flexible GetDeviceInfo(resource table {
-        /// Id of device to retrieve information about, and
-        /// whether it is an input or output device.
-        ///
-        /// Required.
-        1: device DeviceSelector;
-    }) -> (resource table {
-        /// Information about the device.
-        ///
-        /// Required.
-        1: device_info DeviceInfo;
-    }) error zx.Status;
-
     /// Sets the gain of the stream in decibels.
     flexible DeviceSetGainState(resource table {
         /// Id of the device to set the gain state.

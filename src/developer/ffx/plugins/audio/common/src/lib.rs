@@ -139,8 +139,6 @@ pub async fn cancel_on_keypress(
 
 pub mod tests {
     use super::*;
-    use fidl_fuchsia_audio_device as fadevice;
-    use fidl_fuchsia_hardware_audio as fhaudio;
     use fuchsia_audio::stop_listener;
     use futures::AsyncWriteExt;
     use timeout::timeout;
@@ -168,100 +166,6 @@ pub mod tests {
     \x93\x8b\x84\x7d\x75\x6e\x67\x60\x58\x52\x4b\x44\x3e\x38\x32\x2c\
     \x26\x21\x1d\x18\x14\x10\x0d\x0a\x07\x05\x03\x02\x01\x00\x00\x00\
     \x01\x02\x04\x06\x08\x0b\x0e\x11\x15\x1a\x1e\x23";
-
-    pub fn fake_audio_daemon() -> fac::DeviceControlProxy {
-        let callback = |req| match req {
-            fac::DeviceControlRequest::GetDeviceInfo { payload, responder } => match payload.device
-            {
-                Some(device_selector) => {
-                    let fac::DeviceSelector::Devfs(devfs) = device_selector else {
-                        panic!("unknown selector type");
-                    };
-
-                    let result = match devfs.device_type {
-                        fadevice::DeviceType::Input | fadevice::DeviceType::Output => {
-                            let stream_device_info = fac::StreamConfigDeviceInfo {
-                                stream_properties: Some(fhaudio::StreamProperties {
-                                    unique_id: Some([
-                                        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
-                                        0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-                                    ]),
-                                    is_input: Some(true),
-                                    can_mute: Some(true),
-                                    can_agc: Some(true),
-                                    min_gain_db: Some(-32.0),
-                                    max_gain_db: Some(60.0),
-                                    gain_step_db: Some(0.5),
-                                    plug_detect_capabilities: None,
-                                    manufacturer: Some(format!("Spacely Sprockets")),
-                                    product: Some(format!("Test Microphone")),
-                                    clock_domain: Some(2),
-                                    ..Default::default()
-                                }),
-                                supported_formats: Some(vec![fhaudio::SupportedFormats {
-                                    pcm_supported_formats: Some(fhaudio::PcmSupportedFormats {
-                                        channel_sets: Some(vec![
-                                            fhaudio::ChannelSet {
-                                                attributes: Some(vec![
-                                                    fhaudio::ChannelAttributes::default(),
-                                                ]),
-                                                ..Default::default()
-                                            },
-                                            fhaudio::ChannelSet {
-                                                attributes: Some(vec![
-                                                    fhaudio::ChannelAttributes::default(),
-                                                    fhaudio::ChannelAttributes::default(),
-                                                ]),
-                                                ..Default::default()
-                                            },
-                                        ]),
-                                        sample_formats: Some(vec![
-                                            fhaudio::SampleFormat::PcmSigned,
-                                        ]),
-                                        bytes_per_sample: Some(vec![2]),
-                                        valid_bits_per_sample: Some(vec![16]),
-                                        frame_rates: Some(vec![
-                                            16000, 22050, 32000, 44100, 48000, 88200, 96000,
-                                        ]),
-                                        ..Default::default()
-                                    }),
-                                    ..Default::default()
-                                }]),
-                                gain_state: None,
-                                plug_state: None,
-                                ..Default::default()
-                            };
-                            fac::DeviceInfo::StreamConfig(stream_device_info)
-                        }
-                        fadevice::DeviceType::Composite => {
-                            let composite_device_info = fac::CompositeDeviceInfo {
-                                composite_properties: Some(fhaudio::CompositeProperties {
-                                    clock_domain: Some(0),
-                                    ..Default::default()
-                                }),
-                                supported_dai_formats: None,
-                                supported_ring_buffer_formats: None,
-                                ..Default::default()
-                            };
-
-                            fac::DeviceInfo::Composite(composite_device_info)
-                        }
-                        _ => unimplemented!(),
-                    };
-
-                    responder
-                        .send(Ok(fac::DeviceControlGetDeviceInfoResponse {
-                            device_info: Some(result),
-                            ..Default::default()
-                        }))
-                        .unwrap();
-                }
-                None => unimplemented!(),
-            },
-            _ => unimplemented!(),
-        };
-        fho::testing::fake_proxy(callback)
-    }
 
     pub fn fake_audio_player() -> fac::PlayerProxy {
         let callback = |req| match req {

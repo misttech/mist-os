@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{dai::DaiFormatSet, format_set::PcmFormatSet};
 use camino::Utf8PathBuf;
 use fidl_fuchsia_audio_controller as fac;
 use fidl_fuchsia_audio_device as fadevice;
 use fidl_fuchsia_hardware_audio as fhaudio;
 use fidl_fuchsia_io as fio;
+use fuchsia_zircon_types as zx_types;
+use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::str::FromStr;
 use thiserror::Error;
@@ -205,9 +208,17 @@ pub struct DevfsSelector(pub fac::Devfs);
 impl DevfsSelector {
     /// Returns the full devfs path for this device.
     pub fn path(&self) -> Utf8PathBuf {
-        Utf8PathBuf::from("/dev/class")
-            .join(Type(self.0.device_type).devfs_class())
-            .join(self.0.id.clone())
+        Utf8PathBuf::from("/dev/class").join(self.relative_path())
+    }
+
+    /// Returns the path for this device relative to the /dev/class directory root.
+    pub fn relative_path(&self) -> Utf8PathBuf {
+        Utf8PathBuf::from(self.device_type().devfs_class()).join(self.0.id.clone())
+    }
+
+    /// Returns the type of this device.
+    pub fn device_type(&self) -> Type {
+        Type(self.0.device_type)
     }
 }
 
@@ -295,6 +306,90 @@ impl Info {
     pub fn device_type(&self) -> Type {
         Type(self.0.device_type.expect("missing device_type"))
     }
+
+    pub fn unique_instance_id(&self) -> Option<UniqueInstanceId> {
+        self.0.unique_instance_id.map(UniqueInstanceId)
+    }
+
+    pub fn plug_detect_capabilities(&self) -> Option<PlugDetectCapabilities> {
+        self.0.plug_detect_caps.map(PlugDetectCapabilities::from)
+    }
+
+    pub fn gain_capabilities(&self) -> Option<GainCapabilities> {
+        self.0.gain_caps.clone().and_then(|gain_caps| GainCapabilities::try_from(gain_caps).ok())
+    }
+
+    pub fn clock_domain(&self) -> Option<ClockDomain> {
+        self.0.clock_domain.map(ClockDomain)
+    }
+
+    pub fn supported_ring_buffer_formats(
+        &self,
+    ) -> Result<BTreeMap<fadevice::ElementId, Vec<PcmFormatSet>>, String> {
+        self.0
+            .ring_buffer_format_sets
+            .as_ref()
+            .map_or_else(
+                || Ok(BTreeMap::new()),
+                |element_rb_format_sets| {
+                    element_rb_format_sets
+                        .iter()
+                        .cloned()
+                        .map(|element_rb_format_set| {
+                            let element_id = element_rb_format_set
+                                .element_id
+                                .ok_or_else(|| "missing element_id".to_string())?;
+                            let fidl_format_sets = element_rb_format_set
+                                .format_sets
+                                .ok_or_else(|| "missing format_sets".to_string())?;
+
+                            let format_sets: Vec<PcmFormatSet> = fidl_format_sets
+                                .into_iter()
+                                .map(TryInto::try_into)
+                                .collect::<Result<Vec<_>, _>>()
+                                .map_err(|err| format!("invalid format set: {}", err))?;
+
+                            Ok((element_id, format_sets))
+                        })
+                        .collect::<Result<BTreeMap<_, _>, String>>()
+                },
+            )
+            .map_err(|err| format!("invalid ring buffer format sets: {}", err))
+    }
+
+    pub fn supported_dai_formats(
+        &self,
+    ) -> Result<BTreeMap<fadevice::ElementId, Vec<DaiFormatSet>>, String> {
+        self.0
+            .dai_format_sets
+            .as_ref()
+            .map_or_else(
+                || Ok(BTreeMap::new()),
+                |element_dai_format_sets| {
+                    element_dai_format_sets
+                        .iter()
+                        .cloned()
+                        .map(|element_dai_format_set| {
+                            let element_id = element_dai_format_set
+                                .element_id
+                                .ok_or_else(|| "missing element_id".to_string())?;
+                            let fidl_format_sets = element_dai_format_set
+                                .format_sets
+                                .ok_or_else(|| "missing format_sets".to_string())?;
+
+                            let dai_format_sets: Vec<DaiFormatSet> = fidl_format_sets
+                                .into_iter()
+                                .map(TryInto::try_into)
+                                .collect::<Result<Vec<_>, _>>()
+                                .map_err(|err| format!("invalid DAI format set: {}", err))?;
+
+                            Ok((element_id, dai_format_sets))
+                        })
+                        .collect::<Result<BTreeMap<_, _>, String>>()
+                },
+            )
+            .map_err(|err| format!("invalid ring buffer format sets: {}", err))
+    }
 }
 
 impl From<fadevice::Info> for Info {
@@ -373,7 +468,38 @@ impl TryFrom<PlugDetectCapabilities> for fhaudio::PlugDetectCapabilities {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+/// Describes the plug state of a device or endpoint, and when it changed.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PlugEvent {
+    pub state: PlugState,
+
+    /// The Zircon monotonic time when the plug state changed.
+    pub time: zx_types::zx_time_t,
+}
+
+impl From<(fadevice::PlugState, i64 /* time */)> for PlugEvent {
+    fn from(value: (fadevice::PlugState, i64)) -> Self {
+        let (state, time) = value;
+        Self { state: state.into(), time }
+    }
+}
+
+impl TryFrom<fhaudio::PlugState> for PlugEvent {
+    type Error = String;
+
+    fn try_from(value: fhaudio::PlugState) -> Result<Self, Self::Error> {
+        let plugged = value.plugged.ok_or_else(|| "missing 'plugged'".to_string())?;
+        let time = value.plug_state_time.ok_or_else(|| "missing 'plug_state_time'".to_string())?;
+        let state = PlugState(if plugged {
+            fadevice::PlugState::Plugged
+        } else {
+            fadevice::PlugState::Unplugged
+        });
+        Ok(Self { state, time })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PlugState(pub fadevice::PlugState);
 
 impl Display for PlugState {
@@ -396,17 +522,6 @@ impl From<fadevice::PlugState> for PlugState {
 impl From<PlugState> for fadevice::PlugState {
     fn from(value: PlugState) -> Self {
         value.0
-    }
-}
-
-impl TryFrom<fhaudio::PlugState> for PlugState {
-    type Error = String;
-
-    fn try_from(value: fhaudio::PlugState) -> Result<Self, Self::Error> {
-        let plugged = value.plugged.ok_or_else(|| "missing 'plugged'".to_string())?;
-        let plug_state =
-            if plugged { fadevice::PlugState::Plugged } else { fadevice::PlugState::Unplugged };
-        Ok(Self(plug_state))
     }
 }
 

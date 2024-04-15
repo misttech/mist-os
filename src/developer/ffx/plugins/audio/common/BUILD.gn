@@ -11,8 +11,6 @@ rustc_library("ffx_audio_common") {
 
   deps = [
     "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
-    "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_rust",
-    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/developer/ffx/command:lib",
     "//src/developer/ffx/lib/fho:lib",

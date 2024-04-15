@@ -8,6 +8,7 @@ use fidl_fuchsia_audio_controller as fac;
 use futures::TryStreamExt;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+pub mod dai;
 pub mod device;
 pub mod format;
 pub mod format_set;

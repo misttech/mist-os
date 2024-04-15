@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use blocking::Unblock;
 use ffx_audio_common::ffxtool::{exposed_dir, optional_moniker};
 use ffx_audio_device_args::{DeviceCommand, DeviceRecordCommand, SubCommand};
-use ffx_command::{bug, user_error};
+use ffx_command::user_error;
 use fho::{moniker, FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl::{
     endpoints::{create_proxy, ServerEnd},
@@ -18,7 +18,7 @@ use fidl_fuchsia_audio_device as fadevice;
 use fidl_fuchsia_hardware_audio as fhaudio;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_media as fmedia;
-use fuchsia_audio::device::Selector;
+use fuchsia_audio::{device::Selector, Registry};
 use fuchsia_zircon_status::Status;
 use futures::{AsyncWrite, FutureExt};
 use prettytable::Table;
@@ -61,10 +61,12 @@ impl FfxMain for DeviceTool {
     type Writer = MachineWriter<DeviceResult>;
 
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        let registry = self.registry.map(Registry::new);
+
         let devices = {
             let query = DeviceQuery::try_from(&self.cmd)
                 .map_err(|msg| user_error!("Invalid device query: {msg}"))?;
-            let mut devices = list::get_devices(&self.dev_class, self.registry.as_ref())
+            let mut devices = list::get_devices(&self.dev_class, registry.as_ref())
                 .await
                 .bug_context("Failed to get devices")?;
             match &mut devices {
@@ -87,7 +89,9 @@ impl FfxMain for DeviceTool {
 
         match self.cmd.subcommand {
             SubCommand::List(_) => unreachable!(),
-            SubCommand::Info(_) => device_info(self.device_controller, selector, writer).await,
+            SubCommand::Info(_) => {
+                device_info(&self.dev_class, registry.as_ref(), selector, writer).await
+            }
             SubCommand::Play(play_command) => {
                 let (play_remote, play_local) = fidl::Socket::create_datagram();
                 let reader: Box<dyn Read + Send + 'static> = match &play_command.file {
@@ -150,21 +154,12 @@ impl FfxMain for DeviceTool {
 }
 
 async fn device_info(
-    device_control: fac::DeviceControlProxy,
+    dev_class: &fio::DirectoryProxy,
+    registry: Option<&Registry>,
     selector: Selector,
     mut writer: MachineWriter<DeviceResult>,
 ) -> fho::Result<()> {
-    let info = device_control
-        .get_device_info(fac::DeviceControlGetDeviceInfoRequest {
-            device: Some(selector.clone().into()),
-            ..Default::default()
-        })
-        .await
-        .bug_context("Failed to call DeviceControl.GetDeviceInfo")?
-        .map_err(|status| Status::from_raw(status))
-        .bug_context("Failed to get device info")?;
-
-    let device_info = info.device_info.ok_or_else(|| bug!("DeviceInfo missing from response."))?;
+    let device_info = info::get_info(dev_class, registry, selector.clone()).await?;
 
     let info_result = info::InfoResult::from((device_info, selector));
     let result = DeviceResult::Info(info_result.clone());
@@ -482,81 +477,6 @@ mod tests {
             keypress_waiter,
         )
         .await?;
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    pub async fn test_stream_config_info() -> Result<(), fho::Error> {
-        let audio_daemon = ffx_audio_common::tests::fake_audio_daemon();
-
-        let selector = Selector::from(fac::Devfs {
-            id: "abc123".to_string(),
-            device_type: fadevice::DeviceType::Input,
-        });
-
-        let test_buffers = TestBuffers::default();
-        let writer: MachineWriter<DeviceResult> =
-            MachineWriter::new_test(Some(ffx_writer::Format::Json), &test_buffers);
-        let result = device_info(audio_daemon, selector, writer).await;
-        result.unwrap();
-
-        let stdout = test_buffers.into_stdout_str();
-        let stdout_expected = "{\"Info\":{\
-            \"device_path\":\"/dev/class/audio-input/abc123\",\
-            \"unique_id\":\"000102030405060708090a0b0c0d0e0f\",\
-            \"manufacturer\":\"Spacely Sprockets\",\"product_name\":\"Test Microphone\",\
-            \"gain_state\":null,\
-            \"gain_capabilities\":{\
-                \"min_gain_db\":-32.0,\
-                \"max_gain_db\":60.0,\
-                \"gain_step_db\":0.5,\
-                \"can_mute\":true,\
-                \"can_agc\":true\
-            },\
-            \"plug_state\":null,\
-            \"plug_time\":null,\
-            \"plug_detect_capabilities\":null,\
-            \"clock_domain\":null,\
-            \"supported_ring_buffer_formats\":[\
-                {\"channel_sets\":[\
-                    {\"attributes\":[{\"min_frequency\":null,\"max_frequency\":null}]},\
-                    {\"attributes\":[{\"min_frequency\":null,\"max_frequency\":null},\
-                                     {\"min_frequency\":null,\"max_frequency\":null}]}\
-                ],\
-                \"sample_types\":[\"int16\"],\
-                \"frame_rates\":[16000,22050,32000,44100,48000,88200,96000]}\
-            ]}}\n";
-
-        assert_eq!(stdout, stdout_expected);
-
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    pub async fn test_composite_info() -> Result<(), fho::Error> {
-        let audio_daemon = ffx_audio_common::tests::fake_audio_daemon();
-
-        let selector = Selector::from(fac::Devfs {
-            id: "abc123".to_string(),
-            device_type: fadevice::DeviceType::Composite,
-        });
-
-        let test_buffers = TestBuffers::default();
-        let writer: MachineWriter<DeviceResult> =
-            MachineWriter::new_test(Some(ffx_writer::Format::Json), &test_buffers);
-        let result = device_info(audio_daemon, selector, writer).await;
-        result.unwrap();
-
-        let stdout = test_buffers.into_stdout_str();
-        let stdout_expected = "\
-            {\"Info\":{\"device_path\":\"/dev/class/audio-composite/abc123\",\
-            \"unique_id\":null,\"manufacturer\":null,\"product_name\":null,\
-            \"gain_state\":null,\"gain_capabilities\":null,\"plug_state\":null,\
-            \"plug_time\":null,\"plug_detect_capabilities\":null,\"clock_domain\":0,\
-            \"supported_ring_buffer_formats\":null}}\n";
-
-        assert_eq!(stdout, stdout_expected);
-
         Ok(())
     }
 
