@@ -470,8 +470,7 @@ pub enum IpDeviceEvent<DeviceId, I: Ip, Instant> {
 
 impl<
         DeviceId,
-        BC: InstantContext
-            + EventContext<IpDeviceEvent<DeviceId, Ipv6, <BC as InstantBindingsTypes>::Instant>>,
+        BC: InstantBindingsTypes + EventContext<IpDeviceEvent<DeviceId, Ipv6, BC::Instant>>,
     > EventContext<DadEvent<DeviceId>> for BC
 {
     fn on_event(&mut self, event: DadEvent<DeviceId>) {
@@ -542,17 +541,17 @@ pub trait IpDeviceAddressIdContext<I: IpDeviceIpExt>: DeviceIdContext<AnyDevice>
     type AddressId: IpAddressId<I::Addr>;
 }
 
-pub trait IpDeviceAddressContext<I: IpDeviceIpExt, BC: InstantContext>:
+pub trait IpDeviceAddressContext<I: IpDeviceIpExt, BT: InstantBindingsTypes>:
     IpDeviceAddressIdContext<I>
 {
-    fn with_ip_address_state<O, F: FnOnce(&I::AddressState<BC::Instant>) -> O>(
+    fn with_ip_address_state<O, F: FnOnce(&I::AddressState<BT::Instant>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         addr_id: &Self::AddressId,
         cb: F,
     ) -> O;
 
-    fn with_ip_address_state_mut<O, F: FnOnce(&mut I::AddressState<BC::Instant>) -> O>(
+    fn with_ip_address_state_mut<O, F: FnOnce(&mut I::AddressState<BT::Instant>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         addr_id: &Self::AddressId,
@@ -561,12 +560,12 @@ pub trait IpDeviceAddressContext<I: IpDeviceIpExt, BC: InstantContext>:
 }
 
 /// Accessor for IP device state.
-pub trait IpDeviceStateContext<I: IpDeviceIpExt, BC: InstantContext>:
-    IpDeviceAddressContext<I, BC>
+pub trait IpDeviceStateContext<I: IpDeviceIpExt, BT: InstantBindingsTypes>:
+    IpDeviceAddressContext<I, BT>
 {
     type IpDeviceAddressCtx<'a>: IpDeviceAddressContext<
         I,
-        BC,
+        BT,
         DeviceId = Self::DeviceId,
         AddressId = Self::AddressId,
     >;
@@ -588,7 +587,7 @@ pub trait IpDeviceStateContext<I: IpDeviceIpExt, BC: InstantContext>:
         &mut self,
         device_id: &Self::DeviceId,
         addr: AddrSubnet<I::Addr, I::AssignedWitness>,
-        config: I::AddressConfig<BC::Instant>,
+        config: I::AddressConfig<BT::Instant>,
     ) -> Result<Self::AddressId, ExistsError>;
 
     /// Removes an address from the device identified by the ID.
@@ -596,7 +595,7 @@ pub trait IpDeviceStateContext<I: IpDeviceIpExt, BC: InstantContext>:
         &mut self,
         device_id: &Self::DeviceId,
         addr: Self::AddressId,
-    ) -> (AddrSubnet<I::Addr, I::AssignedWitness>, I::AddressConfig<BC::Instant>);
+    ) -> (AddrSubnet<I::Addr, I::AssignedWitness>, I::AddressConfig<BT::Instant>);
 
     /// Returns the address ID for the given address value.
     fn get_address_id(
@@ -640,7 +639,7 @@ pub trait IpDeviceStateContext<I: IpDeviceIpExt, BC: InstantContext>:
     /// multicast group.
     fn join_link_multicast_group(
         &mut self,
-        bindings_ctx: &mut BC,
+        bindings_ctx: &mut BT,
         device_id: &Self::DeviceId,
         multicast_addr: MulticastAddr<I::Addr>,
     );
@@ -649,7 +648,7 @@ pub trait IpDeviceStateContext<I: IpDeviceIpExt, BC: InstantContext>:
     /// multicast group.
     fn leave_link_multicast_group(
         &mut self,
-        bindings_ctx: &mut BC,
+        bindings_ctx: &mut BT,
         device_id: &Self::DeviceId,
         multicast_addr: MulticastAddr<I::Addr>,
     );
@@ -657,12 +656,12 @@ pub trait IpDeviceStateContext<I: IpDeviceIpExt, BC: InstantContext>:
 
 /// The context provided to the callback passed to
 /// [`IpDeviceConfigurationContext::with_ip_device_configuration_mut`].
-pub trait WithIpDeviceConfigurationMutInner<I: IpDeviceIpExt, BC: InstantContext>:
+pub trait WithIpDeviceConfigurationMutInner<I: IpDeviceIpExt, BT: InstantBindingsTypes>:
     DeviceIdContext<AnyDevice>
 {
-    type IpDeviceStateCtx<'s>: IpDeviceStateContext<I, BC, DeviceId = Self::DeviceId>
-        + GmpHandler<I, BC>
-        + NudIpHandler<I, BC>
+    type IpDeviceStateCtx<'s>: IpDeviceStateContext<I, BT, DeviceId = Self::DeviceId>
+        + GmpHandler<I, BT>
+        + NudIpHandler<I, BT>
         + 's
     where
         Self: 's;
@@ -1326,8 +1325,8 @@ fn disable_ipv4_device_with_config<
 ///
 /// Returns an [`Iterator`] of `AddrSubnet`.
 pub(crate) fn with_assigned_ipv4_addr_subnets<
-    BC: InstantContext,
-    CC: IpDeviceStateContext<Ipv4, BC>,
+    BT: InstantBindingsTypes,
+    CC: IpDeviceStateContext<Ipv4, BT>,
     O,
     F: FnOnce(Box<dyn Iterator<Item = AddrSubnet<Ipv4Addr>> + '_>) -> O,
 >(
@@ -1340,7 +1339,7 @@ pub(crate) fn with_assigned_ipv4_addr_subnets<
 }
 
 /// Gets a single IPv4 address and subnet for a device.
-pub(crate) fn get_ipv4_addr_subnet<BC: InstantContext, CC: IpDeviceStateContext<Ipv4, BC>>(
+pub(crate) fn get_ipv4_addr_subnet<BT: InstantBindingsTypes, CC: IpDeviceStateContext<Ipv4, BT>>(
     core_ctx: &mut CC,
     device_id: &CC::DeviceId,
 ) -> Option<AddrSubnet<Ipv4Addr>> {
@@ -1348,7 +1347,7 @@ pub(crate) fn get_ipv4_addr_subnet<BC: InstantContext, CC: IpDeviceStateContext<
 }
 
 /// Gets the hop limit for new IPv6 packets that will be sent out from `device`.
-pub(crate) fn get_ipv6_hop_limit<BC: InstantContext, CC: IpDeviceStateContext<Ipv6, BC>>(
+pub(crate) fn get_ipv6_hop_limit<BT: InstantBindingsTypes, CC: IpDeviceStateContext<Ipv6, BT>>(
     core_ctx: &mut CC,
     device: &CC::DeviceId,
 ) -> NonZeroU8 {
