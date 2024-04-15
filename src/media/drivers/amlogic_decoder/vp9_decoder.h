@@ -9,7 +9,6 @@
 #include <lib/async/cpp/task.h>
 
 #include <cstdint>
-#include <ostream>
 #include <string_view>
 #include <vector>
 

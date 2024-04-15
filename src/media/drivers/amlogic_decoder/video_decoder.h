@@ -25,7 +25,6 @@
 #include <zircon/syscalls.h>
 
 #include <functional>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <type_traits>

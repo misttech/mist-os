@@ -158,6 +158,7 @@ if (target_cpu == "arm64") {
       "registers.h",
       "secmem_session.cc",
       "secmem_session.h",
+      "setbuf_workaround.cc",
       "thread_role.h",
       "vdec1.cc",
       "vdec1.h",
