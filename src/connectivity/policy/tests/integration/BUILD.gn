@@ -9,14 +9,22 @@ import(
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 
+tests = [ "reachability" ]
+
 tests_with_err_logs = [
   {
     label = "management"
   },
-  {
-    label = "reachability"
-  },
 ]
+
+foreach(test, tests) {
+  name = "policy-${test}-integration-test"
+  fuchsia_test_component_with_expectations(name) {
+    expectations = "expects/${name}.json5"
+    manifest = "meta/${name}.cml"
+    deps = [ test ]
+  }
+}
 
 foreach(test, tests_with_err_logs) {
   name = "policy-${test.label}-integration-test"
@@ -68,6 +76,15 @@ if (target_cpu != "riscv64") {
     "//src/connectivity/network/netstack:component-debug",
     "//src/connectivity/network/netstack:component-with-fast-udp-debug",
   ]
+}
+
+fuchsia_test_package("policy-integration-tests") {
+  test_components = []
+  foreach(test, tests) {
+    test_components += [ ":policy-${test}-integration-test" ]
+  }
+
+  deps = package_deps + [ "//src/lib/testing/expectation:expectation_comparer" ]
 }
 
 err_log_package_deps = []
@@ -122,5 +139,5 @@ resource("netcfg-netemul-configs") {
 group("tests") {
   testonly = true
 
-  deps = err_log_package_deps
+  deps = [ ":policy-integration-tests" ] + err_log_package_deps
 }
