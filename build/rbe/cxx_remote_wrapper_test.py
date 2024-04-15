@@ -398,7 +398,9 @@ class CxxRemoteActionTests(unittest.TestCase):
             c.remote_action.output_files_relative_to_project_root,
             [fake_builddir / output, fake_builddir / depfile],
         )
-        self.assertEqual(set(c.remote_action.always_download), set([depfile]))
+        self.assertEqual(
+            set(c.remote_action.expected_downloads), {output, depfile}
+        )
 
         with mock.patch.object(
             remote_action.RemoteAction,
@@ -444,7 +446,7 @@ class CxxRemoteActionTests(unittest.TestCase):
 
             mock_check.assert_called_once()
             self.assertEqual(
-                set(c.remote_action.always_download), set([depfile])
+                set(c.remote_action.expected_downloads), {output, depfile}
             )
             self.assertEqual(c.remote_action.remote_working_dir, remote_cwd)
             c._rewrite_remote_depfile()

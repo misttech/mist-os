@@ -358,15 +358,24 @@ class CxxLinkRemoteAction(object):
         self.vprintlist("remote inputs", remote_inputs)
         self.vprintlist("remote output files", remote_output_files)
         self.vprintlist("remote output dirs", remote_output_dirs)
-        self.vprintlist("rewrapper options", remote_options)
 
-        downloads = []
-        if self.depfile:  # always fetch the depfile
-            downloads.append(self.depfile)
+        # Interpret --download_outputs=false as a request to avoid
+        # downloading the main linker output, but download everything else.
+        # This will always fetch the depfile, which is needed by ninja.
+        translated_remote_options = []
+        for opt in remote_options:
+            if opt == "--download_outputs=false":
+                translated_remote_options.append(
+                    f"--download_regex=-{self.primary_output}$"
+                )
+            else:
+                translated_remote_options.append(opt)
+
+        self.vprintlist("rewrapper options", translated_remote_options)
 
         self._remote_action = remote_action.remote_action_from_args(
             main_args=self._main_args,
-            remote_options=remote_options,
+            remote_options=translated_remote_options,
             command=remote_command,
             inputs=remote_inputs,
             output_files=remote_output_files,
@@ -374,7 +383,6 @@ class CxxLinkRemoteAction(object):
             working_dir=self.working_dir,
             exec_root=self.exec_root,
             post_remote_run_success_action=self._post_remote_success_action,
-            downloads=downloads,
         )
 
         self._prepare_status = 0

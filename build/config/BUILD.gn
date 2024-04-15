@@ -380,13 +380,13 @@ config("download_outputs") {
   # Override global settings that may disable downloading of outputs.
   # This is useful for targets that are known to be needed for local actions.
   if (rust_rbe_enable) {
-    rustflags = [ "--remote-flag=--download_outputs=true" ]
+    rustflags = [ "--remote-flag=--download_regex=.*" ]
   }
   if (cxx_rbe_enable) {
-    cflags = [ "--remote-flag=--download_outputs=true" ]
+    cflags = [ "--remote-flag=--download_regex=.*" ]
   }
   if (link_rbe_enable) {
-    ldflags = [ "--remote-flag=--download_outputs=true" ]
+    ldflags = [ "--remote-flag=--download_regex=.*" ]
   }
 }
 

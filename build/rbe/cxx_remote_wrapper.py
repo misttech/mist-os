@@ -211,7 +211,7 @@ class CxxRemoteAction(object):
             # return self._verify_remote_depfile()
             self._rewrite_remote_depfile()
 
-        # TODO: if downloads were skipped, need to force-download depfile
+        # we expect the depfile to always be downloaded, via --download_regex
         return 0
 
     def _verify_remote_depfile(self) -> int:
@@ -330,14 +330,10 @@ class CxxRemoteAction(object):
         self.vprintlist("remote output dirs", remote_output_dirs)
         self.vprintlist("rewrapper options", remote_options)
 
-        # Interpret --download_outputs=false as a request to avoid
-        # downloading only the primary compiler output, usually the .o file.
-        # In other words, always download *all* other outputs,
-        # including the depfile.
-        # The depfile *must* be downloaded because it is consumed by ninja.
-        downloads = [
-            f for f in remote_output_files if f != self.primary_output
-        ] + remote_output_dirs
+        # To skip downloading, pass --download_regex=... to rewrapper.
+        # The argument should start with '-' to indicate that
+        # everything that does not match the pattern should be downloaded.
+        # Depfiles must be downloaded because ninja expects them.
 
         self._remote_action = remote_action.remote_action_from_args(
             main_args=self._main_args,
@@ -349,7 +345,6 @@ class CxxRemoteAction(object):
             working_dir=self.working_dir,
             exec_root=self.exec_root,
             post_remote_run_success_action=self._post_remote_success_action,
-            downloads=downloads,
         )
 
         self._prepare_status = 0

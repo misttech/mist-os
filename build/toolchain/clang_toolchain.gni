@@ -151,8 +151,9 @@ template("clang_toolchain") {
         _cxx_concurrent_jobs = concurrent_jobs.local
       } else {
         compiler_prefix_list += RBE_EXEC_STRATEGY_MAP[cxx_rbe_exec_strategy]
-        if (!cxx_rbe_download_obj_files) {
-          compiler_prefix_list += [ "--download_outputs=false" ]
+        if (!cxx_rbe_download_obj_files) {  # download everything except the
+                                            # object file
+          compiler_prefix_list += [ "--download_regex='-.*\\.o\$\$'" ]
         }
         _cxx_concurrent_jobs = concurrent_jobs.remote
       }
@@ -857,7 +858,7 @@ template("clang_toolchain") {
           not_needed([ "rmeta" ])
         }
         command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link$extra_emit_opts -Zdep-info-omit-d-target {{rustflags}}"
-        if (!rust_rbe_download_rlibs) {
+        if (!rust_rbe_download_rlibs) {  # download everything except the rlib
           command += " --remote-flag=--download_outputs=false"
         }
         command += " -o $rlib"

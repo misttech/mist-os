@@ -259,7 +259,8 @@ template("zircon_toolchain") {
     } else {
       compiler_prefix_list += RBE_EXEC_STRATEGY_MAP[cxx_rbe_exec_strategy]
       if (!cxx_rbe_download_obj_files) {
-        compiler_prefix_list += [ "--download_outputs=false" ]
+        # download everything except the object file
+        compiler_prefix_list += [ "--download_regex='-.*\\.o\$\$'" ]
       }
       _cxx_concurrent_jobs = concurrent_jobs.remote
     }

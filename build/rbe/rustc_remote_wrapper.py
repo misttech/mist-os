@@ -755,11 +755,19 @@ class RustRemoteAction(object):
         # artifact).  In other words, always download *all* other outputs,
         # including the depfile and emitted llvm-ir (if applicable).
         # The depfile *must* be downloaded because it is consumed by ninja.
-        downloads = [f for f in remote_output_files if f != self.primary_output]
+
+        translated_remote_options = []
+        for opt in self.remote_options:
+            if opt == "--download_outputs=false":
+                translated_remote_options.append(
+                    f"--download_regex=-{self.primary_output}$"
+                )
+            else:
+                translated_remote_options.append(opt)
 
         self._remote_action = remote_action.remote_action_from_args(
             main_args=self._main_args,
-            remote_options=self.remote_options,
+            remote_options=translated_remote_options,
             command=list(self.remote_compile_command()),
             inputs=remote_inputs,
             output_files=remote_output_files,
@@ -767,7 +775,6 @@ class RustRemoteAction(object):
             working_dir=self.working_dir,
             exec_root=self.exec_root,
             post_remote_run_success_action=self._post_remote_success_action,
-            downloads=downloads,
         )
         self._prepare_status = 0  # exit code success
         return self._prepare_status
@@ -920,7 +927,7 @@ class RustRemoteAction(object):
             self._rewrite_remote_or_local_depfile()
 
         if (
-            not self.remote_action.download_outputs
+            self.remote_action.skipping_some_download
             and self._rust_action.main_output_is_executable
         ):
             # TODO(b/285030257): This is a workaround to a problem where

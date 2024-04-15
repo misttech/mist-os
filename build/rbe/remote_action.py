@@ -920,7 +920,6 @@ class RemoteAction(object):
         miscomparison_export_dir: Path = None,
         post_remote_run_success_action: Callable[[], int] = None,
         remote_debug_command: Sequence[str] = None,
-        always_download: Sequence[Path] = None,
     ):
         """RemoteAction constructor.
 
@@ -973,8 +972,6 @@ class RemoteAction(object):
             a cause of error.
           remote_debug_command: if True, run different command remotely instead of
             the original command, for debugging the remote inputs setup.
-          always_download: files/dirs to download, relative to the working dir,
-            even if --download_outputs=false.
         """
         self._rewrapper = rewrapper
         self._config = cfg  # can be None
@@ -1000,7 +997,6 @@ class RemoteAction(object):
         self._options = options or []
         self._post_remote_run_success_action = post_remote_run_success_action
         self._remote_debug_command = remote_debug_command or []
-        self._always_download = always_download or []
 
         # When comparing local vs. remote, force exec_strategy=remote
         # to eliminate any unintended local execution cases.
@@ -1069,10 +1065,6 @@ class RemoteAction(object):
     @property
     def config(self) -> str:
         return self._config
-
-    @property
-    def always_download(self) -> Sequence[str]:
-        return self._always_download
 
     @property
     def _default_auxiliary_file_basename(self) -> str:
@@ -1192,8 +1184,51 @@ exec "${{cmd[@]}}"
         return self._rewrapper_known_options.canonicalize_working_dir
 
     @property
+    def download_regex(self) -> Optional[str]:
+        return self._rewrapper_known_options.download_regex
+
+    @property
     def download_outputs(self) -> bool:
         return self._rewrapper_known_options.download_outputs
+
+    @property
+    def need_download_stub_predicate(self) -> Callable[[Path], bool]:
+        """Return a function that indicates whether an output path will require a download stub."""
+        download_regex = self.download_regex
+        if download_regex is not None:
+            if download_regex.startswith("-"):
+                exclude_regex = re.compile(download_regex.removeprefix("-"))
+
+                def need_download_stub(path: Path) -> bool:
+                    return exclude_regex.match(str(path))
+
+            else:
+                include_regex = re.compile(download_regex)
+
+                def need_download_stub(path: Path) -> bool:
+                    return not include_regex.match(str(path))
+
+        else:
+
+            def need_download_stub(path: Path) -> bool:
+                # --download_outputs applies to all paths
+                return not self.download_outputs
+
+        return need_download_stub
+
+    @property
+    def skipping_some_download(self) -> bool:
+        """Returns true if some download is expected to be skipped."""
+        return self.download_regex is not None or not self.download_outputs
+
+    @property
+    def expected_downloads(self) -> Sequence[Path]:
+        """Returns a collection of output files that are expected to be downloaded."""
+        return [
+            f
+            for f in self.output_files_relative_to_working_dir
+            if not self.need_download_stub_predicate(f)
+        ]
 
     @property
     def save_temps(self) -> bool:
@@ -1321,7 +1356,7 @@ exec "${{cmd[@]}}"
         # diagnostics and troubleshooting.
         # When NOT downloading outputs, we need the .rrpl file for the
         # output digests to be able to retrieve them from the CAS later.
-        if self.diagnose_nonzero or not self.download_outputs:
+        if self.diagnose_nonzero or self.skipping_some_download:
             yield f"--action_log={self._action_log}"
 
         yield from self.options
@@ -1449,7 +1484,7 @@ exec "${{cmd[@]}}"
             return self.local_launch_command
         return self.remote_launch_command
 
-    def _process_download_stubs(self) -> Dict[Path, cl_utils.SubprocessResult]:
+    def _process_download_stubs(self) -> None:
         """Create download stubs so artifacts can be retrieved later."""
         self.vmsg(f"Reading remote action log from {self._action_log}.")
         log_record = ReproxyLogEntry.parse_action_log(self._action_log)
@@ -1460,10 +1495,12 @@ exec "${{cmd[@]}}"
             "STATUS_LOCAL_FALLBACK",
             "STATUS_RACING_LOCAL",
         }:
-            return {}
+            return
 
-        self.vmsg("Creating download stubs for remote outputs.")
-        # Create stubs, even for artifacts that are always_download-ed.
+        if not self.skipping_some_download:
+            return
+
+        self.vmsg("Collecting digests for all remote outputs.")
         unique_log_dir = _reproxy_log_dir()  # unique per build
         build_id = Path(unique_log_dir).name if unique_log_dir else "unknown"
         stub_infos = log_record.make_download_stubs(
@@ -1472,42 +1509,17 @@ exec "${{cmd[@]}}"
             build_id=build_id,
         )
 
-        # Write download stubs out.
+        # rewrapper has already downloaded the outputs that were not excluded
+        # by 'download_regex'.
+        # Write download stubs out for the artifacts that were not downloaded.
+
+        need_download_stub = self.need_download_stub_predicate
         for stub_info in stub_infos.values():
-            self.vmsg(f"  {stub_info.path}: {stub_info.blob_digest}")
-            self._update_stub(stub_info)
-
-        if not self.always_download:
-            return {}
-
-        always_download = set(self.always_download)
-        # Download outputs that were explicitly requested.
-        # Download actions here do not need to be locked because
-        # this remote action (as a step of a full build)
-        # is the sole producer of its outputs.
-
-        # Declared outputs are not required to exist remotely.
-        available_downloads = {
-            path: stub_info
-            for path, stub_info in stub_infos.items()
-            if path in always_download
-        }
-
-        path_strs = [str(path) for path in available_downloads.keys()]
-        outputs = self.output_files_relative_to_working_dir
-        target = outputs[0] if len(outputs) > 0 else "unknown-target"
-        try:
-            self.vmsg(f"Downloading outputs for {target}: {path_strs}")
-            download_statuses = download_output_stub_infos_batch(
-                downloader=self.downloader(),
-                stub_infos=available_downloads.values(),
-                working_dir_abs=self.working_dir,
-                verbose=self.verbose,
-            )
-        finally:
-            self.vmsg(f"  Downloaded outputs for {target} ({len(stub_infos)}).")
-
-        return download_statuses
+            if need_download_stub(stub_info.path):
+                self.vmsg(
+                    f"  download stub: {stub_info.path}: {stub_info.blob_digest}"
+                )
+                self._update_stub(stub_info)
 
     def download_inputs(
         self, keep_filter: Callable[[Path], bool]
@@ -1654,7 +1666,7 @@ exec "${{cmd[@]}}"
             # Nothing do compare.
             return 0
 
-        if not self.download_outputs:
+        if self.skipping_some_download:
             self._process_download_stubs()
 
         # Possibly transform some of the remote outputs.
@@ -1668,12 +1680,12 @@ exec "${{cmd[@]}}"
                 return post_run_status
 
         if self.compare_with_local:  # requesting comparison vs. local
-            if self.download_outputs:
+            if not self.skipping_some_download:
                 # Also run locally, and compare outputs.
                 return self._compare_against_local()
 
             # TODO: in compare-mode, force-download all output files and dirs,
-            # overriding and taking precedence over
+            # overriding and taking precedence over --download_regex and
             # --download_outputs=false, because comparison is intended
             # to be done locally with downloaded artifacts.
             # For now, just advise the user.
@@ -2251,8 +2263,12 @@ def _rewrapper_arg_parser() -> argparse.ArgumentParser:
         "--download_outputs",
         type=cl_utils.bool_golang_flag,
         default=True,
-        help="Set to false to avoid downloading outputs after remote execution succeeds.  Each toolchain (Rust, C++) may decide how to apply this to its set of outputs yb default.  For example, for Rust, this affects only the main -o output."
-        "",
+        help="Set to false to avoid downloading outputs after remote execution succeeds.  Each toolchain (Rust, C++) may decide how to apply this to its set of outputs by default.  For example, for Rust, this affects only the main -o output.  Prefer using --download_regex over this option.",
+    )
+    parser.add_argument(
+        "--download_regex",
+        type=str,
+        help="Use a regex to specify which outputs to download or not.  Prefix with '-' to exclude files matching the pattern from downloading.  This flag takes precedence over --download_outputs.  This wrapper only supports a single regex value.",
     )
     return parser
 
@@ -2432,12 +2448,6 @@ Otherwise, BASE will default to the first output file named.""",
         default=None,
         help=f"""Alternate command to execute remotely, while doing the setup for the original command.  e.g. --remote-debug-command="ls -l -R {PROJECT_ROOT_REL}" .""",
     )
-    main_group.add_argument(
-        "--download",
-        action="append",
-        default=[],
-        help="Always download these outputs, even when --download_outputs=false.  Arguments are files or directories relative to the working dir, comma-separated, repeatable and cumulative.",
-    )
     # Positional args are the command and arguments to run.
     parser.add_argument(
         "command", nargs="*", help="The command to run remotely"
@@ -2466,7 +2476,6 @@ def remote_action_from_args(
     input_list_paths: Sequence[Path] = None,
     output_files: Sequence[Path] = None,
     output_dirs: Sequence[Path] = None,
-    downloads: Sequence[Path] = None,
     **kwargs,  # other RemoteAction __init__ params
 ) -> RemoteAction:
     """Construct a remote action based on argparse parameters."""
@@ -2482,9 +2491,6 @@ def remote_action_from_args(
     output_dirs = (output_dirs or []) + [
         Path(p)
         for p in cl_utils.flatten_comma_list(main_args.output_directories)
-    ]
-    always_download = (downloads or []) + [
-        Path(p) for p in cl_utils.flatten_comma_list(main_args.download)
     ]
     return RemoteAction(
         rewrapper=main_args.bindir / "rewrapper",
@@ -2508,7 +2514,6 @@ def remote_action_from_args(
         fsatrace_path=main_args.fsatrace_path,
         diagnose_nonzero=main_args.diagnose_nonzero,
         remote_debug_command=main_args.remote_debug_command,
-        always_download=always_download,
         **kwargs,
     )
 
