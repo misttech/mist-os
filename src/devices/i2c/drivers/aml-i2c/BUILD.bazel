@@ -40,8 +40,8 @@ fuchsia_cc_driver(
     output_name = "aml-i2c",
     deps = [
         "//src/devices/lib/amlogic",
+        "//src/lib/ddk:ddk_metadata",
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
-        "@fuchsia_sdk//pkg/ddk",
         "@fuchsia_sdk//pkg/driver_component_cpp",
         "@fuchsia_sdk//pkg/driver_runtime",
         "@fuchsia_sdk//pkg/hwreg",
@@ -92,10 +92,10 @@ fuchsia_cc_test(
     ],
     deps = [
         "//src/devices/lib/amlogic",
+        "//src/lib/ddk:ddk_metadata",
         "@com_google_googletest//:gtest_main",
         "@fuchsia_sdk//pkg/async-loop-default",
         "@fuchsia_sdk//pkg/async_patterns_testing_cpp",
-        "@fuchsia_sdk//pkg/ddk",
         "@fuchsia_sdk//pkg/driver_component_cpp",
         "@fuchsia_sdk//pkg/driver_runtime",
         "@fuchsia_sdk//pkg/driver_testing_cpp",
