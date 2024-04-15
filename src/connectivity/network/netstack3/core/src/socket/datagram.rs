@@ -337,7 +337,7 @@ impl<I: IpExt, D: Debug + Hash + Eq, S: DatagramSocketSpec> AsRef<IpOptions<I, D
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
 pub struct ConnState<WireI: IpExt, SocketI: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Sized> {
-    pub(crate) socket: IpSock<WireI, D, SocketHopLimits<WireI>>,
+    pub(crate) socket: IpSock<WireI, D>,
     pub(crate) ip_options: IpOptions<SocketI, D, S>,
     pub(crate) shutdown: Shutdown,
     pub(crate) addr: ConnAddr<
@@ -2545,7 +2545,6 @@ struct ConnectParameters<WireI: IpExt, SocketI: IpExt, D: device::WeakId, S: Dat
     device: Option<D>,
     sharing: S::SharingState,
     ip_options: IpOptions<SocketI, D, S>,
-    send_options: SocketHopLimits<WireI>,
     socket_id:
         <S::SocketMapSpec<WireI, D> as DatagramSocketMapSpec<WireI, D, S::AddrSpec>>::BoundSocketId,
     original_shutdown: Option<Shutdown>,
@@ -2587,7 +2586,6 @@ fn connect_inner<
         device,
         sharing,
         ip_options,
-        send_options,
         socket_id,
         original_shutdown,
         extra,
@@ -2608,9 +2606,7 @@ fn connect_inner<
         local_ip.map(SocketIpAddr::into),
         remote_ip,
         S::ip_proto::<WireI>(),
-        send_options,
-    )
-    .map_err(|(e, _ip_options)| e)?;
+    )?;
 
     let local_port = match local_port {
         Some(id) => id.clone(),
@@ -2691,7 +2687,6 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> SingleStackConnectOpera
                         device: device.clone(),
                         sharing: sharing.clone(),
                         ip_options: ip_options.clone(),
-                        send_options: ip_options.hop_limits,
                         socket_id: S::make_bound_socket_map_id(socket_id),
                         original_shutdown: None,
                         extra,
@@ -2719,7 +2714,6 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> SingleStackConnectOpera
                                 device: device.clone(),
                                 sharing: sharing.clone(),
                                 ip_options: ip_options.clone(),
-                                send_options: ip_options.hop_limits,
                                 socket_id: S::make_bound_socket_map_id(socket_id),
                                 original_shutdown: None,
                                 extra,
@@ -2750,7 +2744,6 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> SingleStackConnectOpera
                                 device: device.clone(),
                                 sharing: sharing.clone(),
                                 ip_options: ip_options.clone(),
-                                send_options: ip_options.hop_limits,
                                 socket_id: S::make_bound_socket_map_id(socket_id),
                                 original_shutdown: Some(shutdown.clone()),
                                 extra,
@@ -2831,7 +2824,6 @@ impl<I: DualStackIpExt, D: device::WeakId, S: DatagramSocketSpec>
                             device: device.clone(),
                             sharing: sharing.clone(),
                             ip_options: ip_options.clone(),
-                            send_options: ip_options.hop_limits,
                             socket_id: S::make_bound_socket_map_id(socket_id),
                             original_shutdown: None,
                             extra,
@@ -2849,7 +2841,6 @@ impl<I: DualStackIpExt, D: device::WeakId, S: DatagramSocketSpec>
                             device: device.clone(),
                             sharing: sharing.clone(),
                             ip_options: ip_options.clone(),
-                            send_options: core_ctx.to_other_send_options(ip_options).clone(),
                             socket_id: core_ctx.to_other_bound_socket_id(socket_id),
                             original_shutdown: None,
                             extra,
@@ -2897,7 +2888,6 @@ impl<I: DualStackIpExt, D: device::WeakId, S: DatagramSocketSpec>
                                     device: device.clone(),
                                     sharing: sharing.clone(),
                                     ip_options: ip_options.clone(),
-                                    send_options: ip_options.hop_limits,
                                     socket_id: S::make_bound_socket_map_id(socket_id),
                                     original_shutdown: None,
                                     extra,
@@ -2920,7 +2910,6 @@ impl<I: DualStackIpExt, D: device::WeakId, S: DatagramSocketSpec>
                                     device: device.clone(),
                                     sharing: sharing.clone(),
                                     ip_options: ip_options.clone(),
-                                    send_options: ip_options.hop_limits,
                                     socket_id: S::make_bound_socket_map_id(socket_id),
                                     original_shutdown: None,
                                     extra,
@@ -2944,9 +2933,6 @@ impl<I: DualStackIpExt, D: device::WeakId, S: DatagramSocketSpec>
                                     device: device.clone(),
                                     sharing: sharing.clone(),
                                     ip_options: ip_options.clone(),
-                                    send_options: core_ctx
-                                        .to_other_send_options(ip_options)
-                                        .clone(),
                                     socket_id: core_ctx.to_other_bound_socket_id(socket_id),
                                     original_shutdown: None,
                                     extra,
@@ -2969,9 +2955,6 @@ impl<I: DualStackIpExt, D: device::WeakId, S: DatagramSocketSpec>
                                     device: device.clone(),
                                     sharing: sharing.clone(),
                                     ip_options: ip_options.clone(),
-                                    send_options: core_ctx
-                                        .to_other_send_options(ip_options)
-                                        .clone(),
                                     socket_id: core_ctx.to_other_bound_socket_id(socket_id),
                                     original_shutdown: None,
                                     extra,
@@ -3020,7 +3003,6 @@ impl<I: DualStackIpExt, D: device::WeakId, S: DatagramSocketSpec>
                                     device: device.clone(),
                                     sharing: sharing.clone(),
                                     ip_options: ip_options.clone(),
-                                    send_options: ip_options.hop_limits,
                                     socket_id: S::make_bound_socket_map_id(socket_id),
                                     original_shutdown: Some(shutdown.clone()),
                                     extra,
@@ -3053,9 +3035,6 @@ impl<I: DualStackIpExt, D: device::WeakId, S: DatagramSocketSpec>
                                     device: device.clone(),
                                     sharing: sharing.clone(),
                                     ip_options: ip_options.clone(),
-                                    send_options: core_ctx
-                                        .to_other_send_options(ip_options)
-                                        .clone(),
                                     socket_id: core_ctx.to_other_bound_socket_id(socket_id),
                                     original_shutdown: Some(shutdown.clone()),
                                     extra,
@@ -3527,13 +3506,14 @@ pub(crate) fn send_conn<
             }
         };
 
-        struct SendParams<'a, I: IpExt, S: DatagramSocketSpec, D: device::WeakId> {
-            socket: &'a IpSock<I, D, SocketHopLimits<I>>,
+        struct SendParams<'a, I: IpExt, S: DatagramSocketSpec, D: device::WeakId, O: SendOptions<I>> {
+            socket: &'a IpSock<I, D>,
             ip: &'a ConnIpAddr<
                 I::Addr,
                 <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
                 <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
             >,
+            options: &'a O,
         }
 
         enum Operation<
@@ -3544,9 +3524,11 @@ pub(crate) fn send_conn<
             BC: DatagramStateBindingsContext<I, S>,
             DualStackSC: DualStackDatagramBoundStateContext<I, BC, S>,
             CC: DatagramBoundStateContext<I, BC, S>,
+            O: SendOptions<I>,
+            OtherO: SendOptions<I::OtherVersion>,
         > {
-            SendToThisStack((SendParams<'a, I, S, D>, &'a mut CC)),
-            SendToOtherStack((SendParams<'a, I::OtherVersion, S, D>, &'a mut DualStackSC)),
+            SendToThisStack((SendParams<'a, I, S, D, O>, &'a mut CC)),
+            SendToOtherStack((SendParams<'a, I::OtherVersion, S, D, OtherO>, &'a mut DualStackSC)),
             // Allow `Operation` to be generic over `B` and `C` so that they can
             // be used in trait bounds for `DualStackSC` and `SC`.
             _Phantom((Never, PhantomData<BC>)),
@@ -3556,33 +3538,53 @@ pub(crate) fn send_conn<
             MaybeDualStack::DualStack(dual_stack) => match dual_stack.converter().convert(state) {
                 DualStackConnState::ThisStack(ConnState {
                     socket,
-                    ip_options: _,
+                    ip_options,
                     clear_device_on_disconnect: _,
                     shutdown,
                     addr: ConnAddr { ip, device: _ },
                     extra: _,
-                }) => (shutdown, Operation::SendToThisStack((SendParams { socket, ip }, core_ctx))),
+                }) => (
+                    shutdown,
+                    Operation::SendToThisStack((
+                        SendParams { socket, ip, options: &ip_options.hop_limits },
+                        core_ctx,
+                    )),
+                ),
                 DualStackConnState::OtherStack(ConnState {
                     socket,
-                    ip_options: _,
+                    ip_options,
                     clear_device_on_disconnect: _,
                     shutdown,
                     addr: ConnAddr { ip, device: _ },
                     extra: _,
-                }) => {
-                    (shutdown, Operation::SendToOtherStack((SendParams { socket, ip }, dual_stack)))
-                }
+                }) => (
+                    shutdown,
+                    Operation::SendToOtherStack((
+                        SendParams {
+                            socket,
+                            ip,
+                            options: dual_stack.to_other_send_options(ip_options),
+                        },
+                        dual_stack,
+                    )),
+                ),
             },
             MaybeDualStack::NotDualStack(not_dual_stack) => {
                 let ConnState {
                     socket,
-                    ip_options: _,
+                    ip_options,
                     clear_device_on_disconnect: _,
                     shutdown,
                     addr: ConnAddr { ip, device: _ },
                     extra: _,
                 } = not_dual_stack.converter().convert(state);
-                (shutdown, Operation::SendToThisStack((SendParams { socket, ip }, core_ctx)))
+                (
+                    shutdown,
+                    Operation::SendToThisStack((
+                        SendParams { socket, ip, options: &ip_options.hop_limits },
+                        core_ctx,
+                    )),
+                )
             }
         };
 
@@ -3592,21 +3594,21 @@ pub(crate) fn send_conn<
         }
 
         match operation {
-            Operation::SendToThisStack((SendParams { socket, ip }, core_ctx)) => {
+            Operation::SendToThisStack((SendParams { socket, ip, options }, core_ctx)) => {
                 let packet =
                     S::make_packet::<I, _>(body, &ip).map_err(SendError::SerializeError)?;
                 core_ctx.with_transport_context(|core_ctx| {
                     core_ctx
-                        .send_ip_packet(bindings_ctx, &socket, packet, None)
+                        .send_ip_packet(bindings_ctx, &socket, packet, None, options)
                         .map_err(|(_serializer, send_error)| SendError::IpSock(send_error))
                 })
             }
-            Operation::SendToOtherStack((SendParams { socket, ip }, dual_stack)) => {
+            Operation::SendToOtherStack((SendParams { socket, ip, options }, dual_stack)) => {
                 let packet = S::make_packet::<I::OtherVersion, _>(body, &ip)
                     .map_err(SendError::SerializeError)?;
                 dual_stack.with_transport_context::<_, _>(|core_ctx| {
                     core_ctx
-                        .send_ip_packet(bindings_ctx, &socket, packet, None)
+                        .send_ip_packet(bindings_ctx, &socket, packet, None, options)
                         .map_err(|(_serializer, send_error)| SendError::IpSock(send_error))
                 })
             }
@@ -3977,9 +3979,7 @@ fn send_oneshot<
             None,
         )
         .map_err(|err| match err {
-            SendOneShotIpPacketError::CreateAndSendError { err, options: _ } => {
-                SendToError::CreateAndSend(err)
-            }
+            SendOneShotIpPacketError::CreateAndSendError { err } => SendToError::CreateAndSend(err),
             SendOneShotIpPacketError::SerializeError(err) => SendToError::SerializeError(err),
         })
 }
@@ -4082,18 +4082,15 @@ fn set_bound_device_single_stack<
         }) => {
             let ConnAddr { ip, device } = addr;
             let ConnIpAddr { local: (local_ip, _local_id), remote: (remote_ip, _remote_id) } = ip;
-            let mut new_socket = core_ctx
+            let new_socket = core_ctx
                 .new_ip_socket(
                     bindings_ctx,
                     new_device.map(EitherDeviceId::Strong),
                     Some(local_ip.clone()),
                     remote_ip.clone(),
                     socket.proto(),
-                    // NB: Use default options; They'll be replaced later if
-                    // the insertion is successful.
-                    Default::default(),
                 )
-                .map_err(|_: (IpSockCreationError, _)| {
+                .map_err(|_: IpSockCreationError| {
                     SocketError::Remote(RemoteAddressError::NoRoute)
                 })?;
             let new_device = new_socket.device().cloned();
@@ -4106,9 +4103,6 @@ fn set_bound_device_single_stack<
             let entry = entry
                 .try_update_addr(new_addr)
                 .map_err(|(ExistsError {}, _entry)| LocalAddressError::AddressInUse)?;
-            // Since the move was successful, replace the old socket with
-            // the new one but move the options over.
-            let _: SocketHopLimits<WireI> = new_socket.replace_options(socket.take_options());
             *socket = new_socket;
             // If this operation explicitly sets the device for the socket, it
             // should no longer be cleared on disconnect.
@@ -4671,8 +4665,6 @@ pub(crate) fn update_ip_hop_limit<
     id: &S::SocketId<I, CC::WeakDeviceId>,
     update: impl FnOnce(&mut SocketHopLimits<I>),
 ) {
-    // TODO(https://fxbug.dev/324279602): The options held by a connected
-    // socket's `IpSock` will now be out of sync with the options updated here.
     core_ctx.with_socket_state_mut(id, |core_ctx, state| {
         let options = get_options_mut(core_ctx, state);
 

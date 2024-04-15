@@ -183,11 +183,11 @@ pub(crate) struct IcmpConn<S> {
     ip: S,
 }
 
-impl<'a, A: IpAddress, D> From<&'a IcmpConn<IpSock<A::Version, D, ()>>> for IcmpAddr<A>
+impl<'a, A: IpAddress, D> From<&'a IcmpConn<IpSock<A::Version, D>>> for IcmpAddr<A>
 where
     A::Version: IpExt,
 {
-    fn from(conn: &'a IcmpConn<IpSock<A::Version, D, ()>>) -> IcmpAddr<A> {
+    fn from(conn: &'a IcmpConn<IpSock<A::Version, D>>) -> IcmpAddr<A> {
         IcmpAddr {
             local_addr: *conn.ip.local_ip(),
             remote_addr: *conn.ip.remote_ip(),

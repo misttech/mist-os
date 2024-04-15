@@ -277,10 +277,10 @@ impl<
 impl<I: IpLayerIpExt, C, P: DeviceIpSocketHandler<I, C>> DeviceIpSocketHandler<I, C>
     for UninstantiableWrapper<P>
 {
-    fn get_mms<O: SendOptions<I>>(
+    fn get_mms(
         &mut self,
         _ctx: &mut C,
-        _ip_sock: &IpSock<I, Self::WeakDeviceId, O>,
+        _ip_sock: &IpSock<I, Self::WeakDeviceId>,
     ) -> Result<Mms, MmsError> {
         self.uninstantiable_unreachable()
     }
@@ -310,23 +310,23 @@ impl<I: IpExt, C, P: TransportIpContext<I, C>> TransportIpContext<I, C>
 }
 
 impl<I: IpExt, C, P: IpSocketHandler<I, C>> IpSocketHandler<I, C> for UninstantiableWrapper<P> {
-    fn new_ip_socket<O>(
+    fn new_ip_socket(
         &mut self,
         _ctx: &mut C,
         _device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
         _local_ip: Option<SocketIpAddr<I::Addr>>,
         _remote_ip: SocketIpAddr<I::Addr>,
         _proto: I::Proto,
-        _options: O,
-    ) -> Result<IpSock<I, Self::WeakDeviceId, O>, (IpSockCreationError, O)> {
+    ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
         self.uninstantiable_unreachable()
     }
     fn send_ip_packet<S, O>(
         &mut self,
         _ctx: &mut C,
-        _socket: &IpSock<I, Self::WeakDeviceId, O>,
+        _socket: &IpSock<I, Self::WeakDeviceId>,
         _body: S,
         _mtu: Option<u32>,
+        _options: &O,
     ) -> Result<(), (S, IpSockSendError)>
     where
         S: Serializer,

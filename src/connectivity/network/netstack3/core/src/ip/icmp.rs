@@ -1958,7 +1958,7 @@ fn send_icmp_reply<I, BC, CC, S, F>(
             |src_ip| get_body_from_src_ip(src_ip.into()),
             None,
         )
-        .unwrap_or_else(|(err, DefaultSendOptions)| {
+        .unwrap_or_else(|err| {
             debug!("failed to send ICMP reply: {}", err);
         })
 }

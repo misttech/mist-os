@@ -58,8 +58,7 @@ use crate::{
     ip::{
         icmp::IcmpErrorCode,
         socket::{
-            DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreationError,
-            IpSocketHandler, SendOptions,
+            DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSocketHandler,
         },
         EitherDeviceId, IpExt, IpSockCreateAndSendError, TransportIpContext,
     },
@@ -1609,7 +1608,7 @@ pub struct Connection<
         BT::SendBuffer,
         BT::ListenerNotifierOrProvidedBuffers,
     >,
-    ip_sock: IpSock<WireI, D, DefaultSendOptions>,
+    ip_sock: IpSock<WireI, D>,
     /// The user has indicated that this connection will never be used again, we
     /// keep the connection in the socketmap to perform the shutdown but it will
     /// be auto removed once the state reaches Closed.
@@ -3217,7 +3216,7 @@ where
         bindings_ctx: &mut C::BindingsContext,
         addr: &mut ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
         demux_id: &WireI::DemuxSocketId<CC::WeakDeviceId, C::BindingsContext>,
-        ip_sock: &mut IpSock<WireI, CC::WeakDeviceId, DefaultSendOptions>,
+        ip_sock: &mut IpSock<WireI, CC::WeakDeviceId>,
         new_device: Option<CC::DeviceId>,
     ) -> Result<(), SetDeviceError>
     where
@@ -3245,9 +3244,8 @@ where
                 Some(*local_ip),
                 *remote_ip,
                 IpProto::Tcp.into(),
-                Default::default(),
             )
-            .map_err(|_: (IpSockCreationError, DefaultSendOptions)| SetDeviceError::Unroutable)?;
+            .map_err(|_: IpSockCreationError| SetDeviceError::Unroutable)?;
         core_ctx.with_demux_mut(|DemuxState { socketmap }| {
             let entry = socketmap
                 .conns_mut()
@@ -4393,7 +4391,7 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
         BC::SendBuffer,
         BC::ListenerNotifierOrProvidedBuffers,
     >,
-    ip_sock: &IpSock<WireI, DC::WeakDeviceId, DefaultSendOptions>,
+    ip_sock: &IpSock<WireI, DC::WeakDeviceId>,
     conn_addr: &ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, DC::WeakDeviceId>,
 ) where
     WireI: DualStackIpExt,
@@ -4736,9 +4734,8 @@ where
             local_ip,
             remote_ip,
             IpProto::Tcp.into(),
-            DefaultSendOptions,
         )
-        .map_err(|(err, DefaultSendOptions {})| match err {
+        .map_err(|err| match err {
             IpSockCreationError::Route(_) => ConnectError::NoRoute,
         })?;
 
@@ -4964,11 +4961,11 @@ where
 ///
 /// `socket_id` is used strictly for logging. `None` can be provided in cases
 /// where the segment is not associated with any particular socket.
-fn send_tcp_segment<'a, WireI, SockI, CC, BC, D, O>(
+fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     socket_id: Option<&TcpSocketId<SockI, D, BC>>,
-    ip_sock: Option<&IpSock<WireI, D, O>>,
+    ip_sock: Option<&IpSock<WireI, D>>,
     conn_addr: ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>,
     segment: Segment<SendPayload<'a>>,
 ) where
@@ -4978,30 +4975,27 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D, O>(
         + IpSocketHandler<WireI, BC, DeviceId = D::Strong, WeakDeviceId = D>,
     BC: TcpBindingsTypes,
     D: WeakId,
-    O: SendOptions<WireI>,
 {
     let control = segment.contents.control();
     let result = match ip_sock {
         Some(ip_sock) => {
             let body = tcp_serialize_segment(segment, conn_addr);
             core_ctx
-                .send_ip_packet(bindings_ctx, ip_sock, body, None)
+                .send_ip_packet(bindings_ctx, ip_sock, body, None, &DefaultSendOptions)
                 .map_err(|(_serializer, err)| IpSockCreateAndSendError::Send(err))
         }
         None => {
             let ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) } = conn_addr;
-            core_ctx
-                .send_oneshot_ip_packet(
-                    bindings_ctx,
-                    None,
-                    Some(local_ip),
-                    remote_ip,
-                    IpProto::Tcp.into(),
-                    DefaultSendOptions,
-                    |_addr| tcp_serialize_segment(segment, conn_addr),
-                    None,
-                )
-                .map_err(|(err, _options)| err)
+            core_ctx.send_oneshot_ip_packet(
+                bindings_ctx,
+                None,
+                Some(local_ip),
+                remote_ip,
+                IpProto::Tcp.into(),
+                DefaultSendOptions,
+                |_addr| tcp_serialize_segment(segment, conn_addr),
+                None,
+            )
         }
     };
     match result {
@@ -5424,10 +5418,10 @@ mod tests {
         D: FakeStrongDeviceId,
         BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
     {
-        fn get_mms<O: SendOptions<I>>(
+        fn get_mms(
             &mut self,
             _bindings_ctx: &mut BC,
-            _ip_sock: &IpSock<I, Self::WeakDeviceId, O>,
+            _ip_sock: &IpSock<I, Self::WeakDeviceId>,
         ) -> Result<Mms, MmsError> {
             Ok(Mms::from_mtu::<I>(Mtu::new(1500), 0).unwrap())
         }

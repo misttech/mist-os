@@ -29,9 +29,8 @@ use crate::{
     error::NotFoundError,
     filter::TransportPacketSerializer,
     ip::{
-        socket::{DefaultSendOptions, MmsError},
-        EitherDeviceId, IpSockCreationError, IpTransportContext, TransportIpContext,
-        TransportReceiveError,
+        socket::MmsError, EitherDeviceId, IpSockCreationError, IpTransportContext,
+        TransportIpContext, TransportReceiveError,
     },
     socket::{
         address::{
@@ -384,7 +383,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
         // there is no TCB, and therefore, no connection.
         if let Some(seg) = (Closed { reason: None::<Option<ConnectionError>> }.on_segment(incoming))
         {
-            tcp::socket::send_tcp_segment::<WireI, WireI, _, _, _, DefaultSendOptions>(
+            tcp::socket::send_tcp_segment::<WireI, WireI, _, _, _>(
                 core_ctx,
                 bindings_ctx,
                 None,
@@ -891,10 +890,9 @@ where
         Some(local_ip),
         remote_ip,
         IpProto::Tcp.into(),
-        DefaultSendOptions,
     ) {
         Ok(ip_sock) => ip_sock,
-        err @ Err((IpSockCreationError::Route(_), DefaultSendOptions)) => {
+        err @ Err(IpSockCreationError::Route(_)) => {
             core_ctx.increment(|counters| &counters.passive_open_no_route_errors);
             core_ctx.increment(|counters| &counters.failed_connection_attempts);
             debug!("cannot construct an ip socket to the SYN originator: {:?}, ignoring", err);

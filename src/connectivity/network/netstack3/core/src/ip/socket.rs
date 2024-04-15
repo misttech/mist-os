@@ -47,15 +47,14 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     /// `new_ip_socket` returns an error if no route to the remote was found in
     /// the forwarding table or if the given local IP address is not valid for
     /// the found route.
-    fn new_ip_socket<O>(
+    fn new_ip_socket(
         &mut self,
         bindings_ctx: &mut BC,
         device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
         local_ip: Option<SocketIpAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
         proto: I::Proto,
-        options: O,
-    ) -> Result<IpSock<I, Self::WeakDeviceId, O>, (IpSockCreationError, O)>;
+    ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError>;
 
     /// Sends an IP packet on a socket.
     ///
@@ -72,9 +71,10 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     fn send_ip_packet<S, O>(
         &mut self,
         bindings_ctx: &mut BC,
-        socket: &IpSock<I, Self::WeakDeviceId, O>,
+        socket: &IpSock<I, Self::WeakDeviceId>,
         body: S,
         mtu: Option<u32>,
+        options: &O,
     ) -> Result<(), (S, IpSockSendError)>
     where
         S: TransportPacketSerializer,
@@ -113,7 +113,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         options: O,
         get_body_from_src_ip: F,
         mtu: Option<u32>,
-    ) -> Result<(), SendOneShotIpPacketError<O, E>>
+    ) -> Result<(), SendOneShotIpPacketError<E>>
     where
         S: TransportPacketSerializer,
         S::Buffer: BufferMut,
@@ -121,16 +121,12 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         O: SendOptions<I>,
     {
         let tmp = self
-            .new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto, options)
-            .map_err(|(err, options)| SendOneShotIpPacketError::CreateAndSendError {
-                err: err.into(),
-                options,
-            })?;
+            .new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
+            .map_err(|err| SendOneShotIpPacketError::CreateAndSendError { err: err.into() })?;
         let packet = get_body_from_src_ip(*tmp.local_ip())
             .map_err(SendOneShotIpPacketError::SerializeError)?;
-        self.send_ip_packet(bindings_ctx, &tmp, packet, mtu).map_err(|(_body, err)| {
-            let IpSock { options, definition: _ } = tmp;
-            SendOneShotIpPacketError::CreateAndSendError { err: err.into(), options }
+        self.send_ip_packet(bindings_ctx, &tmp, packet, mtu, &options).map_err(|(_body, err)| {
+            SendOneShotIpPacketError::CreateAndSendError { err: err.into() }
         })
     }
 
@@ -145,7 +141,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         options: O,
         get_body_from_src_ip: F,
         mtu: Option<u32>,
-    ) -> Result<(), (IpSockCreateAndSendError, O)>
+    ) -> Result<(), IpSockCreateAndSendError>
     where
         S: TransportPacketSerializer,
         S::Buffer: BufferMut,
@@ -163,7 +159,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
             mtu,
         )
         .map_err(|err| match err {
-            SendOneShotIpPacketError::CreateAndSendError { err, options } => (err, options),
+            SendOneShotIpPacketError::CreateAndSendError { err } => err,
             SendOneShotIpPacketError::SerializeError(infallible) => match infallible {},
         })
     }
@@ -204,8 +200,8 @@ pub enum IpSockCreateAndSendError {
 }
 
 #[derive(Debug)]
-pub enum SendOneShotIpPacketError<O, E> {
-    CreateAndSendError { err: IpSockCreateAndSendError, options: O },
+pub enum SendOneShotIpPacketError<E> {
+    CreateAndSendError { err: IpSockCreateAndSendError },
     SerializeError(E),
 }
 
@@ -279,10 +275,10 @@ where
     ///
     /// This corresponds to the GET_MAXSIZES call described in:
     /// https://www.rfc-editor.org/rfc/rfc1122#section-3.4
-    fn get_mms<O: SendOptions<I>>(
+    fn get_mms(
         &mut self,
         bindings_ctx: &mut BC,
-        ip_sock: &IpSock<I, Self::WeakDeviceId, O>,
+        ip_sock: &IpSock<I, Self::WeakDeviceId>,
     ) -> Result<Mms, MmsError>;
 }
 
@@ -297,16 +293,11 @@ pub enum IpSockCreationError {
 /// An IP socket.
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
-pub struct IpSock<I: IpExt, D, O> {
+pub struct IpSock<I: IpExt, D> {
     /// The definition of the socket.
     ///
     /// This does not change for the lifetime of the socket.
     definition: IpSockDefinition<I, D>,
-    /// Options set on the socket that are independent of the socket definition.
-    ///
-    /// TODO(https://fxbug.dev/42115343): use this to record multicast options.
-    #[allow(unused)]
-    options: O,
 }
 
 /// The definition of an IP socket.
@@ -329,7 +320,7 @@ pub(crate) struct IpSockDefinition<I: IpExt, D> {
     proto: I::Proto,
 }
 
-impl<I: IpExt, D, O> IpSock<I, D, O> {
+impl<I: IpExt, D> IpSock<I, D> {
     pub(crate) fn local_ip(&self) -> &SocketIpAddr<I::Addr> {
         &self.definition.local_ip
     }
@@ -344,23 +335,6 @@ impl<I: IpExt, D, O> IpSock<I, D, O> {
 
     pub(crate) fn proto(&self) -> I::Proto {
         self.definition.proto
-    }
-
-    pub(crate) fn options_mut(&mut self) -> &mut O {
-        &mut self.options
-    }
-
-    /// Swaps in `new_options` for the existing options and returns the old
-    /// options.
-    pub(crate) fn replace_options(&mut self, new_options: O) -> O {
-        core::mem::replace(self.options_mut(), new_options)
-    }
-
-    pub(crate) fn take_options(&mut self) -> O
-    where
-        O: Default,
-    {
-        self.replace_options(Default::default())
     }
 }
 
@@ -413,20 +387,19 @@ where
     CC: IpSocketContext<I, BC> + CounterContext<IpCounters<I>>,
     CC::DeviceId: crate::filter::InterfaceProperties<BC::DeviceClass>,
 {
-    fn new_ip_socket<O>(
+    fn new_ip_socket(
         &mut self,
         bindings_ctx: &mut BC,
         device: Option<EitherDeviceId<&CC::DeviceId, &CC::WeakDeviceId>>,
         local_ip: Option<SocketIpAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
         proto: I::Proto,
-        options: O,
-    ) -> Result<IpSock<I, CC::WeakDeviceId, O>, (IpSockCreationError, O)> {
+    ) -> Result<IpSock<I, CC::WeakDeviceId>, IpSockCreationError> {
         let device = if let Some(device) = device.as_ref() {
             if let Some(device) = device.as_strong_ref(self) {
                 Some(device)
             } else {
-                return Err((IpSockCreationError::Route(ResolveRouteError::Unreachable), options));
+                return Err(IpSockCreationError::Route(ResolveRouteError::Unreachable));
             }
         } else {
             None
@@ -445,7 +418,7 @@ where
         let ResolvedRoute { src_addr, device: route_device, local_delivery_device, next_hop: _ } =
             match self.lookup_route(bindings_ctx, device, local_ip, remote_ip) {
                 Ok(r) => r,
-                Err(e) => return Err((e.into(), options)),
+                Err(e) => return Err(e.into()),
             };
 
         // If the source or destination address require a device, make sure to
@@ -464,15 +437,16 @@ where
 
         let definition =
             IpSockDefinition { local_ip: src_addr, remote_ip, device: socket_device, proto };
-        Ok(IpSock { definition: definition, options })
+        Ok(IpSock { definition: definition })
     }
 
     fn send_ip_packet<S, O>(
         &mut self,
         bindings_ctx: &mut BC,
-        ip_sock: &IpSock<I, CC::WeakDeviceId, O>,
+        ip_sock: &IpSock<I, CC::WeakDeviceId>,
         body: S,
         mtu: Option<u32>,
+        options: &O,
     ) -> Result<(), (S, IpSockSendError)>
     where
         S: TransportPacketSerializer,
@@ -482,7 +456,7 @@ where
         // TODO(joshlf): Call `trace!` with relevant fields from the socket.
         self.increment(|counters| &counters.send_ip_packet);
 
-        send_ip_packet(self, bindings_ctx, ip_sock, body, mtu)
+        send_ip_packet(self, bindings_ctx, ip_sock, body, mtu, options)
     }
 }
 
@@ -521,9 +495,10 @@ impl<I: Ip, S: SendOptions<I>> SendOptions<I> for &'_ S {
 fn send_ip_packet<I, S, BC, CC, O>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    socket: &IpSock<I, CC::WeakDeviceId, O>,
+    socket: &IpSock<I, CC::WeakDeviceId>,
     body: S,
     mtu: Option<u32>,
+    options: &O,
 ) -> Result<(), (S, IpSockSendError)>
 where
     I: IpExt + IpDeviceStateIpExt + packet_formats::ip::IpExt,
@@ -532,12 +507,11 @@ where
     BC: IpSocketBindingsContext,
     CC: IpSocketContext<I, BC>,
     CC::DeviceId: crate::filter::InterfaceProperties<BC::DeviceClass>,
-    O: SendOptions<I>,
+    O: SendOptions<I> + ?Sized,
 {
     trace_duration!(bindings_ctx, c"ip::send_packet");
 
-    let IpSock { definition: IpSockDefinition { remote_ip, local_ip, device, proto }, options } =
-        socket;
+    let IpSock { definition: IpSockDefinition { remote_ip, local_ip, device, proto } } = socket;
 
     let device = if let Some(device) = device {
         let Some(device) = core_ctx.upgrade_weak_device_id(device) else {
@@ -596,10 +570,10 @@ impl<
         CC: IpDeviceContext<I, BC> + IpSocketContext<I, BC> + NonTestCtxMarker,
     > DeviceIpSocketHandler<I, BC> for CC
 {
-    fn get_mms<O: SendOptions<I>>(
+    fn get_mms(
         &mut self,
         bindings_ctx: &mut BC,
-        ip_sock: &IpSock<I, Self::WeakDeviceId, O>,
+        ip_sock: &IpSock<I, Self::WeakDeviceId>,
     ) -> Result<Mms, MmsError> {
         let IpSockDefinition { remote_ip, local_ip, device, proto: _ } = &ip_sock.definition;
         let device = device
@@ -1908,7 +1882,7 @@ mod tests {
     use packet_formats::{
         ethernet::EthernetFrameLengthCheck,
         icmp::{IcmpIpExt, IcmpUnusedCode},
-        ip::{IpExt, IpPacket, Ipv4Proto},
+        ip::{IpExt, IpPacket},
         ipv4::{Ipv4OnlyMeta, Ipv4Packet},
         testutil::{parse_ethernet_frame, parse_ip_packet_in_ethernet_frame},
     };
@@ -1919,7 +1893,6 @@ mod tests {
         context::EventContext,
         device::{
             loopback::{LoopbackCreationProperties, LoopbackDevice},
-            testutil::FakeDeviceId,
             DeviceId, EthernetLinkDevice,
         },
         ip::{
@@ -2150,7 +2123,6 @@ mod tests {
                 device: weak_local_device.clone(),
                 proto,
             },
-            options: WithHopLimit(None),
         };
 
         let res = IpSocketHandler::<I, _>::new_ip_socket(
@@ -2160,32 +2132,8 @@ mod tests {
             from_ip.map(|a| SocketIpAddr::try_from(a).unwrap()),
             SocketIpAddr::try_from(to_ip).unwrap(),
             proto,
-            WithHopLimit(None),
-        )
-        .map_err(|(e, WithHopLimit(_))| e);
-        assert_eq!(res, get_expected_result(template.clone()));
-
-        // Hop Limit is specified.
-        const SPECIFIED_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(1));
-        assert_eq!(
-            IpSocketHandler::new_ip_socket(
-                &mut core_ctx.context(),
-                bindings_ctx,
-                weak_local_device.as_ref().map(EitherDeviceId::Weak),
-                from_ip.map(|a| SocketIpAddr::try_from(a).unwrap()),
-                SocketIpAddr::try_from(to_ip).unwrap(),
-                proto,
-                WithHopLimit(Some(SPECIFIED_HOP_LIMIT)),
-            )
-            .map_err(|(e, WithHopLimit(_))| e),
-            {
-                // The template socket, but with the TTL set to 1.
-                let mut template_with_hop_limit = template;
-                let IpSock { definition: _, options } = &mut template_with_hop_limit;
-                *options = WithHopLimit(Some(SPECIFIED_HOP_LIMIT));
-                get_expected_result(template_with_hop_limit)
-            }
         );
+        assert_eq!(res, get_expected_result(template));
     }
 
     #[ip_test]
@@ -2268,7 +2216,6 @@ mod tests {
             from_ip.map(|a| SocketIpAddr::try_from(a).unwrap()),
             SocketIpAddr::try_from(to_ip).unwrap(),
             I::ICMP_IP_PROTO,
-            DefaultSendOptions,
         )
         .unwrap();
 
@@ -2292,6 +2239,7 @@ mod tests {
             &sock,
             buffer.into_inner().buffer_view().as_ref().into_serializer(),
             None,
+            &DefaultSendOptions,
         )
         .unwrap();
 
@@ -2330,7 +2278,6 @@ mod tests {
             None,
             SocketIpAddr::try_from(remote_ip).unwrap(),
             proto,
-            socket_options,
         )
         .unwrap();
 
@@ -2379,6 +2326,7 @@ mod tests {
             &sock,
             (&[0u8][..]).into_serializer(),
             None,
+            &socket_options,
         )
         .unwrap();
         let mut check_sent_frame = |bindings_ctx: &mut crate::testutil::FakeBindingsCtx| {
@@ -2400,6 +2348,7 @@ mod tests {
             &sock,
             small_body_serializer,
             Some(Ipv6::MINIMUM_LINK_MTU.into()),
+            &socket_options,
         );
         assert_matches!(res, Ok(()));
         check_sent_frame(&mut bindings_ctx);
@@ -2412,6 +2361,7 @@ mod tests {
             &sock,
             small_body_serializer,
             Some(1), // mtu
+            &socket_options,
         );
         assert_matches!(res, Err((_, IpSockSendError::Mtu)));
 
@@ -2424,6 +2374,7 @@ mod tests {
             &sock,
             (&[0; Ipv6::MINIMUM_LINK_MTU.get() as usize][..]).into_serializer(),
             None,
+            &socket_options,
         );
         assert_matches!(res, Err((_, IpSockSendError::Mtu)));
 
@@ -2440,6 +2391,7 @@ mod tests {
             &sock,
             small_body_serializer,
             None,
+            &socket_options,
         );
         assert_matches!(res, Err((_, IpSockSendError::Unroutable(ResolveRouteError::Unreachable))));
     }
@@ -2501,7 +2453,6 @@ mod tests {
                 None,
                 destination_ip,
                 I::ICMP_IP_PROTO,
-                options,
             )
             .unwrap();
 
@@ -2511,6 +2462,7 @@ mod tests {
                 &sock,
                 (&[0u8][..]).into_serializer(),
                 None,
+                &options,
             )
             .unwrap();
         };
@@ -2542,28 +2494,6 @@ mod tests {
             // is used.
             assert_eq!(hop_limit, crate::ip::DEFAULT_HOP_LIMITS.unicast.get());
         }
-    }
-
-    #[test]
-    fn manipulate_options() {
-        // The values here don't matter since we won't actually be using this
-        // socket to send anything.
-        const START_OPTION: usize = 23;
-        const DEFAULT_OPTION: usize = 0;
-        const NEW_OPTION: usize = 55;
-        let mut socket = IpSock::<Ipv4, FakeDeviceId, _> {
-            definition: IpSockDefinition {
-                remote_ip: SocketIpAddr::new(Ipv4::LOOPBACK_ADDRESS.get()).unwrap(),
-                local_ip: SocketIpAddr::new(Ipv4::LOOPBACK_ADDRESS.get()).unwrap(),
-                device: None,
-                proto: Ipv4Proto::Icmp,
-            },
-            options: START_OPTION,
-        };
-
-        assert_eq!(socket.take_options(), START_OPTION);
-        assert_eq!(socket.replace_options(NEW_OPTION), DEFAULT_OPTION);
-        assert_eq!(socket.options, NEW_OPTION);
     }
 
     #[ip_test]
@@ -2612,7 +2542,6 @@ mod tests {
             None,
             SocketIpAddr::try_from(I::multicast_addr(1)).unwrap(),
             I::ICMP_IP_PROTO,
-            WithHopLimit(None),
         )
         .unwrap();
 
