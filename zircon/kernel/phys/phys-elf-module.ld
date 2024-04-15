@@ -18,11 +18,11 @@ SECTIONS {
   .rela.dyn : { INPUT_SECTION_FLAGS(SHF_ALLOC) *(.rela.*) }
   .rel.dyn : { INPUT_SECTION_FLAGS(SHF_ALLOC) *(.rel.*) }
 
-  .rodata : { *(.rodata*) }
+  .rodata : { *(.rodata*) *(.srodata*) }
 
   . = ALIGN(CONSTANT(MAXPAGESIZE));
 
-  .text : { *(.text*) }
+  .text : { *(.stext*) *(.text*) }
 
    PROVIDE_HIDDEN(_etext = .);
 
@@ -45,7 +45,7 @@ SECTIONS {
     KEEP(*(.fini_array))
   }
 
-  .data.rel.ro : { *(.data.rel.ro*) }
+  .data.rel.ro : {  *(.sdata.rel.ro*) *(.data.rel.ro*) }
 
   .dynamic : { *(.dynamic) }
 
@@ -53,13 +53,13 @@ SECTIONS {
 
   . = DATA_SEGMENT_RELRO_END (0, .);
 
-  .data : { *(.data*) *(COMMON) }
+  .data : { *(.sdata*) *(.data*) }
 
    PROVIDE_HIDDEN(_edata = .);
 
    PROVIDE_HIDDEN(__bss_start = .);
 
-  .bss : { *(.bss*) }
+  .bss : { *(.sbss*) *(.bss* COMMON) }
 
    PROVIDE_HIDDEN(_end = .);
   . = DATA_SEGMENT_END (.);

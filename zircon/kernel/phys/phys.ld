@@ -42,7 +42,7 @@ SECTIONS {
   } :load
 
   .text : {
-    *(.text*)
+    *(.text*) *(.stext*)
   }
 
   /*
@@ -77,7 +77,7 @@ SECTIONS {
   }
 
   .rodata : {
-    *(.rodata*)
+    *(.srodata*) *(.rodata*)
 
     /*
      * Provide the link-time load address, required for relocation calculations.
@@ -147,9 +147,7 @@ SECTIONS {
    */
   __llvm_prf_data : { *(__llvm_prf_data) }
 
-  .data : {
-    *(.data*)
-  }
+  .data : { *(.sdata*) *(.data*) }
 
   /*
    * Instrumentation data.  Orphans placement can put this in weird places,
@@ -174,7 +172,7 @@ SECTIONS {
      */
     PROVIDE_HIDDEN(_edata = .);
 
-    *(.bss* .sbss* COMMON)
+    *(.sbss*) *(.bss* COMMON)
 
     /*
      * The start.S code relies on the alignment of the end of .bss as well.
