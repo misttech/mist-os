@@ -37,8 +37,8 @@ developers, don't hesitate to reach out! We hang out on the
 * Generate a `Cargo.toml` file to enable development with `cargo` by running `fx
   build build/rust:cargo_toml_gen` followed by `fx gen-cargo
   //src/connectivity/network/netstack3/core:netstack3-core`.
-* Add the following lines to your `~/.cargo/config` file, replacing the absolute
-  path to your Fuchsia directory and replacing the target if your local
+* Add the following lines to your `~/.cargo/config.toml` file, replacing the
+  absolute path to your Fuchsia directory and replacing the target if your local
   development target is different than `x86_64-unknown-linux-gnu`:
 
   ```toml
