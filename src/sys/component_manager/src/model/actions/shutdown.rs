@@ -267,7 +267,7 @@ async fn do_shutdown(
     // Ensure `Shutdown` is dispatched after `Discovered`.
     {
         let discover_completed =
-            component.lock_actions().await.wait_for_action(ActionKey::Discover);
+            component.lock_actions().await.wait_for_action(ActionKey::Discover).await;
         discover_completed.await.unwrap();
     }
     // Keep logs short to preserve as much as possible in the crash report

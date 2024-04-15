@@ -352,7 +352,8 @@ mod tests {
         let _ = component
             .lock_actions()
             .await
-            .register_no_wait(&component, DiscoverAction::new(ComponentInput::default()));
+            .register_no_wait(&component, DiscoverAction::new(ComponentInput::default()))
+            .await;
         component
     }
 
@@ -384,7 +385,8 @@ mod tests {
         let _ = component
             .lock_actions()
             .await
-            .register_no_wait(&component, DiscoverAction::new(ComponentInput::default()));
+            .register_no_wait(&component, DiscoverAction::new(ComponentInput::default()))
+            .await;
         component
     }
 

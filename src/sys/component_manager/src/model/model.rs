@@ -89,7 +89,7 @@ impl Model {
     pub async fn discover_root_component(self: &Arc<Model>, input_for_root: ComponentInput) {
         let mut actions = self.root.lock_actions().await;
         // This returns a Future that does not need to be polled.
-        let _ = actions.register_no_wait(&self.root, DiscoverAction::new(input_for_root));
+        let _ = actions.register_no_wait(&self.root, DiscoverAction::new(input_for_root)).await;
     }
 
     /// Starts root, starting the component tree.
@@ -117,7 +117,7 @@ impl Model {
                 // shutdown, that's ok. The system is tearing down, so it doesn't matter any more
                 // if we never got everything started that we wanted to.
                 let action_set = self.root.lock_actions().await;
-                if !action_set.contains(&ActionKey::Shutdown) {
+                if !action_set.contains(&ActionKey::Shutdown).await {
                     if !self.root.lock_state().await.is_shut_down() {
                         panic!(
                             "failed to start root component {}: {:?}",

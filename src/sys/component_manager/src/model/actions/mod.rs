@@ -202,7 +202,7 @@ impl ActionSet {
         ActionSet { rep: HashMap::new(), history: HashSet::new(), passive_waiters: HashMap::new() }
     }
 
-    pub fn contains(&self, key: &ActionKey) -> bool {
+    pub async fn contains(&self, key: &ActionKey) -> bool {
         self.rep.contains_key(key)
     }
 
@@ -221,7 +221,7 @@ impl ActionSet {
     /// performing an action with the given key. The oneshot will receive a message immediately if
     /// the component has ever finished such an action. Does not cause any new actions to be
     /// started.
-    pub fn wait_for_action(&mut self, action_key: ActionKey) -> oneshot::Receiver<()> {
+    pub async fn wait_for_action(&mut self, action_key: ActionKey) -> oneshot::Receiver<()> {
         let (sender, receiver) = oneshot::channel();
         if self.history.contains(&action_key) {
             sender.send(()).unwrap();
@@ -243,7 +243,7 @@ impl ActionSet {
     {
         let rx = {
             let mut actions = component.lock_actions().await;
-            actions.register_no_wait(&component, action)
+            actions.register_no_wait(&component, action).await
         };
         rx.await
     }
@@ -253,7 +253,7 @@ impl ActionSet {
     /// already registered.
     ///
     /// REQUIRES: `self` is the `ActionSet` contained in `component`.
-    pub fn register_no_wait<A>(
+    pub async fn register_no_wait<A>(
         &mut self,
         component: &Arc<ComponentInstance>,
         action: A,
@@ -269,7 +269,7 @@ impl ActionSet {
     }
 
     /// Returns a future that waits for the given action to complete, if one exists.
-    pub fn wait<A>(&self, action: A) -> Option<impl Future<Output = Result<(), ActionError>>>
+    pub async fn wait<A>(&self, action: A) -> Option<impl Future<Output = Result<(), ActionError>>>
     where
         A: Action,
     {

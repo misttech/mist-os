@@ -804,6 +804,7 @@ impl ResolvedInstanceState {
             .lock_actions()
             .await
             .register_no_wait(&child, DiscoverAction::new(input))
+            .await
             .boxed();
         Ok((child, discover_fut))
     }
@@ -1025,7 +1026,8 @@ impl ResolvedInstanceState {
                 .clone()
                 .lock_actions()
                 .await
-                .register_no_wait(&child_instance, DiscoverAction::new(child_input));
+                .register_no_wait(&child_instance, DiscoverAction::new(child_input))
+                .await;
         }
     }
 }
@@ -1107,7 +1109,7 @@ impl ProgramRuntime {
             terminated_fut.await;
             if let Ok(component) = component.upgrade() {
                 let mut actions = component.lock_actions().await;
-                let stop_nf = actions.register_no_wait(&component, StopAction::new(false));
+                let stop_nf = actions.register_no_wait(&component, StopAction::new(false)).await;
                 drop(actions);
                 component.nonblocking_task_group().spawn(fasync::Task::spawn(async move {
                     let _ = stop_nf.await.map_err(
@@ -1269,7 +1271,8 @@ impl Routable for CapabilityRequestedHook {
         // TODO(https://fxbug.dev/320698181): Before dispatching events we need to wait for any
         // in-progress resolve actions to end. See https://fxbug.dev/320698181#comment21 for why.
         {
-            let resolve_completed = source.lock_actions().await.wait_for_action(ActionKey::Resolve);
+            let resolve_completed =
+                source.lock_actions().await.wait_for_action(ActionKey::Resolve).await;
             resolve_completed.await.unwrap();
         }
         source.hooks.dispatch(&event).await;

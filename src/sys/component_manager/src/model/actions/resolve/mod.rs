@@ -51,7 +51,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<(), ResolveAct
     // Ensure `Resolved` is dispatched after `Discovered`.
     {
         let discover_completed =
-            component.lock_actions().await.wait_for_action(ActionKey::Discover);
+            component.lock_actions().await.wait_for_action(ActionKey::Discover).await;
         discover_completed.await.unwrap();
     }
     let result = async move {

@@ -29,7 +29,7 @@ impl Action for StopAction {
         // Ensure `Stop` is dispatched after `Discovered`.
         {
             let discover_completed =
-                component.lock_actions().await.wait_for_action(ActionKey::Discover);
+                component.lock_actions().await.wait_for_action(ActionKey::Discover).await;
             discover_completed.await.unwrap();
         }
         component.stop_instance_internal(self.shut_down).await.map_err(Into::into)
@@ -182,7 +182,7 @@ pub mod tests {
         let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let mut actions = component_a.lock_actions().await;
-        let nf = actions.register_no_wait(&component_a, StopAction::new(false));
+        let nf = actions.register_no_wait(&component_a, StopAction::new(false)).await;
         drop(actions);
         stopped_rx.await.unwrap();
 
