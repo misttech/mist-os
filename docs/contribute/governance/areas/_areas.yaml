@@ -406,6 +406,19 @@
       </li>
     </ul>
 
+- name: 'Testing'
+  api_primary: 'crjohns@google.com'
+  api_secondary: ''
+  description: |
+    The set of APIs responsible for executing, observing, and returning the results
+    of tests executed on a device. These APIs abstract over different
+    test frameworks and tools to provide a FIDL interface for testing use cases
+    on Fuchsia.
+  examples:
+    - fidl: 'fuchsia.test.manager'
+    - fidl: 'fuchsia.test'
+    - fidl: 'fuchsia.debugdata'
+
 - name: 'Toolchain'
   api_primary: 'mcgrathr@google.com'
   api_secondary: ''
