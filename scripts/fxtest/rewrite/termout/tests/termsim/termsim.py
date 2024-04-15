@@ -22,7 +22,7 @@ class Terminal:
         lines (List[str]): The list of lines that would show on a terminal.
     """
 
-    def __init__(self, width: int):
+    def __init__(self, width: int) -> None:
         self._width = width
         self.lines: list[str] = [""]
         self._line_position: int = 0

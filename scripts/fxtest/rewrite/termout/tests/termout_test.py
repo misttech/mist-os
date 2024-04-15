@@ -15,6 +15,7 @@ import unittest
 import termsim
 
 import termout
+from typing import cast, IO
 
 
 class TestTermout(unittest.TestCase):
@@ -23,7 +24,7 @@ class TestTermout(unittest.TestCase):
         size = termout.Size(25, 25)
         termout.reset()
         terminal = termsim.Terminal(size.columns)
-        with contextlib.redirect_stdout(terminal):
+        with contextlib.redirect_stdout(cast(IO[str], terminal)):
             termout.write_lines(["Hello"], size=size)
             self.assertListEqual(terminal.lines, ["Hello"])
             termout.write_lines(["World"], size=size)
@@ -34,7 +35,7 @@ class TestTermout(unittest.TestCase):
         size = termout.Size(3, 25)
         termout.reset()
         terminal = termsim.Terminal(size.columns)
-        with contextlib.redirect_stdout(terminal):
+        with contextlib.redirect_stdout(cast(IO[str], terminal)):
             termout.write_lines(["Hello"], size=size)
             self.assertListEqual(terminal.lines, ["Hel"])
             termout.write_lines(["World"], size=size)
@@ -45,7 +46,7 @@ class TestTermout(unittest.TestCase):
         size = termout.Size(25, 25)
         termout.reset()
         terminal = termsim.Terminal(size.columns)
-        with contextlib.redirect_stdout(terminal):
+        with contextlib.redirect_stdout(cast(IO[str], terminal)):
             termout.write_lines(["Hello", "World"], size=size)
             self.assertListEqual(terminal.lines, ["Hello", "World"])
             termout.write_lines(["Hello 2", "Different"], size=size)
@@ -56,7 +57,7 @@ class TestTermout(unittest.TestCase):
         size = termout.Size(25, 25)
         termout.reset()
         terminal = termsim.Terminal(size.columns)
-        with contextlib.redirect_stdout(terminal):
+        with contextlib.redirect_stdout(cast(IO[str], terminal)):
             termout.write_lines(["Hello"], size=size)
             self.assertListEqual(terminal.lines, ["Hello"])
             termout.write_lines(["Hello", "World"], size=size)
@@ -70,7 +71,7 @@ class TestTermout(unittest.TestCase):
         size = termout.Size(25, 25)
         termout.reset()
         terminal = termsim.Terminal(size.columns)
-        with contextlib.redirect_stdout(terminal):
+        with contextlib.redirect_stdout(cast(IO[str], terminal)):
             termout.write_lines(["Hello"], size=size)
             self.assertListEqual(terminal.lines, ["Hello"])
             termout.write_lines(
