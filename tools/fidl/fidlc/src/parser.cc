@@ -58,19 +58,20 @@ Parser::Parser(Lexer* lexer, Reporter* reporter, ExperimentalFlagSet experimenta
 std::nullptr_t Parser::Fail() { return Fail(ErrUnexpectedToken); }
 
 template <ErrorId Id, typename... Args>
-std::nullptr_t Parser::Fail(const ErrorDef<Id, Args...>& err, const identity_t<Args>&... args) {
+std::nullptr_t Parser::Fail(const ErrorDef<Id, Args...>& err,
+                            const cpp20::type_identity_t<Args>&... args) {
   return Fail(err, last_token_, args...);
 }
 
 template <ErrorId Id, typename... Args>
 std::nullptr_t Parser::Fail(const ErrorDef<Id, Args...>& err, const Token token,
-                            const identity_t<Args>&... args) {
+                            const cpp20::type_identity_t<Args>&... args) {
   return Fail(err, token.span(), args...);
 }
 
 template <ErrorId Id, typename... Args>
 std::nullptr_t Parser::Fail(const ErrorDef<Id, Args...>& err, SourceSpan span,
-                            const identity_t<Args>&... args) {
+                            const cpp20::type_identity_t<Args>&... args) {
   if (Ok()) {
     reporter_->Fail(err, span, args...);
   }
@@ -1456,7 +1457,7 @@ std::unique_ptr<RawTypeConstructor> Parser::ParseTypeConstructor() {
       }
       case Token::Kind::kColon: {
         ConstraintOrSubtype after_colon = ParseTokenAfterColon();
-        std::visit(matchers{
+        std::visit(overloaded{
                        [&](std::unique_ptr<RawTypeConstraints>& constraint) -> void {
                          if (constraints != nullptr) {
                            Fail(ErrMultipleConstraintDefinitions, previous_token_.span());
@@ -1498,7 +1499,7 @@ std::unique_ptr<RawTypeConstructor> Parser::ParseTypeConstructor() {
   ZX_ASSERT_MSG(std::holds_alternative<std::unique_ptr<RawCompoundIdentifier>>(layout) ||
                     std::holds_alternative<std::unique_ptr<RawLayout>>(layout),
                 "must have set layout by this point");
-  std::visit(matchers{
+  std::visit(overloaded{
                  [&](std::unique_ptr<RawCompoundIdentifier>& named_layout) -> void {
                    layout_ref = std::make_unique<RawNamedLayoutReference>(
                        SourceElement(named_layout->start_token, named_layout->end_token),

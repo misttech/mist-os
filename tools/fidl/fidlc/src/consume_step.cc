@@ -65,7 +65,7 @@ Decl* ConsumeStep::RegisterDecl(std::unique_ptr<Decl> decl) {
     if (library()->dependencies.Contains(name.span()->source_file().filename(),
                                          {name.span()->data()})) {
       reporter()->Fail(ErrDeclNameConflictsWithLibraryImport, name.span().value(), name);
-    } else if (auto canonical_decl_name = canonicalize(name.decl_name());
+    } else if (auto canonical_decl_name = Canonicalize(name.decl_name());
                library()->dependencies.Contains(name.span()->source_file().filename(),
                                                 {canonical_decl_name})) {
       reporter()->Fail(ErrDeclNameConflictsWithLibraryImportCanonical, name.span().value(), name,
@@ -380,16 +380,15 @@ void ConsumeStep::ConsumeProtocolDeclaration(
         // Note that although the success variant is named P_M_Response, in the
         // fidlc codebase we use the word "response" to refer to the outermost
         // type, which in this case is P_M_Result.
-        response_context->set_name_override(
-            StringJoin({protocol_name.decl_name(), method_name.data(), "Result"}, "_"));
+        auto prefix =
+            std::string(protocol_name.decl_name()) + "_" + std::string(method_name.data());
+        response_context->set_name_override(prefix + "_Result");
         success_variant_context =
             response_context->EnterMember(generated_source_file()->AddLine("response"));
-        success_variant_context->set_name_override(
-            StringJoin({protocol_name.decl_name(), method_name.data(), "Response"}, "_"));
+        success_variant_context->set_name_override(prefix + "_Response");
         err_variant_context =
             response_context->EnterMember(generated_source_file()->AddLine("err"));
-        err_variant_context->set_name_override(
-            StringJoin({protocol_name.decl_name(), method_name.data(), "Error"}, "_"));
+        err_variant_context->set_name_override(prefix + "_Error");
         framework_err_variant_context =
             response_context->EnterMember(generated_source_file()->AddLine("framework_err"));
 

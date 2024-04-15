@@ -13,9 +13,9 @@
 namespace fidlc {
 namespace {
 
-void compare_id_to_words(std::string_view id, std::string_view expected_lowercase_words) {
+void CompareIdToWords(std::string_view id, std::string_view expected_lowercase_words) {
   std::ostringstream actual;
-  for (const auto& word : id_to_words(id)) {
+  for (const auto& word : SplitIdentifierWords(id)) {
     if (actual.tellp() > 0) {
       actual << ' ';
     }
@@ -25,41 +25,41 @@ void compare_id_to_words(std::string_view id, std::string_view expected_lowercas
 }
 
 TEST(UtilsTests, IdToWords) {
-  compare_id_to_words("agent_request_count", "agent request count");
-  compare_id_to_words("common", "common");
-  compare_id_to_words("Service", "service");
-  compare_id_to_words("Blink32", "blink32");
-  compare_id_to_words("the21jumpStreet", "the21jump street");
-  compare_id_to_words("the21JumpStreet", "the21 jump street");
-  compare_id_to_words("onOntologyUpdate", "on ontology update");
-  compare_id_to_words("urlLoader", "url loader");
-  compare_id_to_words("onUrlLoader", "on url loader");
-  compare_id_to_words("OnOntologyUpdate", "on ontology update");
-  compare_id_to_words("UrlLoader", "url loader");
-  compare_id_to_words("OnUrlLoader", "on url loader");
-  compare_id_to_words("kUrlLoader", "url loader");
-  compare_id_to_words("kOnUrlLoader", "on url loader");
-  compare_id_to_words("WhatIfSomeoneDoes_This", "what if someone does this");
-  compare_id_to_words("SOME_CONST", "some const");
-  compare_id_to_words("NAME_MIN_LEN", "name min len");
-  compare_id_to_words("OnPress", "on press");
-  compare_id_to_words("URLLoader", "url loader");
-  compare_id_to_words("PPPOE", "pppoe");
-  compare_id_to_words("PPP_O_E", "ppp o e");
-  compare_id_to_words("PPP_o_E", "ppp o e");
+  CompareIdToWords("agent_request_count", "agent request count");
+  CompareIdToWords("common", "common");
+  CompareIdToWords("Service", "service");
+  CompareIdToWords("Blink32", "blink32");
+  CompareIdToWords("the21jumpStreet", "the21jump street");
+  CompareIdToWords("the21JumpStreet", "the21 jump street");
+  CompareIdToWords("onOntologyUpdate", "on ontology update");
+  CompareIdToWords("urlLoader", "url loader");
+  CompareIdToWords("onUrlLoader", "on url loader");
+  CompareIdToWords("OnOntologyUpdate", "on ontology update");
+  CompareIdToWords("UrlLoader", "url loader");
+  CompareIdToWords("OnUrlLoader", "on url loader");
+  CompareIdToWords("kUrlLoader", "url loader");
+  CompareIdToWords("kOnUrlLoader", "on url loader");
+  CompareIdToWords("WhatIfSomeoneDoes_This", "what if someone does this");
+  CompareIdToWords("SOME_CONST", "some const");
+  CompareIdToWords("NAME_MIN_LEN", "name min len");
+  CompareIdToWords("OnPress", "on press");
+  CompareIdToWords("URLLoader", "url loader");
+  CompareIdToWords("PPPOE", "pppoe");
+  CompareIdToWords("PPP_O_E", "ppp o e");
+  CompareIdToWords("PPP_o_E", "ppp o e");
 
   // Note the next two tests have expected results that may seem
   // counter-intuitive, but if IDs like "URLLoader" are expected to
   // translate to the words "url loader", then these translations
   // are consistent.
-  compare_id_to_words("PppOE", "ppp oe");
-  compare_id_to_words("PPPoE", "pp po e");
+  CompareIdToWords("PppOE", "ppp oe");
+  CompareIdToWords("PPPoE", "pp po e");
 }
 
-void case_test(bool valid_conversion, std::string case_name,
-               fit::function<bool(std::string)> is_case,
-               fit::function<std::string(std::string)> to_case, std::string original,
-               std::string expected) {
+void CaseTest(bool valid_conversion, std::string_view case_name,
+              fit::function<bool(std::string_view)> is_case,
+              fit::function<std::string(std::string_view)> to_case, std::string_view original,
+              std::string_view expected) {
   EXPECT_FALSE(is_case(original)) << original << " is " << case_name;
   std::string converted = to_case(original);
   EXPECT_EQ(converted, expected) << "from '" << original << "' to '" << converted << "' != '"
@@ -76,355 +76,131 @@ void case_test(bool valid_conversion, std::string case_name,
 }
 
 #define ASSERT_CASE(CASE, FROM, TO) \
-  case_test(/*valid_conversion=*/true, #CASE, is_##CASE##_case, to_##CASE##_case, FROM, TO)
+  CaseTest(/*valid_conversion=*/true, #CASE, Is##CASE##Case, To##CASE##Case, FROM, TO)
 
 #define ASSERT_BAD_CASE(CASE, FROM, TO) \
-  case_test(/*valid_conversion=*/false, #CASE, is_##CASE##_case, to_##CASE##_case, FROM, TO)
+  CaseTest(/*valid_conversion=*/false, #CASE, Is##CASE##Case, To##CASE##Case, FROM, TO)
 
 TEST(UtilsTests, UpperCamelCase) {
-  ASSERT_CASE(upper_camel, "x", "X");
-  ASSERT_CASE(upper_camel, "xy", "Xy");
-  ASSERT_BAD_CASE(upper_camel, "x_y", "XY");
-  ASSERT_CASE(upper_camel, "xyz_123", "Xyz123");
-  ASSERT_CASE(upper_camel, "xy_z_123", "XyZ123");
-  ASSERT_CASE(upper_camel, "xy_z123", "XyZ123");
-  ASSERT_CASE(upper_camel, "days_in_a_week", "DaysInAWeek");
-  ASSERT_CASE(upper_camel, "android8_0_0", "Android8_0_0");
-  ASSERT_CASE(upper_camel, "android_8_0_0", "Android8_0_0");
-  ASSERT_CASE(upper_camel, "x_marks_the_spot", "XMarksTheSpot");
-  ASSERT_CASE(upper_camel, "RealID", "RealId");
-  ASSERT_CASE(upper_camel, "real_id", "RealId");
-  ASSERT_BAD_CASE(upper_camel, "real_i_d", "RealID");
-  ASSERT_CASE(upper_camel, "real3d", "Real3d");
-  ASSERT_CASE(upper_camel, "real3_d", "Real3D");
-  ASSERT_CASE(upper_camel, "real_3d", "Real3d");
-  ASSERT_CASE(upper_camel, "real_3_d", "Real3D");
-  ASSERT_CASE(upper_camel, "hello_e_world", "HelloEWorld");
-  ASSERT_CASE(upper_camel, "hello_eworld", "HelloEworld");
-  ASSERT_CASE(upper_camel, "URLLoader", "UrlLoader");
-  ASSERT_CASE(upper_camel, "is_21Jump_street", "Is21JumpStreet");
-  ASSERT_CASE(upper_camel, "URLloader", "UrLloader");
-  ASSERT_CASE(upper_camel, "URLLoader", "UrlLoader");
-  ASSERT_CASE(upper_camel, "url_loader", "UrlLoader");
-  ASSERT_CASE(upper_camel, "URL_LOADER", "UrlLoader");
-  ASSERT_CASE(upper_camel, "urlLoader", "UrlLoader");
-  ASSERT_CASE(upper_camel, "kUrlLoader", "UrlLoader");
-  ASSERT_CASE(upper_camel, "kURLLoader", "UrlLoader");
+  ASSERT_CASE(UpperCamel, "x", "X");
+  ASSERT_CASE(UpperCamel, "xy", "Xy");
+  ASSERT_BAD_CASE(UpperCamel, "x_y", "XY");
+  ASSERT_CASE(UpperCamel, "xyz_123", "Xyz123");
+  ASSERT_CASE(UpperCamel, "xy_z_123", "XyZ123");
+  ASSERT_CASE(UpperCamel, "xy_z123", "XyZ123");
+  ASSERT_CASE(UpperCamel, "days_in_a_week", "DaysInAWeek");
+  ASSERT_CASE(UpperCamel, "android8_0_0", "Android8_0_0");
+  ASSERT_CASE(UpperCamel, "android_8_0_0", "Android8_0_0");
+  ASSERT_CASE(UpperCamel, "x_marks_the_spot", "XMarksTheSpot");
+  ASSERT_CASE(UpperCamel, "RealID", "RealId");
+  ASSERT_CASE(UpperCamel, "real_id", "RealId");
+  ASSERT_BAD_CASE(UpperCamel, "real_i_d", "RealID");
+  ASSERT_CASE(UpperCamel, "real3d", "Real3d");
+  ASSERT_CASE(UpperCamel, "real3_d", "Real3D");
+  ASSERT_CASE(UpperCamel, "real_3d", "Real3d");
+  ASSERT_CASE(UpperCamel, "real_3_d", "Real3D");
+  ASSERT_CASE(UpperCamel, "hello_e_world", "HelloEWorld");
+  ASSERT_CASE(UpperCamel, "hello_eworld", "HelloEworld");
+  ASSERT_CASE(UpperCamel, "URLLoader", "UrlLoader");
+  ASSERT_CASE(UpperCamel, "is_21Jump_street", "Is21JumpStreet");
+  ASSERT_CASE(UpperCamel, "URLloader", "UrLloader");
+  ASSERT_CASE(UpperCamel, "URLLoader", "UrlLoader");
+  ASSERT_CASE(UpperCamel, "url_loader", "UrlLoader");
+  ASSERT_CASE(UpperCamel, "URL_LOADER", "UrlLoader");
+  ASSERT_CASE(UpperCamel, "urlLoader", "UrlLoader");
+  ASSERT_CASE(UpperCamel, "kUrlLoader", "UrlLoader");
+  ASSERT_CASE(UpperCamel, "kURLLoader", "UrlLoader");
 }
 
 TEST(UtilsTests, LowerCamelCase) {
-  ASSERT_CASE(lower_camel, "X", "x");
-  ASSERT_CASE(lower_camel, "XY", "xy");
-  ASSERT_CASE(lower_camel, "X_Y", "xY");
-  ASSERT_CASE(lower_camel, "XYZ_123", "xyz123");
-  ASSERT_CASE(lower_camel, "XY_Z_123", "xyZ123");
-  ASSERT_CASE(lower_camel, "XY_Z123", "xyZ123");
-  ASSERT_CASE(lower_camel, "DAYS_IN_A_WEEK", "daysInAWeek");
-  ASSERT_CASE(lower_camel, "ANDROID8_0_0", "android8_0_0");
-  ASSERT_CASE(lower_camel, "ANDROID_8_0_0", "android8_0_0");
-  ASSERT_CASE(lower_camel, "X_MARKS_THE_SPOT", "xMarksTheSpot");
-  ASSERT_CASE(lower_camel, "realID", "realId");
-  ASSERT_CASE(lower_camel, "REAL_ID", "realId");
-  ASSERT_BAD_CASE(lower_camel, "REAL_I_D", "realID");
-  ASSERT_CASE(lower_camel, "REAL3D", "real3D");
-  ASSERT_CASE(lower_camel, "REAL3_D", "real3D");
-  ASSERT_CASE(lower_camel, "REAL_3D", "real3D");
-  ASSERT_CASE(lower_camel, "REAL_3_D", "real3D");
-  ASSERT_CASE(lower_camel, "HELLO_E_WORLD", "helloEWorld");
-  ASSERT_CASE(lower_camel, "HELLO_EWORLD", "helloEworld");
-  ASSERT_CASE(lower_camel, "URLLoader", "urlLoader");
-  ASSERT_CASE(lower_camel, "is_21Jump_street", "is21JumpStreet");
-  ASSERT_CASE(lower_camel, "URLloader", "urLloader");
-  ASSERT_CASE(lower_camel, "UrlLoader", "urlLoader");
-  ASSERT_CASE(lower_camel, "URLLoader", "urlLoader");
-  ASSERT_CASE(lower_camel, "url_loader", "urlLoader");
-  ASSERT_CASE(lower_camel, "URL_LOADER", "urlLoader");
-  ASSERT_CASE(lower_camel, "kUrlLoader", "urlLoader");
-  ASSERT_CASE(lower_camel, "kURLLoader", "urlLoader");
+  ASSERT_CASE(LowerCamel, "X", "x");
+  ASSERT_CASE(LowerCamel, "XY", "xy");
+  ASSERT_CASE(LowerCamel, "X_Y", "xY");
+  ASSERT_CASE(LowerCamel, "XYZ_123", "xyz123");
+  ASSERT_CASE(LowerCamel, "XY_Z_123", "xyZ123");
+  ASSERT_CASE(LowerCamel, "XY_Z123", "xyZ123");
+  ASSERT_CASE(LowerCamel, "DAYS_IN_A_WEEK", "daysInAWeek");
+  ASSERT_CASE(LowerCamel, "ANDROID8_0_0", "android8_0_0");
+  ASSERT_CASE(LowerCamel, "ANDROID_8_0_0", "android8_0_0");
+  ASSERT_CASE(LowerCamel, "X_MARKS_THE_SPOT", "xMarksTheSpot");
+  ASSERT_CASE(LowerCamel, "realID", "realId");
+  ASSERT_CASE(LowerCamel, "REAL_ID", "realId");
+  ASSERT_BAD_CASE(LowerCamel, "REAL_I_D", "realID");
+  ASSERT_CASE(LowerCamel, "REAL3D", "real3D");
+  ASSERT_CASE(LowerCamel, "REAL3_D", "real3D");
+  ASSERT_CASE(LowerCamel, "REAL_3D", "real3D");
+  ASSERT_CASE(LowerCamel, "REAL_3_D", "real3D");
+  ASSERT_CASE(LowerCamel, "HELLO_E_WORLD", "helloEWorld");
+  ASSERT_CASE(LowerCamel, "HELLO_EWORLD", "helloEworld");
+  ASSERT_CASE(LowerCamel, "URLLoader", "urlLoader");
+  ASSERT_CASE(LowerCamel, "is_21Jump_street", "is21JumpStreet");
+  ASSERT_CASE(LowerCamel, "URLloader", "urLloader");
+  ASSERT_CASE(LowerCamel, "UrlLoader", "urlLoader");
+  ASSERT_CASE(LowerCamel, "URLLoader", "urlLoader");
+  ASSERT_CASE(LowerCamel, "url_loader", "urlLoader");
+  ASSERT_CASE(LowerCamel, "URL_LOADER", "urlLoader");
+  ASSERT_CASE(LowerCamel, "kUrlLoader", "urlLoader");
+  ASSERT_CASE(LowerCamel, "kURLLoader", "urlLoader");
 }
 
 TEST(UtilsTests, UpperSnakeCase) {
-  ASSERT_CASE(upper_snake, "x", "X");
-  ASSERT_CASE(upper_snake, "xy", "XY");
-  ASSERT_CASE(upper_snake, "xY", "X_Y");
-  ASSERT_CASE(upper_snake, "xyz123", "XYZ123");
-  ASSERT_CASE(upper_snake, "xyz_123", "XYZ_123");
-  ASSERT_CASE(upper_snake, "xyZ123", "XY_Z123");
-  ASSERT_CASE(upper_snake, "daysInAWeek", "DAYS_IN_A_WEEK");
-  ASSERT_CASE(upper_snake, "android8_0_0", "ANDROID8_0_0");
-  ASSERT_CASE(upper_snake, "android_8_0_0", "ANDROID_8_0_0");
-  ASSERT_CASE(upper_snake, "xMarksTheSpot", "X_MARKS_THE_SPOT");
-  ASSERT_CASE(upper_snake, "realId", "REAL_ID");
-  ASSERT_CASE(upper_snake, "realID", "REAL_ID");
-  ASSERT_CASE(upper_snake, "real3d", "REAL3D");
-  ASSERT_CASE(upper_snake, "real3D", "REAL3_D");
-  ASSERT_CASE(upper_snake, "real_3d", "REAL_3D");
-  ASSERT_CASE(upper_snake, "real_3D", "REAL_3_D");
-  ASSERT_CASE(upper_snake, "helloEWorld", "HELLO_E_WORLD");
-  ASSERT_CASE(upper_snake, "helloEworld", "HELLO_EWORLD");
-  ASSERT_CASE(upper_snake, "URLLoader", "URL_LOADER");
-  ASSERT_CASE(upper_snake, "is_21Jump_street", "IS_21_JUMP_STREET");
-  ASSERT_CASE(upper_snake, "URLloader", "UR_LLOADER");
-  ASSERT_CASE(upper_snake, "UrlLoader", "URL_LOADER");
-  ASSERT_CASE(upper_snake, "URLLoader", "URL_LOADER");
-  ASSERT_CASE(upper_snake, "url_loader", "URL_LOADER");
-  ASSERT_CASE(upper_snake, "urlLoader", "URL_LOADER");
-  ASSERT_CASE(upper_snake, "kUrlLoader", "URL_LOADER");
-  ASSERT_CASE(upper_snake, "kURLLoader", "URL_LOADER");
+  ASSERT_CASE(UpperSnake, "x", "X");
+  ASSERT_CASE(UpperSnake, "xy", "XY");
+  ASSERT_CASE(UpperSnake, "xY", "X_Y");
+  ASSERT_CASE(UpperSnake, "xyz123", "XYZ123");
+  ASSERT_CASE(UpperSnake, "xyz_123", "XYZ_123");
+  ASSERT_CASE(UpperSnake, "xyZ123", "XY_Z123");
+  ASSERT_CASE(UpperSnake, "daysInAWeek", "DAYS_IN_A_WEEK");
+  ASSERT_CASE(UpperSnake, "android8_0_0", "ANDROID8_0_0");
+  ASSERT_CASE(UpperSnake, "android_8_0_0", "ANDROID_8_0_0");
+  ASSERT_CASE(UpperSnake, "xMarksTheSpot", "X_MARKS_THE_SPOT");
+  ASSERT_CASE(UpperSnake, "realId", "REAL_ID");
+  ASSERT_CASE(UpperSnake, "realID", "REAL_ID");
+  ASSERT_CASE(UpperSnake, "real3d", "REAL3D");
+  ASSERT_CASE(UpperSnake, "real3D", "REAL3_D");
+  ASSERT_CASE(UpperSnake, "real_3d", "REAL_3D");
+  ASSERT_CASE(UpperSnake, "real_3D", "REAL_3_D");
+  ASSERT_CASE(UpperSnake, "helloEWorld", "HELLO_E_WORLD");
+  ASSERT_CASE(UpperSnake, "helloEworld", "HELLO_EWORLD");
+  ASSERT_CASE(UpperSnake, "URLLoader", "URL_LOADER");
+  ASSERT_CASE(UpperSnake, "is_21Jump_street", "IS_21_JUMP_STREET");
+  ASSERT_CASE(UpperSnake, "URLloader", "UR_LLOADER");
+  ASSERT_CASE(UpperSnake, "UrlLoader", "URL_LOADER");
+  ASSERT_CASE(UpperSnake, "URLLoader", "URL_LOADER");
+  ASSERT_CASE(UpperSnake, "url_loader", "URL_LOADER");
+  ASSERT_CASE(UpperSnake, "urlLoader", "URL_LOADER");
+  ASSERT_CASE(UpperSnake, "kUrlLoader", "URL_LOADER");
+  ASSERT_CASE(UpperSnake, "kURLLoader", "URL_LOADER");
 }
 
 TEST(UtilsTests, LowerSnakeCase) {
-  ASSERT_CASE(lower_snake, "X", "x");
-  ASSERT_CASE(lower_snake, "Xy", "xy");
-  ASSERT_CASE(lower_snake, "XY", "xy");
-  ASSERT_CASE(lower_snake, "Xyz123", "xyz123");
-  ASSERT_CASE(lower_snake, "Xyz_123", "xyz_123");
-  ASSERT_CASE(lower_snake, "XyZ123", "xy_z123");
-  ASSERT_CASE(lower_snake, "DaysInAWeek", "days_in_a_week");
-  ASSERT_CASE(lower_snake, "Android8_0_0", "android8_0_0");
-  ASSERT_CASE(lower_snake, "Android_8_0_0", "android_8_0_0");
-  ASSERT_CASE(lower_snake, "XMarksTheSpot", "x_marks_the_spot");
-  ASSERT_CASE(lower_snake, "RealId", "real_id");
-  ASSERT_CASE(lower_snake, "RealID", "real_id");
-  ASSERT_CASE(lower_snake, "Real3d", "real3d");
-  ASSERT_CASE(lower_snake, "Real3D", "real3_d");
-  ASSERT_CASE(lower_snake, "Real_3d", "real_3d");
-  ASSERT_CASE(lower_snake, "Real_3D", "real_3_d");
-  ASSERT_CASE(lower_snake, "HelloEWorld", "hello_e_world");
-  ASSERT_CASE(lower_snake, "HelloEworld", "hello_eworld");
-  ASSERT_CASE(lower_snake, "URLLoader", "url_loader");
-  ASSERT_CASE(lower_snake, "is_21Jump_street", "is_21_jump_street");
-  ASSERT_CASE(lower_snake, "URLloader", "ur_lloader");
-  ASSERT_CASE(lower_snake, "UrlLoader", "url_loader");
-  ASSERT_CASE(lower_snake, "URLLoader", "url_loader");
-  ASSERT_CASE(lower_snake, "URL_LOADER", "url_loader");
-  ASSERT_CASE(lower_snake, "urlLoader", "url_loader");
-  ASSERT_CASE(lower_snake, "kUrlLoader", "url_loader");
-  ASSERT_CASE(lower_snake, "kURLLoader", "url_loader");
-}
-
-TEST(UtilsTests, KonstantCase) {
-  ASSERT_CASE(konstant, "URLLoader", "kUrlLoader");
-  ASSERT_CASE(konstant, "is_21Jump_street", "kIs21JumpStreet");
-  ASSERT_CASE(konstant, "URLloader", "kUrLloader");
-  ASSERT_CASE(konstant, "UrlLoader", "kUrlLoader");
-  ASSERT_CASE(konstant, "URLLoader", "kUrlLoader");
-  ASSERT_CASE(konstant, "url_loader", "kUrlLoader");
-  ASSERT_CASE(konstant, "URL_LOADER", "kUrlLoader");
-  ASSERT_CASE(konstant, "urlLoader", "kUrlLoader");
-  ASSERT_CASE(konstant, "kURLLoader", "kUrlLoader");
-}
-
-TEST(UtilsTests, LowerNoSeparatorCase) {
-  ASSERT_CASE(lower_no_separator, "URLLoader", "urlloader");
-  ASSERT_CASE(lower_no_separator, "is_21Jump_street", "is21jumpstreet");
-  ASSERT_CASE(lower_no_separator, "URLloader", "urlloader");
-  ASSERT_CASE(lower_no_separator, "UrlLoader", "urlloader");
-  ASSERT_CASE(lower_no_separator, "URLLoader", "urlloader");
-  ASSERT_CASE(lower_no_separator, "url_loader", "urlloader");
-  ASSERT_CASE(lower_no_separator, "URL_LOADER", "urlloader");
-  ASSERT_CASE(lower_no_separator, "urlLoader", "urlloader");
-  ASSERT_CASE(lower_no_separator, "kUrlLoader", "urlloader");
-  ASSERT_CASE(lower_no_separator, "kURLLoader", "urlloader");
-}
-
-TEST(UtilsTests, WhitespaceAndComments) {
-  ASSERT_TRUE(IsWhitespace(' '));
-  ASSERT_TRUE(IsWhitespace('\t'));
-  ASSERT_TRUE(IsWhitespace('\v'));
-  ASSERT_TRUE(IsWhitespace('\f'));
-  ASSERT_TRUE(IsWhitespace('\r'));
-  ASSERT_TRUE(IsWhitespace('\n'));
-  ASSERT_FALSE(IsWhitespace('\0'));
-  ASSERT_FALSE(IsWhitespace('_'));
-  ASSERT_FALSE(IsWhitespace('-'));
-  ASSERT_FALSE(IsWhitespace('A'));
-  ASSERT_FALSE(IsWhitespace('Z'));
-  ASSERT_FALSE(IsWhitespace('a'));
-  ASSERT_FALSE(IsWhitespace('z'));
-  ASSERT_FALSE(IsWhitespace('0'));
-  ASSERT_FALSE(IsWhitespace('9'));
-  ASSERT_FALSE(IsWhitespace('!'));
-
-  ASSERT_TRUE(IsWhitespaceNoNewline(' '));
-  ASSERT_TRUE(IsWhitespaceNoNewline('\t'));
-  ASSERT_TRUE(IsWhitespaceNoNewline('\v'));
-  ASSERT_TRUE(IsWhitespaceNoNewline('\f'));
-  ASSERT_TRUE(IsWhitespaceNoNewline('\r'));
-  ASSERT_FALSE(IsWhitespaceNoNewline('\n'));
-  ASSERT_FALSE(IsWhitespaceNoNewline('\0'));
-  ASSERT_FALSE(IsWhitespaceNoNewline('_'));
-  ASSERT_FALSE(IsWhitespaceNoNewline('-'));
-  ASSERT_FALSE(IsWhitespaceNoNewline('A'));
-  ASSERT_FALSE(IsWhitespaceNoNewline('Z'));
-  ASSERT_FALSE(IsWhitespaceNoNewline('a'));
-  ASSERT_FALSE(IsWhitespaceNoNewline('z'));
-  ASSERT_FALSE(IsWhitespaceNoNewline('0'));
-  ASSERT_FALSE(IsWhitespaceNoNewline('9'));
-  ASSERT_FALSE(IsWhitespaceNoNewline('!'));
-
-  ASSERT_TRUE(IsBlank(""));
-  ASSERT_TRUE(IsBlank(" "));
-  ASSERT_TRUE(IsBlank("\t"));
-  ASSERT_TRUE(IsBlank("\n"));
-  ASSERT_TRUE(IsBlank("\n\n\n"));
-  ASSERT_TRUE(IsBlank("  \n  \n  \n"));
-  ASSERT_TRUE(IsBlank(" \t\v\f\r\n"));
-  ASSERT_TRUE(IsBlank("     "));
-  ASSERT_TRUE(IsBlank(" \t \t "));
-  ASSERT_TRUE(IsBlank("\t \t \t"));
-  ASSERT_FALSE(IsBlank("multi\nline"));
-  ASSERT_FALSE(IsBlank("\nmore\nmulti\nline\n"));
-  ASSERT_FALSE(IsBlank("\t\t."));
-  ASSERT_FALSE(IsBlank("    ."));
-  ASSERT_FALSE(IsBlank(".    "));
-  ASSERT_FALSE(IsBlank("// Comment "));
-  ASSERT_FALSE(IsBlank("/// Doc Comment "));
-
-  ASSERT_TRUE(LineFromOffsetIsBlank("four", 4));
-  ASSERT_TRUE(LineFromOffsetIsBlank("four\n", 4));
-  ASSERT_TRUE(LineFromOffsetIsBlank("four    ", 4));
-  ASSERT_TRUE(LineFromOffsetIsBlank("four    \n", 4));
-  ASSERT_TRUE(LineFromOffsetIsBlank("four  \t \t  ", 4));
-  ASSERT_TRUE(LineFromOffsetIsBlank("four    \n", 4));
-  ASSERT_TRUE(LineFromOffsetIsBlank("four    \t\n", 4));
-  ASSERT_TRUE(LineFromOffsetIsBlank("four    \n\t", 4));
-  ASSERT_TRUE(LineFromOffsetIsBlank("four    \nmore lines", 4));
-  ASSERT_TRUE(LineFromOffsetIsBlank("four    \nmore lines\n", 4));
-  ASSERT_TRUE(LineFromOffsetIsBlank("four    \t\n\t", 4));
-  ASSERT_FALSE(LineFromOffsetIsBlank("four.", 4));
-  ASSERT_FALSE(LineFromOffsetIsBlank("four.\n", 4));
-  ASSERT_FALSE(LineFromOffsetIsBlank("fournot blank    \n", 4));
-  ASSERT_FALSE(LineFromOffsetIsBlank("four    more chars", 4));
-  ASSERT_FALSE(LineFromOffsetIsBlank("four    more chars\n", 4));
-
-  ASSERT_TRUE(FirstLineIsBlank(""));
-  ASSERT_TRUE(FirstLineIsBlank(""));
-  ASSERT_TRUE(FirstLineIsBlank("\n"));
-  ASSERT_TRUE(FirstLineIsBlank("    "));
-  ASSERT_TRUE(FirstLineIsBlank("    \n"));
-  ASSERT_TRUE(FirstLineIsBlank("  \t \t  "));
-  ASSERT_TRUE(FirstLineIsBlank("    \n"));
-  ASSERT_TRUE(FirstLineIsBlank("    \t\n"));
-  ASSERT_TRUE(FirstLineIsBlank("    \nmore lines"));
-  ASSERT_TRUE(FirstLineIsBlank("    \nmore lines\n"));
-  ASSERT_TRUE(FirstLineIsBlank("    \n\t"));
-  ASSERT_TRUE(FirstLineIsBlank("    \t\n\t"));
-  ASSERT_FALSE(FirstLineIsBlank("."));
-  ASSERT_FALSE(FirstLineIsBlank(".\n"));
-  ASSERT_FALSE(FirstLineIsBlank("not blank    \n"));
-  ASSERT_FALSE(FirstLineIsBlank("    more chars"));
-  ASSERT_FALSE(FirstLineIsBlank("    more chars\n"));
-
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four//", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four//\n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four//    ", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four//    \n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four//  \t\n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four//not blank    ", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four//  not blank", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four//not blank", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four//not blank    \n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four//  not blank\n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four//not blank\n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four//    \n\t", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four//    \t\n\t", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four//    \nmore lines", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four//    \nmore lines\n", 4));
-  ASSERT_FALSE(LineFromOffsetIsRegularComment("four.//", 4));
-  ASSERT_FALSE(LineFromOffsetIsRegularComment("four    .//\n", 4));
-  ASSERT_FALSE(LineFromOffsetIsRegularComment("fourmore//    ", 4));
-  ASSERT_FALSE(LineFromOffsetIsRegularComment("four    more\n//    \n", 4));
-  //// Greater than 3 slashes are still interpreted as a regular comment
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four////", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four////\n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four////    ", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four////    \n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four////  \t\n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four////not blank    ", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four////  not blank", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four////not blank", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four////not blank    \n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four////  not blank\n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four////not blank\n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four/////", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four/////\n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four/////    ", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four/////    \n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four/////  \t\n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four/////not blank    ", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four/////  not blank", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four/////not blank", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four/////not blank    \n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four/////  not blank\n", 4));
-  ASSERT_TRUE(LineFromOffsetIsRegularComment("four/////not blank\n", 4));
-  /// FIDL Doc Comments start with 3 slashes, like this one
-  ASSERT_FALSE(LineFromOffsetIsRegularComment("four///", 4));
-  ASSERT_FALSE(LineFromOffsetIsRegularComment("four///\n", 4));
-  ASSERT_FALSE(LineFromOffsetIsRegularComment("four///    ", 4));
-  ASSERT_FALSE(LineFromOffsetIsRegularComment("four///    \n", 4));
-  ASSERT_FALSE(LineFromOffsetIsRegularComment("four///  \t\n", 4));
-  ASSERT_FALSE(LineFromOffsetIsRegularComment("four///not blank    ", 4));
-  ASSERT_FALSE(LineFromOffsetIsRegularComment("four///  not blank", 4));
-  ASSERT_FALSE(LineFromOffsetIsRegularComment("four///not blank", 4));
-  ASSERT_FALSE(LineFromOffsetIsRegularComment("four///not blank    \n", 4));
-  ASSERT_FALSE(LineFromOffsetIsRegularComment("four///  not blank\n", 4));
-  ASSERT_FALSE(LineFromOffsetIsRegularComment("four///not blank\n", 4));
-
-  ASSERT_TRUE(FirstLineIsRegularComment("//"));
-  ASSERT_TRUE(FirstLineIsRegularComment("//\n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("//    "));
-  ASSERT_TRUE(FirstLineIsRegularComment("//    \n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("//  \t\n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("//not blank    "));
-  ASSERT_TRUE(FirstLineIsRegularComment("//  not blank"));
-  ASSERT_TRUE(FirstLineIsRegularComment("//not blank"));
-  ASSERT_TRUE(FirstLineIsRegularComment("//not blank    \n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("//  not blank\n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("//not blank\n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("//    \n\t"));
-  ASSERT_TRUE(FirstLineIsRegularComment("//    \t\n\t"));
-  ASSERT_TRUE(FirstLineIsRegularComment("//    \nmore lines"));
-  ASSERT_TRUE(FirstLineIsRegularComment("//    \nmore lines\n"));
-  ASSERT_FALSE(FirstLineIsRegularComment(".//"));
-  ASSERT_FALSE(FirstLineIsRegularComment("    .//\n"));
-  ASSERT_FALSE(FirstLineIsRegularComment("more//    "));
-  ASSERT_FALSE(FirstLineIsRegularComment("    more\n//    \n"));
-  //// Greater than 3 slashes are still interpreted as a regular comment
-  ASSERT_TRUE(FirstLineIsRegularComment("////"));
-  ASSERT_TRUE(FirstLineIsRegularComment("////\n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("////    "));
-  ASSERT_TRUE(FirstLineIsRegularComment("////    \n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("////  \t\n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("////not blank    "));
-  ASSERT_TRUE(FirstLineIsRegularComment("////  not blank"));
-  ASSERT_TRUE(FirstLineIsRegularComment("////not blank"));
-  ASSERT_TRUE(FirstLineIsRegularComment("////not blank    \n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("////  not blank\n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("////not blank\n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("/////"));
-  ASSERT_TRUE(FirstLineIsRegularComment("/////\n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("/////    "));
-  ASSERT_TRUE(FirstLineIsRegularComment("/////    \n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("/////  \t\n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("/////not blank    "));
-  ASSERT_TRUE(FirstLineIsRegularComment("/////  not blank"));
-  ASSERT_TRUE(FirstLineIsRegularComment("/////not blank"));
-  ASSERT_TRUE(FirstLineIsRegularComment("/////not blank    \n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("/////  not blank\n"));
-  ASSERT_TRUE(FirstLineIsRegularComment("/////not blank\n"));
-  /// FIDL Doc Comments start with 3 slashes, like this one
-  ASSERT_FALSE(FirstLineIsRegularComment("///"));
-  ASSERT_FALSE(FirstLineIsRegularComment("///\n"));
-  ASSERT_FALSE(FirstLineIsRegularComment("///    "));
-  ASSERT_FALSE(FirstLineIsRegularComment("///    \n"));
-  ASSERT_FALSE(FirstLineIsRegularComment("///  \t\n"));
-  ASSERT_FALSE(FirstLineIsRegularComment("///not blank    "));
-  ASSERT_FALSE(FirstLineIsRegularComment("///  not blank"));
-  ASSERT_FALSE(FirstLineIsRegularComment("///not blank"));
-  ASSERT_FALSE(FirstLineIsRegularComment("///not blank    \n"));
-  ASSERT_FALSE(FirstLineIsRegularComment("///  not blank\n"));
-  ASSERT_FALSE(FirstLineIsRegularComment("///not blank\n"));
+  ASSERT_CASE(LowerSnake, "X", "x");
+  ASSERT_CASE(LowerSnake, "Xy", "xy");
+  ASSERT_CASE(LowerSnake, "XY", "xy");
+  ASSERT_CASE(LowerSnake, "Xyz123", "xyz123");
+  ASSERT_CASE(LowerSnake, "Xyz_123", "xyz_123");
+  ASSERT_CASE(LowerSnake, "XyZ123", "xy_z123");
+  ASSERT_CASE(LowerSnake, "DaysInAWeek", "days_in_a_week");
+  ASSERT_CASE(LowerSnake, "Android8_0_0", "android8_0_0");
+  ASSERT_CASE(LowerSnake, "Android_8_0_0", "android_8_0_0");
+  ASSERT_CASE(LowerSnake, "XMarksTheSpot", "x_marks_the_spot");
+  ASSERT_CASE(LowerSnake, "RealId", "real_id");
+  ASSERT_CASE(LowerSnake, "RealID", "real_id");
+  ASSERT_CASE(LowerSnake, "Real3d", "real3d");
+  ASSERT_CASE(LowerSnake, "Real3D", "real3_d");
+  ASSERT_CASE(LowerSnake, "Real_3d", "real_3d");
+  ASSERT_CASE(LowerSnake, "Real_3D", "real_3_d");
+  ASSERT_CASE(LowerSnake, "HelloEWorld", "hello_e_world");
+  ASSERT_CASE(LowerSnake, "HelloEworld", "hello_eworld");
+  ASSERT_CASE(LowerSnake, "URLLoader", "url_loader");
+  ASSERT_CASE(LowerSnake, "is_21Jump_street", "is_21_jump_street");
+  ASSERT_CASE(LowerSnake, "URLloader", "ur_lloader");
+  ASSERT_CASE(LowerSnake, "UrlLoader", "url_loader");
+  ASSERT_CASE(LowerSnake, "URLLoader", "url_loader");
+  ASSERT_CASE(LowerSnake, "URL_LOADER", "url_loader");
+  ASSERT_CASE(LowerSnake, "urlLoader", "url_loader");
+  ASSERT_CASE(LowerSnake, "kUrlLoader", "url_loader");
+  ASSERT_CASE(LowerSnake, "kURLLoader", "url_loader");
 }
 
 TEST(UtilsTests, IsValidLibraryComponent) {
@@ -461,7 +237,7 @@ TEST(UtilsTests, IsValidFullyQualifiedMethodIdentifier) {
   ASSERT_FALSE(IsValidFullyQualifiedMethodIdentifier("long.liB/Protocol.Method"));
 }
 
-TEST(UtilsTests, IsOnlyWhitespace) {
+TEST(UtilsTests, RemoveWhitespace) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 /// C1a
@@ -592,108 +368,107 @@ service MyService { // C32
 }; // C35
 )FIDL";
 
-  ASSERT_TRUE(OnlyWhitespaceChanged(unformatted, formatted));
+  ASSERT_EQ(RemoveWhitespace(unformatted), RemoveWhitespace(formatted));
 }
 
-TEST(UtilsTests, CanonicalForm) {
-  EXPECT_EQ(canonicalize(""), "");
+TEST(UtilsTests, Canonicalize) {
+  EXPECT_EQ(Canonicalize(""), "");
 
   // Basic letter combinations.
-  EXPECT_EQ(canonicalize("a"), "a");
-  EXPECT_EQ(canonicalize("A"), "a");
-  EXPECT_EQ(canonicalize("ab"), "ab");
-  EXPECT_EQ(canonicalize("AB"), "ab");
-  EXPECT_EQ(canonicalize("Ab"), "ab");
-  EXPECT_EQ(canonicalize("aB"), "a_b");
-  EXPECT_EQ(canonicalize("a_b"), "a_b");
-  EXPECT_EQ(canonicalize("A_B"), "a_b");
-  EXPECT_EQ(canonicalize("A_b"), "a_b");
-  EXPECT_EQ(canonicalize("a_B"), "a_b");
+  EXPECT_EQ(Canonicalize("a"), "a");
+  EXPECT_EQ(Canonicalize("A"), "a");
+  EXPECT_EQ(Canonicalize("ab"), "ab");
+  EXPECT_EQ(Canonicalize("AB"), "ab");
+  EXPECT_EQ(Canonicalize("Ab"), "ab");
+  EXPECT_EQ(Canonicalize("aB"), "a_b");
+  EXPECT_EQ(Canonicalize("a_b"), "a_b");
+  EXPECT_EQ(Canonicalize("A_B"), "a_b");
+  EXPECT_EQ(Canonicalize("A_b"), "a_b");
+  EXPECT_EQ(Canonicalize("a_B"), "a_b");
 
   // Digits are treated like lowercase letters.
-  EXPECT_EQ(canonicalize("1"), "1");
-  EXPECT_EQ(canonicalize("a1"), "a1");
-  EXPECT_EQ(canonicalize("A1"), "a1");
+  EXPECT_EQ(Canonicalize("1"), "1");
+  EXPECT_EQ(Canonicalize("a1"), "a1");
+  EXPECT_EQ(Canonicalize("A1"), "a1");
 
   // Leading digits are illegal in FIDL identifiers, so these do not matter.
-  EXPECT_EQ(canonicalize("1a"), "1a");
-  EXPECT_EQ(canonicalize("1A"), "1_a");
-  EXPECT_EQ(canonicalize("12"), "12");
+  EXPECT_EQ(Canonicalize("1a"), "1a");
+  EXPECT_EQ(Canonicalize("1A"), "1_a");
+  EXPECT_EQ(Canonicalize("12"), "12");
 
   // Lower/upper snake/camel case conventions.
-  EXPECT_EQ(canonicalize("lowerCamelCase"), "lower_camel_case");
-  EXPECT_EQ(canonicalize("UpperCamelCase"), "upper_camel_case");
-  EXPECT_EQ(canonicalize("lower_snake_case"), "lower_snake_case");
-  EXPECT_EQ(canonicalize("UPPER_SNAKE_CASE"), "upper_snake_case");
-  EXPECT_EQ(canonicalize("Camel_With_Underscores"), "camel_with_underscores");
-  EXPECT_EQ(canonicalize("camelWithAOneLetterWord"), "camel_with_a_one_letter_word");
-  EXPECT_EQ(canonicalize("1_2__3___underscores"), "1_2_3_underscores");
+  EXPECT_EQ(Canonicalize("lowerCamelCase"), "lower_camel_case");
+  EXPECT_EQ(Canonicalize("UpperCamelCase"), "upper_camel_case");
+  EXPECT_EQ(Canonicalize("lower_snake_case"), "lower_snake_case");
+  EXPECT_EQ(Canonicalize("UpperSnake_CASE"), "upper_snake_case");
+  EXPECT_EQ(Canonicalize("Camel_With_Underscores"), "camel_with_underscores");
+  EXPECT_EQ(Canonicalize("camelWithAOneLetterWord"), "camel_with_a_one_letter_word");
+  EXPECT_EQ(Canonicalize("1_2__3___underscores"), "1_2_3_underscores");
 
   // Acronym casing.
-  EXPECT_EQ(canonicalize("HTTPServer"), "http_server");
-  EXPECT_EQ(canonicalize("HttpServer"), "http_server");
-  EXPECT_EQ(canonicalize("URLIsATLA"), "url_is_atla");
-  EXPECT_EQ(canonicalize("UrlIsATla"), "url_is_a_tla");
+  EXPECT_EQ(Canonicalize("HTTPServer"), "http_server");
+  EXPECT_EQ(Canonicalize("HttpServer"), "http_server");
+  EXPECT_EQ(Canonicalize("URLIsATLA"), "url_is_atla");
+  EXPECT_EQ(Canonicalize("UrlIsATla"), "url_is_a_tla");
 
   // Words with digits: H264 encoder.
-  EXPECT_EQ(canonicalize("h264encoder"), "h264encoder");
-  EXPECT_EQ(canonicalize("H264ENCODER"), "h264_encoder");
-  EXPECT_EQ(canonicalize("h264_encoder"), "h264_encoder");
-  EXPECT_EQ(canonicalize("H264_ENCODER"), "h264_encoder");
-  EXPECT_EQ(canonicalize("h264Encoder"), "h264_encoder");
-  EXPECT_EQ(canonicalize("H264Encoder"), "h264_encoder");
+  EXPECT_EQ(Canonicalize("h264encoder"), "h264encoder");
+  EXPECT_EQ(Canonicalize("H264ENCODER"), "h264_encoder");
+  EXPECT_EQ(Canonicalize("h264_encoder"), "h264_encoder");
+  EXPECT_EQ(Canonicalize("H264_ENCODER"), "h264_encoder");
+  EXPECT_EQ(Canonicalize("h264Encoder"), "h264_encoder");
+  EXPECT_EQ(Canonicalize("H264Encoder"), "h264_encoder");
 
   // Words with digits: DDR4 memory.
-  EXPECT_EQ(canonicalize("ddr4memory"), "ddr4memory");
-  EXPECT_EQ(canonicalize("DDR4MEMORY"), "ddr4_memory");
-  EXPECT_EQ(canonicalize("ddr4_memory"), "ddr4_memory");
-  EXPECT_EQ(canonicalize("DDR4_MEMORY"), "ddr4_memory");
-  EXPECT_EQ(canonicalize("ddr4Memory"), "ddr4_memory");
-  EXPECT_EQ(canonicalize("Ddr4Memory"), "ddr4_memory");
-  EXPECT_EQ(canonicalize("DDR4Memory"), "ddr4_memory");
+  EXPECT_EQ(Canonicalize("ddr4memory"), "ddr4memory");
+  EXPECT_EQ(Canonicalize("DDR4MEMORY"), "ddr4_memory");
+  EXPECT_EQ(Canonicalize("ddr4_memory"), "ddr4_memory");
+  EXPECT_EQ(Canonicalize("DDR4_MEMORY"), "ddr4_memory");
+  EXPECT_EQ(Canonicalize("ddr4Memory"), "ddr4_memory");
+  EXPECT_EQ(Canonicalize("Ddr4Memory"), "ddr4_memory");
+  EXPECT_EQ(Canonicalize("DDR4Memory"), "ddr4_memory");
 
   // Words with digits: A2DP profile.
-  EXPECT_EQ(canonicalize("a2dpprofile"), "a2dpprofile");
-  EXPECT_EQ(canonicalize("A2DPPROFILE"), "a2_dpprofile");
-  EXPECT_EQ(canonicalize("a2dp_profile"), "a2dp_profile");
-  EXPECT_EQ(canonicalize("A2DP_PROFILE"), "a2_dp_profile");
-  EXPECT_EQ(canonicalize("a2dpProfile"), "a2dp_profile");
-  EXPECT_EQ(canonicalize("A2dpProfile"), "a2dp_profile");
-  EXPECT_EQ(canonicalize("A2DPProfile"), "a2_dp_profile");
+  EXPECT_EQ(Canonicalize("a2dpprofile"), "a2dpprofile");
+  EXPECT_EQ(Canonicalize("A2DPPROFILE"), "a2_dpprofile");
+  EXPECT_EQ(Canonicalize("a2dp_profile"), "a2dp_profile");
+  EXPECT_EQ(Canonicalize("A2DP_PROFILE"), "a2_dp_profile");
+  EXPECT_EQ(Canonicalize("a2dpProfile"), "a2dp_profile");
+  EXPECT_EQ(Canonicalize("A2dpProfile"), "a2dp_profile");
+  EXPECT_EQ(Canonicalize("A2DPProfile"), "a2_dp_profile");
 
   // Words with digits: R2D2 is one word.
-  EXPECT_EQ(canonicalize("r2d2isoneword"), "r2d2isoneword");
-  EXPECT_EQ(canonicalize("R2D2ISONEWORD"), "r2_d2_isoneword");
-  EXPECT_EQ(canonicalize("r2d2_is_one_word"), "r2d2_is_one_word");
-  EXPECT_EQ(canonicalize("R2D2_IS_ONE_WORD"), "r2_d2_is_one_word");
-  EXPECT_EQ(canonicalize("r2d2IsOneWord"), "r2d2_is_one_word");
-  EXPECT_EQ(canonicalize("R2d2IsOneWord"), "r2d2_is_one_word");
-  EXPECT_EQ(canonicalize("R2D2IsOneWord"), "r2_d2_is_one_word");
+  EXPECT_EQ(Canonicalize("r2d2isoneword"), "r2d2isoneword");
+  EXPECT_EQ(Canonicalize("R2D2ISONEWORD"), "r2_d2_isoneword");
+  EXPECT_EQ(Canonicalize("r2d2_is_one_word"), "r2d2_is_one_word");
+  EXPECT_EQ(Canonicalize("R2D2_IS_ONE_WORD"), "r2_d2_is_one_word");
+  EXPECT_EQ(Canonicalize("r2d2IsOneWord"), "r2d2_is_one_word");
+  EXPECT_EQ(Canonicalize("R2d2IsOneWord"), "r2d2_is_one_word");
+  EXPECT_EQ(Canonicalize("R2D2IsOneWord"), "r2_d2_is_one_word");
 
   // Leading and trailing underscores are illegal in FIDL identifiers, so these
   // do not matter.
-  EXPECT_EQ(canonicalize("_"), "");
-  EXPECT_EQ(canonicalize("_a"), "a");
-  EXPECT_EQ(canonicalize("a_"), "a_");
-  EXPECT_EQ(canonicalize("_a_"), "a_");
-  EXPECT_EQ(canonicalize("__a__"), "a_");
+  EXPECT_EQ(Canonicalize("_"), "");
+  EXPECT_EQ(Canonicalize("_a"), "a");
+  EXPECT_EQ(Canonicalize("a_"), "a_");
+  EXPECT_EQ(Canonicalize("_a_"), "a_");
+  EXPECT_EQ(Canonicalize("__a__"), "a_");
 }
 
-TEST(UtilsTests, StringStripping) {
-  EXPECT_EQ(strip_konstant_k("kFoobar"), "Foobar");
-  EXPECT_EQ(strip_konstant_k("KFoobar"), "KFoobar");
+TEST(UtilsTests, StripStringLiteralQuotes) {
+  EXPECT_EQ(StripStringLiteralQuotes("\"\""), "");
+  EXPECT_EQ(StripStringLiteralQuotes("\"foobar\""), "foobar");
+}
 
-  EXPECT_EQ(strip_string_literal_quotes("\"\""), "");
-  EXPECT_EQ(strip_string_literal_quotes("\"foobar\""), "foobar");
-
-  EXPECT_EQ(strip_doc_comment_slashes(R"FIDL(
+TEST(UtilsTests, StripDocCommentSlashes) {
+  EXPECT_EQ(StripDocCommentSlashes(R"FIDL(
   /// A
   /// multiline
   /// comment!
 )FIDL"),
             "\n A\n multiline\n comment!\n");
 
-  EXPECT_EQ(strip_doc_comment_slashes(R"FIDL(
+  EXPECT_EQ(StripDocCommentSlashes(R"FIDL(
   ///
   /// With
   ///
@@ -704,7 +479,7 @@ TEST(UtilsTests, StringStripping) {
 )FIDL"),
             "\n\n With\n\n empty\n\n lines\n\n");
 
-  EXPECT_EQ(strip_doc_comment_slashes(R"FIDL(
+  EXPECT_EQ(StripDocCommentSlashes(R"FIDL(
   /// With
 
   /// blank
@@ -714,7 +489,7 @@ TEST(UtilsTests, StringStripping) {
 )FIDL"),
             "\n With\n\n blank\n\n\n lines\n");
 
-  EXPECT_EQ(strip_doc_comment_slashes(R"FIDL(
+  EXPECT_EQ(StripDocCommentSlashes(R"FIDL(
 	/// With
 		/// tabs
 	 /// in
@@ -724,7 +499,7 @@ TEST(UtilsTests, StringStripping) {
 )FIDL"),
             "\n With\n tabs\n in\n addition\n to\n spaces\n");
 
-  EXPECT_EQ(strip_doc_comment_slashes(R"FIDL(
+  EXPECT_EQ(StripDocCommentSlashes(R"FIDL(
   /// Weird
 /// Offsets
   /// Slash///
@@ -735,26 +510,26 @@ TEST(UtilsTests, StringStripping) {
 }
 
 TEST(UtilsTests, DecodeUnicodeHex) {
-  EXPECT_EQ(decode_unicode_hex("0"), 0x0u);
-  EXPECT_EQ(decode_unicode_hex("a"), 0xau);
-  EXPECT_EQ(decode_unicode_hex("12"), 0x12u);
-  EXPECT_EQ(decode_unicode_hex("123abc"), 0x123abcu);
-  EXPECT_EQ(decode_unicode_hex("ffffff"), 0xffffffu);
+  EXPECT_EQ(DecodeUnicodeHex("0"), 0x0u);
+  EXPECT_EQ(DecodeUnicodeHex("a"), 0xau);
+  EXPECT_EQ(DecodeUnicodeHex("12"), 0x12u);
+  EXPECT_EQ(DecodeUnicodeHex("123abc"), 0x123abcu);
+  EXPECT_EQ(DecodeUnicodeHex("ffffff"), 0xffffffu);
 }
 
 TEST(UtilsTests, StringLiteralLength) {
-  EXPECT_EQ(string_literal_length(R"("Hello")"), 5u);
-  EXPECT_EQ(string_literal_length(R"("\\")"), 1u);
-  EXPECT_EQ(string_literal_length(R"("\to")"), 2u);
-  EXPECT_EQ(string_literal_length(R"("\n")"), 1u);
-  EXPECT_EQ(string_literal_length(R"("\u{01F600}")"), 4u);
-  EXPECT_EQ(string_literal_length(R"("\u{2713}")"), 3u);
-  EXPECT_EQ(string_literal_length(R"("")"), 0u);
-  EXPECT_EQ(string_literal_length(R"("$")"), 1u);
-  EXPECT_EQ(string_literal_length(R"("¢")"), 2u);
-  EXPECT_EQ(string_literal_length(R"("€")"), 3u);
-  EXPECT_EQ(string_literal_length(R"("𐍈")"), 4u);
-  EXPECT_EQ(string_literal_length(R"("😁")"), 4u);
+  EXPECT_EQ(StringLiteralLength(R"("Hello")"), 5u);
+  EXPECT_EQ(StringLiteralLength(R"("\\")"), 1u);
+  EXPECT_EQ(StringLiteralLength(R"("\to")"), 2u);
+  EXPECT_EQ(StringLiteralLength(R"("\n")"), 1u);
+  EXPECT_EQ(StringLiteralLength(R"("\u{01F600}")"), 4u);
+  EXPECT_EQ(StringLiteralLength(R"("\u{2713}")"), 3u);
+  EXPECT_EQ(StringLiteralLength(R"("")"), 0u);
+  EXPECT_EQ(StringLiteralLength(R"("$")"), 1u);
+  EXPECT_EQ(StringLiteralLength(R"("¢")"), 2u);
+  EXPECT_EQ(StringLiteralLength(R"("€")"), 3u);
+  EXPECT_EQ(StringLiteralLength(R"("𐍈")"), 4u);
+  EXPECT_EQ(StringLiteralLength(R"("😁")"), 4u);
 }
 
 }  // namespace

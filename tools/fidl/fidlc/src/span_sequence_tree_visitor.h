@@ -8,6 +8,7 @@
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
+#include <set>
 #include <stack>
 
 #include "tools/fidl/fidlc/src/raw_ast.h"

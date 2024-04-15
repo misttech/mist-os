@@ -19,7 +19,6 @@
 #include "tools/fidl/fidlc/src/flat_ast.h"
 #include "tools/fidl/fidlc/src/json_generator.h"
 #include "tools/fidl/fidlc/src/source_file.h"
-#include "tools/fidl/fidlc/src/utils.h"
 #include "tools/fidl/fidlc/src/versioning_types.h"
 #include "tools/fidl/fidlc/src/virtual_source_file.h"
 
@@ -177,14 +176,16 @@ class TestLibrary final : public SharedInterface {
   // Record that a particular error is expected during the compile.
   // The args can either match the ErrorDef's argument types, or they can be string literals.
   template <ErrorId Id, typename... Args>
-  void ExpectFail(const ErrorDef<Id, Args...>& def, identity_t<StringOrArg<Args>>... args) {
+  void ExpectFail(const ErrorDef<Id, Args...>& def,
+                  cpp20::type_identity_t<StringOrArg<Args>>... args) {
     expected_diagnostics_.push_back(internal::FormatDiagnostic(def.msg, args.string...));
   }
 
   // Record that a particular warning is expected during the compile.
   // The args can either match the WarningDef's argument types, or they can be string literals.
   template <ErrorId Id, typename... Args>
-  void ExpectWarn(const WarningDef<Id, Args...>& def, identity_t<StringOrArg<Args>>... args) {
+  void ExpectWarn(const WarningDef<Id, Args...>& def,
+                  cpp20::type_identity_t<StringOrArg<Args>>... args) {
     expected_diagnostics_.push_back(internal::FormatDiagnostic(def.msg, args.string...));
   }
 

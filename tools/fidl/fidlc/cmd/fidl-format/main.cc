@@ -65,7 +65,7 @@ bool Format(const fidlc::SourceFile& source_file, fidlc::Reporter* reporter, std
   output = result.value();
 
   std::string source_file_str(source_file.data());
-  if (!fidlc::OnlyWhitespaceChanged(source_file_str, output)) {
+  if (fidlc::RemoveWhitespace(source_file_str) != fidlc::RemoveWhitespace(output)) {
     // Note that this is only useful as long as we do not have the formatter do
     // things that affect non-whitespace characters, like sort using statements
     // or coalesce consts into const blocks.  If / when this happens, this check

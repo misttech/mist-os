@@ -73,8 +73,8 @@ class Linter {
 
  private:
   // Holds function pointers for an identify case type. For example,
-  // for "UpperCamelCase" type, |matches| points to is_upper_camel_case()
-  // and |convert| points to to_upper_camel_case().
+  // for "UpperCamelCase" type, |matches| points to IsUpperCamelCase()
+  // and |convert| points to ToUpperCamelCase().
   struct CaseType {
     fit::function<bool(std::string)> matches;
     fit::function<std::string(std::string)> convert;
@@ -181,9 +181,9 @@ class Linter {
   LintingTreeCallbacks callbacks_;
 
   // Case type functions used by CheckCase().
-  CaseType lower_snake_{is_lower_snake_case, to_lower_snake_case};
-  CaseType upper_snake_{is_upper_snake_case, to_upper_snake_case};
-  CaseType upper_camel_{is_upper_camel_case, to_upper_camel_case};
+  CaseType lower_snake_{IsLowerSnakeCase, ToLowerSnakeCase};
+  CaseType upper_snake_{IsUpperSnakeCase, ToUpperSnakeCase};
+  CaseType upper_camel_{IsUpperCamelCase, ToUpperCamelCase};
 
   // In IpcStyle, bits, protocols, protocol methods, structs, tables, unions,
   // and enums use UpperCamelCase. In CStyle used for syscalls, they

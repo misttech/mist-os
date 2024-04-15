@@ -5,6 +5,7 @@
 #ifndef TOOLS_FIDL_FIDLC_SRC_DIAGNOSTIC_TYPES_H_
 #define TOOLS_FIDL_FIDLC_SRC_DIAGNOSTIC_TYPES_H_
 
+#include <lib/stdcompat/type_traits.h>
 #include <zircon/assert.h>
 
 #include <memory>
@@ -16,7 +17,6 @@
 #include "tools/fidl/fidlc/src/properties.h"
 #include "tools/fidl/fidlc/src/source_span.h"
 #include "tools/fidl/fidlc/src/token.h"
-#include "tools/fidl/fidlc/src/utils.h"
 #include "tools/fidl/fidlc/src/versioning_types.h"
 
 namespace fidlc {
@@ -175,13 +175,14 @@ struct Diagnostic {
 
   template <ErrorId Id, typename... Args>
   static std::unique_ptr<Diagnostic> MakeError(const ErrorDef<Id, Args...>& def, SourceSpan span,
-                                               const identity_t<Args>&... args) {
+                                               const cpp20::type_identity_t<Args>&... args) {
     return std::make_unique<Diagnostic>(def, span, args...);
   }
 
   template <ErrorId Id, typename... Args>
   static std::unique_ptr<Diagnostic> MakeWarning(const WarningDef<Id, Args...>& def,
-                                                 SourceSpan span, const identity_t<Args>&... args) {
+                                                 SourceSpan span,
+                                                 const cpp20::type_identity_t<Args>&... args) {
     return std::make_unique<Diagnostic>(def, span, args...);
   }
 

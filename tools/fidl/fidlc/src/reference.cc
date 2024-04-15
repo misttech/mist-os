@@ -68,7 +68,7 @@ Reference::Reference(const RawCompoundIdentifier& name) : span_(name.span()) {
 Reference::Reference(Target target) : state_(RawSynthetic{target}) {}
 
 Reference::State Reference::state() const {
-  return std::visit(matchers{
+  return std::visit(overloaded{
                         [&](const RawSourced&) { return State::kRawSourced; },
                         [&](const RawSynthetic&) { return State::kRawSynthetic; },
                         [&](const Key&) { return State::kKey; },

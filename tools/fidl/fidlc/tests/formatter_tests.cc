@@ -7,13 +7,14 @@
 #include "tools/fidl/fidlc/src/formatter.h"
 #include "tools/fidl/fidlc/src/utils.h"
 
-#define ASSERT_FORMATTED(source, expected)            \
-  std::string actual = Format(source);                \
-  ASSERT_TRUE(OnlyWhitespaceChanged(source, actual)); \
+#define ASSERT_FORMATTED(source, expected)                       \
+  std::string actual = Format(source);                           \
+  ASSERT_EQ(RemoveWhitespace(source), RemoveWhitespace(actual)); \
   ASSERT_EQ(expected, actual);
 
 namespace fidlc {
 namespace {
+
 std::string Format(const std::string& source, bool reformat_and_compare = true) {
   SourceFile source_file("example.fidl", source);
 

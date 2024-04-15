@@ -114,7 +114,7 @@ struct RawLiteral : public SourceElement {
 struct RawDocCommentLiteral final : public RawLiteral {
   explicit RawDocCommentLiteral(const SourceElement& element)
       : RawLiteral(element, Kind::kDocComment),
-        value(strip_doc_comment_slashes(element.span().data())) {}
+        value(StripDocCommentSlashes(element.span().data())) {}
 
   void Accept(TreeVisitor* visitor) const;
 
@@ -124,7 +124,7 @@ struct RawDocCommentLiteral final : public RawLiteral {
 struct RawStringLiteral final : public RawLiteral {
   explicit RawStringLiteral(const SourceElement& element)
       : RawLiteral(element, Kind::kString),
-        value(strip_string_literal_quotes(element.span().data())) {}
+        value(StripStringLiteralQuotes(element.span().data())) {}
 
   void Accept(TreeVisitor* visitor) const;
 

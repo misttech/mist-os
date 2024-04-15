@@ -204,13 +204,14 @@ class Parser {
   // * They return nullptr rather than false.
   std::nullptr_t Fail();
   template <ErrorId Id, typename... Args>
-  std::nullptr_t Fail(const ErrorDef<Id, Args...>& err, const identity_t<Args>&... args);
+  std::nullptr_t Fail(const ErrorDef<Id, Args...>& err,
+                      const cpp20::type_identity_t<Args>&... args);
   template <ErrorId Id, typename... Args>
   std::nullptr_t Fail(const ErrorDef<Id, Args...>& err, Token token,
-                      const identity_t<Args>&... args);
+                      const cpp20::type_identity_t<Args>&... args);
   template <ErrorId Id, typename... Args>
   std::nullptr_t Fail(const ErrorDef<Id, Args...>& err, SourceSpan span,
-                      const identity_t<Args>&... args);
+                      const cpp20::type_identity_t<Args>&... args);
 
   // Reports an error if |modifiers| contains a modifier whose type is not
   // included in |Allowlist|. The |decl_token| should be "struct", "enum", etc.

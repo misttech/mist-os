@@ -16,6 +16,8 @@ namespace fidlc {
 
 const std::string kLibraryComponentPattern = "[a-z][a-z0-9]*";
 const std::string kIdentifierComponentPattern = "[A-Za-z]([A-Za-z0-9_]*[A-Za-z0-9])?";
+const std::string kLibraryPattern =
+    kLibraryComponentPattern + "(\\." + kLibraryComponentPattern + ")*";
 
 bool IsValidLibraryComponent(std::string_view component) {
   static const re2::RE2 kPattern("^" + kLibraryComponentPattern + "$");
@@ -28,55 +30,24 @@ bool IsValidIdentifierComponent(std::string_view component) {
 }
 
 bool IsValidFullyQualifiedMethodIdentifier(std::string_view fq_identifier) {
-  static const re2::RE2 kPattern("^" +
-                                 // library identifier
-                                 kLibraryComponentPattern + "(\\." + kLibraryComponentPattern +
-                                 ")*" +
-                                 // slash
-                                 "/" +
-                                 // protocol
-                                 kIdentifierComponentPattern +
-                                 // dot
-                                 "\\." +
-                                 // method
-                                 kIdentifierComponentPattern + "$");
+  static const re2::RE2 kPattern("^" + kLibraryPattern + "/" +
+                                 /* protocol */ kIdentifierComponentPattern + "\\." +
+                                 /* method */ kIdentifierComponentPattern + "$");
   return re2::RE2::FullMatch(fq_identifier, kPattern);
 }
 
 bool IsValidDiscoverableName(std::string_view discoverable_name) {
-  static const re2::RE2 kPattern("^" +
-                                 // library identifier
-                                 kLibraryComponentPattern + "(\\." + kLibraryComponentPattern +
-                                 ")*" +
-                                 // dot
-                                 "\\." +
-                                 // protocol
-                                 kIdentifierComponentPattern + "$");
+  static const re2::RE2 kPattern("^" + kLibraryPattern + "\\." + kIdentifierComponentPattern + "$");
   return re2::RE2::FullMatch(discoverable_name, kPattern);
 }
 
-bool ends_with_underscore(std::string_view str) {
-  ZX_ASSERT(!str.empty());
-  return str.back() == '_';
-}
-
-bool has_adjacent_underscores(std::string_view str) { return str.find("__") != std::string::npos; }
-
-bool has_konstant_k(std::string_view str) {
-  return str.size() >= 2 && str[0] == 'k' && isupper(str[1]);
-}
-
-std::string strip_string_literal_quotes(std::string_view str) {
+std::string StripStringLiteralQuotes(std::string_view str) {
   ZX_ASSERT_MSG(str.size() >= 2 && str[0] == '"' && str[str.size() - 1] == '"',
                 "string must start and end with '\"' style quotes");
   return std::string(str.data() + 1, str.size() - 2);
 }
 
-// NOTE: we currently explicitly only support UNIX line endings
-std::string strip_doc_comment_slashes(std::string_view str) {
-  // In English, this regex says: "any number of tabs/spaces, followed by three
-  // slashes is group 1, the remainder of the line is group 2.  Keep only group
-  // 2."
+std::string StripDocCommentSlashes(std::string_view str) {
   std::string no_slashes(str);
   re2::RE2::GlobalReplace(&no_slashes, "([\\t ]*\\/\\/\\/)(.*)", "\\2");
   if (no_slashes[no_slashes.size() - 1] != '\n') {
@@ -85,59 +56,40 @@ std::string strip_doc_comment_slashes(std::string_view str) {
   return no_slashes;
 }
 
-std::string strip_konstant_k(std::string_view str) {
-  return std::string(has_konstant_k(str) ? str.substr(1) : str);
+static bool HasConstantK(std::string_view str) {
+  return str.size() >= 2 && str[0] == 'k' && isupper(str[1]);
 }
 
-bool is_lower_no_separator_case(std::string_view str) {
-  static re2::RE2 re{"^[a-z][a-z0-9]*$"};
-  return !str.empty() && re2::RE2::FullMatch(str, re);
+static std::string StripConstantK(std::string_view str) {
+  return std::string(HasConstantK(str) ? str.substr(1) : str);
 }
 
-bool is_lower_snake_case(std::string_view str) {
+bool IsLowerSnakeCase(std::string_view str) {
   static re2::RE2 re{"^[a-z][a-z0-9_]*$"};
   return !str.empty() && re2::RE2::FullMatch(str, re);
 }
 
-bool is_upper_snake_case(std::string_view str) {
+bool IsUpperSnakeCase(std::string_view str) {
   static re2::RE2 re{"^[A-Z][A-Z0-9_]*$"};
   return !str.empty() && re2::RE2::FullMatch(str, re);
 }
 
-bool is_lower_camel_case(std::string_view str) {
-  if (has_konstant_k(str)) {
+bool IsLowerCamelCase(std::string_view str) {
+  if (HasConstantK(str)) {
     return false;
   }
   static re2::RE2 re{"^[a-z][a-z0-9]*(([A-Z]{1,2}[a-z0-9]+)|(_[0-9]+))*([A-Z][a-z0-9]*)?$"};
   return !str.empty() && re2::RE2::FullMatch(str, re);
 }
 
-bool is_upper_camel_case(std::string_view str) {
+bool IsUpperCamelCase(std::string_view str) {
   static re2::RE2 re{
       "^(([A-Z]{1,2}[a-z0-9]+)(([A-Z]{1,2}[a-z0-9]+)|(_[0-9]+))*)?([A-Z][a-z0-9]*)?$"};
   return !str.empty() && re2::RE2::FullMatch(str, re);
 }
 
-bool is_konstant_case(std::string_view astr) {
-  if (!has_konstant_k(astr)) {
-    return false;
-  }
-  std::string str = strip_konstant_k(astr);
-  return is_upper_camel_case(str);
-}
-
-static void add_word(const std::string& word, std::vector<std::string>& words,
-                     const std::set<std::string>& stop_words) {
-  if (stop_words.find(word) == stop_words.end()) {
-    words.push_back(word);
-  }
-}
-
-std::vector<std::string> id_to_words(std::string_view astr) { return id_to_words(astr, {}); }
-
-std::vector<std::string> id_to_words(std::string_view astr,
-                                     const std::set<std::string>& stop_words) {
-  std::string str = strip_konstant_k(astr);
+std::vector<std::string> SplitIdentifierWords(std::string_view astr) {
+  std::string str = StripConstantK(astr);
   std::vector<std::string> words;
   std::string word;
   bool last_char_was_upper_or_begin = true;
@@ -145,7 +97,7 @@ std::vector<std::string> id_to_words(std::string_view astr,
     char ch = str[i];
     if (ch == '_' || ch == '-' || ch == '.') {
       if (!word.empty()) {
-        add_word(word, words, stop_words);
+        words.push_back(word);
         word.clear();
       }
       last_char_was_upper_or_begin = true;
@@ -153,7 +105,7 @@ std::vector<std::string> id_to_words(std::string_view astr,
       bool next_char_is_lower = ((i + 1) < str.size()) && islower(str[i + 1]);
       if (isupper(ch) && (!last_char_was_upper_or_begin || next_char_is_lower)) {
         if (!word.empty()) {
-          add_word(word, words, stop_words);
+          words.push_back(word);
           word.clear();
         }
       }
@@ -162,24 +114,15 @@ std::vector<std::string> id_to_words(std::string_view astr,
     }
   }
   if (!word.empty()) {
-    add_word(word, words, stop_words);
+    words.push_back(word);
   }
   return words;
 }
 
-std::string to_lower_no_separator_case(std::string_view astr) {
-  std::string str = strip_konstant_k(astr);
+std::string ToLowerSnakeCase(std::string_view astr) {
+  std::string str = StripConstantK(astr);
   std::string newid;
-  for (const auto& word : id_to_words(str)) {
-    newid.append(word);
-  }
-  return newid;
-}
-
-std::string to_lower_snake_case(std::string_view astr) {
-  std::string str = strip_konstant_k(astr);
-  std::string newid;
-  for (const auto& word : id_to_words(str)) {
+  for (const auto& word : SplitIdentifierWords(str)) {
     if (!newid.empty()) {
       newid.push_back('_');
     }
@@ -188,18 +131,18 @@ std::string to_lower_snake_case(std::string_view astr) {
   return newid;
 }
 
-std::string to_upper_snake_case(std::string_view astr) {
-  std::string str = strip_konstant_k(astr);
-  auto newid = to_lower_snake_case(str);
+std::string ToUpperSnakeCase(std::string_view astr) {
+  std::string str = StripConstantK(astr);
+  auto newid = ToLowerSnakeCase(str);
   std::transform(newid.begin(), newid.end(), newid.begin(), ::toupper);
   return newid;
 }
 
-std::string to_lower_camel_case(std::string_view astr) {
-  std::string str = strip_konstant_k(astr);
+std::string ToLowerCamelCase(std::string_view astr) {
+  std::string str = StripConstantK(astr);
   bool prev_char_was_digit = false;
   std::string newid;
-  for (const auto& word : id_to_words(str)) {
+  for (const auto& word : SplitIdentifierWords(str)) {
     if (newid.empty()) {
       newid.append(word);
     } else {
@@ -214,11 +157,11 @@ std::string to_lower_camel_case(std::string_view astr) {
   return newid;
 }
 
-std::string to_upper_camel_case(std::string_view astr) {
-  std::string str = strip_konstant_k(astr);
+std::string ToUpperCamelCase(std::string_view astr) {
+  std::string str = StripConstantK(astr);
   bool prev_char_was_digit = false;
   std::string newid;
-  for (const auto& word : id_to_words(str)) {
+  for (const auto& word : SplitIdentifierWords(str)) {
     if (prev_char_was_digit && isdigit(word[0])) {
       newid.push_back('_');
     }
@@ -229,9 +172,7 @@ std::string to_upper_camel_case(std::string_view astr) {
   return newid;
 }
 
-std::string to_konstant_case(std::string_view str) { return "k" + to_upper_camel_case(str); }
-
-std::string canonicalize(std::string_view identifier) {
+std::string Canonicalize(std::string_view identifier) {
   const auto size = identifier.size();
   std::string canonical;
   char prev = '_';
@@ -253,56 +194,7 @@ std::string canonicalize(std::string_view identifier) {
   return canonical;
 }
 
-std::string StringJoin(const std::vector<std::string_view>& strings, std::string_view separator) {
-  std::string result;
-  bool first = true;
-  for (const auto& part : strings) {
-    if (!first) {
-      result += separator;
-    }
-    first = false;
-    result += part;
-  }
-  return result;
-}
-
-void PrintFinding(std::ostream& os, const Finding& finding) {
-  os << finding.message() << " [";
-  os << finding.subcategory();
-  os << ']';
-  if (finding.suggestion().has_value()) {
-    auto& suggestion = finding.suggestion();
-    os << "; " << suggestion->description();
-    if (suggestion->replacement().has_value()) {
-      os << "\n    Proposed replacement:  '" << *suggestion->replacement() << "'";
-    }
-  }
-}
-
-std::vector<std::string> FormatFindings(const Findings& findings, bool enable_color) {
-  std::vector<std::string> lint;
-  for (auto& finding : findings) {
-    std::stringstream ss;
-    PrintFinding(ss, finding);
-    auto warning = Reporter::Format("warning", finding.span(), ss.str(), enable_color);
-    lint.push_back(warning);
-  }
-  return lint;
-}
-
-bool OnlyWhitespaceChanged(std::string_view unformatted_input, std::string_view formatted_output) {
-  std::string formatted(formatted_output);
-  auto formatted_end = std::remove_if(formatted.begin(), formatted.end(), isspace);
-  formatted.erase(formatted_end, formatted.end());
-
-  std::string unformatted(unformatted_input);
-  auto unformatted_end = std::remove_if(unformatted.begin(), unformatted.end(), isspace);
-  unformatted.erase(unformatted_end, unformatted.end());
-
-  return formatted == unformatted;
-}
-
-uint32_t decode_unicode_hex(std::string_view str) {
+uint32_t DecodeUnicodeHex(std::string_view str) {
   char* endptr;
   unsigned long codepoint = strtoul(str.data(), &endptr, 16);
   ZX_ASSERT(codepoint != ULONG_MAX);
@@ -310,7 +202,7 @@ uint32_t decode_unicode_hex(std::string_view str) {
   return codepoint;
 }
 
-static size_t utf8_size_for_codepoint(uint32_t codepoint) {
+static size_t Utf8SizeForCodepoint(uint32_t codepoint) {
   if (codepoint <= 0x7f) {
     return 1;
   }
@@ -324,8 +216,8 @@ static size_t utf8_size_for_codepoint(uint32_t codepoint) {
   return 4;
 }
 
-std::uint32_t string_literal_length(std::string_view str) {
-  std::uint32_t count = 0;
+uint32_t StringLiteralLength(std::string_view str) {
+  uint32_t count = 0;
   auto it = str.begin();
   ZX_ASSERT(*it == '"');
   ++it;
@@ -351,8 +243,8 @@ std::uint32_t string_literal_length(std::string_view str) {
             ++it;
           }
           auto codepoint =
-              decode_unicode_hex(std::string_view(&(*codepoint_begin), it - codepoint_begin));
-          count += utf8_size_for_codepoint(codepoint) - 1;
+              DecodeUnicodeHex(std::string_view(&(*codepoint_begin), it - codepoint_begin));
+          count += Utf8SizeForCodepoint(codepoint) - 1;
           break;
         }
         default:
@@ -363,6 +255,30 @@ std::uint32_t string_literal_length(std::string_view str) {
   }
   ZX_ASSERT(*it == '"');
   return count;
+}
+
+void PrintFinding(std::ostream& os, const Finding& finding) {
+  os << finding.message() << " [";
+  os << finding.subcategory();
+  os << ']';
+  if (finding.suggestion().has_value()) {
+    auto& suggestion = finding.suggestion();
+    os << "; " << suggestion->description();
+    if (suggestion->replacement().has_value()) {
+      os << "\n    Proposed replacement:  '" << *suggestion->replacement() << "'";
+    }
+  }
+}
+
+std::vector<std::string> FormatFindings(const Findings& findings, bool enable_color) {
+  std::vector<std::string> lint;
+  for (auto& finding : findings) {
+    std::stringstream ss;
+    PrintFinding(ss, finding);
+    auto warning = Reporter::Format("warning", finding.span(), ss.str(), enable_color);
+    lint.push_back(warning);
+  }
+  return lint;
 }
 
 }  // namespace fidlc

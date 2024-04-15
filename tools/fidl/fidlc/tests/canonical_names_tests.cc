@@ -515,10 +515,10 @@ TEST(CanonicalNamesTests, BadVariousCollisions) {
       "a", "a1", "x_single_start", "single_end_x", "x_single_both_x", "single_x_middle",
   };
   const auto functions = {
-      to_lower_snake_case,
-      to_upper_snake_case,
-      to_lower_camel_case,
-      to_upper_camel_case,
+      ToLowerSnakeCase,
+      ToUpperSnakeCase,
+      ToLowerCamelCase,
+      ToUpperCamelCase,
   };
 
   for (const auto base_name : base_names) {
@@ -539,12 +539,12 @@ TEST(CanonicalNamesTests, BadVariousCollisions) {
           // We compile name1 first, and see that name2 collides with it.
           library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kStruct, name2,
                              Element::Kind::kStruct, name1, "example.fidl:2:6",
-                             canonicalize(name1));
+                             Canonicalize(name1));
         } else {
           // We compile name2 first, and see that name1 collides with it.
           library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kStruct, name1,
                              Element::Kind::kStruct, name2, "example.fidl:3:6",
-                             canonicalize(name1));
+                             Canonicalize(name1));
         }
         ASSERT_COMPILER_DIAGNOSTICS(library);
       }

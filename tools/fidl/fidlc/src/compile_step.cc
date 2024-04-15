@@ -517,7 +517,7 @@ const Type* CompileStep::InferType(Constant* constant) {
       switch (literal->kind) {
         case RawLiteral::Kind::kString: {
           auto string_literal = static_cast<const RawStringLiteral*>(literal);
-          auto inferred_size = string_literal_length(string_literal->span().data());
+          auto inferred_size = StringLiteralLength(string_literal->span().data());
           return typespace()->GetStringType(inferred_size);
         }
         case RawLiteral::Kind::kNumeric:
@@ -557,7 +557,7 @@ void CompileStep::CompileAttributeList(AttributeList* attributes) {
   Scope<std::string> scope;
   for (auto& attribute : attributes->attributes) {
     const auto original_name = attribute->name.data();
-    const auto canonical_name = canonicalize(original_name);
+    const auto canonical_name = Canonicalize(original_name);
     const auto result = scope.Insert(canonical_name, attribute->name);
     if (!result.ok()) {
       const auto previous_span = result.previous_occurrence();
@@ -583,7 +583,7 @@ void CompileStep::CompileAttribute(Attribute* attribute, bool early) {
       continue;
     }
     const auto original_name = arg->name.value().data();
-    const auto canonical_name = canonicalize(original_name);
+    const auto canonical_name = Canonicalize(original_name);
     const auto result = scope.Insert(canonical_name, arg->name.value());
     if (!result.ok()) {
       const auto previous_span = result.previous_occurrence();
@@ -962,7 +962,7 @@ class PopulateAllMethods {
     }
     for (auto& method : protocol->methods) {
       auto original_name = method.name.data();
-      auto canonical_name = canonicalize(original_name);
+      auto canonical_name = Canonicalize(original_name);
       if (auto result = canonical_names_.Insert(canonical_name, method.name); !result.ok()) {
         auto previous_span = result.previous_occurrence();
         if (original_name == previous_span.data()) {

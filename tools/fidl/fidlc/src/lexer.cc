@@ -282,7 +282,7 @@ Token Lexer::LexStringLiteral() {
           } else {
             SourceSpan span(std::string_view(current_ - 1 - unicode_hex_digits, unicode_hex_digits),
                             source_file_);
-            auto codepoint = decode_unicode_hex(span.data());
+            auto codepoint = DecodeUnicodeHex(span.data());
             if (codepoint > 0x10ffff) {
               reporter_->Fail(ErrUnicodeEscapeTooLarge, span, span.data());
             }

@@ -17,16 +17,16 @@ std::string NamingContext::BuildFlattenedName(SourceSpan name, Kind kind,
     case Kind::kDecl:
       return std::string(name.data());
     case Kind::kLayoutMember:
-      return to_upper_camel_case(std::string(name.data()));
+      return ToUpperCamelCase(std::string(name.data()));
     case Kind::kMethodRequest: {
-      std::string result = to_upper_camel_case(std::string(parent->name_.data()));
-      result.append(to_upper_camel_case(std::string(name.data())));
+      std::string result = ToUpperCamelCase(std::string(parent->name_.data()));
+      result.append(ToUpperCamelCase(std::string(name.data())));
       result.append("Request");
       return result;
     }
     case Kind::kMethodResponse: {
-      std::string result = to_upper_camel_case(std::string(parent->name_.data()));
-      result.append(to_upper_camel_case(std::string(name.data())));
+      std::string result = ToUpperCamelCase(std::string(parent->name_.data()));
+      result.append(ToUpperCamelCase(std::string(name.data())));
       result.append("Response");
       return result;
     }

@@ -263,7 +263,7 @@ void JSONGenerator::Generate(const AttributeArg& value) {
 
 void JSONGenerator::Generate(const Attribute& value) {
   GenerateObject([&]() {
-    const auto& name = to_lower_snake_case(std::string(value.name.data()));
+    const auto& name = ToLowerSnakeCase(std::string(value.name.data()));
     GenerateObjectMember("name", name, Position::kFirst);
     GenerateObjectMember("arguments", value.args);
     ZX_ASSERT(value.span.valid());

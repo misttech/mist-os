@@ -35,7 +35,8 @@ class Reporter {
   };
 
   template <ErrorId Id, typename... Args>
-  bool Fail(const ErrorDef<Id, Args...>& def, SourceSpan span, const identity_t<Args>&... args) {
+  bool Fail(const ErrorDef<Id, Args...>& def, SourceSpan span,
+            const cpp20::type_identity_t<Args>&... args) {
     static_assert(Id <= kNumDiagnosticDefs,
                   "please add this ErrorDef to kAllDiagnosticDefs in diagnostics.h");
     Report(Diagnostic::MakeError(def, span, args...));
@@ -43,7 +44,8 @@ class Reporter {
   }
 
   template <ErrorId Id, typename... Args>
-  void Warn(const WarningDef<Id, Args...>& def, SourceSpan span, const identity_t<Args>&... args) {
+  void Warn(const WarningDef<Id, Args...>& def, SourceSpan span,
+            const cpp20::type_identity_t<Args>&... args) {
     static_assert(Id <= kNumDiagnosticDefs,
                   "please add this WarningDef to kAllDiagnosticDefs in diagnostics.h");
     Report(Diagnostic::MakeWarning(def, span, args...));

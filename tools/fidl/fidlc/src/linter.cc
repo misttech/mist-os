@@ -474,7 +474,7 @@ Linter::Linter()
       (const RawProtocolDeclaration& element) {
         linter.CheckCase("protocols", element.identifier, linter.invalid_case_for_decl_name(),
                          linter.upper_camel_);
-        for (const auto& word : id_to_words(to_string(element.identifier))) {
+        for (const auto& word : SplitIdentifierWords(to_string(element.identifier))) {
           if (word == "service") {
             linter.AddFinding(element.identifier, name_contains_service_check);
             break;

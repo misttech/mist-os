@@ -15,7 +15,7 @@ std::unique_ptr<AttributeArg> AttributeArg::Clone() const {
 }
 
 const AttributeArg* Attribute::GetArg(std::string_view arg_name) const {
-  std::string name = canonicalize(arg_name);
+  std::string name = Canonicalize(arg_name);
   for (const auto& arg : args) {
     if (arg->name && arg->name.value().data() == name) {
       return arg.get();
