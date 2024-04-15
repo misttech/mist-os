@@ -123,6 +123,42 @@ impl From<EthernetSockaddr> for libc::sockaddr_ll {
     }
 }
 
+/// Socket address for a Pure IP packet socket.
+pub struct PureIpSockaddr {
+    /// The interface identifier, or `None` for no interface.
+    pub interface_id: Option<NonZeroU64>,
+    /// The IP version.
+    pub protocol: net_types::ip::IpVersion,
+}
+
+impl From<PureIpSockaddr> for libc::sockaddr_ll {
+    fn from(value: PureIpSockaddr) -> Self {
+        let PureIpSockaddr { interface_id, protocol } = value;
+        let protocol = match protocol {
+            net_types::ip::IpVersion::V4 => libc::ETH_P_IP,
+            net_types::ip::IpVersion::V6 => libc::ETH_P_IPV6,
+        };
+        libc::sockaddr_ll {
+            sll_family: libc::AF_PACKET
+                .try_into()
+                .expect("libc::AF_PACKET should fit in sll_family field"),
+            sll_ifindex: interface_id
+                .map_or(0, NonZeroU64::get)
+                .try_into()
+                .expect("interface_id should fit in sll_ifindex field"),
+            // Network order is big endian.
+            sll_protocol: u16::try_from(protocol)
+                .expect("protocol should fit in sll_protocol field")
+                .to_be(),
+            // Pure IP devices don't have a hardware address.
+            sll_halen: 0,
+            sll_addr: [0, 0, 0, 0, 0, 0, 0, 0],
+            sll_hatype: 0,  // unused by sendto() or bind()
+            sll_pkttype: 0, // unused by sendto() or bind()
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

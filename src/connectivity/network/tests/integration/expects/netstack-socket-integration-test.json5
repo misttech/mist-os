@@ -17,15 +17,16 @@
                 "tcp_socket_shutdown_listener_v6_ns2",
                 "udp_recv_msg_postflight_fidl_ns3*",
                 "udp_send_msg_preflight*ns3*",
-            ],
-        },
-        {
-            type: "expect_failure",
-            matchers: [
+
                 // TODO(https://fxbug.dev/321240038): remove when Netstack3's
                 // SocketMap correctly takes bound devices into account.
                 "tcp_connect_bound_to_device_ns3",
                 "tcp_bind_with_zone_connect_unzoned_ns3",
+
+                // TODO(https://fxbug.dev/42051633): Support Pure IP devices in
+                // Netstack3.
+                "ip_endpoints_socket_ns3_v4::packet_socket",
+                "ip_endpoints_socket_ns3_v6::packet_socket",
             ],
         },
         {

@@ -20,6 +20,7 @@ use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_net_tun as fnet_tun;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
+use fidl_fuchsia_posix_socket_packet as fpacket;
 use fuchsia_async::{
     self as fasync,
     net::{DatagramSocket, UdpSocket},
@@ -38,7 +39,10 @@ use net_declare::{
 };
 use net_types::{
     ethernet::Mac,
-    ip::{AddrSubnetEither, Ip, IpAddress as _, IpInvariant, Ipv4, Ipv4Addr, Ipv6},
+    ip::{
+        AddrSubnetEither, Ip, IpAddress as _, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6,
+        Ipv6Addr,
+    },
     Witness as _,
 };
 use netemul::{
@@ -52,8 +56,9 @@ use netstack_testing_common::{
     realms::{KnownServiceProvider, Netstack, NetstackVersion, TestSandboxExt as _},
     Result,
 };
+
 use netstack_testing_macros::netstack_test;
-use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
+use packet::{serialize::Buf, InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
 use packet_formats::{
     arp::{ArpOp, ArpPacketBuilder},
     ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG},
@@ -62,15 +67,18 @@ use packet_formats::{
             options::{NdpOptionBuilder, PrefixInformation},
             NeighborAdvertisement,
         },
-        IcmpDestUnreachable, IcmpPacketBuilder, Icmpv4DestUnreachableCode,
-        Icmpv6DestUnreachableCode,
+        IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode,
+        Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv6DestUnreachableCode, Icmpv6Packet,
+        MessageBody,
     },
+    igmp::messages::IgmpPacket,
     ip::{IpProto, Ipv4Proto, Ipv6Proto},
     ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder},
-    ipv6::{Ipv6Header as _, Ipv6Packet},
+    ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder},
 };
+use sockaddr::{IntoSockAddr as _, PureIpSockaddr};
 use socket2::SockRef;
-use std::pin::pin;
+use std::{num::NonZeroU64, pin::pin};
 use test_case::test_case;
 
 async fn run_udp_socket_test(
@@ -113,6 +121,112 @@ async fn run_udp_socket_test(
     };
 
     let ((), ()) = futures::future::join(client_fut, server_fut).await;
+}
+
+async fn run_ip_endpoint_packet_socket_test(
+    server: &netemul::TestRealm<'_>,
+    server_iface_id: u64,
+    server_addr: fnet::IpAddress,
+    client: &netemul::TestRealm<'_>,
+    client_iface_id: u64,
+    client_addr: fnet::IpAddress,
+) {
+    async fn new_packet_socket_in_realm(
+        realm: &netemul::TestRealm<'_>,
+        addr: PureIpSockaddr,
+    ) -> Result<fasync::net::DatagramSocket> {
+        let socket =
+            realm.packet_socket(fpacket::Kind::Network).await.context("creating packet socket")?;
+        let sockaddr = libc::sockaddr_ll::from(addr).into_sockaddr();
+        let () = socket.bind(&sockaddr).context("binding packet_socket")?;
+        let socket = fasync::net::DatagramSocket::new_from_socket(socket)
+            .context("wrapping packet socket in fuchsia-async DatagramSocket")?;
+        Ok(socket)
+    }
+
+    let (ip_version, packet) = {
+        const PAYLOAD: &'static str = "Hello World";
+        const HOP_LIMIT: u8 = 1;
+        let data = PAYLOAD.bytes().collect::<Vec<_>>();
+        match (client_addr, server_addr) {
+            (fnet::IpAddress::Ipv4(client), fnet::IpAddress::Ipv4(server)) => {
+                let builder = Ipv4PacketBuilder::new(
+                    std::net::Ipv4Addr::from(client.addr),
+                    std::net::Ipv4Addr::from(server.addr),
+                    HOP_LIMIT,
+                    Ipv4Proto::Other(u8::MAX),
+                );
+                (
+                    IpVersion::V4,
+                    Buf::new(data, ..)
+                        .encapsulate(builder)
+                        .serialize_vec_outer()
+                        .expect("serialize")
+                        .into_inner()
+                        .into_inner(),
+                )
+            }
+            (fnet::IpAddress::Ipv6(client), fnet::IpAddress::Ipv6(server)) => {
+                let builder = Ipv6PacketBuilder::new(
+                    std::net::Ipv6Addr::from(client.addr),
+                    std::net::Ipv6Addr::from(server.addr),
+                    HOP_LIMIT,
+                    Ipv6Proto::NoNextHeader,
+                );
+                (
+                    IpVersion::V6,
+                    Buf::new(data, ..)
+                        .encapsulate(builder)
+                        .serialize_vec_outer()
+                        .expect("serialize")
+                        .into_inner()
+                        .into_inner(),
+                )
+            }
+            addrs => panic!("client and server addresses are not the same IP version: {addrs:?}"),
+        }
+    };
+
+    let client_iface_id = NonZeroU64::new(client_iface_id).expect("client iface id is 0");
+    let server_iface_id = NonZeroU64::new(server_iface_id).expect("server iface id is 0");
+
+    let client_sock = new_packet_socket_in_realm(
+        client,
+        PureIpSockaddr { interface_id: Some(client_iface_id), protocol: ip_version },
+    )
+    .await
+    .expect("failed to create client socket");
+
+    let server_sock = new_packet_socket_in_realm(
+        server,
+        PureIpSockaddr { interface_id: Some(server_iface_id), protocol: ip_version },
+    )
+    .await
+    .expect("failed to create server socket");
+
+    let send_to_addr = libc::sockaddr_ll::from(PureIpSockaddr {
+        interface_id: Some(client_iface_id),
+        protocol: ip_version,
+    })
+    .into_sockaddr();
+    let r = client_sock.send_to(&packet, send_to_addr).await.expect("sendto failed");
+    assert_eq!(r, packet.len());
+
+    let mut buf = [0u8; 1024];
+    // Receive from the socket, ignoring all spurious data that may be observed
+    // from the network.
+    let (recv_len, from) = {
+        loop {
+            let (recv_len, from) =
+                server_sock.recv_from(&mut buf[..]).await.expect("failed to receive");
+            if !is_packet_spurious(ip_version, &buf[..recv_len]).expect("failed to parse packet") {
+                break (recv_len, from);
+            }
+        }
+    };
+    assert_eq!(recv_len, packet.len());
+    assert_eq!(&buf[..recv_len], &packet);
+    assert_eq!(i32::from(from.family()), libc::AF_PACKET);
 }
 
 const CLIENT_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.2/24");
@@ -1935,8 +2049,20 @@ fn base_ip_device_port_config() -> fnet_tun::BasePortConfig {
     }
 }
 
+enum IpEndpointsSocketTestCase {
+    Udp,
+    Tcp,
+    Packet,
+}
+
 #[netstack_test]
-async fn ip_endpoints_socket<N: Netstack>(name: &str) {
+#[test_case(IpEndpointsSocketTestCase::Udp; "udp_socket")]
+#[test_case(IpEndpointsSocketTestCase::Tcp; "tcp_socket")]
+#[test_case(IpEndpointsSocketTestCase::Packet; "packet_socket")]
+async fn ip_endpoints_socket<N: Netstack, I: net_types::ip::Ip>(
+    name: &str,
+    socket_type: IpEndpointsSocketTestCase,
+) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let client = sandbox
         .create_netstack_realm::<N, _>(format!("{}_client", name))
@@ -1958,27 +2084,94 @@ async fn ip_endpoints_socket<N: Netstack>(name: &str) {
     .await;
 
     // Addresses must be in the same subnet.
-    const SERVER_ADDR_V4: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
-    const SERVER_ADDR_V6: fnet::Subnet = fidl_subnet!("2001::1/120");
-    const CLIENT_ADDR_V4: fnet::Subnet = fidl_subnet!("192.168.0.2/24");
-    const CLIENT_ADDR_V6: fnet::Subnet = fidl_subnet!("2001::2/120");
+    let (client_addr, server_addr) = match I::VERSION {
+        IpVersion::V4 => (fidl_subnet!("192.168.0.1/24"), fidl_subnet!("192.168.0.2/24")),
+        IpVersion::V6 => (fidl_subnet!("2001::1/120"), fidl_subnet!("2001::2/120")),
+    };
 
     // We install both devices in parallel because a DevicePair will only have
     // its link signal set to up once both sides have sessions attached. This
     // way both devices will be configured "at the same time" and DAD will be
     // able to complete for IPv6 addresses.
     let (
-        (_client_id, _client_control, _client_device_control),
-        (_server_id, _server_control, _server_device_control),
+        (client_id, _client_control, _client_device_control),
+        (server_id, _server_control, _server_device_control),
     ) = futures::future::join(
-        install_ip_device(&client, client_port, [CLIENT_ADDR_V4, CLIENT_ADDR_V6]),
-        install_ip_device(&server, server_port, [SERVER_ADDR_V4, SERVER_ADDR_V6]),
+        install_ip_device(&client, client_port, [client_addr]),
+        install_ip_device(&server, server_port, [server_addr]),
     )
     .await;
 
-    // Run socket test for both IPv4 and IPv6.
-    let () = run_udp_socket_test(&server, SERVER_ADDR_V4.addr, &client, CLIENT_ADDR_V4.addr).await;
-    let () = run_udp_socket_test(&server, SERVER_ADDR_V6.addr, &client, CLIENT_ADDR_V6.addr).await;
+    match socket_type {
+        IpEndpointsSocketTestCase::Udp => {
+            run_udp_socket_test(&server, server_addr.addr, &client, client_addr.addr).await
+        }
+        IpEndpointsSocketTestCase::Tcp => {
+            run_tcp_socket_test(&server, server_addr.addr, &client, client_addr.addr).await
+        }
+        IpEndpointsSocketTestCase::Packet => {
+            run_ip_endpoint_packet_socket_test(
+                &server,
+                server_id,
+                server_addr.addr,
+                &client,
+                client_id,
+                client_addr.addr,
+            )
+            .await
+        }
+    }
+}
+
+/// Returns true if the packet is one of is IGMP, MLD, or NDP.
+
+/// This traffic implicitly exists on the network, and may be unexpectedly
+/// received during tests who interact directly with the underlying device (e.g.
+/// via packet sockets, or via the netdevice APIs).
+///
+/// Returns `Err` if the packet cannot be parsed.
+fn is_packet_spurious(ip_version: IpVersion, mut body: &[u8]) -> Result<bool> {
+    match ip_version {
+        IpVersion::V6 => {
+            let ipv6 = Ipv6Packet::parse(&mut body, ())
+                .with_context(|| format!("failed to parse IPv6 packet {:?}", body))?;
+            if ipv6.proto() == Ipv6Proto::Icmpv6 {
+                let parse_args =
+                    packet_formats::icmp::IcmpParseArgs::new(ipv6.src_ip(), ipv6.dst_ip());
+                match Icmpv6Packet::parse(&mut body, parse_args)
+                    .context("failed to parse ICMP packet")?
+                {
+                    Icmpv6Packet::Ndp(p) => {
+                        println!("ignoring NDP packet {:?}", p);
+                        Ok(true)
+                    }
+                    Icmpv6Packet::Mld(p) => {
+                        println!("ignoring MLD packet {:?}", p);
+                        Ok(true)
+                    }
+                    Icmpv6Packet::DestUnreachable(_)
+                    | Icmpv6Packet::PacketTooBig(_)
+                    | Icmpv6Packet::TimeExceeded(_)
+                    | Icmpv6Packet::ParameterProblem(_)
+                    | Icmpv6Packet::EchoRequest(_)
+                    | Icmpv6Packet::EchoReply(_) => Ok(false),
+                }
+            } else {
+                Ok(false)
+            }
+        }
+        IpVersion::V4 => {
+            let ipv4 = Ipv4Packet::parse(&mut body, ())
+                .with_context(|| format!("failed to parse IPv4 packet {:?}", body))?;
+            if ipv4.proto() == Ipv4Proto::Igmp {
+                let p = IgmpPacket::parse(&mut body, ()).context("failed to parse IGMP packet")?;
+                println!("ignoring IGMP packet {:?}", p);
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        }
+    }
 }
 
 #[netstack_test]
@@ -2039,18 +2232,6 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
     )
     .await;
 
-    use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
-    use packet::ParsablePacket;
-    use packet_formats::{
-        icmp::{
-            IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode, Icmpv4Packet, Icmpv6Packet,
-            MessageBody,
-        },
-        igmp::messages::IgmpPacket,
-        ipv4::{Ipv4Packet, Ipv4PacketBuilder},
-        ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder},
-    };
-
     let read_frame = futures::stream::try_unfold(tun_dev.clone(), |tun_dev| async move {
         let frame = tun_dev
             .read_frame()
@@ -2063,50 +2244,16 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
     .try_filter_map(|frame| async move {
         let frame_type = frame.frame_type.context("missing frame type in frame")?;
         let frame_data = frame.data.context("missing data in frame")?;
-        match frame_type {
+        let is_spurious = match frame_type {
             fhardware_network::FrameType::Ipv6 => {
-                // Ignore all NDP and MLD IPv6 frames.
-                let mut bv = &frame_data[..];
-                let ipv6 = Ipv6Packet::parse(&mut bv, ())
-                    .with_context(|| format!("failed to parse IPv6 packet {:?}", frame_data))?;
-                if ipv6.proto() == Ipv6Proto::Icmpv6 {
-                    let parse_args =
-                        packet_formats::icmp::IcmpParseArgs::new(ipv6.src_ip(), ipv6.dst_ip());
-                    match Icmpv6Packet::parse(&mut bv, parse_args)
-                        .context("failed to parse ICMP packet")?
-                    {
-                        Icmpv6Packet::Ndp(p) => {
-                            println!("ignoring NDP packet {:?}", p);
-                            return Ok(None);
-                        }
-                        Icmpv6Packet::Mld(p) => {
-                            println!("ignoring MLD packet {:?}", p);
-                            return Ok(None);
-                        }
-                        Icmpv6Packet::DestUnreachable(_)
-                        | Icmpv6Packet::PacketTooBig(_)
-                        | Icmpv6Packet::TimeExceeded(_)
-                        | Icmpv6Packet::ParameterProblem(_)
-                        | Icmpv6Packet::EchoRequest(_)
-                        | Icmpv6Packet::EchoReply(_) => {}
-                    }
-                }
+                is_packet_spurious(IpVersion::V6, &frame_data[..])
             }
             fhardware_network::FrameType::Ipv4 => {
-                // Ignore all IGMP frames.
-                let mut bv = &frame_data[..];
-                let ipv4 = Ipv4Packet::parse(&mut bv, ())
-                    .with_context(|| format!("failed to parse IPv4 packet {:?}", frame_data))?;
-                if ipv4.proto() == Ipv4Proto::Igmp {
-                    let p =
-                        IgmpPacket::parse(&mut bv, ()).context("failed to parse IGMP packet")?;
-                    println!("ignoring IGMP packet {:?}", p);
-                    return Ok(None);
-                }
+                is_packet_spurious(IpVersion::V4, &frame_data[..])
             }
-            fhardware_network::FrameType::Ethernet => {}
-        }
-        Ok(Some((frame_type, frame_data)))
+            fhardware_network::FrameType::Ethernet => Ok(false),
+        }?;
+        Ok((!is_spurious).then_some((frame_type, frame_data)))
     });
     let mut read_frame = pin!(read_frame);
 
