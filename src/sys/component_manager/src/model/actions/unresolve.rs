@@ -29,8 +29,8 @@ impl UnresolveAction {
 
 #[async_trait]
 impl Action for UnresolveAction {
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<(), ActionError> {
-        do_unresolve(component).await
+    async fn handle(self, component: Arc<ComponentInstance>) -> Result<(), ActionError> {
+        do_unresolve(&component).await
     }
     fn key(&self) -> ActionKey {
         ActionKey::Unresolve

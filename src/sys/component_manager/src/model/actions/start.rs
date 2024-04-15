@@ -84,9 +84,9 @@ impl StartAction {
 
 #[async_trait]
 impl Action for StartAction {
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<(), ActionError> {
+    async fn handle(self, component: Arc<ComponentInstance>) -> Result<(), ActionError> {
         do_start(
-            component,
+            &component,
             &self.start_reason,
             self.execution_controller_task,
             self.incoming,

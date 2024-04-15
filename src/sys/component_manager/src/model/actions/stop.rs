@@ -25,7 +25,7 @@ impl StopAction {
 
 #[async_trait]
 impl Action for StopAction {
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<(), ActionError> {
+    async fn handle(self, component: Arc<ComponentInstance>) -> Result<(), ActionError> {
         // Ensure `Stop` is dispatched after `Discovered`.
         {
             let discover_completed =

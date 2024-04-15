@@ -91,7 +91,7 @@ use {
 #[async_trait]
 pub trait Action: Send + Sync + 'static {
     /// Run the action.
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<(), ActionError>;
+    async fn handle(self, component: Arc<ComponentInstance>) -> Result<(), ActionError>;
 
     /// `key` identifies the action.
     fn key(&self) -> ActionKey;
@@ -321,7 +321,7 @@ impl ActionSet {
             }
             _ = join_all(prereqs).await;
             let key = action.key();
-            let res = action.handle(&component).await;
+            let res = action.handle(component.clone()).await;
             Self::finish(&component, &key).await;
             res
         }

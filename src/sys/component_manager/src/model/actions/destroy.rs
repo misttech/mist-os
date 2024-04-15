@@ -35,8 +35,8 @@ impl DestroyAction {
 
 #[async_trait]
 impl Action for DestroyAction {
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<(), ActionError> {
-        do_destroy(component).await.map_err(Into::into)
+    async fn handle(self, component: Arc<ComponentInstance>) -> Result<(), ActionError> {
+        do_destroy(&component).await.map_err(Into::into)
     }
     fn key(&self) -> ActionKey {
         ActionKey::Destroy
@@ -350,7 +350,7 @@ pub mod tests {
 
     #[async_trait]
     impl Action for MockAction {
-        async fn handle(mut self, _: &Arc<ComponentInstance>) -> Result<(), ActionError> {
+        async fn handle(mut self, _: Arc<ComponentInstance>) -> Result<(), ActionError> {
             self.rx.next().await.unwrap();
             self.result
         }
