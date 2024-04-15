@@ -18,7 +18,7 @@ use {
     fuchsia_hash::Hash,
     fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
     fuchsia_zircon::{self as zx, HandleBased as _, Status},
-    futures::{lock::Mutex as AsyncMutex, try_join, TryStreamExt as _},
+    futures::{try_join, TryStreamExt as _},
     fxfs::{
         errors::FxfsError,
         object_handle::{ObjectHandle, WriteObjectHandle},
@@ -32,10 +32,7 @@ use {
         serialized_types::BlobMetadata,
     },
     lazy_static::lazy_static,
-    std::sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    std::sync::Arc,
 };
 
 lazy_static! {
@@ -44,27 +41,34 @@ lazy_static! {
 
 const PAYLOAD_BUFFER_FLUSH_THRESHOLD: usize = 131_072; /* 128 KiB */
 
-/// Represents an RFC-0207 compliant delivery blob that is being written. The blob cannot be read
-/// until writes complete, and the Merkle root has been verified.
+/// Represents an RFC-0207 compliant delivery blob that is being written. Used to implement the
+/// fuchisa.fxfs/BlobWriter protocol (see [`Self::handle_requests`]).
+///
+/// Once all data for the delivery blob has been written, the calculated Merkle root is verified
+/// against [`Self::hash`]. On success, the blob is added under the [`Self::parent`] directory.
 pub struct DeliveryBlobWriter {
+    /// The expected hash for this blob. **MUST** match the Merkle root from [`Self::tree_builder`].
     hash: Hash,
+    /// Handle to this blob within the filesystem.
     handle: DataObjectHandle<FxVolume>,
+    /// The parent directory we will add this blob to once verified.
     parent: Arc<FxDirectory>,
-    is_completed: AtomicBool,
-    inner: AsyncMutex<Inner>,
-}
-
-struct Inner {
-    /// Total number of bytes we expect for the delivery blob to be fully written. This is the same
-    /// number of bytes passed to truncate. We expect this to be non-zero for a delivery blob.
-    delivery_size: Option<u64>,
-    /// Write offset with respect to the fuchsia.io protocol.
-    delivery_bytes_written: u64,
-    /// Vmo used for the blob writer protocol.
+    /// Set to true once we have verified the blob and ensured it was added to the blob directory.
+    is_completed: bool,
+    /// Total number of bytes we expect for this delivery blob (via fuchsia.fxfs/BlobWriter.GetVmo).
+    /// This is checked against the header + payload size encoded within the delivery blob.
+    expected_size: Option<u64>,
+    /// Total number of bytes that have been written to this delivery blob so far. When this reaches
+    /// [`Self::expected_size`], the blob will be verified.
+    total_written: u64,
+    /// Vmo for the ring buffer used for the fuchsia.fxfs/BlobWriter protocol.
     vmo: Option<zx::Vmo>,
-    /// Internal buffer of data being written via the write protocols.
+    /// Temporary buffer used to copy data from [`Self::vmo`].
     buffer: Vec<u8>,
+    /// The header for this delivery blob. Decoded once we have enough data.
     header: Option<Type1Blob>,
+    /// The Merkle tree builder for this blob. Once the Merkle tree is complete, the root hash of
+    /// the blob is verified, before storing the Merkle tree as part of the blob's metadata.
     tree_builder: MerkleTreeBuilder,
     /// Set to true when we've allocated space for the blob payload on disk.
     allocated_space: bool,
@@ -72,15 +76,45 @@ struct Inner {
     payload_persisted: u64,
     /// Offset within the delivery blob payload we started writing data to disk.
     payload_offset: u64,
-    /// Decompressor used when writing compressed delivery blobs.
+    /// Streaming decompressor used to calculate the Merkle tree of compressed delivery blobs.
+    /// Initialized once the seek table has been decoded and verified.
     decompressor: Option<ChunkedDecompressor>,
 }
 
-impl Default for Inner {
-    fn default() -> Self {
-        Self {
-            delivery_size: None,
-            delivery_bytes_written: 0,
+impl DeliveryBlobWriter {
+    /// Creates a new object in the `parent` object store that manages writing the blob `hash`.
+    /// After the blob is fully written and verified, it will be added as an entry under `parent`.
+    /// If this object is dropped before the blob is fully written/verified, it will be tombstoned.
+    pub(crate) async fn new(parent: &Arc<BlobDirectory>, hash: Hash) -> Result<Self, Error> {
+        let parent = parent.directory().clone();
+        let store = parent.store();
+        let keys = lock_keys![LockKey::object(store.store_object_id(), parent.object_id())];
+        let mut transaction = store
+            .filesystem()
+            .clone()
+            .new_transaction(keys, Default::default())
+            .await
+            .context("Failed to create transaction.")?;
+        let handle = ObjectStore::create_object(
+            parent.volume(),
+            &mut transaction,
+            // Checksums are redundant for blobs, which are already content-verified.
+            HandleOptions { skip_checksums: true, ..Default::default() },
+            None,
+            None,
+        )
+        .await
+        .context("Failed to create object.")?;
+        // Add the object to the graveyard so that it's cleaned up if we crash.
+        store.add_to_graveyard(&mut transaction, handle.object_id());
+        transaction.commit().await.context("Failed to commit transaction.")?;
+        Ok(Self {
+            hash,
+            handle,
+            parent,
+            is_completed: false,
+            expected_size: None,
+            total_written: 0,
             vmo: None,
             buffer: Default::default(),
             header: None,
@@ -89,11 +123,24 @@ impl Default for Inner {
             payload_persisted: 0,
             payload_offset: 0,
             decompressor: None,
+        })
+    }
+}
+
+impl Drop for DeliveryBlobWriter {
+    /// Tombstone the object if we didn't finish writing the blob or the hash didn't match.
+    fn drop(&mut self) {
+        if !self.is_completed {
+            let store = self.handle.store();
+            store
+                .filesystem()
+                .graveyard()
+                .queue_tombstone_object(store.store_object_id(), self.handle.object_id());
         }
     }
 }
 
-impl Inner {
+impl DeliveryBlobWriter {
     fn header(&self) -> &Type1Blob {
         self.header.as_ref().unwrap()
     }
@@ -117,11 +164,16 @@ impl Inner {
         header.payload_length
     }
 
-    async fn write_payload(&mut self, handle: &DataObjectHandle<FxVolume>) -> Result<(), Error> {
-        debug_assert!(self.allocated_space);
+    async fn write_payload(&mut self) -> Result<(), Error> {
+        self.ensure_allocated().await.with_context(|| {
+            format!(
+                "Failed to allocate space for blob (required space = {} bytes)",
+                self.storage_size()
+            )
+        })?;
         let final_write =
             (self.payload_persisted as usize + self.buffer.len()) == self.header().payload_length;
-        let block_size = handle.block_size() as usize;
+        let block_size = self.handle.block_size() as usize;
         let flush_threshold = std::cmp::max(block_size, PAYLOAD_BUFFER_FLUSH_THRESHOLD);
         // If we expect more data but haven't met the flush threshold, wait for more.
         if !final_write && self.buffer.len() < flush_threshold {
@@ -148,13 +200,17 @@ impl Inner {
 
         // Copy data into transfer buffer, zero pad if required.
         let aligned_len = round_up(len, block_size).ok_or(FxfsError::OutOfRange)?;
-        let mut buffer = handle.allocate_buffer(aligned_len).await;
+        let mut buffer = self.handle.allocate_buffer(aligned_len).await;
         buffer.as_mut_slice()[..len].copy_from_slice(&self.buffer[..len]);
         buffer.as_mut_slice()[len..].fill(0);
 
         // Overwrite allocated bytes in the object's handle.
-        let overwrite_fut =
-            handle.overwrite(self.payload_persisted - self.payload_offset, buffer.as_mut(), false);
+        let overwrite_fut = async {
+            self.handle
+                .overwrite(self.payload_persisted - self.payload_offset, buffer.as_mut(), false)
+                .await
+                .context("Failed to write data to object handle.")
+        };
         // NOTE: `overwrite_fut` needs to be polled first to initiate the asynchronous write to the
         // block device which will then run in parallel with the synchronous
         // `update_merkle_tree_fut`.
@@ -178,7 +234,8 @@ impl Inner {
                 hashes.push(**hash);
             }
             let (uncompressed_size, chunk_size, compressed_offsets) = if is_compressed {
-                parse_seek_table(self.decompressor().seek_table())?
+                parse_seek_table(self.decompressor().seek_table())
+                    .context("Failed to parse seek table.")?
             } else {
                 (self.header().payload_length as u64, 0u64, vec![])
             };
@@ -188,82 +245,61 @@ impl Inner {
             Ok(None)
         }
     }
-}
 
-impl DeliveryBlobWriter {
-    /// Creates a new object under the |parent| directory that manages writing the blob |hash|.
-    /// After the blob is fully written and verified, it will be linked as an entry under |parent|.
-    /// If this object is dropped before the blob is fully written/verified, it will be tombstoned.
-    pub(crate) async fn new(parent: &Arc<BlobDirectory>, hash: Hash) -> Result<Self, Error> {
-        let parent = parent.directory().clone();
-        let store = parent.store();
-        let keys = lock_keys![LockKey::object(store.store_object_id(), parent.object_id())];
-        let mut transaction =
-            store.filesystem().clone().new_transaction(keys, Default::default()).await?;
-        let handle = ObjectStore::create_object(
-            parent.volume(),
-            &mut transaction,
-            // Checksums are redundant for blobs, which are already content-verified.
-            HandleOptions { skip_checksums: true, ..Default::default() },
-            None,
-            None,
-        )
-        .await?;
-        // Add the object to the graveyard so that it's cleaned up if we crash.
-        store.add_to_graveyard(&mut transaction, handle.object_id());
-        transaction.commit().await?;
-        Ok(Self {
-            hash,
-            handle,
-            parent,
-            is_completed: AtomicBool::new(false),
-            inner: Default::default(),
-        })
-    }
-}
-
-impl Drop for DeliveryBlobWriter {
-    /// Tombstone the object if we didn't finish writing the blob or the hash didn't match.
-    fn drop(&mut self) {
-        if !self.is_completed.load(Ordering::Relaxed) {
-            let store = self.handle.store();
-            store
-                .filesystem()
-                .graveyard()
-                .queue_tombstone_object(store.store_object_id(), self.handle.object_id());
+    async fn ensure_allocated(&mut self) -> Result<(), Error> {
+        if self.allocated_space {
+            return Ok(());
         }
-    }
-}
-
-impl DeliveryBlobWriter {
-    async fn allocate(&self, size: usize) -> Result<(), Error> {
-        let size = size as u64;
+        let size = self.storage_size() as u64;
         let mut range = 0..round_up(size, self.handle.block_size()).ok_or(FxfsError::OutOfRange)?;
         let mut first_time = true;
         while range.start < range.end {
-            let mut transaction = self.handle.new_transaction().await?;
+            let mut transaction =
+                self.handle.new_transaction().await.context("Failed to create transaction.")?;
             if first_time {
-                self.handle.grow(&mut transaction, 0, size).await?;
+                self.handle
+                    .grow(&mut transaction, 0, size)
+                    .await
+                    .with_context(|| format!("Failed to grow handle to {} bytes.", size))?;
                 first_time = false;
             }
-            self.handle.preallocate_range(&mut transaction, &mut range).await?;
-            transaction.commit().await?;
+            self.handle.preallocate_range(&mut transaction, &mut range).await.with_context(
+                || format!("Failed to allocate range ({} to {}).", range.start, range.end),
+            )?;
+            transaction.commit().await.context("Failed to commit transaction.")?;
         }
+        self.allocated_space = true;
         Ok(())
     }
 
-    async fn complete(&self, metadata: Option<BlobMetadata>) -> Result<(), Error> {
-        self.handle.flush().await?;
-
+    async fn complete(&mut self) -> Result<(), Error> {
+        debug_assert!(self.payload_persisted == self.header().payload_length as u64);
+        // Finish building Merkle tree and verify the hash matches the filename.
+        let merkle_tree = std::mem::take(&mut self.tree_builder).finish();
+        if merkle_tree.root() != self.hash {
+            return Err(FxfsError::IntegrityError).with_context(|| {
+                format!(
+                    "Calculated Merkle root ({}) does not match given hash ({}).",
+                    merkle_tree.root(),
+                    self.hash
+                )
+            });
+        }
+        // Write metadata and ensure everything is flushed to disk.
+        let metadata =
+            self.generate_metadata(merkle_tree).context("Failed to generate metadata for blob.")?;
         if let Some(metadata) = metadata {
             let mut serialized = vec![];
             bincode::serialize_into(&mut serialized, &metadata)?;
-            self.handle.write_attr(BLOB_MERKLE_ATTRIBUTE_ID, &serialized).await?;
+            self.handle
+                .write_attr(BLOB_MERKLE_ATTRIBUTE_ID, &serialized)
+                .await
+                .context("Failed to write metadata for blob.")?;
         }
+        self.handle.flush().await.context("Failed to flush blob.")?;
 
         let volume = self.handle.owner();
         let store = self.handle.store();
-
         let dir = volume
             .cache()
             .get(store.root_directory_object_id())
@@ -277,7 +313,8 @@ impl DeliveryBlobWriter {
             .directory()
             .directory()
             .acquire_context_for_replace(None, &name, false)
-            .await?
+            .await
+            .context("Failed to acquire context for replacement.")?
             .transaction;
 
         let object_id = self.handle.object_id();
@@ -290,7 +327,8 @@ impl DeliveryBlobWriter {
             0,
             Timestamp::now(),
         )
-        .await?
+        .await
+        .context("Replacing child failed.")?
         {
             ReplacedChild::None => {}
             _ => {
@@ -301,135 +339,82 @@ impl DeliveryBlobWriter {
 
         transaction
             .commit_with_callback(|_| {
-                self.is_completed.store(true, Ordering::Relaxed);
+                self.is_completed = true;
                 // This can't actually add the node to the cache, because it hasn't been created
                 // ever at this point. Passes in None for now as a result.
                 self.parent.did_add(&name, None);
             })
-            .await?;
+            .await
+            .context("Failed to commit transaction!")?;
         Ok(())
     }
 
-    async fn truncate(&self, length: u64) -> Result<(), Error> {
-        let mut inner = self.inner.lock().await;
-        if inner.delivery_size.is_some() {
+    async fn truncate(&mut self, length: u64) -> Result<(), Error> {
+        if self.expected_size.is_some() {
             return Err(Status::BAD_STATE).context("Blob was already truncated.");
         }
         if length < Type1Blob::HEADER.header_length as u64 {
             return Err(Status::INVALID_ARGS).context("Invalid size (too small).");
         }
-        inner.delivery_size = Some(length);
+        self.expected_size = Some(length);
         Ok(())
     }
 
-    /// Appends |content| to this delivery blob.
-    ///
-    /// *WARNING*: If this function fails, the blob will remain in an invalid state. Errors should
-    /// be latched by the caller instead of calling this function again. The blob can be closed and
-    /// re-opened to attempt writing again.
-    async fn append(&self, content: &[u8], inner: &mut Inner) -> Result<u64, Error> {
-        let delivery_size = inner
-            .delivery_size
-            .ok_or(Status::BAD_STATE)
-            .context("Must truncate blob before writing.")?;
-        let content_len = content.len() as u64;
-        if (inner.delivery_bytes_written + content_len) > delivery_size {
-            return Err(Status::BUFFER_TOO_SMALL).with_context(|| {
-                format!(
-                    "Wrote more bytes than truncated size (truncated = {}, written = {}).",
-                    delivery_size,
-                    inner.delivery_bytes_written + content_len
-                )
-            });
+    /// Process the data that exists in the writer's buffer. The writer cannot recover from errors,
+    /// so this function should not be invoked after it returns any errors.
+    async fn process_buffer(&mut self) -> Result<(), Error> {
+        // Decode delivery blob header.
+        if self.header.is_none() {
+            let Some((header, payload)) =
+                Type1Blob::parse(&self.buffer).context("Failed to decode delivery blob header.")?
+            else {
+                return Ok(()); // Not enough data to decode header yet.
+            };
+            let expected_size = self.expected_size.unwrap_or_default() as usize;
+            let delivery_size = header.header.header_length as usize + header.payload_length;
+            if expected_size != delivery_size {
+                return Err(FxfsError::IntegrityError).with_context(|| {
+                    format!(
+                        "Expected size ({}) does not match size from blob header ({})!",
+                        expected_size, delivery_size
+                    )
+                });
+            }
+            self.buffer = Vec::from(payload);
+            self.header = Some(header);
         }
-        async {
-            inner.buffer.extend_from_slice(content);
-            inner.delivery_bytes_written += content_len;
 
-            // Decode delivery blob header.
-            if inner.header.is_none() {
-                let Some((header, payload)) = Type1Blob::parse(&inner.buffer)
-                    .context("Failed to decode delivery blob header.")?
-                else {
-                    return Ok(()); // Not enough data to decode header yet.
-                };
-                let expected_size = header.header.header_length as usize + header.payload_length;
-                if expected_size != delivery_size as usize {
-                    return Err(FxfsError::IntegrityError).with_context(|| {
-                        format!(
-                            "Truncated size ({}) does not match size from blob header ({})!",
-                            delivery_size, expected_size
-                        )
-                    });
-                }
-                inner.buffer = Vec::from(payload);
-                inner.header = Some(header);
-            }
-
-            // If blob is compressed, decode chunked archive header & initialize decompressor.
-            if inner.header().is_compressed && inner.decompressor.is_none() {
-                let prev_buff_len = inner.buffer.len();
-                let archive_length = inner.header().payload_length;
-                let Some((seek_table, chunk_data)) = decode_archive(&inner.buffer, archive_length)
-                    .context("Failed to decode archive header")?
-                else {
-                    return Ok(()); // Not enough data to decode archive header/seek table.
-                };
-                // We store the seek table out-of-line with the data, so we don't persist that
-                // part of the payload directly.
-                inner.buffer = Vec::from(chunk_data);
-                inner.payload_offset = (prev_buff_len - inner.buffer.len()) as u64;
-                inner.payload_persisted = inner.payload_offset;
-                inner.decompressor = Some(
-                    ChunkedDecompressor::new(seek_table)
-                        .context("Failed to create decompressor")?,
-                );
-            }
-
-            // Allocate storage space on the filesystem to write the blob payload.
-            if !inner.allocated_space {
-                let amount = inner.storage_size();
-                self.allocate(amount)
-                    .await
-                    .with_context(|| format!("Failed to allocate {} bytes", amount))?;
-                inner.allocated_space = true;
-            }
-
-            // Write payload to disk and update Merkle tree.
-            if !inner.buffer.is_empty() {
-                inner.write_payload(&self.handle).await?;
-            }
-
-            let blob_complete = inner.delivery_bytes_written == inner.delivery_size.unwrap();
-            if blob_complete {
-                debug_assert!(inner.payload_persisted == inner.header().payload_length as u64);
-                // Finish building Merkle tree and verify the hash matches the filename.
-                let merkle_tree = std::mem::take(&mut inner.tree_builder).finish();
-                if merkle_tree.root() != self.hash {
-                    return Err(FxfsError::IntegrityError).with_context(|| {
-                        format!(
-                            "Calculated Merkle root ({}) does not match blob name ({})",
-                            merkle_tree.root(),
-                            self.hash
-                        )
-                    });
-                }
-                // Calculate metadata and promote verified blob into a directory entry.
-                let metadata = inner.generate_metadata(merkle_tree)?;
-                self.complete(metadata).await?;
-            }
-            Ok(())
+        // If blob is compressed, decode chunked archive header & initialize decompressor.
+        if self.header().is_compressed && self.decompressor.is_none() {
+            let prev_buff_len = self.buffer.len();
+            let archive_length = self.header().payload_length;
+            let Some((seek_table, chunk_data)) = decode_archive(&self.buffer, archive_length)
+                .context("Failed to decode archive header")?
+            else {
+                return Ok(()); // Not enough data to decode archive header/seek table.
+            };
+            // We store the seek table out-of-line with the data, so we don't persist that
+            // part of the payload directly.
+            self.buffer = Vec::from(chunk_data);
+            self.payload_offset = (prev_buff_len - self.buffer.len()) as u64;
+            self.payload_persisted = self.payload_offset;
+            self.decompressor = Some(
+                ChunkedDecompressor::new(seek_table).context("Failed to create decompressor")?,
+            );
         }
-        .await?;
-        Ok(content_len)
+
+        // Write payload to disk and update Merkle tree.
+        if !self.buffer.is_empty() {
+            self.write_payload().await?;
+        }
+        Ok(())
     }
 
-    async fn get_vmo(&self, size: u64) -> Result<zx::Vmo, Error> {
+    async fn get_vmo(&mut self, size: u64) -> Result<zx::Vmo, Error> {
         self.truncate(size)
             .await
             .with_context(|| format!("Failed to truncate blob {} to size {}", self.hash, size))?;
-        let mut inner = self.inner.lock().await;
-        if inner.vmo.is_some() {
+        if self.vmo.is_some() {
             return Err(FxfsError::AlreadyExists)
                 .with_context(|| format!("VMO was already created for blob {}", self.hash));
         }
@@ -439,12 +424,17 @@ impl DeliveryBlobWriter {
         let vmo_dup = vmo
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
             .context("Failed to duplicate VMO handle")?;
-        inner.vmo = Some(vmo);
+        self.vmo = Some(vmo);
         Ok(vmo_dup)
     }
 
-    async fn bytes_ready(&self, bytes_written: u64) -> Result<(), Error> {
-        // TODO(https://fxbug.dev/42077275): Remove extra copy.
+    /// Called when there is more data in the ring buffer ready to be processed. Once all data has
+    /// been written and verified, it will be added to the parent directory.
+    ///
+    /// *WARNING*: If this function fails, the writer will remain in an invalid state. Errors should
+    /// be latched by the caller instead of calling this function again. The writer can be closed,
+    /// and a new one can be opened to attempt writing the delivery blob again.
+    async fn bytes_ready(&mut self, bytes_written: u64) -> Result<(), Error> {
         if bytes_written > *RING_BUFFER_SIZE {
             return Err(FxfsError::OutOfRange).with_context(|| {
                 format!(
@@ -453,32 +443,50 @@ impl DeliveryBlobWriter {
                 )
             });
         }
-        let mut buf = vec![0; bytes_written as usize];
-        let mut inner = self.inner.lock().await;
-        let write_offset = inner.delivery_bytes_written;
-        {
-            let Some(ref vmo) = inner.vmo else {
-                return Err(Status::BAD_STATE)
-                    .context("BlobWriter.GetVmo must be called before BlobWriter.BytesReady.");
-            };
-            let vmo_offset = write_offset % *RING_BUFFER_SIZE;
-            if vmo_offset + bytes_written > *RING_BUFFER_SIZE {
-                let split = (*RING_BUFFER_SIZE - vmo_offset) as usize;
-                vmo.read(&mut buf[0..split], vmo_offset).context("failed to read from VMO")?;
-                vmo.read(&mut buf[split..], 0).context("failed to read from VMO")?;
-            } else {
-                vmo.read(&mut buf, vmo_offset).context("failed to read from VMO")?;
-            }
+        let expected_size = self
+            .expected_size
+            .ok_or(Status::BAD_STATE)
+            .context("Must call BlobWriter.GetVmo before writing data to blob.")?;
+        if (self.total_written + bytes_written) > expected_size {
+            return Err(Status::BUFFER_TOO_SMALL).with_context(|| {
+                format!(
+                    "Wrote more bytes than passed to BlobWriter.GetVmo (expected = {}, written = {}).",
+                    expected_size,
+                    self.total_written + bytes_written
+                )
+            });
         }
-        self.append(&buf, &mut inner).await.with_context(|| {
+        let Some(ref vmo) = self.vmo else {
+            return Err(Status::BAD_STATE)
+                .context("BlobWriter.GetVmo must be called before BlobWriter.BytesReady.");
+        };
+        // Extend our write buffer by the amount of data that was written.
+        let prev_len = self.buffer.len();
+        self.buffer.resize(prev_len + bytes_written as usize, 0);
+        let mut buf = &mut self.buffer[prev_len..];
+        let write_offset = self.total_written;
+        self.total_written += bytes_written;
+        // Copy data from the ring buffer into our internal buffer.
+        let vmo_offset = write_offset % *RING_BUFFER_SIZE;
+        if vmo_offset + bytes_written > *RING_BUFFER_SIZE {
+            let split = (*RING_BUFFER_SIZE - vmo_offset) as usize;
+            vmo.read(&mut buf[0..split], vmo_offset).context("failed to read from VMO")?;
+            vmo.read(&mut buf[split..], 0).context("failed to read from VMO")?;
+        } else {
+            vmo.read(&mut buf, vmo_offset).context("failed to read from VMO")?;
+        }
+        // Process the data from the buffer.
+        self.process_buffer().await.with_context(|| {
             format!(
                 "failed to write blob {} (bytes_written = {}, offset = {}, delivery_size = {})",
-                self.hash,
-                bytes_written,
-                write_offset,
-                inner.delivery_size.unwrap_or_default()
+                self.hash, bytes_written, write_offset, expected_size
             )
         })?;
+        // If all bytes for this delivery blob were written successfully, attempt to verify the blob
+        // and add it to the parent directory.
+        if self.total_written == expected_size {
+            self.complete().await?;
+        }
         Ok(())
     }
 
@@ -487,36 +495,40 @@ impl DeliveryBlobWriter {
         self,
         mut request_stream: BlobWriterRequestStream,
     ) -> Result<(), Error> {
-        let mut latched_error = None;
+        // Current state of the writer. If any unrecoverable errors are encountered, the writer is
+        // dropped and instead the error state is latched.
+        let mut writer = Ok(self);
         while let Some(request) = request_stream.try_next().await? {
             match request {
                 BlobWriterRequest::GetVmo { size, responder } => {
-                    let res = match self.get_vmo(size).await {
-                        Ok(vmo) => Ok(vmo),
-                        Err(e) => {
+                    let result = match writer.as_mut() {
+                        Ok(writer) => writer.get_vmo(size).await.map_err(|e| {
                             tracing::error!("BlobWriter.GetVmo error: {:?}", e);
-                            Err(map_to_status(e).into_raw())
-                        }
+                            map_to_status(e).into_raw()
+                        }),
+                        Err(e) => Err(*e),
                     };
-                    responder.send(res).unwrap_or_else(|e| {
+                    responder.send(result).unwrap_or_else(|e| {
                         tracing::error!("Error sending BlobWriter.GetVmo response: {:?}", e);
                     });
                 }
                 BlobWriterRequest::BytesReady { bytes_written, responder } => {
-                    let res = if let Some(status) = &latched_error {
-                        Err(*status)
-                    } else {
-                        match self.bytes_ready(bytes_written).await {
-                            Ok(()) => Ok(()),
-                            Err(e) => {
-                                tracing::error!("BlobWriter.BytesReady error: {:?}", e);
-                                let status = map_to_status(e).into_raw();
-                                latched_error = Some(status);
-                                Err(status)
-                            }
-                        }
+                    let result = match writer.as_mut() {
+                        Ok(writer) => writer.bytes_ready(bytes_written).await.map_err(|e| {
+                            tracing::error!("BlobWriter.BytesReady error: {:?}", e);
+                            map_to_status(e).into_raw()
+                        }),
+                        Err(e) => Err(*e),
                     };
-                    responder.send(res).unwrap_or_else(|e| {
+                    if let Err(e) = result {
+                        // Latch the write error.
+                        //
+                        // *NOTE*: This drops the writer, immediately queuing a tombstone for this
+                        // blob. This will also happen automatically if the client drops their end
+                        // of the channel before the blob is fully written.
+                        writer = Err(e);
+                    }
+                    responder.send(result).unwrap_or_else(|e| {
                         tracing::error!("Error sending BlobWriter.BytesReady response: {:?}", e);
                     });
                 }
