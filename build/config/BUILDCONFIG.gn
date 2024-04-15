@@ -396,6 +396,10 @@ if (in_default_toolchain) {
 # Prepend the prefix configs, if any, before the default ones.
 default_common_binary_configs = toolchain_variant.prefix_configs
 
+# Enable the rust compiler's parallel front-end for all binaries.
+default_common_binary_configs +=
+    [ "//build/config/rust:parallel_frontend_threads" ]
+
 # Note that Zircon toolchains and non-Zircon ones have a very different set
 # of default configs for all target types.
 if (zircon_toolchain == false) {

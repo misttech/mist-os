@@ -31,6 +31,9 @@ declare_args() {
 
   # Enable debug assertions, e.g. for overflow checking.
   rust_debug_assertions = is_debug
+
+  # Enable the rust parallel front-end with N threads
+  rust_parallel_frontend_threads = false
 }
 
 # Turns on the rust compilation analysis generator. This will produce a
@@ -100,6 +103,17 @@ config("codegen_units_16") {
   # https://doc.rust-lang.org/rustc/codegen-options/index.html#lto
   if (rust_incremental == "") {
     rustflags = [ "-Ccodegen-units=16" ]
+  }
+}
+
+config("parallel_frontend_threads") {
+  if (rust_parallel_frontend_threads != false) {
+    # Use the parallel front-end with up to N threads, set by the
+    # rust_parallel_frontend_threads GN arg.
+    rustflags = [
+      "-Z",
+      "threads=${rust_parallel_frontend_threads}",
+    ]
   }
 }
 
