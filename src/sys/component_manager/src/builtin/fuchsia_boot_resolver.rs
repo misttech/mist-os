@@ -676,7 +676,8 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///#meta/root.cm".to_string(),
-        );
+        )
+        .await;
 
         let url = "fuchsia-boot:///#meta/has_config.cm";
         let err =
@@ -719,7 +720,8 @@ mod tests {
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///#meta/root.cm".to_string(),
-        );
+        )
+        .await;
         test_resolve_error!(resolver, "fuchsia-boot:///#meta/invalid.cm", root, ManifestInvalid);
     }
 }

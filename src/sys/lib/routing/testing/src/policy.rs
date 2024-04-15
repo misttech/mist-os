@@ -5,6 +5,7 @@
 use {
     anyhow::Error,
     assert_matches::assert_matches,
+    async_trait::async_trait,
     cm_config::{
         AllowlistEntry, AllowlistEntryBuilder, CapabilityAllowlistKey, CapabilityAllowlistSource,
         ChildPolicyAllowlists, DebugCapabilityAllowlistEntry, DebugCapabilityKey,
@@ -52,24 +53,24 @@ macro_rules! instantiate_global_policy_checker_tests {
         instantiate_global_policy_checker_tests! { $fixture_impl, $($remaining),+ }
     };
     ($fixture_impl:path, $test:ident) => {
-        #[test]
         fn $test() -> Result<(), Error> {
-            let _executor = fuchsia_async::LocalExecutor::new();
-            <$fixture_impl as Default>::default().$test()
+            let mut executor = fuchsia_async::LocalExecutor::new();
+            executor.run_singlethreaded(<$fixture_impl as Default>::default().$test())
         }
     };
 }
 
 // Tests `GlobalPolicyChecker` for implementations of `ComponentInstanceInterface`.
+#[async_trait]
 pub trait GlobalPolicyCheckerTest<C>
 where
     C: ComponentInstanceInterface,
 {
     // Creates a `ComponentInstanceInterface` with the given `InstancedMoniker`.
-    fn make_component(&self, instanced_moniker: InstancedMoniker) -> Arc<C>;
+    async fn make_component(&self, instanced_moniker: InstancedMoniker) -> Arc<C>;
 
     // Tests `GlobalPolicyChecker::can_route_capability()` for framework capability sources.
-    fn global_policy_checker_can_route_capability_framework_cap(&self) -> Result<(), Error> {
+    async fn global_policy_checker_can_route_capability_framework_cap(&self) -> Result<(), Error> {
         let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
         policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
@@ -86,7 +87,7 @@ where
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
-        let component = self.make_component(vec!["foo:0", "bar:0"].try_into().unwrap());
+        let component = self.make_component(vec!["foo:0", "bar:0"].try_into().unwrap()).await;
 
         let protocol_capability = CapabilitySource::<C>::Framework {
             capability: InternalCapability::Protocol("fuchsia.component.Realm".parse().unwrap()),
@@ -117,7 +118,7 @@ where
     }
 
     // Tests `GlobalPolicyChecker::can_route_capability()` for namespace capability sources.
-    fn global_policy_checker_can_route_capability_namespace_cap(&self) -> Result<(), Error> {
+    async fn global_policy_checker_can_route_capability_namespace_cap(&self) -> Result<(), Error> {
         let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
         policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
@@ -172,7 +173,7 @@ where
     }
 
     // Tests `GlobalPolicyChecker::can_route_capability()` for component capability sources.
-    fn global_policy_checker_can_route_capability_component_cap(&self) -> Result<(), Error> {
+    async fn global_policy_checker_can_route_capability_component_cap(&self) -> Result<(), Error> {
         let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
         policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
@@ -190,7 +191,7 @@ where
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
-        let component = self.make_component(vec!["foo:0"].try_into().unwrap());
+        let component = self.make_component(vec!["foo:0"].try_into().unwrap()).await;
 
         let protocol_capability = CapabilitySource::<C>::Component {
             capability: ComponentCapability::Protocol(ProtocolDecl {
@@ -225,7 +226,7 @@ where
     }
 
     // Tests `GlobalPolicyChecker::can_route_capability()` for capability sources of type `Capability`.
-    fn global_policy_checker_can_route_capability_capability_cap(&self) -> Result<(), Error> {
+    async fn global_policy_checker_can_route_capability_capability_cap(&self) -> Result<(), Error> {
         let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
         policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
@@ -243,7 +244,7 @@ where
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
-        let component = self.make_component(vec!["foo:0"].try_into().unwrap());
+        let component = self.make_component(vec!["foo:0"].try_into().unwrap()).await;
 
         let protocol_capability = CapabilitySource::<C>::Capability {
             source_capability: ComponentCapability::Storage(StorageDecl {
@@ -280,7 +281,9 @@ where
     }
 
     // Tests `GlobalPolicyChecker::can_route_debug_capability()` for capability sources of type `Capability`.
-    fn global_policy_checker_can_route_debug_capability_capability_cap(&self) -> Result<(), Error> {
+    async fn global_policy_checker_can_route_debug_capability_capability_cap(
+        &self,
+    ) -> Result<(), Error> {
         let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
         policy_builder.add_debug_capability_policy(
             DebugCapabilityKey {
@@ -348,7 +351,7 @@ where
 
     // Tests `GlobalPolicyChecker::can_route_debug_capability()` for capability sources of type
     // `Capability` with realm allowlist entries.
-    fn global_policy_checker_can_route_debug_capability_with_realm_allowlist_entry(
+    async fn global_policy_checker_can_route_debug_capability_with_realm_allowlist_entry(
         &self,
     ) -> Result<(), Error> {
         let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
@@ -431,7 +434,7 @@ where
 
     // Tests `GlobalPolicyChecker::can_route_debug_capability()` for capability sources of type
     // `Capability` with collection allowlist entries.
-    fn global_policy_checker_can_route_debug_capability_with_collection_allowlist_entry(
+    async fn global_policy_checker_can_route_debug_capability_with_collection_allowlist_entry(
         &self,
     ) -> Result<(), Error> {
         let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
@@ -521,7 +524,7 @@ where
     }
 
     // Tests `GlobalPolicyChecker::can_route_capability()` for builtin capabilities.
-    fn global_policy_checker_can_route_capability_builtin_cap(&self) -> Result<(), Error> {
+    async fn global_policy_checker_can_route_capability_builtin_cap(&self) -> Result<(), Error> {
         let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
         policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
@@ -567,7 +570,7 @@ where
 
     // Tests `GlobalPolicyChecker::can_route_capability()` for policy that includes non-exact
     // `AllowlistEntry::Realm` entries.
-    fn global_policy_checker_can_route_capability_with_realm_allowlist_entry(
+    async fn global_policy_checker_can_route_capability_with_realm_allowlist_entry(
         &self,
     ) -> Result<(), Error> {
         let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();
@@ -616,7 +619,7 @@ where
 
     // Tests `GlobalPolicyChecker::can_route_capability()` for policy that includes non-exact
     // `AllowlistEntry::Collection` entries.
-    fn global_policy_checker_can_route_capability_with_collection_allowlist_entry(
+    async fn global_policy_checker_can_route_capability_with_collection_allowlist_entry(
         &self,
     ) -> Result<(), Error> {
         let mut policy_builder = CapabilityAllowlistPolicyBuilder::new();

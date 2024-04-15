@@ -347,7 +347,8 @@ mod tests {
             context,
             component_manager_instance,
             component_url,
-        );
+        )
+        .await;
         // We don't care about waiting for the discover action to complete, just that it's started.
         let _ = component
             .lock_actions()
@@ -380,7 +381,8 @@ mod tests {
             parent,
             hooks,
             persistent_storage,
-        );
+        )
+        .await;
         // We don't care about waiting for the discover action to complete, just that it's started.
         let _ = component
             .lock_actions()

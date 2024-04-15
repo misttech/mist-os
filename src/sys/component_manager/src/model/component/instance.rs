@@ -893,7 +893,8 @@ impl ResolvedInstanceState {
             WeakExtendedInstance::Component(WeakComponentInstance::from(component)),
             component.hooks.clone(),
             component.persistent_storage_for_child(collection),
-        );
+        )
+        .await;
         if let Some(controller) = controller {
             if let Ok(stream) = controller.into_stream() {
                 child

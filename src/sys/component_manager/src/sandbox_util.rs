@@ -623,7 +623,8 @@ pub mod tests {
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "test:///root".to_string(),
-        );
+        )
+        .await;
         let capability = router
             .route(Request { availability: Availability::Required, target: component.as_weak() })
             .await
@@ -670,7 +671,8 @@ pub mod tests {
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "test:///root".to_string(),
-        );
+        )
+        .await;
         let capability = router
             .route(Request { availability: Availability::Required, target: component.as_weak() })
             .await

@@ -59,7 +59,8 @@ impl Model {
             context.clone(),
             Arc::downgrade(&params.top_instance),
             params.root_component_url,
-        );
+        )
+        .await;
         let model =
             Arc::new(Model { root: root.clone(), context, top_instance: params.top_instance });
         model.top_instance.init(root).await;

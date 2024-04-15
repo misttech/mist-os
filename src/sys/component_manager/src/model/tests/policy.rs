@@ -14,6 +14,7 @@ use {
         resolver::ResolverRegistry,
     },
     anyhow::Error,
+    async_trait::async_trait,
     cm_moniker::InstancedMoniker,
     fidl_fuchsia_component_decl as fdecl,
     routing::environment::{DebugRegistry, RunnerRegistry},
@@ -27,8 +28,9 @@ use {
 #[derive(Default)]
 struct GlobalPolicyCheckerTestForCm {}
 
+#[async_trait]
 impl GlobalPolicyCheckerTest<ComponentInstance> for GlobalPolicyCheckerTestForCm {
-    fn make_component(&self, instanced_moniker: InstancedMoniker) -> Arc<ComponentInstance> {
+    async fn make_component(&self, instanced_moniker: InstancedMoniker) -> Arc<ComponentInstance> {
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
         ComponentInstance::new(
             Arc::new(Environment::new_root(
@@ -47,6 +49,7 @@ impl GlobalPolicyCheckerTest<ComponentInstance> for GlobalPolicyCheckerTestForCm
             Arc::new(Hooks::new()),
             false,
         )
+        .await
     }
 }
 

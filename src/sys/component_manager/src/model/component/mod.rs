@@ -271,7 +271,7 @@ pub struct ComponentInstance {
 
 impl ComponentInstance {
     /// Instantiates a new root component instance.
-    pub fn new_root(
+    pub async fn new_root(
         environment: Environment,
         context: Arc<ModelContext>,
         component_manager_instance: Weak<ComponentManagerInstance>,
@@ -289,11 +289,12 @@ impl ComponentInstance {
             Arc::new(Hooks::new()),
             false,
         )
+        .await
     }
 
     /// Instantiates a new component instance with the given contents.
     // TODO(https://fxbug.dev/42077692) convert this to a builder API
-    pub fn new(
+    pub async fn new(
         environment: Arc<Environment>,
         instanced_moniker: InstancedMoniker,
         component_url: String,
@@ -2096,6 +2097,7 @@ pub mod tests {
             Arc::new(Hooks::new()),
             false,
         )
+        .await
     }
 
     async fn new_resolved() -> InstanceState {
