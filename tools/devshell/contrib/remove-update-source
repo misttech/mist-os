@@ -6,11 +6,11 @@
 #### CATEGORY=Software delivery
 ### deregisters dev host as target's update source
 
-## usage: fx remove-update-source [-r|--repository NAME]
+## usage: fx remove-update-source [-r|--repositoryname NAME]
 ##
-## Configure target device to use a new update source.
+## Configure target device to remove an update source.
 ##
-##   -r|--repo-name NAME  Name the generated repository config NAME.
+##   -r|--repositoryname NAME  Name the generated repository config NAME.
 ##
 ## NAME:
 ## If no name is supplied, the name defaults to "devhost", otherwise
@@ -77,7 +77,7 @@ function main {
       repo_name="$(ffx-default-repository-name)"
     fi
 
-    fx-command-run ffx --config ffx_repository=true repository target deregister \
+    fx-command-run ffx --config ffx_repository=true target repository deregister \
       --repository "$repo_name"
     err=$?
 
