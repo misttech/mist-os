@@ -90,7 +90,7 @@
 ///
 /// This should be implemented for lock types to specify that, in the lock
 /// ordering graph, `A` comes before `Self`. So if `B: LockAfter<A>`, lock type
-/// `B` can be acquired after `A` but `A` cannot be acquired before `B`.
+/// `B` can be acquired after `A` but `A` cannot be acquired after `B`.
 ///
 /// Note, though, that it's preferred to use the [`impl_lock_after`] macro
 /// instead of writing trait impls directly to avoid the possibility of lock
