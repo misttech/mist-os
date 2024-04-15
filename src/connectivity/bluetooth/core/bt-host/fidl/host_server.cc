@@ -140,7 +140,7 @@ HostServer::HostServer(zx::channel channel, const bt::gap::Adapter::WeakPtr& ada
   adapter->peer_cache()->ForEach([this](const bt::gap::Peer& peer) { OnPeerUpdated(peer); });
 }
 
-HostServer::~HostServer() { Close(); }
+HostServer::~HostServer() { Shutdown(); }
 
 void HostServer::RequestProtocol(fhost::ProtocolRequest request) {
   switch (request.Which()) {
@@ -753,7 +753,7 @@ void HostServer::PairBrEdr(PeerId peer_id, PairCallback callback) {
   adapter()->bredr()->Pair(peer_id, security, std::move(on_complete));
 }
 
-void HostServer::Close() {
+void HostServer::Shutdown() {
   bt_log(INFO, "fidl", "closing FIDL handles");
 
   // Invalidate all weak pointers. This will guarantee that all pending tasks

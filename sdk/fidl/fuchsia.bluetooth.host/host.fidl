@@ -47,7 +47,9 @@ open protocol Host {
     ///
     /// The Host will continue to send OnDeviceUpdated events as procedures get
     /// terminated.
-    strict Close();
+    ///
+    /// The Host protocol will close when shutdown is complete.
+    strict Shutdown();
 
     /// Returns information about the Bluetooth host subsystem and controller managed by this Host
     /// instance. If there has been no change to the state since the last call to this method, the

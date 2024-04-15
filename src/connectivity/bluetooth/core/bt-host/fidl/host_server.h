@@ -102,7 +102,7 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   void Pair(::fuchsia::bluetooth::PeerId id, ::fuchsia::bluetooth::sys::PairingOptions options,
             PairCallback callback) override;
   void Forget(::fuchsia::bluetooth::PeerId id, ForgetCallback callback) override;
-  void Close() override;
+  void Shutdown() override;
   void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
 
  private:

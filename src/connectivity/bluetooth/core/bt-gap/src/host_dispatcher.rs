@@ -224,7 +224,7 @@ impl HostDispatcherState {
             }
 
             // Shut down the previously active host.
-            let _ = self.host_devices[&id].close();
+            let _ = self.host_devices[&id].shutdown();
         }
 
         if self.host_devices.contains_key(&adapter_id) {

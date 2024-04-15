@@ -171,8 +171,8 @@ impl HostDevice {
         self.0.proxy.forget(&id).map(from_fidl_result)
     }
 
-    pub fn close(&self) -> types::Result<()> {
-        self.0.proxy.close().map_err(|e| e.into())
+    pub fn shutdown(&self) -> types::Result<()> {
+        self.0.proxy.shutdown().map_err(|e| e.into())
     }
 
     pub fn restore_bonds(

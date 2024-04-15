@@ -213,8 +213,8 @@ async fn test_close(harness: HostHarness) {
         .and(expectation::host_driver::discovering(true));
     let _ = host_expectation::host_state(&harness, active_state).await.unwrap();
 
-    // Close should cancel these procedures.
-    proxy.close().unwrap();
+    // Shutdown should cancel these procedures.
+    proxy.shutdown().unwrap();
 
     let closed_state_update = expectation::host_driver::discoverable(false)
         .and(expectation::host_driver::discovering(false));
