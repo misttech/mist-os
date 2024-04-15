@@ -59,7 +59,6 @@ rustc_test("io1_conformance_test") {
   deps = [
     ":io_conformance_util",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/fidl/fuchsia.io.test:fuchsia.io.test_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",

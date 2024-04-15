@@ -11,7 +11,6 @@ use {
         self as io_test, Io1Config, Io1HarnessRequest, Io1HarnessRequestStream,
     },
     fuchsia_component::server::ServiceFs,
-    fuchsia_zircon as zx,
     futures::prelude::*,
     std::sync::Arc,
     tracing::error,
@@ -32,16 +31,6 @@ use {
 struct Harness(Io1HarnessRequestStream);
 
 const HARNESS_EXEC_PATH: &'static str = "/pkg/bin/io_conformance_harness_rustvfs";
-
-/// Creates and returns a Rust VFS VmoFile-backed file using the contents of the given buffer.
-///
-/// The VMO backing the buffer is duplicated so that tests can ensure the same VMO is returned by
-/// subsequent GetBackingMemory calls.
-fn new_vmo_file(vmo: zx::Vmo) -> Result<Arc<vmo::VmoFile>, Error> {
-    Ok(vmo::VmoFile::new(
-        vmo, /*readable*/ true, /*writable*/ true, /*executable*/ false,
-    ))
-}
 
 /// Creates and returns a Rust VFS VmoFile-backed executable file using the contents of the
 /// conformance test harness binary itself.
@@ -89,12 +78,6 @@ fn add_entry(
             let new_file = vmo::read_write(contents);
             dest.add_entry(name, new_file)?;
         }
-        io_test::DirectoryEntry::VmoFile(io_test::VmoFile { name, vmo, .. }) => {
-            let name = name.expect("VMO file must have a name");
-            let vmo = vmo.expect("VMO file must have a VMO");
-            let vmo_file = new_vmo_file(vmo)?;
-            dest.add_entry(name, vmo_file)?;
-        }
         io_test::DirectoryEntry::ExecutableFile(io_test::ExecutableFile { name, .. }) => {
             let name = name.expect("Executable file must have a name");
             let executable_file = new_executable_file()?;
@@ -112,7 +95,7 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     // Supported options:
                     supports_create: Some(true),
                     supports_executable_file: Some(true),
-                    supports_vmo_file: Some(true),
+                    supports_get_backing_memory: Some(true),
                     supports_remote_dir: Some(true),
                     supports_rename: Some(true),
                     supports_get_token: Some(true),

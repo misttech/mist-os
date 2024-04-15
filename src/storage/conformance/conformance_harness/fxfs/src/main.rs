@@ -55,18 +55,6 @@ async fn add_entries(
                             .context(format!("failed to write contents for {name}"))?;
                     }
                 }
-                io_test::DirectoryEntry::VmoFile(io_test::VmoFile {
-                    name: Some(name),
-                    vmo: Some(vmo),
-                    ..
-                }) => {
-                    let file = open_file(&dest, FLAGS, &name)
-                        .await
-                        .context(format!("failed to create file {name}"))?;
-                    fuchsia_fs::file::write(&file, &vmo.read_to_vec(0, vmo.get_content_size()?)?)
-                        .await
-                        .context(format!("failed to write contents for {name}"))?;
-                }
                 _ => panic!("Not supported"),
             }
         }
@@ -83,7 +71,7 @@ async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Resu
                 responder.send(&Io1Config {
                     supports_create: Some(true),
                     supports_executable_file: Some(false),
-                    supports_vmo_file: Some(false),
+                    supports_get_backing_memory: Some(true),
                     supports_remote_dir: Some(false),
                     supports_rename: Some(true),
                     supports_link: Some(true),

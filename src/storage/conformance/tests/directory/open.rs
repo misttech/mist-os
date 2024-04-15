@@ -130,32 +130,6 @@ async fn validate_file_rights() {
         .expect_err("open succeeded");
 }
 
-// Validate allowed rights for VmoFile objects (ensures cannot be opened as executable).
-#[fuchsia::test]
-async fn validate_vmo_file_rights() {
-    let harness = TestHarness::new().await;
-    if !harness.config.supports_vmo_file.unwrap_or_default() {
-        return;
-    }
-    // Create a test directory with a VmoFile object, and ensure the directory has all rights.
-    let root = root_directory(vec![vmo_file(TEST_FILE, TEST_FILE_CONTENTS, 128 * 1024)]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all());
-    // Opening with READ/WRITE should succeed.
-    open_node::<fio::NodeMarker>(
-        &root_dir,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        TEST_FILE,
-    )
-    .await;
-    // Opening with EXECUTE must fail to ensure W^X enforcement.
-    assert!(matches!(
-        open_node_status::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_EXECUTABLE, TEST_FILE)
-            .await
-            .expect_err("open succeeded"),
-        zx::Status::ACCESS_DENIED | zx::Status::NOT_SUPPORTED
-    ));
-}
-
 // Validate allowed rights for ExecutableFile objects (ensures cannot be opened as writable).
 #[fuchsia::test]
 async fn validate_executable_file_rights() {

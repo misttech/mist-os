@@ -42,8 +42,8 @@ type Io1Config = table {
     /// ExecutableFile objects are supported.
     3: supports_executable_file bool;
 
-    /// VmoFile objects are supported. Must support fuchsia.io/File.GetBackingMemory.
-    4: supports_vmo_file bool;
+    /// GetBackingMemory is supported.
+    4: supports_get_backing_memory bool;
 
     /// Remote directories are supported.
     5: supports_remote_dir bool;
@@ -111,18 +111,6 @@ type File = table {
     2: contents vector<uint8>:MAX;
 };
 
-/// Vmo-backed file object which supports opening as readable + writable.
-///
-/// Enabled via the `supports_vmo_file` configuration option. `VmoFile` objects should support
-/// fuchsia.io/File.GetBackingMemory.
-///
-/// As the conformance tests verify W^X enforcement, attempting to open a VmoFile as executable
-/// should fail with ACCESS_DENIED. If executable files are required, use ExecutableFile.
-type VmoFile = resource table {
-    1: name string;
-    2: vmo zx.Handle:VMO;
-};
-
 /// Adds an executable file that supports opening as readable + executable. The file has a non-zero
 /// size, but the contents are otherwise unspecified.
 ///
@@ -130,7 +118,7 @@ type VmoFile = resource table {
 /// support fuchsia.io/File.GetBackingMemory.
 ///
 /// As the conformance tests verify W^X enforcement, opening an ExecutableFile with RIGHT_WRITABLE
-/// should fail with ACCESS_DENIED. If writable files are required, use File/VmoFile instead.
+/// should fail with ACCESS_DENIED. If writable files are required, use File instead.
 type ExecutableFile = table {
     1: name string;
 };
@@ -139,7 +127,6 @@ type DirectoryEntry = strict resource union {
     1: directory Directory;
     2: remote_directory RemoteDirectory;
     3: file File;
-    4: vmo_file VmoFile;
     5: executable_file ExecutableFile;
 };
 

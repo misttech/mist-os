@@ -168,7 +168,6 @@ pub fn get_directory_entry_name(dir_entry: &io_test::DirectoryEntry) -> String {
         DirectoryEntry::Directory(entry) => entry.name.as_ref(),
         DirectoryEntry::RemoteDirectory(entry) => entry.name.as_ref(),
         DirectoryEntry::File(entry) => entry.name.as_ref(),
-        DirectoryEntry::VmoFile(entry) => entry.name.as_ref(),
         DirectoryEntry::ExecutableFile(entry) => entry.name.as_ref(),
     }
     .expect("DirectoryEntry name is None!")
@@ -264,18 +263,6 @@ pub fn file(name: &str, contents: Vec<u8>) -> io_test::DirectoryEntry {
     io_test::DirectoryEntry::File(io_test::File {
         name: Some(name.to_string()),
         contents: Some(contents),
-        ..Default::default()
-    })
-}
-
-/// Makes a vmo file to be placed in the test directory.
-pub fn vmo_file(name: &str, contents: &[u8], capacity: u64) -> io_test::DirectoryEntry {
-    let vmo = zx::Vmo::create(capacity).expect("Cannot create VMO");
-    let () = vmo.write(contents, 0).expect("Cannot write to VMO");
-    let () = vmo.set_content_size(&(contents.len() as u64)).expect("Cannot set VMO content size");
-    io_test::DirectoryEntry::VmoFile(io_test::VmoFile {
-        name: Some(name.to_string()),
-        vmo: Some(vmo),
         ..Default::default()
     })
 }

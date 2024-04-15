@@ -81,7 +81,7 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
 
     // Unsupported options
     config.set_supports_executable_file(false);
-    config.set_supports_vmo_file(false);
+    config.set_supports_get_backing_memory(false);
     config.set_supports_remote_dir(false);
     config.set_supports_get_attributes(false);
     config.set_supports_update_attributes(false);
@@ -146,8 +146,6 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
       }
       case fuchsia::io::test::DirectoryEntry::Tag::kRemoteDirectory:
         ZX_PANIC("Remote directories are not supported");
-      case fuchsia::io::test::DirectoryEntry::Tag::kVmoFile:
-        ZX_PANIC("VMO files are not supported");
       case fuchsia::io::test::DirectoryEntry::Tag::kExecutableFile:
         ZX_PANIC("Executable files are not supported");
       case fuchsia::io::test::DirectoryEntry::Tag::Invalid:

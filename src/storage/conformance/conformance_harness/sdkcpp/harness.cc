@@ -39,7 +39,7 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
     // test harness should be the exact same as the current SDK VFS one.
 
     // Supported options:
-    config.supports_vmo_file(true);
+    config.supports_get_backing_memory(true);
     config.supports_remote_dir(true);
     config.supports_get_token(true);
 
@@ -114,19 +114,6 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
                                                          vfs::VmoFile::WriteMode::kWritable);
         ZX_ASSERT_MSG(dest.AddEntry(*file.name(), std::move(file_entry)) == ZX_OK,
                       "Failed to add File entry!");
-        break;
-      }
-      case fio_test::DirectoryEntry::Tag::kVmoFile: {
-        fio_test::VmoFile vmo_file = std::move(entry.vmo_file().value());
-        zx::vmo& vmo = *vmo_file.vmo();
-        uint64_t size;
-        zx_status_t status = vmo.get_prop_content_size(&size);
-        ZX_ASSERT_MSG(status == ZX_OK, "Failed to get VMO content size: %s",
-                      zx_status_get_string(status));
-        auto vmo_file_entry = std::make_unique<vfs::VmoFile>(std::move(vmo), size,
-                                                             vfs::VmoFile::WriteMode::kWritable);
-        ZX_ASSERT_MSG(dest.AddEntry(*vmo_file.name(), std::move(vmo_file_entry)) == ZX_OK,
-                      "Failed to add VmoFile entry!");
         break;
       }
       case fio_test::DirectoryEntry::Tag::kExecutableFile:

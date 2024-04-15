@@ -3,23 +3,23 @@
 // found in the LICENSE file.
 
 use {
-    fidl_fuchsia_io as fio, fidl_fuchsia_io_test as io_test, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     io_conformance_util::{test_harness::TestHarness, *},
 };
 
 #[fuchsia::test]
 async fn file_get_readable_memory_with_sufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_vmo_file.unwrap_or_default() {
+    if !harness.config.supports_get_backing_memory.unwrap_or_default() {
         return;
     }
 
-    for file_flags in harness.vmo_file_rights.valid_combos_with(fio::OpenFlags::RIGHT_READABLE) {
+    for file_flags in harness.file_rights.valid_combos_with(fio::OpenFlags::RIGHT_READABLE) {
         // Should be able to get a readable VMO in default, exact, and private sharing modes.
         for sharing_mode in
             [fio::VmoFlags::empty(), fio::VmoFlags::SHARED_BUFFER, fio::VmoFlags::PRIVATE_CLONE]
         {
-            let file = vmo_file(TEST_FILE, TEST_FILE_CONTENTS, 128 * 1024);
+            let file = file(TEST_FILE, TEST_FILE_CONTENTS.to_owned());
             let (vmo, _) = create_file_and_get_backing_memory(
                 file,
                 &harness,
@@ -45,12 +45,12 @@ async fn file_get_readable_memory_with_sufficient_rights() {
 #[fuchsia::test]
 async fn file_get_readable_memory_with_insufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_vmo_file.unwrap_or_default() {
+    if !harness.config.supports_get_backing_memory.unwrap_or_default() {
         return;
     }
 
-    for file_flags in harness.vmo_file_rights.valid_combos_without(fio::OpenFlags::RIGHT_READABLE) {
-        let file = vmo_file(TEST_FILE, TEST_FILE_CONTENTS, 128 * 1024);
+    for file_flags in harness.file_rights.valid_combos_without(fio::OpenFlags::RIGHT_READABLE) {
+        let file = file(TEST_FILE, TEST_FILE_CONTENTS.to_owned());
         assert_eq!(
             create_file_and_get_backing_memory(file, &harness, file_flags, fio::VmoFlags::READ)
                 .await
@@ -63,15 +63,15 @@ async fn file_get_readable_memory_with_insufficient_rights() {
 #[fuchsia::test]
 async fn file_get_writable_memory_with_sufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_vmo_file.unwrap_or_default() {
+    if !harness.config.supports_get_backing_memory.unwrap_or_default() {
         return;
     }
     // Writable VMOs currently require private sharing mode.
     const VMO_FLAGS: fio::VmoFlags =
         fio::VmoFlags::empty().union(fio::VmoFlags::WRITE).union(fio::VmoFlags::PRIVATE_CLONE);
 
-    for file_flags in harness.vmo_file_rights.valid_combos_with(fio::OpenFlags::RIGHT_WRITABLE) {
-        let file = vmo_file(TEST_FILE, TEST_FILE_CONTENTS, 128 * 1024);
+    for file_flags in harness.file_rights.valid_combos_with(fio::OpenFlags::RIGHT_WRITABLE) {
+        let file = file(TEST_FILE, TEST_FILE_CONTENTS.to_owned());
         let (vmo, _) = create_file_and_get_backing_memory(file, &harness, file_flags, VMO_FLAGS)
             .await
             .expect("Failed to create file and obtain VMO");
@@ -87,14 +87,14 @@ async fn file_get_writable_memory_with_sufficient_rights() {
 #[fuchsia::test]
 async fn file_get_writable_memory_with_insufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_vmo_file.unwrap_or_default() {
+    if !harness.config.supports_get_backing_memory.unwrap_or_default() {
         return;
     }
     const VMO_FLAGS: fio::VmoFlags =
         fio::VmoFlags::empty().union(fio::VmoFlags::WRITE).union(fio::VmoFlags::PRIVATE_CLONE);
 
-    for file_flags in harness.vmo_file_rights.valid_combos_without(fio::OpenFlags::RIGHT_WRITABLE) {
-        let file = vmo_file(TEST_FILE, TEST_FILE_CONTENTS, 128 * 1024);
+    for file_flags in harness.file_rights.valid_combos_without(fio::OpenFlags::RIGHT_WRITABLE) {
+        let file = file(TEST_FILE, TEST_FILE_CONTENTS.to_owned());
         assert_eq!(
             create_file_and_get_backing_memory(file, &harness, file_flags, VMO_FLAGS)
                 .await
@@ -170,19 +170,13 @@ async fn file_get_executable_memory_with_insufficient_rights() {
 #[fuchsia::test]
 async fn file_get_backing_memory_shared_buffer() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_vmo_file.unwrap_or_default() {
+    if !harness.config.supports_get_backing_memory.unwrap_or_default() {
         return;
     }
 
-    let vmo = zx::Vmo::create(3).expect("Cannot create VMO");
-    let vmofile_object = io_test::DirectoryEntry::VmoFile(io_test::VmoFile {
-        name: Some(TEST_FILE.to_string()),
-        vmo: Some(vmo),
-        ..Default::default()
-    });
-
+    let file = file(TEST_FILE, TEST_FILE_CONTENTS.to_owned());
     let (vmo, (_, vmo_file)) = create_file_and_get_backing_memory(
-        vmofile_object,
+        file,
         &harness,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
         fio::VmoFlags::READ | fio::VmoFlags::SHARED_BUFFER,

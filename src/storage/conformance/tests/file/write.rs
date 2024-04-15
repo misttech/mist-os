@@ -86,38 +86,3 @@ async fn file_write_at_with_insufficient_rights() {
         assert_eq!(result, Err(zx::Status::BAD_HANDLE));
     }
 }
-
-#[fuchsia::test]
-async fn vmo_file_write_to_limits() {
-    let harness = TestHarness::new().await;
-    if !harness.config.supports_vmo_file.unwrap_or_default() {
-        return;
-    }
-
-    let capacity = 128 * 1024;
-    let root = root_directory(vec![vmo_file(TEST_FILE, TEST_FILE_CONTENTS, capacity)]);
-    let test_dir = harness
-        .get_directory(root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
-    let file = open_node::<fio::FileMarker>(
-        &test_dir,
-        fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::NOT_DIRECTORY,
-        TEST_FILE,
-    )
-    .await;
-    let _: Vec<_> = file.query().await.expect("query failed");
-
-    let data = vec![0u8];
-
-    // The VMO file will have a capacity
-    file.write_at(&data[..], capacity)
-        .await
-        .expect("fidl call failed")
-        .expect_err("Write at end of file limit should fail");
-    // An empty write should still succeed even if it targets an out-of-bounds offset.
-    file.write_at(&[], capacity)
-        .await
-        .expect("fidl call failed")
-        .expect("Zero-byte write at end of file limit should succeed");
-}

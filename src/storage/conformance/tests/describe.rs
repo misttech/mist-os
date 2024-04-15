@@ -59,32 +59,3 @@ async fn file_query() {
         assert_eq!(std::str::from_utf8(&protocol), Ok(fio::FILE_PROTOCOL_NAME));
     }
 }
-
-#[fuchsia::test]
-async fn vmo_file_query() {
-    let harness = TestHarness::new().await;
-    if !harness.config.supports_vmo_file.unwrap_or_default() {
-        return;
-    }
-
-    let root = root_directory(vec![vmo_file(TEST_FILE, TEST_FILE_CONTENTS, 128 * 1024)]);
-    let test_dir = harness.get_directory(root, fio::OpenFlags::empty());
-    {
-        let file = open_node::<fio::FileMarker>(
-            &test_dir,
-            fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::NOT_DIRECTORY,
-            TEST_FILE,
-        )
-        .await;
-
-        let protocol = file.query().await.expect("query failed");
-        assert_eq!(std::str::from_utf8(&protocol), Ok(fio::NODE_PROTOCOL_NAME));
-    }
-    {
-        let file =
-            open_node::<fio::FileMarker>(&test_dir, fio::OpenFlags::NOT_DIRECTORY, TEST_FILE).await;
-
-        let protocol = file.query().await.expect("query failed");
-        assert_eq!(std::str::from_utf8(&protocol), Ok(fio::FILE_PROTOCOL_NAME));
-    }
-}

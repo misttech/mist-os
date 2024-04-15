@@ -22,9 +22,6 @@ pub struct TestHarness {
     /// All [`io_test::File`] rights supported by the filesystem.
     pub file_rights: Rights,
 
-    /// All [`io_test::VmoFile`] rights supported by the filesystem.
-    pub vmo_file_rights: Rights,
-
     /// All [`io_test::ExecutableFile`] rights supported by the filesystem.
     pub executable_file_rights: Rights,
 }
@@ -47,19 +44,10 @@ impl TestHarness {
         let dir_rights = Rights::new(get_supported_dir_rights(&config));
         let file_rights =
             Rights::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
-        let vmo_file_rights =
-            Rights::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
         let executable_file_rights =
             Rights::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE);
 
-        TestHarness {
-            proxy,
-            config,
-            dir_rights,
-            file_rights,
-            vmo_file_rights,
-            executable_file_rights,
-        }
+        TestHarness { proxy, config, dir_rights, file_rights, executable_file_rights }
     }
 
     /// Creates a [`fio::DirectoryProxy`] with the given root directory structure.

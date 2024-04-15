@@ -52,7 +52,7 @@ class TestHarness : public fio_test::Io1Harness {
     fio_test::Io1Config config;
 
     // Supported options
-    config.set_supports_vmo_file(true);
+    config.set_supports_get_backing_memory(true);
     config.set_supports_remote_dir(true);
     config.set_supports_get_token(true);
 
@@ -127,17 +127,6 @@ class TestHarness : public fio_test::Io1Harness {
         dest.AddEntry(file.name(),
                       fbl::MakeRefCounted<fs::VmoFile>(std::move(vmo), file.contents().size(),
                                                        /*writable=*/true));
-        break;
-      }
-      case fio_test::DirectoryEntry::Tag::kVmoFile: {
-        fio_test::VmoFile vmo_file = std::move(entry.vmo_file());
-        zx::vmo& vmo = *vmo_file.mutable_vmo();
-        uint64_t size;
-        zx_status_t status = vmo.get_prop_content_size(&size);
-        ZX_ASSERT_MSG(status == ZX_OK, "Failed to get VMO content size: %s",
-                      zx_status_get_string(status));
-        dest.AddEntry(vmo_file.name(), fbl::MakeRefCounted<fs::VmoFile>(std::move(vmo), size,
-                                                                        /*writable=*/true));
         break;
       }
       case fio_test::DirectoryEntry::Tag::kExecutableFile:
