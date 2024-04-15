@@ -110,7 +110,7 @@ struct ::fidl::internal::TransactionalRequest<::test_doccomments::Interface::Met
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_doccomments::Interface::Method>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_doccomments::Interface::Method>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 0 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 0 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_doccomments::Interface::Method>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -139,7 +139,7 @@ struct ::fidl::internal::TransactionalEvent<::test_doccomments::Interface::OnEve
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_doccomments::Interface::OnEvent>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_doccomments::Interface::OnEvent>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 0 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 0 + sizeof(fidl_message_header_t);
 
   static void Encode(
       internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_doccomments::Interface::OnEvent>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {

@@ -71,15 +71,15 @@ static_assert(sizeof(::test_driveroneway::wire::Payload) == TypeTraits<::test_dr
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_driveroneway::wire::Payload, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4;
+  static constexpr size_t kInlineSize = 4;
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>());
   static constexpr bool kHasPadding = false;
   using Base = WireStructCodingTraitsBase<::test_driveroneway::wire::Payload, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
-  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+  static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
       internal::WireEncoder* encoder, ::test_driveroneway::wire::Payload* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (is_memcpy_compatible) {
+    if constexpr (kIsMemcpyCompatible) {
       memcpy(position.As<void>(), value, sizeof(::test_driveroneway::wire::Payload));
     } else {
       internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->value, position + 0, recursion_depth);
@@ -117,15 +117,15 @@ static_assert(sizeof(::test_driveroneway::wire::OneWaySendRequest) == TypeTraits
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_driveroneway::wire::OneWaySendRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4;
+  static constexpr size_t kInlineSize = 4;
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_driveroneway::wire::Payload, fidl::internal::WireCodingConstraintEmpty, IsRecursive>());
   static constexpr bool kHasPadding = false;
   using Base = WireStructCodingTraitsBase<::test_driveroneway::wire::OneWaySendRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
-  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+  static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
       internal::WireEncoder* encoder, ::test_driveroneway::wire::OneWaySendRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (is_memcpy_compatible) {
+    if constexpr (kIsMemcpyCompatible) {
       memcpy(position.As<void>(), value, sizeof(::test_driveroneway::wire::OneWaySendRequest));
     } else {
       internal::WireCodingTraits<::test_driveroneway::wire::Payload, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->payload, position + 0, recursion_depth);

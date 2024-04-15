@@ -317,7 +317,7 @@ namespace fidl {
 
 template <>
 struct CodingTraits<::test::placementofattributes::ExampleBits> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::placementofattributes::ExampleBits);
+  static constexpr size_t kInlineSize = sizeof(::test::placementofattributes::ExampleBits);
   static void Encode(Encoder* encoder, ::test::placementofattributes::ExampleBits* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -346,7 +346,7 @@ struct Equality<::test::placementofattributes::ExampleBits> {
 };
 template <>
 struct CodingTraits<::test::placementofattributes::ExampleEnum> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::placementofattributes::ExampleEnum);
+  static constexpr size_t kInlineSize = sizeof(::test::placementofattributes::ExampleEnum);
   static void Encode(Encoder* encoder, ::test::placementofattributes::ExampleEnum* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -448,7 +448,7 @@ struct CodingTraits<::test::placementofattributes::ExampleUnion>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::placementofattributes::ExampleUnion>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::placementofattributes::ExampleUnion>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {

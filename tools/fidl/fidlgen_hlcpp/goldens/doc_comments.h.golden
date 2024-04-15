@@ -588,7 +588,7 @@ namespace fidl {
 
 template <>
 struct CodingTraits<::test::doccomments::MyStrictBits> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::doccomments::MyStrictBits);
+  static constexpr size_t kInlineSize = sizeof(::test::doccomments::MyStrictBits);
   static void Encode(Encoder* encoder, ::test::doccomments::MyStrictBits* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -617,7 +617,7 @@ struct Equality<::test::doccomments::MyStrictBits> {
 };
 template <>
 struct CodingTraits<::test::doccomments::MyFlexibleBits> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::doccomments::MyFlexibleBits);
+  static constexpr size_t kInlineSize = sizeof(::test::doccomments::MyFlexibleBits);
   static void Encode(Encoder* encoder, ::test::doccomments::MyFlexibleBits* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -646,7 +646,7 @@ struct Equality<::test::doccomments::MyFlexibleBits> {
 };
 template <>
 struct CodingTraits<::test::doccomments::MyStrictEnum> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::doccomments::MyStrictEnum);
+  static constexpr size_t kInlineSize = sizeof(::test::doccomments::MyStrictEnum);
   static void Encode(Encoder* encoder, ::test::doccomments::MyStrictEnum* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -673,7 +673,7 @@ struct Equality<::test::doccomments::MyStrictEnum> {
 
 template <>
 struct CodingTraits<::test::doccomments::MyFlexibleEnum> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::doccomments::MyFlexibleEnum);
+  static constexpr size_t kInlineSize = sizeof(::test::doccomments::MyFlexibleEnum);
   static void Encode(Encoder* encoder, ::test::doccomments::MyFlexibleEnum* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -729,7 +729,7 @@ struct CodingTraits<::test::doccomments::StrictUnion>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::doccomments::StrictUnion>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::doccomments::StrictUnion>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -784,7 +784,7 @@ struct CodingTraits<::test::doccomments::FlexibleUnion>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::doccomments::FlexibleUnion>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::doccomments::FlexibleUnion>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {

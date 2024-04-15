@@ -451,7 +451,7 @@ struct CodingTraits<::test::unionsandwich::UnionSize8Alignment4>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unionsandwich::UnionSize8Alignment4>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unionsandwich::UnionSize8Alignment4>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -537,7 +537,7 @@ struct CodingTraits<::test::unionsandwich::UnionSize12Alignment4>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unionsandwich::UnionSize12Alignment4>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unionsandwich::UnionSize12Alignment4>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -648,7 +648,7 @@ struct CodingTraits<::test::unionsandwich::UnionSize24Alignment8>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unionsandwich::UnionSize24Alignment8>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unionsandwich::UnionSize24Alignment8>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -734,7 +734,7 @@ struct CodingTraits<::test::unionsandwich::UnionSize36Alignment4>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unionsandwich::UnionSize36Alignment4>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unionsandwich::UnionSize36Alignment4>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {

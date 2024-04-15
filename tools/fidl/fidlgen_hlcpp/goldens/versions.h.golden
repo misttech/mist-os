@@ -391,7 +391,7 @@ namespace fidl {
 
 template <>
 struct CodingTraits<::test::versions::Bits> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::versions::Bits);
+  static constexpr size_t kInlineSize = sizeof(::test::versions::Bits);
   static void Encode(Encoder* encoder, ::test::versions::Bits* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -420,7 +420,7 @@ struct Equality<::test::versions::Bits> {
 };
 template <>
 struct CodingTraits<::test::versions::Enum> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::versions::Enum);
+  static constexpr size_t kInlineSize = sizeof(::test::versions::Enum);
   static void Encode(Encoder* encoder, ::test::versions::Enum* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -500,7 +500,7 @@ struct CodingTraits<::test::versions::Union>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::versions::Union>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::versions::Union>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {

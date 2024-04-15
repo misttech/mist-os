@@ -987,7 +987,7 @@ namespace fidl {
 
 template <>
 struct CodingTraits<::test::anonymous::Op> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::anonymous::Op);
+  static constexpr size_t kInlineSize = sizeof(::test::anonymous::Op);
   static void Encode(Encoder* encoder, ::test::anonymous::Op* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -1045,7 +1045,7 @@ struct Equality<::test::anonymous::OverrideTest> {
 };
 template <>
 struct CodingTraits<::test::anonymous::Flags> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::anonymous::Flags);
+  static constexpr size_t kInlineSize = sizeof(::test::anonymous::Flags);
   static void Encode(Encoder* encoder, ::test::anonymous::Flags* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -1125,7 +1125,7 @@ struct CodingTraits<::test::anonymous::Expression>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::anonymous::Expression>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::anonymous::Expression>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -1183,7 +1183,7 @@ struct CodingTraits<::test::anonymous::UnionMember>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::anonymous::UnionMember>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::anonymous::UnionMember>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -1304,7 +1304,7 @@ struct Equality<::test::anonymous::SomeProtocolSomeMethodRequest> {
 };
 template <>
 struct CodingTraits<::test::anonymous::BitsMember> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::anonymous::BitsMember);
+  static constexpr size_t kInlineSize = sizeof(::test::anonymous::BitsMember);
   static void Encode(Encoder* encoder, ::test::anonymous::BitsMember* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -1355,7 +1355,7 @@ struct Equality<::test::anonymous::SomeProtocol_SomeMethod_Response> {
 };
 template <>
 struct CodingTraits<::test::anonymous::SomeProtocol_SomeMethod_Error> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::anonymous::SomeProtocol_SomeMethod_Error);
+  static constexpr size_t kInlineSize = sizeof(::test::anonymous::SomeProtocol_SomeMethod_Error);
   static void Encode(Encoder* encoder, ::test::anonymous::SomeProtocol_SomeMethod_Error* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -1389,7 +1389,7 @@ struct CodingTraits<::test::anonymous::SomeProtocol_SomeMethod_Result>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::anonymous::SomeProtocol_SomeMethod_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::anonymous::SomeProtocol_SomeMethod_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {

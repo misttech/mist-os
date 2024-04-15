@@ -3354,7 +3354,7 @@ namespace fidl {
 
 template <>
 struct CodingTraits<::test::typesinprotocols::Bits> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::typesinprotocols::Bits);
+  static constexpr size_t kInlineSize = sizeof(::test::typesinprotocols::Bits);
   static void Encode(Encoder* encoder, ::test::typesinprotocols::Bits* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -3383,7 +3383,7 @@ struct Equality<::test::typesinprotocols::Bits> {
 };
 template <>
 struct CodingTraits<::test::typesinprotocols::Enum> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::typesinprotocols::Enum);
+  static constexpr size_t kInlineSize = sizeof(::test::typesinprotocols::Enum);
   static void Encode(Encoder* encoder, ::test::typesinprotocols::Enum* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -3459,7 +3459,7 @@ struct CodingTraits<::test::typesinprotocols::Union>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Union>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Union>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -3566,7 +3566,7 @@ struct CodingTraits<::test::typesinprotocols::ResourceUnion>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::typesinprotocols::ResourceUnion>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::ResourceUnion>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -4222,7 +4222,7 @@ struct CodingTraits<::test::typesinprotocols::Protocol_ErrorBasic_Result>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorBasic_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorBasic_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -4279,7 +4279,7 @@ struct CodingTraits<::test::typesinprotocols::Protocol_ErrorCompound_Result>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorCompound_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorCompound_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -4336,7 +4336,7 @@ struct CodingTraits<::test::typesinprotocols::Protocol_ErrorArrayBasic_Result>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorArrayBasic_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorArrayBasic_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -4393,7 +4393,7 @@ struct CodingTraits<::test::typesinprotocols::Protocol_ErrorArrayCompound_Result
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorArrayCompound_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorArrayCompound_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -4450,7 +4450,7 @@ struct CodingTraits<::test::typesinprotocols::Protocol_ErrorVectorBasic_Result>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorVectorBasic_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorVectorBasic_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -4507,7 +4507,7 @@ struct CodingTraits<::test::typesinprotocols::Protocol_ErrorVectorCompound_Resul
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorVectorCompound_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorVectorCompound_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -4564,7 +4564,7 @@ struct CodingTraits<::test::typesinprotocols::Protocol_ErrorVectorOptional_Resul
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorVectorOptional_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorVectorOptional_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -4621,7 +4621,7 @@ struct CodingTraits<::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Re
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -4680,7 +4680,7 @@ struct CodingTraits<::test::typesinprotocols::Protocol_ErrorResource_Result>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::typesinprotocols::Protocol_ErrorResource_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::typesinprotocols::Protocol_ErrorResource_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {

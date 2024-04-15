@@ -1404,7 +1404,7 @@ struct CodingTraits<::test::protocollayouts::LocalUnionPayload>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::protocollayouts::LocalUnionPayload>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::LocalUnionPayload>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -1458,7 +1458,7 @@ struct CodingTraits<::test::protocollayouts::MainProtocol_TwoWayImportWithError_
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -1515,7 +1515,7 @@ struct CodingTraits<::test::protocollayouts::MainProtocol_TwoWayLocalWithError_R
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -1596,7 +1596,7 @@ struct CodingTraits<::test::protocollayouts::MainProtocolTwoWayAnonRequest>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::protocollayouts::MainProtocolTwoWayAnonRequest>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::MainProtocolTwoWayAnonRequest>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -1698,7 +1698,7 @@ struct CodingTraits<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Re
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -1752,7 +1752,7 @@ struct CodingTraits<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Re
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -1809,7 +1809,7 @@ struct CodingTraits<::test::protocollayouts::MainProtocolOnAnonRequest>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::protocollayouts::MainProtocolOnAnonRequest>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocollayouts::MainProtocolOnAnonRequest>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {

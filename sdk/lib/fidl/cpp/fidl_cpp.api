@@ -19,5 +19,5 @@
   "pkg/fidl_cpp/include/lib/fidl/cpp/service_connector.h": "921dc36b03d9c1854b05ebed40c00644",
   "pkg/fidl_cpp/include/lib/fidl/cpp/service_handler_base.h": "4a422b98568937fae5340575ac8d4303",
   "pkg/fidl_cpp/include/lib/fidl/cpp/type_converter.h": "81ea87e9526f104ff4bbebd502c6a7ec",
-  "pkg/fidl_cpp/include/lib/fidl/cpp/unknown_interactions_hlcpp.h": "1d17b2fa8a4a8dea25af7018c356fb86"
+  "pkg/fidl_cpp/include/lib/fidl/cpp/unknown_interactions_hlcpp.h": "1ae305ebbb47d7b39599e0cc28ff19b5"
 }

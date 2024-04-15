@@ -53,7 +53,7 @@ struct fidl::TypeTraits<TwoWayRequest> {
 template <bool IsRecursive>
 struct fidl::internal::WireCodingTraits<TwoWayRequest, fidl::internal::WireCodingConstraintEmpty,
                                         IsRecursive> {
-  static constexpr size_t inline_size = 24;
+  static constexpr size_t kInlineSize = 24;
 
   static void Encode(fidl::internal::WireEncoder* encoder, TwoWayRequest* value,
                      WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -83,7 +83,7 @@ struct fidl::TypeTraits<TwoWayResponseBody> {
 template <bool IsRecursive>
 struct fidl::internal::WireCodingTraits<TwoWayResponseBody,
                                         fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4;
+  static constexpr size_t kInlineSize = 4;
 
   static void Encode(fidl::internal::WireEncoder* encoder, TwoWayResponseBody* value,
                      fidl::internal::WirePosition position,
@@ -116,7 +116,7 @@ struct fidl::TypeTraits<TwoWayResponse> {
 template <bool IsRecursive>
 struct fidl::internal::WireCodingTraits<TwoWayResponse, fidl::internal::WireCodingConstraintEmpty,
                                         IsRecursive> {
-  static constexpr size_t inline_size = 24;
+  static constexpr size_t kInlineSize = 24;
 
   static void Encode(fidl::internal::WireEncoder* encoder, TwoWayResponse* value,
                      fidl::internal::WirePosition position,

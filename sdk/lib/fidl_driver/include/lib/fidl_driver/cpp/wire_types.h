@@ -13,8 +13,8 @@ namespace fidl::internal {
 
 template <typename Constraint, bool IsRecursive>
 struct WireCodingTraits<::fdf::Channel, Constraint, IsRecursive> {
-  static constexpr size_t inline_size = sizeof(fdf_handle_t);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(fdf_handle_t);
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(WireEncoder* encoder, ::fdf::Channel* value, WirePosition position,
                      RecursionDepth<IsRecursive> recursion_depth) {
@@ -29,8 +29,8 @@ struct WireCodingTraits<::fdf::Channel, Constraint, IsRecursive> {
 
 template <typename T, typename Constraint, bool IsRecursive>
 struct WireCodingTraits<::fdf::ServerEnd<T>, Constraint, IsRecursive> {
-  static constexpr size_t inline_size = sizeof(fdf_handle_t);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(fdf_handle_t);
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(WireEncoder* encoder, ::fdf::ServerEnd<T>* value, WirePosition position,
                      RecursionDepth<IsRecursive> recursion_depth) {
@@ -45,8 +45,8 @@ struct WireCodingTraits<::fdf::ServerEnd<T>, Constraint, IsRecursive> {
 
 template <typename T, typename Constraint, bool IsRecursive>
 struct WireCodingTraits<::fdf::ClientEnd<T>, Constraint, IsRecursive> {
-  static constexpr size_t inline_size = sizeof(fdf_handle_t);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(fdf_handle_t);
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(WireEncoder* encoder, ::fdf::ClientEnd<T>* value, WirePosition position,
                      RecursionDepth<IsRecursive> recursion_depth) {

@@ -314,8 +314,8 @@ namespace fidl {
 
 template <bool IsRecursive>
 struct internal::WireCodingTraits<::test_placementofattributes::wire::ExampleBits, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = sizeof(uint32_t);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(uint32_t);
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_placementofattributes::wire::ExampleBits* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     if (unlikely(static_cast<uint32_t>(*value) & ~1ull)) {
@@ -333,8 +333,8 @@ struct internal::WireCodingTraits<::test_placementofattributes::wire::ExampleBit
 
 template <bool IsRecursive>
 struct internal::WireCodingTraits<::test_placementofattributes::wire::ExampleEnum, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = sizeof(uint32_t);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(uint32_t);
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_placementofattributes::wire::ExampleEnum* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     switch (*value) {
@@ -381,15 +381,15 @@ static_assert(sizeof(::test_placementofattributes::wire::ExampleProtocolMethodRe
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_placementofattributes::wire::ExampleProtocolMethodRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 1;
+  static constexpr size_t kInlineSize = 1;
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_exampleusing::wire::Empty, fidl::internal::WireCodingConstraintEmpty, IsRecursive>());
   static constexpr bool kHasPadding = false;
   using Base = WireStructCodingTraitsBase<::test_placementofattributes::wire::ExampleProtocolMethodRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
-  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+  static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
       internal::WireEncoder* encoder, ::test_placementofattributes::wire::ExampleProtocolMethodRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (is_memcpy_compatible) {
+    if constexpr (kIsMemcpyCompatible) {
       memcpy(position.As<void>(), value, sizeof(::test_placementofattributes::wire::ExampleProtocolMethodRequest));
     } else {
       internal::WireCodingTraits<::test_exampleusing::wire::Empty, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->arg, position + 0, recursion_depth);
@@ -427,15 +427,15 @@ static_assert(sizeof(::test_placementofattributes::wire::ExampleStruct) == TypeT
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_placementofattributes::wire::ExampleStruct, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4;
+  static constexpr size_t kInlineSize = 4;
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>());
   static constexpr bool kHasPadding = false;
   using Base = WireStructCodingTraitsBase<::test_placementofattributes::wire::ExampleStruct, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
-  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+  static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
       internal::WireEncoder* encoder, ::test_placementofattributes::wire::ExampleStruct* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (is_memcpy_compatible) {
+    if constexpr (kIsMemcpyCompatible) {
       memcpy(position.As<void>(), value, sizeof(::test_placementofattributes::wire::ExampleStruct));
     } else {
       internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->member, position + 0, recursion_depth);
@@ -473,8 +473,8 @@ template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_placementofattributes::wire::ExampleTable, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : ::fidl::internal::WireTableCodingTraitsBase<IsRecursive> {
   using Base = ::fidl::internal::WireTableCodingTraitsBase<IsRecursive>;
-  static constexpr size_t inline_size = 16;
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = 16;
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_placementofattributes::wire::ExampleTable* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 2);
@@ -494,7 +494,7 @@ struct ::fidl::internal::WireCodingTraits<::test_placementofattributes::wire::Ex
       size_t encode_inline_size = 0;
       switch (i) {
         case 0:
-          encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+          encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
           break;
       }
       ::fidl::internal::EncodeFn<IsRecursive> encode_fn = nullptr;
@@ -523,7 +523,7 @@ struct ::fidl::internal::WireCodingTraits<::test_placementofattributes::wire::Ex
       size_t decode_inline_size = 0;
       switch (i) {
         case 0:
-          decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+          decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
           break;
       }
       DecodeFn<IsRecursive> decode_fn = nullptr;
@@ -558,8 +558,8 @@ static_assert(std::is_standard_layout_v<::test_placementofattributes::wire::Exam
 
 template <typename Constraint, bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_placementofattributes::wire::ExampleUnion, Constraint, IsRecursive> {
-  static constexpr size_t inline_size = 16;
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = 16;
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_placementofattributes::wire::ExampleUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
@@ -583,7 +583,7 @@ struct ::fidl::internal::WireCodingTraits<::test_placementofattributes::wire::Ex
     size_t encode_inline_size;
     switch (u->tag) {
       case 1:  // ::test_placementofattributes::wire::ExampleUnion::Tag::kVariant
-        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
         break;
       default:
         encode_inline_size = 0;
@@ -623,7 +623,7 @@ struct ::fidl::internal::WireCodingTraits<::test_placementofattributes::wire::Ex
     size_t decode_inline_size;
     switch (tag) {
       case ::test_placementofattributes::wire::ExampleUnion::Tag::kVariant:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
         break;
       default:
         decode_inline_size = 0;

@@ -16,7 +16,7 @@ using FrameworkErr = ::fidl::internal::FrameworkErr;
 
 template <>
 struct CodingTraits<::fidl::internal::FrameworkErr> {
-  static constexpr size_t inline_size_v2 = sizeof(::fidl::internal::FrameworkErr);
+  static constexpr size_t kInlineSize = sizeof(::fidl::internal::FrameworkErr);
   static void Encode(Encoder* encoder, ::fidl::internal::FrameworkErr* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);

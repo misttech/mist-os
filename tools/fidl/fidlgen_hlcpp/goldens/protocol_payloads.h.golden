@@ -759,7 +759,7 @@ struct CodingTraits<::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -941,7 +941,7 @@ struct CodingTraits<::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_R
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -1023,7 +1023,7 @@ struct CodingTraits<::test::protocolpayloads::MainProtocol_TwoWayImportWithError
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {

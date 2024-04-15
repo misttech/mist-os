@@ -504,7 +504,7 @@ struct CodingTraits<{{ . }}>
 
 template <>
 struct CodingTraits<std::unique_ptr<{{ . }}>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<{{ . }}>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {

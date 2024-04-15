@@ -539,7 +539,7 @@ struct ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProto
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 4 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayComposed>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -579,7 +579,7 @@ struct ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProto
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 4 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayComposed>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -609,7 +609,7 @@ struct ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayCompose
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4;
+  static constexpr size_t kInlineSize = 4;
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayComposed>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -644,7 +644,7 @@ struct ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProt
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 4 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayComposed>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -681,7 +681,7 @@ struct ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProto
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 4 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -710,7 +710,7 @@ struct ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayCompose
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -745,7 +745,7 @@ struct ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProt
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 16 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -784,7 +784,7 @@ struct ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtoco
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 4 + sizeof(fidl_message_header_t);
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnComposed>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -824,7 +824,7 @@ struct ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProto
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 8 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 8 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayLocal>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -864,7 +864,7 @@ struct ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProto
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 8 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 8 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayLocal>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -894,7 +894,7 @@ struct ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayLocal> 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 8;
+  static constexpr size_t kInlineSize = 8;
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayLocal>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -929,7 +929,7 @@ struct ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProt
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 8 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 8 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayLocal>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -966,7 +966,7 @@ struct ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProto
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 8 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 8 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -995,7 +995,7 @@ struct ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayLocalWi
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -1030,7 +1030,7 @@ struct ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProt
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 16 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -1069,7 +1069,7 @@ struct ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtoco
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnLocal>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnLocal>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 8 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 8 + sizeof(fidl_message_header_t);
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnLocal>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -1109,7 +1109,7 @@ struct ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProto
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayImport>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayImport>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 4 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayImport>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -1149,7 +1149,7 @@ struct ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProto
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayImport>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayImport>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 4 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayImport>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -1179,7 +1179,7 @@ struct ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayImport>
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayImport>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayImport>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4;
+  static constexpr size_t kInlineSize = 4;
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayImport>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -1214,7 +1214,7 @@ struct ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProt
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayImport>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayImport>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 4 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayImport>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -1251,7 +1251,7 @@ struct ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProto
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 4 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -1280,7 +1280,7 @@ struct ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayImportW
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -1315,7 +1315,7 @@ struct ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProt
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 16 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -1354,7 +1354,7 @@ struct ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtoco
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnImport>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnImport>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 4 + sizeof(fidl_message_header_t);
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnImport>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -1394,7 +1394,7 @@ struct ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProto
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 8 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 8 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayAnon>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -1434,7 +1434,7 @@ struct ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProto
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 8 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 8 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayAnon>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -1464,7 +1464,7 @@ struct ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayAnon> f
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 8;
+  static constexpr size_t kInlineSize = 8;
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayAnon>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -1499,7 +1499,7 @@ struct ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProt
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 8 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 8 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayAnon>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -1536,7 +1536,7 @@ struct ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProto
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 8 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 8 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -1565,7 +1565,7 @@ struct ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayAnonWit
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -1600,7 +1600,7 @@ struct ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProt
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 16 + sizeof(fidl_message_header_t);
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     *position.As<fidl_message_header_t>() = value->header;
@@ -1639,7 +1639,7 @@ struct ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtoco
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnAnon>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnAnon>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 8 + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = 8 + sizeof(fidl_message_header_t);
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnAnon>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {

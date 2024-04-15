@@ -2427,7 +2427,7 @@ struct Equality<::test::protocols::WithAndWithoutRequestResponseOnWithResponseRe
 };
 template <>
 struct CodingTraits<::test::protocols::ErrorEnum> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::protocols::ErrorEnum);
+  static constexpr size_t kInlineSize = sizeof(::test::protocols::ErrorEnum);
   static void Encode(Encoder* encoder, ::test::protocols::ErrorEnum* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -2495,7 +2495,7 @@ struct CodingTraits<::test::protocols::WithErrorSyntax_ResponseAsStruct_Result>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::protocols::WithErrorSyntax_ResponseAsStruct_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocols::WithErrorSyntax_ResponseAsStruct_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -2579,7 +2579,7 @@ struct CodingTraits<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -2663,7 +2663,7 @@ struct CodingTraits<::test::protocols::WithErrorSyntax_ErrorAsEnum_Result>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::protocols::WithErrorSyntax_ErrorAsEnum_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocols::WithErrorSyntax_ErrorAsEnum_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -2754,7 +2754,7 @@ struct CodingTraits<::test::protocols::WithErrorSyntax_HandleInResult_Result>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::protocols::WithErrorSyntax_HandleInResult_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocols::WithErrorSyntax_HandleInResult_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -3488,7 +3488,7 @@ struct CodingTraits<::test::protocols::TheUnion>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::protocols::TheUnion>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::protocols::TheUnion>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {

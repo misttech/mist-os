@@ -135,7 +135,7 @@ namespace fidl {
 
 template <>
 struct CodingTraits<::test::consts::EnumType> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::consts::EnumType);
+  static constexpr size_t kInlineSize = sizeof(::test::consts::EnumType);
   static void Encode(Encoder* encoder, ::test::consts::EnumType* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -162,7 +162,7 @@ struct Equality<::test::consts::EnumType> {
 
 template <>
 struct CodingTraits<::test::consts::BitsType> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::consts::BitsType);
+  static constexpr size_t kInlineSize = sizeof(::test::consts::BitsType);
   static void Encode(Encoder* encoder, ::test::consts::BitsType* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);

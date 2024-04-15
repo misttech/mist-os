@@ -41,7 +41,7 @@ struct {{ .WireTransactionalEvent }} final {
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<{{ .WireTransactionalEvent }}, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public WireStructCodingTraitsBase<{{ .WireTransactionalEvent }}, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = {{ .Response.TypeShapeV2.InlineSize }} + sizeof(fidl_message_header_t);
+  static constexpr size_t kInlineSize = {{ .Response.TypeShapeV2.InlineSize }} + sizeof(fidl_message_header_t);
 
   static void Encode(
     internal::WireEncoder* encoder, {{ .WireTransactionalEvent }}* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {

@@ -319,7 +319,7 @@ namespace fidl {
 
 template <>
 struct CodingTraits<::test::bits::MyBits> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::bits::MyBits);
+  static constexpr size_t kInlineSize = sizeof(::test::bits::MyBits);
   static void Encode(Encoder* encoder, ::test::bits::MyBits* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -348,7 +348,7 @@ struct Equality<::test::bits::MyBits> {
 };
 template <>
 struct CodingTraits<::test::bits::StrictBits> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::bits::StrictBits);
+  static constexpr size_t kInlineSize = sizeof(::test::bits::StrictBits);
   static void Encode(Encoder* encoder, ::test::bits::StrictBits* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -377,7 +377,7 @@ struct Equality<::test::bits::StrictBits> {
 };
 template <>
 struct CodingTraits<::test::bits::FlexibleBits> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::bits::FlexibleBits);
+  static constexpr size_t kInlineSize = sizeof(::test::bits::FlexibleBits);
   static void Encode(Encoder* encoder, ::test::bits::FlexibleBits* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -406,7 +406,7 @@ struct Equality<::test::bits::FlexibleBits> {
 };
 template <>
 struct CodingTraits<::test::bits::EmptyBits> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::bits::EmptyBits);
+  static constexpr size_t kInlineSize = sizeof(::test::bits::EmptyBits);
   static void Encode(Encoder* encoder, ::test::bits::EmptyBits* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);

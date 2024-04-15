@@ -257,7 +257,7 @@ struct NaturalStructPadding final {
 
 template <typename T, size_t Size>
 struct NaturalStructCodingTraits {
-  static constexpr size_t inline_size_v2 = Size;
+  static constexpr size_t kInlineSize = Size;
   // True iff all fields are memcpy compatible.
   static constexpr bool are_members_memcpy_compatible =
       TupleVisitor::All(T::kMembers, [](auto member_info) {
@@ -266,11 +266,11 @@ struct NaturalStructCodingTraits {
         return NaturalIsMemcpyCompatible<Field, Constraint>();
       });
   // True iff fields are memcpy compatible and there is no padding.
-  static constexpr bool is_memcpy_compatible =
+  static constexpr bool kIsMemcpyCompatible =
       are_members_memcpy_compatible && std::tuple_size_v<decltype(T::kPadding)> == 0;
 
   static void Encode(NaturalEncoder* encoder, T* value, size_t offset, size_t recursion_depth) {
-    if constexpr (is_memcpy_compatible) {
+    if constexpr (kIsMemcpyCompatible) {
       memcpy(encoder->GetPtr<T>(offset), value, sizeof(T));
     } else {
       MemberVisitor<T>::Visit(value, [&](auto* member, auto& member_info) -> void {
@@ -282,7 +282,7 @@ struct NaturalStructCodingTraits {
   }
 
   static void Decode(NaturalDecoder* decoder, T* value, size_t offset, size_t recursion_depth) {
-    if constexpr (is_memcpy_compatible) {
+    if constexpr (kIsMemcpyCompatible) {
       memcpy(value, decoder->GetPtr<T>(offset), sizeof(T));
     } else {
       MemberVisitor<T>::Visit(value, [&](auto* member, auto& member_info) {
@@ -317,8 +317,8 @@ struct NaturalStructCodingTraits {
 
 template <typename T>
 struct NaturalEmptyStructCodingTraits {
-  static constexpr size_t inline_size_v2 = 1;
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = 1;
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(NaturalEncoder* encoder, T* value, size_t offset, size_t recursion_depth) {}
 
@@ -342,8 +342,8 @@ struct NaturalTableMember final {
 
 template <typename T>
 struct NaturalTableCodingTraits {
-  static constexpr size_t inline_size_v2 = 16;
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = 16;
+  static constexpr bool kIsMemcpyCompatible = false;
 
   struct TableMemberVisitor : public MemberVisitor<T> {
     using Base = MemberVisitor<T>;
@@ -507,8 +507,8 @@ struct NaturalUnionMember final {
 
 template <typename T>
 struct NaturalUnionCodingTraits {
-  static constexpr size_t inline_size_v2 = 16;
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = 16;
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(NaturalEncoder* encoder, T* value, size_t offset, size_t recursion_depth) {
     const size_t index = value->storage_->index();

@@ -80,7 +80,7 @@ struct fidl::TypeTraits<Input> {
 template <bool IsRecursive>
 struct fidl::internal::WireCodingTraits<Input, fidl::internal::WireCodingConstraintEmpty,
                                         IsRecursive> {
-  static constexpr size_t inline_size = 4;
+  static constexpr size_t kInlineSize = 4;
 
   static void Encode(fidl::internal::WireEncoder* encoder, Input* value, WirePosition position,
                      RecursionDepth<IsRecursive> recursion_depth) {

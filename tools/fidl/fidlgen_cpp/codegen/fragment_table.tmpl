@@ -383,8 +383,8 @@ template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : ::fidl::internal::WireTableCodingTraitsBase<IsRecursive> {
   using Base = ::fidl::internal::WireTableCodingTraitsBase<IsRecursive>;
-  static constexpr size_t inline_size = {{ .TypeShapeV2.InlineSize }};
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = {{ .TypeShapeV2.InlineSize }};
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(internal::WireEncoder* encoder, {{ . }}* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 2);
@@ -406,7 +406,7 @@ struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingC
       switch (i) {
         {{- range .Members }}
         case {{ Sub .Ordinal 1 }}:
-          encode_inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::inline_size;
+          encode_inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::kInlineSize;
           break;
         {{- end }}
       }
@@ -440,7 +440,7 @@ struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingC
       switch (i) {
         {{- range .Members }}
         case {{ Sub .Ordinal 1 }}:
-          decode_inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::inline_size;
+          decode_inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::kInlineSize;
           break;
         {{- end }}
       }

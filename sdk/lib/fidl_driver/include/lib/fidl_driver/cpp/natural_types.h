@@ -14,9 +14,8 @@ namespace fidl::internal {
 
 template <typename Constraint>
 struct NaturalCodingTraits<::fdf::Channel, Constraint> {
-  static constexpr size_t inline_size_v1_no_ee = sizeof(fdf_handle_t);
-  static constexpr size_t inline_size_v2 = sizeof(fdf_handle_t);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(fdf_handle_t);
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(NaturalEncoder* encoder, ::fdf::Channel* value, size_t offset,
                      size_t recursion_depth) {
@@ -33,9 +32,8 @@ struct NaturalCodingTraits<::fdf::Channel, Constraint> {
 
 template <typename T, typename Constraint>
 struct NaturalCodingTraits<::fdf::ServerEnd<T>, Constraint> {
-  static constexpr size_t inline_size_v1_no_ee = sizeof(fdf_handle_t);
-  static constexpr size_t inline_size_v2 = sizeof(fdf_handle_t);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(fdf_handle_t);
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(NaturalEncoder* encoder, ::fdf::ServerEnd<T>* value, size_t offset,
                      size_t recursion_depth) {
@@ -52,9 +50,8 @@ struct NaturalCodingTraits<::fdf::ServerEnd<T>, Constraint> {
 
 template <typename T, typename Constraint>
 struct NaturalCodingTraits<::fdf::ClientEnd<T>, Constraint> {
-  static constexpr size_t inline_size_v1_no_ee = sizeof(fdf_handle_t);
-  static constexpr size_t inline_size_v2 = sizeof(fdf_handle_t);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(fdf_handle_t);
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(NaturalEncoder* encoder, ::fdf::ClientEnd<T>* value, size_t offset,
                      size_t recursion_depth) {

@@ -142,7 +142,7 @@ namespace fidl {
 
 template <>
 struct CodingTraits<::test::enum_::MyStrictEnum> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::enum_::MyStrictEnum);
+  static constexpr size_t kInlineSize = sizeof(::test::enum_::MyStrictEnum);
   static void Encode(Encoder* encoder, ::test::enum_::MyStrictEnum* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -169,7 +169,7 @@ struct Equality<::test::enum_::MyStrictEnum> {
 
 template <>
 struct CodingTraits<::test::enum_::MyFlexibleEnum> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::enum_::MyFlexibleEnum);
+  static constexpr size_t kInlineSize = sizeof(::test::enum_::MyFlexibleEnum);
   static void Encode(Encoder* encoder, ::test::enum_::MyFlexibleEnum* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -196,7 +196,7 @@ struct Equality<::test::enum_::MyFlexibleEnum> {
 
 template <>
 struct CodingTraits<::test::enum_::MyFlexibleEnumWithCustomUnknown> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::enum_::MyFlexibleEnumWithCustomUnknown);
+  static constexpr size_t kInlineSize = sizeof(::test::enum_::MyFlexibleEnumWithCustomUnknown);
   static void Encode(Encoder* encoder, ::test::enum_::MyFlexibleEnumWithCustomUnknown* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -223,7 +223,7 @@ struct Equality<::test::enum_::MyFlexibleEnumWithCustomUnknown> {
 
 template <>
 struct CodingTraits<::test::enum_::MyEmptyFlexibleEnum> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::enum_::MyEmptyFlexibleEnum);
+  static constexpr size_t kInlineSize = sizeof(::test::enum_::MyEmptyFlexibleEnum);
   static void Encode(Encoder* encoder, ::test::enum_::MyEmptyFlexibleEnum* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);

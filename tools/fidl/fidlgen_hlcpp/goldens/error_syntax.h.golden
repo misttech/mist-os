@@ -295,7 +295,7 @@ struct CodingTraits<::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFai
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {

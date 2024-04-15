@@ -108,8 +108,7 @@ class UnionMemberView final {
 // declaration only for natural types.
 template <typename FidlType>
 using EnableIfNaturalType = std::enable_if_t<static_cast<bool>(
-    internal::NaturalCodingTraits<FidlType,
-                                  internal::NaturalCodingConstraintEmpty>::inline_size_v2)>*;
+    internal::NaturalCodingTraits<FidlType, internal::NaturalCodingConstraintEmpty>::kInlineSize)>*;
 
 class NaturalEncodeResult final : public EncodeResult {
  public:
@@ -211,8 +210,7 @@ template <typename FidlType>
   FidlType value{internal::DefaultConstructPossiblyInvalidObjectTag{}};
 
   const size_t inline_size =
-      internal::NaturalCodingTraits<FidlType,
-                                    internal::NaturalCodingConstraintEmpty>::inline_size_v2;
+      internal::NaturalCodingTraits<FidlType, internal::NaturalCodingConstraintEmpty>::kInlineSize;
   const internal::NaturalTopLevelDecodeFn decode_fn =
       internal::MakeNaturalTopLevelDecodeFn<FidlType>();
   const Status status = internal::NaturalDecode(metadata, inline_size, decode_fn, message,

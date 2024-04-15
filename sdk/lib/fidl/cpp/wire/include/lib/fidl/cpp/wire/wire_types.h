@@ -79,7 +79,7 @@ class WireTableBaseBuilder;
 // declaration only for wire types.
 template <typename FidlType>
 using EnableIfWireType =
-    std::enable_if_t<static_cast<bool>(internal::TopLevelCodingTraits<FidlType>::inline_size)>*;
+    std::enable_if_t<static_cast<bool>(internal::TopLevelCodingTraits<FidlType>::kInlineSize)>*;
 
 // The wire format version used when encoding.
 constexpr WireFormatVersion kLLCPPWireFormatVersion = WireFormatVersion::kV2;
@@ -212,7 +212,7 @@ class UnownedEncodedMessage final
                 UnownedEncodedMessageHandleContainer::handle_metadata_storage_.data()),
             UnownedEncodedMessageHandleContainer::kNumHandles,
             fidl::IsFidlTransactionalMessage<FidlType>::value, value,
-            internal::TopLevelCodingTraits<FidlType>::inline_size,
+            internal::TopLevelCodingTraits<FidlType>::kInlineSize,
             internal::MakeTopLevelEncodeFn<FidlType>()) {}
 
   UnownedEncodedMessage(const UnownedEncodedMessage&) = delete;
@@ -365,7 +365,7 @@ template <typename FidlType>
     EncodedMessage message, WireFormatMetadata metadata) {
   static_assert(IsFidlType<FidlType>::value, "Only FIDL types are supported");
 
-  size_t inline_size = internal::TopLevelCodingTraits<FidlType>::inline_size;
+  size_t inline_size = internal::TopLevelCodingTraits<FidlType>::kInlineSize;
   const internal::TopLevelDecodeFn decode_fn = internal::MakeTopLevelDecodeFn<FidlType>();
   const Status status = internal::WireDecode(metadata, inline_size, decode_fn, message);
 

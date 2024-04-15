@@ -94,7 +94,7 @@ namespace fidl {
 
 template <>
 struct CodingTraits<::test::aliases::obj_type> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::aliases::obj_type);
+  static constexpr size_t kInlineSize = sizeof(::test::aliases::obj_type);
   static void Encode(Encoder* encoder, ::test::aliases::obj_type* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);

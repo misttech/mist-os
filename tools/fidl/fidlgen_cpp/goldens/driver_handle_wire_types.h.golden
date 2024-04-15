@@ -363,15 +363,15 @@ static_assert(sizeof(::test_driverhandle::wire::ClientEndWrapper) == TypeTraits<
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_driverhandle::wire::ClientEndWrapper, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4;
+  static constexpr size_t kInlineSize = 4;
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>, IsRecursive>());
   static constexpr bool kHasPadding = false;
   using Base = WireStructCodingTraitsBase<::test_driverhandle::wire::ClientEndWrapper, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
-  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+  static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
       internal::WireEncoder* encoder, ::test_driverhandle::wire::ClientEndWrapper* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (is_memcpy_compatible) {
+    if constexpr (kIsMemcpyCompatible) {
       memcpy(position.As<void>(), value, sizeof(::test_driverhandle::wire::ClientEndWrapper));
     } else {
       internal::WireCodingTraits<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>, IsRecursive>::Encode(encoder, &value->value, position + 0, recursion_depth);
@@ -415,15 +415,15 @@ static_assert(sizeof(::test_driverhandle::wire::ServerEndWrapper) == TypeTraits<
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_driverhandle::wire::ServerEndWrapper, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 4;
+  static constexpr size_t kInlineSize = 4;
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::fdf::ServerEnd<::test_driverhandle::DriverProtocol>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>, IsRecursive>());
   static constexpr bool kHasPadding = false;
   using Base = WireStructCodingTraitsBase<::test_driverhandle::wire::ServerEndWrapper, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
-  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+  static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
       internal::WireEncoder* encoder, ::test_driverhandle::wire::ServerEndWrapper* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (is_memcpy_compatible) {
+    if constexpr (kIsMemcpyCompatible) {
       memcpy(position.As<void>(), value, sizeof(::test_driverhandle::wire::ServerEndWrapper));
     } else {
       internal::WireCodingTraits<::fdf::ServerEnd<::test_driverhandle::DriverProtocol>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>, IsRecursive>::Encode(encoder, &value->value, position + 0, recursion_depth);
@@ -467,15 +467,15 @@ static_assert(sizeof(::test_driverhandle::wire::HandlesInProtocolSendHandlesRequ
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16;
+  static constexpr size_t kInlineSize = 16;
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_driverhandle::wire::T, fidl::internal::WireCodingConstraintEmpty, IsRecursive>());
   static constexpr bool kHasPadding = false;
   using Base = WireStructCodingTraitsBase<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
-  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
+  static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
       internal::WireEncoder* encoder, ::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (is_memcpy_compatible) {
+    if constexpr (kIsMemcpyCompatible) {
       memcpy(position.As<void>(), value, sizeof(::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest));
     } else {
       internal::WireCodingTraits<::test_driverhandle::wire::T, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->t, position + 0, recursion_depth);
@@ -519,8 +519,8 @@ template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_driverhandle::wire::T, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : ::fidl::internal::WireTableCodingTraitsBase<IsRecursive> {
   using Base = ::fidl::internal::WireTableCodingTraitsBase<IsRecursive>;
-  static constexpr size_t inline_size = 16;
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = 16;
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_driverhandle::wire::T* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 2);
@@ -540,10 +540,10 @@ struct ::fidl::internal::WireCodingTraits<::test_driverhandle::wire::T, ::fidl::
       size_t encode_inline_size = 0;
       switch (i) {
         case 0:
-          encode_inline_size = ::fidl::internal::WireCodingTraits<::zx::event, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_EVENT, 0x80000000, false>, IsRecursive>::inline_size;
+          encode_inline_size = ::fidl::internal::WireCodingTraits<::zx::event, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_EVENT, 0x80000000, false>, IsRecursive>::kInlineSize;
           break;
         case 1:
-          encode_inline_size = ::fidl::internal::WireCodingTraits<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>, IsRecursive>::inline_size;
+          encode_inline_size = ::fidl::internal::WireCodingTraits<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>, IsRecursive>::kInlineSize;
           break;
       }
       ::fidl::internal::EncodeFn<IsRecursive> encode_fn = nullptr;
@@ -575,10 +575,10 @@ struct ::fidl::internal::WireCodingTraits<::test_driverhandle::wire::T, ::fidl::
       size_t decode_inline_size = 0;
       switch (i) {
         case 0:
-          decode_inline_size = ::fidl::internal::WireCodingTraits<::zx::event, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_EVENT, 0x80000000, false>, IsRecursive>::inline_size;
+          decode_inline_size = ::fidl::internal::WireCodingTraits<::zx::event, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_EVENT, 0x80000000, false>, IsRecursive>::kInlineSize;
           break;
         case 1:
-          decode_inline_size = ::fidl::internal::WireCodingTraits<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>, IsRecursive>::inline_size;
+          decode_inline_size = ::fidl::internal::WireCodingTraits<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>, IsRecursive>::kInlineSize;
           break;
       }
       DecodeFn<IsRecursive> decode_fn = nullptr;

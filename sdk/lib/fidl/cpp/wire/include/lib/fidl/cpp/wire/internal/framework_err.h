@@ -20,8 +20,8 @@ struct ContainsHandle<::fidl::internal::FrameworkErr> : public std::false_type {
 template <bool IsRecursive>
 struct internal::WireCodingTraits<::fidl::internal::FrameworkErr,
                                   ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = sizeof(int32_t);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(int32_t);
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::FrameworkErr* value,
                      ::fidl::internal::WirePosition position,

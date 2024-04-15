@@ -10171,7 +10171,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocolStri
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -10276,7 +10276,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocol_Str
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -10360,7 +10360,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocol_Str
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -10417,7 +10417,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocol_Str
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -10471,7 +10471,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocol_Str
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -10552,7 +10552,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocol_Str
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayTableErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayTableErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -10636,7 +10636,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocol_Fle
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -10720,7 +10720,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocol_Fle
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -10777,7 +10777,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocol_Fle
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -10831,7 +10831,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocol_Fle
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -10912,7 +10912,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocol_Fle
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -10996,7 +10996,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocol_Fle
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -11082,7 +11082,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocol_Fle
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -11141,7 +11141,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocol_Fle
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -11195,7 +11195,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocol_Fle
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -11278,7 +11278,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocol_Fle
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -11364,7 +11364,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocolStri
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -11469,7 +11469,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsProtocolFlex
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -11574,7 +11574,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -11679,7 +11679,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -11763,7 +11763,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -11820,7 +11820,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -11874,7 +11874,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -11955,7 +11955,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -12039,7 +12039,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -12144,7 +12144,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsAjarProtocol
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -12249,7 +12249,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsClosedProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -12354,7 +12354,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsClosedProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -12438,7 +12438,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsClosedProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -12495,7 +12495,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsClosedProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -12549,7 +12549,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsClosedProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -12630,7 +12630,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsClosedProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -12714,7 +12714,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsClosedProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -12819,7 +12819,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -12924,7 +12924,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -13008,7 +13008,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -13065,7 +13065,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -13119,7 +13119,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -13200,7 +13200,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -13284,7 +13284,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -13368,7 +13368,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -13425,7 +13425,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -13479,7 +13479,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -13560,7 +13560,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -13644,7 +13644,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -13730,7 +13730,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -13789,7 +13789,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -13843,7 +13843,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -13926,7 +13926,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsDriverProtoc
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -14012,7 +14012,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsAjarDriverPr
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -14117,7 +14117,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsAjarDriverPr
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -14201,7 +14201,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsAjarDriverPr
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -14258,7 +14258,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsAjarDriverPr
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -14312,7 +14312,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsAjarDriverPr
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -14393,7 +14393,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsAjarDriverPr
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -14477,7 +14477,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsClosedDriver
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -14582,7 +14582,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsClosedDriver
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -14666,7 +14666,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsClosedDriver
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -14723,7 +14723,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsClosedDriver
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -14777,7 +14777,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsClosedDriver
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -14858,7 +14858,7 @@ struct CodingTraits<::test::unknowninteractions::UnknownInteractionsClosedDriver
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {

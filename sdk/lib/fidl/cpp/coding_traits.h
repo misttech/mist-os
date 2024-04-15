@@ -29,17 +29,17 @@ struct CodingTraits;
 
 template <typename T, class EncoderImpl = Encoder>
 size_t EncodingInlineSize(EncoderImpl* encoder) {
-  return CodingTraits<T>::inline_size_v2;
+  return CodingTraits<T>::kInlineSize;
 }
 
 template <typename T, class DecoderImpl = Decoder>
 size_t DecodingInlineSize(DecoderImpl* decoder) {
-  return CodingTraits<T>::inline_size_v2;
+  return CodingTraits<T>::kInlineSize;
 }
 
 template <typename T>
 struct CodingTraits<T, typename std::enable_if<IsPrimitive<T>::value>::type> {
-  static constexpr size_t inline_size_v2 = sizeof(T);
+  static constexpr size_t kInlineSize = sizeof(T);
   template <class EncoderImpl>
   static void Encode(EncoderImpl* encoder, T* value, size_t offset,
                      cpp17::optional<HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -54,7 +54,7 @@ struct CodingTraits<T, typename std::enable_if<IsPrimitive<T>::value>::type> {
 
 template <>
 struct CodingTraits<bool> {
-  static constexpr size_t inline_size_v2 = sizeof(bool);
+  static constexpr size_t kInlineSize = sizeof(bool);
   template <class EncoderImpl>
   static void Encode(EncoderImpl* encoder, bool* value, size_t offset,
                      cpp17::optional<HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -78,7 +78,7 @@ struct CodingTraits<bool> {
 #ifdef __Fuchsia__
 template <typename T>
 struct CodingTraits<T, typename std::enable_if<std::is_base_of<zx::object_base, T>::value>::type> {
-  static constexpr size_t inline_size_v2 = sizeof(zx_handle_t);
+  static constexpr size_t kInlineSize = sizeof(zx_handle_t);
   static void Encode(Encoder* encoder, zx::object_base* value, size_t offset,
                      cpp17::optional<HandleInformation> maybe_handle_info = cpp17::nullopt) {
     ZX_ASSERT(maybe_handle_info);
@@ -92,7 +92,7 @@ struct CodingTraits<T, typename std::enable_if<std::is_base_of<zx::object_base, 
 
 template <typename T>
 struct CodingTraits<std::unique_ptr<T>, typename std::enable_if<!IsFidlXUnion<T>::value>::type> {
-  static constexpr size_t inline_size_v2 = sizeof(uintptr_t);
+  static constexpr size_t kInlineSize = sizeof(uintptr_t);
   template <class EncoderImpl>
   static void Encode(EncoderImpl* encoder, std::unique_ptr<T>* value, size_t offset,
                      cpp17::optional<HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -131,7 +131,7 @@ void EncodeVectorPointer(EncoderImpl* encoder, size_t count, size_t offset) {
 
 template <typename T>
 struct CodingTraits<VectorPtr<T>> {
-  static constexpr size_t inline_size_v2 = sizeof(fidl_vector_t);
+  static constexpr size_t kInlineSize = sizeof(fidl_vector_t);
   template <class EncoderImpl>
   static void Encode(EncoderImpl* encoder, VectorPtr<T>* value, size_t offset,
                      cpp17::optional<HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -163,7 +163,7 @@ void EncodeVectorBody(UseStdCopy<true>, EncoderImpl* encoder,
                       typename std::vector<T>::iterator in_begin,
                       typename std::vector<T>::iterator in_end, size_t out_offset,
                       cpp17::optional<HandleInformation> maybe_handle_info) {
-  static_assert(CodingTraits<T>::inline_size_v2 == sizeof(T), "stride doesn't match object size");
+  static_assert(CodingTraits<T>::kInlineSize == sizeof(T), "stride doesn't match object size");
   std::copy(in_begin, in_end, encoder->template GetPtr<T>(out_offset));
 }
 
@@ -182,7 +182,7 @@ void EncodeVectorBody(UseStdCopy<false>, EncoderImpl* encoder,
 template <typename T, typename DecoderImpl>
 void DecodeVectorBody(UseStdCopy<true>, DecoderImpl* decoder, size_t in_begin_offset,
                       size_t in_end_offset, std::vector<T>* out, size_t count) {
-  static_assert(CodingTraits<T>::inline_size_v2 == sizeof(T), "stride doesn't match object size");
+  static_assert(CodingTraits<T>::kInlineSize == sizeof(T), "stride doesn't match object size");
   *out = std::vector<T>(decoder->template GetPtr<T>(in_begin_offset),
                         decoder->template GetPtr<T>(in_end_offset));
 }
@@ -203,7 +203,7 @@ void DecodeVectorBody(UseStdCopy<false>, DecoderImpl* decoder, size_t in_begin_o
 
 template <typename T>
 struct CodingTraits<::std::vector<T>> {
-  static constexpr size_t inline_size_v2 = sizeof(fidl_vector_t);
+  static constexpr size_t kInlineSize = sizeof(fidl_vector_t);
   template <class EncoderImpl>
   static void Encode(EncoderImpl* encoder, ::std::vector<T>* value, size_t offset,
                      cpp17::optional<HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -227,7 +227,7 @@ struct CodingTraits<::std::vector<T>> {
 
 template <typename T, size_t N>
 struct CodingTraits<::std::array<T, N>> {
-  static constexpr size_t inline_size_v2 = CodingTraits<T>::inline_size_v2 * N;
+  static constexpr size_t kInlineSize = CodingTraits<T>::kInlineSize * N;
   template <class EncoderImpl>
   static void Encode(EncoderImpl* encoder, std::array<T, N>* value, size_t offset,
                      cpp17::optional<HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -320,7 +320,7 @@ void EncodeUnknownData(EncoderImpl* encoder, UnknownData* value, size_t envelope
 
 template <typename T, size_t InlineSizeV2>
 struct EncodableCodingTraits {
-  static constexpr size_t inline_size_v2 = InlineSizeV2;
+  static constexpr size_t kInlineSize = InlineSizeV2;
   template <class EncoderImpl>
   static void Encode(EncoderImpl* encoder, T* value, size_t offset,
                      cpp17::optional<HandleInformation> maybe_handle_info = cpp17::nullopt) {

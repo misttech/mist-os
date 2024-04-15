@@ -124,8 +124,8 @@ constexpr inline void {{ .Name }}::operator-=(
 {{- define "Bits:Traits:WireTypesHeader" }}
 template <bool IsRecursive>
 struct internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = sizeof({{ .Type }});
-  static constexpr bool is_memcpy_compatible = {{ not .Strictness }};
+  static constexpr size_t kInlineSize = sizeof({{ .Type }});
+  static constexpr bool kIsMemcpyCompatible = {{ not .Strictness }};
 
   static void Encode(internal::WireEncoder* encoder, {{ . }}* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     {{- if .Strictness }}
@@ -167,8 +167,8 @@ using {{ .Name }} = {{ .Unified }};
 {{- define "Bits:Traits:NaturalTypesHeader" }}
   template <>
   struct internal::NaturalCodingTraits<{{ . }}, ::fidl::internal::NaturalCodingConstraintEmpty> {
-    static constexpr size_t inline_size_v2 = sizeof({{ .Type }});
-    static constexpr bool is_memcpy_compatible = {{ not .Strictness }};
+    static constexpr size_t kInlineSize = sizeof({{ .Type }});
+    static constexpr bool kIsMemcpyCompatible = {{ not .Strictness }};
 
     static void Encode(internal::NaturalEncoder* encoder, {{ . }}* value, size_t offset, size_t recursion_depth) {
       {{- if .Strictness }}

@@ -484,8 +484,8 @@ struct internal::NaturalCodingTraits<::test_doccomments::FlexibleUnion, ::fidl::
 
 template <>
 struct internal::NaturalCodingTraits<::test_doccomments::MyStrictBits, ::fidl::internal::NaturalCodingConstraintEmpty> {
-  static constexpr size_t inline_size_v2 = sizeof(uint32_t);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(uint32_t);
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(internal::NaturalEncoder* encoder, ::test_doccomments::MyStrictBits* value, size_t offset, size_t recursion_depth) {
     if (unlikely(static_cast<uint32_t>(*value) & ~3ull)) {
@@ -502,8 +502,8 @@ struct internal::NaturalCodingTraits<::test_doccomments::MyStrictBits, ::fidl::i
 };
 template <>
 struct internal::NaturalCodingTraits<::test_doccomments::MyFlexibleBits, ::fidl::internal::NaturalCodingConstraintEmpty> {
-  static constexpr size_t inline_size_v2 = sizeof(uint32_t);
-  static constexpr bool is_memcpy_compatible = true;
+  static constexpr size_t kInlineSize = sizeof(uint32_t);
+  static constexpr bool kIsMemcpyCompatible = true;
 
   static void Encode(internal::NaturalEncoder* encoder, ::test_doccomments::MyFlexibleBits* value, size_t offset, size_t recursion_depth) {
     *encoder->template GetPtr<::test_doccomments::MyFlexibleBits>(offset) = *value;
@@ -515,8 +515,8 @@ struct internal::NaturalCodingTraits<::test_doccomments::MyFlexibleBits, ::fidl:
 
 template <>
 struct internal::NaturalCodingTraits<::test_doccomments::MyStrictEnum, ::fidl::internal::NaturalCodingConstraintEmpty> {
-  static constexpr size_t inline_size_v2 = sizeof(uint32_t);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(uint32_t);
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(internal::NaturalEncoder* encoder, ::test_doccomments::MyStrictEnum* value, size_t offset, size_t recursion_depth) {
     switch (*value) {
@@ -543,8 +543,8 @@ struct internal::NaturalCodingTraits<::test_doccomments::MyStrictEnum, ::fidl::i
 };
 template <>
 struct internal::NaturalCodingTraits<::test_doccomments::MyFlexibleEnum, ::fidl::internal::NaturalCodingConstraintEmpty> {
-  static constexpr size_t inline_size_v2 = sizeof(uint32_t);
-  static constexpr bool is_memcpy_compatible = true;
+  static constexpr size_t kInlineSize = sizeof(uint32_t);
+  static constexpr bool kIsMemcpyCompatible = true;
 
   static void Encode(internal::NaturalEncoder* encoder, ::test_doccomments::MyFlexibleEnum* value, size_t offset, size_t recursion_depth) {
     *encoder->template GetPtr<::test_doccomments::MyFlexibleEnum>(offset) = *value;

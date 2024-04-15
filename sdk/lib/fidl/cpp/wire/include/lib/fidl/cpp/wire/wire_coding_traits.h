@@ -63,7 +63,7 @@ struct WireCodingTraits;
 
 template <typename T, typename Constraint, bool IsRecursive>
 constexpr bool WireIsMemcpyCompatible() {
-  return WireCodingTraits<T, Constraint, IsRecursive>::is_memcpy_compatible;
+  return WireCodingTraits<T, Constraint, IsRecursive>::kIsMemcpyCompatible;
 }
 
 template <typename MaskType>
@@ -81,8 +81,8 @@ void WireCheckPadding(WireDecoder* decoder, WirePosition position, MaskType mask
 template <typename T, bool IsRecursive>
 struct WireCodingTraits<T, WireCodingConstraintEmpty, IsRecursive,
                         std::enable_if_t<IsPrimitive<T>::value>> {
-  static constexpr size_t inline_size = sizeof(T);
-  static constexpr bool is_memcpy_compatible = true;
+  static constexpr size_t kInlineSize = sizeof(T);
+  static constexpr bool kIsMemcpyCompatible = true;
 
   static void Encode(WireEncoder* encoder, T* value, WirePosition position,
                      RecursionDepth<IsRecursive> recursion_depth) {
@@ -94,8 +94,8 @@ struct WireCodingTraits<T, WireCodingConstraintEmpty, IsRecursive,
 
 template <bool IsRecursive>
 struct WireCodingTraits<bool, WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = sizeof(bool);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(bool);
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(WireEncoder* encoder, const bool* value, WirePosition position,
                      RecursionDepth<IsRecursive> recursion_depth) {
@@ -131,7 +131,7 @@ struct VectorCodingTraitHelper {
     }
     using InnerConstraint = typename Constraint::Inner;
     if constexpr (WireIsMemcpyCompatible<T, InnerConstraint, IsRecursive>()) {
-      constexpr size_t stride = WireCodingTraits<T, InnerConstraint, IsRecursive>::inline_size;
+      constexpr size_t stride = WireCodingTraits<T, InnerConstraint, IsRecursive>::kInlineSize;
       static_assert(stride <= std::numeric_limits<uint32_t>::max(),
                     "assume 32-bit stride to reduce checks");
       encoder->EncodeMemcpyableVector(data, count, stride);
@@ -143,7 +143,7 @@ struct VectorCodingTraitHelper {
   template <typename T, typename InnerConstraint>
   static void EncodeEachElement(WireEncoder* encoder, T* data, size_t count, WirePosition position,
                                 RecursionDepth<IsRecursive> recursion_depth) {
-    constexpr size_t stride = WireCodingTraits<T, InnerConstraint, IsRecursive>::inline_size;
+    constexpr size_t stride = WireCodingTraits<T, InnerConstraint, IsRecursive>::kInlineSize;
     static_assert(stride <= std::numeric_limits<uint32_t>::max(),
                   "assume 32-bit stride to reduce checks");
 
@@ -204,7 +204,7 @@ struct VectorCodingTraitHelper {
     if (!inner_depth.IsValid()) {
       return;
     }
-    constexpr size_t stride = WireCodingTraits<T, InnerConstraint, IsRecursive>::inline_size;
+    constexpr size_t stride = WireCodingTraits<T, InnerConstraint, IsRecursive>::kInlineSize;
     static_assert(stride <= std::numeric_limits<uint32_t>::max(),
                   "assume 32-bit stride to reduce checks");
     fidl_vector_t* encoded = position.As<fidl_vector_t>();
@@ -257,8 +257,8 @@ struct VectorCodingTraitHelper {
 
 template <typename T, typename Constraint, bool IsRecursive>
 struct WireCodingTraits<fidl::VectorView<T>, Constraint, IsRecursive> {
-  static constexpr size_t inline_size = sizeof(fidl_vector_t);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(fidl_vector_t);
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(WireEncoder* encoder, fidl::VectorView<T>* value, WirePosition position,
                      RecursionDepth<IsRecursive> recursion_depth) {
@@ -274,8 +274,8 @@ struct WireCodingTraits<fidl::VectorView<T>, Constraint, IsRecursive> {
 
 template <typename Constraint, bool IsRecursive>
 struct WireCodingTraits<fidl::StringView, Constraint, IsRecursive> final {
-  static constexpr size_t inline_size = sizeof(fidl_string_t);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(fidl_string_t);
+  static constexpr bool kIsMemcpyCompatible = false;
   using StringVectorConstraint =
       WireCodingConstraintVector<WireCodingConstraintEmpty, Constraint::is_optional,
                                  Constraint::limit>;
@@ -309,15 +309,15 @@ struct WireCodingTraits<fidl::StringView, Constraint, IsRecursive> final {
 
 template <typename T, size_t N, typename Constraint, bool IsRecursive>
 struct WireCodingTraits<fidl::Array<T, N>, Constraint, IsRecursive> {
-  static constexpr size_t inline_size =
-      WireCodingTraits<T, Constraint, IsRecursive>::inline_size * N;
-  static constexpr bool is_memcpy_compatible =
-      WireCodingTraits<T, Constraint, IsRecursive>::is_memcpy_compatible;
+  static constexpr size_t kInlineSize =
+      WireCodingTraits<T, Constraint, IsRecursive>::kInlineSize * N;
+  static constexpr bool kIsMemcpyCompatible =
+      WireCodingTraits<T, Constraint, IsRecursive>::kIsMemcpyCompatible;
 
   static void Encode(WireEncoder* encoder, fidl::Array<T, N>* value, WirePosition position,
                      RecursionDepth<IsRecursive> recursion_depth) {
-    constexpr size_t stride = WireCodingTraits<T, Constraint, IsRecursive>::inline_size;
-    if constexpr (is_memcpy_compatible) {
+    constexpr size_t stride = WireCodingTraits<T, Constraint, IsRecursive>::kInlineSize;
+    if constexpr (kIsMemcpyCompatible) {
       memcpy(position.As<void>(), &value[0], N * stride);
     } else {
       for (size_t i = 0; i < N; ++i) {
@@ -328,8 +328,8 @@ struct WireCodingTraits<fidl::Array<T, N>, Constraint, IsRecursive> {
   }
   static void Decode(WireDecoder* decoder, WirePosition position,
                      RecursionDepth<IsRecursive> recursion_depth) {
-    constexpr size_t stride = WireCodingTraits<T, Constraint, IsRecursive>::inline_size;
-    if constexpr (!is_memcpy_compatible) {
+    constexpr size_t stride = WireCodingTraits<T, Constraint, IsRecursive>::kInlineSize;
+    if constexpr (!kIsMemcpyCompatible) {
       for (size_t i = 0; i < N; ++i) {
         WireCodingTraits<T, Constraint, IsRecursive>::Decode(decoder, position + i * stride,
                                                              recursion_depth);
@@ -342,8 +342,8 @@ struct WireCodingTraits<fidl::Array<T, N>, Constraint, IsRecursive> {
 template <typename T, typename Constraint, bool IsRecursive>
 struct WireCodingTraits<T, Constraint, IsRecursive,
                         std::enable_if_t<std::is_base_of_v<zx::object_base, T>>> {
-  static constexpr size_t inline_size = sizeof(zx_handle_t);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(zx_handle_t);
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(WireEncoder* encoder, zx::object_base* value, WirePosition position,
                      RecursionDepth<IsRecursive> recursion_depth) {
@@ -368,8 +368,8 @@ struct WireCodingTraits<T, Constraint, IsRecursive,
 
 template <typename T, typename Constraint, bool IsRecursive>
 struct WireCodingTraits<fidl::ObjectView<T>, Constraint, IsRecursive> {
-  static constexpr size_t inline_size = sizeof(uintptr_t);
-  static constexpr bool is_memcpy_compatible = false;
+  static constexpr size_t kInlineSize = sizeof(uintptr_t);
+  static constexpr bool kIsMemcpyCompatible = false;
 
   static void Encode(WireEncoder* encoder, fidl::ObjectView<T>* value, WirePosition position,
                      RecursionDepth<IsRecursive> recursion_depth) {
@@ -385,7 +385,7 @@ struct WireCodingTraits<fidl::ObjectView<T>, Constraint, IsRecursive> {
 
     *position.As<uintptr_t>() = FIDL_ALLOC_PRESENT;
 
-    constexpr size_t alloc_size = WireCodingTraits<T, Constraint, IsRecursive>::inline_size;
+    constexpr size_t alloc_size = WireCodingTraits<T, Constraint, IsRecursive>::kInlineSize;
     WirePosition body;
     if (unlikely(!encoder->Alloc(alloc_size, &body))) {
       return;
@@ -409,7 +409,7 @@ struct WireCodingTraits<fidl::ObjectView<T>, Constraint, IsRecursive> {
     if (!inner_depth.IsValid()) {
       return;
     }
-    constexpr size_t alloc_size = WireCodingTraits<T, Constraint, IsRecursive>::inline_size;
+    constexpr size_t alloc_size = WireCodingTraits<T, Constraint, IsRecursive>::kInlineSize;
     WirePosition body;
     if (unlikely(!decoder->Alloc(alloc_size, &body))) {
       return;
@@ -425,8 +425,8 @@ struct WireCodingTraits<fidl::WireOptional<T>, Constraint, IsRecursive> {
   using MemberTrait = WireCodingTraits<T, Constraint, IsRecursive>;
 
  public:
-  static constexpr size_t inline_size = MemberTrait::inline_size;
-  static constexpr bool is_memcpy_compatible = MemberTrait::is_memcpy_compatible;
+  static constexpr size_t kInlineSize = MemberTrait::kInlineSize;
+  static constexpr bool kIsMemcpyCompatible = MemberTrait::kIsMemcpyCompatible;
 
   static void Encode(internal::WireEncoder* encoder, fidl::WireOptional<T>* value,
                      fidl::internal::WirePosition position,
@@ -443,8 +443,8 @@ struct WireCodingTraits<fidl::WireOptional<T>, Constraint, IsRecursive> {
 #ifdef __Fuchsia__
 template <typename T, typename Constraint, bool IsRecursive>
 struct WireCodingTraits<ClientEnd<T>, Constraint, IsRecursive> {
-  static constexpr bool is_memcpy_compatible = false;
-  static constexpr size_t inline_size = sizeof(zx_handle_t);
+  static constexpr bool kIsMemcpyCompatible = false;
+  static constexpr size_t kInlineSize = sizeof(zx_handle_t);
 
   static void Encode(WireEncoder* encoder, ClientEnd<T>* value, WirePosition position,
                      RecursionDepth<IsRecursive> recursion_depth) {
@@ -469,8 +469,8 @@ struct WireCodingTraits<ClientEnd<T>, Constraint, IsRecursive> {
 
 template <typename T, typename Constraint, bool IsRecursive>
 struct WireCodingTraits<ServerEnd<T>, Constraint, IsRecursive> {
-  static constexpr bool is_memcpy_compatible = false;
-  static constexpr size_t inline_size = sizeof(zx_handle_t);
+  static constexpr bool kIsMemcpyCompatible = false;
+  static constexpr size_t kInlineSize = sizeof(zx_handle_t);
 
   static void Encode(WireEncoder* encoder, ServerEnd<T>* value, WirePosition position,
                      RecursionDepth<IsRecursive> recursion_depth) {
@@ -517,7 +517,7 @@ struct WireStructMemberCodingInfo {
   static constexpr bool kIsRecursive = IsRecursive;
 };
 
-// In order to prevent cyclic dependency issues computing is_memcpy_compatible, perform the
+// In order to prevent cyclic dependency issues computing kIsMemcpyCompatible, perform the
 // computation in a base class.
 template <typename T, typename Constraint, bool IsRecursive>
 struct WireStructCodingTraitsBase {
@@ -525,9 +525,9 @@ struct WireStructCodingTraitsBase {
       WireCodingTraits<T, Constraint, IsRecursive>::kMembers, [](auto coding_info) {
         return WireCodingTraits<typename decltype(coding_info)::Field,
                                 typename decltype(coding_info)::Constraint,
-                                decltype(coding_info)::kIsRecursive>::is_memcpy_compatible;
+                                decltype(coding_info)::kIsRecursive>::kIsMemcpyCompatible;
       });
-  static constexpr bool is_memcpy_compatible =
+  static constexpr bool kIsMemcpyCompatible =
       are_members_memcpy_compatible && !WireCodingTraits<T, Constraint, IsRecursive>::kHasPadding;
 };
 

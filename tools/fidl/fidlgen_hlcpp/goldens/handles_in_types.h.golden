@@ -410,7 +410,7 @@ namespace fidl {
 
 template <>
 struct CodingTraits<::test::handlesintypes::obj_type> {
-  static constexpr size_t inline_size_v2 = sizeof(::test::handlesintypes::obj_type);
+  static constexpr size_t kInlineSize = sizeof(::test::handlesintypes::obj_type);
   static void Encode(Encoder* encoder, ::test::handlesintypes::obj_type* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
@@ -475,7 +475,7 @@ struct CodingTraits<::test::handlesintypes::UnionWithHandle>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::handlesintypes::UnionWithHandle>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::handlesintypes::UnionWithHandle>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
@@ -625,7 +625,7 @@ struct CodingTraits<::test::handlesintypes::EmptyResourceUnion>
 
 template <>
 struct CodingTraits<std::unique_ptr<::test::handlesintypes::EmptyResourceUnion>> {
-  static constexpr size_t inline_size_v2 = 16;
+  static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::handlesintypes::EmptyResourceUnion>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
