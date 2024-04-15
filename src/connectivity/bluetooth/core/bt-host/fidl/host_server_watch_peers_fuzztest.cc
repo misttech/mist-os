@@ -41,7 +41,11 @@ class HostServerFuzzTest final : public bthost::testing::AdapterTestFixture {
     // TODO(https://fxbug.dev/42144165): WatchPeers will trigger this test as a failure if we try to
     // encode a lot of peers, even though fuzzing multiple peers would be helpful.
     int watch_peers_responses = 0;
-    host_client()->WatchPeers([this, peer, &watch_peers_responses](auto updated, auto removed) {
+    host_client()->WatchPeers([this, peer, &watch_peers_responses](
+                                  fuchsia::bluetooth::host::Host_WatchPeers_Result result) {
+      BT_ASSERT(result.is_response());
+      std::vector<::fuchsia::bluetooth::sys::Peer> updated = std::move(result.response().updated);
+      std::vector<::fuchsia::bluetooth::PeerId> removed = std::move(result.response().removed);
       BT_ASSERT_MSG(updated.size() == 1, "peer %s: peers updated = %zu", bt_str(*peer),
                     updated.size());
       BT_ASSERT_MSG(removed.size() == 0, "peer %s: peers removed = %zu", bt_str(*peer),
@@ -76,9 +80,14 @@ class HostServerFuzzTest final : public bthost::testing::AdapterTestFixture {
                                 std::vector<fuchsia::bluetooth::PeerId> removed) {
     call_counter++;
     BT_ASSERT_MSG(call_counter <= max_call_depth, "max depth (%d) exceeded", call_counter);
-    host.WatchPeers([this, &host, &call_counter, max_call_depth](auto updated, auto removed) {
-      this->HandleWatchPeersResponse(host, call_counter, max_call_depth, std::move(updated),
-                                     std::move(removed));
+    host.WatchPeers([this, &host, &call_counter,
+                     max_call_depth](fuchsia::bluetooth::host::Host_WatchPeers_Result result) {
+      BT_ASSERT(result.is_response());
+      std::vector<::fuchsia::bluetooth::sys::Peer> updated = std::move(result.response().updated);
+      std::vector<::fuchsia::bluetooth::PeerId> removed = std::move(result.response().removed);
+      this->HandleWatchPeersResponse(host, call_counter, max_call_depth,
+                                     std::move(result.response().updated),
+                                     std::move(result.response().removed));
     });
   }
 

@@ -169,7 +169,10 @@ void HostServer::RequestProtocol(fhost::ProtocolRequest request) {
 }
 
 void HostServer::WatchState(WatchStateCallback callback) {
-  info_getter_.Watch(std::move(callback));
+  info_getter_.Watch([cb = std::move(callback)](fsys::HostInfo info) {
+    cb(fhost::Host_WatchState_Result::WithResponse(
+        fhost::Host_WatchState_Response(std::move(info))));
+  });
 }
 
 void HostServer::SetLocalData(fsys::HostData host_data) {
@@ -182,7 +185,11 @@ void HostServer::SetLocalData(fsys::HostData host_data) {
 }
 
 void HostServer::WatchPeers(WatchPeersCallback callback) {
-  watch_peers_getter_.Watch(std::move(callback));
+  watch_peers_getter_.Watch([cb = std::move(callback)](std::vector<fsys::Peer> updated,
+                                                       std::vector<fbt::PeerId> removed) {
+    cb(fhost::Host_WatchPeers_Result::WithResponse(
+        fhost::Host_WatchPeers_Response({std::move(updated), std::move(removed)})));
+  });
 }
 
 void HostServer::SetLocalName(::std::string local_name, SetLocalNameCallback callback) {
@@ -331,14 +338,13 @@ void HostServer::RestoreBonds(::std::vector<fsys::BondingData> bonds,
                               RestoreBondsCallback callback) {
   bt_log(INFO, "fidl", "%s", __FUNCTION__);
 
-  std::vector<fsys::BondingData> errors;
-
   if (bonds.empty()) {
     // Nothing to do. Reply with an empty list.
-    callback(std::move(errors));
+    callback(fhost::Host_RestoreBonds_Result::WithResponse(fhost::Host_RestoreBonds_Response()));
     return;
   }
 
+  std::vector<fsys::BondingData> errors;
   for (auto& bond : bonds) {
     if (!bond.has_identifier() || !bond.has_address() ||
         !(bond.has_le_bond() || bond.has_bredr_bond())) {
@@ -376,7 +382,8 @@ void HostServer::RestoreBonds(::std::vector<fsys::BondingData> bonds,
     }
   }
 
-  callback(std::move(errors));
+  callback(fhost::Host_RestoreBonds_Result::WithResponse(
+      fhost::Host_RestoreBonds_Response(std::move(errors))));
 }
 
 void HostServer::OnPeerBonded(const bt::gap::Peer& peer) {

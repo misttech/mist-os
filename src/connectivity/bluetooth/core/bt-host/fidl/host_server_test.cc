@@ -50,6 +50,7 @@ using bt::testing::FakePeer;
 
 namespace fbt = fuchsia::bluetooth;
 namespace fsys = fuchsia::bluetooth::sys;
+namespace fhost = fuchsia::bluetooth::host;
 
 const bt::PeerId kTestId(1);
 const bt::DeviceAddress kLeTestAddr(bt::DeviceAddress::Type::kLEPublic, {0x01, 0, 0, 0, 0, 0});
@@ -167,11 +168,11 @@ class HostServerTest : public bthost::testing::AdapterTestFixture {
     return peer;
   }
 
-  using ConnectResult = fpromise::result<void, fsys::Error>;
+  using ConnectResult = fhost::Host_Connect_Result;
   std::optional<ConnectResult> ConnectFakePeer(bt::PeerId id) {
     std::optional<ConnectResult> result;
     host_client()->Connect(fbt::PeerId{id.value()},
-                           [&](ConnectResult _result) { result = _result; });
+                           [&](ConnectResult _result) { result = std::move(_result); });
     RunLoopUntilIdle();
     return result;
   }
@@ -188,7 +189,7 @@ class HostServerTest : public bthost::testing::AdapterTestFixture {
 
     auto connect_result = ConnectFakePeer(peer->identifier());
 
-    if (!connect_result || connect_result->is_error()) {
+    if (!connect_result || connect_result->is_err()) {
       peer = nullptr;
       fake_chan.reset();
     }
@@ -199,12 +200,13 @@ class HostServerTest : public bthost::testing::AdapterTestFixture {
   void TestRestoreBonds(std::vector<fsys::BondingData> bonds,
                         std::vector<fsys::BondingData> expected) {
     bool called = false;
-    host_server()->RestoreBonds(std::move(bonds), [&](auto errors) {
+    host_server()->RestoreBonds(std::move(bonds), [&](fhost::Host_RestoreBonds_Result result) {
+      ASSERT_TRUE(result.is_response());
       called = true;
-      ASSERT_EQ(expected.size(), errors.size());
-      for (size_t i = 0; i < errors.size(); i++) {
+      ASSERT_EQ(expected.size(), result.response().errors.size());
+      for (size_t i = 0; i < result.response().errors.size(); i++) {
         SCOPED_TRACE(i);
-        EXPECT_TRUE(fidl::Equals(errors[i], expected[i]));
+        EXPECT_TRUE(fidl::Equals(result.response().errors[i], expected[i]));
       }
     });
     EXPECT_TRUE(called);
@@ -529,7 +531,10 @@ TEST_F(HostServerTest, SysDelegateInvokesCallbackMultipleTimesIgnored) {
 
 TEST_F(HostServerTest, WatchState) {
   std::optional<fsys::HostInfo> info;
-  host_server()->WatchState([&](auto value) { info = std::move(value); });
+  host_server()->WatchState([&](fhost::Host_WatchState_Result result) {
+    ASSERT_TRUE(result.is_response());
+    info = std::move(result.response().info);
+  });
   ASSERT_TRUE(info.has_value());
   ASSERT_TRUE(info->has_id());
   ASSERT_TRUE(info->has_technology());
@@ -552,12 +557,18 @@ TEST_F(HostServerTest, WatchDiscoveryState) {
   std::optional<fsys::HostInfo> info;
 
   // Make initial watch call so that subsequent calls remain pending.
-  host_server()->WatchState([&](auto value) { info = std::move(value); });
+  host_server()->WatchState([&](fhost::Host_WatchState_Result result) {
+    ASSERT_TRUE(result.is_response());
+    info = std::move(result.response().info);
+  });
   ASSERT_TRUE(info.has_value());
   info.reset();
 
   // Watch for updates.
-  host_server()->WatchState([&](auto value) { info = std::move(value); });
+  host_server()->WatchState([&](fhost::Host_WatchState_Result result) {
+    ASSERT_TRUE(result.is_response());
+    info = std::move(result.response().info);
+  });
   EXPECT_FALSE(info.has_value());
 
   host_server()->StartDiscovery([](auto) {});
@@ -567,7 +578,10 @@ TEST_F(HostServerTest, WatchDiscoveryState) {
   EXPECT_TRUE(info->discovering());
 
   info.reset();
-  host_server()->WatchState([&](auto value) { info = std::move(value); });
+  host_server()->WatchState([&](fhost::Host_WatchState_Result result) {
+    ASSERT_TRUE(result.is_response());
+    info = std::move(result.response().info);
+  });
   EXPECT_FALSE(info.has_value());
   host_server()->StopDiscovery();
   RunLoopUntilIdle();
@@ -580,12 +594,18 @@ TEST_F(HostServerTest, WatchDiscoverableState) {
   std::optional<fsys::HostInfo> info;
 
   // Make initial watch call so that subsequent calls remain pending.
-  host_server()->WatchState([&](auto value) { info = std::move(value); });
+  host_server()->WatchState([&](fhost::Host_WatchState_Result result) {
+    ASSERT_TRUE(result.is_response());
+    info = std::move(result.response().info);
+  });
   ASSERT_TRUE(info.has_value());
   info.reset();
 
   // Watch for updates.
-  host_server()->WatchState([&](auto value) { info = std::move(value); });
+  host_server()->WatchState([&](fhost::Host_WatchState_Result result) {
+    ASSERT_TRUE(result.is_response());
+    info = std::move(result.response().info);
+  });
   EXPECT_FALSE(info.has_value());
 
   host_server()->SetDiscoverable(/*discoverable=*/true, [](auto) {});
@@ -595,7 +615,10 @@ TEST_F(HostServerTest, WatchDiscoverableState) {
   EXPECT_TRUE(info->discoverable());
 
   info.reset();
-  host_server()->WatchState([&](auto value) { info = std::move(value); });
+  host_server()->WatchState([&](fhost::Host_WatchState_Result result) {
+    ASSERT_TRUE(result.is_response());
+    info = std::move(result.response().info);
+  });
   EXPECT_FALSE(info.has_value());
   host_server()->SetDiscoverable(/*discoverable=*/false, [](auto) {});
   RunLoopUntilIdle();
@@ -628,10 +651,10 @@ TEST_F(HostServerPairingTest, InitiatePairingLeDefault) {
   };
   fake_chan()->SetSendCallback(expect_default_bytebuffer, pw_dispatcher());
 
-  std::optional<fpromise::result<void, fsys::Error>> pair_result;
+  std::optional<fhost::Host_Pair_Result> pair_result;
   fsys::PairingOptions opts;
   host_client()->Pair(fbt::PeerId{peer()->identifier().value()}, std::move(opts),
-                      [&](auto result) { pair_result = std::move(result); });
+                      [&](fhost::Host_Pair_Result result) { pair_result = std::move(result); });
   RunLoopUntilIdle();
 
   // TODO(https://fxbug.dev/42169848): We don't have a good mechanism for driving pairing to
@@ -663,7 +686,7 @@ TEST_F(HostServerPairingTest, InitiatePairingLeEncrypted) {
   };
   fake_chan()->SetSendCallback(expect_default_bytebuffer, pw_dispatcher());
 
-  std::optional<fpromise::result<void, fsys::Error>> pair_result;
+  std::optional<fhost::Host_Pair_Result> pair_result;
   fsys::PairingOptions opts;
   opts.set_le_security_level(fsys::PairingSecurityLevel::ENCRYPTED);
   host_client()->Pair(fbt::PeerId{peer()->identifier().value()}, std::move(opts),
@@ -701,7 +724,7 @@ TEST_F(HostServerPairingTest, InitiatePairingNonBondableLe) {
   };
   fake_chan()->SetSendCallback(expect_default_bytebuffer, pw_dispatcher());
 
-  std::optional<fpromise::result<void, fsys::Error>> pair_result;
+  std::optional<fhost::Host_Pair_Result> pair_result;
   fsys::PairingOptions opts;
   opts.set_bondable_mode(fsys::BondableMode::NON_BONDABLE);
   host_client()->Pair(fbt::PeerId{peer()->identifier().value()}, std::move(opts),
@@ -722,7 +745,7 @@ TEST_F(HostServerTest, InitiateBrEdrPairingLePeerFails) {
   ASSERT_TRUE(fake_chan.is_alive());
   ASSERT_EQ(bt::gap::Peer::ConnectionState::kConnected, peer->le()->connection_state());
 
-  std::optional<fpromise::result<void, fsys::Error>> pair_result;
+  std::optional<fhost::Host_Pair_Result> pair_result;
   fsys::PairingOptions opts;
   // Set pairing option with classic
   opts.set_transport(fsys::TechnologyType::CLASSIC);
@@ -733,14 +756,15 @@ TEST_F(HostServerTest, InitiateBrEdrPairingLePeerFails) {
   host_client()->Pair(fbt::PeerId{peer->identifier().value()}, std::move(opts), std::move(pair_cb));
   RunLoopUntilIdle();
   ASSERT_TRUE(pair_result);
-  ASSERT_EQ(pair_result->error(), fsys::Error::PEER_NOT_FOUND);
+  ASSERT_TRUE(pair_result->is_err());
+  ASSERT_EQ(pair_result->err(), fsys::Error::PEER_NOT_FOUND);
 }
 
 TEST_F(HostServerTest, WatchPeersHangsOnFirstCallWithNoExistingPeers) {
   // By default the peer cache contains no entries when HostServer is first constructed. The first
   // call to WatchPeers should hang.
   bool replied = false;
-  host_server()->WatchPeers([&](auto, auto) { replied = true; });
+  host_server()->WatchPeers([&](auto) { replied = true; });
   EXPECT_FALSE(replied);
 }
 
@@ -751,9 +775,10 @@ TEST_F(HostServerTest, WatchPeersRepliesOnFirstCallWithExistingPeers) {
 
   // The first call to WatchPeers immediately resolves with the contents of the peer cache.
   bool replied = false;
-  host_server()->WatchPeers([&](auto updated, auto removed) {
-    EXPECT_EQ(1u, updated.size());
-    EXPECT_TRUE(removed.empty());
+  host_server()->WatchPeers([&](fhost::Host_WatchPeers_Result result) {
+    ASSERT_TRUE(result.is_response());
+    EXPECT_EQ(1u, result.response().updated.size());
+    EXPECT_TRUE(result.response().removed.empty());
     replied = true;
   });
   EXPECT_TRUE(replied);
@@ -774,12 +799,13 @@ TEST_F(HostServerTest, WatchPeersHandlesNonEnumeratedAppearanceInPeer) {
   ResetHostServer();
 
   bool replied = false;
-  host_client()->WatchPeers([&](auto updated, [[maybe_unused]] auto removed) {
+  host_client()->WatchPeers([&](fhost::Host_WatchPeers_Result result) {
     // Client should still receive updates to this peer.
     replied = true;
     const fbt::PeerId id = {peer->identifier().value()};
-    ASSERT_THAT(updated, Contains(Property(&fsys::Peer::id, id)));
-    EXPECT_FALSE(updated.front().has_appearance());
+    ASSERT_TRUE(result.is_response());
+    ASSERT_THAT(result.response().updated, Contains(Property(&fsys::Peer::id, id)));
+    EXPECT_FALSE(result.response().updated.front().has_appearance());
   });
   RunLoopUntilIdle();
   EXPECT_TRUE(replied);
@@ -790,9 +816,10 @@ TEST_F(HostServerTest, WatchPeersStateMachine) {
   std::optional<std::vector<fbt::PeerId>> removed;
 
   // Initial watch call hangs as the cache is empty.
-  host_server()->WatchPeers([&](auto updated_arg, auto removed_arg) {
-    updated = std::move(updated_arg);
-    removed = std::move(removed_arg);
+  host_server()->WatchPeers([&](fhost::Host_WatchPeers_Result result) {
+    ASSERT_TRUE(result.is_response());
+    updated = std::move(result.response().updated);
+    removed = std::move(result.response().removed);
   });
   ASSERT_FALSE(updated.has_value());
   ASSERT_FALSE(removed.has_value());
@@ -808,9 +835,10 @@ TEST_F(HostServerTest, WatchPeersStateMachine) {
   removed.reset();
 
   // The next call should hang.
-  host_server()->WatchPeers([&](auto updated_arg, auto removed_arg) {
-    updated = std::move(updated_arg);
-    removed = std::move(removed_arg);
+  host_server()->WatchPeers([&](fhost::Host_WatchPeers_Result result) {
+    ASSERT_TRUE(result.is_response());
+    updated = std::move(result.response().updated);
+    removed = std::move(result.response().removed);
   });
   ASSERT_FALSE(updated.has_value());
   ASSERT_FALSE(removed.has_value());
@@ -838,10 +866,11 @@ TEST_F(HostServerTest, WatchPeersUpdatedThenRemoved) {
   }
 
   bool replied = false;
-  host_server()->WatchPeers([&replied, id](auto updated, auto removed) {
-    EXPECT_TRUE(updated.empty());
-    EXPECT_EQ(1u, removed.size());
-    EXPECT_TRUE(fidl::Equals(fbt::PeerId{id.value()}, removed[0]));
+  host_server()->WatchPeers([&replied, id](fhost::Host_WatchPeers_Result result) {
+    ASSERT_TRUE(result.is_response());
+    EXPECT_TRUE(result.response().updated.empty());
+    EXPECT_EQ(1u, result.response().removed.size());
+    EXPECT_TRUE(fidl::Equals(fbt::PeerId{id.value()}, result.response().removed[0]));
     replied = true;
   });
   EXPECT_TRUE(replied);
@@ -886,7 +915,7 @@ TEST_F(HostServerTest, ConnectLowEnergy) {
 
   auto result = ConnectFakePeer(peer->identifier());
   ASSERT_TRUE(result);
-  ASSERT_FALSE(result->is_error());
+  ASSERT_FALSE(result->is_err());
 
   EXPECT_FALSE(peer->bredr());
   ASSERT_TRUE(peer->le());
@@ -903,7 +932,7 @@ TEST_F(HostServerTest, ConnectBredr) {
 
   auto result = ConnectFakePeer(peer->identifier());
   ASSERT_TRUE(result);
-  ASSERT_FALSE(result->is_error());
+  ASSERT_FALSE(result->is_err());
 
   EXPECT_FALSE(peer->le());
   ASSERT_TRUE(peer->bredr());
@@ -924,7 +953,7 @@ TEST_F(HostServerTest, ConnectDualMode) {
 
   auto result = ConnectFakePeer(peer->identifier());
   ASSERT_TRUE(result);
-  ASSERT_FALSE(result->is_error());
+  ASSERT_FALSE(result->is_err());
 
   // bt-host should only attempt to connect the BR/EDR transport.
   EXPECT_FALSE(peer->le()->connected());
@@ -1284,11 +1313,17 @@ class HostServerTestFakeAdapter : public bt::fidl::testing::FakeAdapterTestFixtu
 TEST_F(HostServerTestFakeAdapter, SetLocalNameNotifiesWatchState) {
   std::vector<fsys::HostInfo> info;
   // Consume initial state value.
-  host_client()->WatchState([&](auto value) { info.push_back(std::move(value)); });
+  host_client()->WatchState([&](fhost::Host_WatchState_Result result) {
+    ASSERT_TRUE(result.is_response());
+    info.push_back(std::move(result.response().info));
+  });
   RunLoopUntilIdle();
   EXPECT_EQ(info.size(), 1u);
   // Second watch state will hang until state is updated.
-  host_client()->WatchState([&](auto value) { info.push_back(std::move(value)); });
+  host_client()->WatchState([&](fhost::Host_WatchState_Result result) {
+    ASSERT_TRUE(result.is_response());
+    info.push_back(std::move(result.response().info));
+  });
   RunLoopUntilIdle();
   EXPECT_EQ(info.size(), 1u);
 
@@ -1309,12 +1344,18 @@ TEST_F(HostServerTestFakeAdapter, WatchAddressesState) {
   std::optional<fsys::HostInfo> info;
 
   // Make an initial watch call so that subsequent calls remain pending.
-  host_server()->WatchState([&](auto value) { info = std::move(value); });
+  host_server()->WatchState([&](fhost::Host_WatchState_Result result) {
+    ASSERT_TRUE(result.is_response());
+    info = std::move(result.response().info);
+  });
   ASSERT_TRUE(info.has_value());
   info.reset();
 
   // Next request to watch should hang and not produce a result.
-  host_server()->WatchState([&](auto value) { info = std::move(value); });
+  host_server()->WatchState([&](fhost::Host_WatchState_Result result) {
+    ASSERT_TRUE(result.is_response());
+    info = std::move(result.response().info);
+  });
   EXPECT_FALSE(info.has_value());
 
   host_server()->EnablePrivacy(/*enabled=*/true);
@@ -1338,7 +1379,10 @@ TEST_F(HostServerTestFakeAdapter, WatchAddressesState) {
                               info->addresses()[1].bytes));
 
   info.reset();
-  host_server()->WatchState([&](auto value) { info = std::move(value); });
+  host_server()->WatchState([&](fhost::Host_WatchState_Result result) {
+    ASSERT_TRUE(result.is_response());
+    info = std::move(result.response().info);
+  });
   EXPECT_FALSE(info.has_value());
   // Disabling privacy is a synchronous operation - the random LE address should no longer be used.
   host_server()->EnablePrivacy(/*enabled=*/false);
