@@ -142,6 +142,8 @@ class SyncToCommand:
         self.state: str = args.state
         self.dry_run: bool = args.dry_run
         self.force: bool = args.force
+        self.verbose: bool = args.verbose
+        self.jiri_update_extra_args: list[str] = ["-v"] if self.verbose else []
 
     @property
     def integration_dir(self) -> pathlib.Path:
@@ -248,7 +250,7 @@ class SyncToCommand:
         # checkout prior to syncing and have `reset` restore the exact contents
         # of the old checkout instead of always going back to JIRI_HEAD.
         print("Resetting the tree to the latest...")
-        self.jiri("update", "-gc")
+        self.jiri("update", "-gc", *self.jiri_update_extra_args)
 
     def sync_to_release_branch(self) -> None:
         print(f"{self.state!r} looks like a branch name")
@@ -317,7 +319,13 @@ class SyncToCommand:
         self.set_baseline()
 
         print(f"Syncing to Jiri snapshot {str(snapshot_file)!r}")
-        self.jiri("update", "-local-manifest", "-gc", snapshot_file)
+        self.jiri(
+            "update",
+            "-local-manifest",
+            "-gc",
+            snapshot_file,
+            *self.jiri_update_extra_args,
+        )
 
     def sync_to_integration_ref(self, ref: str) -> None:
         """Sync to a branch, tag, or revision of the integration repo."""
@@ -341,7 +349,9 @@ class SyncToCommand:
             ref,
         )
         try:
-            self.jiri("update", "-local-manifest", "-gc")
+            self.jiri(
+                "update", "-local-manifest", "-gc", *self.jiri_update_extra_args
+            )
         except subprocess.CalledProcessError:
             print("Sync failed, restoring the integration repo to JIRI_HEAD")
             self.run_command(
@@ -504,7 +514,13 @@ class SyncToCommand:
         # If we patched in a change to the integration repo, we have to `jiri
         # update` again to make sure we respect any project/package pin updates.
         if has_integration_patch:
-            self.jiri("update", "-local-manifest", "-rebase-tracked", "-gc")
+            self.jiri(
+                "update",
+                "-local-manifest",
+                "-rebase-tracked",
+                "-gc",
+                *self.jiri_update_extra_args,
+            )
 
     def sync_to_legacy_build_id(self, build_id: str) -> None:
         """Sync to a build's Jiri snapshot from GCS.
@@ -760,6 +776,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-h", "--help", action="store_true")
     parser.add_argument("-n", "--dry-run", dest="dry_run", action="store_true")
     parser.add_argument("-f", "--force", dest="force", action="store_true")
+    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
     parser.add_argument("state", nargs="?", default="")
     return parser.parse_args()
 
