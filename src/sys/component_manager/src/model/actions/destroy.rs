@@ -400,7 +400,7 @@ pub mod tests {
         // Check that the destroy action is waiting on the mock action.
         loop {
             let actions = component_a.lock_actions().await;
-            assert!(actions.contains(&mock_action_key).await);
+            assert!(actions.contains(mock_action_key).await);
 
             // Check the reference count on the notifier of the mock action
             let rx = &actions.rep[&mock_action_key];
@@ -410,7 +410,7 @@ pub mod tests {
             // - 1 for the ActionSet that owns the notifier
             // - 1 for destroy action to wait on the mock action
             if refcount == 2 {
-                assert!(actions.contains(&ActionKey::Destroy).await);
+                assert!(actions.contains(ActionKey::Destroy).await);
                 break;
             }
 
@@ -505,7 +505,7 @@ pub mod tests {
         // Check that the destroy action is waiting on the mock action.
         loop {
             let actions = component_a.lock_actions().await;
-            assert!(actions.contains(&mock_action_key).await);
+            assert!(actions.contains(mock_action_key).await);
 
             // Check the reference count on the notifier of the mock action
             let rx = &actions.rep[&mock_action_key];
@@ -515,7 +515,7 @@ pub mod tests {
             // - 1 for the ActionSet that owns the notifier
             // - 1 for destroy action to wait on the mock action
             if refcount == 2 {
-                assert!(actions.contains(&ActionKey::Destroy).await);
+                assert!(actions.contains(ActionKey::Destroy).await);
                 break;
             }
 

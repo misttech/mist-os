@@ -202,8 +202,8 @@ impl ActionSet {
         ActionSet { rep: HashMap::new(), history: HashSet::new(), passive_waiters: HashMap::new() }
     }
 
-    pub async fn contains(&self, key: &ActionKey) -> bool {
-        self.rep.contains_key(key)
+    pub async fn contains(&self, key: ActionKey) -> bool {
+        self.rep.contains_key(&key)
     }
 
     #[cfg(test)]
