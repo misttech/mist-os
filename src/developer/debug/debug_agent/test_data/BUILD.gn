@@ -119,8 +119,6 @@ group("helper_executables") {
     ":limbo_caller",
     ":multi_threaded",
     ":printer",
-    ":process_loop",
-    ":process_spawner",
     ":test_suite",
     ":thread_signals",
   ]
@@ -188,24 +186,6 @@ executable("multi_threaded") {
 
 executable("printer") {
   sources = [ "printer.cc" ]
-}
-
-executable("process_loop") {
-  output_name = "process_loop"
-
-  sources = [ "process_loop.cc" ]
-}
-
-executable("process_spawner") {
-  output_name = "process_spawner"
-
-  sources = [ "process_spawner.cc" ]
-
-  deps = [
-    "//sdk/lib/fdio",
-    "//src/lib/fxl",
-    "//zircon/system/ulib/zx",
-  ]
 }
 
 executable("thread_signals") {
