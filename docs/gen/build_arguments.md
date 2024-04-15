@@ -90,7 +90,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2100
+From //build/config/BUILDCONFIG.gn:2104
 
 ### allowed_test_device_types
 
@@ -3269,7 +3269,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1835
+From //build/config/BUILDCONFIG.gn:1839
 
 ### extra_vbmeta_descriptors
 
@@ -4400,7 +4400,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1636
+From //build/config/BUILDCONFIG.gn:1640
 
 ### legacy_base_package_labels
 
@@ -7159,6 +7159,14 @@ See http://g-issues.fuchsia.dev/issues/319148874 for more details.
 
 From //build/rust/build.gni:19
 
+### rust_parallel_frontend_threads
+
+Enable the rust parallel front-end with N threads
+
+**Current value (from the default):** `false`
+
+From //build/config/rust/BUILD.gn:36
+
 ### rust_rbe_check
 
 Run one of the more expensive checks, intended for CI.
@@ -7582,7 +7590,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2090
+From //build/config/BUILDCONFIG.gn:2094
 
 ### select_variant_canonical
 
@@ -7592,7 +7600,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2095
+From //build/config/BUILDCONFIG.gn:2099
 
 ### select_variant_shortcuts
 
@@ -7650,7 +7658,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1881
+From //build/config/BUILDCONFIG.gn:1885
 
 ### size_checker_input
 
@@ -8125,7 +8133,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1865
+From //build/config/BUILDCONFIG.gn:1869
 
 ### universe_package_labels
 
@@ -8854,13 +8862,13 @@ TODO(https://fxbug.dev/42146493) - remove once external sync FD extensions fully
 
 **Current value (from the default):** `false`
 
-From //third_party/mesa/src/intel/vulkan/BUILD.gn:26
+From //third_party/mesa/src/intel/vulkan/BUILD.gn:27
 
 ### anv_enable_raytracing
 
 **Current value (from the default):** `false`
 
-From //third_party/mesa/src/intel/vulkan/BUILD.gn:27
+From //third_party/mesa/src/intel/vulkan/BUILD.gn:28
 
 ### anv_use_max_ram
 
@@ -8868,7 +8876,7 @@ Give maximum possible memory to Vulkan heap
 
 **Current value (from the default):** `false`
 
-From //third_party/mesa/src/intel/vulkan/BUILD.gn:30
+From //third_party/mesa/src/intel/vulkan/BUILD.gn:31
 
 ### build_libvulkan_goldfish
 
