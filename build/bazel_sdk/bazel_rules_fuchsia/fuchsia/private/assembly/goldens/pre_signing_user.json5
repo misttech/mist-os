@@ -95,6 +95,17 @@
                     },
                     state: "Absent",
                 },
+
+                // Ensure sshd_config is absent in user builds.
+                // SSH should not be enabled in user builds.
+                {
+                    source: {
+                        PackageFar: [
+                            "meta/data/sshd-host/sshd_config",
+                        ],
+                    },
+                    state: "Absent",
+                },
             ],
         },
     ],

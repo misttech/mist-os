@@ -84,6 +84,7 @@
         },
 
         // Note: there is no pkg-resolver config check for recovery because pkg-resolver is not
-        // expected to be present on recovery builds.
+        // expected to be present on recovery builds. Similarly, there is no sshd_config check
+        // because sshd is not included in recovery builds.
     ],
 }
