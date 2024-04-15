@@ -51,17 +51,21 @@ group("common") {
 test("aml-spi-test-bin") {
   output_name = "aml-spi-test"
   sources = [
-    "aml-spi-test.cc",
     "aml-spi.cc",
+    "tests/aml-spi-bti-test.cc",
+    "tests/aml-spi-clock-mode-test.cc",
+    "tests/aml-spi-shutdown-test.cc",
+    "tests/aml-spi-test.cc",
   ]
   deps = [
     ":common",
-    "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:gtest_fixture",
     "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/registers/testing/mock-registers",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/fake-mmio-reg",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
