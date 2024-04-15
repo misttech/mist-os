@@ -349,7 +349,7 @@ var tcpCoreExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	{20, 19}: Pass,
 	{20, 20}: Pass,
 	{23, 1}:  Pass,
-	{23, 2}:  Fail,
+	{23, 2}:  Pass,
 	{23, 3}:  Pass,
 	{23, 4}:  Pass,
 	{23, 5}:  Pass,
