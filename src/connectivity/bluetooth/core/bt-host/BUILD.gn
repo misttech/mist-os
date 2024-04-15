@@ -5,6 +5,7 @@
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/fuzz.gni")
+import("//build/packages/prebuilt_package.gni")
 import("//src/connectivity/bluetooth/core/bt-host/build/bt_gtest_package.gni")
 
 source_set("sources") {
@@ -88,6 +89,16 @@ fuchsia_structured_config_values("default_config_values") {
 fuchsia_component("component") {
   cm_label = ":manifest"
   deps = [ ":bin" ]
+}
+
+# This is the OOT built bt-host component.
+# See https://pigweed.dev/pw_bluetooth_sapphire/.
+# TODO(https://fxbug.dev/324107025): Rename this target to "bt-host" and update
+#   `//build:non_hermetic_deps` once it's fully migrated OOT.
+prebuilt_package("bt-host-oot") {
+  # component-url: fuchsia-pkg://fuchsia.com/bt-host#meta/bt-host.cm
+  package_name = "bt-host"
+  archive = "//prebuilt/connectivity/bluetooth/bt-host/$target_cpu/bt-host"
 }
 
 fuchsia_package("bt-host") {
