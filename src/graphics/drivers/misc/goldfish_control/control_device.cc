@@ -664,6 +664,21 @@ void Control::GetBufferHandleInfo(GetBufferHandleInfoRequestView request,
   completer.Reply(::fit::ok(&response));
 }
 
+void Control::ConnectToGoldfishPipe(ConnectToGoldfishPipeRequestView request,
+                                    ConnectToGoldfishPipeCompleter::Sync& completer) {
+  zx_status_t status = device_connect_fragment_fidl_protocol(
+      parent(), "goldfish-pipe", fuchsia_hardware_goldfish_pipe::Service::Name,
+      fuchsia_hardware_goldfish_pipe::Service::Device::Name,
+      request->server.TakeChannel().release());
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to connect to the GoldfishPipe protocol: %s",
+           zx_status_get_string(status));
+    completer.ReplyError(status);
+    return;
+  }
+  completer.ReplySuccess();
+}
+
 void Control::DdkRelease() { delete this; }
 
 zx_status_t Control::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {

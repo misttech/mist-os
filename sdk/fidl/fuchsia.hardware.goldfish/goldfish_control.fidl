@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.hardware.goldfish;
 
+using fuchsia.hardware.goldfish.pipe;
 using zx;
 
 type BufferHandleType = strict enum : uint32 {
@@ -224,5 +225,16 @@ closed protocol ControlDevice {
     ///       trigger the wait.
     strict CreateSyncFence(resource struct {
         event zx.Handle:EVENTPAIR;
+    }) -> () error zx.Status;
+
+    /// Connects to the [`fuchsia.hardware.goldfish.pipe/GoldfishPipe`] FIDL
+    /// server.
+    //
+    // TODO(https://fxbug.dev/333832142): This is a workaround to route FIDL
+    // protocols for DFv1 non-composite drivers. We can export the FIDL protocol
+    // to the goldfish-control driver's outgoing directory once we migrate the
+    // driver to DFv2.
+    strict ConnectToGoldfishPipe(resource struct {
+        server server_end:fuchsia.hardware.goldfish.pipe.GoldfishPipe;
     }) -> () error zx.Status;
 };

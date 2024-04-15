@@ -82,6 +82,9 @@ class Control : public ControlType,
   void GetBufferHandleInfo(GetBufferHandleInfoRequestView request,
                            GetBufferHandleInfoCompleter::Sync& completer) override;
 
+  void ConnectToGoldfishPipe(ConnectToGoldfishPipeRequestView request,
+                             ConnectToGoldfishPipeCompleter::Sync& completer) override;
+
   // Device protocol implementation.
   void DdkRelease();
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
