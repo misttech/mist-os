@@ -2,8 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/cache_packages_from_product_assembler.gni")
 import("//build/assembly/package_list.gni")
+import("//build/assembly/packages_from_product_assembler.gni")
 import("//build/bazel/bazel_workspace.gni")
 import("//build/images/args.gni")
 import("//build/packages/package_metadata.gni")
@@ -12,6 +12,145 @@ import("//build/security.gni")
 import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 import("//src/sys/pkg/bin/system-updater/epoch/generate_epoch.gni")
 import("//src/sys/pkg/repositories/devhost/devhost.gni")
+
+# Package publishing
+#
+# While this is called "updates", it's not about OTA as much as it is about
+# package publishing.
+#
+# This file contains targets that gather data from two different places, and
+# then combines that to create a list of "all unique packages in the build",
+# which is then published.
+#
+# The general flow is:
+#
+#  +----------------+    +----------------+
+#  |   The "main"   |    | The "universe" |
+#  | Product Bundle |    |  Package Set   |
+#  +----------------+    +----------------+
+#           |                     |
+#           +----------+----------+
+#                      |
+#                      V
+#               +-------------+
+#               | The devhost |
+#               | Repository  |
+#               +-------------+
+#
+# Note that `fx publish` and `fx build` use different data to produce the set
+# of packages to publish to the repository, and both are in this file.  The
+# flow for `fx build` will be covered first, then `fx publish`. (This matches
+# their order within the file).
+#
+# Also: In "bringup" product configs, this is all a giant no-op, as there are no
+# packages to be published.
+#
+# Entry-Point Targets
+#
+#  //build/updates:updates  -> Create package lists and publish everything
+#
+#  //build/updates:packages -> Used to do metadata walks over "all software
+#                              built for the product", but not usable to gather
+#                              all the packages, as it doesn't have enough info
+#                              to do so via GN metadata.  See the target for
+#                              details.
+#
+#  //build/updates:publish -> publish everything
+#
+#
+# The "universe" package set is constructed in the same manner:  A GN metadata
+# walk is done over the the following:
+#   - //:developer_universe_packages (created from the 'universe_package_labels'
+#                                     GN build argument, in 'args.gn')
+#
+#   - //:discoverable_packages (created from the 'discoverable_package_lables'
+#                               GN build arg, and all "discoverable" tests)
+#
+# The `package_manifests_from_metadata.list` target creates a file of the same
+# name which is a metadata walk for all packages in the above.
+#
+#
+# The packages from assembly need to be gathered.  Depending on if the assembly
+# operation is performed by a Bazel or a GN target, this is done differently:
+#
+# Note:  All "foo.list" files are a file of paths to package manifests, one per
+#        line, relative to the root_build_dir.
+#
+# GN:
+#    base_package_manifests.list
+#    cache_package_manifests.list
+#      These targets (and files of the same name) are created by getting the
+#      list of base and cache packages from the product bundle.
+#
+#    assembly_ondemand_packages.list
+#      This set of packages is pulled from product assembly only (skipping the
+#      need to trigger the product bundle creation in order to get them).
+#
+#    package_manifests_from_metadata.list
+#      This is created by doing a metadata walk over the "universe" packages
+#      which are in the following groups:
+#        //:developer_universe_packages
+#        //:discoverable_packages
+#      These groups' contents are primarily driven by developer-specified GN
+#      build arguments.
+#
+#    universe_package_manifests.list
+#      This file is created from the 'package_manifests_from_metadata.list' by
+#      deduplicating it against the base, cache, and ondemand package lists in
+#      the above files.
+#      NOTE:  This deduplication is possibly no longer needed
+#
+#    all_package_manifests.list
+#      This is created by merging the following files from above:
+#        - base_package_manifests.list
+#        - cache_package_manifests.list
+#        - assembly_ondemand_packages.list
+#        - universe_package_manifests.list
+#
+# Bazel:
+#    assembly_ondemand_packages.list
+#      This set of packages is pulled from product assembly only (skipping the
+#      need to trigger the product bundle creation in order to get them).
+#
+#    package_manifests_from_metadata.list
+#      This is created by doing a metadata walk over the "universe" packages
+#      which are in the following groups:
+#        //:developer_universe_packages
+#        //:discoverable_packages
+#      These groups' contents are primarily driven by developer-specified GN
+#      build arguments.
+#
+#    universe_package_manifests.list
+#      This file is created from the 'package_manifests_from_metadata.list'.
+#      No deduplication is performed.
+#
+#    [labels|files].bazel_package_manifests_list
+#      The bazel_product_bundle() GN template creates this target and file
+#      using the package tool to make a list of all packages that are in the
+#      product bundle.
+#
+#    all_package_manifests.list
+#      This is created by merging the following files from above:
+#        - bazel_package_manifests_list
+#        - universe_package_manifests.list
+#
+# Publishing in fx build
+#
+#    //build/images/updates:publish
+#      After 'all_package_manifests.list' is created, all packages listed in it
+#      are published to the devhost repo.
+#
+# fx publish cache
+#
+#   When just publishing cache, all of the above is skipped.  Instead the
+#   following file is used:
+#
+#    assembly_cache_packages.list
+#      This file is created by taking the list of cache packages from the
+#      output of the product assembly action (not product bundle).
+#      This allows the publishing of cache packages without running the
+#      product bundle creation step.
+#
 
 assert(current_toolchain == default_toolchain,
        "//build/images/* are only valid in the Fuchsia toolchain")
@@ -97,8 +236,14 @@ if (use_bringup_assembly) {
   }
 
   #####
-  # These are lists of the packages in the above groups
+  # These are lists of the names of the packages in each package set, sourced
+  # either from assembly's outputs, or from GN metadata walks.  It's not clear
+  # who uses these files (aside from the base_packages.list)
+  # These are intermediate outputs which are used to create the final outputs
 
+  # This file is used by `fx test` to determine if a test package is in the base
+  # package set, and if so, triggers an OTA instead of a resolving of the
+  # package by merkle.
   package_list_from_assembly("base_packages.list") {
     testonly = true
     system_label = labels.images
@@ -141,8 +286,9 @@ if (use_bringup_assembly) {
       ":all_package_manifests.list",
       ":assembly_cache_packages.list",
       ":base_packages.list",
-      ":cache_packages.list",
-      ":universe_packages.list",
+
+      # ":cache_packages.list",
+      # ":universe_packages.list",
     ]
   }
 
@@ -183,20 +329,10 @@ if (use_bringup_assembly) {
     ]
   }
 
-  if (use_bazel_images_only) {
-    # Base and cache package_manifests.list files are intentionally left empty
-    # when Bazel assembly is used. The information here will come from Bazel
-    # assembly (fuchsia_product_bundle) instead. See all_package_manifests.list
-    # below.
-    generated_file("base_package_manifests.list") {
-      outputs = [ files.base_package_manifests ]
-      contents = ""
-    }
-    generated_file("cache_package_manifests.list") {
-      outputs = [ files.cache_package_manifests ]
-      contents = ""
-    }
-  } else {
+  if (!use_bazel_images_only) {
+    # When using GN-based assembly, these lists need to be extracted from the
+    # assembly manifest.
+
     package_list_from_assembly("base_package_manifests.list") {
       testonly = true
       system_label = labels.images
@@ -214,12 +350,13 @@ if (use_bringup_assembly) {
     }
   }
 
-  # Generate a list of cache packages from product assembly for the `fx publish`
-  # tool.
-  cache_packages_from_product_assembler("assembly_cache_packages.list") {
+  # The on_demand package set defined during assembly, so that its packages can
+  # be published along with the universe package set.
+  packages_from_product_assembler("assembly_ondemand_packages.list") {
+    package_set = "on_demand"
     assembly_label = labels.images
     is_bazel_assembled = use_bazel_images_only
-    outputs = [ files.assembly_cache_package_manifests ]
+    outputs = [ files.assembly_ondemand_package_manifests ]
     testonly = true
   }
 
@@ -227,60 +364,107 @@ if (use_bringup_assembly) {
     testonly = true
     script = "create-universe-package-manifests-list.py"
     depfile = "$root_build_dir/$target_name.d"
-    outputs = [ files.universe_package_manifests ]
-    deps = [
-      ":base_package_manifests.list",
-      ":cache_package_manifests.list",
-      ":package_manifests_from_metadata.list",
-    ]
-
-    inputs = [
-      files.base_package_manifests,
-      files.cache_package_manifests,
-      files.manifests_from_metadata,
-    ]
-
     args = [
       "--depfile",
       rebase_path(depfile, root_build_dir),
-      "-o",
-      rebase_path(outputs[0], root_build_dir),
     ]
-    foreach(input, inputs) {
-      args += [ rebase_path(input, root_build_dir) ]
+
+    # The paths from GN metdaata walk
+    deps = [ ":package_manifests_from_metadata.list" ]
+    inputs = [ files.manifests_from_metadata ]
+    args += [
+      "--metadata-walk-manifests-list",
+      rebase_path(files.manifests_from_metadata, root_build_dir),
+    ]
+
+    # TODO - This action previously used empty package lists for base and cache
+    # packages from assembly, meaning that it just output those packages found
+    # via metadata walk, without stripping any duplicates with assembly.  This
+    # seems incorrect.
+    if (!use_bazel_images_only) {
+      # The package sets from assembly, which need to be stripped from the above
+      deps += [
+        ":assembly_ondemand_packages.list",
+        ":base_package_manifests.list",
+        ":cache_package_manifests.list",
+      ]
+      inputs += [
+        files.base_package_manifests,
+        files.cache_package_manifests,
+        files.assembly_ondemand_package_manifests,
+      ]
+      args += [
+        "--assembly-base-manifests-list",
+        rebase_path(files.base_package_manifests, root_build_dir),
+        "--assembly-cache-manifests-list",
+        rebase_path(files.cache_package_manifests, root_build_dir),
+        "--assembly-ondemand-manifests-list",
+        rebase_path(files.assembly_ondemand_package_manifests, root_build_dir),
+      ]
     }
+
+    # And the output file.
+    outputs = [ files.universe_package_manifests ]
+    args += [
+      "-o",
+      rebase_path(files.universe_package_manifests, root_build_dir),
+    ]
   }
 
   action("all_package_manifests.list") {
     testonly = true
     script = "create-all-package-manifests-list.py"
-    outputs = [ all_package_manifests_list ]
-    deps = []
-    args = rebase_path(outputs, root_build_dir)
-    sources = []
 
-    _manifest_deps = [ ":universe_package_manifests.list" ]
+    # GN legacy-defined universe packages
+    deps = [ ":universe_package_manifests.list" ]
+    inputs = [ files.universe_package_manifests ]
+    args = [
+      "--paths",
+      rebase_path(files.universe_package_manifests, root_build_dir),
+    ]
 
     if (use_bazel_images_only) {
+      # Assemblies in Bazel provide a single file that lists all packages in
+      # base and cache
       deps += [ labels.bazel_package_manifests_list ]
-
-      args +=
-          [ rebase_path(files.bazel_package_manifests_list, root_build_dir) ]
-      sources += [ files.bazel_package_manifests_list ]
+      inputs += [ files.bazel_package_manifests_list ]
+      args += [
+        "--paths",
+        rebase_path(files.bazel_package_manifests_list, root_build_dir),
+      ]
     } else {
-      _manifest_deps += [
+      # Assemblies in GN use a file for each package set.
+      deps += [
         ":base_package_manifests.list",
         ":cache_package_manifests.list",
       ]
+      inputs += [
+        files.base_package_manifests,
+        files.cache_package_manifests,
+      ]
+      args += [
+        "--paths",
+        rebase_path(files.base_package_manifests, root_build_dir),
+        "--paths",
+        rebase_path(files.cache_package_manifests, root_build_dir),
+      ]
     }
 
-    foreach(_dep, _manifest_deps) {
-      deps += [ _dep ]
-      _dep_outputs = []  # tell gn its ok to rewrite each iteration
-      _dep_outputs = get_target_outputs(_dep)
-      args += [ rebase_path(_dep_outputs[0], root_build_dir) ]
-      sources += [ _dep_outputs[0] ]
-    }
+    # The on_demand package set is added via the same mechanism, whether it's a
+    # Bazel or GN-based assembly.
+    deps += [ ":assembly_ondemand_packages.list" ]
+    inputs += [ files.assembly_ondemand_package_manifests ]
+    args += [
+      "--paths",
+      rebase_path(files.assembly_ondemand_package_manifests, root_build_dir),
+    ]
+
+    # And the output file
+    outputs = [ all_package_manifests_list ]
+    args += [
+      "--output",
+      rebase_path(all_package_manifests_list, root_build_dir),
+    ]
   }
 
   _output_repository_dir = "${root_build_dir}/amber-files"
@@ -309,6 +493,21 @@ if (use_bringup_assembly) {
         },
       ]
     }
+  }
+
+  # Generate a list of packages for the `fx publish` tool to use, these are
+  # different from those used above to create the `all_package_manifests.list`
+  # files.
+  #
+  # These are defined by assembly, and not by legacy GN arguments.
+
+  # The cache package set from assembly
+  packages_from_product_assembler("assembly_cache_packages.list") {
+    package_set = "cache"
+    assembly_label = labels.images
+    is_bazel_assembled = use_bazel_images_only
+    outputs = [ files.assembly_cache_package_manifests ]
+    testonly = true
   }
 
   # Allow the incremental publisher to stage the repository keys and root metadata so it can publish

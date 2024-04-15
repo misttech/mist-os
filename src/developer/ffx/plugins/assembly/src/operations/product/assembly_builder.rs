@@ -841,6 +841,7 @@ impl ImageAssemblyConfigBuilder {
             cache: packages.package_manifest_paths(PackageSet::Cache),
             system: packages.package_manifest_paths(PackageSet::System),
             bootfs_packages: packages.package_manifest_paths(PackageSet::Bootfs),
+            on_demand: packages.package_manifest_paths(PackageSet::OnDemand),
             kernel: KernelConfig {
                 path: kernel_path.context("A kernel path must be specified")?,
                 args: kernel_args.into_iter().collect(),

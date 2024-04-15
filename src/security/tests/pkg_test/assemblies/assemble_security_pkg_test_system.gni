@@ -377,8 +377,11 @@ template("assemble_security_pkg_test_system") {
       ":${labels.update_packages_manifests_lists}",
     ]
     args = [
+      "--output",
       rebase_path(outputs[0], root_build_dir),
+      "--paths",
       rebase_path(files.base_package_manifests_list, root_build_dir),
+      "--paths",
       rebase_path(files.update_packages_manifests_list, root_build_dir),
     ]
     inputs = [

@@ -48,7 +48,10 @@ def main():
             for package in contents["packages"][args.package_set]:
                 # Paths in the manifest are relative to the manifest file itself
                 manifest_paths.append(
-                    os.path.join(manifest_path, package[args.contents])
+                    # Normalize the paths to remove internal ../../'s.
+                    os.path.normpath(
+                        os.path.join(manifest_path, package[args.contents])
+                    )
                 )
 
     out_package_manifest_list = {

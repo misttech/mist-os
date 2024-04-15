@@ -32,6 +32,12 @@ pub struct ImageAssemblyConfig {
     #[serde(default)]
     pub cache: Vec<Utf8PathBuf>,
 
+    /// The packages that are in the on_demand package list, which is not part
+    /// of the image itself, but is to be published alongside those packages in
+    /// the image.
+    #[serde(default)]
+    pub on_demand: Vec<Utf8PathBuf>,
+
     /// The parameters that specify which kernel to put into the ZBI.
     pub kernel: KernelConfig,
 
@@ -71,6 +77,7 @@ impl ImageAssemblyConfig {
             system: Vec::default(),
             base: Vec::default(),
             cache: Vec::default(),
+            on_demand: Vec::default(),
             boot_args: Vec::default(),
             bootfs_files: Vec::default(),
             bootfs_packages: Vec::default(),
@@ -145,6 +152,7 @@ mod tests {
               "system": ["package0"],
               "base": ["package1", "package2"],
               "cache": ["package3", "package4"],
+              "on_demand": ["package5", "package6"],
               "kernel": {
                 "path": "path/to/kernel",
                 "args": ["arg1", "arg2"],

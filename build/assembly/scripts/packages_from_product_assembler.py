@@ -16,13 +16,18 @@ from pathlib import Path
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Parse assembly product output manifest to get cache packages."
+        description="Parse assembly product output manifest to get packages for a particular package set."
     )
     parser.add_argument(
         "--assembly-manifest",
         type=argparse.FileType("r"),
         required=True,
         help="Path to image_assembly.json created by `ffx assembly product`.",
+    )
+    parser.add_argument(
+        "--package-set",
+        required=True,
+        help="Package set to get the packages for",
     )
     parser.add_argument(
         "--rebase",
@@ -40,18 +45,22 @@ def main():
         args.rebase
     ), "--rebase needs to specify a valid directory path!"
     assembly_manifest = json.load(args.assembly_manifest)
-    cache_package_manifests = [
-        args.rebase.rstrip("/") + "/" + cache_package
-        if args.rebase
-        else cache_package
-        for cache_package in assembly_manifest["cache"]
+    package_manifests = [
+        (
+            # Normalize the rebased path to remove any internal ../..'s.
+            os.path.normpath(args.rebase.rstrip("/") + "/" + package)
+            if args.rebase
+            else package
+        )
+        for package in assembly_manifest[args.package_set]
     ]
     Path(args.output).write_text(
         json.dumps(
             {
-                "content": {"manifests": cache_package_manifests},
+                "content": {"manifests": package_manifests},
                 "version": "1",
-            }
+            },
+            indent=2,
         )
     )
 

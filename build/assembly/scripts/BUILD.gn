@@ -8,8 +8,8 @@ import("//build/python/python_host_test.gni")
 
 assert(is_host, "Only include assembly build scripts via the host toolchain")
 
-python_binary("cache_packages_from_product_assembler") {
-  main_source = "cache_packages_from_product_assembler.py"
+python_binary("packages_from_product_assembler") {
+  main_source = "packages_from_product_assembler.py"
 }
 
 python_binary("generate_scrutiny_configs") {

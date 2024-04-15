@@ -58,9 +58,6 @@ files = {
     _images_outdir = get_label_info(labels.images, "target_out_dir") +
                      "/${_bazel_target_name}/product_bundle"
     _assembly_outdir = _images_outdir + "/system_a"
-    bazel_package_manifests_list =
-        get_label_info(labels.images, "target_out_dir") +
-        "/${_bazel_target_name}/manifests/package_manifests.list"
   } else {
     _images_outdir = get_label_info(labels.images, "target_out_dir")
     _assembly_outdir = _images_outdir + "/${labels.assembly_name}"
@@ -81,19 +78,47 @@ files = {
       fvm_fastboot = "${_assembly_outdir}/fvm.fastboot.blk"
     }
 
+    # This file is used by fx test, which means that fx test cannot detect which
+    # tests are in base (and need to be updated via ota instead of publishing),
+    # when the assembly target is in Bazel instead of GN.
     base_package_names = "$root_build_dir/base_packages.list"
+
+    # It's not clear that either of these files are used by any tool:
     cache_package_names = "$root_build_dir/cache_packages.list"
     universe_package_names = "$root_build_dir/universe_packages.list"
+
+    # This is an intermediate output file used to construct the universe
+    # packages list, and probably shouldn't be listed in this (shared) gni file.
     manifests_from_metadata =
         "$root_build_dir/package_manifests_from_metadata.list"
 
-    # TODO(https://fxbug.dev/42180818) move these to image-relative paths along with tools' usages
-    base_package_manifests = "$root_build_dir/base_package_manifests.list"
-    cache_package_manifests = "$root_build_dir/cache_package_manifests.list"
-    universe_package_manifests =
-        "$root_build_dir/universe_package_manifests.list"
+    # Where to get the package manifest lists from (for publishing) depends on
+    # whether bazel or GN is performing the assembly.
+    #
+    # These are all intermediates that are processed into a canonical list of
+    # packages.
+    if (use_bazel_images_only) {
+      # Bazel has a single package_manifests.list that it produces
+      bazel_package_manifests_list =
+          get_label_info(labels.images, "target_out_dir") +
+          "/${_bazel_target_name}/manifests/package_manifests.list"
+    } else {
+      # GN has a series of files that are based on product assembly, or a GN
+      # metadata walk in the case of the "universe" package set.
+
+      # TODO(https://fxbug.dev/42180818) move these to image-relative paths along with tools' usages
+      base_package_manifests = "$root_build_dir/base_package_manifests.list"
+      cache_package_manifests = "$root_build_dir/cache_package_manifests.list"
+    }
+
     assembly_cache_package_manifests =
         "$root_build_dir/assembly_cache_packages.list"
+    assembly_ondemand_package_manifests =
+        "$root_build_dir/assembly_ondemand_packages.list"
+
+    # The output file containing (only) packages in universe.
+    universe_package_manifests =
+        "$root_build_dir/universe_package_manifests.list"
 
     # TODO(https://fxbug.dev/42074075): Audit and add the following paths when
     # only Bazel assembly is enabled.

@@ -16,7 +16,7 @@ bazel_assembly_cache_packages_list =
 if (is_fuchsia) {
   import("//build/assembly/assembled_system.gni")
   import("//build/assembly/board_configuration.gni")
-  import("//build/assembly/cache_packages_from_product_assembler.gni")
+  import("//build/assembly/packages_from_product_assembler.gni")
   import("//build/assembly/product_assembly_configuration.gni")
   import("//build/bazel/assembly/bazel_product_bundle.gni")
   import("//build/images/paths.gni")
@@ -94,15 +94,16 @@ if (is_fuchsia) {
       outputs = [ bazel_assembly_cache_packages_list ]
     }
   } else {
-    cache_packages_from_product_assembler("gn_assembly_cache_packages.list") {
+    packages_from_product_assembler("gn_assembly_cache_packages.list") {
       assembly_label = ":fx_publish_test.gn_assembly($default_toolchain)"
+      package_set = "cache"
       is_bazel_assembled = false
       outputs = [ gn_assembly_cache_packages_list ]
       testonly = true
     }
-    cache_packages_from_product_assembler(
-        "bazel_assembly_cache_packages.list") {
+    packages_from_product_assembler("bazel_assembly_cache_packages.list") {
       assembly_label = ":bazel_pb($default_toolchain)"
+      package_set = "cache"
       is_bazel_assembled = true
       outputs = [ bazel_assembly_cache_packages_list ]
       testonly = true

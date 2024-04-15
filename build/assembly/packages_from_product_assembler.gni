@@ -9,9 +9,16 @@ import("//build/python/python_action.gni")
 assert(is_fuchsia,
        "Assembly templates can only be used with `$default_toolchain`.")
 
-# Collect a newline-delimited text file of cache packages from the `ffx assembly product` call.
+# Collect a newline-delimited text file of the package manifests for all
+# packages in a given package set from the `ffx assembly product` call.
 #
 # Arguments:
+#
+#   package_set (string, required)
+#     Which package set to get.  Valid values are:
+#       base
+#       cache
+#       on_demand
 #
 #   assembly_label (GN label, required)
 #     Label for the assembled_system() invocation to use, e.g. //build/images/fuchsia.
@@ -30,7 +37,7 @@ assert(is_fuchsia,
 #
 #   testonly
 #   visibility
-template("cache_packages_from_product_assembler") {
+template("packages_from_product_assembler") {
   assert(
       defined(invoker.assembly_label),
       "must define a `assembly_label` argument which points to an assembled_system() invocation")
@@ -39,6 +46,18 @@ template("cache_packages_from_product_assembler") {
          "must define `is_bazel_assembled`")
   assert(!invoker.is_bazel_assembled || !defined(invoker.namespace),
          "`namespace` is not allowed for Bazel-assembled products!")
+
+  assert(
+      defined(invoker.package_set),
+      "must define a `package_set` argument specifying which package set to list")
+  valid_package_sets = [
+    "base",
+    "cache",
+    "on_demand",
+  ]
+  assert(valid_package_sets + [ invoker.package_set ] -
+             [ invoker.package_set ] != valid_package_sets,
+         "the `package_set` argument must be one of: ${valid_package_sets}")
 
   _assembly_target_name = get_label_info(invoker.assembly_label, "name")
   _assembly_dir = get_label_info(invoker.assembly_label, "dir")
@@ -66,11 +85,12 @@ template("cache_packages_from_product_assembler") {
                              "testonly",
                              "visibility",
                            ])
-    binary_label =
-        "//build/assembly/scripts:cache_packages_from_product_assembler"
+    binary_label = "//build/assembly/scripts:packages_from_product_assembler"
     args = [
       "--assembly-manifest",
       rebase_path(_assembly_manifest, root_build_dir),
+      "--package-set",
+      invoker.package_set,
       "--output",
       rebase_path(outputs[0], root_build_dir),
     ]
