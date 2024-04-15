@@ -12,7 +12,7 @@ use net_types::{
 
 use crate::{
     context::ContextPair,
-    device::{AnyDevice, DeviceIdContext},
+    device::{self, AnyDevice, DeviceIdContext},
     inspect::{Inspector, InspectorDeviceExt},
     ip::{
         base::{IpLayerBindingsContext, IpLayerContext, ResolveRouteError},
@@ -205,12 +205,14 @@ where
 pub trait RoutesApiBindingsContext<I, D>:
     IpDeviceBindingsContext<I, D> + IpLayerBindingsContext<I, D>
 where
+    D: device::StrongId,
     I: IpLayerIpExt + IpDeviceIpExt,
 {
 }
 
 impl<I, D, BC> RoutesApiBindingsContext<I, D> for BC
 where
+    D: device::StrongId,
     I: IpLayerIpExt + IpDeviceIpExt,
     BC: IpDeviceBindingsContext<I, D> + IpLayerBindingsContext<I, D>,
 {
