@@ -5,60 +5,61 @@
 */}}
 
 {{- define "TableDefinition" -}}
-{{range .DocComments}}
-//{{ . }}
-{{- end}}
-type {{ .Name }} struct {
-	_ struct{} `{{ .Tags }}`
+{{- $table := . }}
+
+{{ range $comment := .DocComments }}
+//{{ $comment }}
+{{- end }}
+type {{ $table.Name }} struct {
+	_ struct{} `{{ $table.Tags }}`
 	I_unknownData interface{}
-	{{- range .Members }}
-	{{- range .DocComments}}
-	//{{ . }}
-	{{- end}}
-	{{ .DataField }} {{ .Type }} `{{ .Tags }}`
-	{{ .PresenceField }} bool
+	{{- range $memb := $table.Members }}
+	{{- range $comment := $memb.DocComments }}
+	//{{ $comment }}
+	{{- end }}
+	{{ $memb.DataField }} {{ $memb.Type }} `{{ $memb.Tags }}`
+	{{ $memb.PresenceField }} bool
 	{{- end }}
 }
 
-var _m{{ .Name }} = _bindings.CreateLazyMarshaler({{ .Name }}{})
+var _m{{ $table.Name }} = _bindings.CreateLazyMarshaler({{ $table.Name }}{})
 
-func (msg *{{ .Name }}) Marshaler() _bindings.Marshaler {
-	return _m{{ .Name }}
+func (msg *{{ $table.Name }}) Marshaler() _bindings.Marshaler {
+	return _m{{ $table.Name }}
 }
 
-{{- range .Members }}
-
-func (u *{{ $.Name }}) {{ .Setter }}({{ .PrivateDataField }} {{ .Type }}) {
-	u.{{ .DataField }} = {{ .PrivateDataField }}
-	u.{{ .PresenceField }} = true
+{{ range $memb := .Members }}
+func (u *{{ $table.Name }}) {{ $memb.Setter }}({{ $memb.PrivateDataField }} {{ $memb.Type }}) {
+	u.{{ $memb.DataField }} = {{ $memb.PrivateDataField }}
+	u.{{ $memb.PresenceField }} = true
 }
 
-func (u *{{ $.Name }}) {{ .Getter }}() {{ .Type }} {
-	return u.{{ .DataField }}
+func (u *{{ $table.Name }}) {{ $memb.Getter }}() {{ $memb.Type }} {
+	return u.{{ $memb.DataField }}
 }
 
-func (u *{{ $.Name }}) {{ .GetterWithDefault }}(_default {{ .Type }}) {{ .Type }} {
-	if !u.{{ .Haser }}() {
+func (u *{{ $table.Name }}) {{ $memb.GetterWithDefault }}(_default {{ $memb.Type }}) {{ $memb.Type }} {
+	if !u.{{ $memb.Haser }}() {
 		return _default
 	}
-	return u.{{ .DataField }}
+	return u.{{ $memb.DataField }}
 }
 
-func (u *{{ $.Name }}) {{ .Haser }}() bool {
-	return u.{{ .PresenceField }}
+func (u *{{ $table.Name }}) {{ $memb.Haser }}() bool {
+	return u.{{ $memb.PresenceField }}
 }
 
-func (u *{{ $.Name }}) {{ .Clearer }}() {
-	u.{{ .PresenceField }} = false
+func (u *{{ $table.Name }}) {{ $memb.Clearer }}() {
+	u.{{ $memb.PresenceField }} = false
 }
-{{- end }}
+{{ end }}
 
-func (u *{{ .Name }}) HasUnknownData() bool {
+func (u *{{ $table.Name }}) HasUnknownData() bool {
 	return u.I_unknownData != nil
 }
 
-func (u *{{ .Name }}) GetUnknownData() map[uint64]{{ .UnknownDataType }} {
-	return u.I_unknownData.(map[uint64]{{ .UnknownDataType }})
+func (u *{{ $table.Name }}) GetUnknownData() map[uint64]{{ $table.UnknownDataType }} {
+	return u.I_unknownData.(map[uint64]{{ $table.UnknownDataType }})
 }
 
 {{- end -}}

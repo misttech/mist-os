@@ -5,55 +5,57 @@
 */}}
 
 {{- define "BitsDefinition" -}}
-{{range .DocComments}}
-//{{ . }}
-{{- end}}
-type {{ .Name }} {{ .Type }}
+{{- $bits := . }}
+
+{{ range $comment := $bits.DocComments }}
+//{{ $comment }}
+{{- end }}
+type {{ $bits.Name }} {{ $bits.Type }}
 const (
-	{{- range .Members }}
-	{{ $.Name }}{{ .Name }} {{ $.Name }} = {{ .Value }}
+	{{- range $memb := $bits.Members }}
+	{{ $bits.Name }}{{ $memb.Name }} {{ $bits.Name }} = {{ $memb.Value }}
 	{{- end }}
-	{{ .Name }}_Mask {{ .Name }} = {{ .Mask }}
+	{{ $bits.Name }}_Mask {{ $bits.Name }} = {{ $bits.Mask }}
 )
 
-func (_ {{ .Name }}) I_BitsMask() {{ .Name }} {
-	return {{ .Name }}_Mask
+func (_ {{ $bits.Name }}) I_BitsMask() {{ $bits.Name }} {
+	return {{ $bits.Name }}_Mask
 }
 
-func (_ {{ .Name }}) I_BitsIsStrict() bool {
-	return {{ .IsStrict }}
+func (_ {{ $bits.Name }}) I_BitsIsStrict() bool {
+	return {{ $bits.IsStrict }}
 }
 
-func (x {{ .Name }}) HasUnknownBits() bool {
+func (x {{ $bits.Name }}) HasUnknownBits() bool {
 	return x.GetUnknownBits() != 0
 }
 
-func (x {{ .Name }}) GetUnknownBits() uint64 {
-	return uint64(^{{ .Name }}_Mask & x)
+func (x {{ $bits.Name }}) GetUnknownBits() uint64 {
+	return uint64(^{{ $bits.Name }}_Mask & x)
 }
 
-func (x {{ .Name }}) InvertBits() {{ .Name }} {
-	return {{ .Name }}_Mask & ^x
+func (x {{ $bits.Name }}) InvertBits() {{ $bits.Name }} {
+	return {{ $bits.Name }}_Mask & ^x
 }
 
 // HasBits validates that all flipped bits in the mask are set.
-func (x {{ .Name }}) HasBits(mask {{ .Name }}) bool {
+func (x {{ $bits.Name }}) HasBits(mask {{ $bits.Name }}) bool {
 	return mask | x == x
 }
 
 // ClearBits ensures all flipped bits in the mask are unset.
-func (x {{ .Name }}) ClearBits(mask {{ .Name }}) {{ .Name }} {
+func (x {{ $bits.Name }}) ClearBits(mask {{ $bits.Name }}) {{ $bits.Name }} {
 	return ^mask & x
 }
 
-func (x {{.Name}}) String() string {
+func (x {{ $bits.Name }}) String() string {
 	var buf _strings.Builder
-	{{- range .Members }}
-	if {{ .Value }} & x != 0 {
+	{{- range $memb := $bits.Members }}
+	if {{ $memb.Value }} & x != 0 {
 		if buf.Len() != 0 {
 			buf.WriteRune('|')
 		}
-		buf.WriteString("{{.Name}}")
+		buf.WriteString("{{ $memb.Name }}")
 	}
 	{{- end }}
 	if buf.Len() == 0 {

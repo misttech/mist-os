@@ -5,64 +5,65 @@
 */}}
 
 {{- define "ProtocolDefinition" -}}
+{{- $protocol := . }}
 
 const (
-{{- range .Methods }}
-	{{ .OrdinalName }} uint64 = {{ .Ordinal | printf "%#x" }}
+{{- range $method := $protocol.Methods }}
+	{{ $method.OrdinalName }} uint64 = {{ $method.Ordinal | printf "%#x" }}
 {{- end }}
 )
 
-{{ if .Openness.IsClosed -}}
-type {{ .ProxyName }} _bindings.{{ .ProxyType }}
-{{ range .Methods }}
-{{range .DocComments}}
-//{{ . }}
-{{- end}}
-func (p *{{ $.ProxyName }}) {{ if .IsEvent -}}
-		{{ .EventExpectName }}
+{{ if $protocol.Openness.IsClosed -}}
+type {{ $protocol.ProxyName }} _bindings.{{ $protocol.ProxyType }}
+{{ range $method := $protocol.Methods }}
+{{ range $comment := $method.DocComments }}
+//{{ $comment }}
+{{- end }}
+func (p *{{ $.ProxyName }}) {{ if $method.IsEvent -}}
+		{{ $method.EventExpectName }}
 	{{- else -}}
-		{{ .Name }}
+		{{ $method.Name }}
 	{{- end -}}
-	{{- if .Request -}}
-	(ctx_ _bindings.Context, {{ .Request.NamesAndTypes }})
+	{{- if $method.Request -}}
+	(ctx_ _bindings.Context, {{ $method.Request.NamesAndTypes }})
 	{{- else -}}
 	(ctx_ _bindings.Context)
 	{{- end -}}
-	{{- if .HasResponse -}}
-	{{- if .Response }} ({{ .Response.Types }}, error)
+	{{- if $method.HasResponse -}}
+	{{- if $method.Response }} ({{ $method.Response.Types }}, error)
 	{{- else }} error{{ end -}}
 	{{- else }} error{{ end }} {
 
-	{{- if .HasRequest }}
-	{{- if .Request }}
-	req_ := &{{ .Request.Construct }}
+	{{- if $method.HasRequest }}
+	{{- if $method.Request }}
+	req_ := &{{ $method.Request.Construct }}
 	{{- else }}
 	var req_ _bindings.Message
 	{{- end }}
 	{{- end }}
-	{{- if .HasResponse }}
-	{{- if .Response }}
-	resp_ := &{{ .Response.Name }}{}
+	{{- if $method.HasResponse }}
+	{{- if $method.Response }}
+	resp_ := &{{ $method.Response.Name }}{}
 	{{- else }}
 	var resp_ _bindings.Message
 	{{- end }}
 	{{- end }}
-	{{- if .HasRequest }}
-		{{- if .HasResponse }}
-	err_ := ((*_bindings.{{ $.ProxyType }})(p)).Call({{ .OrdinalName }}, req_, resp_)
+	{{- if $method.HasRequest }}
+		{{- if $method.HasResponse }}
+	err_ := ((*_bindings.{{ $protocol.ProxyType }})(p)).Call({{ $method.OrdinalName }}, req_, resp_)
 		{{- else }}
-	err_ := ((*_bindings.{{ $.ProxyType }})(p)).Send({{ .OrdinalName }}, req_)
+	err_ := ((*_bindings.{{ $protocol.ProxyType }})(p)).Send({{ $method.OrdinalName }}, req_)
 		{{- end }}
 	{{- else }}
-		{{- if .HasResponse }}
-	err_ := ((*_bindings.{{ $.ProxyType }})(p)).Recv({{ .OrdinalName }}, resp_)
+		{{- if $method.HasResponse }}
+	err_ := ((*_bindings.{{ $protocol.ProxyType }})(p)).Recv({{ $method.OrdinalName }}, resp_)
 		{{- else }}
 	err_ := nil
 		{{- end }}
 	{{- end }}
-	{{- if .HasResponse }}
-	{{- if .Response }}
-	return {{ call .Response.Destructure "(*resp_)" }}, err_
+	{{- if $method.HasResponse }}
+	{{- if $method.Response }}
+	return {{ call $method.Response.Destructure "(*resp_)" }}, err_
 	{{- else }}
 	return err_
 	{{- end }}
@@ -72,61 +73,61 @@ func (p *{{ $.ProxyName }}) {{ if .IsEvent -}}
 }
 {{- end }}
 
-{{range .DocComments}}
-//{{ . }}
-{{- end}}
-type {{ .Name }} interface {
-{{- range .Methods }}
-	{{- range .DocComments}}
-	//{{ . }}
-	{{- end}}
-	{{- if .HasRequest }}
-	{{- if .Request }}
-	{{ .Name }}(ctx_ _bindings.Context, {{ .Request.NamesAndTypes }})
-	{{- else }}
-	{{ .Name }}(ctx_ _bindings.Context)
+{{ range $comment := .DocComments }}
+//{{ $comment }}
+{{- end }}
+type {{ $protocol.Name }} interface {
+{{- range $method := $protocol.Methods }}
+	{{- range $comment := $method.DocComments }}
+	//{{ $comment }}
 	{{- end }}
-	{{- if .HasResponse -}}
-	{{- if .Response }} ({{ .Response.Types }}, error)
+	{{- if $method.HasRequest }}
+	{{- if $method.Request }}
+	{{ $method.Name }}(ctx_ _bindings.Context, {{ $method.Request.NamesAndTypes }})
+	{{- else }}
+	{{ $method.Name }}(ctx_ _bindings.Context)
+	{{- end }}
+	{{- if $method.HasResponse -}}
+	{{- if $method.Response }} ({{ $method.Response.Types }}, error)
 	{{- else }} error{{ end -}}
 	{{- else }} error{{ end }}
 	{{- end }}
 {{- end }}
 }
 
-{{- if eq .ProxyType "ChannelProxy" }}
-type {{ .RequestName }} _bindings.InterfaceRequest
+{{- if eq $protocol.ProxyType "ChannelProxy" }}
+type {{ $protocol.RequestName }} _bindings.InterfaceRequest
 
-func New{{ .RequestName }}() ({{ .RequestName }}, *{{ .ProxyName }}, error) {
+func New{{ $protocol.RequestName }}() ({{ $protocol.RequestName }}, *{{ $protocol.ProxyName }}, error) {
 	req, cli, err := _bindings.NewInterfaceRequest()
-	return {{ .RequestName }}(req), (*{{ .ProxyName }})(cli), err
+	return {{ $protocol.RequestName }}(req), (*{{ $protocol.ProxyName }})(cli), err
 }
 
-{{- if .ProtocolNameString }}
+{{- if $protocol.ProtocolNameString }}
 // Implements ServiceRequest.
-func (_ {{ .RequestName }}) Name() string {
-	return {{ .ProtocolNameString }}
+func (_ {{ $protocol.RequestName }}) Name() string {
+	return {{ $protocol.ProtocolNameString }}
 }
-func (c {{ .RequestName }}) ToChannel() _zx.Channel {
+func (c {{ $protocol.RequestName }}) ToChannel() _zx.Channel {
 	return c.Channel
 }
 
-const {{ .ProtocolNameConstant }} = {{ .ProtocolNameString }}
+const {{ $protocol.ProtocolNameConstant }} = {{ $protocol.ProtocolNameString }}
 {{- end }}
 {{- end }}
 
-type {{ .StubName }} struct {
-	Impl {{ .Name }}
+type {{ $protocol.StubName }} struct {
+	Impl {{ $protocol.Name }}
 }
 
-func (s_ *{{ .StubName }}) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Message, bool, error) {
+func (s_ *{{ $protocol.StubName }}) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Message, bool, error) {
 	switch args_.Ordinal {
-	{{- range .Methods }}
-	{{- if not .IsEvent }}
-	case {{ .OrdinalName }}:
-		{{- if .HasRequest }}
-		{{- if .Request }}
-		in_ := &{{ .Request.Name }}{}
+	{{- range $method := $protocol.Methods }}
+	{{- if not $method.IsEvent }}
+	case {{ $method.OrdinalName }}:
+		{{- if $method.HasRequest }}
+		{{- if $method.Request }}
+		in_ := &{{ $method.Request.Name }}{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
 		if !ok {
 			return nil, false, _bindings.ErrMissingMarshalerContext
@@ -136,15 +137,15 @@ func (s_ *{{ .StubName }}) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Mes
 		}
 		{{- end }}
 		{{- end }}
-		{{ if .Response }}{{- .Response.Names -}}, {{- end -}}
-		{{- if .Request -}}
-		err_ := s_.Impl.{{ .Name }}(args_.Ctx, {{ call .Request.Destructure "(*in_)" -}})
+		{{ if $method.Response }}{{- $method.Response.Names -}}, {{- end -}}
+		{{- if $method.Request -}}
+		err_ := s_.Impl.{{ $method.Name }}(args_.Ctx, {{ call $method.Request.Destructure "(*in_)" -}})
 		{{- else -}}
-		err_ := s_.Impl.{{ .Name }}(args_.Ctx)
+		err_ := s_.Impl.{{ $method.Name }}(args_.Ctx)
 		{{- end -}}
-		{{- if .HasResponse }}
-		{{- if .Response }}
-		out_ := &{{ .Response.Construct }}
+		{{- if $method.HasResponse }}
+		{{- if $method.Response }}
+		out_ := &{{ $method.Response.Construct }}
 		return out_, true, err_
 		{{- else }}
 		return nil, true, err_
@@ -158,67 +159,67 @@ func (s_ *{{ .StubName }}) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Mes
 	return nil, false, _bindings.ErrUnknownOrdinal
 }
 
-type {{ .EventProxyName }} _bindings.{{ .ProxyType }}
-{{ range .Methods }}
-{{- if .IsEvent }}
-func (p *{{ $.EventProxyName }}) {{ .Name }}(
-	{{- if .Response -}}
-	{{- .Response.NamesAndTypes -}}
+type {{ $protocol.EventProxyName }} _bindings.{{ $protocol.ProxyType }}
+{{ range $method := $protocol.Methods }}
+{{- if $method.IsEvent }}
+func (p *{{ $protocol.EventProxyName }}) {{ $method.Name }}(
+	{{- if $method.Response -}}
+	{{- $method.Response.NamesAndTypes -}}
 	{{- end -}}
 	) error {
 
-	{{- if .HasResponse }}
-	{{- if .Response }}
-	event_ := &{{ .Response.Construct }}
+	{{- if $method.HasResponse }}
+	{{- if $method.Response }}
+	event_ := &{{ $method.Response.Construct }}
 	{{- else }}
 	var event_ _bindings.Message
 	{{- end }}
 	{{- end }}
-	return ((*_bindings.{{ $.ProxyType }})(p)).Send({{ .OrdinalName }}, event_)
+	return ((*_bindings.{{ $protocol.ProxyType }})(p)).Send({{ $method.OrdinalName }}, event_)
 }
 {{- end }}
 {{- end }}
-{{- else }}{{/* end of if .Openness.IsClosed */}}
+{{- else }}{{/* end of if $protocol.Openness.IsClosed */}}
 // Bindings for this protocol have not been generated because it is an
-// {{ .Openness }} protocol. If bindings for {{ .Openness }} protocols are
+// {{ $protocol.Openness }} protocol. If bindings for {{ $protocol.Openness }} protocols are
 // needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type {{ .ProxyName }} _bindings.{{ .ProxyType }}
+type {{ $protocol.ProxyName }} _bindings.{{ $protocol.ProxyType }}
 
 // Bindings for this protocol have not been generated because it is an
-// {{ .Openness }} protocol. If bindings for {{ .Openness }} protocols are
+// {{ $protocol.Openness }} protocol. If bindings for {{ $protocol.Openness }} protocols are
 // needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type {{ .Name }} interface {}
+type {{ $protocol.Name }} interface {}
 
-{{- if eq .ProxyType "ChannelProxy" }}
-type {{ .RequestName }} _bindings.InterfaceRequest
+{{- if eq $protocol.ProxyType "ChannelProxy" }}
+type {{ $protocol.RequestName }} _bindings.InterfaceRequest
 
-func New{{ .RequestName }}() ({{ .RequestName }}, *{{ .ProxyName }}, error) {
+func New{{ $protocol.RequestName }}() ({{ $protocol.RequestName }}, *{{ $protocol.ProxyName }}, error) {
 	req, cli, err := _bindings.NewInterfaceRequest()
-	return {{ .RequestName }}(req), (*{{ .ProxyName }})(cli), err
+	return {{ $protocol.RequestName }}(req), (*{{ $protocol.ProxyName }})(cli), err
 }
 
-{{- if .ProtocolNameString }}
+{{- if $protocol.ProtocolNameString }}
 // Implements ServiceRequest.
-func (_ {{ .RequestName }}) Name() string {
-	return {{ .ProtocolNameString }}
+func (_ {{ $protocol.RequestName }}) Name() string {
+	return {{ $protocol.ProtocolNameString }}
 }
-func (c {{ .RequestName }}) ToChannel() _zx.Channel {
+func (c {{ $protocol.RequestName }}) ToChannel() _zx.Channel {
 	return c.Channel
 }
 
-const {{ .ProtocolNameConstant }} = {{ .ProtocolNameString }}
+const {{ $protocol.ProtocolNameConstant }} = {{ $protocol.ProtocolNameString }}
 {{- end }}
 {{- end }}
 
 // Bindings for this protocol have not been generated because it is an
-// {{ .Openness }} protocol. If bindings for {{ .Openness }} protocols are
+// {{ $protocol.Openness }} protocol. If bindings for {{ $protocol.Openness }} protocols are
 // needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type {{ .StubName }} struct {}
+type {{ $protocol.StubName }} struct {}
 
 // Bindings for this protocol have not been generated because it is an
-// {{ .Openness }} protocol. If bindings for {{ .Openness }} protocols are
+// {{ $protocol.Openness }} protocol. If bindings for {{ $protocol.Openness }} protocols are
 // needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type {{ .EventProxyName }} struct {}
-{{- end }}{{/* end of else for if .Openness.IsClosed */}}
+type {{ $protocol.EventProxyName }} struct {}
+{{- end }}{{/* end of else for if $protocol.Openness.IsClosed */}}
 
 {{ end -}}

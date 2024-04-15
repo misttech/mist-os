@@ -4,37 +4,39 @@
 // found in the LICENSE file.
 */}}
 
-{{- define "UnionDefinition" -}}
-type {{ .TagName }} uint64
+{{- define "UnionDefinition" }}
+{{- $union := . }}
+
+type {{ $union.TagName }} uint64
 const (
-	{{- if .IsFlexible }}
-	{{ $.Name }}_unknownData = 0  // 0x00000000
+	{{- if $union.IsFlexible }}
+	{{ $union.Name }}_unknownData = 0  // 0x00000000
 	{{- end }}
-	{{- range .Members }}
-	{{ $.Name }}{{ .Name }} = {{ .Ordinal }} // {{ .Ordinal | printf "%#08x" }}
+	{{- range $memb := $union.Members }}
+	{{ $union.Name }}{{ $memb.Name }} = {{ $memb.Ordinal }} // {{ $memb.Ordinal | printf "%#08x" }}
 	{{- end }}
 )
 
-{{range .DocComments}}
-//{{ . }}
-{{- end}}
-type {{ .Name }} struct {
-	{{ .TagName }} `{{ .Tags }}`
-	{{- if .IsFlexible }}
+{{ range $comment := $union.DocComments }}
+//{{ $comment }}
+{{- end }}
+type {{ $union.Name }} struct {
+	{{ $union.TagName }} `{{ $union.Tags }}`
+	{{- if $union.IsFlexible }}
 	I_unknownData interface{}
 	{{- end }}
-	{{- range .Members }}
-	{{- range .DocComments}}
-	//{{ . }}
-	{{- end}}
-	{{ .Name }} {{ .Type }}  `{{ .Tags }}`
+	{{- range $memb := $union.Members }}
+	{{- range $comment := $memb.DocComments }}
+	//{{ $comment }}
+	{{- end }}
+	{{ $memb.Name }} {{ $memb.Type }}  `{{ $memb.Tags }}`
 	{{- end }}
 }
 
-var _m{{ .Name }} = _bindings.CreateLazyMarshaler({{ .Name }}{})
+var _m{{ $union.Name }} = _bindings.CreateLazyMarshaler({{ $union.Name }}{})
 
-func (msg *{{ .Name }}) Marshaler() _bindings.Marshaler {
-	return _m{{ .Name }}
+func (msg *{{ $union.Name }}) Marshaler() _bindings.Marshaler {
+	return _m{{ $union.Name }}
 }
 
 {{- /*
@@ -46,14 +48,14 @@ unions and modified-in-place unions with ostensibly the same variant to fail
 equality checks.
 */}}
 
-func (_m *{{ .Name }}) reset() {
-	switch _m.{{ .TagName }} {
-	{{- range .Members }}
-	case {{ .Ordinal }}:
-		var _zeroed {{ .Type }}
-		_m.{{ .Name }} = _zeroed
+func (_m *{{ $union.Name }}) reset() {
+	switch _m.{{ $union.TagName }} {
+	{{- range $memb := $union.Members }}
+	case {{ $memb.Ordinal }}:
+		var _zeroed {{ $memb.Type }}
+		_m.{{ $memb.Name }} = _zeroed
 	{{- end }}
-	{{- if .IsFlexible }}
+	{{- if $union.IsFlexible }}
 	default:
 		var _zeroed interface{}
 		_m.I_unknownData = _zeroed
@@ -61,43 +63,43 @@ func (_m *{{ .Name }}) reset() {
 	}
 }
 
-func (_m *{{ .Name }}) Which() {{ .TagName }} {
-	{{- if .IsStrict }}
-	return _m.{{ .TagName }}
+func (_m *{{ $union.Name }}) Which() {{ $union.TagName }} {
+	{{- if $union.IsStrict }}
+	return _m.{{ $union.TagName }}
 	{{- else }}
-	switch _m.{{ .TagName }} {
-	{{- range .Members }}
-	case {{ .Ordinal }}:
-		return {{ $.Name }}{{ .Name }}
+	switch _m.{{ $union.TagName }} {
+	{{- range $memb := $union.Members }}
+	case {{ $memb.Ordinal }}:
+		return {{ $union.Name }}{{ $memb.Name }}
 	{{- end }}
 	default:
-		return {{ $.Name }}_unknownData
+		return {{ $union.Name }}_unknownData
 	}
 	{{- end }}
 }
 
-func (_m *{{ .Name }}) Ordinal() uint64 {
-	return uint64(_m.{{ .TagName }})
+func (_m *{{ $union.Name }}) Ordinal() uint64 {
+	return uint64(_m.{{ $union.TagName }})
 }
 
-{{- range .Members }}
+{{- range $memb := $union.Members }}
 
-func (_m *{{ $.Name }}) Set{{ .Name }}({{ .PrivateName }} {{ .Type }}) {
+func (_m *{{ $union.Name }}) Set{{ $memb.Name }}({{ $memb.PrivateName }} {{ $memb.Type }}) {
 	_m.reset()
-	_m.{{ $.TagName }} = {{ $.Name }}{{ .Name }}
-	_m.{{ .Name }} = {{ .PrivateName }}
+	_m.{{ $union.TagName }} = {{ $union.Name }}{{ $memb.Name }}
+	_m.{{ $memb.Name }} = {{ $memb.PrivateName }}
 }
 
-func {{ $.Name }}With{{ .Name }}({{ .PrivateName }} {{ .Type }}) {{ $.Name }} {
-	var _u {{ $.Name }}
-	_u.Set{{ .Name }}({{ .PrivateName }})
+func {{ $union.Name }}With{{ $memb.Name }}({{ $memb.PrivateName }} {{ $memb.Type }}) {{ $union.Name }} {
+	var _u {{ $union.Name }}
+	_u.Set{{ $memb.Name }}({{ $memb.PrivateName }})
 	return _u
 }
 {{- end }}
 
-{{- if .IsFlexible }}
-func (_m *{{ .Name }}) GetUnknownData() {{ .UnknownDataType }} {
-	return _m.I_unknownData.({{ .UnknownDataType }})
+{{- if $union.IsFlexible }}
+func (_m *{{ $union.Name }}) GetUnknownData() {{ $union.UnknownDataType }} {
+	return _m.I_unknownData.({{ $union.UnknownDataType }})
 }
 {{- end }}
 

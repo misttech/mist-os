@@ -5,45 +5,47 @@
 */}}
 
 {{- define "EnumDefinition" -}}
-{{range .DocComments}}
-//{{ . }}
-{{- end}}
-type {{ .Name }} {{ .Type }}
+{{- $enum := . }}
+
+{{ range $comment := .DocComments }}
+//{{ $comment }}
+{{- end }}
+type {{ $enum.Name }} {{ $enum.Type }}
 
 const (
-	{{- range .Members }}
-	{{ if .DocComments -}}
-	{{range .DocComments}}
-	//{{ . }}
-	{{- end}}
+	{{- range $memb := $enum.Members }}
+	{{ if $memb.DocComments -}}
+	{{ range $comment := $memb.DocComments }}
+	//{{ $comment }}
+	{{- end }}
 	{{ end -}}
-	{{ $.Name }}{{ .Name }} {{ $.Name }} = {{ .Value }}
+	{{ $enum.Name }}{{ $memb.Name }} {{ $enum.Name }} = {{ $memb.Value }}
 	{{- end }}
 
-{{ if .IsFlexible }}
-	// {{ .Name }}_Unknown is the default unknown placeholder.
-	{{ .Name }}_Unknown {{ .Name }} = {{ .UnknownValueForTmpl | printf "%#x" }}
+{{ if $enum.IsFlexible }}
+	// {{ $enum.Name }}_Unknown is the default unknown placeholder.
+	{{ $enum.Name }}_Unknown {{ $enum.Name }} = {{ $enum.UnknownValueForTmpl | printf "%#x" }}
 {{ end }}
 )
 
-func (_ {{.Name}}) I_EnumValues() []{{.Name}} {
-	return []{{.Name}}{
-		{{- range .Members }}
-		{{ $.Name }}{{ .Name }},
+func (_ {{ $enum.Name }}) I_EnumValues() []{{ $enum.Name }} {
+	return []{{ $enum.Name }}{
+		{{- range $memb := $enum.Members }}
+		{{ $enum.Name }}{{ $memb.Name }},
 		{{- end }}
 	}
 }
 
-func (_ {{.Name}}) I_EnumIsStrict() bool {
-	return {{ .IsStrict }}
+func (_ {{ $enum.Name }}) I_EnumIsStrict() bool {
+	return {{ $enum.IsStrict }}
 }
 
-func (x {{.Name}}) IsUnknown() bool {
-	{{- if .Members }}
+func (x {{ $enum.Name }}) IsUnknown() bool {
+	{{- if $enum.Members }}
 	switch x {
-		{{- range .Members }}
-		{{- if not .IsUnknown }}
-		case {{ .Value }}:
+		{{- range $memb := $enum.Members }}
+		{{- if not $memb.IsUnknown }}
+		case {{ $memb.Value }}:
 			return false
 		{{- end }}
 		{{- end }}
@@ -52,12 +54,12 @@ func (x {{.Name}}) IsUnknown() bool {
 	return true
 }
 
-func (x {{.Name}}) String() string {
-	{{- if .Members }}
+func (x {{ $enum.Name }}) String() string {
+	{{- if $enum.Members }}
 	switch x {
-	{{- range .Members }}
-	case {{ .Value }}:
-		return "{{.Name}}"
+	{{- range $memb := $enum.Members }}
+	case {{ $memb.Value }}:
+		return "{{ $memb.Name }}"
 	{{- end }}
 	}
 	{{- end }}

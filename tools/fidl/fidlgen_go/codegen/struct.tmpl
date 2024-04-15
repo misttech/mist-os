@@ -5,22 +5,24 @@
 */}}
 
 {{- define "StructDefinition" -}}
-{{range .DocComments}}
-//{{ . }}
-{{- end}}
-type {{ .Name }} struct {
-	_ struct{} `{{ .Tags }}`
-	{{- range .Members }}
-	{{- range .DocComments}}
-	//{{ . }}
-	{{- end}}
-	{{ .Name }} {{ .Type }} `{{ .Tags }}`
+{{- $struct := . }}
+
+{{ range $comment := $struct.DocComments }}
+//{{ $comment }}
+{{- end }}
+type {{ $struct.Name }} struct {
+	_ struct{} `{{ $struct.Tags }}`
+	{{- range $memb := $struct.Members }}
+	{{- range $comment := $memb.DocComments }}
+	//{{ $comment }}
+	{{- end }}
+	{{ $memb.Name }} {{ $memb.Type }} `{{ $memb.Tags }}`
 	{{- end }}
 }
 
-var _m{{ .Name }} = _bindings.CreateLazyMarshaler({{ .Name }}{})
+var _m{{ $struct.Name }} = _bindings.CreateLazyMarshaler({{ $struct.Name }}{})
 
-func (msg *{{ .Name }}) Marshaler() _bindings.Marshaler {
-	return _m{{ .Name }}
+func (msg *{{ $struct.Name }}) Marshaler() _bindings.Marshaler {
+	return _m{{ $struct.Name }}
 }
 {{- end -}}
