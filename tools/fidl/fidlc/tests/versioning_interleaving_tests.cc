@@ -9,8 +9,7 @@
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 // This file tests ways of interleaving the availability of a source element
-// with that of a target element that it references. See also
-// versioning_tests.cc and decomposition_tests.cc.
+// with that of a target element that it references.
 
 namespace fidlc {
 namespace {
@@ -395,7 +394,7 @@ void substitute(std::string& str, std::string_view placeholder, std::string_view
   str.replace(str.find(placeholder), placeholder.size(), replacement);
 }
 
-TEST(AvailabilityInterleavingTests, SameLibrary) {
+TEST(VersioningInterleavingTests, SameLibrary) {
   for (auto& test_case : kTestCases) {
     auto attributes = test_case.Format();
     std::string fidl = R"FIDL(
@@ -436,7 +435,7 @@ void TestExternalLibrary(const TestCase& test_case, std::string example_fidl,
   test_case.CompileAndAssert(example);
 }
 
-TEST(AvailabilityInterleavingTests, DeclToDeclExternal) {
+TEST(VersioningInterleavingTests, DeclToDeclExternal) {
   std::string example_fidl = R"FIDL(
 @available(added=1)
 library platform.example;
@@ -458,7 +457,7 @@ const TARGET bool = false;
   }
 }
 
-TEST(AvailabilityInterleavingTests, LibraryToLibraryExternal) {
+TEST(VersioningInterleavingTests, LibraryToLibraryExternal) {
   std::string example_fidl = R"FIDL(
 ${source_available}
 library platform.example;
@@ -478,7 +477,7 @@ const TARGET bool = false;
   }
 }
 
-TEST(AvailabilityInterleavingTests, LibraryToDeclExternal) {
+TEST(VersioningInterleavingTests, LibraryToDeclExternal) {
   std::string example_fidl = R"FIDL(
 ${source_available}
 library platform.example;
@@ -499,7 +498,7 @@ const TARGET bool = false;
   }
 }
 
-TEST(AvailabilityInterleavingTests, DeclToLibraryExternal) {
+TEST(VersioningInterleavingTests, DeclToLibraryExternal) {
   std::string example_fidl = R"FIDL(
 @available(added=1)
 library platform.example;
@@ -520,7 +519,7 @@ const TARGET bool = false;
   }
 }
 
-TEST(AvailabilityInterleavingTests, Error0055) {
+TEST(VersioningInterleavingTests, Error0055) {
   TestLibrary library;
   library.AddFile("bad/fi-0055.test.fidl");
   library.SelectVersion("test", "HEAD");
@@ -530,7 +529,7 @@ TEST(AvailabilityInterleavingTests, Error0055) {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(AvailabilityInterleavingTests, Error0056) {
+TEST(VersioningInterleavingTests, Error0056) {
   SharedAmongstLibraries shared;
   shared.SelectVersion("foo", "HEAD");
   shared.SelectVersion("bar", "HEAD");

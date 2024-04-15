@@ -10,7 +10,6 @@
 
 // This file tests the temporal decomposition algorithm by comparing the JSON IR
 // resulting from a versioned library and its manually decomposed equivalents.
-// See also versioning_tests.cc and availability_interleaving_tests.cc.
 
 namespace fidlc {
 namespace {
@@ -110,7 +109,7 @@ void AssertEquivalent(const std::string& left_fidl, const std::string& right_fid
     AssertEquivalent(left_fidl, right_fidl, version);              \
   }
 
-TEST(DecompositionTests, EquivalentToSelf) {
+TEST(VersioningDecompositionTests, EquivalentToSelf) {
   auto fidl = R"FIDL(
 @available(added=1)
 library example;
@@ -123,7 +122,7 @@ library example;
 }
 
 // An unversioned library behaves the same as an unchanging versioned library.
-TEST(DecompositionTests, UnversionedLibrary) {
+TEST(VersioningDecompositionTests, UnversionedLibrary) {
   auto unversioned = R"FIDL(
 library example;
 
@@ -143,7 +142,7 @@ type Foo = struct {};
   ASSERT_EQUIVALENT(unversioned, versioned, "LEGACY");
 }
 
-TEST(DecompositionTests, AbsentLibraryIsEmpty) {
+TEST(VersioningDecompositionTests, AbsentLibraryIsEmpty) {
   auto fidl = R"FIDL(
 @available(added=2, removed=3)
 library example;
@@ -175,7 +174,7 @@ library example;
   ASSERT_EQUIVALENT(fidl, v3_onward, "LEGACY");
 }
 
-TEST(DecompositionTests, SplitByMembership) {
+TEST(VersioningDecompositionTests, SplitByMembership) {
   auto fidl = R"FIDL(
 @available(added=1)
 library example;
@@ -208,7 +207,7 @@ type TopLevel = struct {
   ASSERT_EQUIVALENT(fidl, v2_onward, "LEGACY");
 }
 
-TEST(DecompositionTests, SplitByReference) {
+TEST(VersioningDecompositionTests, SplitByReference) {
   auto fidl = R"FIDL(
 @available(added=1)
 library example;
@@ -253,7 +252,7 @@ type That = struct {
   ASSERT_EQUIVALENT(fidl, v2_onward, "LEGACY");
 }
 
-TEST(DecompositionTests, SplitByTwoMembers) {
+TEST(VersioningDecompositionTests, SplitByTwoMembers) {
   auto fidl = R"FIDL(
 @available(added=1)
 library example;
@@ -307,7 +306,7 @@ type That = struct {};
   ASSERT_EQUIVALENT(fidl, v3_onward, "LEGACY");
 }
 
-TEST(DecompositionTests, Recursion) {
+TEST(VersioningDecompositionTests, Recursion) {
   auto fidl = R"FIDL(
 @available(added=1)
 library example;
@@ -418,7 +417,7 @@ type Expr = flexible union {
   ASSERT_EQUIVALENT(fidl, v4_onward, "LEGACY");
 }
 
-TEST(DecompositionTests, MutualRecursion) {
+TEST(VersioningDecompositionTests, MutualRecursion) {
   auto fidl = R"FIDL(
 @available(added=1)
 library example;
@@ -509,7 +508,7 @@ type Bar = struct {
   ASSERT_EQUIVALENT(fidl, v5_onward, "LEGACY");
 }
 
-TEST(DecompositionTests, MisalignedSwapping) {
+TEST(VersioningDecompositionTests, MisalignedSwapping) {
   auto fidl = R"FIDL(
 @available(added=1)
 library example;
@@ -573,7 +572,7 @@ type Foo = table {
   ASSERT_EQUIVALENT(fidl, v4_onward, "LEGACY");
 }
 
-TEST(DecompositionTests, StrictToFlexible) {
+TEST(VersioningDecompositionTests, StrictToFlexible) {
   auto fidl = R"FIDL(
 @available(added=1)
 library example;
@@ -636,7 +635,7 @@ type Y = flexible enum { A = 1; };
   ASSERT_EQUIVALENT(fidl, v4_onward, "LEGACY");
 }
 
-TEST(DecompositionTests, NameReuse) {
+TEST(VersioningDecompositionTests, NameReuse) {
   auto fidl = R"FIDL(
 @available(added=1)
 library example;
@@ -713,7 +712,7 @@ library example;
   ASSERT_EQUIVALENT(fidl, v7_onward, "LEGACY");
 }
 
-TEST(DecompositionTests, ConstsAndConstraints) {
+TEST(VersioningDecompositionTests, ConstsAndConstraints) {
   auto fidl = R"FIDL(
 @available(added=1)
 library example;
@@ -796,7 +795,7 @@ type Bar = table {};
   ASSERT_EQUIVALENT(fidl, v5_onward, "LEGACY");
 }
 
-TEST(DecompositionTests, AllElementsSplitByMembership) {
+TEST(VersioningDecompositionTests, AllElementsSplitByMembership) {
   auto fidl = R"FIDL(
 @available(added=1)
 library example;
@@ -1030,7 +1029,7 @@ library example;
   ASSERT_EQUIVALENT(fidl, v5_onward, "LEGACY");
 }
 
-TEST(DecompositionTests, AllElementsSplitByReference) {
+TEST(VersioningDecompositionTests, AllElementsSplitByReference) {
   auto fidl_prefix = R"FIDL(
 @available(added=1)
 library example;
@@ -1220,7 +1219,7 @@ protocol AnonymousLayoutsInProtocol {
   ASSERT_EQUIVALENT(fidl, v2_onward, "LEGACY");
 }
 
-TEST(DecompositionTests, Complicated) {
+TEST(VersioningDecompositionTests, Complicated) {
   auto fidl = R"FIDL(
 @available(added=1)
 library example;
@@ -1488,7 +1487,7 @@ protocol B {
   ASSERT_EQUIVALENT(fidl, v7_onward, "LEGACY");
 }
 
-TEST(DecompositionTests, Legacy) {
+TEST(VersioningDecompositionTests, Legacy) {
   auto fidl = R"FIDL(
 @available(added=1)
 library example;
@@ -1663,7 +1662,7 @@ protocol RemovedAt3LegacyTrue {
   ASSERT_EQUIVALENT(fidl, legacy, "LEGACY");
 }
 
-TEST(DecompositionTests, ConvertNamedToAnonymous) {
+TEST(VersioningDecompositionTests, ConvertNamedToAnonymous) {
   auto fidl = R"FIDL(
 @available(added=1)
 library example;
@@ -1708,7 +1707,7 @@ type Foo = struct {
   ASSERT_EQUIVALENT(fidl, v2_onward, "LEGACY");
 }
 
-TEST(DecompositionTests, ConvertAnonymousToNamed) {
+TEST(VersioningDecompositionTests, ConvertAnonymousToNamed) {
   auto fidl = R"FIDL(
 @available(added=1)
 library example;

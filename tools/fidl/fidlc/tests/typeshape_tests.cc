@@ -2396,14 +2396,14 @@ type A = resource struct {
 
 // TODO(https://fxbug.dev/323940291): Enable this. Currently can't report the
 // error because there is no SourceSpan to use.
-TEST(TypeShapeTests, DISABLED_BadIntegerOverflowArray) {
+TEST(TypeshapeTests, DISABLED_BadIntegerOverflowArray) {
   TestLibrary library;
   library.AddFile("bad/fi-0207.test.fidl");
   library.ExpectFail(ErrTypeShapeIntegerOverflow, 536870912, '*', 8);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(TypeShapeTests, BadIntegerOverflowStruct) {
+TEST(TypeshapeTests, BadIntegerOverflowStruct) {
   TestLibrary library(R"FIDL(
 library example;
 type Foo = struct {
@@ -2415,7 +2415,7 @@ type Foo = struct {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(TypeShapeTests, BadInlineSizeExceedsLimit) {
+TEST(TypeshapeTests, BadInlineSizeExceedsLimit) {
   TestLibrary library(R"FIDL(
 library example;
 type Foo = struct {

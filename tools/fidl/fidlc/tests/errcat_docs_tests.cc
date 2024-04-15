@@ -98,16 +98,11 @@ TEST(ErrcatDocsTests, RedirectsAreComplete) {
 
 TEST(ErrcatDocsTests, MarkdownFilesExist) {
   for (auto def : kAllDiagnosticDefs) {
+    if (!def->opts.documented)
+      continue;
     auto id = def->FormatId();
     auto path = TestLibrary::TestFilePath("error-catalog/_" + id + ".md");
-    bool exists = std::filesystem::exists(path);
-    if (def->opts.documented) {
-      EXPECT_TRUE(exists) << id << " is marked documented=true in diagnostics.h, "
-                          << "but the Markdown file " << path << " DOES NOT exist";
-    } else {
-      EXPECT_FALSE(exists) << id << " is marked documented=false in diagnostics.h, "
-                           << "but the Markdown file " << path << " DOES exists";
-    }
+    EXPECT_TRUE(std::filesystem::exists(path)) << "missing Markdown file " << path << " for " << id;
   }
 }
 

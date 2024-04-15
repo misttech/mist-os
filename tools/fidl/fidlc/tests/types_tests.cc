@@ -145,7 +145,7 @@ TEST(TypesTests, GoodHandleSubtype) {
 // sync, until the latter is generated.
 TEST(TypesTests, GoodRights) { static_assert(sizeof(RightsWrappedType) == sizeof(zx_rights_t)); }
 
-TEST(NewSyntaxTests, GoodTypeDeclOfAnonymousLayouts) {
+TEST(TypesTests, GoodTypeDeclOfAnonymousLayouts) {
   TestLibrary library(R"FIDL(
 library example;
 type TypeDecl = struct {
@@ -189,14 +189,14 @@ type TypeDecl = struct {
   EXPECT_EQ(type_decl_f4->members.size(), 1u);
 }
 
-TEST(NewSyntaxTests, BadTypeDeclOfNewTypeErrors) {
+TEST(TypesTests, BadTypeDeclOfNewTypeErrors) {
   TestLibrary library;
   library.AddFile("bad/fi-0062.test.fidl");
   library.ExpectFail(ErrNewTypesNotAllowed, "Matrix", "array");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(NewSyntaxTests, GoodTypeParameters) {
+TEST(TypesTests, GoodTypeParameters) {
   TestLibrary library(R"FIDL(
 library example;
 type Inner = struct{};
@@ -244,7 +244,7 @@ type TypeDecl = struct {
   ASSERT_NE(library.LookupStruct("I3"), nullptr);
 }
 
-TEST(NewSyntaxTests, GoodLayoutMemberConstraints) {
+TEST(TypesTests, GoodLayoutMemberConstraints) {
   TestLibrary library(R"FIDL(
 library example;
 
@@ -275,7 +275,7 @@ type t1 = resource struct {
   EXPECT_EQ(u1_type->type_decl->kind, Decl::Kind::kUnion);
 }
 
-TEST(NewSyntaxTests, GoodConstraintsOnVectors) {
+TEST(TypesTests, GoodConstraintsOnVectors) {
   TestLibrary library(R"FIDL(
 library example;
 
@@ -427,7 +427,7 @@ type TypeDecl= struct {
   EXPECT_EQ(a15_type->ElementCount(), a15_invocation.size_resolved->value);
 }
 
-TEST(NewSyntaxTests, GoodConstraintsOnUnions) {
+TEST(TypesTests, GoodConstraintsOnUnions) {
   TestLibrary library(R"FIDL(
 library example;
 
@@ -474,7 +474,7 @@ type TypeDecl= struct {
   EXPECT_EQ(u5_type->nullability, Nullability::kNullable);
 }
 
-TEST(NewSyntaxTests, GoodConstraintsOnHandles) {
+TEST(TypesTests, GoodConstraintsOnHandles) {
   TestLibrary library(R"FIDL(
 library example;
 using zx;
@@ -532,14 +532,14 @@ type TypeDecl = resource struct {
   EXPECT_EQ(h5_type->nullability, Nullability::kNullable);
 }
 
-TEST(NewSyntaxTests, BadTooManyLayoutParameters) {
+TEST(TypesTests, BadTooManyLayoutParameters) {
   TestLibrary library;
   library.AddFile("bad/fi-0162-b.test.fidl");
   library.ExpectFail(ErrWrongNumberOfLayoutParameters, "uint8", 0, 1);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(NewSyntaxTests, BadZeroParameters) {
+TEST(TypesTests, BadZeroParameters) {
   TestLibrary library(R"FIDL(
 library example;
 
@@ -553,7 +553,7 @@ type Foo = struct {
   EXPECT_EQ(library.errors()[0]->span.data(), "array");
 }
 
-TEST(NewSyntaxTests, BadNotEnoughParameters) {
+TEST(TypesTests, BadNotEnoughParameters) {
   TestLibrary library;
   library.AddFile("bad/fi-0162-a.test.fidl");
   library.ExpectFail(ErrWrongNumberOfLayoutParameters, "array", 2, 1);
@@ -561,7 +561,7 @@ TEST(NewSyntaxTests, BadNotEnoughParameters) {
   EXPECT_EQ(library.errors()[0]->span.data(), "<8>");
 }
 
-TEST(NewSyntaxTests, BadTooManyConstraints) {
+TEST(TypesTests, BadTooManyConstraints) {
   TestLibrary library;
   library.AddFile("bad/fi-0164.test.fidl");
   library.ExpectFail(ErrTooManyConstraints, "string", 2, 3);
@@ -569,7 +569,7 @@ TEST(NewSyntaxTests, BadTooManyConstraints) {
   EXPECT_EQ(library.errors()[0]->span.data(), "<0, optional, 20>");
 }
 
-TEST(NewSyntaxTests, BadParameterizedAnonymousLayout) {
+TEST(TypesTests, BadParameterizedAnonymousLayout) {
   TestLibrary library(R"FIDL(
 library example;
 
@@ -582,7 +582,7 @@ type Foo = struct {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(NewSyntaxTests, BadConstrainTwice) {
+TEST(TypesTests, BadConstrainTwice) {
   TestLibrary library(R"FIDL(
 library example;
 
@@ -603,7 +603,7 @@ type Foo = struct {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(NewSyntaxTests, GoodNoOverlappingConstraints) {
+TEST(TypesTests, GoodNoOverlappingConstraints) {
   TestLibrary library(R"FIDL(
 library example;
 
@@ -620,14 +620,14 @@ type Foo = resource struct {
   ASSERT_COMPILED(library);
 }
 
-TEST(NewSyntaxTests, BadWantTypeLayoutParameter) {
+TEST(TypesTests, BadWantTypeLayoutParameter) {
   TestLibrary library;
   library.AddFile("bad/fi-0165.test.fidl");
   library.ExpectFail(ErrExpectedType);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(NewSyntaxTests, BadWantValueLayoutParameter) {
+TEST(TypesTests, BadWantValueLayoutParameter) {
   TestLibrary library(R"FIDL(
 library example;
 
@@ -640,14 +640,14 @@ type Foo = struct {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(NewSyntaxTests, BadUnresolvableConstraint) {
+TEST(TypesTests, BadUnresolvableConstraint) {
   TestLibrary library;
   library.AddFile("bad/fi-0166.test.fidl");
   library.ExpectFail(ErrUnexpectedConstraint, "vector");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(NewSyntaxTests, BadShadowedOptional) {
+TEST(TypesTests, BadShadowedOptional) {
   TestLibrary library(R"FIDL(
 library example;
 
@@ -662,7 +662,7 @@ type Foo = resource struct {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(NewSyntaxTests, BadWrongConstraintType) {
+TEST(TypesTests, BadWrongConstraintType) {
   TestLibrary library(R"FIDL(
 library example;
 
@@ -676,7 +676,7 @@ type Foo = resource struct {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(InternalTypes, CannotReferToUnqualifiedInternalType) {
+TEST(TypesTests, CannotReferToUnqualifiedInternalType) {
   TestLibrary library(R"FIDL(
 library example;
 
@@ -689,7 +689,7 @@ type Foo = struct {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(InternalTypes, CannotReferToQualifiedInternalType) {
+TEST(TypesTests, CannotReferToQualifiedInternalType) {
   TestLibrary library(R"FIDL(
 library example;
 
