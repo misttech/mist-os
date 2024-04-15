@@ -124,14 +124,15 @@ void Symbolize::PrintBacktraces(const Symbolize::FramePointerBacktrace& frame_po
   // For either kind of backtrace, the interrupt_pc is a special frame #0 if
   // it's present.  It gets printed after other messages about the backtrace as
   // a whole, just as if it were stack.front() in a case with no interrupt_pc.
-  auto backtrace = [this, interrupt_pc](const auto& stack, const char* which) PHYS_SINGLETHREAD {
+  auto backtrace = [configured_max = gBootOptions ? gBootOptions->phys_backtrace_max : 0,  //
+                    this, interrupt_pc](const auto& stack, const char* which) PHYS_SINGLETHREAD {
     Printf("%s: Backtrace (via %s)%s%s\n", name_, which, stack.empty() ? " is empty!" : ":",
            (stack.empty() && interrupt_pc) ? "  Only the interrupted PC is available:" : "");
     if (interrupt_pc) {
       BackTraceFrame(0, *interrupt_pc, true);
-      BackTrace(stack, 1);
+      BackTrace(stack, 1, configured_max);
     } else {
-      BackTrace(stack, 0);
+      BackTrace(stack, 0, configured_max);
     }
   };
 
@@ -266,30 +267,108 @@ void Symbolize::PrintRegisters(const PhysExceptionState& exc) {
 
 void Symbolize::PrintException(uint64_t vector, const char* vector_name,
                                const PhysExceptionState& exc) {
+  // To avoid re-entry cascades from exceptions during the steps of this
+  // function, maintain a progress indicator.
+  enum Progress : unsigned int {
+    kNotInUse,
+    kEntered,
+    kChecked,
+    kVector,
+    kContext,
+    kRegs,
+    kFp,
+    kScs,
+    kPrintBt,
+    kStack,
+    kStepLimit,
+  };
+  constexpr unsigned int kSteps = kStepLimit - 1;
+  static Progress gProgress = kNotInUse;
+
+  // `return_after(kJustDid)` returns false normally, and returns true if we
+  // should bail out early because we've already gotten this far and re-entered
+  // without getting farther.
+  constexpr auto return_after = [](Progress step) -> bool {
+    if (gProgress < step) [[likely]] {
+      ZX_ASSERT_MSG(gProgress == step - 1, ": Hit return_after(%u) with gProgress=%u", step,
+                    gProgress);
+      gProgress = step;
+      return false;
+    }
+
+    if (gProgress > step) {
+      // This is a re-entry, but we haven't yet gotten as far as the last entry
+      // got, so keep going to report details about the re-entry.
+      printf(
+          "PrintException reached step %u of %u on re-entry after previously reaching step %u.\n",
+          step, kSteps, gProgress);
+      return false;
+    }
+
+    // This is a re-entry after not getting farther than this last time.  So it
+    // could be a cascade of repeated re-entry that would continue forever if
+    // we attempted to go past the step just completed.  Don't even attempt a
+    // printf here before recording the first step, so we identify a re-entry
+    // that's just from printf on the early-return paths above for later steps.
+    if (step != kEntered) {
+      printf("PrintException truncated after %u of %u steps in re-entry.\n", step, kSteps);
+    }
+    return true;
+  };
+
+  // The kChecked step just makes sure we won't even try the printf in the
+  // early-return case if we re-entered from that very printf at kChecked.
+  if (return_after(kEntered) || return_after(kChecked)) {
+    return;
+  }
+
   Printf("%s: exception vector %s (%#" PRIx64 ")\n", Symbolize::name_, vector_name, vector);
+  if (return_after(kVector)) {
+    return;
+  }
 
   // Always print the context, even if it was printed earlier.
   context_done_ = false;
   Context();
+  if (return_after(kContext)) {
+    return;
+  }
 
   PrintRegisters(exc);
+  if (return_after(kRegs)) {
+    return;
+  }
 
   // Collect each kind of backtrace if possible.
   FramePointerBacktrace fp_backtrace;
   arch::ShadowCallStackBacktrace scs_backtrace;
 
   fp_backtrace = FramePointerBacktrace::BackTrace(exc.fp());
+  if (return_after(kFp)) {
+    return;
+  }
 
   uint64_t scsp = exc.shadow_call_sp();
   scs_backtrace = boot_shadow_call_stack.BackTrace(scsp);
   if (scs_backtrace.empty()) {
     scs_backtrace = phys_exception_shadow_call_stack.BackTrace(scsp);
   }
+  if (return_after(kScs)) {
+    return;
+  }
 
   // Print whatever we have.
   PrintBacktraces(fp_backtrace, scs_backtrace, exc.pc());
+  if (return_after(kPrintBt)) {
+    return;
+  }
 
   PrintStack(exc.sp());
+  if (return_after(kStack)) {
+    return;
+  }
+
+  gProgress = kNotInUse;
 }
 
 void PrintPhysException(uint64_t vector, const char* vector_name, const PhysExceptionState& regs) {

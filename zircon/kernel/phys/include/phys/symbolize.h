@@ -107,9 +107,16 @@ class Symbolize {
   // Print a backtrace, ensuring context has been printed beforehand.
   // This takes any container of uintptr_t, so FramePointer works.
   template <typename T>
-  PHYS_SINGLETHREAD void BackTrace(const T& pcs, unsigned int n = 0) {
+  PHYS_SINGLETHREAD void BackTrace(const T& pcs, unsigned int n, unsigned int max) {
     Context();
     for (uintptr_t pc : pcs) {
+      if (max != 0 && n >= max) {
+        writer_.Prefix(name_)
+            .Literal("Backtrace truncated before frame #")
+            .DecimalDigits(n)
+            .Newline();
+        break;
+      }
       BackTraceFrame(n++, pc);
     }
   }

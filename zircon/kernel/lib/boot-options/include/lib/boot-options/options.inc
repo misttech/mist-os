@@ -312,6 +312,16 @@ spent in physboot and it is desirable to exclude this sort of work from
 holistic time measurements.
 )""")
 
+DEFINE_OPTION("kernel.phys.backtrace-max", uint32_t, phys_backtrace_max, {64}, R"""(
+When there is a crash in the kernel's early boot phase, it can print out
+backtraces on the serial console; it prints both a backtrace based on frame
+pointers and, when built to use shadow call stacks also a parallel backtrace
+based on the shadow call stack.  Each backtrace will print no more than this
+many frames.  (Most backtraces will end with the outermost frame before hitting
+the limit.)  Setting the limit to zero prints unlimited frames, which for the
+frame-pointers backtrace can get into an infinite loop with some bugs.
+)""")
+
 DEFINE_OPTION("kernel.phys.print-stack-max", uint32_t, phys_print_stack_max, {1024}, R"""(
 When there is a crash in the kernel's early boot phase, it can print out stack
 contents on the serial console.  This is the maximum size (in bytes) of stack

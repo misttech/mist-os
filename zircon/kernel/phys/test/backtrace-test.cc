@@ -34,13 +34,29 @@ namespace {
   const ptrdiff_t fp_depth = bt_depth(fp_bt);
 
   printf("Printing frame pointer backtrace, %td frames:\n", fp_depth);
-  gSymbolize->BackTrace(fp_bt);
+  gSymbolize->BackTrace(fp_bt, 0, 0);
+
+  const unsigned int fp_max = static_cast<unsigned int>(fp_depth - 2);
+  constexpr unsigned int fp_bias = 3;
+  printf(
+      "Printing frame pointer backtrace, %td frames but"
+      " starting at #%u and truncated to %u frames total:\n",
+      fp_depth, fp_bias, fp_max);
+  gSymbolize->BackTrace(fp_bt, fp_bias, fp_bias + fp_max);
 
   const auto scs_bt = CollectScs();
   const ptrdiff_t scs_depth = bt_depth(scs_bt);
   if (BootShadowCallStack::kEnabled) {
     printf("Printing shadow call stack backtrace, %td frames:\n", scs_depth);
-    gSymbolize->BackTrace(scs_bt);
+    gSymbolize->BackTrace(scs_bt, 0, 0);
+
+    const unsigned int scs_max = static_cast<unsigned int>(scs_depth - 2);
+    constexpr unsigned int scs_bias = 3;
+    printf(
+        "Printing shadow call stack backtrace, %td frames but"
+        " starting at #%u and truncated to %u frames total:\n",
+        scs_depth, scs_bias, scs_max);
+    gSymbolize->BackTrace(scs_bt, scs_bias, scs_bias + scs_max);
 
     ZX_ASSERT(fp_depth == scs_depth);
 
