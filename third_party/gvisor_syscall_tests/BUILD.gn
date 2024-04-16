@@ -507,11 +507,7 @@ suite_labels = [
 
 ns3_labels = []
 foreach(label, suite_labels) {
-  # TODO(https://fxbug.dev/331492167): Enable loopback syscall tests on riscv
-  # builders.
-  if (target_cpu != "riscv64" || label != loopback_test_label) {
-    ns3_labels += [ ":${label}_ns3" ]
-  }
+  ns3_labels += [ ":${label}_ns3" ]
 }
 
 all_packages = ns3_labels
