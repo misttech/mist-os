@@ -30,6 +30,16 @@ impl BoundedListNode {
         }
     }
 
+    /// Returns how many children are in the `BoundedListNode`.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Returns the capacity of the `BoundedListNode`, the maximum number of child nodes.
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
     /// Create a new entry within a list and return a writer that creates properties or children
     /// for this entry. The writer does not have to be kept for the created properties and
     /// children to be maintained in the list.
@@ -74,9 +84,13 @@ mod tests {
         let inspector = Inspector::default();
         let list_node = inspector.root().create_child("list_node");
         let mut list_node = BoundedListNode::new(list_node, 3);
+        assert_eq!(list_node.capacity(), 3);
+        assert_eq!(list_node.len(), 0);
         let _ = list_node.add_entry(|_| {});
+        assert_eq!(list_node.len(), 1);
         assert_data_tree!(inspector, root: { list_node: { "0": {} } });
         let _ = list_node.add_entry(|_| {});
+        assert_eq!(list_node.len(), 2);
         assert_data_tree!(inspector, root: { list_node: { "0": {}, "1": {} } });
     }
 
@@ -90,12 +104,15 @@ mod tests {
         let _ = list_node.add_entry(|_| {});
 
         assert_data_tree!(inspector, root: { list_node: { "0": {}, "1": {}, "2": {} } });
+        assert_eq!(list_node.len(), 3);
 
         let _ = list_node.add_entry(|_| {});
         assert_data_tree!(inspector, root: { list_node: { "1": {}, "2": {}, "3": {} } });
+        assert_eq!(list_node.len(), 3);
 
         let _ = list_node.add_entry(|_| {});
         assert_data_tree!(inspector, root: { list_node: { "2": {}, "3": {}, "4": {} } });
+        assert_eq!(list_node.len(), 3);
     }
 
     #[fuchsia::test]

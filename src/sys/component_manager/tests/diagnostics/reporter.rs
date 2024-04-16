@@ -87,27 +87,36 @@ async fn main() {
             start_timestamp_nanos: AnyProperty,
             status: "OK"
         },
-        early_start_times: {
-            "0": {
-                moniker: ".",
-                time: AnyProperty,
+        lifecycle: {
+            early: {
+                "0": {
+                    moniker: ".",
+                    type: "started",
+                    time: AnyProperty,
+                },
+                "1": {
+                    moniker: "root",
+                    type: "started",
+                    time: AnyProperty,
+                },
+                "2": {
+                    moniker: "root/elf_runner",
+                    type: "started",
+                    time: AnyProperty,
+                },
+                "3": {
+                    moniker: "root/reporter",
+                    type: "started",
+                    time: AnyProperty,
+                },
+                "4": {
+                    moniker: "root/archivist",
+                    type: "started",
+                    time: AnyProperty,
+                },
             },
-            "1": {
-                moniker: "root",
-                time: AnyProperty,
-            },
-            "2": {
-                moniker: "root/elf_runner",
-                time: AnyProperty,
-            },
-            "3": {
-                moniker: "root/reporter",
-                time: AnyProperty,
-            },
-            "4": {
-                moniker: "root/archivist",
-                time: AnyProperty,
-            },
+            late: {
+            }
         },
         stats: contains {
             measurements: {

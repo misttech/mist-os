@@ -27,9 +27,7 @@ use {
             time::{create_utc_clock, UtcTimeMaintainer},
         },
         capability::{BuiltinCapability, CapabilitySource, DerivedCapability, FrameworkCapability},
-        diagnostics::{
-            lifecycle::ComponentEarlyStartupTimeStats, task_metrics::ComponentTreeStats,
-        },
+        diagnostics::{lifecycle::ComponentLifecycleTimeStats, task_metrics::ComponentTreeStats},
         framework::{
             binder::BinderFrameworkCapability,
             factory::{FactoryCapabilityHost, FactoryFrameworkCapability},
@@ -113,6 +111,11 @@ use crate::model::resolver::Resolver;
 
 // Allow shutdown to take up to an hour.
 pub static SHUTDOWN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+
+// LINT.IfChange
+/// Set the size of the inspect VMO to be 300 KiB.
+const INSPECTOR_SIZE: usize = 300 * 1024;
+// LINT.ThenChange(/src/tests/diagnostics/meta/component_manager_status_tests.cml)
 
 pub struct BuiltinEnvironmentBuilder {
     // TODO(60804): Make component manager's namespace injectable here.
@@ -358,7 +361,7 @@ impl BuiltinEnvironmentBuilder {
             boot_resolver,
             realm_builder_resolver,
             self.utc_clock,
-            self.inspector.unwrap_or(component::inspector().clone()),
+            self.inspector.unwrap_or(component::init_inspector_with_size(INSPECTOR_SIZE).clone()),
             self.crash_records,
             capability_passthrough,
         )
@@ -498,9 +501,8 @@ pub struct BuiltinEnvironment {
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
     pub component_tree_stats: Arc<ComponentTreeStats<DiagnosticsTask>>,
-    // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
-    #[allow(dead_code)]
-    pub component_startup_time_stats: Arc<ComponentEarlyStartupTimeStats>,
+    // Keeps the inspect node alive.
+    _component_lifecycle_time_stats: Arc<ComponentLifecycleTimeStats>,
     pub debug: bool,
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
@@ -1119,10 +1121,9 @@ impl BuiltinEnvironment {
         component_tree_stats.start_measuring().await;
         model.root().hooks.install(component_tree_stats.hooks()).await;
 
-        let component_startup_time_stats = Arc::new(ComponentEarlyStartupTimeStats::new(
-            inspector.root().create_child("early_start_times"),
-        ));
-        model.root().hooks.install(component_startup_time_stats.hooks()).await;
+        let component_lifecycle_time_stats =
+            Arc::new(ComponentLifecycleTimeStats::new(inspector.root().create_child("lifecycle")));
+        model.root().hooks.install(component_lifecycle_time_stats.hooks()).await;
 
         // Serve stats about inspect in a lazy node.
         inspector.record_lazy_stats();
@@ -1141,7 +1142,7 @@ impl BuiltinEnvironment {
             event_stream_provider,
             event_logger,
             component_tree_stats,
-            component_startup_time_stats,
+            _component_lifecycle_time_stats: component_lifecycle_time_stats,
             debug,
             num_threads,
             realm_builder_resolver,

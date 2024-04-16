@@ -10,10 +10,13 @@
             // Component manager reports that it is healthy.
             "<component_manager>:root/fuchsia.inspect.Health:status WHERE [a] a == 'OK'",
 
-            // Ensure component manager has at least 256KiB of space
+            // LINT.IfChange
+            // Ensure component manager has at least 300KiB of space
             // for inspect, and that this limit is not reached.
-            "<component_manager>:root/fuchsia.inspect.Stats:current_size WHERE [a] a < 256*1024",
-            "<component_manager>:root/fuchsia.inspect.Stats:maximum_size WHERE [a] a >= 256*1024",
+            "<component_manager>:root/fuchsia.inspect.Stats:current_size WHERE [a] a < 300*1024",
+            "<component_manager>:root/fuchsia.inspect.Stats:maximum_size WHERE [a] a >= 300*1024",
+
+            // LINT.ThenChange(/src/sys/component_manager/src/builtin_environment.rs)
         ],
     },
 }
