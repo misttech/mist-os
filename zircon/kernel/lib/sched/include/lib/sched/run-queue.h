@@ -119,14 +119,8 @@ class RunQueue {
   // Selects the next thread to run and also gives the time at which the
   // preemption timer should fire for the subsequent round of scheduling.
   //
-  // The next thread is the one that is active and has the earliest finish time
-  // within its current period. In the event of a tie of finish times, the one
-  // with the earlier start time is picked - and then in the event of a tie of
-  // start times, the thread with the lowest address is expediently picked
-  // (which is a small bias that should not persist across runs of the system).
-  //
-  // If no threads are eligible, nullptr is returned, along with the time at
-  // which the next thread should become eligible.
+  // See //zircon/kernel/lib/sched/README.md#thread-selection for more detail on
+  // the behavior of this method.
   SelectNextThreadResult SelectNextThread(Time now) {
     // The next eligible might actually be expired (e.g., due to bandwidth
     // oversubscription), in which case it should be reactivated and
