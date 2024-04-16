@@ -26,8 +26,7 @@ pub use time::{
 };
 
 /// Test utilities provided to all crates.
+#[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
-    pub use crate::time::local_timer_heap::testutil::LocalTimerHeapTestExt;
-
     pub use crate::time::testutil::{FakeInstant, FakeInstantCtx};
 }

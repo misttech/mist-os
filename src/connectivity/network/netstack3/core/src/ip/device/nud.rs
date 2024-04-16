@@ -2591,7 +2591,6 @@ mod tests {
         ip::{AddrSubnet, IpAddress as _, IpInvariant, Ipv4Addr, Ipv6Addr, Subnet},
         UnicastAddr, Witness as _,
     };
-    use netstack3_base::testutil::LocalTimerHeapTestExt as _;
     use packet::{InnerPacketBuilder as _, Serializer as _};
     use packet_formats::{
         ethernet::{EtherType, EthernetFrameLengthCheck},

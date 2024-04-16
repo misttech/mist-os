@@ -114,7 +114,6 @@ rustc_library_with_features("netstack3-core") {
 
     # Placeholder comment so the auto formatter does not move one of these
     # dependencies above "fakestd".
-    "base:netstack3-base",
     "lock-order",
     "macros:netstack3-macros",
     "//src/connectivity/lib/net-types",
@@ -152,6 +151,7 @@ rustc_library_with_features("netstack3-core") {
     {
       features = []
       deps += [
+        "base:netstack3-base",
         "filter:netstack3-filter",
         "sync:netstack3-sync",
       ]
@@ -164,11 +164,16 @@ rustc_library_with_features("netstack3-core") {
       target_name = "netstack3-core-instrumented"
       features = [ "instrumented" ]
       with_unit_tests = true
-      deps += [
-        "filter:netstack3-filter-testutils",
-        "sync:netstack3-sync-instrumented",
+      deps += [ "sync:netstack3-sync-instrumented" ]
+      non_test_deps = [
+        "base:netstack3-base",
+        "filter:netstack3-filter-instrumented",
       ]
-      test_deps += [ "//third_party/rust_crates:scopeguard" ]
+      test_deps += [
+        "base:netstack3-base-testutils",
+        "filter:netstack3-filter-testutils",
+        "//third_party/rust_crates:scopeguard",
+      ]
 
       # TODO(https://fxbug.dev/42086491): Split up large tests.
       # Compiling the tests OOMs on RBE with these variants.
@@ -190,6 +195,7 @@ rustc_library_with_features("netstack3-core") {
         "testutils",
       ]
       deps += [
+        "base:netstack3-base-testutils",
         "filter:netstack3-filter",
         "sync:netstack3-sync-instrumented",
         "//third_party/rust_crates:rand_xorshift",
@@ -203,6 +209,7 @@ rustc_library_with_features("netstack3-core") {
       testonly = true
       features = []
       deps += [
+        "base:netstack3-base-testutils",
         "filter:netstack3-filter-testutils",
         "sync:netstack3-sync",
         "//third_party/rust_crates:criterion",
@@ -225,6 +232,7 @@ rustc_library_with_features("netstack3-core") {
           "testutils",
         ]
         deps += [
+          "base:netstack3-base-testutils",
           "filter:netstack3-filter-loom",
           "sync:netstack3-sync-loom",
           "//third_party/rust_crates:rand_xorshift",

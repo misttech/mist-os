@@ -302,24 +302,33 @@ impl<T: Instant, K> PartialOrd for HeapEntry<T, K> {
     }
 }
 
-// TODO(https://fxbug.dev/332936622): Gate behind testutil feature flag or move
-// to testutil only crate.
-pub(crate) mod testutil {
+#[cfg(any(test, feature = "testutils"))]
+mod testutil {
     use core::fmt::Debug;
 
     use super::*;
 
-    /// Test assertion extensions for [`LocalTimerHeap`].
-    pub trait LocalTimerHeapTestExt<K, V, BC: TimerContext2>: Sealed {
+    impl<K, V, BC> LocalTimerHeap<K, V, BC>
+    where
+        K: Hash + Eq + Clone + Debug,
+        V: Debug + Eq + PartialEq,
+        BC: TimerContext2,
+    {
         /// Asserts installed timers with an iterator of `(key, value, instant)`
         /// tuples.
         #[track_caller]
-        fn assert_timers(&self, timers: impl IntoIterator<Item = (K, V, BC::Instant)>);
+        pub fn assert_timers(&self, timers: impl IntoIterator<Item = (K, V, BC::Instant)>) {
+            let map = timers
+                .into_iter()
+                .map(|(k, value, time)| (k, MapEntry { value, time }))
+                .collect::<HashMap<_, _>>();
+            assert_eq!(&self.heap.map, &map);
+        }
 
         /// Like [`LocalTimerHeap::assert_timers`], but asserts based on a
         /// duration after `bindings_ctx.now()`.
         #[track_caller]
-        fn assert_timers_after(
+        pub fn assert_timers_after(
             &self,
             bindings_ctx: &mut BC,
             timers: impl IntoIterator<Item = (K, V, Duration)>,
@@ -329,30 +338,8 @@ pub(crate) mod testutil {
         }
 
         /// Assets that the next time to fire has `key` and `value`.
-        fn assert_top(&mut self, key: &K, value: &V);
-    }
-
-    pub trait Sealed {}
-
-    impl<K, V, BC: InstantBindingsTypes + TimerBindingsTypes> Sealed for LocalTimerHeap<K, V, BC> {}
-
-    impl<K, V, BC> LocalTimerHeapTestExt<K, V, BC> for LocalTimerHeap<K, V, BC>
-    where
-        K: Hash + Eq + Clone + Debug,
-        V: Debug + Eq + PartialEq,
-        BC: TimerContext2,
-    {
         #[track_caller]
-        fn assert_timers(&self, timers: impl IntoIterator<Item = (K, V, BC::Instant)>) {
-            let map = timers
-                .into_iter()
-                .map(|(k, value, time)| (k, MapEntry { value, time }))
-                .collect::<HashMap<_, _>>();
-            assert_eq!(&self.heap.map, &map);
-        }
-
-        #[track_caller]
-        fn assert_top(&mut self, key: &K, value: &V) {
+        pub fn assert_top(&mut self, key: &K, value: &V) {
             // NB: We can't know that the top of the heap holds a valid entry,
             // so we need to do the slow thing and look in the map for this
             // assertion.

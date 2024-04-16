@@ -820,7 +820,7 @@ mod tests {
         ip::{Ipv4, Ipv6},
         Witness,
     };
-    use netstack3_base::{testutil::LocalTimerHeapTestExt as _, IntoCoreTimerCtx};
+    use netstack3_base::IntoCoreTimerCtx;
     use packet::{Buf, ParseBuffer, Serializer};
     use packet_formats::{
         ip::{IpProto, Ipv6ExtHdrType},

@@ -59,6 +59,7 @@ rustc_library_with_features("netstack3-filter") {
 
     {
       target_name = "netstack3-filter-testutils"
+      testonly = true
       features = [
         "testutils",
         "instrumented",

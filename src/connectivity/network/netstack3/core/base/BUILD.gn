@@ -4,10 +4,11 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
+import(
+    "//src/connectivity/network/netstack3/core/rustc_library_with_features.gni")
 
-rustc_library("netstack3-base") {
+rustc_library_with_features("netstack3-base") {
   edition = "2021"
-  with_unit_tests = true
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   sources = [
     "src/context.rs",
@@ -26,6 +27,20 @@ rustc_library("netstack3-base") {
   if (!is_host) {
     configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
   }
+
+  feature_sets = [
+    {
+      features = []
+      with_unit_tests = true
+    },
+
+    # A variant of the netstack3-base library that exposes test utilities.
+    {
+      target_name = "netstack3-base-testutils"
+      testonly = true
+      features = [ "testutils" ]
+    },
+  ]
 }
 
 fuchsia_unittest_package("netstack3-core-base-test") {

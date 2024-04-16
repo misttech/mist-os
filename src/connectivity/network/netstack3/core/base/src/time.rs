@@ -5,6 +5,7 @@
 //! Common time abstractions.
 
 pub(crate) mod local_timer_heap;
+#[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil;
 
 use core::{convert::Infallible as Never, fmt::Debug, marker::PhantomData, time::Duration};
