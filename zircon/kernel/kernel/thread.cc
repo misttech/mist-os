@@ -363,6 +363,23 @@ Thread* Thread::Create(const char* name, thread_start_routine entry, void* arg,
 void Thread::Resume() {
   canary_.Assert();
 
+  // We cannot allow a resume to happen if we are holding any spinlocks, unless
+  // local preemption has been disabled.  If we have local preemption enabled,
+  // and a spinlock held, then it is theoretically possible for our current CPU
+  // to be chosen as the target for the thread being resumed, triggering a local
+  // preemption event.  This is illegal; being preempted while holding a
+  // spinlock means that we might lose our CPU while holding a spinlock.
+  //
+  // So, assert this here.  Either we have no spinlocks, or preemption has
+  // already been disabled (presumably to the point where we have dropped all of
+  // our spinlocks)
+  DEBUG_ASSERT_MSG((arch_num_spinlocks_held() == 0) ||
+                       (Thread::Current::Get()->preemption_state().PreemptIsEnabled() == false),
+                   "It is illegal to Resume a thread when any spinlocks are held unless local "
+                   "preemption is disabled.  (spinlocks held %u, preemption enabled %d)",
+                   arch_num_spinlocks_held(),
+                   Thread::Current::Get()->preemption_state().PreemptIsEnabled());
+
   Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
 
   if (state() == THREAD_DEATH) {

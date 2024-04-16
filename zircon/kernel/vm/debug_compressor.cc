@@ -8,6 +8,7 @@
 #include <lib/crypto/global_prng.h>
 
 #include <fbl/ref_counted_upgradeable.h>
+#include <kernel/auto_preempt_disabler.h>
 #include <vm/compression.h>
 #include <vm/debug_compressor.h>
 #include <vm/vm_cow_pages.h>
@@ -150,6 +151,7 @@ zx_status_t VmDebugCompressor::Init() {
     return ZX_ERR_NO_MEMORY;
   }
 
+  AnnotatedAutoPreemptDisabler apd;
   Guard<SpinLock, IrqSave> guard{&lock_};
   ASSERT(!thread_);
   list_ = ktl::move(list);
