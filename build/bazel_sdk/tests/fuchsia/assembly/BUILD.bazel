@@ -15,6 +15,7 @@ load(
     "fuchsia_partitions_configuration",
     "fuchsia_prebuilt_board_input_bundle",
     "fuchsia_prebuilt_package",
+    "fuchsia_prebuilt_product_configuration",
     "fuchsia_product_configuration",
     "fuchsia_product_ota_config",
     "fuchsia_virtual_device",
@@ -170,10 +171,24 @@ fuchsia_product_configuration(
     },
 )
 
+fuchsia_prebuilt_product_configuration(
+    name = "prebuilt_product_config",
+    build_type = "userdebug",
+    product_config_dir = "test_data/prebuilt_product_config",
+    product_config_filename = "prebuilt_product_config.json",
+)
+
 fuchsia_product_configuration_test(
     name = "product_config_with_labels_golden_test",
     golden_file = ":test_data/product_config_with_labels_golden_file.json",
     product_config = ":testing_product_config_with_labels",
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_product_configuration_test(
+    name = "prebuilt_product_config_golden_test",
+    golden_file = ":test_data/prebuilt_product_config_golden.json",
+    product_config = ":prebuilt_product_config",
     visibility = ["//visibility:public"],
 )
 

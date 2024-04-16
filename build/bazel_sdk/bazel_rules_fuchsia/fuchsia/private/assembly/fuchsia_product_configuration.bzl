@@ -138,6 +138,36 @@ def _fuchsia_product_configuration_impl(ctx):
         ),
     ]
 
+def _fuchsia_prebuilt_product_configuration_impl(ctx):
+    return [
+        DefaultInfo(files = depset(direct = ctx.files.files)),
+        FuchsiaProductConfigInfo(
+            product_config = ctx.file.product_config,
+            build_type = ctx.attr.build_type,
+        ),
+    ]
+
+_fuchsia_prebuilt_product_configuration = rule(
+    doc = "Use a prebuilt product configuration directory for hybrid assembly.",
+    implementation = _fuchsia_prebuilt_product_configuration_impl,
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    attrs = {
+        "product_config": attr.label(
+            doc = "The product assembly input artifacts directory containing the product config.",
+            allow_single_file = True,
+            mandatory = True,
+        ),
+        "files": attr.label_list(
+            doc = "All files referenced by the product config. This should be the entire contents of the product input artifacts directory.",
+            mandatory = True,
+        ),
+        "build_type": attr.string(
+            doc = "Build type of the product config. Must match the prebuilts.",
+            mandatory = True,
+        ),
+    },
+)
+
 _fuchsia_product_configuration = rule(
     doc = """Generates a product configuration file.""",
     implementation = _fuchsia_product_configuration_impl,
@@ -187,6 +217,25 @@ _fuchsia_product_configuration = rule(
         ),
     },
 )
+
+def fuchsia_prebuilt_product_configuration(
+        name,
+        product_config_dir,
+        product_config_filename,
+        build_type,
+        **kwargs):
+    _all_files_target = "{}_all_files".format(name)
+    native.filegroup(
+        name = _all_files_target,
+        srcs = native.glob(["{}/**/*".format(product_config_dir)]),
+    )
+    _fuchsia_prebuilt_product_configuration(
+        name = name,
+        product_config = product_config_dir + "/" + product_config_filename,
+        files = [":{}".format(_all_files_target)],
+        build_type = build_type,
+        **kwargs
+    )
 
 def fuchsia_product_configuration(
         name,
