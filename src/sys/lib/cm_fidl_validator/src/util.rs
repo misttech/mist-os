@@ -327,6 +327,11 @@ mod tests {
             input = "/foo/bar/",
             result = Err(ErrorList::new(vec![Error::invalid_field(DeclType::Child, "foo")])),
         },
+        test_identifier_path_segment_invalid => {
+            check_fn = check_path,
+            input = "/.",
+            result = Err(ErrorList::new(vec![Error::field_invalid_segment(DeclType::Child, "foo")])),
+        },
         test_identifier_path_segment_too_long => {
             check_fn = check_path,
             input = &format!("/{}", "a".repeat(256)),

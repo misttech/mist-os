@@ -291,7 +291,12 @@ impl NamespacePath {
         if path == "/" {
             Ok(Self(RelativePath::dot()))
         } else {
-            Ok(Self(path[1..].parse()?))
+            let path: RelativePath = path[1..].parse()?;
+            if path.is_dot() {
+                // "/." is not a valid NamespacePath
+                return Err(ParseError::InvalidSegment);
+            }
+            Ok(Self(path))
         }
     }
 
@@ -453,7 +458,12 @@ impl Path {
         if path.len() > MAX_PATH_LENGTH {
             return Err(ParseError::TooLong);
         }
-        Ok(Self(path[1..].parse()?))
+        let path: RelativePath = path[1..].parse()?;
+        if path.is_dot() {
+            // "/." is not a valid Path
+            return Err(ParseError::InvalidSegment);
+        }
+        Ok(Self(path))
     }
 
     /// Splits the path according to "/".
@@ -1318,6 +1328,7 @@ mod tests {
         expect_err!(Path, ParseError::InvalidValue, "/foo/");
         expect_err!(Path, ParseError::InvalidValue, "/foo//bar");
         expect_err!(Path, ParseError::InvalidSegment, "/fo\0b/bar");
+        expect_err!(Path, ParseError::InvalidSegment, "/.");
         expect_err!(Path, ParseError::InvalidSegment, "/foo/.");
         expect_err!(
             Path,
@@ -1357,6 +1368,7 @@ mod tests {
         expect_err_no_serialize!(NamespacePath, ParseError::InvalidValue, "/foo/");
         expect_err_no_serialize!(NamespacePath, ParseError::InvalidValue, "/foo//bar");
         expect_err_no_serialize!(NamespacePath, ParseError::InvalidSegment, "/fo\0b/bar");
+        expect_err_no_serialize!(NamespacePath, ParseError::InvalidSegment, "/.");
         expect_err_no_serialize!(NamespacePath, ParseError::InvalidSegment, "/foo/.");
         expect_err_no_serialize!(
             NamespacePath,
