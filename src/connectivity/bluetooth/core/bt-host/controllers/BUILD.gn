@@ -6,10 +6,7 @@ import("//build_overrides/pigweed.gni")
 import("//src/connectivity/bluetooth/core/bt-host/build/bt_gtest_package.gni")
 
 group("controllers") {
-  public_deps = [
-    ":banjo_controller",
-    ":fidl_controller",
-  ]
+  public_deps = [ ":fidl_controller" ]
 }
 
 source_set("helpers") {
@@ -26,30 +23,6 @@ source_set("helpers") {
   ]
 }
 
-source_set("banjo_controller") {
-  sources = [
-    "banjo_controller.cc",
-    "banjo_controller.h",
-  ]
-
-  deps = [
-    ":helpers",
-    "//src/connectivity/bluetooth/core/bt-host/common",
-    "//src/connectivity/bluetooth/core/bt-host/iso",
-    "//src/connectivity/bluetooth/core/bt-host/transport",
-    "//src/lib/ddk",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/zx",
-  ]
-
-  public_deps = [
-    "$dir_pw_bluetooth",
-    "//sdk/banjo/fuchsia.hardware.bt.hci:fuchsia.hardware.bt.hci_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.bt.vendor:fuchsia.hardware.bt.vendor_banjo_cpp",
-    "//zircon/system/ulib/async",
-  ]
-}
-
 source_set("fidl_controller") {
   sources = [
     "fidl_controller.cc",
@@ -61,7 +34,6 @@ source_set("fidl_controller") {
     "//src/connectivity/bluetooth/core/bt-host/common",
     "//src/connectivity/bluetooth/core/bt-host/iso",
     "//src/connectivity/bluetooth/core/bt-host/transport",
-    "//src/lib/ddk",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/zx",
   ]
@@ -77,18 +49,13 @@ source_set("fidl_controller") {
 source_set("tests") {
   testonly = true
 
-  sources = [
-    "banjo_controller_test.cc",
-    "fidl_controller_test.cc",
-  ]
+  sources = [ "fidl_controller_test.cc" ]
 
   deps = [
     ":controllers",
     "//src/connectivity/bluetooth/core/bt-host/fidl:fake_hci_test_fixture",
     "//src/connectivity/bluetooth/core/bt-host/testing",
     "//src/connectivity/bluetooth/core/bt-host/testing:test_helpers",
-    "//src/devices/testing/mock-ddk",
-    "//src/lib/ddktl",
     "//src/lib/testing/loop_fixture",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
