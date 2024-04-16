@@ -602,6 +602,13 @@ func infraToolLogChecks() []FailureModeCheck {
 			Type:         swarmingOutputType,
 			OnlyOnStates: []string{"TIMED_OUT"},
 		},
+		&stringInLogCheck{
+			String:          fmt.Sprintf("botanist ERROR: %s", botanistconstants.FailedToCaptureSyslogMsg),
+			Type:            swarmingOutputType,
+			AlwaysFlake:     true,
+			AttributeToTest: true,
+			AddTag:          true,
+		},
 		// For https://fxbug.dev/42130052.
 		// Kernel panics and other low-level errors often cause crashes that
 		// manifest as SSH failures, so this check must come after all

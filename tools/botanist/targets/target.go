@@ -424,8 +424,19 @@ func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, r
 	defer f.Close()
 
 	syslogWriter := botanist.NewLineWriter(botanist.NewTimestampWriter(f), "")
-	errs := syslogger.Stream(t.targetCtx, syslogWriter)
+	syslogCtx, cancel := context.WithCancel(t.targetCtx)
+	defer cancel()
+	errs := syslogger.Stream(syslogCtx, syslogWriter)
+	maxAttempts := 5
+	startTime := time.Now()
+	attempt := 0
 	for range errs {
+		attempt += 1
+		if attempt == maxAttempts && time.Since(startTime) < time.Minute {
+			// If we failed maxAttempts times within a minute of starting to stream,
+			// then there's likely an issue with the syslogger so return an err.
+			return fmt.Errorf("failed to capture syslog %d times within 1 minute", maxAttempts)
+		}
 		if !syslogger.IsRunning() {
 			return nil
 		}
@@ -434,12 +445,18 @@ func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, r
 		// build out a more resilient framework in which we register "restart handlers"
 		// that are triggered on reboot.
 		if repoURL != "" && blobURL != "" {
-			client, err := t.SSHClient()
-			if err != nil {
-				return fmt.Errorf("failed to get SSH client: %w", err)
+			select {
+			case <-client.DisconnectionListener():
+				if err := client.Reconnect(syslogCtx); err != nil {
+					return fmt.Errorf("failed to reconnect SSH client: %w", err)
+				}
+			default:
+				// The client is still connected, so continue.
 			}
 			t.AddPackageRepository(client, repoURL, blobURL)
-			client.Close()
+			if t.UseFFXExperimental(1) {
+				client.Close()
+			}
 		}
 	}
 	return nil

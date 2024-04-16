@@ -16,6 +16,7 @@ const (
 	FailedToExtendBlkMsg      = "failed to extend blk"
 	CommandExceededTimeoutMsg = "Command exceeded timeout"
 	FailedToServeMsg          = "[package server] failed to serve"
+	FailedToCaptureSyslogMsg  = "failed to capture syslog"
 
 	NodenameEnvKey     = "FUCHSIA_NODENAME"
 	SSHKeyEnvKey       = "FUCHSIA_SSH_KEY"

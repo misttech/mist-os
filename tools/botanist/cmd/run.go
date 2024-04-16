@@ -407,7 +407,7 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 						}
 						syslogPath := filepath.Join(r.syslogDir, syslogName)
 						if err := t.CaptureSyslog(client, syslogPath, r.repoURL, r.blobURL); err != nil && ctx.Err() == nil {
-							logger.Errorf(ctx, "failed to capture syslog at %s: %s", syslogPath, err)
+							logger.Errorf(ctx, "%s at %s: %s", constants.FailedToCaptureSyslogMsg, syslogPath, err)
 						}
 					}()
 				}

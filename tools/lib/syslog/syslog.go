@@ -44,7 +44,7 @@ func LogListenerWithArgs(args ...string) []string {
 }
 
 func ffxLogWithArgs(args ...string) []string {
-	return []string{"log", "--no-color", "--no-symbolize"}
+	return []string{"log", "--no-color", "--symbolize", "off"}
 }
 
 // NewSyslogger creates a new Syslogger, given an SSH session with a Fuchsia instance.
@@ -75,6 +75,8 @@ func (s *Syslogger) IsRunning() bool {
 func (s *Syslogger) Stream(ctx context.Context, output io.Writer) <-chan error {
 	errs := make(chan error, 1)
 	sendErr := func(errs chan error, err error) {
+		// Wait a bit for any listeners to clear the channel first.
+		time.Sleep(500 * time.Millisecond)
 		select {
 		case <-errs:
 			// Clear the channel if nobody is listening.
@@ -139,19 +141,26 @@ func (s *Syslogger) Stream(ctx context.Context, output io.Writer) <-chan error {
 			}
 
 			logger.Errorf(ctx, "syslog: SSH client unresponsive; will attempt to reconnect and continue streaming: %s", err)
-			if s.client != nil {
-				if err := s.client.ReconnectWithBackoff(ctx, retry.NewConstantBackoff(defaultReconnectInterval)); err != nil {
-					// The context probably got cancelled before we were able to
-					// reconnect.
-					if ctx.Err() != nil {
-						logger.Errorf(ctx, "syslog: %s: %s", constants.CtxReconnectError, ctx.Err())
-					}
-					s.running = false
-					sendErr(errs, err)
-					close(errs)
-					return
-				}
+			var reconnectErr error
+			if s.ffx != nil {
+				reconnectErr = retry.Retry(ctx, retry.WithMaxDuration(retry.NewConstantBackoff(defaultReconnectInterval), 30*time.Second), func() error {
+					return s.ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
+				}, nil)
+			} else {
+				reconnectErr = s.client.ReconnectWithBackoff(ctx, retry.NewConstantBackoff(defaultReconnectInterval))
 			}
+			if reconnectErr != nil {
+				// The context probably got cancelled before we were able to
+				// reconnect.
+				if ctx.Err() != nil {
+					logger.Errorf(ctx, "syslog: %s: %s", constants.CtxReconnectError, ctx.Err())
+				}
+				s.running = false
+				sendErr(errs, err)
+				close(errs)
+				return
+			}
+
 			// Start streaming from the beginning of the system's uptime again now that
 			// we're rebooting.
 			if s.ffx != nil {

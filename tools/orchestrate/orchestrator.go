@@ -365,7 +365,7 @@ func (r *TestOrchestrator) dumpFfxLog() error {
 		return fmt.Errorf("os.Create: %w", err)
 	}
 	r.targetLogFile = logFile
-	cmd := r.ffx.Cmd("log", "--no-symbolize")
+	cmd := r.ffx.Cmd("log", "--symbolize", "off")
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	if err := cmd.Start(); err != nil {
