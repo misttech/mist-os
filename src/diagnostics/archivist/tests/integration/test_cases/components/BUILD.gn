@@ -5,32 +5,6 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
-rustc_binary("log_on_interest_bin") {
-  testonly = true
-  output_name = "log_on_interest"
-  edition = "2021"
-  source_root = "src/log_on_interest.rs"
-  deps = [
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
-    "//src/lib/diagnostics/log/rust",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-component",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
-  ]
-
-  sources = [ "src/log_on_interest.rs" ]
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
-}
-
-fuchsia_component("log_on_interest_component") {
-  component_name = "log-on-interest"
-  testonly = true
-  deps = [ ":log_on_interest_bin" ]
-  manifest = "meta/log-on-interest.cml"
-}
-
 rustc_binary("socket_puppet_bin") {
   edition = "2021"
   testonly = true
@@ -59,8 +33,5 @@ fuchsia_component("socket-puppet") {
 
 group("components") {
   testonly = true
-  deps = [
-    ":log_on_interest_component",
-    ":socket-puppet",
-  ]
+  deps = [ ":socket-puppet" ]
 }

@@ -42,10 +42,7 @@
             availability: "optional",
         },
         {
-            event_stream: [
-                "started",
-                "stopped",
-            ],
+            event_stream: [ "stopped" ],
             from: "parent",
             to: [ "#test_cases" ],
         },
