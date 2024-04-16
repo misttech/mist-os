@@ -43,6 +43,10 @@ pub enum Error {
     #[error("Encountered an error on a RequestStream: {}", _0)]
     RequestStreamError(#[from] fidl::Error),
 
+    /// Peer performed an disallowed action and the server will close
+    #[error("Peer performed an invalid action: {}", _0)]
+    PeerError(String),
+
     /// Action tried in an invalid state
     #[error("Tried to do an action in an invalid state")]
     InvalidState,
@@ -130,7 +134,7 @@ impl From<PcmFormat> for AudioSampleFormat {
                         AudioSampleFormat::ThirtyTwo { unsigned: is_unsigned, invert_endian: false }
                     }
                     _ => panic!(
-                        "audio valie bits per sample {:?} not supported",
+                        "audio valid bits per sample {:?} not supported",
                         v.valid_bits_per_sample
                     ),
                 },

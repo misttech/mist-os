@@ -13,42 +13,42 @@ use futures::{
 use std::{pin::Pin, sync::Arc};
 use tracing::warn;
 
-use crate::driver::{PcmOrTask, SoftPcm};
 use crate::frame_vmo;
+use crate::stream_config::{SoftStreamConfig, StreamConfigOrTask};
 use crate::types::{Error, Result};
 
 /// A sink that accepts audio frames to send as input to Fuchsia audio
-/// Usually acquired via SoftPcm::create_input()
+/// Usually acquired via SoftStreamConfig::create_input()
 pub struct AudioFrameSink {
     /// Handle to the VMO that is receiving the frames.
     frame_vmo: Arc<Mutex<frame_vmo::FrameVmo>>,
     /// The index of the next frame we are writing.
     next_frame_index: usize,
-    /// SoftPcm this is attached to, or the SoftPcm::process_requests task
-    pcm: PcmOrTask,
+    /// StreamConfig this is attached to, or the SoftStreamConfig::process_requests task
+    stream_config: StreamConfigOrTask,
     /// Inspect node
     inspect: inspect::Node,
 }
 
 impl AudioFrameSink {
-    pub fn new(pcm: SoftPcm) -> AudioFrameSink {
+    pub fn new(stream_config: SoftStreamConfig) -> AudioFrameSink {
         AudioFrameSink {
-            frame_vmo: pcm.frame_vmo(),
+            frame_vmo: stream_config.frame_vmo(),
             next_frame_index: 0,
-            pcm: PcmOrTask::Pcm(pcm),
+            stream_config: StreamConfigOrTask::StreamConfig(stream_config),
             inspect: Default::default(),
         }
     }
 
     /// Start the requests task if not started, and poll the task.
     fn poll_task(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
-        if let PcmOrTask::Complete = &self.pcm {
+        if let StreamConfigOrTask::Complete = &self.stream_config {
             return Poll::Ready(Err(Error::InvalidState));
         }
-        if let PcmOrTask::Task(ref mut task) = &mut self.pcm {
+        if let StreamConfigOrTask::Task(ref mut task) = &mut self.stream_config {
             return task.poll_unpin(cx);
         }
-        self.pcm.start();
+        self.stream_config.start();
         self.poll_task(cx)
     }
 }
@@ -60,8 +60,8 @@ impl Inspect for &mut AudioFrameSink {
         name: impl AsRef<str>,
     ) -> core::result::Result<(), AttachError> {
         self.inspect = parent.create_child(name.as_ref());
-        if let PcmOrTask::Pcm(ref mut o) = &mut self.pcm {
-            return o.iattach(&self.inspect, "soft_pcm");
+        if let StreamConfigOrTask::StreamConfig(ref mut o) = &mut self.stream_config {
+            return o.iattach(&self.inspect, "soft_stream_config");
         }
         Ok(())
     }
@@ -74,7 +74,7 @@ impl io::AsyncWrite for AudioFrameSink {
         buf: &[u8],
     ) -> Poll<std::result::Result<usize, io::Error>> {
         if let Poll::Ready(r) = self.poll_task(cx) {
-            self.pcm = PcmOrTask::Complete;
+            self.stream_config = StreamConfigOrTask::Complete;
             if let Some(error) = r.err() {
                 return Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, error)));
             } else {
@@ -110,7 +110,7 @@ impl io::AsyncWrite for AudioFrameSink {
         mut self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
     ) -> Poll<std::result::Result<(), io::Error>> {
-        self.pcm = PcmOrTask::Complete;
+        self.stream_config = StreamConfigOrTask::Complete;
         Poll::Ready(Ok(()))
     }
 }
@@ -141,7 +141,7 @@ mod tests {
             frames_per_second: 44100,
             channel_map: vec![AudioChannelId::Lf, AudioChannelId::Rf],
         };
-        let (client, frame_sink) = SoftPcm::create_input(
+        let (client, frame_sink) = SoftStreamConfig::create_input(
             TEST_UNIQUE_ID,
             "Google",
             "UnitTest",
@@ -156,7 +156,7 @@ mod tests {
     #[fixture(with_audio_frame_sink)]
     #[fuchsia::test]
     #[rustfmt::skip]
-    fn soft_pcm_audio_in(mut exec: fasync::TestExecutor, stream_config: StreamConfigProxy, mut frame_sink: AudioFrameSink) {
+    fn audio_in(mut exec: fasync::TestExecutor, stream_config: StreamConfigProxy, mut frame_sink: AudioFrameSink) {
 
         // Some test "audio" data.  Silence in signed 16-bit, for 10ms
         let mut send_audio = Vec::new();

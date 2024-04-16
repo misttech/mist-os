@@ -13,13 +13,13 @@ use futures::{
 use std::{pin::Pin, sync::Arc};
 use tracing::info;
 
-use crate::driver::{PcmOrTask, SoftPcm};
 use crate::frame_vmo;
+use crate::stream_config::{SoftStreamConfig, StreamConfigOrTask};
 use crate::types::{Error, Result};
 
 /// A stream that produces audio frames.
 /// Frames are of constant length.
-/// Usually acquired via SoftPcm::create_output()
+/// Usually acquired via SoftStreamConfig::create_output()
 pub struct AudioFrameStream {
     /// Handle to the VMO that is receiving the frames.
     frame_vmo: Arc<Mutex<frame_vmo::FrameVmo>>,
@@ -30,33 +30,33 @@ pub struct AudioFrameStream {
     /// Vector that will be filled with a packet.
     /// Replaced when stream produces a packet.
     next_packet: std::cell::RefCell<Vec<u8>>,
-    /// SoftPcm this is attached to, or the SoftPcm::process_requests task
-    pcm: PcmOrTask,
+    /// SoftStreamConfig this is attached to, or the SoftStreamConfig::process_requests task
+    stream_task: StreamConfigOrTask,
     /// Inspect node
     inspect: inspect::Node,
 }
 
 impl AudioFrameStream {
-    pub fn new(pcm: SoftPcm) -> AudioFrameStream {
+    pub fn new(stream: SoftStreamConfig) -> AudioFrameStream {
         AudioFrameStream {
-            frame_vmo: pcm.frame_vmo(),
+            frame_vmo: stream.frame_vmo(),
             next_frame: 0,
-            packet_frames: pcm.packet_frames(),
+            packet_frames: stream.packet_frames(),
             next_packet: Vec::new().into(),
-            pcm: PcmOrTask::Pcm(pcm),
+            stream_task: StreamConfigOrTask::StreamConfig(stream),
             inspect: Default::default(),
         }
     }
 
     /// Start the requests task if not started, and poll the task.
     fn poll_task(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
-        if let PcmOrTask::Complete = &self.pcm {
+        if let StreamConfigOrTask::Complete = &self.stream_task {
             return Poll::Ready(Err(Error::InvalidState));
         }
-        if let PcmOrTask::Task(ref mut task) = &mut self.pcm {
+        if let StreamConfigOrTask::Task(ref mut task) = &mut self.stream_task {
             return task.poll_unpin(cx);
         }
-        self.pcm.start();
+        self.stream_task.start();
         self.poll_task(cx)
     }
 }
@@ -66,7 +66,7 @@ impl Stream for AudioFrameStream {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if let Poll::Ready(r) = self.poll_task(cx) {
-            self.pcm = PcmOrTask::Complete;
+            self.stream_task = StreamConfigOrTask::Complete;
             return Poll::Ready(r.err().map(Result::Err));
         }
         if self.next_packet.borrow().len() == 0 {
@@ -101,8 +101,8 @@ impl Stream for AudioFrameStream {
 
 impl FusedStream for AudioFrameStream {
     fn is_terminated(&self) -> bool {
-        match self.pcm {
-            PcmOrTask::Complete => true,
+        match self.stream_task {
+            StreamConfigOrTask::Complete => true,
             _ => false,
         }
     }
@@ -115,8 +115,8 @@ impl Inspect for &mut AudioFrameStream {
         name: impl AsRef<str>,
     ) -> core::result::Result<(), AttachError> {
         self.inspect = parent.create_child(name.as_ref());
-        if let PcmOrTask::Pcm(ref mut o) = &mut self.pcm {
-            return o.iattach(&self.inspect, "soft_pcm");
+        if let StreamConfigOrTask::StreamConfig(ref mut o) = &mut self.stream_task {
+            return o.iattach(&self.inspect, "stream_config");
         }
         Ok(())
     }
@@ -133,7 +133,7 @@ mod tests {
     use fuchsia_zircon as zx;
     use futures::StreamExt;
 
-    use crate::driver::tests::with_audio_frame_stream;
+    use crate::stream_config::tests::with_audio_frame_stream;
 
     const TEST_UNIQUE_ID: &[u8; 16] = &[5; 16];
     const TEST_CLOCK_DOMAIN: u32 = 0x00010203;
@@ -141,7 +141,7 @@ mod tests {
     #[fixture(with_audio_frame_stream)]
     #[fuchsia::test]
     #[rustfmt::skip]
-    fn soft_pcm_audio_out(mut exec: fasync::TestExecutor, stream_config: StreamConfigProxy, mut frame_stream: AudioFrameStream) {
+    fn soft_audio_out(mut exec: fasync::TestExecutor, stream_config: StreamConfigProxy, mut frame_stream: AudioFrameStream) {
         let mut frame_fut = frame_stream.next();
         // Poll the frame stream, which should start the processing of proxy requests.
         exec.run_until_stalled(&mut frame_fut).expect_pending("no frames yet");

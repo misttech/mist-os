@@ -35,9 +35,10 @@ rustc_library("fuchsia-audio-device") {
   sources = [
     "src/audio_frame_sink.rs",
     "src/audio_frame_stream.rs",
-    "src/driver.rs",
+    "src/codec.rs",
     "src/frame_vmo.rs",
     "src/lib.rs",
+    "src/stream_config.rs",
     "src/types.rs",
   ]
 

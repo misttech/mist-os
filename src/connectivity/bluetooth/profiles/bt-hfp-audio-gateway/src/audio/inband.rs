@@ -7,7 +7,7 @@ use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_media as media;
 use fuchsia_async as fasync;
 use fuchsia_audio_codec::{StreamProcessor, StreamProcessorOutputStream};
-use fuchsia_audio_device::{driver::SoftPcm, AudioFrameSink, AudioFrameStream};
+use fuchsia_audio_device::{stream_config::SoftStreamConfig, AudioFrameSink, AudioFrameStream};
 use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId, Uuid};
 use fuchsia_zircon as zx;
 use futures::{task::Context, AsyncWriteExt, FutureExt, StreamExt};
@@ -269,7 +269,7 @@ impl InbandAudioControl {
         codec_id: CodecId,
     ) -> Result<AudioFrameSink, AudioError> {
         let audio_dev_id = peer_audio_stream_id(peer_id, Self::HF_INPUT_UUID);
-        let (client, sink) = SoftPcm::create_input(
+        let (client, sink) = SoftStreamConfig::create_input(
             &audio_dev_id,
             "Fuchsia",
             "Bluetooth HFP",
@@ -289,7 +289,7 @@ impl InbandAudioControl {
         codec_id: CodecId,
     ) -> Result<AudioFrameStream, AudioError> {
         let audio_dev_id = peer_audio_stream_id(peer_id, Self::HF_OUTPUT_UUID);
-        let (client, stream) = SoftPcm::create_output(
+        let (client, stream) = SoftStreamConfig::create_output(
             &audio_dev_id,
             "Fuchsia",
             "Bluetooth HFP",

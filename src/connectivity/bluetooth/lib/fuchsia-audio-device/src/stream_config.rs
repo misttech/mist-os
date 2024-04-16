@@ -20,18 +20,20 @@ use crate::audio_frame_stream::AudioFrameStream;
 use crate::frame_vmo;
 use crate::types::{AudioSampleFormat, Error, Result};
 
-pub(crate) enum PcmOrTask {
-    Pcm(SoftPcm),
+pub(crate) enum StreamConfigOrTask {
+    StreamConfig(SoftStreamConfig),
     Task(fasync::Task<Result<()>>),
     Complete,
 }
 
-impl PcmOrTask {
+impl StreamConfigOrTask {
     /// Start the task if it's not running.
     /// Does nothing if the task is running or completed.
     pub(crate) fn start(&mut self) {
-        *self = match std::mem::replace(self, PcmOrTask::Complete) {
-            PcmOrTask::Pcm(pcm) => PcmOrTask::Task(fasync::Task::spawn(pcm.process_requests())),
+        *self = match std::mem::replace(self, StreamConfigOrTask::Complete) {
+            StreamConfigOrTask::StreamConfig(st) => {
+                StreamConfigOrTask::Task(fasync::Task::spawn(st.process_requests()))
+            }
             x => x,
         }
     }
@@ -50,7 +52,7 @@ pub(crate) fn frames_from_duration(frames_per_second: usize, duration: fasync::D
 /// A software fuchsia audio output, which implements Audio Driver Streaming Interface
 /// as defined in //docs/concepts/drivers/driver_interfaces/audio_streaming.md
 #[derive(Inspect)]
-pub struct SoftPcm {
+pub struct SoftStreamConfig {
     /// The Stream channel handles format negotiation, plug detection, and gain
     stream_config_stream: StreamConfigRequestStream,
 
@@ -102,17 +104,17 @@ pub struct SoftPcm {
 
     /// Inspect node
     #[inspect(forward)]
-    inspect: SoftPcmInspect,
+    inspect: SoftStreamConfigInspect,
 }
 
 #[derive(Default, Inspect)]
-struct SoftPcmInspect {
+struct SoftStreamConfigInspect {
     inspect_node: inspect::Node,
     ring_buffer_format: IValue<Option<String>>,
     frame_vmo_status: IValue<Option<String>>,
 }
 
-impl SoftPcmInspect {
+impl SoftStreamConfigInspect {
     fn record_current_format(&mut self, current: &(u32, AudioSampleFormat, u16)) {
         self.ring_buffer_format
             .iset(Some(format!("{} rate: {} channels: {}", current.1, current.0, current.2)));
@@ -123,7 +125,7 @@ impl SoftPcmInspect {
     }
 }
 
-impl SoftPcm {
+impl SoftStreamConfig {
     /// Create a new software audio device, returning a client channel which can be supplied
     /// to the AudioCore and will act correctly as an audio output driver channel which can
     /// render audio in the `pcm_format` format, and an AudioFrameStream which produces the
@@ -143,7 +145,7 @@ impl SoftPcm {
         packet_duration: zx::Duration,
         initial_external_delay: zx::Duration,
     ) -> Result<(ClientEnd<StreamConfigMarker>, AudioFrameStream)> {
-        let (client, soft_pcm) = SoftPcm::build(
+        let (client, soft_stream_config) = SoftStreamConfig::build(
             unique_id,
             manufacturer,
             product,
@@ -153,7 +155,7 @@ impl SoftPcm {
             packet_duration,
             initial_external_delay,
         )?;
-        Ok((client, AudioFrameStream::new(soft_pcm)))
+        Ok((client, AudioFrameStream::new(soft_stream_config)))
     }
 
     pub fn create_input(
@@ -164,7 +166,7 @@ impl SoftPcm {
         pcm_format: fidl_fuchsia_media::PcmFormat,
         buffer: zx::Duration,
     ) -> Result<(ClientEnd<StreamConfigMarker>, AudioFrameSink)> {
-        let (client, soft_pcm) = SoftPcm::build(
+        let (client, soft_stream_config) = SoftStreamConfig::build(
             unique_id,
             manufacturer,
             product,
@@ -174,7 +176,7 @@ impl SoftPcm {
             buffer,
             zx::Duration::from_nanos(0),
         )?;
-        Ok((client, AudioFrameSink::new(soft_pcm)))
+        Ok((client, AudioFrameSink::new(soft_stream_config)))
     }
 
     fn build(
@@ -186,7 +188,7 @@ impl SoftPcm {
         pcm_format: fidl_fuchsia_media::PcmFormat,
         packet_duration: zx::Duration,
         initial_external_delay: zx::Duration,
-    ) -> Result<(ClientEnd<StreamConfigMarker>, SoftPcm)> {
+    ) -> Result<(ClientEnd<StreamConfigMarker>, SoftStreamConfig)> {
         if pcm_format.bits_per_sample % 8 != 0 {
             // Non-byte-aligned format not allowed.
             return Err(Error::InvalidArgs);
@@ -210,7 +212,7 @@ impl SoftPcm {
         let packet_frames =
             frames_from_duration(pcm_format.frames_per_second as usize, packet_duration);
 
-        let soft_pcm = SoftPcm {
+        let soft_stream_config = SoftStreamConfig {
             stream_config_stream: request_stream,
             unique_id: unique_id.clone(),
             manufacturer: manufacturer.to_string(),
@@ -229,7 +231,7 @@ impl SoftPcm {
             delay_info_replied: false,
             inspect: Default::default(),
         };
-        Ok((client, soft_pcm))
+        Ok((client, soft_stream_config))
     }
 
     pub(crate) fn frame_vmo(&self) -> Arc<Mutex<frame_vmo::FrameVmo>> {
@@ -514,7 +516,7 @@ pub(crate) mod tests {
             frames_per_second: 44100,
             channel_map: vec![AudioChannelId::Lf, AudioChannelId::Rf],
         };
-        let (client, frame_stream) = SoftPcm::create_output(
+        let (client, frame_stream) = SoftStreamConfig::create_output(
             TEST_UNIQUE_ID,
             "Google",
             "UnitTest",
@@ -553,7 +555,7 @@ pub(crate) mod tests {
     }
 
     #[fuchsia::test]
-    fn soft_pcm_audio_should_end_when_stream_dropped() {
+    fn soft_stream_config_audio_should_end_when_stream_dropped() {
         let format = PcmFormat {
             pcm_mode: AudioPcmMode::Linear,
             bits_per_sample: 16,
@@ -562,7 +564,7 @@ pub(crate) mod tests {
         };
 
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        let (client, frame_stream) = SoftPcm::build(
+        let (client, frame_stream) = SoftStreamConfig::build(
             TEST_UNIQUE_ID,
             &"Google".to_string(),
             &"UnitTest".to_string(),

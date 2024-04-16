@@ -9,7 +9,7 @@ use futures::task::{Context, Poll, Waker};
 use futures::FutureExt;
 use tracing::debug;
 
-use crate::driver::frames_from_duration;
+use crate::stream_config::frames_from_duration;
 use crate::types::{AudioSampleFormat, Error, Result};
 
 /// A FrameVmo wraps a VMO with time tracking.  When a FrameVmo is started, it
