@@ -2,37 +2,48 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{constants::*, test_topology};
+use crate::test_topology;
 use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::{ArchiveReader, Logs, Severity};
+use fidl_fuchsia_archivist_test as ftest;
+use fidl_fuchsia_archivist_test::LogPuppetLogRequest;
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use futures::StreamExt;
 
 // This test verifies that Archivist knows about logging from this component.
 #[fuchsia::test]
 async fn log_attribution() {
-    let (builder, test_realm) = test_topology::create(test_topology::Options::default())
-        .await
-        .expect("create base topology");
-    test_topology::add_eager_child(&test_realm, "child", STUB_INSPECT_COMPONENT_URL)
-        .await
-        .expect("add child");
+    const REALM_NAME: &str = "child";
+    let realm = test_topology::create_realm(ftest::RealmOptions {
+        puppets: Some(vec![test_topology::PuppetDeclBuilder::new(REALM_NAME).into()]),
+        ..Default::default()
+    })
+    .await
+    .expect("create base topology");
 
-    let instance = builder.build().await.expect("create instance");
-
-    let accessor = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fdiagnostics::ArchiveAccessorMarker>()
-        .unwrap();
+    let accessor =
+        realm.connect_to_protocol::<fdiagnostics::ArchiveAccessorMarker>().await.unwrap();
     let mut result = ArchiveReader::new()
         .with_archive(accessor)
         .snapshot_then_subscribe::<Logs>()
         .expect("snapshot then subscribe");
 
-    for log_str in &["This is a syslog message", "This is another syslog message"] {
-        let log_record = result.next().await.expect("received log").expect("log is not an error");
+    let puppet = test_topology::connect_to_puppet(&realm, REALM_NAME).await.unwrap();
+    let messages = ["This is a syslog message", "This is another syslog message"];
+    for message in messages {
+        puppet
+            .log(&LogPuppetLogRequest {
+                severity: Some(fdiagnostics::Severity::Info),
+                message: Some(message.to_string()),
+                ..Default::default()
+            })
+            .await
+            .expect("Log succeeds");
+    }
 
-        assert_eq!(log_record.moniker, "child");
+    for log_str in &messages {
+        let log_record = result.next().await.expect("received log").expect("log is not an error");
+        assert_eq!(log_record.moniker, REALM_NAME);
         assert_eq!(log_record.metadata.severity, Severity::Info);
         assert_data_tree!(log_record.payload.unwrap(), root: contains {
             message: {
