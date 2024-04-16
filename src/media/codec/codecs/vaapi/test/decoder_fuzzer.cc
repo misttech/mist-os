@@ -100,36 +100,36 @@ void VaapiFuzzerTestFixture::CodecAndStreamInit(std::string mime_type) {
   format_details.set_mime_type(mime_type);
   decoder_->CoreCodecInit(format_details);
 
-  auto input_constraints = decoder_->CoreCodecGetBufferCollectionConstraints(
+  auto input_constraints = decoder_->CoreCodecGetBufferCollectionConstraints2(
       CodecPort::kInputPort, fuchsia::media::StreamBufferConstraints(),
       fuchsia::media::StreamBufferPartialSettings());
-  ZX_ASSERT(input_constraints.buffer_memory_constraints.cpu_domain_supported);
+  ZX_ASSERT(*input_constraints.buffer_memory_constraints()->cpu_domain_supported());
 
-  auto output_constraints = decoder_->CoreCodecGetBufferCollectionConstraints(
+  auto output_constraints = decoder_->CoreCodecGetBufferCollectionConstraints2(
       CodecPort::kOutputPort, fuchsia::media::StreamBufferConstraints(),
       fuchsia::media::StreamBufferPartialSettings());
-  ZX_ASSERT(output_constraints.buffer_memory_constraints.cpu_domain_supported);
+  ZX_ASSERT(*output_constraints.buffer_memory_constraints()->cpu_domain_supported());
 
   // Set the codec output format to either linear or tiled depending on the fuzzer
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection;
-  buffer_collection.settings.has_image_format_constraints = true;
-  buffer_collection.buffer_count = output_constraints.min_buffer_count_for_camping;
+  fuchsia_sysmem2::BufferCollectionInfo buffer_collection;
+  buffer_collection.buffers().emplace(*output_constraints.min_buffer_count_for_camping());
 
+  auto &ifc = buffer_collection.settings().emplace().image_format_constraints().emplace();
   switch (output_image_format_) {
     case ImageFormat::kLinear: {
-      const auto &linear_constraints = output_constraints.image_format_constraints.at(0);
-      ZX_ASSERT(!linear_constraints.pixel_format.has_format_modifier ||
-                linear_constraints.pixel_format.format_modifier.value ==
-                    fuchsia::sysmem::FORMAT_MODIFIER_LINEAR);
-      buffer_collection.settings.image_format_constraints = linear_constraints;
+      const auto &linear_constraints = output_constraints.image_format_constraints()->at(0);
+      ZX_ASSERT(!linear_constraints.pixel_format_modifier().has_value() ||
+                linear_constraints.pixel_format_modifier().value() ==
+                    fuchsia_images2::PixelFormatModifier::kLinear);
+      ifc = linear_constraints;
       break;
     }
     case ImageFormat::kTiled: {
-      const auto &tiled_constraints = output_constraints.image_format_constraints.at(1);
-      ZX_ASSERT(tiled_constraints.pixel_format.has_format_modifier &&
-                tiled_constraints.pixel_format.format_modifier.value ==
-                    fuchsia::sysmem::FORMAT_MODIFIER_INTEL_I915_Y_TILED);
-      buffer_collection.settings.image_format_constraints = tiled_constraints;
+      const auto &tiled_constraints = output_constraints.image_format_constraints()->at(1);
+      ZX_ASSERT(tiled_constraints.pixel_format_modifier().has_value() &&
+                tiled_constraints.pixel_format_modifier().value() ==
+                    fuchsia_images2::PixelFormatModifier::kIntelI915YTiled);
+      ifc = tiled_constraints;
       break;
     }
     default:
@@ -213,25 +213,25 @@ void VaapiFuzzerTestFixture::onCoreCodecMidStreamOutputConstraintsChange(
   decoder_->CoreCodecEnsureBuffersNotConfigured(CodecPort::kOutputPort);
 
   // Test a representative value.
-  auto output_constraints = decoder_->CoreCodecGetBufferCollectionConstraints(
+  auto output_constraints = decoder_->CoreCodecGetBufferCollectionConstraints2(
       CodecPort::kOutputPort, fuchsia::media::StreamBufferConstraints(),
       fuchsia::media::StreamBufferPartialSettings());
-  ZX_ASSERT(output_constraints.buffer_memory_constraints.cpu_domain_supported);
+  ZX_ASSERT(*output_constraints.buffer_memory_constraints()->cpu_domain_supported());
 
-  ZX_ASSERT(output_constraints.image_format_constraints_count == 1u);
-  const auto &image_constraints = output_constraints.image_format_constraints.at(0u);
+  ZX_ASSERT(output_constraints.image_format_constraints()->size() == 1u);
+  const auto &image_constraints = output_constraints.image_format_constraints()->at(0);
 
   switch (output_image_format_) {
     case ImageFormat::kLinear: {
-      ZX_ASSERT(!image_constraints.pixel_format.has_format_modifier ||
-                image_constraints.pixel_format.format_modifier.value ==
-                    fuchsia::sysmem::FORMAT_MODIFIER_LINEAR);
+      ZX_ASSERT(!image_constraints.pixel_format_modifier().has_value() ||
+                image_constraints.pixel_format_modifier().value() ==
+                    fuchsia_images2::PixelFormatModifier::kLinear);
       break;
     }
     case ImageFormat::kTiled: {
-      ZX_ASSERT(image_constraints.pixel_format.has_format_modifier &&
-                image_constraints.pixel_format.format_modifier.value ==
-                    fuchsia::sysmem::FORMAT_MODIFIER_INTEL_I915_Y_TILED);
+      ZX_ASSERT(image_constraints.pixel_format_modifier().has_value() &&
+                image_constraints.pixel_format_modifier().value() ==
+                    fuchsia_images2::PixelFormatModifier::kIntelI915YTiled);
       break;
     }
     default:
@@ -240,10 +240,9 @@ void VaapiFuzzerTestFixture::onCoreCodecMidStreamOutputConstraintsChange(
   }
 
   // Set the codec output format to either linear or tiled depending on the fuzzer
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection;
-  buffer_collection.buffer_count = output_constraints.min_buffer_count_for_camping;
-  buffer_collection.settings.has_image_format_constraints = true;
-  buffer_collection.settings.image_format_constraints = image_constraints;
+  fuchsia_sysmem2::BufferCollectionInfo buffer_collection;
+  buffer_collection.buffers().emplace(*output_constraints.min_buffer_count_for_camping());
+  buffer_collection.settings().emplace().image_format_constraints() = image_constraints;
   decoder_->CoreCodecSetBufferCollectionInfo(CodecPort::kOutputPort, buffer_collection);
 
   // Should be enough to handle a large fraction of bear.h264 output without recycling.
@@ -256,13 +255,14 @@ void VaapiFuzzerTestFixture::onCoreCodecMidStreamOutputConstraintsChange(
   switch (output_image_format_) {
     case ImageFormat::kLinear: {
       // Output is linear
-      auto out_width = RoundUp(safemath::MakeCheckedNum(image_constraints.required_max_coded_width),
-                               safemath::MakeCheckedNum(image_constraints.coded_width_divisor));
+      auto out_width =
+          RoundUp(safemath::MakeCheckedNum(image_constraints.required_max_size()->width()),
+                  safemath::MakeCheckedNum(image_constraints.size_alignment()->width()));
       auto out_width_stride =
-          RoundUp(out_width, safemath::MakeCheckedNum(image_constraints.bytes_per_row_divisor));
+          RoundUp(out_width, safemath::MakeCheckedNum(*image_constraints.bytes_per_row_divisor()));
       auto out_height =
-          RoundUp(safemath::MakeCheckedNum(image_constraints.required_max_coded_height),
-                  safemath::MakeCheckedNum(image_constraints.coded_height_divisor));
+          RoundUp(safemath::MakeCheckedNum(image_constraints.required_max_size()->height()),
+                  safemath::MakeCheckedNum(image_constraints.size_alignment()->height()));
 
       auto main_plane_size = out_width_stride * out_height;
       auto uv_plane_size = main_plane_size / 2;
@@ -281,12 +281,12 @@ void VaapiFuzzerTestFixture::onCoreCodecMidStreamOutputConstraintsChange(
       static constexpr auto kBytesPerRowPerTile =
           safemath::MakeCheckedNum(CodecAdapterVaApiDecoder::kTileSurfaceWidthAlignment);
 
-      auto aligned_stride =
-          RoundUp(safemath::MakeCheckedNum(image_constraints.required_max_coded_width),
-                  kBytesPerRowPerTile);
-      auto aligned_y_height = safemath::MakeCheckedNum(image_constraints.required_max_coded_height);
+      auto aligned_stride = RoundUp(safemath::MakeCheckedNum(image_constraints.max_size()->width()),
+                                    kBytesPerRowPerTile);
+      auto aligned_y_height =
+          safemath::MakeCheckedNum(image_constraints.required_max_size()->height());
       auto aligned_uv_height =
-          safemath::MakeCheckedNum(image_constraints.required_max_coded_height) / 2u;
+          safemath::MakeCheckedNum(image_constraints.required_max_size()->height()) / 2u;
 
       aligned_y_height = RoundUp(aligned_y_height, kRowsPerTile);
       aligned_uv_height = RoundUp(aligned_uv_height, kRowsPerTile);

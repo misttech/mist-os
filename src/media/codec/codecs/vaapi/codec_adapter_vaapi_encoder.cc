@@ -305,9 +305,9 @@ bool CodecAdapterVaApiEncoder::ProcessPacket(CodecPacket* packet) {
   video_frame->coded_size = coded_size_;
   video_frame->base = packet->buffer()->base();
   video_frame->size_bytes = packet->buffer()->size();
-  video_frame->stride =
-      fbl::round_up(static_cast<uint32_t>(display_size_.width()),
-                    buffer_settings_[kInputPort]->image_format_constraints.bytes_per_row_divisor);
+  video_frame->stride = fbl::round_up(
+      static_cast<uint32_t>(display_size_.width()),
+      *buffer_settings_[kInputPort]->image_format_constraints()->bytes_per_row_divisor());
 
   scoped_refptr<VASurface> va_surface = GetVASurface();
   VABufferID coded_buffer;

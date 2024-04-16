@@ -158,11 +158,12 @@ class FakeCodecAdapterEvents : public CodecAdapterEvents {
 
   void onCoreCodecMidStreamOutputConstraintsChange(bool output_re_config_required) override {
     // Test a representative value.
-    auto output_constraints = codec_adapter_->CoreCodecGetBufferCollectionConstraints(
+    auto output_constraints = codec_adapter_->CoreCodecGetBufferCollectionConstraints2(
         CodecPort::kOutputPort, fuchsia::media::StreamBufferConstraints(),
         fuchsia::media::StreamBufferPartialSettings());
-    EXPECT_TRUE(output_constraints.buffer_memory_constraints.cpu_domain_supported);
-    EXPECT_EQ(kVideoWidth, output_constraints.image_format_constraints[0].required_min_coded_width);
+    EXPECT_TRUE(*output_constraints.buffer_memory_constraints()->cpu_domain_supported());
+    EXPECT_EQ(kVideoWidth,
+              output_constraints.image_format_constraints()->at(0).required_min_size()->width());
 
     std::unique_lock<std::mutex> lock(lock_);
     // Wait for buffer initialization to complete to ensure all buffers are staged to be loaded.
@@ -171,13 +172,17 @@ class FakeCodecAdapterEvents : public CodecAdapterEvents {
     // Set the codec output format to the linear format and other various fields that sysmem would
     // normally populate. This is not meant to be an implementation of sysmem, only what is needed
     // for the test to work.
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection;
-    buffer_collection.settings.image_format_constraints =
-        output_constraints.image_format_constraints.at(0);
-    buffer_collection.settings.has_image_format_constraints = true;
-    buffer_collection.buffer_count = output_constraints.min_buffer_count_for_camping;
-    EXPECT_FALSE(
-        buffer_collection.settings.image_format_constraints.pixel_format.has_format_modifier);
+    fuchsia_sysmem2::BufferCollectionInfo buffer_collection;
+    buffer_collection.settings().emplace().image_format_constraints() =
+        output_constraints.image_format_constraints()->at(0);
+    buffer_collection.buffers().emplace(*output_constraints.min_buffer_count_for_camping());
+    if (!buffer_collection.settings()
+             ->image_format_constraints()
+             ->pixel_format_modifier()
+             .has_value()) {
+      buffer_collection.settings()->image_format_constraints()->pixel_format_modifier() =
+          fuchsia_images2::PixelFormatModifier::kLinear;
+    }
     codec_adapter_->CoreCodecSetBufferCollectionInfo(CodecPort::kOutputPort, buffer_collection);
     codec_adapter_->CoreCodecMidStreamOutputBufferReConfigFinish();
   }
@@ -280,10 +285,10 @@ class Vp9VaapiTestFixture : public ::testing::Test {
     format_details.set_mime_type("video/vp9");
     decoder_->CoreCodecInit(format_details);
 
-    auto input_constraints = decoder_->CoreCodecGetBufferCollectionConstraints(
+    auto input_constraints = decoder_->CoreCodecGetBufferCollectionConstraints2(
         CodecPort::kInputPort, fuchsia::media::StreamBufferConstraints(),
         fuchsia::media::StreamBufferPartialSettings());
-    EXPECT_TRUE(input_constraints.buffer_memory_constraints.cpu_domain_supported);
+    EXPECT_TRUE(*input_constraints.buffer_memory_constraints()->cpu_domain_supported());
 
     {
       std::lock_guard<std::mutex> guard(lock_);
@@ -312,10 +317,10 @@ class Vp9VaapiTestFixture : public ::testing::Test {
     format_details.set_mime_type("video/vp9");
     decoder_->CoreCodecInit(format_details);
 
-    auto input_constraints = decoder_->CoreCodecGetBufferCollectionConstraints(
+    auto input_constraints = decoder_->CoreCodecGetBufferCollectionConstraints2(
         CodecPort::kInputPort, fuchsia::media::StreamBufferConstraints(),
         fuchsia::media::StreamBufferPartialSettings());
-    EXPECT_TRUE(input_constraints.buffer_memory_constraints.cpu_domain_supported);
+    EXPECT_TRUE(*input_constraints.buffer_memory_constraints()->cpu_domain_supported());
 
     decoder_->CoreCodecStartStream();
     decoder_->CoreCodecQueueInputFormatDetails(format_details);
@@ -568,21 +573,21 @@ TEST_F(Vp9VaapiTestFixture, AttemptToSwitchFormatModifier) {
   decoder_->CoreCodecInit(format_details);
 
   {
-    auto pre_cfg_constraints = decoder_->CoreCodecGetBufferCollectionConstraints(
+    auto pre_cfg_constraints = decoder_->CoreCodecGetBufferCollectionConstraints2(
         CodecPort::kOutputPort, fuchsia::media::StreamBufferConstraints(),
         fuchsia::media::StreamBufferPartialSettings());
 
-    ASSERT_EQ(pre_cfg_constraints.image_format_constraints_count, 2u);
+    ASSERT_EQ(pre_cfg_constraints.image_format_constraints()->size(), 2u);
 
-    const auto& linear_pixel_format = pre_cfg_constraints.image_format_constraints[0u].pixel_format;
-    EXPECT_TRUE(!linear_pixel_format.has_format_modifier ||
-                linear_pixel_format.format_modifier.value ==
-                    fuchsia::sysmem::FORMAT_MODIFIER_LINEAR);
+    const auto& linear_format_modifier =
+        pre_cfg_constraints.image_format_constraints()->at(0).pixel_format_modifier();
+    EXPECT_TRUE(!linear_format_modifier.has_value() ||
+                linear_format_modifier.value() == fuchsia_images2::PixelFormatModifier::kLinear);
 
-    const auto& tiled_pixel_format = pre_cfg_constraints.image_format_constraints[1u].pixel_format;
-    EXPECT_TRUE(tiled_pixel_format.has_format_modifier);
-    EXPECT_TRUE(tiled_pixel_format.format_modifier.value ==
-                fuchsia::sysmem::FORMAT_MODIFIER_INTEL_I915_Y_TILED);
+    const auto& tiled_image_constraints = pre_cfg_constraints.image_format_constraints()->at(1);
+    EXPECT_TRUE(tiled_image_constraints.pixel_format_modifier().has_value());
+    EXPECT_TRUE(tiled_image_constraints.pixel_format_modifier().value() ==
+                fuchsia_images2::PixelFormatModifier::kIntelI915YTiled);
   }
 
   decoder_->CoreCodecStartStream();
@@ -604,15 +609,16 @@ TEST_F(Vp9VaapiTestFixture, AttemptToSwitchFormatModifier) {
   events_.WaitForInputPacketsDone();
 
   {
-    auto post_cfg_constraints = decoder_->CoreCodecGetBufferCollectionConstraints(
+    auto post_cfg_constraints = decoder_->CoreCodecGetBufferCollectionConstraints2(
         CodecPort::kOutputPort, fuchsia::media::StreamBufferConstraints(),
         fuchsia::media::StreamBufferPartialSettings());
 
-    ASSERT_EQ(post_cfg_constraints.image_format_constraints_count, 1u);
+    ASSERT_EQ(post_cfg_constraints.image_format_constraints()->size(), 1u);
 
-    const auto& pixel_format = post_cfg_constraints.image_format_constraints[0u].pixel_format;
-    EXPECT_TRUE(!pixel_format.has_format_modifier ||
-                pixel_format.format_modifier.value == fuchsia::sysmem::FORMAT_MODIFIER_LINEAR);
+    const auto& image_format_constraints = post_cfg_constraints.image_format_constraints()->at(0);
+    EXPECT_TRUE(!image_format_constraints.pixel_format_modifier().has_value() ||
+                image_format_constraints.pixel_format_modifier().value() ==
+                    fuchsia_images2::PixelFormatModifier::kLinear);
   }
 
   EXPECT_EQ(kExpectedOutputPackets, events_.output_packet_count());

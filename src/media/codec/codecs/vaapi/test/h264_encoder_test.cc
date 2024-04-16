@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <stdio.h>
 
@@ -44,20 +45,23 @@ class FakeCodecAdapterEvents : public CodecAdapterEvents {
 
   void onCoreCodecMidStreamOutputConstraintsChange(bool output_re_config_required) override {
     // Test a representative value.
-    auto output_constraints = codec_adapter_->CoreCodecGetBufferCollectionConstraints(
+    auto output_constraints = codec_adapter_->CoreCodecGetBufferCollectionConstraints2(
         CodecPort::kOutputPort, fuchsia::media::StreamBufferConstraints(),
         fuchsia::media::StreamBufferPartialSettings());
-    EXPECT_TRUE(output_constraints.buffer_memory_constraints.cpu_domain_supported);
+    EXPECT_TRUE(*output_constraints.buffer_memory_constraints()->cpu_domain_supported());
 
     std::unique_lock<std::mutex> lock(lock_);
     // Wait for buffer initialization to complete to ensure all buffers are staged to be loaded.
     cond_.wait(lock, [&]() { return buffer_initialization_completed_; });
 
     // Fake out the client setting buffer constraints on sysmem
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection;
-    buffer_collection.settings.image_format_constraints =
-        output_constraints.image_format_constraints.at(0);
-    buffer_collection.buffer_count = output_constraints.min_buffer_count_for_camping;
+    fuchsia_sysmem2::BufferCollectionInfo buffer_collection;
+    buffer_collection.settings().emplace();
+    if (output_constraints.image_format_constraints().has_value()) {
+      buffer_collection.settings()->image_format_constraints() =
+          output_constraints.image_format_constraints()->at(0);
+    }
+    buffer_collection.buffers().emplace(*output_constraints.min_buffer_count_for_camping());
     codec_adapter_->CoreCodecSetBufferCollectionInfo(CodecPort::kOutputPort, buffer_collection);
     codec_adapter_->CoreCodecMidStreamOutputBufferReConfigFinish();
   }
@@ -168,10 +172,10 @@ class H264EncoderTestFixture : public ::testing::Test {
     format_details.set_domain(std::move(domain_format));
     encoder_->CoreCodecInit(format_details);
 
-    auto input_constraints = encoder_->CoreCodecGetBufferCollectionConstraints(
+    auto input_constraints = encoder_->CoreCodecGetBufferCollectionConstraints2(
         CodecPort::kInputPort, fuchsia::media::StreamBufferConstraints(),
         fuchsia::media::StreamBufferPartialSettings());
-    EXPECT_TRUE(input_constraints.buffer_memory_constraints.cpu_domain_supported);
+    EXPECT_TRUE(*input_constraints.buffer_memory_constraints()->cpu_domain_supported());
 
     encoder_->CoreCodecStartStream();
     encoder_->CoreCodecQueueInputFormatDetails(format_details);
@@ -233,15 +237,15 @@ TEST_F(H264EncoderTestFixture, Resize) {
   // Nothing writes to the output packet so its size doesn't matter.
   constexpr size_t kOutputPacketSize = 4096;
   {
-    auto input_constraints = encoder_->CoreCodecGetBufferCollectionConstraints(
+    auto input_constraints = encoder_->CoreCodecGetBufferCollectionConstraints2(
         CodecPort::kInputPort, fuchsia::media::StreamBufferConstraints(),
         fuchsia::media::StreamBufferPartialSettings());
-    EXPECT_TRUE(input_constraints.buffer_memory_constraints.cpu_domain_supported);
+    EXPECT_TRUE(*input_constraints.buffer_memory_constraints()->cpu_domain_supported());
 
     // Fake out the client setting buffer constraints on sysmem
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection;
-    buffer_collection.settings.image_format_constraints =
-        input_constraints.image_format_constraints.at(0);
+    fuchsia_sysmem2::BufferCollectionInfo buffer_collection;
+    buffer_collection.settings().emplace().image_format_constraints() =
+        input_constraints.image_format_constraints()->at(0);
     encoder_->CoreCodecSetBufferCollectionInfo(CodecPort::kInputPort, buffer_collection);
   }
 
@@ -306,15 +310,15 @@ TEST_F(H264EncoderTestFixture, EncodeBasic) {
   // Nothing writes to the output packet so its size doesn't matter.
   constexpr size_t kOutputPacketSize = 4096;
   {
-    auto input_constraints = encoder_->CoreCodecGetBufferCollectionConstraints(
+    auto input_constraints = encoder_->CoreCodecGetBufferCollectionConstraints2(
         CodecPort::kInputPort, fuchsia::media::StreamBufferConstraints(),
         fuchsia::media::StreamBufferPartialSettings());
-    EXPECT_TRUE(input_constraints.buffer_memory_constraints.cpu_domain_supported);
+    EXPECT_TRUE(*input_constraints.buffer_memory_constraints()->cpu_domain_supported());
 
     // Fake out the client setting buffer constraints on sysmem
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection;
-    buffer_collection.settings.image_format_constraints =
-        input_constraints.image_format_constraints.at(0);
+    fuchsia_sysmem2::BufferCollectionInfo buffer_collection;
+    buffer_collection.settings().emplace().image_format_constraints() =
+        input_constraints.image_format_constraints()->at(0);
     encoder_->CoreCodecSetBufferCollectionInfo(CodecPort::kInputPort, buffer_collection);
   }
 

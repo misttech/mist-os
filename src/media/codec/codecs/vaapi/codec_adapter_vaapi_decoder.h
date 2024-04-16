@@ -92,9 +92,9 @@ class SurfaceBufferManager {
   // into account the pixel format.
   virtual gfx::Size GetRequiredSurfaceSize(const gfx::Size& picture_size) = 0;
 
-  // TODO(https://fxbug.dev/42060469): This is a temporary workaround until the new media APIs are adopted
-  // Returns true if the surface manager can not have outstanding reference frames when new buffers
-  // are required to hold the new coded picture size.
+  // TODO(https://fxbug.dev/42060469): This is a temporary workaround until the new media APIs are
+  // adopted Returns true if the surface manager can not have outstanding reference frames when new
+  // buffers are required to hold the new coded picture size.
   virtual bool NeedsKeyframeForBufferAllocation() const = 0;
 
   // Updates the picture size of the current stream. If the surfaces that are currently under
@@ -399,42 +399,40 @@ class CodecAdapterVaApiDecoder : public CodecAdapter {
     return result;
   }
 
-  fuchsia::sysmem::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints(
+  fuchsia_sysmem2::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints2(
       CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
       const fuchsia::media::StreamBufferPartialSettings& partial_settings) override {
+    fuchsia_sysmem2::BufferCollectionConstraints constraints;
+    auto& bmc = constraints.buffer_memory_constraints().emplace();
+
     if (port == kInputPort) {
-      fuchsia::sysmem::BufferCollectionConstraints constraints;
-      constraints.min_buffer_count_for_camping = 1;
-      constraints.has_buffer_memory_constraints = true;
-      constraints.buffer_memory_constraints.cpu_domain_supported = true;
+      constraints.min_buffer_count_for_camping() = 1;
+      bmc.cpu_domain_supported() = true;
       // Must be big enough to hold an entire NAL unit, since the H264Decoder doesn't support
       // split NAL units.
-      constraints.buffer_memory_constraints.min_size_bytes = 8192 * 512;
-      return constraints;
-    } else if (port == kOutputPort) {
-      fuchsia::sysmem::BufferCollectionConstraints constraints;
-      constraints.min_buffer_count_for_camping =
+      bmc.min_size_bytes() = 8192 * 512;
+    } else {
+      ZX_DEBUG_ASSERT(port == kOutputPort);
+      constraints.min_buffer_count_for_camping() =
           static_cast<uint32_t>(media_decoder_->GetRequiredNumOfPictures());
-      constraints.has_buffer_memory_constraints = true;
       // TODO(https://fxbug.dev/42176003): Add RAM domain support.
-      constraints.buffer_memory_constraints.cpu_domain_supported = true;
+      bmc.cpu_domain_supported() = true;
 
       // Lamdba that will set the common constraint values regardless of what format modifier value
       using CommonConstraintsFunction =
-          fit::inline_function<void(fuchsia::sysmem::ImageFormatConstraints & constraints)>;
+          fit::inline_function<void(fuchsia_sysmem2::ImageFormatConstraints & constraints)>;
       auto set_common_constraints =
-          CommonConstraintsFunction([this](fuchsia::sysmem::ImageFormatConstraints& constraints) {
+          CommonConstraintsFunction([this](fuchsia_sysmem2::ImageFormatConstraints& constraints) {
             ZX_ASSERT(media_decoder_);
             ZX_ASSERT(media_codec_.has_value());
 
             bool is_h264 = (media_codec_.value() == CodecType::kH264);
 
             // Currently only support outputting to NV12
-            constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::NV12;
+            constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
 
             // Currently only support the REC709 color space.
-            constraints.color_spaces_count = 1;
-            constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::REC709;
+            constraints.color_spaces() = {fuchsia_images2::ColorSpace::kRec709};
 
             // The non-"required_" fields indicate the decoder's ability to potentially
             // output frames at various dimensions as coded in the stream.  Aside from
@@ -442,23 +440,19 @@ class CodecAdapterVaApiDecoder : public CodecAdapter {
             // do with the current stream in particular. We advertise the known min codec width
             // depending on the codec. For the max, we advertise what the current hardware supports,
             // not the codec max.
-            constraints.min_coded_width = is_h264 ? kH264MinBlockSize : kVp9MinBlockSize;
-            constraints.max_coded_width = max_picture_width_;
-            constraints.min_coded_height = is_h264 ? kH264MinBlockSize : kVp9MinBlockSize;
-            constraints.max_coded_height = max_picture_height_;
-            constraints.max_coded_width_times_coded_height =
-                (max_picture_width_ * max_picture_height_);
+            constraints.min_size() = {is_h264 ? kH264MinBlockSize : kVp9MinBlockSize,
+                                      is_h264 ? kH264MinBlockSize : kVp9MinBlockSize};
+            constraints.max_size() = {max_picture_width_, max_picture_height_};
+            constraints.max_width_times_height() = max_picture_width_ * max_picture_height_;
 
-            constraints.layers = 1;
-            constraints.coded_width_divisor = is_h264 ? kH264MinBlockSize : kVp9MinBlockSize;
-            constraints.coded_height_divisor = is_h264 ? kH264MinBlockSize : kVp9MinBlockSize;
-            constraints.start_offset_divisor = 1;
+            constraints.size_alignment() = {is_h264 ? kH264MinBlockSize : kVp9MinBlockSize,
+                                            is_h264 ? kH264MinBlockSize : kVp9MinBlockSize};
+            constraints.start_offset_divisor() = 1;
 
             // Odd display dimensions are permitted, but these don't imply odd YV12
             // dimensions - those are constrained by coded_width_divisor and
             // coded_height_divisor which are both 16.
-            constraints.display_width_divisor = 1;
-            constraints.display_height_divisor = 1;
+            constraints.display_rect_alignment() = {1, 1};
 
             // The decoder is producing frames and the decoder has no choice but to
             // produce frames at their coded size.  The decoder wants to potentially be
@@ -486,70 +480,60 @@ class CodecAdapterVaApiDecoder : public CodecAdapter {
                 static_cast<bool>(surface_buffer_manager_)
                     ? surface_buffer_manager_->GetRequiredSurfaceSize(pic_size)
                     : pic_size;
-            constraints.required_min_coded_width = required_size.width();
-            constraints.required_max_coded_width = required_size.width();
-            constraints.required_min_coded_height = required_size.height();
-            constraints.required_max_coded_height = required_size.height();
-            constraints.required_min_bytes_per_row = required_size.width();
-            constraints.required_max_bytes_per_row = required_size.width();
+            constraints.required_min_size() = {static_cast<uint32_t>(required_size.width()),
+                                               static_cast<uint32_t>(required_size.height())};
+            constraints.required_max_size() = {static_cast<uint32_t>(required_size.width()),
+                                               static_cast<uint32_t>(required_size.height())};
 
-            constraints.min_bytes_per_row = required_size.width();
+            constraints.min_bytes_per_row() = required_size.width();
           });
 
-      constraints.image_format_constraints_count = 0;
+      constraints.image_format_constraints().emplace();
 
       // Linear Format
-      if (!output_buffer_format_modifier_ ||
-          (output_buffer_format_modifier_.value() == fuchsia::sysmem::FORMAT_MODIFIER_LINEAR)) {
-        auto& linear_constraints =
-            constraints.image_format_constraints[constraints.image_format_constraints_count];
-        linear_constraints.pixel_format.has_format_modifier = false;
-        linear_constraints.bytes_per_row_divisor = kLinearSurfaceWidthAlignment;
-        linear_constraints.max_bytes_per_row =
+      if (!output_buffer_format_modifier_ || (output_buffer_format_modifier_.value() ==
+                                              fuchsia_images2::PixelFormatModifier::kLinear)) {
+        auto& linear_constraints = constraints.image_format_constraints()->emplace_back();
+        linear_constraints.bytes_per_row_divisor() = kLinearSurfaceWidthAlignment;
+        linear_constraints.max_bytes_per_row() =
             fbl::round_up(max_picture_width_, kLinearSurfaceWidthAlignment);
 
         set_common_constraints(linear_constraints);
-
-        constraints.image_format_constraints_count += 1;
       }
 
       // Y-Tiled format
       if (!output_buffer_format_modifier_ ||
           (output_buffer_format_modifier_.value() ==
-           fuchsia::sysmem::FORMAT_MODIFIER_INTEL_I915_Y_TILED)) {
-        auto& tiled_constraints =
-            constraints.image_format_constraints[constraints.image_format_constraints_count];
-        tiled_constraints.pixel_format.has_format_modifier = true;
-        tiled_constraints.pixel_format.format_modifier.value =
-            fuchsia::sysmem::FORMAT_MODIFIER_INTEL_I915_Y_TILED;
-        tiled_constraints.bytes_per_row_divisor = 0;
+           fuchsia_images2::PixelFormatModifier::kIntelI915YTiled)) {
+        auto& tiled_constraints = constraints.image_format_constraints()->emplace_back();
+        tiled_constraints.pixel_format_modifier() =
+            fuchsia_images2::PixelFormatModifier::kIntelI915YTiled;
+        tiled_constraints.bytes_per_row_divisor() = 0;
 
         set_common_constraints(tiled_constraints);
-
-        constraints.image_format_constraints_count += 1;
       }
 
-      return constraints;
+      ZX_ASSERT(!constraints.image_format_constraints()->empty());
     }
 
-    return fuchsia::sysmem::BufferCollectionConstraints{};
+    return constraints;
   }
 
   void CoreCodecSetBufferCollectionInfo(
       CodecPort port,
-      const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) override {
-    buffer_settings_[port] = buffer_collection_info.settings;
-    buffer_counts_[port] = buffer_collection_info.buffer_count;
+      const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) override {
+    buffer_settings_[port] = buffer_collection_info.settings();
+    buffer_counts_[port] = buffer_collection_info.buffers()->size();
 
     if (port == CodecPort::kOutputPort) {
-      ZX_ASSERT(buffer_collection_info.settings.has_image_format_constraints);
+      ZX_ASSERT(buffer_collection_info.settings()->image_format_constraints().has_value());
 
-      // If the format doesn't have a format modifier, then it is linear
-      const auto& pixel_format =
-          buffer_collection_info.settings.image_format_constraints.pixel_format;
-      uint64_t format_modifier = pixel_format.has_format_modifier
-                                     ? pixel_format.format_modifier.value
-                                     : fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
+      ZX_ASSERT(buffer_collection_info.settings()
+                    ->image_format_constraints()
+                    ->pixel_format_modifier()
+                    .has_value());
+      auto format_modifier =
+          *buffer_collection_info.settings()->image_format_constraints()->pixel_format_modifier();
 
       // Should never happen but ensure we do not overwrite a format modifier that has been
       // initialized with another value
@@ -561,10 +545,10 @@ class CodecAdapterVaApiDecoder : public CodecAdapter {
       if (!output_buffer_format_modifier_.has_value()) {
         std::string format_modifier_str;
         switch (format_modifier) {
-          case fuchsia::sysmem::FORMAT_MODIFIER_LINEAR:
+          case fuchsia_images2::PixelFormatModifier::kLinear:
             format_modifier_str = "linear";
             break;
-          case fuchsia::sysmem::FORMAT_MODIFIER_INTEL_I915_Y_TILED:
+          case fuchsia_images2::PixelFormatModifier::kIntelI915YTiled:
             format_modifier_str = "intel_i915_y_tiled";
             break;
           default:
@@ -572,7 +556,8 @@ class CodecAdapterVaApiDecoder : public CodecAdapter {
             break;
         }
 
-        FX_SLOG(INFO, "Format modifier has been chosen", FX_KV("format_modifier", format_modifier),
+        FX_SLOG(INFO, "Format modifier has been chosen",
+                FX_KV("format_modifier", fidl::ToUnderlying(format_modifier)),
                 FX_KV("format_modifier_str", format_modifier_str.c_str()));
       }
 
@@ -672,13 +657,13 @@ class CodecAdapterVaApiDecoder : public CodecAdapter {
 
   bool IsOutputTiled() const {
     ZX_ASSERT(buffer_settings_[kOutputPort]);
-    ZX_ASSERT(buffer_settings_[kOutputPort]->has_image_format_constraints);
+    ZX_ASSERT(buffer_settings_[kOutputPort]->image_format_constraints().has_value());
 
-    auto& format_constraints = buffer_settings_[kOutputPort]->image_format_constraints;
+    auto& format_constraints = *buffer_settings_[kOutputPort]->image_format_constraints();
 
-    return (format_constraints.pixel_format.has_format_modifier) &&
-           (format_constraints.pixel_format.format_modifier.value !=
-            fuchsia_sysmem::wire::kFormatModifierLinear);
+    return format_constraints.pixel_format_modifier().has_value() &&
+           (*format_constraints.pixel_format_modifier() !=
+            fuchsia_images2::PixelFormatModifier::kLinear);
   }
 
   // Use to construct the |media_decoder_|. Can only be called iff |media_decoder_| is not
@@ -789,7 +774,7 @@ class CodecAdapterVaApiDecoder : public CodecAdapter {
 
   AvccProcessor avcc_processor_;
 
-  std::optional<fuchsia::sysmem::SingleBufferSettings> buffer_settings_[kPortCount];
+  std::optional<fuchsia_sysmem2::SingleBufferSettings> buffer_settings_[kPortCount];
   std::optional<uint32_t> buffer_counts_[kPortCount];
 
   // Initially this value is std::nullopt meaning that there has been no format modifier set by the
@@ -799,7 +784,7 @@ class CodecAdapterVaApiDecoder : public CodecAdapter {
   // CoreCodecGetBufferCollectionConstraints() will only advertise the format modifier selected
   // by the client since the format modifier can not be changed during a mid stream output
   // buffer reconfiguration or at any other part in the codec's lifecycle.
-  std::optional<uint64_t> output_buffer_format_modifier_{};
+  std::optional<fuchsia_images2::PixelFormatModifier> output_buffer_format_modifier_{};
 
   // Since CoreCodecInit() is called after SetDriverDiagnostics() we need to save a pointer to the
   // codec diagnostics object so that we can create the codec diagnotcis when we construct the

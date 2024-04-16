@@ -55,12 +55,12 @@ class FakeCodecAdapterEvents : public CodecAdapterEvents {
     {
       std::lock_guard lock(lock_);
       // Test a representative value.
-      output_constraints_ = codec_adapter_->CoreCodecGetBufferCollectionConstraints(
+      output_constraints_ = codec_adapter_->CoreCodecGetBufferCollectionConstraints2(
           CodecPort::kOutputPort, fuchsia::media::StreamBufferConstraints(),
           fuchsia::media::StreamBufferPartialSettings());
-      EXPECT_TRUE(output_constraints_.buffer_memory_constraints.cpu_domain_supported);
+      EXPECT_TRUE(*output_constraints_.buffer_memory_constraints()->cpu_domain_supported());
       EXPECT_EQ(kBearVideoWidth,
-                output_constraints_.image_format_constraints[0].required_min_coded_width);
+                output_constraints_.image_format_constraints()->at(0).required_min_size()->width());
       output_constraints_set_ = true;
       cond_.notify_all();
     }
@@ -140,16 +140,20 @@ class FakeCodecAdapterEvents : public CodecAdapterEvents {
     cond_.wait(lock, [&]() { return buffer_initialization_completed_; });
 
     // Set the codec output format to the linear format
-    auto output_constraints = codec_adapter_->CoreCodecGetBufferCollectionConstraints(
+    auto output_constraints = codec_adapter_->CoreCodecGetBufferCollectionConstraints2(
         CodecPort::kOutputPort, fuchsia::media::StreamBufferConstraints(),
         fuchsia::media::StreamBufferPartialSettings());
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection;
-    buffer_collection.settings.image_format_constraints =
-        output_constraints.image_format_constraints.at(0);
-    buffer_collection.settings.has_image_format_constraints = true;
-    buffer_collection.buffer_count = output_constraints.min_buffer_count_for_camping;
-    EXPECT_FALSE(
-        buffer_collection.settings.image_format_constraints.pixel_format.has_format_modifier);
+    fuchsia_sysmem2::BufferCollectionInfo buffer_collection;
+    buffer_collection.settings().emplace().image_format_constraints() =
+        output_constraints.image_format_constraints()->at(0);
+    buffer_collection.buffers().emplace(*output_constraints.min_buffer_count_for_camping());
+    if (!buffer_collection.settings()
+             ->image_format_constraints()
+             ->pixel_format_modifier()
+             .has_value()) {
+      buffer_collection.settings()->image_format_constraints()->pixel_format_modifier() =
+          fuchsia_images2::PixelFormatModifier::kLinear;
+    }
     codec_adapter_->CoreCodecSetBufferCollectionInfo(CodecPort::kOutputPort, buffer_collection);
     codec_adapter_->CoreCodecMidStreamOutputBufferReConfigFinish();
   }
@@ -175,7 +179,7 @@ class FakeCodecAdapterEvents : public CodecAdapterEvents {
   std::vector<CodecPacket *> output_packets_done_;
   bool buffer_initialization_completed_ = false;
   bool reconfigure_in_constraints_change_ = true;
-  fuchsia::sysmem::BufferCollectionConstraints output_constraints_;
+  fuchsia_sysmem2::BufferCollectionConstraints output_constraints_;
   bool output_constraints_set_ = false;
 };
 
@@ -203,10 +207,10 @@ class H264VaapiTestFixture : public ::testing::Test {
     format_details.set_mime_type("video/h264");
     decoder_->CoreCodecInit(format_details);
 
-    auto input_constraints = decoder_->CoreCodecGetBufferCollectionConstraints(
+    auto input_constraints = decoder_->CoreCodecGetBufferCollectionConstraints2(
         CodecPort::kInputPort, fuchsia::media::StreamBufferConstraints(),
         fuchsia::media::StreamBufferPartialSettings());
-    EXPECT_TRUE(input_constraints.buffer_memory_constraints.cpu_domain_supported);
+    EXPECT_TRUE(*input_constraints.buffer_memory_constraints()->cpu_domain_supported());
 
     decoder_->CoreCodecStartStream();
     decoder_->CoreCodecQueueInputFormatDetails(format_details);
@@ -355,7 +359,7 @@ TEST(H264Vaapi, CodecDescriptions) {
   // video/x-motion-jpeg decode, video/h264 decode, video/vp9 decode, video/h264 encode
 
   // TODO(https://fxbug.dev/42166089): Uncomment this after new prebuilts have rolled.
-  //EXPECT_EQ(4u, codec_descriptions.size());
+  // EXPECT_EQ(4u, codec_descriptions.size());
 }
 
 // Test that we can connect using the CodecFactory.

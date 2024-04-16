@@ -238,75 +238,72 @@ class CodecAdapterVaApiEncoder : public CodecAdapter {
     return result;
   }
 
-  fuchsia::sysmem::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints(
+  fuchsia_sysmem2::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints2(
       CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
       const fuchsia::media::StreamBufferPartialSettings& partial_settings) override {
+    fuchsia_sysmem2::BufferCollectionConstraints constraints;
+    auto& bmc = constraints.buffer_memory_constraints().emplace();
+
     if (port == kOutputPort) {
-      fuchsia::sysmem::BufferCollectionConstraints constraints;
-      constraints.min_buffer_count_for_camping = 1;
-      constraints.has_buffer_memory_constraints = true;
+      constraints.min_buffer_count_for_camping() = 1;
+
       // The Intel GPU supports CPU domain buffer collections, so we don't really need to support
       // RAM domain.
-      constraints.buffer_memory_constraints.cpu_domain_supported = true;
+      bmc.cpu_domain_supported() = true;
       ZX_ASSERT(display_size_.width() > 0);
       ZX_ASSERT(display_size_.height() > 0);
+
       // The encoder doesn't support splitting output across buffers.
-      constraints.buffer_memory_constraints.min_size_bytes =
+      bmc.min_size_bytes() =
           static_cast<uint32_t>(media::GetEncodeBitstreamBufferSize(coded_size_));
-      return constraints;
-    } else if (port == kInputPort) {
-      fuchsia::sysmem::BufferCollectionConstraints constraints;
-      constraints.min_buffer_count_for_camping = 1;
-      constraints.has_buffer_memory_constraints = true;
-      constraints.buffer_memory_constraints.cpu_domain_supported = true;
-      constraints.image_format_constraints_count = 1;
-      fuchsia::sysmem::ImageFormatConstraints& image_constraints =
-          constraints.image_format_constraints[0];
-      image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::NV12;
+    } else {
+      ZX_DEBUG_ASSERT(port == kInputPort);
+      constraints.min_buffer_count_for_camping() = 1;
+      bmc.cpu_domain_supported() = true;
+      auto& image_constraints = constraints.image_format_constraints().emplace().emplace_back();
+      image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
+
       // TODO(https://fxbug.dev/42051379): Add support for more colorspaces.
-      image_constraints.color_spaces_count = 1;
-      image_constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::REC709;
+      image_constraints.color_spaces() = {fuchsia_images2::ColorSpace::kRec709};
 
       // The non-"required_" fields indicate the encoder's ability to accept
       // input frames at various dimensions. The input frames need to be within
       // these bounds.
-      image_constraints.min_coded_width = 16;
-      image_constraints.max_coded_width = 3840;
-      image_constraints.min_coded_height = 16;
+      image_constraints.min_size() = {16, 16};
+
       // This intentionally isn't the height of a 4k frame.  See
       // max_coded_width_times_coded_height.  We intentionally constrain the max
       // dimension in width or height to the width of a 4k frame.  While the HW
       // might be able to go bigger than that as long as the other dimension is
       // smaller to compensate, we don't really need to enable any larger than
       // 4k's width in either dimension, so we don't.
-      image_constraints.max_coded_height = 3840;
-      image_constraints.min_bytes_per_row = 16;
+      image_constraints.max_size() = {3840, 3840};
+      image_constraints.min_bytes_per_row() = 16;
+
       // no hard-coded max stride, at least for now
-      image_constraints.max_bytes_per_row = 0xFFFFFFFF;
-      image_constraints.max_coded_width_times_coded_height = 3840 * 2160;
-      image_constraints.layers = 1;
-      image_constraints.coded_width_divisor = 2;
-      image_constraints.coded_height_divisor = 2;
-      image_constraints.bytes_per_row_divisor = 2;
-      image_constraints.start_offset_divisor = 1;
+      ZX_DEBUG_ASSERT(!image_constraints.max_bytes_per_row().has_value());
+      image_constraints.max_width_times_height() = 3840 * 2160;
+      image_constraints.size_alignment() = {2, 2};
+      image_constraints.bytes_per_row_divisor() = 2;
+      image_constraints.start_offset_divisor() = 1;
+
       // Odd display dimensions are permitted, but these don't imply odd YV12
       // dimensions - those are constrainted by coded_width_divisor and
       // coded_height_divisor which are both 2.
-      image_constraints.display_width_divisor = 1;
-      image_constraints.display_height_divisor = 1;
+      image_constraints.display_rect_alignment() = {1, 1};
 
       // The required sizes aren't initialized, since
       // CoreCodecGetBufferCollectionConstraints won't be re-triggered when the
       // input format is changed.
-      return constraints;
     }
-    return fuchsia::sysmem::BufferCollectionConstraints{};
+
+    return constraints;
   }
 
   void CoreCodecSetBufferCollectionInfo(
       CodecPort port,
-      const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) override {
-    buffer_settings_[port] = buffer_collection_info.settings;
+      const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) override {
+    buffer_settings_[port] = *buffer_collection_info.settings();
   }
 
   VAContextID context_id() { return context_id_->id(); }
@@ -382,7 +379,7 @@ class CodecAdapterVaApiEncoder : public CodecAdapter {
   uint64_t input_format_details_version_ordinal_;
   media::VideoEncodeAccelerator::Config accelerator_config_;
 
-  std::optional<fuchsia::sysmem::SingleBufferSettings> buffer_settings_[kPortCount];
+  std::optional<fuchsia_sysmem2::SingleBufferSettings> buffer_settings_[kPortCount];
 
   // DPB surfaces.
   std::mutex surfaces_lock_;
