@@ -63,7 +63,6 @@ use {
     routing_test_helpers::{
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
     },
-    sandbox::Open,
     std::{
         collections::HashSet,
         pin::pin,
@@ -1090,8 +1089,7 @@ async fn create_child_with_dict() {
 
     // CreateChild dictionary entries must be Open capabilities.
     // TODO(https://fxbug.dev/319542502): Insert the external Router type, once it exists
-    let open: sandbox::Open = sender.into();
-    dict.lock_entries().insert("hippo".parse().unwrap(), sandbox::Capability::Open(open));
+    dict.lock_entries().insert("hippo".parse().unwrap(), sender.into());
 
     let dictionary_client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
 
@@ -3428,12 +3426,15 @@ async fn source_component_stopping_when_routing() {
                 target: root.as_weak().into(),
             })
             .await
-            .unwrap()
-            .try_into_directory_entry()
             .unwrap();
 
         // Connect to the capability.
-        Open::new(entry).open(ExecutionScope::new(), fio::OpenFlags::empty(), ".", server_end);
+        match entry {
+            sandbox::Capability::Sender(s) => {
+                s.send(sandbox::Message { channel: server_end }).unwrap()
+            }
+            e => panic!("{:#?}", e),
+        };
     };
 
     // Both should complete after the response delay has passed.
@@ -3481,19 +3482,19 @@ async fn source_component_stopped_after_routing_before_open() {
 
     // Request a capability from the component.
     let output = root.lock_resolved_state().await.unwrap().component_output_dict.clone();
-    let open: Open = Open::new(
-        output
-            .get_capability(&RelativePath::new("foo").unwrap())
-            .unwrap()
-            .route(crate::model::routing::router::Request {
-                availability: Availability::Required,
-                target: root.as_weak().into(),
-            })
-            .await
-            .unwrap()
-            .try_into_directory_entry()
-            .unwrap(),
-    );
+    let cap = output
+        .get_capability(&RelativePath::new("foo").unwrap())
+        .unwrap()
+        .route(crate::model::routing::router::Request {
+            availability: Availability::Required,
+            target: root.as_weak().into(),
+        })
+        .await
+        .unwrap();
+    let sender = match cap {
+        sandbox::Capability::Sender(s) => s,
+        c => panic!("{:#?}", c),
+    };
 
     // It should be started with the capability access start reason.
     assert!(root.is_started().await);
@@ -3508,7 +3509,7 @@ async fn source_component_stopped_after_routing_before_open() {
 
     // Connect to the capability. The component should be started again.
     let (client_end, server_end) = zx::Channel::create();
-    open.open(ExecutionScope::new(), fio::OpenFlags::empty(), ".", server_end);
+    sender.send(sandbox::Message { channel: server_end }).unwrap();
 
     let server_end = open_request_rx.next().await.unwrap();
     assert_eq!(
@@ -3550,19 +3551,19 @@ async fn source_component_shutdown_after_routing_before_open() {
 
     // Request a capability from the component.
     let output = root.lock_resolved_state().await.unwrap().component_output_dict.clone();
-    let open: Open = Open::new(
-        output
-            .get_capability(&RelativePath::new("foo").unwrap())
-            .unwrap()
-            .route(crate::model::routing::router::Request {
-                availability: Availability::Required,
-                target: root.as_weak().into(),
-            })
-            .await
-            .unwrap()
-            .try_into_directory_entry()
-            .unwrap(),
-    );
+    let cap = output
+        .get_capability(&RelativePath::new("foo").unwrap())
+        .unwrap()
+        .route(crate::model::routing::router::Request {
+            availability: Availability::Required,
+            target: root.as_weak().into(),
+        })
+        .await
+        .unwrap();
+    let sender = match cap {
+        sandbox::Capability::Sender(s) => s,
+        c => panic!("{:#?}", c),
+    };
 
     // It should be started with the capability access start reason.
     assert!(root.is_started().await);
@@ -3577,7 +3578,7 @@ async fn source_component_shutdown_after_routing_before_open() {
 
     // Connect to the capability. The request will fail and the component is not started.
     let (client_end, server_end) = zx::Channel::create();
-    open.open(ExecutionScope::new(), fio::OpenFlags::empty(), ".", server_end);
+    sender.send(sandbox::Message { channel: server_end }).unwrap();
     fasync::OnSignals::new(&client_end, zx::Signals::CHANNEL_PEER_CLOSED).await.unwrap();
     assert!(!root.is_started().await);
 }

@@ -524,6 +524,7 @@ impl ComponentInstance {
                 // it exists
                 let router = match value {
                     Capability::Open(o) => Router::new_ok(o),
+                    Capability::Sender(s) => Router::new_ok(s),
                     _ => return Err(AddDynamicChildError::InvalidDictionary),
                 };
 
