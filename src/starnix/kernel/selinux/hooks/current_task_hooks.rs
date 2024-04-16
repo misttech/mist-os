@@ -90,7 +90,7 @@ pub fn check_exec_access(
         let executable_sid = executable_node.effective_sid(current_task);
         let group_state = current_task.thread_group.read();
         thread_group_hooks::check_exec_access(
-            &security_server.as_permission_check(),
+            &security_server,
             &group_state.selinux_state,
             executable_sid,
         )

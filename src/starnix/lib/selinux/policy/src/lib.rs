@@ -23,7 +23,7 @@ use {
     parsed_policy::ParsedPolicy,
     parser::ByValue,
     parser::{ByRef, ParseStrategy},
-    selinux_common::{self as sc, ClassPermission as _, FileClass},
+    selinux_common::{self as sc, ClassPermission as _, FileClass, ObjectClass},
     std::{fmt::Debug, marker::PhantomData, num::NonZeroU32, ops::Deref},
     zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned},
 };
@@ -216,6 +216,31 @@ impl<PS: ParseStrategy> Policy<PS> {
         class: &FileClass,
     ) -> Result<SecurityContext, NewSecurityContextError> {
         self.0.new_file_security_context(source, target, class)
+    }
+
+    /// Returns the security context that should be applied to a newly created SELinux
+    /// object according to `source` and `target` security contexts, as well as the new object's
+    /// `class`.
+    /// Defaults to the `source` security context if the policy does not specify transitions or
+    /// defaults for the `source`, `target` or `class` components.
+    ///
+    /// Returns an error if the security context for such an object is not well-defined
+    /// by this [`Policy`].
+    pub fn new_security_context(
+        &self,
+        source: &SecurityContext,
+        target: &SecurityContext,
+        class: &ObjectClass,
+    ) -> Result<SecurityContext, NewSecurityContextError> {
+        self.0.new_security_context(
+            source,
+            target,
+            class,
+            source.role(),
+            source.type_(),
+            source.low_level(),
+            source.high_level(),
+        )
     }
 
     /// Returns whether the input types are explicitly granted `permission` via an `allow [...];`

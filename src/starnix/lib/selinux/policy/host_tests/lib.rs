@@ -8,7 +8,7 @@ use selinux_policy::{
 };
 
 use anyhow::Context as _;
-use selinux_common::{FileClass, InitialSid, Permission, ProcessPermission};
+use selinux_common::{FileClass, InitialSid, ObjectClass, Permission, ProcessPermission};
 use serde::Deserialize;
 use std::io::Read as _;
 
@@ -303,6 +303,29 @@ fn new_file_security_context_minimal() {
 }
 
 #[test]
+fn new_security_context_minimal() {
+    let policy_path =
+        format!("{}/{}/compiled/minimal_policy.pp", TESTDATA_DIR, COMPOSITE_POLICIES_SUBDIR);
+    let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
+    let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        .expect("parse policy")
+        .validate()
+        .expect("validate policy");
+    let source = policy
+        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .expect("valid source security context");
+    let target = policy
+        .parse_security_context("target_u:target_r:target_t:s1:c1".as_bytes())
+        .expect("valid target security context");
+
+    let actual = policy
+        .new_security_context(&source, &target, &ObjectClass::Process)
+        .expect("compute new context for new file");
+
+    assert_eq!(source, actual);
+}
+
+#[test]
 fn new_file_security_context_class_defaults() {
     let policy_path =
         format!("{}/{}/compiled/class_defaults_policy.pp", TESTDATA_DIR, COMPOSITE_POLICIES_SUBDIR);
@@ -320,6 +343,32 @@ fn new_file_security_context_class_defaults() {
 
     let actual = policy
         .new_file_security_context(&source, &target, &FileClass::File)
+        .expect("compute new context for new file");
+    let expected: SecurityContext = policy
+        .parse_security_context("target_u:source_r:source_t:s1:c0-s1:c0.c1".as_bytes())
+        .expect("valid expected security context");
+
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn new_security_context_class_defaults() {
+    let policy_path =
+        format!("{}/{}/compiled/class_defaults_policy.pp", TESTDATA_DIR, COMPOSITE_POLICIES_SUBDIR);
+    let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
+    let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        .expect("parse policy")
+        .validate()
+        .expect("validate policy");
+    let source = policy
+        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .expect("valid source security context");
+    let target = policy
+        .parse_security_context("target_u:target_r:target_t:s1:c0-s1:c0.c1".as_bytes())
+        .expect("valid target security context");
+
+    let actual = policy
+        .new_security_context(&source, &target, &ObjectClass::Process)
         .expect("compute new context for new file");
     let expected: SecurityContext = policy
         .parse_security_context("target_u:source_r:source_t:s1:c0-s1:c0.c1".as_bytes())
@@ -357,6 +406,36 @@ fn new_file_security_context_role_transition() {
 }
 
 #[test]
+fn new_security_context_role_transition() {
+    let policy_path = format!(
+        "{}/{}/compiled/role_transition_policy.pp",
+        TESTDATA_DIR, COMPOSITE_POLICIES_SUBDIR
+    );
+    let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
+    let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        .expect("parse policy")
+        .validate()
+        .expect("validate policy");
+    let source = policy
+        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .expect("valid source security context");
+    let target = policy
+        .parse_security_context("target_u:target_r:target_t:s1:c1".as_bytes())
+        .expect("valid target security context");
+
+    let actual = policy
+        .new_security_context(&source, &target, &ObjectClass::Process)
+        .expect("compute new context for new file");
+    let expected: SecurityContext = policy
+        .parse_security_context("source_u:transition_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .expect("valid expected security context");
+
+    assert_eq!(expected, actual);
+}
+
+#[test]
+// TODO(http://b/334968228): check role allowed separate from SID calculation.
+#[ignore]
 fn new_file_security_context_role_transition_not_allowed() {
     let policy_path = format!(
         "{}/{}/compiled/role_transition_not_allowed_policy.pp",
@@ -417,6 +496,34 @@ fn new_file_security_context_type_transition() {
 }
 
 #[test]
+fn new_security_context_type_transition() {
+    let policy_path = format!(
+        "{}/{}/compiled/type_transition_policy.pp",
+        TESTDATA_DIR, COMPOSITE_POLICIES_SUBDIR
+    );
+    let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
+    let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        .expect("parse policy")
+        .validate()
+        .expect("validate policy");
+    let source = policy
+        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .expect("valid source security context");
+    let target = policy
+        .parse_security_context("target_u:target_r:target_t:s1:c1".as_bytes())
+        .expect("valid target security context");
+
+    let actual = policy
+        .new_security_context(&source, &target, &ObjectClass::Process)
+        .expect("compute new context for new file");
+    let expected: SecurityContext = policy
+        .parse_security_context("source_u:source_r:transition_t:s0:c0-s2:c0.c1".as_bytes())
+        .expect("valid expected security context");
+
+    assert_eq!(expected, actual);
+}
+
+#[test]
 fn new_file_security_context_range_transition() {
     let policy_path = format!(
         "{}/{}/compiled/range_transition_policy.pp",
@@ -439,6 +546,34 @@ fn new_file_security_context_range_transition() {
         .expect("compute new context for new file");
     let expected: SecurityContext = policy
         .parse_security_context("source_u:object_r:target_t:s1:c1-s2:c1.c2".as_bytes())
+        .expect("valid expected security context");
+
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn new_security_context_range_transition() {
+    let policy_path = format!(
+        "{}/{}/compiled/range_transition_policy.pp",
+        TESTDATA_DIR, COMPOSITE_POLICIES_SUBDIR
+    );
+    let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
+    let policy = parse_policy_by_reference(policy_bytes.as_slice())
+        .expect("parse policy")
+        .validate()
+        .expect("validate policy");
+    let source = policy
+        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .expect("valid source security context");
+    let target = policy
+        .parse_security_context("target_u:target_r:target_t:s1:c1".as_bytes())
+        .expect("valid target security context");
+
+    let actual = policy
+        .new_security_context(&source, &target, &ObjectClass::Process)
+        .expect("compute new context for new file");
+    let expected: SecurityContext = policy
+        .parse_security_context("source_u:source_r:source_t:s1:c1-s2:c1.c2".as_bytes())
         .expect("valid expected security context");
 
     assert_eq!(expected, actual);

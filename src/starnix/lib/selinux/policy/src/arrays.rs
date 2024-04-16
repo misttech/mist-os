@@ -392,10 +392,16 @@ pub(crate) struct RoleAllow {
 }
 
 impl RoleAllow {
+    #[allow(dead_code)]
+    // TODO(http://b/334968228): fn to be used again when checking role allow rules separately from
+    // SID calculation.
     pub(crate) fn source_role(&self) -> RoleId {
         RoleId(NonZeroU32::new(self.role.get()).unwrap())
     }
 
+    #[allow(dead_code)]
+    // TODO(http://b/334968228): fn to be used again when checking role allow rules separately from
+    // SID calculation.
     pub(crate) fn new_role(&self) -> RoleId {
         RoleId(NonZeroU32::new(self.new_role.get()).unwrap())
     }

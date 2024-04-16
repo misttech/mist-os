@@ -4,14 +4,17 @@
 
 use crate::task::Kernel;
 
-use selinux::{permission_check::PermissionCheck, InitialSid, SecurityId};
-use selinux_common::{FilePermission, ProcessPermission};
+use selinux::{
+    permission_check::PermissionCheck, security_server::SecurityServer, InitialSid, SecurityId,
+};
+use selinux_common::{FilePermission, ObjectClass, ProcessPermission};
 use starnix_logging::log_debug;
 use starnix_uapi::{
-    error,
+    errno, error,
     errors::Errno,
     signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP},
 };
+use std::sync::Arc;
 
 /// Checks if creating a task is allowed.
 pub(crate) fn check_task_create_access(
@@ -27,7 +30,7 @@ pub(crate) fn check_task_create_access(
 /// Checks the SELinux permissions required for exec. Returns the SELinux state of a resolved
 /// elf if all required permissions are allowed.
 pub(crate) fn check_exec_access(
-    permission_check: &impl PermissionCheck,
+    security_server: &Arc<SecurityServer>,
     selinux_state: &SeLinuxThreadGroupState,
     executable_sid: SecurityId,
 ) -> Result<Option<SeLinuxResolvedElfState>, Errno> {
@@ -36,15 +39,16 @@ pub(crate) fn check_exec_access(
         // Use the proc exec SID if set.
         exec_sid
     } else {
-        // TODO(http://b/320436714): Check typetransition rules from the current security
-        // context to the executable's security context. If none, use the current security
-        // context.
-        current_sid
+        security_server
+            .compute_new_sid(current_sid, executable_sid, ObjectClass::Process)
+            .map_err(|_| errno!(EACCES))?
+        // TODO(http://b/319232900): validate that the new context is valid, and return EACCESS if
+        // it's not.
     };
     if current_sid == new_sid {
         // To `exec()` a binary in the caller's domain, the caller must be granted
         // "execute_no_trans" permission to the binary.
-        if !permission_check.has_permission(
+        if !security_server.has_permission(
             current_sid,
             executable_sid,
             FilePermission::ExecuteNoTrans,
@@ -54,11 +58,11 @@ pub(crate) fn check_exec_access(
         }
     } else {
         // Domain transition, check that transition is allowed.
-        if !permission_check.has_permission(current_sid, new_sid, ProcessPermission::Transition) {
+        if !security_server.has_permission(current_sid, new_sid, ProcessPermission::Transition) {
             return error!(EACCES);
         }
         // Check that the executable file has an entry point into the new domain.
-        if !permission_check.has_permission(new_sid, executable_sid, FilePermission::Entrypoint) {
+        if !security_server.has_permission(new_sid, executable_sid, FilePermission::Entrypoint) {
             // TODO(http://b/330904217): once filesystems are labeled, deny access.
             log_debug!("entrypoint permission is denied, ignoring.");
         }
@@ -241,9 +245,8 @@ pub struct SeLinuxResolvedElfState {
 mod tests {
     use super::*;
     use crate::testing::{create_kernel_and_task, create_kernel_and_task_with_selinux};
-    use selinux::security_server::{Mode, SecurityServer};
+    use selinux::security_server::Mode;
     use starnix_uapi::signals::SIGTERM;
-    use std::sync::Arc;
 
     const HOOKS_TESTS_BINARY_POLICY: &[u8] =
         include_bytes!("../../../lib/selinux/testdata/micro_policies/hooks_tests_policy.pp");
@@ -301,11 +304,7 @@ mod tests {
         };
 
         assert_eq!(
-            check_exec_access(
-                &security_server.as_permission_check(),
-                &selinux_state,
-                executable_sid
-            ),
+            check_exec_access(&security_server, &selinux_state, executable_sid),
             Ok(Some(SeLinuxResolvedElfState { sid: exec_sid }))
         );
     }
@@ -332,11 +331,7 @@ mod tests {
         };
 
         assert_eq!(
-            check_exec_access(
-                &security_server.as_permission_check(),
-                &selinux_state,
-                executable_sid
-            ),
+            check_exec_access(&security_server, &selinux_state, executable_sid),
             error!(EACCES)
         );
     }
@@ -365,11 +360,7 @@ mod tests {
         };
 
         assert_eq!(
-            check_exec_access(
-                &security_server.as_permission_check(),
-                &selinux_state,
-                executable_sid
-            ),
+            check_exec_access(&security_server, &selinux_state, executable_sid),
             error!(EACCES)
         );
     }
@@ -394,11 +385,7 @@ mod tests {
         };
 
         assert_eq!(
-            check_exec_access(
-                &security_server.as_permission_check(),
-                &selinux_state,
-                executable_sid
-            ),
+            check_exec_access(&security_server, &selinux_state, executable_sid),
             Ok(Some(SeLinuxResolvedElfState { sid: current_sid }))
         );
     }
@@ -426,11 +413,7 @@ mod tests {
         // There is no `execute_no_trans` allow statement from `current_sid` to `executable_sid`,
         // expect access denied.
         assert_eq!(
-            check_exec_access(
-                &security_server.as_permission_check(),
-                &selinux_state,
-                executable_sid
-            ),
+            check_exec_access(&security_server, &selinux_state, executable_sid),
             error!(EACCES)
         );
     }

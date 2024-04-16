@@ -335,6 +335,9 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         &self.conditional_booleans.data
     }
 
+    #[allow(dead_code)]
+    // TODO(http://b/334968228): fn to be used again when checking role allow rules separately from
+    // SID calculation.
     pub(crate) fn role_allowlist(&self) -> &[RoleAllow] {
         PS::deref_slice(&self.role_allowlist.data)
     }

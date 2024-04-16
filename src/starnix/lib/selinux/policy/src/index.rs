@@ -6,7 +6,7 @@ use super::{
     error::NewSecurityContextError,
     extensible_bitmap::ExtensibleBitmapSpan,
     parser::ParseStrategy,
-    security_context,
+    security_context::{self, SecurityLevel},
     symbols::{
         Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, MlsLevel,
         Permission,
@@ -137,77 +137,80 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         class: &sc::FileClass,
     ) -> Result<SecurityContext, NewSecurityContextError> {
         let object_class = sc::ObjectClass::from(class.clone());
-        let policy_class = self.class(&object_class);
+        self.new_security_context(
+            source,
+            target,
+            &object_class,
+            // The SELinux notebook states the role component defaults to the object_r role.
+            self.cached_object_r_role,
+            // The SELinux notebook states the type component defaults to the type of the parent
+            // directory.
+            target.type_(),
+            // The SELinux notebook states the range/level component defaults to the low/current
+            // level of the creating process.
+            source.low_level(),
+            None,
+        )
+    }
+
+    /// Calculates a new security context, as follows:
+    ///
+    /// - user: the `source` user, unless the policy contains a default_user statement for `class`.
+    /// - role:
+    ///     - if the policy contains a role_transition from the `source` role to the `target` type,
+    ///       use the transition role
+    ///     - otherwise, if the policy contains a default_role for `class`, use that default role
+    ///     - lastly, if the policy does not contain either, use `default_role`.
+    /// - type:
+    ///     - if the policy contains a type_transition from the `source` type to the `target` type,
+    ///       use the transition type
+    ///     - otherwise, if the policy contains a default_type for `class`, use that default type
+    ///     - lastly, if the policy does not contain either, use `default_type`.
+    /// - range
+    ///     - if the policy contains a range_transition from the `source` type to the `target` type,
+    ///       use the transition range
+    ///     - otherwise, if the policy contains a default_range for `class`, use that default range
+    ///     - lastly, if the policy does not contain either, use the `default_low_level` -
+    ///       `default_high_level` range.
+    pub fn new_security_context(
+        &self,
+        source: &SecurityContext,
+        target: &SecurityContext,
+        class: &sc::ObjectClass,
+        default_role: RoleId,
+        default_type: TypeId,
+        default_low_level: &SecurityLevel,
+        default_high_level: Option<&SecurityLevel>,
+    ) -> Result<SecurityContext, NewSecurityContextError> {
+        let policy_class = self.class(&class);
         let class_defaults = policy_class.defaults();
 
-        // The SELinux notebook states:
-        //
-        // The user component is inherited from the creating process (policy version 27 allows a
-        // default_user of source or target to be defined for each object class).
         let user = match class_defaults.user() {
             ClassDefault::Source => source.user(),
             ClassDefault::Target => target.user(),
             _ => source.user(),
         };
 
-        // The SELinux notebook states:
-        //
-        // The role component generally defaults to the object_r role (policy version 26 allows a
-        // role_transition and version 27 allows a default_role of source or target to be defined
-        // for each object class).
         let role = match self.role_transition_new_role(source.role(), target.type_(), policy_class)
         {
-            Some(new_role) => {
-                if !self.role_transition_is_explicitly_allowed(source.role(), new_role) {
-                    return Err(NewSecurityContextError::RoleTransitionNotAllowed {
-                        source_security_context: source.clone(),
-                        target_security_context: target.clone(),
-                        source_role: String::from_utf8(
-                            self.parsed_policy.role(source.role()).name_bytes().to_vec(),
-                        )
-                        .unwrap(),
-                        new_role: String::from_utf8(
-                            self.parsed_policy.role(new_role).name_bytes().to_vec(),
-                        )
-                        .unwrap(),
-                    });
-                }
-
-                new_role
-            }
+            Some(new_role) => new_role,
             None => match class_defaults.role() {
                 ClassDefault::Source => source.role(),
                 ClassDefault::Target => target.role(),
-                _ => self.cached_object_r_role,
+                _ => default_role,
             },
         };
 
-        // The SELinux notebook states:
-        //
-        // The type component defaults to the type of the parent directory if no matching
-        // type_transition rule was specified in the policy (policy version 25 allows a filename
-        // type_transition rule and version 28 allows a default_type of source or target to be
-        // defined for each object class).
         let type_ =
             match self.type_transition_new_type(source.type_(), target.type_(), policy_class) {
                 Some(new_type) => new_type,
-                None => {
-                    match class_defaults.type_() {
-                        ClassDefault::Source => source.type_(),
-                        ClassDefault::Target => target.type_(),
-                        // The "parent directory" in this context is the target. (The source is the
-                        // process creating the file-like object.)
-                        _ => target.type_(),
-                    }
-                }
+                None => match class_defaults.type_() {
+                    ClassDefault::Source => source.type_(),
+                    ClassDefault::Target => target.type_(),
+                    _ => default_type,
+                },
             };
 
-        // The SELinux notebook states:
-        //
-        // The range/level component defaults to the low/current level of the creating process if no
-        // matching range_transition rule was specified in the policy (policy version 27 allows a
-        // default_range of source or target with the selected range being low, high or low-high to
-        // be defined for each object class).
         let (low_level, high_level) =
             match self.range_transition_new_range(source.type_(), target.type_(), policy_class) {
                 Some((low_level, high_level)) => (low_level, high_level),
@@ -226,7 +229,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
                     ClassDefaultRange::TargetLowHigh => {
                         (target.low_level().clone(), target.high_level().map(Clone::clone))
                     }
-                    _ => (source.low_level().clone(), None),
+                    _ => (default_low_level.clone(), default_high_level.map(Clone::clone)),
                 },
             };
 
@@ -287,6 +290,9 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
             .map(|x| x.new_role())
     }
 
+    #[allow(dead_code)]
+    // TODO(http://b/334968228): fn to be used again when checking role allow rules separately from
+    // SID calculation.
     fn role_transition_is_explicitly_allowed(&self, source_role: RoleId, new_role: RoleId) -> bool {
         self.parsed_policy
             .role_allowlist()

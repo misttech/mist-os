@@ -12,7 +12,8 @@ use crate::{
 use anyhow::Context as _;
 use fuchsia_zircon::{self as zx};
 use selinux_common::{
-    AbstractObjectClass, ClassPermission, FileClass, InitialSid, Permission, FIRST_UNUSED_SID,
+    AbstractObjectClass, ClassPermission, FileClass, InitialSid, ObjectClass, Permission,
+    FIRST_UNUSED_SID,
 };
 use selinux_policy::{
     metadata::HandleUnknown, parse_policy_by_value, parser::ByValue, AccessVector,
@@ -414,6 +415,28 @@ impl SecurityServer {
             .context("computing new file security context from policy")
     }
 
+    pub fn compute_new_sid(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: ObjectClass,
+    ) -> Result<SecurityId, anyhow::Error> {
+        let mut state = self.state.lock();
+
+        let policy = state.policy.as_ref().expect("policy should be loaded");
+
+        // Policy is loaded, so `sid_to_security_context()` will not panic.
+        let source_context = state.sid_to_security_context(source_sid);
+        let target_context = state.sid_to_security_context(target_sid);
+
+        policy
+            .parsed
+            .new_security_context(source_context, target_context, &target_class)
+            .map(|sc| state.security_context_to_sid(sc))
+            .map_err(anyhow::Error::from)
+            .context("computing new security context from policy")
+    }
+
     /// Returns a read-only VMO containing the SELinux "status" structure.
     pub fn get_status_vmo(&self) -> Arc<zx::Vmo> {
         self.state.lock().status.get_readonly_vmo()
@@ -528,7 +551,6 @@ mod tests {
     use super::*;
 
     use fuchsia_zircon::AsHandleRef as _;
-    use selinux_common::ObjectClass;
     use std::mem::size_of;
     use zerocopy::{FromBytes, FromZeroes};
 
