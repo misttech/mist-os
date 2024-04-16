@@ -113,8 +113,8 @@ use crate::model::resolver::Resolver;
 pub static SHUTDOWN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60 * 60);
 
 // LINT.IfChange
-/// Set the size of the inspect VMO to be 300 KiB.
-const INSPECTOR_SIZE: usize = 300 * 1024;
+/// Set the size of the inspect VMO to be 350 KiB.
+const INSPECTOR_SIZE: usize = 350 * 1024;
 // LINT.ThenChange(/src/tests/diagnostics/meta/component_manager_status_tests.cml)
 
 pub struct BuiltinEnvironmentBuilder {
