@@ -59,8 +59,11 @@ async fn new_model_with(
     additional_hooks: Vec<HooksRegistration>,
 ) -> (Arc<Model>, Arc<Mutex<BuiltinEnvironment>>, Arc<MockRunner>) {
     let TestModelResult { model, builtin_environment, mock_runner, .. } =
-        TestEnvironmentBuilder::new().set_components(components).build().await;
-    model.root().hooks.install(additional_hooks).await;
+        TestEnvironmentBuilder::new()
+            .set_components(components)
+            .set_hooks(additional_hooks)
+            .build()
+            .await;
     (model, builtin_environment, mock_runner)
 }
 

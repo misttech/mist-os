@@ -4,7 +4,7 @@
 
 use {
     crate::model::{
-        actions::{ActionKey, DiscoverAction},
+        actions::{ActionKey, ActionSet, DiscoverAction},
         component::{manager::ComponentManagerInstance, ComponentInstance, StartReason},
         context::ModelContext,
         environment::Environment,
@@ -88,9 +88,9 @@ impl Model {
 
     /// Discovers the root component, providing it with `dict_for_root`.
     pub async fn discover_root_component(self: &Arc<Model>, input_for_root: ComponentInput) {
-        let mut actions = self.root.lock_actions().await;
-        // This returns a Future that does not need to be polled.
-        let _ = actions.register_no_wait(&self.root, DiscoverAction::new(input_for_root)).await;
+        ActionSet::register(self.root.clone(), DiscoverAction::new(input_for_root))
+            .await
+            .expect("failed to discover root component");
     }
 
     /// Starts root, starting the component tree.

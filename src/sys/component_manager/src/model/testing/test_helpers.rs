@@ -243,6 +243,7 @@ pub struct TestEnvironmentBuilder {
     component_id_index_path: Option<Utf8PathBuf>,
     realm_moniker: Option<Moniker>,
     hooks: Vec<HooksRegistration>,
+    front_hooks: Vec<HooksRegistration>,
 }
 
 impl TestEnvironmentBuilder {
@@ -255,6 +256,7 @@ impl TestEnvironmentBuilder {
             component_id_index_path: None,
             realm_moniker: None,
             hooks: vec![],
+            front_hooks: vec![],
         }
     }
 
@@ -296,6 +298,11 @@ impl TestEnvironmentBuilder {
         self
     }
 
+    pub fn set_front_hooks(mut self, hooks: Vec<HooksRegistration>) -> Self {
+        self.front_hooks = hooks;
+        self
+    }
+
     /// Returns a `Model` and `BuiltinEnvironment` suitable for most tests.
     pub async fn build(mut self) -> TestModelResult {
         let mock_runner = Arc::new(MockRunner::new());
@@ -331,10 +338,11 @@ impl TestEnvironmentBuilder {
                 .await
                 .expect("builtin environment setup failed"),
         ));
-        builtin_environment.lock().await.discover_root_component().await;
         let model = builtin_environment.lock().await.model.clone();
 
         model.root().hooks.install(self.hooks).await;
+        model.root().hooks.install_front(self.front_hooks).await;
+        builtin_environment.lock().await.discover_root_component().await;
 
         // Host framework service for `moniker`, if requested.
         let realm_proxy = if let Some(moniker) = self.realm_moniker {

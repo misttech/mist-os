@@ -1400,7 +1400,6 @@ pub mod tests {
         let mut event_stream = event_source
             .subscribe(
                 vec![
-                    EventType::Discovered.into(),
                     EventType::Resolved.into(),
                     EventType::Started.into(),
                     EventType::DebugStarted.into(),
@@ -1427,8 +1426,6 @@ pub mod tests {
         }
         .remote_handle();
         fasync::Task::spawn(f).detach();
-        let discovered_timestamp =
-            wait_until_event_get_timestamp(&mut event_stream, EventType::Discovered).await;
         let resolved_timestamp =
             wait_until_event_get_timestamp(&mut event_stream, EventType::Resolved).await;
         let started_timestamp =
@@ -1436,7 +1433,6 @@ pub mod tests {
         let debug_started_timestamp =
             wait_until_event_get_timestamp(&mut event_stream, EventType::DebugStarted).await;
 
-        assert!(discovered_timestamp < resolved_timestamp);
         assert!(resolved_timestamp < started_timestamp);
         assert!(started_timestamp == debug_started_timestamp);
 

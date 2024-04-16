@@ -367,18 +367,16 @@ mod tests {
         ) -> Self {
             // Init model.
             let config = RuntimeConfig { list_children_batch_size: 2, ..Default::default() };
+            let hook = Arc::new(TestHook::new());
             let TestModelResult { model, builtin_environment, mock_runner, .. } =
                 TestEnvironmentBuilder::new()
                     .set_runtime_config(config)
                     .set_components(components)
+                    // Install TestHook at the front so that when we receive an event the hook has
+                    // already run so the result is reflected in its printout
+                    .set_front_hooks(hook.hooks())
                     .build()
                     .await;
-
-            let hook = Arc::new(TestHook::new());
-            let hooks = hook.hooks();
-            // Install TestHook at the front so that when we receive an event the hook has already
-            // run so the result is reflected in its printout
-            model.root().hooks.install_front(hooks).await;
 
             // Look up and start component.
             let component = model
