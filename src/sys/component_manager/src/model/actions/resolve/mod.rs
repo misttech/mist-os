@@ -17,29 +17,41 @@ use {
     ::routing::{component_instance::ComponentInstanceInterface, resolving::ComponentAddress},
     async_trait::async_trait,
     cm_util::io::clone_dir,
+    cm_util::{AbortError, AbortHandle, AbortableScope},
     std::{ops::DerefMut, sync::Arc},
 };
 
 /// Resolves a component instance's declaration and initializes its state.
-pub struct ResolveAction {}
+pub struct ResolveAction {
+    abort_handle: AbortHandle,
+    abortable_scope: AbortableScope,
+}
 
 impl ResolveAction {
     pub fn new() -> Self {
-        Self {}
+        let (abortable_scope, abort_handle) = AbortableScope::new();
+        Self { abort_handle, abortable_scope }
     }
 }
 
 #[async_trait]
 impl Action for ResolveAction {
     async fn handle(self, component: Arc<ComponentInstance>) -> Result<(), ActionError> {
-        do_resolve(&component).await.map_err(Into::into)
+        do_resolve(&component, self.abortable_scope).await.map_err(Into::into)
     }
     fn key(&self) -> ActionKey {
         ActionKey::Resolve
     }
+
+    fn abort_handle(&self) -> Option<AbortHandle> {
+        Some(self.abort_handle.clone())
+    }
 }
 
-async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<(), ResolveActionError> {
+async fn do_resolve(
+    component: &Arc<ComponentInstance>,
+    abortable_scope: AbortableScope,
+) -> Result<(), ResolveActionError> {
     {
         let state = component.lock_state().await;
         if state.is_shut_down() {
@@ -84,12 +96,21 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<(), ResolveAct
                     err,
                 }
             })?;
-        let component_info =
-            component.environment.resolve(&component_address).await.map_err(|err| {
-                ResolveActionError::ResolverError { url: component.component_url.clone(), err }
-            })?;
-        let component_info =
-            Component::resolve_with_config(component_info, component.config_parent_overrides())?;
+        let component_info = abortable_scope
+            .run(async {
+                let component_info =
+                    component.environment.resolve(&component_address).await.map_err(|err| {
+                        ResolveActionError::ResolverError {
+                            url: component.component_url.clone(),
+                            err,
+                        }
+                    })?;
+                Component::resolve_with_config(component_info, component.config_parent_overrides())
+            })
+            .await
+            .map_err(|_: AbortError| ResolveActionError::Aborted {
+                moniker: component.moniker.clone(),
+            })??;
         let policy = component.context.abi_revision_policy();
         policy
             .check_compatibility(
@@ -168,7 +189,8 @@ pub mod tests {
         crate::model::{
             actions::test_utils::{is_resolved, is_stopped},
             actions::{
-                ActionSet, ResolveAction, ShutdownAction, ShutdownType, StartAction, StopAction,
+                Action, ActionSet, ResolveAction, ShutdownAction, ShutdownType, StartAction,
+                StopAction,
             },
             component::{IncomingCapabilities, StartReason},
             error::{ActionError, ResolveActionError},
@@ -176,16 +198,10 @@ pub mod tests {
         },
         assert_matches::assert_matches,
         cm_rust_testing::ComponentDeclBuilder,
+        futures::{channel::oneshot, FutureExt},
         moniker::{Moniker, MonikerBase},
     };
 
-    /// Check unresolve for _nonrecursive_ case. The system has a root with the child `a` and `a`
-    /// has descendants as shown in the diagram below.
-    ///  a
-    ///   \
-    ///    b
-    ///
-    /// Also tests UnresolveAction on InstanceState::Unresolved.
     #[fuchsia::test]
     async fn resolve_action_test() {
         let components = vec![
@@ -227,5 +243,44 @@ pub mod tests {
         );
         assert!(!is_resolved(&component_a).await);
         assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
+    }
+
+    /// Tests that a resolve action can be cancelled while it's waiting on the resolver.
+    #[fuchsia::test]
+    async fn cancel_resolve_test() {
+        let components = vec![
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            ("a", component_decl_with_test_runner()),
+        ];
+
+        let test = ActionsTest::new("root", components, None).await;
+
+        let (resolved_tx, resolved_rx) = oneshot::channel::<()>();
+        let (_continue_tx, continue_rx) = oneshot::channel::<()>();
+        test.resolver.add_blocker("a", resolved_tx, continue_rx).await;
+
+        let component_root = test.look_up(Moniker::root()).await;
+        let component_a = component_root.find(&vec!["a"].try_into().unwrap()).await.unwrap();
+        let resolve_action = ResolveAction::new();
+        let resolve_abort_handle = resolve_action.abort_handle().unwrap();
+        let resolve_fut =
+            component_a.lock_actions().await.register_no_wait(&component_a, resolve_action).await;
+        let resolve_fut_2 =
+            component_a.lock_actions().await.wait(ResolveAction::new()).await.unwrap();
+
+        // Wait until routing reaches resolution.
+        let _ = resolved_rx.await.unwrap();
+
+        // Resolution should not be finished yet.
+        assert!(resolve_fut_2.now_or_never().is_none());
+
+        // Cancel the resolve action.
+        resolve_abort_handle.abort();
+
+        // We should now see the abort error from the action.
+        assert_matches!(
+            resolve_fut.await,
+            Err(ActionError::ResolveError { err: ResolveActionError::Aborted { .. } })
+        );
     }
 }

@@ -284,7 +284,7 @@ impl RoutingTest {
         }
         for (name, blocker) in builder.blockers {
             let (send, recv) = blocker;
-            mock_resolver.add_blocker(name, send, recv);
+            mock_resolver.add_blocker(name, send, recv).await;
         }
         for (path, values) in builder.configs {
             mock_resolver.add_config_values(&path, values);

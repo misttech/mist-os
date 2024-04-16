@@ -50,7 +50,9 @@ use {
 pub struct MockResolver {
     components: HashMap<String, ComponentDecl>,
     configs: HashMap<String, ConfigValuesData>,
-    blockers: HashMap<String, Arc<Mutex<Option<(oneshot::Sender<()>, oneshot::Receiver<()>)>>>>,
+    blockers: Arc<
+        Mutex<HashMap<String, Arc<Mutex<Option<(oneshot::Sender<()>, oneshot::Receiver<()>)>>>>>,
+    >,
 }
 
 impl MockResolver {
@@ -58,7 +60,7 @@ impl MockResolver {
         MockResolver {
             components: HashMap::new(),
             configs: HashMap::new(),
-            blockers: HashMap::new(),
+            blockers: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -104,7 +106,7 @@ impl MockResolver {
             ServerEnd::new(server.into_channel()),
         );
 
-        if let Some(blocker) = self.blockers.get(name) {
+        if let Some(blocker) = self.blockers.lock().await.get(name).cloned() {
             let mut blocker = blocker.lock().await;
             if let Some(blocker) = blocker.take() {
                 let (send, recv) = blocker;
@@ -133,13 +135,16 @@ impl MockResolver {
         self.configs.insert(path.to_string(), values);
     }
 
-    pub fn add_blocker(
-        &mut self,
+    pub async fn add_blocker(
+        &self,
         path: &str,
         send: oneshot::Sender<()>,
         recv: oneshot::Receiver<()>,
     ) {
-        self.blockers.insert(path.to_string(), Arc::new(Mutex::new(Some((send, recv)))));
+        self.blockers
+            .lock()
+            .await
+            .insert(path.to_string(), Arc::new(Mutex::new(Some((send, recv)))));
     }
 
     pub fn get_component_decl(&self, name: &str) -> Option<ComponentDecl> {

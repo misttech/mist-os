@@ -559,6 +559,8 @@ pub enum ResolveActionError {
     },
     #[error(transparent)]
     Policy(#[from] PolicyError),
+    #[error("Couldn't resolve `{moniker}` because the action was interrupted")]
+    Aborted { moniker: Moniker },
 }
 
 impl ResolveActionError {
@@ -572,6 +574,7 @@ impl ResolveActionError {
             ResolveActionError::ExposeDirError { .. }
             | ResolveActionError::AddStaticChildError { .. }
             | ResolveActionError::StructuredConfigError { .. }
+            | ResolveActionError::Aborted { .. }
             | ResolveActionError::PackageDirProxyCreateError { .. } => zx::Status::INTERNAL,
             ResolveActionError::ResolverError { err, .. } => err.as_zx_status(),
             ResolveActionError::Policy(err) => err.as_zx_status(),
@@ -598,6 +601,7 @@ impl Into<fsys::ResolveError> for ResolveActionError {
             | ResolveActionError::AddStaticChildError { .. }
             | ResolveActionError::DiscoverActionError { .. }
             | ResolveActionError::AbiCompatibilityError { .. }
+            | ResolveActionError::Aborted { .. }
             | ResolveActionError::PackageDirProxyCreateError { .. } => fsys::ResolveError::Internal,
             ResolveActionError::Policy(_) => fsys::ResolveError::PolicyError,
         }
@@ -624,6 +628,7 @@ impl Into<fsys::StartError> for ResolveActionError {
             | ResolveActionError::AddStaticChildError { .. }
             | ResolveActionError::DiscoverActionError { .. }
             | ResolveActionError::AbiCompatibilityError { .. }
+            | ResolveActionError::Aborted { .. }
             | ResolveActionError::PackageDirProxyCreateError { .. } => fsys::StartError::Internal,
             ResolveActionError::Policy(_) => fsys::StartError::PolicyError,
         }
