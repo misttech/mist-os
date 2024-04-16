@@ -6,6 +6,8 @@
 
 #include "aml-fclk.h"
 
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
+
 #define FCLK_PLL_RATE(_r, _premux, _postmux, _mux_div) \
   { .rate = (_r), .premux = (_premux), .postmux = (_postmux), .mux_div = (_mux_div), }
 
@@ -18,4 +20,4 @@ static const aml_fclk_rate_table_t fclk_pll_rate_table[] = {
 
 const aml_fclk_rate_table_t* s905d2_fclk_get_rate_table(void) { return fclk_pll_rate_table; }
 
-size_t s905d2_fclk_get_rate_table_count(void) { return countof(fclk_pll_rate_table); }
+size_t s905d2_fclk_get_rate_table_count(void) { return ARRAY_SIZE(fclk_pll_rate_table); }
