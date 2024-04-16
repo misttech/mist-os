@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error, FfxError};
 use ffx_command_error::FfxContext;
 use ffx_config::EnvironmentContext;
-use ffx_core::Injector;
+use ffx_core::{downcast_injector_error, FfxInjectorError, Injector};
 use ffx_daemon::{get_daemon_proxy_single_link, is_daemon_running_at_path, DaemonConfig};
 use ffx_metrics::add_ffx_rcs_protocol_event;
 use ffx_target::{get_remote_proxy, open_target_with_fut};
@@ -180,21 +180,26 @@ impl Injector for Injection {
     // This could get called multiple times by the plugin system via multiple threads - so make sure
     // the spawning only happens one thread at a time.
     #[tracing::instrument]
-    async fn daemon_factory(&self) -> Result<DaemonProxy> {
+    async fn daemon_factory(&self) -> Result<DaemonProxy, FfxInjectorError> {
         let autostart = self.env_context.query(CONFIG_DAEMON_AUTOSTART).get().await.unwrap_or(true);
-        self.daemon_once
-            .get_or_try_init(|first_connection| {
-                let start_mode =
-                    if autostart { DaemonStart::AutoStart } else { DaemonStart::DoNotAutoStart };
-                init_daemon_proxy(
-                    start_mode,
-                    Arc::clone(&self.node),
-                    self.env_context.clone(),
-                    self.daemon_check.clone(),
-                    first_connection,
-                )
-            })
-            .await
+        downcast_injector_error(
+            self.daemon_once
+                .get_or_try_init(|first_connection| {
+                    let start_mode = if autostart {
+                        DaemonStart::AutoStart
+                    } else {
+                        DaemonStart::DoNotAutoStart
+                    };
+                    init_daemon_proxy(
+                        start_mode,
+                        Arc::clone(&self.node),
+                        self.env_context.clone(),
+                        self.daemon_check.clone(),
+                        first_connection,
+                    )
+                })
+                .await,
+        )
     }
 
     #[tracing::instrument]
@@ -303,10 +308,7 @@ async fn init_daemon_proxy(
 
     if cfg!(not(test)) && !is_daemon_running_at_path(&ascendd_path) {
         if autostart == DaemonStart::DoNotAutoStart {
-            return Err(ffx_error!(
-                "FFX Daemon was told not to autostart and no existing Daemon instance was found"
-            )
-            .into());
+            return Err(FfxInjectorError::DaemonAutostartDisabled.into());
         }
         ffx_daemon::spawn_daemon(&context).await?;
     }

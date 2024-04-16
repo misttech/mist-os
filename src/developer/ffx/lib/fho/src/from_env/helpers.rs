@@ -67,7 +67,7 @@ where
     P::Protocol: DiscoverableProtocolMarker,
 {
     let svc_name = <P::Protocol as DiscoverableProtocolMarker>::PROTOCOL_NAME;
-    let daemon = env.injector.daemon_factory().await?;
+    let daemon = env.injector.daemon_factory().await.map_err(|err| anyhow::Error::from(err))?;
     let (proxy, server_end) = create_proxy()?;
 
     daemon

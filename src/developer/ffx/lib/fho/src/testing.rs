@@ -10,7 +10,7 @@ use argh::FromArgs;
 use async_trait::async_trait;
 use ffx_command::{FfxCommandLine, Result};
 use ffx_config::EnvironmentContext;
-use ffx_core::Injector;
+use ffx_core::{downcast_injector_error, FfxInjectorError, Injector};
 use ffx_writer::Writer;
 use fidl_fuchsia_developer_ffx::{DaemonProxy, TargetProxy, VersionInfo};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
@@ -129,8 +129,8 @@ impl Default for FakeInjector {
 
 #[async_trait(?Send)]
 impl Injector for FakeInjector {
-    async fn daemon_factory(&self) -> anyhow::Result<DaemonProxy> {
-        (self.daemon_factory_closure)().await
+    async fn daemon_factory(&self) -> anyhow::Result<DaemonProxy, FfxInjectorError> {
+        downcast_injector_error((self.daemon_factory_closure)().await)
     }
 
     async fn try_daemon(&self) -> anyhow::Result<Option<DaemonProxy>> {
