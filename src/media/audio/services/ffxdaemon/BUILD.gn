@@ -20,6 +20,7 @@ rustc_binary("bin") {
   with_unit_tests = true
 
   deps = [
+    "//sdk/fidl/fuchsia.audio:fuchsia.audio_rust",
     "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
     "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_rust",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",

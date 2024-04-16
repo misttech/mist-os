@@ -12,22 +12,21 @@
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.audio.controller.DeviceControl" ],
-        },
-        {
-            protocol: [ "fuchsia.audio.controller.Player" ],
-        },
-        {
-            protocol: [ "fuchsia.audio.controller.Recorder" ],
+            protocol: [
+                "fuchsia.audio.controller.DeviceControl",
+                "fuchsia.audio.controller.Player",
+                "fuchsia.audio.controller.Recorder",
+            ],
         },
     ],
     use: [
         {
-            protocol: "fuchsia.media.Audio",
-            availability: "optional",
-        },
-        {
-            protocol: "fuchsia.ultrasound.Factory",
+            protocol: [
+                "fuchsia.audio.device.ControlCreator",
+                "fuchsia.audio.device.Registry",
+                "fuchsia.media.Audio",
+                "fuchsia.ultrasound.Factory",
+            ],
             availability: "optional",
         },
         {
@@ -48,15 +47,11 @@
     ],
     expose: [
         {
-            protocol: [ "fuchsia.audio.controller.DeviceControl" ],
-            from: "self",
-        },
-        {
-            protocol: [ "fuchsia.audio.controller.Player" ],
-            from: "self",
-        },
-        {
-            protocol: [ "fuchsia.audio.controller.Recorder" ],
+            protocol: [
+                "fuchsia.audio.controller.DeviceControl",
+                "fuchsia.audio.controller.Player",
+                "fuchsia.audio.controller.Recorder",
+            ],
             from: "self",
         },
     ],

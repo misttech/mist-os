@@ -22,6 +22,18 @@
       "short": null,
       "description": "file in WAV format containing audio signal. If not specified, ffx command will read from stdin.",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "element-id"
+        }
+      },
+      "optionality": "optional",
+      "long": "--element-id",
+      "short": null,
+      "description": "signal processing element ID, for an Endpoint element of type RingBuffer",
+      "hidden": false
     }
   ],
   "notes": [],

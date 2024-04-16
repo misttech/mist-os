@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use async_trait::async_trait;
+use fidl_fuchsia_audio as faudio;
+use fidl_fuchsia_audio_device as fadevice;
 use fidl_fuchsia_hardware_audio as fhaudio;
 use fuchsia_audio::Format;
 use fuchsia_runtime::vmar_root_self;
@@ -34,8 +36,8 @@ pub trait RingBuffer {
 /// A [RingBuffer] backed by the `fuchsia.hardware.audio.RingBuffer` protocol.
 pub struct HardwareRingBuffer {
     proxy: fhaudio::RingBufferProxy,
-    pub vmo_buffer: VmoBuffer,
-    pub driver_transfer_bytes: u64,
+    vmo_buffer: VmoBuffer,
+    driver_transfer_bytes: u64,
 }
 
 impl HardwareRingBuffer {
@@ -87,6 +89,80 @@ impl RingBuffer for HardwareRingBuffer {
 
     fn consumer_bytes(&self) -> u64 {
         self.driver_transfer_bytes
+    }
+}
+
+/// A [RingBuffer] backed by the `fuchsia.audio.device.RingBuffer` protocol.
+pub struct AudioDeviceRingBuffer {
+    proxy: fadevice::RingBufferProxy,
+    vmo_buffer: VmoBuffer,
+    producer_bytes: u64,
+    consumer_bytes: u64,
+}
+
+impl AudioDeviceRingBuffer {
+    pub async fn new(
+        proxy: fadevice::RingBufferProxy,
+        ring_buffer: faudio::RingBuffer,
+        _properties: fadevice::RingBufferProperties,
+        format: Format,
+    ) -> Result<Self, anyhow::Error> {
+        let producer_bytes =
+            ring_buffer.producer_bytes.ok_or_else(|| anyhow!("missing 'producer_bytes'"))?;
+        let consumer_bytes =
+            ring_buffer.consumer_bytes.ok_or_else(|| anyhow!("missing 'consumer_bytes'"))?;
+        let buffer = ring_buffer.buffer.ok_or_else(|| anyhow!("missing 'buffer'"))?;
+
+        let rb_format: Format = ring_buffer
+            .format
+            .clone()
+            .ok_or_else(|| anyhow!("missing 'format'"))?
+            .try_into()
+            .map_err(|err| anyhow!("invalid ring buffer format: {}", err))?;
+        if rb_format != format {
+            bail!("requested format {} does not match ring buffer format {}", format, rb_format);
+        }
+
+        let num_frames = buffer.size / (format.bytes_per_frame() as u64);
+        let vmo_buffer = VmoBuffer::new(buffer.vmo, num_frames, format)?;
+
+        Ok(Self { proxy, vmo_buffer, producer_bytes, consumer_bytes })
+    }
+}
+
+#[async_trait]
+impl RingBuffer for AudioDeviceRingBuffer {
+    async fn start(&self) -> Result<zx::Time, anyhow::Error> {
+        let response = self
+            .proxy
+            .start(&Default::default())
+            .await
+            .context("failed to call Start")?
+            .map_err(|err| anyhow!("failed to start ring buffer: {:?}", err))?;
+        let start_time = response.start_time.ok_or_else(|| anyhow!("missing 'start_time'"))?;
+        Ok(zx::Time::from_nanos(start_time))
+    }
+
+    async fn stop(&self) -> Result<(), anyhow::Error> {
+        let _ = self
+            .proxy
+            .stop(&Default::default())
+            .await
+            .context("failed to call Stop")?
+            .map_err(|err| anyhow!("failed to stop ring buffer: {:?}", err))?;
+        Ok(())
+    }
+
+    fn vmo_buffer(&self) -> &VmoBuffer {
+        &self.vmo_buffer
+    }
+
+    fn producer_bytes(&self) -> u64 {
+        self.producer_bytes
+    }
+
+    fn consumer_bytes(&self) -> u64 {
+        self.consumer_bytes
     }
 }
 

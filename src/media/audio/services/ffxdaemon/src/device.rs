@@ -4,7 +4,7 @@
 
 use crate::{
     error::ControllerError,
-    ring_buffer::{HardwareRingBuffer, RingBuffer},
+    ring_buffer::{AudioDeviceRingBuffer, HardwareRingBuffer, RingBuffer},
     wav_socket::WavSocket,
 };
 use anyhow::{anyhow, Context, Error};
@@ -14,10 +14,10 @@ use fidl_fuchsia_audio_controller as fac;
 use fidl_fuchsia_audio_device as fadevice;
 use fidl_fuchsia_hardware_audio as fhaudio;
 use fuchsia_audio::{
-    device::{DevfsSelector, RegistrySelector, Selector},
+    device::{DevfsSelector, RegistrySelector},
     stop_listener, Format,
 };
-use fuchsia_component::client::connect_to_protocol_at_path;
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
 use fuchsia_zircon::{self as zx};
 use futures::{AsyncWriteExt, StreamExt};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -29,7 +29,11 @@ const SECONDS_PER_NANOSECOND: f64 = 1.0 / 10_u64.pow(9) as f64;
 // TODO(https://fxbug.dev/317991807): Remove #[async_trait] when supported by compiler.
 #[async_trait]
 pub trait DeviceControl {
-    async fn create_ring_buffer(&mut self, format: Format) -> Result<Box<dyn RingBuffer>, Error>;
+    async fn create_ring_buffer(
+        &mut self,
+        element_id: fadevice::ElementId,
+        format: Format,
+    ) -> Result<Box<dyn RingBuffer>, Error>;
     fn set_gain(&mut self, gain_state: fhaudio::GainState) -> Result<(), Error>;
 }
 
@@ -39,7 +43,11 @@ pub struct StreamConfigDevice {
 
 #[async_trait]
 impl DeviceControl for StreamConfigDevice {
-    async fn create_ring_buffer(&mut self, format: Format) -> Result<Box<dyn RingBuffer>, Error> {
+    async fn create_ring_buffer(
+        &mut self,
+        _element_id: fadevice::ElementId,
+        format: Format,
+    ) -> Result<Box<dyn RingBuffer>, Error> {
         let (ring_buffer_proxy, ring_buffer_server) =
             create_proxy::<fhaudio::RingBufferMarker>().unwrap();
         self.proxy.create_ring_buffer(&fhaudio::Format::from(format), ring_buffer_server)?;
@@ -59,7 +67,11 @@ pub struct CompositeDevice {
 
 #[async_trait]
 impl DeviceControl for CompositeDevice {
-    async fn create_ring_buffer(&mut self, _format: Format) -> Result<Box<dyn RingBuffer>, Error> {
+    async fn create_ring_buffer(
+        &mut self,
+        _element_id: fadevice::ElementId,
+        _format: Format,
+    ) -> Result<Box<dyn RingBuffer>, Error> {
         Err(anyhow!("Creating ring buffers for Composite devices not supported yet in ffx audio."))
     }
 
@@ -70,8 +82,63 @@ impl DeviceControl for CompositeDevice {
     }
 }
 
+pub struct RegistryDevice {
+    proxy: fadevice::ControlProxy,
+}
+
+impl RegistryDevice {
+    fn new(proxy: fadevice::ControlProxy) -> Self {
+        Self { proxy }
+    }
+}
+
+#[async_trait]
+impl DeviceControl for RegistryDevice {
+    async fn create_ring_buffer(
+        &mut self,
+        element_id: fadevice::ElementId,
+        format: Format,
+    ) -> Result<Box<dyn RingBuffer>, Error> {
+        let (ring_buffer_proxy, ring_buffer_server) =
+            create_proxy::<fadevice::RingBufferMarker>().unwrap();
+
+        // Request at least 100ms worth of frames.
+        let min_frames = format.frames_per_second / 10;
+        let min_bytes = min_frames * format.bytes_per_frame();
+
+        let options = fadevice::RingBufferOptions {
+            format: Some(format.into()),
+            ring_buffer_min_bytes: Some(min_bytes),
+            ..Default::default()
+        };
+
+        let response = self
+            .proxy
+            .create_ring_buffer(fadevice::ControlCreateRingBufferRequest {
+                element_id: Some(element_id),
+                options: Some(options),
+                ring_buffer_server: Some(ring_buffer_server),
+                ..Default::default()
+            })
+            .await
+            .context("Failed to call CreateRingBuffer")?
+            .map_err(|err| anyhow!("Failed to create ring buffer: {err:?}"))?;
+        let properties = response.properties.ok_or_else(|| anyhow!("missing 'properties'"))?;
+        let ring_buffer = response.ring_buffer.ok_or_else(|| anyhow!("missing 'ring_buffer'"))?;
+
+        let ring_buffer =
+            AudioDeviceRingBuffer::new(ring_buffer_proxy, ring_buffer, properties, format).await?;
+
+        Ok(Box::new(ring_buffer))
+    }
+
+    fn set_gain(&mut self, _gain_state: fhaudio::GainState) -> Result<(), Error> {
+        Err(anyhow!("set gain is not supported for Registry devices"))
+    }
+}
+
 /// Connects to the device protocol for a device in devfs.
-pub fn connect_to_devfs(devfs: DevfsSelector) -> Result<Box<dyn DeviceControl>, Error> {
+pub fn connect_to_devfs_device(devfs: DevfsSelector) -> Result<Box<dyn DeviceControl>, Error> {
     let protocol_path = devfs.path().join("device_protocol");
 
     match devfs.0.device_type {
@@ -99,8 +166,25 @@ pub fn connect_to_devfs(devfs: DevfsSelector) -> Result<Box<dyn DeviceControl>, 
     }
 }
 
-fn connect_to_registry(_selector: RegistrySelector) -> Result<Box<dyn DeviceControl>, Error> {
-    Err(anyhow!("TODO(https://fxbug.dev/329150383) ffx audio supports fuchsia.audio (ADR) devices"))
+pub async fn connect_to_registry_device(
+    selector: RegistrySelector,
+) -> Result<Box<dyn DeviceControl>, Error> {
+    let control_creator = connect_to_protocol::<fadevice::ControlCreatorMarker>()
+        .context("Failed to connect to ControlCreator")?;
+
+    let (proxy, server_end) = create_proxy::<fadevice::ControlMarker>().unwrap();
+
+    control_creator
+        .create(fadevice::ControlCreatorCreateRequest {
+            token_id: Some(selector.token_id()),
+            control_server: Some(server_end),
+            ..Default::default()
+        })
+        .await
+        .context("failed to call ControlCreator.Create")?
+        .map_err(|err| anyhow!("failed to create Control: {:?}", err))?;
+
+    Ok(Box::new(RegistryDevice::new(proxy)))
 }
 
 pub struct Device {
@@ -108,14 +192,9 @@ pub struct Device {
 }
 
 impl Device {
-    pub fn new_from_selector(selector: Selector) -> Result<Self, Error> {
-        let device_controller = match selector {
-            Selector::Devfs(selector) => connect_to_devfs(selector)?,
-            Selector::Registry(selector) => connect_to_registry(selector)?,
-        };
-        Ok(Self { device_controller })
+    pub fn new(device_controller: Box<dyn DeviceControl>) -> Self {
+        Self { device_controller }
     }
-
     pub fn set_gain(&mut self, gain_state: fhaudio::GainState) -> Result<(), Error> {
         self.device_controller
             .set_gain(gain_state)
@@ -124,12 +203,13 @@ impl Device {
 
     pub async fn play(
         &mut self,
+        element_id: fadevice::ElementId,
         mut socket: WavSocket,
     ) -> Result<fac::PlayerPlayResponse, ControllerError> {
         let spec = socket.read_header().await?;
         let format = Format::from(spec);
 
-        let ring_buffer = self.device_controller.create_ring_buffer(format).await?;
+        let ring_buffer = self.device_controller.create_ring_buffer(element_id, format).await?;
 
         let mut silenced_frames = 0u64;
         let mut late_wakeups = 0;
@@ -282,12 +362,13 @@ impl Device {
 
     pub async fn record(
         &mut self,
+        element_id: fadevice::ElementId,
         format: Format,
         mut socket: WavSocket,
         duration: Option<Duration>,
         cancel_server: Option<ServerEnd<fac::RecordCancelerMarker>>,
     ) -> Result<fac::RecorderRecordResponse, ControllerError> {
-        let ring_buffer = self.device_controller.create_ring_buffer(format).await?;
+        let ring_buffer = self.device_controller.create_ring_buffer(element_id, format).await?;
 
         // Hardware might not use all bytes in vmo. Only want to read frames hardware will write to.
         let bytes_in_rb = ring_buffer.vmo_buffer().data_size_bytes();

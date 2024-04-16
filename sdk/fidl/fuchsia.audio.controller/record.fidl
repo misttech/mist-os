@@ -45,7 +45,7 @@ open protocol Recorder {
             2: loopback struct {};
 
             /// A device ring buffer.
-            3: device_ring_buffer DeviceSelector;
+            3: device_ring_buffer DeviceRingBuffer;
         };
 
         /// The stream format in which to record the audio.

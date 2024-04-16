@@ -34,6 +34,18 @@
       "short": null,
       "description": "output format (see 'ffx audio help' for more information).",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "element-id"
+        }
+      },
+      "optionality": "optional",
+      "long": "--element-id",
+      "short": null,
+      "description": "signal processing element ID, for an Endpoint element of type RingBuffer",
+      "hidden": false
     }
   ],
   "notes": [],

@@ -11,7 +11,7 @@ mod ring_buffer;
 mod wav_socket;
 
 use capturer::Capturer;
-use device::Device;
+use device::{Device, DeviceControl};
 use renderer::Renderer;
 use wav_socket::WavSocket;
 
@@ -61,7 +61,10 @@ pub async fn handle_play_request(
 
             renderer.play(wav_socket).await
         }
-        fac::PlayDestination::DeviceRingBuffer(fidl_selector) => {
+        fac::PlayDestination::DeviceRingBuffer(fac::DeviceRingBuffer {
+            selector: fidl_selector,
+            ring_buffer_element_id,
+        }) => {
             let selector = Selector::try_from(fidl_selector).map_err(|msg| {
                 ControllerError::new(
                     fac::Error::InvalidArguments,
@@ -69,13 +72,10 @@ pub async fn handle_play_request(
                 )
             })?;
 
-            let mut device = Device::new_from_selector(selector).map_err(|err| {
-                ControllerError::new(
-                    fac::Error::DeviceNotReachable,
-                    format!("Failed to connect to device with error: {err}"),
-                )
-            })?;
-            device.play(wav_socket).await
+            let device_controller = connect_to_device(selector).await?;
+            let mut device = Device::new(device_controller);
+
+            device.play(ring_buffer_element_id, wav_socket).await
         }
         fac::PlayDestinationUnknown!() => Err(ControllerError::new(
             fac::Error::InvalidArguments,
@@ -133,7 +133,10 @@ pub async fn handle_record_request(
 
             capturer.record(wav_socket, duration, request.canceler, request.buffer_size).await
         }
-        fac::RecordSource::DeviceRingBuffer(fidl_selector) => {
+        fac::RecordSource::DeviceRingBuffer(fac::DeviceRingBuffer {
+            selector: fidl_selector,
+            ring_buffer_element_id,
+        }) => {
             let selector = Selector::try_from(fidl_selector).map_err(|msg| {
                 ControllerError::new(
                     fac::Error::InvalidArguments,
@@ -141,14 +144,12 @@ pub async fn handle_record_request(
                 )
             })?;
 
-            let mut device = Device::new_from_selector(selector).map_err(|err| {
-                ControllerError::new(
-                    fac::Error::DeviceNotReachable,
-                    format!("Failed to connect to device with error: {err}"),
-                )
-            })?;
+            let device_controller = connect_to_device(selector).await?;
+            let mut device = Device::new(device_controller);
 
-            device.record(format, wav_socket, duration, request.canceler).await
+            device
+                .record(ring_buffer_element_id, format, wav_socket, duration, request.canceler)
+                .await
         }
         fac::RecordSourceUnknown!() => {
             Err(ControllerError::new(fac::Error::InvalidArguments, format!("Unknown RecordSource")))
@@ -187,7 +188,8 @@ async fn serve_device_control(mut stream: fac::DeviceControlRequestStream) -> Re
                     .map_err(|msg| anyhow!("invalid selector: {msg}"))?;
                 let gain_state = payload.gain_state.ok_or(anyhow!("No gain state specified"))?;
 
-                let mut device = device::Device::new_from_selector(selector)?;
+                let device_controller = connect_to_device(selector).await?;
+                let mut device = Device::new(device_controller);
 
                 device.set_gain(gain_state)?;
                 responder.send(Ok(())).map_err(|e| anyhow!("Error sending response: {e}"))
@@ -203,6 +205,19 @@ async fn serve_device_control(mut stream: fac::DeviceControlRequestStream) -> Re
         }
     }
     Ok(())
+}
+
+async fn connect_to_device(selector: Selector) -> Result<Box<dyn DeviceControl>, ControllerError> {
+    match selector {
+        Selector::Devfs(selector) => device::connect_to_devfs_device(selector),
+        Selector::Registry(selector) => device::connect_to_registry_device(selector).await,
+    }
+    .map_err(|err| {
+        ControllerError::new(
+            fac::Error::DeviceNotReachable,
+            format!("Failed to connect to device with error: {err}"),
+        )
+    })
 }
 
 #[fuchsia::main(logging = true)]

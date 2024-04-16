@@ -16,16 +16,22 @@
             to: "#audio_ffx_daemon",
         },
         {
-            protocol: [ "fuchsia.media.Audio" ],
+            protocol: [
+                "fuchsia.media.Audio",
+                "fuchsia.ultrasound.Factory",
+            ],
             from: "#audio_core",
-            to: [ "#audio_ffx_daemon" ],
+            to: "#audio_ffx_daemon",
             availability: "optional",
             source_availability: "unknown",
         },
         {
-            protocol: [ "fuchsia.ultrasound.Factory" ],
-            from: "#audio_core",
-            to: [ "#audio_ffx_daemon" ],
+            protocol: [
+                "fuchsia.audio.device.ControlCreator",
+                "fuchsia.audio.device.Registry",
+            ],
+            from: "#audio_device_registry",
+            to: "#audio_ffx_daemon",
             availability: "optional",
             source_availability: "unknown",
         },

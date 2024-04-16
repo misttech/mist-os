@@ -55,7 +55,7 @@ open protocol Player {
             };
 
             /// A device ring buffer.
-            2: device_ring_buffer DeviceSelector;
+            2: device_ring_buffer DeviceRingBuffer;
         };
 
         /// Play settings.

@@ -4,6 +4,7 @@
 
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
+use fidl_fuchsia_audio_device as fadevice;
 use fuchsia_audio::{
     device::{Direction, HardwareType},
     Format,
@@ -108,6 +109,13 @@ pub struct DevicePlayCommand {
         If not specified, ffx command will read from stdin."
     )]
     pub file: Option<String>,
+
+    #[argh(
+        option,
+        description = "signal processing element ID, \
+        for an Endpoint element of type RingBuffer"
+    )]
+    pub element_id: Option<fadevice::ElementId>,
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -123,6 +131,13 @@ pub struct DeviceRecordCommand {
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
     pub format: Format,
+
+    #[argh(
+        option,
+        description = "signal processing element ID, \
+        for an Endpoint element of type RingBuffer"
+    )]
+    pub element_id: Option<fadevice::ElementId>,
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]

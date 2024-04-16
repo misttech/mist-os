@@ -105,8 +105,16 @@ impl FfxMain for DeviceTool {
                     None => Box::new(std::io::stdin()),
                 };
 
-                device_play(self.play_controller, selector, play_local, play_remote, reader, writer)
-                    .await
+                device_play(
+                    self.play_controller,
+                    selector,
+                    play_command.element_id,
+                    play_local,
+                    play_remote,
+                    reader,
+                    writer,
+                )
+                .await
             }
             SubCommand::Record(record_command) => {
                 let mut stdout = Unblock::new(std::io::stdout());
@@ -177,6 +185,7 @@ async fn device_info(
 async fn device_play(
     player_controller: fac::PlayerProxy,
     selector: Selector,
+    ring_buffer_element_id: Option<fadevice::ElementId>,
     play_local: fidl::Socket,
     play_remote: fidl::Socket,
     input_reader: Box<dyn Read + Send + 'static>,
@@ -188,9 +197,15 @@ async fn device_play(
         .duplicate_handle(fidl::Rights::SAME_RIGHTS)
         .bug_context("Error duplicating socket")?;
 
+    let ring_buffer_element_id =
+        ring_buffer_element_id.unwrap_or(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID);
+
     let request = fac::PlayerPlayRequest {
         wav_source: Some(remote_socket),
-        destination: Some(fac::PlayDestination::DeviceRingBuffer(selector.into())),
+        destination: Some(fac::PlayDestination::DeviceRingBuffer(fac::DeviceRingBuffer {
+            selector: selector.into(),
+            ring_buffer_element_id,
+        })),
         gain_settings: Some(fac::GainSettings {
             mute: None, // TODO(https://fxbug.dev/42072218)
             gain: None, // TODO(https://fxbug.dev/42072218)
@@ -230,8 +245,14 @@ where
 {
     let (record_remote, record_local) = fidl::Socket::create_datagram();
 
+    let ring_buffer_element_id =
+        record_command.element_id.unwrap_or(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID);
+
     let request = fac::RecorderRecordRequest {
-        source: Some(fac::RecordSource::DeviceRingBuffer(selector.into())),
+        source: Some(fac::RecordSource::DeviceRingBuffer(fac::DeviceRingBuffer {
+            selector: selector.into(),
+            ring_buffer_element_id,
+        })),
         stream_type: Some(fmedia::AudioStreamType::from(record_command.format)),
         duration: record_command.duration.map(|duration| duration.as_nanos() as i64),
         canceler: Some(cancel_server),
@@ -318,6 +339,8 @@ mod tests {
             device_type: fadevice::DeviceType::Output,
         });
 
+        let ring_buffer_element_id = Some(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID);
+
         let (play_remote, play_local) = fidl::Socket::create_datagram();
         let mut async_play_local = fidl::AsyncSocket::from_socket(
             play_local.duplicate_handle(fidl::Rights::SAME_RIGHTS).unwrap(),
@@ -328,6 +351,7 @@ mod tests {
         device_play(
             audio_player,
             selector,
+            ring_buffer_element_id,
             play_local,
             play_remote,
             Box::new(&ffx_audio_common::tests::WAV_HEADER_EXT[..]),
@@ -373,9 +397,19 @@ mod tests {
             device_type: fadevice::DeviceType::Output,
         });
 
-        device_play(audio_player, selector, play_local, play_remote, Box::new(file_reader), writer)
-            .await
-            .unwrap();
+        let element_id = Some(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID);
+
+        device_play(
+            audio_player,
+            selector,
+            element_id,
+            play_local,
+            play_remote,
+            Box::new(file_reader),
+            writer,
+        )
+        .await
+        .unwrap();
 
         let expected_output =
             format!("Successfully processed all audio data. Bytes processed: \"1\"\n");
@@ -401,6 +435,7 @@ mod tests {
                 frames_per_second: 48000,
                 channels: 1,
             },
+            element_id: Some(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID),
         };
 
         let selector = Selector::from(fac::Devfs {
@@ -451,6 +486,7 @@ mod tests {
                 frames_per_second: 48000,
                 channels: 1,
             },
+            element_id: Some(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID),
         };
 
         let selector = Selector::from(fac::Devfs {
