@@ -171,24 +171,23 @@ async fn handle_inspect_puppet_request(
     match request {
         fpuppet::InspectPuppetRequest::EmitExampleInspectData { responder } => {
             server.emit_example_inspect_data().await;
-            responder.send()?;
-            Ok(())
+            responder.send().expect("response succeeds")
         }
-        fpuppet::InspectPuppetRequest::RecordString { key, value, .. } => {
+        fpuppet::InspectPuppetRequest::RecordString { key, value, responder } => {
             server.record_string(key, value);
-            Ok(())
+            responder.send().expect("response succeeds")
         }
-        fpuppet::InspectPuppetRequest::RecordInt { key, value, .. } => {
+        fpuppet::InspectPuppetRequest::RecordInt { key, value, responder } => {
             server.record_int(key, value);
-            Ok(())
+            responder.send().expect("response succeeds")
         }
         fpuppet::InspectPuppetRequest::SetHealthOk { responder } => {
             server.set_health_ok();
-            responder.send()?;
-            Ok(())
+            responder.send().expect("response succeeds")
         }
         fpuppet::InspectPuppetRequest::_UnknownMethod { .. } => unreachable!(),
     }
+    Ok(())
 }
 
 async fn handle_puppet_request(
@@ -201,35 +200,32 @@ async fn handle_puppet_request(
         }
         fpuppet::PuppetRequest::EmitExampleInspectData { responder } => {
             server.emit_example_inspect_data().await;
-            responder.send()?;
-            Ok(())
+            responder.send().expect("response succeeds")
         }
         fpuppet::PuppetRequest::RecordLazyValues { key, responder } => {
             let (client, requests) = create_request_stream()?;
-            responder.send(client)?;
+            responder.send(client).expect("response succeeds");
             record_lazy_values(key, requests).await?;
-            Ok(())
         }
-        fpuppet::PuppetRequest::RecordString { key, value, .. } => {
+        fpuppet::PuppetRequest::RecordString { key, value, responder } => {
             server.record_string(key, value);
-            Ok(())
+            responder.send().expect("response succeeds")
         }
-        fpuppet::PuppetRequest::RecordInt { key, value, .. } => {
+        fpuppet::PuppetRequest::RecordInt { key, value, responder } => {
             server.record_int(key, value);
-            Ok(())
+            responder.send().expect("response succeeds")
         }
         fpuppet::PuppetRequest::SetHealthOk { responder } => {
             server.set_health_ok();
-            responder.send()?;
-            Ok(())
+            responder.send().expect("response succeeds")
         }
-        fpuppet::PuppetRequest::Println { message, .. } => {
+        fpuppet::PuppetRequest::Println { message, responder } => {
             println!("{message}");
-            Ok(())
+            responder.send().expect("response succeeds")
         }
-        fpuppet::PuppetRequest::Eprintln { message, .. } => {
+        fpuppet::PuppetRequest::Eprintln { message, responder } => {
             eprintln!("{message}");
-            Ok(())
+            responder.send().expect("response succeeds")
         }
         fpuppet::PuppetRequest::Log { payload, responder, .. } => {
             let request = LogRequest::try_from(payload).context("Log")?;
@@ -242,8 +238,7 @@ async fn handle_puppet_request(
                 Severity::Warn => warn!("{message}"),
                 _ => unimplemented!("Logging with severity: {severity:?}"),
             }
-            responder.send()?;
-            Ok(())
+            responder.send().expect("response succeeds")
         }
         fpuppet::PuppetRequest::WaitForInterestChange { responder } => {
             let mut task_group = server.interest_waiters.lock().await;
@@ -254,12 +249,12 @@ async fn handle_puppet_request(
                     severity: Some(event.severity),
                     ..Default::default()
                 };
-                responder.send(response).unwrap();
+                responder.send(response).expect("response succeeds");
             });
-            Ok(())
         }
         fpuppet::PuppetRequest::_UnknownMethod { .. } => unreachable!(),
     }
+    Ok(())
 }
 
 #[derive(Debug, Clone, ValidFidlTable)]
@@ -279,13 +274,15 @@ async fn record_lazy_values(
     let mut properties = vec![];
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
-            fpuppet::LazyInspectPuppetRequest::RecordString { key, value, .. } => {
+            fpuppet::LazyInspectPuppetRequest::RecordString { key, value, responder } => {
                 properties.push(Property::String(key, value));
+                responder.send().expect("response succeeds")
             }
-            fpuppet::LazyInspectPuppetRequest::RecordInt { key, value, .. } => {
+            fpuppet::LazyInspectPuppetRequest::RecordInt { key, value, responder } => {
                 properties.push(Property::Int(key, value));
+                responder.send().expect("response succeeds")
             }
-            fpuppet::LazyInspectPuppetRequest::Commit { options, .. } => {
+            fpuppet::LazyInspectPuppetRequest::Commit { options, responder } => {
                 component::inspector().root().record_lazy_values(key, move || {
                     let properties = properties.clone();
                     async move {
@@ -305,6 +302,7 @@ async fn record_lazy_values(
                     }
                     .boxed()
                 });
+                responder.send().expect("response succeeds");
                 return Ok(()); // drop the connection.
             }
             fpuppet::LazyInspectPuppetRequest::_UnknownMethod { .. } => unreachable!(),

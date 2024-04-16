@@ -117,12 +117,12 @@ async fn listen_for_syslog_routed_stdio() {
     assert_eq!(Some(Severity::Info), puppet.wait_for_interest_change().await.unwrap().severity);
 
     let msg = format!("logger_integration_rust test_klog stdout {}", rand::random::<u64>());
-    puppet.println(&msg).unwrap();
+    puppet.println(&msg).await.unwrap();
     info!("printed '{msg}' to stdout");
     logs.by_ref().filter(|m| futures::future::ready(m.msg().unwrap() == msg)).next().await;
 
     let msg = format!("logger_integration_rust test_klog stderr {}", rand::random::<u64>());
-    puppet.eprintln(&msg).unwrap();
+    puppet.eprintln(&msg).await.unwrap();
     info!("Printed '{msg}' to stderr");
     logs.filter(|m| futures::future::ready(m.msg().unwrap() == msg)).next().await;
 

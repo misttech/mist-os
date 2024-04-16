@@ -77,12 +77,12 @@ async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, "hanging_data").await?;
 
-    puppet.record_string("child", "value")?;
+    puppet.record_string("child", "value").await?;
 
     let lazy = puppet.record_lazy_values("lazy-node-always-hangs").await?.into_proxy()?;
-    lazy.commit(&ftest::CommitOptions { hang: Some(true), ..Default::default() })?;
+    lazy.commit(&ftest::CommitOptions { hang: Some(true), ..Default::default() }).await?;
 
-    puppet.record_int("int", 3)?;
+    puppet.record_int("int", 3).await?;
 
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await?;
     let data = ArchiveReader::new()
