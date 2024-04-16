@@ -150,12 +150,3 @@ pub async fn exec() -> Result<()> {
         },
     }
 }
-
-#[fuchsia::main(logging = false)]
-async fn main() {
-    #[allow(clippy::large_futures)]
-    if let Err(e) = exec().await {
-        eprintln!("{}", e);
-        std::process::exit(1);
-    }
-}

@@ -54,7 +54,10 @@ pub async fn explore_over_handles(
     command: Option<String>,
 ) -> Result<zx::Process, fdash::LauncherError> {
     let package_resolver = crate::package_resolver::PackageResolver::new(fuchsia_pkg_resolver)?;
-    let dir = package_resolver.resolve_subpackage(url, subpackages).await?;
+    let dir = package_resolver
+        .resolve_subpackage(url, subpackages)
+        .await
+        .map_err(|e| e.while_resolving_package_to_explore())?;
 
     // Add all the necessary entries, except for the tools, into the dash namespace.
     let name_infos =

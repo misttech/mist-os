@@ -47,7 +47,10 @@ async fn get_pkg_dirs(
     let mut dirs: Vec<PkgDir> = vec![];
     for url in tool_urls {
         let (pkg_url, resource) = parse_url(&url)?;
-        let dir = package_resolver.resolve(&pkg_url.to_string()).await?;
+        let dir = package_resolver
+            .resolve(&pkg_url.to_string())
+            .await
+            .map_err(|e| e.while_resolving_tool_package())?;
         dirs.push(PkgDir { pkg_url, dir, resource });
     }
     Ok(dirs)

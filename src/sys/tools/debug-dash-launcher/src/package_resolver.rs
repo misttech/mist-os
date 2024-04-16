@@ -32,10 +32,7 @@ impl PackageResolver {
     }
 
     /// Resolves `url` and returns a proxy to the package directory.
-    pub(crate) async fn resolve(
-        &self,
-        url: &str,
-    ) -> Result<fio::DirectoryProxy, fdash::LauncherError> {
+    pub(crate) async fn resolve(&self, url: &str) -> Result<fio::DirectoryProxy, Error> {
         self.resolve_subpackage(url, &[]).await
     }
 
@@ -45,24 +42,16 @@ impl PackageResolver {
         &self,
         url: &str,
         subpackages: &[String],
-    ) -> Result<fio::DirectoryProxy, fdash::LauncherError> {
-        let (mut dir, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .map_err(|_| fdash::LauncherError::Internal)?;
-        let mut context = self
-            .resolver
-            .resolve(url, server)
-            .await
-            .map_err(|_| fdash::LauncherError::Internal)?
-            .map_err(|_| fdash::LauncherError::PackageResolver)?;
+    ) -> Result<fio::DirectoryProxy, Error> {
+        let (mut dir, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+        let mut context = self.resolver.resolve(url, server).await?.map_err(Error::Application)?;
         for subpackage in subpackages {
-            let (sub_dir, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                .map_err(|_| fdash::LauncherError::Internal)?;
+            let (sub_dir, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
             context = self
                 .resolver
                 .resolve_with_context(subpackage, &context, server)
-                .await
-                .map_err(|_| fdash::LauncherError::Internal)?
-                .map_err(|_| fdash::LauncherError::PackageResolver)?;
+                .await?
+                .map_err(Error::Application)?;
             dir = sub_dir;
         }
         Ok(dir)
@@ -71,6 +60,30 @@ impl PackageResolver {
     #[cfg(test)]
     pub(crate) fn new_test(resolver: fpkg::PackageResolverProxy) -> Self {
         Self { resolver }
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub(crate) enum Error {
+    #[error("fuchsia.pkg/PackageResolver fidl error")]
+    Fidl(#[from] fidl::Error),
+
+    #[error("fuchsia.pkg/PackageResolver application error: {0:?}")]
+    Application(fpkg::ResolveError),
+}
+
+impl Error {
+    pub(crate) fn while_resolving_tool_package(self) -> fdash::LauncherError {
+        fdash::LauncherError::PackageResolver
+    }
+
+    pub(crate) fn while_resolving_package_to_explore(self) -> fdash::LauncherError {
+        match self {
+            Self::Application(fpkg::ResolveError::PackageNotFound) => {
+                fdash::LauncherError::ResolveTargetPackage
+            }
+            _ => fdash::LauncherError::PackageResolver,
+        }
     }
 }
 

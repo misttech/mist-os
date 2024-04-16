@@ -391,6 +391,7 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/diagnostics/iquery:bootfs",
     "//src/media/audio/tools/audio-driver-ctl:bootfs",
     "//src/security/bin/syscall-check:bootfs",
+    "//src/sys/tools/package:bootfs",
     "//src/ui/backlight/bin/backlight:bootfs",
     "//src/ui/input/bin/hid:bootfs",
 
