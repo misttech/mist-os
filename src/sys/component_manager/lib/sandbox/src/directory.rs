@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use core::fmt;
-use fidl::endpoints::{create_endpoints, ClientEnd};
+use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::sync::Arc;
-use vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, remote::RemoteLike};
+use vfs::{directory::entry::DirectoryEntry, remote::RemoteLike};
 
-use crate::{registry, CapabilityTrait, Open};
+use crate::{registry, CapabilityTrait};
 
 /// A capability that is a `fuchsia.io` directory.
 ///
@@ -30,35 +29,6 @@ impl Directory {
     /// * `client_end` - A `fuchsia.io/Directory` client endpoint.
     pub fn new(client_end: ClientEnd<fio::DirectoryMarker>) -> Self {
         Directory { client_end: Some(client_end) }
-    }
-
-    /// Create a new [Directory] capability that will open entries using the [Open] capability.
-    ///
-    /// Arguments:
-    ///
-    /// * `open_flags` - The flags that will be used to open a new connection from the [Open]
-    ///   capability.
-    pub fn from_open(open: Open, open_flags: fio::OpenFlags, scope: ExecutionScope) -> Self {
-        let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
-        scope.clone().spawn(async move {
-            // Wait for the client endpoint to be written or closed. These are the only two
-            // operations the client could do that warrants our attention.
-            let server_end = fasync::Channel::from_channel(server_end.into_channel());
-            let on_signal_fut = fasync::OnSignals::new(
-                &server_end,
-                zx::Signals::CHANNEL_READABLE | zx::Signals::CHANNEL_PEER_CLOSED,
-            );
-            let signals = on_signal_fut.await.unwrap();
-            if signals & zx::Signals::CHANNEL_READABLE != zx::Signals::NONE {
-                open.open(
-                    scope.clone(),
-                    open_flags,
-                    vfs::path::Path::dot(),
-                    server_end.into_zx_channel().into(),
-                );
-            }
-        });
-        Self::new(client_end)
     }
 
     /// Sets this directory's client end to the provided one.
@@ -134,7 +104,8 @@ impl From<Directory> for fsandbox::Capability {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl::endpoints::ServerEnd;
+    use crate::Open;
+    use fidl::endpoints::{create_endpoints, ServerEnd};
     use fidl_fuchsia_io as fio;
     use fuchsia_zircon as zx;
     use futures::channel::mpsc;
@@ -144,6 +115,7 @@ mod tests {
             entry::{EntryInfo, OpenRequest},
             entry_container::Directory as VfsDirectory,
         },
+        execution_scope::ExecutionScope,
         path::Path,
         pseudo_directory,
     };
