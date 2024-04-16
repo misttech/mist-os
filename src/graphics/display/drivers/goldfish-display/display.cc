@@ -106,29 +106,15 @@ zx_status_t Display::Bind() {
   }
   control_ = fidl::WireSyncClient(std::move(connect_control_service_result).value());
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>();
-  if (endpoints.is_error()) {
-    return endpoints.status_value();
+  zx::result<fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe>>
+      connect_pipe_service_result =
+          DdkConnectFidlProtocol<fuchsia_hardware_goldfish_pipe::Service::Device>();
+  if (connect_pipe_service_result.is_error()) {
+    zxlogf(ERROR, "Failed to connect to the goldfish pipe FIDL service: %s",
+           connect_pipe_service_result.status_string());
+    return connect_pipe_service_result.status_value();
   }
-
-  fidl::WireResult pipe_connect_result =
-      control_->ConnectToGoldfishPipe(std::move(endpoints->server));
-  if (!pipe_connect_result.ok()) {
-    zxlogf(ERROR, "Failed to call FIDL ConnectToGoldfishPipe: %s",
-           pipe_connect_result.error().FormatDescription().c_str());
-    return pipe_connect_result.error().status();
-  }
-  if (pipe_connect_result.value().is_error()) {
-    zxlogf(ERROR, "Failed to connect to the goldfish pipe protocol: %s",
-           zx_status_get_string(pipe_connect_result.value().error_value()));
-    return pipe_connect_result.value().error_value();
-  }
-
-  pipe_ = fidl::WireSyncClient(std::move(endpoints->client));
-  if (!pipe_.is_valid()) {
-    zxlogf(ERROR, "%s: no pipe protocol", kTag);
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+  pipe_ = fidl::WireSyncClient(std::move(connect_pipe_service_result).value());
 
   zx_status_t status = InitSysmemAllocatorClientLocked();
   if (status != ZX_OK) {
@@ -136,25 +122,16 @@ zx_status_t Display::Bind() {
     return status;
   }
 
-  // Create a second FIDL connection for use by RenderControl.
-  endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>();
-  if (endpoints.is_error()) {
-    return endpoints.status_value();
+  zx::result<fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe>>
+      render_control_connect_pipe_service_result =
+          DdkConnectFidlProtocol<fuchsia_hardware_goldfish_pipe::Service::Device>();
+  if (render_control_connect_pipe_service_result.is_error()) {
+    zxlogf(ERROR, "Failed to connect to the goldfish pipe FIDL service: %s",
+           render_control_connect_pipe_service_result.status_string());
+    return render_control_connect_pipe_service_result.status_value();
   }
-
-  fidl::WireResult render_control_pipe_connect_result =
-      control_->ConnectToGoldfishPipe(std::move(endpoints->server));
-  if (!render_control_pipe_connect_result.ok()) {
-    zxlogf(ERROR, "Failed to call FIDL ConnectToGoldfishPipe: %s",
-           render_control_pipe_connect_result.error().FormatDescription().c_str());
-    return render_control_pipe_connect_result.error().status();
-  }
-  if (render_control_pipe_connect_result.value().is_error()) {
-    zxlogf(ERROR, "Failed to connect to the goldfish pipe protocol: %s",
-           zx_status_get_string(render_control_pipe_connect_result.value().error_value()));
-    return render_control_pipe_connect_result.value().error_value();
-  }
-  fidl::WireSyncClient render_control_pipe_client{std::move(endpoints->client)};
+  fidl::WireSyncClient<fuchsia_hardware_goldfish_pipe::GoldfishPipe> render_control_pipe_client(
+      std::move(render_control_connect_pipe_service_result).value());
 
   rc_ = std::make_unique<RenderControl>();
   status = rc_->InitRcPipe(std::move(render_control_pipe_client));

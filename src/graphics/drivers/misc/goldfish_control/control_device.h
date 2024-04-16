@@ -80,9 +80,6 @@ class Control : public ControlType {
   void GetBufferHandleInfo(GetBufferHandleInfoRequestView request,
                            GetBufferHandleInfoCompleter::Sync& completer) override;
 
-  void ConnectToGoldfishPipe(ConnectToGoldfishPipeRequestView request,
-                             ConnectToGoldfishPipeCompleter::Sync& completer) override;
-
   // Device protocol implementation.
   void DdkRelease();
 
@@ -130,6 +127,9 @@ class Control : public ControlType {
   zx_status_t CreateSyncKHRLocked(uint64_t* glsync_out, uint64_t* syncthread_out) TA_REQ(lock_);
 
   fit::result<zx_status_t, BufferKey> GetBufferKeyForVmo(const zx::vmo& vmo);
+
+  fuchsia_hardware_goldfish_pipe::Service::InstanceHandler
+  CreateGoldfishPipeServiceInstanceHandler();
 
   fbl::Mutex lock_;
   fidl::WireSyncClient<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe_;

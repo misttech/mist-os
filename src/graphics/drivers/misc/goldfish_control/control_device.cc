@@ -4,6 +4,7 @@
 
 #include "src/graphics/drivers/misc/goldfish_control/control_device.h"
 
+#include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/markers.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
@@ -317,14 +318,24 @@ zx_status_t Control::Bind() {
   heaps_.push_back(std::move(host_visible_heap));
   RegisterAndBindHeap(fuchsia_sysmem::wire::HeapType::kGoldfishHostVisible, host_visible_heap_ptr);
 
-  zx::result<> add_service_result = outgoing_.AddService<fuchsia_hardware_goldfish::ControlService>(
-      fuchsia_hardware_goldfish::ControlService::InstanceHandler({
-          .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
-      }));
-  if (add_service_result.is_error()) {
+  zx::result<> add_control_service_result =
+      outgoing_.AddService<fuchsia_hardware_goldfish::ControlService>(
+          fuchsia_hardware_goldfish::ControlService::InstanceHandler({
+              .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+          }));
+  if (add_control_service_result.is_error()) {
     zxlogf(ERROR, "Failed to add goldfish ControlService to the outgoing directory: %s",
-           add_service_result.status_string());
-    return add_service_result.status_value();
+           add_control_service_result.status_string());
+    return add_control_service_result.status_value();
+  }
+
+  zx::result<> add_pipe_service_result =
+      outgoing_.AddService<fuchsia_hardware_goldfish_pipe::Service>(
+          CreateGoldfishPipeServiceInstanceHandler());
+  if (add_pipe_service_result.is_error()) {
+    zxlogf(ERROR, "Failed to add goldfish pipe Service to the outgoing directory: %s",
+           add_pipe_service_result.status_string());
+    return add_pipe_service_result.status_value();
   }
 
   zx::result directory_endpoints_result = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -343,6 +354,7 @@ zx_status_t Control::Bind() {
 
   const char* kOffersArray[] = {
       fuchsia_hardware_goldfish::ControlService::Name,
+      fuchsia_hardware_goldfish_pipe::Service::Name,
   };
   const cpp20::span<const char*> kOffers(kOffersArray);
 
@@ -707,21 +719,6 @@ void Control::GetBufferHandleInfo(GetBufferHandleInfoRequestView request,
   completer.Reply(::fit::ok(&response));
 }
 
-void Control::ConnectToGoldfishPipe(ConnectToGoldfishPipeRequestView request,
-                                    ConnectToGoldfishPipeCompleter::Sync& completer) {
-  zx_status_t status = device_connect_fragment_fidl_protocol(
-      parent(), "goldfish-pipe", fuchsia_hardware_goldfish_pipe::Service::Name,
-      fuchsia_hardware_goldfish_pipe::Service::Device::Name,
-      request->server.TakeChannel().release());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to connect to the GoldfishPipe protocol: %s",
-           zx_status_get_string(status));
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
-}
-
 void Control::DdkRelease() { delete this; }
 
 int32_t Control::WriteLocked(uint32_t cmd_size, int32_t* consumed_size) {
@@ -993,6 +990,25 @@ fit::result<zx_status_t, BufferKey> Control::GetBufferKeyForVmo(const zx::vmo& v
       *info.buffer_collection_id(),
       *info.buffer_index(),
   });
+}
+
+fuchsia_hardware_goldfish_pipe::Service::InstanceHandler
+Control::CreateGoldfishPipeServiceInstanceHandler() {
+  return fuchsia_hardware_goldfish_pipe::Service::InstanceHandler{{
+      .device =
+          [parent =
+               parent()](fidl::ServerEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe> server_end) {
+            static constexpr const char kGoldfishPipeFragmentName[] = "goldfish-pipe";
+            zx_status_t status = device_connect_fragment_fidl_protocol(
+                parent, kGoldfishPipeFragmentName, fuchsia_hardware_goldfish_pipe::Service::Name,
+                fuchsia_hardware_goldfish_pipe::Service::Device::Name,
+                server_end.TakeChannel().release());
+            if (status != ZX_OK) {
+              zxlogf(ERROR, "Failed to connect to the GoldfishPipe protocol: %s",
+                     zx_status_get_string(status));
+            }
+          },
+  }};
 }
 
 }  // namespace goldfish
