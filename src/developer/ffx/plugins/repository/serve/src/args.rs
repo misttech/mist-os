@@ -34,7 +34,7 @@ pub struct ServeCommand {
 
     /// location of the package repo.
     /// Default is given by the build directory
-    /// obtained from the ffx context, e.g. "out/default"
+    /// obtained from the ffx context.
     #[argh(option)]
     pub repo_path: Option<Utf8PathBuf>,
 
