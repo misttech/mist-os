@@ -158,6 +158,7 @@ if (is_host) {
       "//src/developer/ffx/frontends/ffx:config.json($host_toolchain)",
 
       # These are separate subtools with plugin-generated config.json
+      "//src/developer/ffx/plugins/emulator:config.json($host_toolchain)",
       "//src/developer/ffx/plugins/log:config.json($host_toolchain)",
       "//src/developer/ffx/plugins/trace:config.json($host_toolchain)",
     ]
