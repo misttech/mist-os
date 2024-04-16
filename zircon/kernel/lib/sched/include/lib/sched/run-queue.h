@@ -58,12 +58,18 @@ class RunQueue {
   const Thread* current_thread() const { return current_; }
 
   // The total duration within the thread's activation period in which the
-  // thread is expected to complete its work. This can be regarded as a measure
-  // of the expected worst-case runtime.
+  // thread is expected to complete its firm and flexible work . This can be
+  // regarded as a measure of the expected worst-case runtime given current
+  // bandwidth subscription.
   Duration CapacityOf(const Thread& thread) const {
-    // TODO(https://fxbug.dev/328641440): Account for flexible capacity when
-    // introduced.
-    return thread.firm_capacity();
+    return thread.firm_capacity() + FlexibleCapacityOf(thread);
+  }
+
+  // Given current bandwidth subscription, the duration of time we expect to be
+  // allotted to a thread's flexible work within its period.
+  Duration FlexibleCapacityOf(const Thread& thread) const {
+    return (Utilization{1} - total_firm_utilization()) * FlexibleUtilizationOf(thread) *
+           thread.period();
   }
 
   // The remaining time expected for the thread to be scheduled within its
@@ -82,6 +88,12 @@ class RunQueue {
   // the thread is or will be active).
   void Queue(Thread& thread, Time now) {
     ZX_DEBUG_ASSERT(!thread.IsQueued());
+
+    // Contribute ready demand ahead of the IsExpired() check, as that is
+    // dependent on this quantity.
+    ready_firm_utilization_ += thread.firm_utilization();
+    ready_flexible_demand_ += thread.flexible_weight();
+
     if (IsExpired(thread, now)) {
       thread.Reactivate(now);
     }
@@ -93,6 +105,8 @@ class RunQueue {
   void Dequeue(Thread& thread) {
     ZX_DEBUG_ASSERT(thread.IsQueued());
     ready_.erase(thread);
+    ready_firm_utilization_ -= thread.firm_utilization();
+    ready_flexible_demand_ -= thread.flexible_weight();
   }
 
   struct SelectNextThreadResult {
@@ -224,6 +238,22 @@ class RunQueue {
     return it->run_queue_.subtree_min_finish;
   }
 
+  FlexibleWeight total_flexible_demand() const {
+    return (current_ ? current_->flexible_weight() : FlexibleWeight{0}) + ready_flexible_demand_;
+  }
+
+  Utilization total_firm_utilization() const {
+    Utilization utilization =
+        (current_ ? current_->firm_utilization() : Utilization{0}) + ready_firm_utilization_;
+    // Clamp to account for oversubscription.
+    return std::min(Utilization{1}, utilization);
+  }
+
+  Utilization FlexibleUtilizationOf(const Thread& thread) const {
+    FlexibleWeight demand = total_flexible_demand();
+    return demand == 0 ? Utilization{0} : thread.flexible_weight() / demand;
+  }
+
   // Returns the thread eligible to scheduled at a given time with the minimal
   // finish time.
   mutable_iterator FindNextEligibleThread(Time time) {
@@ -287,6 +317,12 @@ class RunQueue {
 
   // The tree of threads ready to be run.
   Tree ready_;
+
+  // The aggregate flexible weight across all ready threads.
+  FlexibleWeight ready_flexible_demand_{0};
+
+  // The aggregate firm utilization across all ready threads.
+  Utilization ready_firm_utilization_{0};
 };
 
 }  // namespace sched

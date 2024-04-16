@@ -21,26 +21,36 @@
 namespace {
 
 using Duration = sched::Duration;
+using FlexibleWeight = sched::FlexibleWeight;
 using Time = sched::Time;
 
 Time ConsumeTime(FuzzedDataProvider& provider) {
   return Time{provider.ConsumeIntegral<zx_time_t>()};
 }
 
-Duration ConsumeDuration(FuzzedDataProvider& provider, Duration max = Duration::Max()) {
-  ZX_ASSERT(max > 0);
-  return Duration{provider.ConsumeIntegralInRange<zx_duration_t>(1, max.raw_value())};
+FlexibleWeight ConsumeFlexibleWeight(FuzzedDataProvider& provider, FlexibleWeight min) {
+  return FlexibleWeight{
+      provider.ConsumeIntegralInRange<int64_t>(min.raw_value(), FlexibleWeight::Max().raw_value())};
+}
+
+Duration ConsumeDuration(FuzzedDataProvider& provider, Duration min, Duration max) {
+  ZX_ASSERT(min >= 0);
+  ZX_ASSERT(max >= min);
+  return Duration{provider.ConsumeIntegralInRange<zx_duration_t>(min.raw_value(), max.raw_value())};
 }
 
 TestThread* AllocateNewThread(FuzzedDataProvider& provider,
                               std::vector<std::unique_ptr<TestThread>>& threads) {
   Time start = ConsumeTime(provider);
-  Duration period = ConsumeDuration(provider, (Time::Max() - start) + Time{1});
-  Duration firm_capacity = ConsumeDuration(provider, period);
+  Duration period = ConsumeDuration(provider, Duration{1}, (Time::Max() - start) + Time{1});
+  Duration firm_capacity = ConsumeDuration(provider, Duration{0}, period);
+  FlexibleWeight flexible_weight =
+      ConsumeFlexibleWeight(provider, FlexibleWeight{firm_capacity == 0 ? 1 : 0});
   threads.emplace_back(std::make_unique<TestThread>(
       sched::BandwidthParameters{
           .period = period,
           .firm_capacity = firm_capacity,
+          .flexible_weight = flexible_weight,
       },
       start));
   return threads.back().get();

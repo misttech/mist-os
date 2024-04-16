@@ -22,6 +22,25 @@ class RunQueue;
 using Duration = ffl::Fixed<zx_duration_t, 0>;
 using Time = ffl::Fixed<zx_time_t, 0>;
 
+// Flexible work weight.
+//
+// Gives a measure of priority for the flexible portion of a thread's work
+// (i.e., that done on a best-effort basis all other required/firm work is
+// accomplished).
+//
+// Weights should not be negative; however, the value is signed for consistency
+// with Time and Duration, which are the primary types used in conjunction with
+// FlexibleWeight. This is to make it less likely that expressions involving
+// weights are accidentally promoted to unsigned.
+using FlexibleWeight = ffl::Fixed<int64_t, 16>;
+
+// The utilization factor of a thread's desired work, defined as the ratio
+// between a thread's capacity (firm, flexible, or total) and its period.
+//
+// The 20bit fractional component represents the utilization with a precision
+// of ~1us.
+using Utilization = ffl::Fixed<int64_t, 20>;
+
 // The parameters that specify a thread's activation period (i.e., the
 // recurring cycle in which it is scheduled).
 struct BandwidthParameters {
@@ -31,6 +50,11 @@ struct BandwidthParameters {
   // The duration within a given activation period in which a thread is expected
   // to complete its *required* work.
   Duration firm_capacity;
+
+  // The weight of the flexible portion of a thread's work. Zero is equivalent
+  // to the thread not having flexible work to do, its total capacity being
+  // equal to its firm capacity.
+  FlexibleWeight flexible_weight;
 };
 
 // The base thread class from which we expect schedulable thread types to
@@ -40,15 +64,26 @@ template <typename Thread>
 class ThreadBase {
  public:
   constexpr ThreadBase(BandwidthParameters bandwidth, Time start)
-      : period_(bandwidth.period), firm_capacity_(bandwidth.firm_capacity) {
-    ZX_ASSERT(bandwidth.period >= bandwidth.firm_capacity);
-    ZX_ASSERT(bandwidth.firm_capacity > 0);
+      : period_(bandwidth.period),                //
+        firm_capacity_(bandwidth.firm_capacity),  //
+        flexible_weight_(bandwidth.flexible_weight) {
+    ZX_DEBUG_ASSERT(bandwidth.period >= bandwidth.firm_capacity);
+    ZX_DEBUG_ASSERT(bandwidth.period > 0);
+    ZX_DEBUG_ASSERT(bandwidth.firm_capacity >= 0);
+    ZX_DEBUG_ASSERT(bandwidth.flexible_weight >= 0);
+    ZX_DEBUG_ASSERT(bandwidth.firm_capacity != 0 || bandwidth.flexible_weight != 0);
     Reactivate(start);
   }
 
   constexpr Duration period() const { return period_; }
 
   constexpr Duration firm_capacity() const { return firm_capacity_; }
+
+  constexpr FlexibleWeight flexible_weight() const { return flexible_weight_; }
+
+  // The total proportion of the period in which the thread is expected to run
+  // in order to complete its required work.
+  constexpr Utilization firm_utilization() const { return firm_capacity() / period(); }
 
   // The start of the thread's current activation period.
   constexpr Time start() const { return start_; }
@@ -88,6 +123,7 @@ class ThreadBase {
 
   Duration period_{0};
   Duration firm_capacity_{0};
+  FlexibleWeight flexible_weight_{0};
   Time start_{Time::Min()};
   Duration time_slice_used_{0};
 

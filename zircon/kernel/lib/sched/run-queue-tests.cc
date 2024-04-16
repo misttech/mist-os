@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/sched/run-queue.h>
+#include <lib/sched/thread-base.h>
 
 #include <array>
 #include <cstddef>
@@ -16,6 +17,7 @@
 namespace {
 
 using Duration = sched::Duration;
+using FlexibleWeight = sched::FlexibleWeight;
 using Time = sched::Time;
 
 TEST(RunQueueTests, Empty) {
@@ -154,7 +156,7 @@ TEST(RunQueueTests, OrderedByStartTime) {
   EXPECT_EQ(queue.end(), it);
 }
 
-TEST(RunQueueTests, SelectNextThread) {
+TEST(RunQueueTests, SelectNextFirmThread) {
   // Empty: no next thread.
   {
     constexpr Time kNow{Start(0)};
@@ -447,6 +449,118 @@ TEST(RunQueueTests, SelectNextThread) {
     EXPECT_EQ(&threadC, next);
     EXPECT_EQ(Time{13}, preemption);
   }
+}
+
+TEST(RunQueueTests, FlexibleWork) {
+  std::array threads = {
+      TestThread{{Period(4), Capacity(0), FlexibleWeight{1}}, Start(0)},
+      TestThread{{Period(4), Capacity(0), FlexibleWeight{2}}, Start(0)},
+      TestThread{{Period(4), Capacity(0), FlexibleWeight{1}}, Start(0)},
+  };
+  TestThread& threadA = threads[0];
+  TestThread& threadB = threads[1];
+  TestThread& threadC = threads[2];
+
+  sched::RunQueue<TestThread> queue;
+  queue.Queue(threadA, Start(0));
+  queue.Queue(threadB, Start(0));
+  queue.Queue(threadC, Start(0));
+
+  EXPECT_EQ(Capacity(1), queue.FlexibleCapacityOf(threadA));
+  EXPECT_EQ(Capacity(1), queue.CapacityOf(threadA));
+
+  EXPECT_EQ(Capacity(2), queue.FlexibleCapacityOf(threadB));
+  EXPECT_EQ(Capacity(2), queue.CapacityOf(threadB));
+
+  EXPECT_EQ(Capacity(1), queue.FlexibleCapacityOf(threadC));
+  EXPECT_EQ(Capacity(1), queue.CapacityOf(threadC));
+
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(0));
+    EXPECT_EQ(&threadA, next);
+    EXPECT_EQ(Time{1}, preemption);
+  }
+  threadA.Tick(Duration{1});
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(1));
+    EXPECT_EQ(&threadB, next);
+    EXPECT_EQ(Time{3}, preemption);
+  }
+  threadB.Tick(Duration{2});
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(3));
+    EXPECT_EQ(&threadC, next);
+    EXPECT_EQ(Time{4}, preemption);
+  }
+}
+
+TEST(RunQueueTests, HybridWorkWithoutBandwidthForFlexible) {
+  TestThread threadA = {{Period(5), Capacity(1), FlexibleWeight{1}}, Start(0)};
+  TestThread threadB = {{Period(10), Capacity(8), FlexibleWeight{0}}, Start(0)};
+
+  sched::RunQueue<TestThread> queue;
+  queue.Queue(threadA, Start(0));
+  queue.Queue(threadB, Start(0));
+
+  // Firm work soaks up available bandwidth: no capacity for flexible work
+  EXPECT_EQ(Capacity(0), queue.FlexibleCapacityOf(threadA));
+  EXPECT_EQ(Capacity(1), queue.CapacityOf(threadA));
+
+  EXPECT_EQ(Capacity(0), queue.FlexibleCapacityOf(threadB));
+  EXPECT_EQ(Capacity(8), queue.CapacityOf(threadB));
+
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(0));
+    EXPECT_EQ(&threadA, next);
+    EXPECT_EQ(Time{1}, preemption);
+  }
+  threadA.Tick(Duration{1});
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(1));
+    EXPECT_EQ(&threadB, next);
+    EXPECT_EQ(Time{9}, preemption);
+  }
+  threadB.Tick(Duration{8});
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(9));
+    EXPECT_EQ(&threadA, next);
+    EXPECT_EQ(Time{10}, preemption);
+  }
+  threadA.Tick(Duration{1});
+}
+
+TEST(RunQueueTests, HybridWorkWithBandwidthForFlexible) {
+  TestThread threadA = {{Period(5), Capacity(1), FlexibleWeight{1}}, Start(0)};
+  TestThread threadB = {{Period(10), Capacity(6), FlexibleWeight{0}}, Start(0)};
+
+  sched::RunQueue<TestThread> queue;
+  queue.Queue(threadA, Start(0));
+  queue.Queue(threadB, Start(0));
+
+  EXPECT_EQ(Capacity(1), queue.FlexibleCapacityOf(threadA));
+  EXPECT_EQ(Capacity(2), queue.CapacityOf(threadA));
+
+  EXPECT_EQ(Capacity(0), queue.FlexibleCapacityOf(threadB));
+  EXPECT_EQ(Capacity(6), queue.CapacityOf(threadB));
+
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(0));
+    EXPECT_EQ(&threadA, next);
+    EXPECT_EQ(Time{2}, preemption);
+  }
+  threadA.Tick(Duration{2});
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(2));
+    EXPECT_EQ(&threadB, next);
+    EXPECT_EQ(Time{8}, preemption);
+  }
+  threadB.Tick(Duration{6});
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(8));
+    EXPECT_EQ(&threadA, next);
+    EXPECT_EQ(Time{10}, preemption);
+  }
+  threadA.Tick(Duration{2});
 }
 
 }  // namespace
