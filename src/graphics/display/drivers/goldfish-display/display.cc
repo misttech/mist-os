@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/goldfish-display/display.h"
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
@@ -116,7 +117,7 @@ zx_status_t Display::Bind() {
   }
   pipe_ = fidl::WireSyncClient(std::move(connect_pipe_service_result).value());
 
-  zx_status_t status = InitSysmemAllocatorClientLocked();
+  zx_status_t status = InitSysmemAllocatorClient();
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: cannot initialize sysmem allocator: %s", kTag, zx_status_get_string(status));
     return status;
@@ -220,15 +221,16 @@ void Display::DisplayControllerImplResetDisplayControllerInterface() {
   dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient();
 }
 
-zx_status_t Display::InitSysmemAllocatorClientLocked() {
-  auto [client, server] = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
-  auto connect_result = pipe_->ConnectSysmem(server.TakeChannel());
-  if (!connect_result.ok()) {
-    zxlogf(ERROR, "Cannot connect to sysmem Allocator protocol: %s",
-           connect_result.status_string());
-    return connect_result.status();
+zx_status_t Display::InitSysmemAllocatorClient() {
+  zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> connect_sysmem_service_result =
+      DdkConnectFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1>();
+  if (connect_sysmem_service_result.is_error()) {
+    zxlogf(ERROR, "Failed to connect to the sysmem Allocator FIDL protocol: %s",
+           connect_sysmem_service_result.status_string());
+    return connect_sysmem_service_result.status_value();
   }
-  sysmem_allocator_client_ = fidl::WireSyncClient(std::move(client));
+  sysmem_allocator_client_ = fidl::WireSyncClient(std::move(connect_sysmem_service_result).value());
+
   auto pid = GetKoid(zx_process_self());
   std::string debug_name = fxl::StringPrintf("goldfish-display");
   auto set_debug_status =

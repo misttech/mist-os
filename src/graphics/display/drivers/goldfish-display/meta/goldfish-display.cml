@@ -18,5 +18,6 @@
     use: [
         { service: "fuchsia.hardware.goldfish.ControlService" },
         { service: "fuchsia.hardware.goldfish.pipe.Service" },
+        { service: "fuchsia.hardware.sysmem.Service" },
     ],
 }

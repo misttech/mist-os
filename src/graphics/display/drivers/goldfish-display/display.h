@@ -165,7 +165,7 @@ class Display : public DisplayType,
   //
   // On success, returns ZX_OK and the sysmem allocator client will be open
   // until the device is released.
-  zx_status_t InitSysmemAllocatorClientLocked() TA_REQ(lock_);
+  zx_status_t InitSysmemAllocatorClient();
 
   zx::result<display::DriverImageId> ImportVmoImage(const image_metadata_t& image_metadata,
                                                     const fuchsia_sysmem::PixelFormat& pixel_format,
