@@ -6,9 +6,9 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_GOLDFISH_DISPLAY_DISPLAY_H_
 
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
+#include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <fuchsia/hardware/goldfish/control/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/ddk/device.h>
@@ -176,7 +176,7 @@ class Display : public DisplayType,
   void FlushPrimaryDisplay(async_dispatcher_t* dispatcher);
 
   fbl::Mutex lock_;
-  ddk::GoldfishControlProtocolClient control_ TA_GUARDED(lock_);
+  fidl::WireSyncClient<fuchsia_hardware_goldfish::ControlDevice> control_ TA_GUARDED(lock_);
   fidl::WireSyncClient<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe_ TA_GUARDED(lock_);
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.

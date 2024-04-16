@@ -9,7 +9,7 @@
 #include <fidl/fuchsia.hardware.goldfish/cpp/markers.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
-#include <fuchsia/hardware/goldfish/control/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/fpromise/result.h>
@@ -30,15 +30,13 @@ namespace goldfish {
 
 class Control;
 using ControlType =
-    ddk::Device<Control, ddk::Messageable<fuchsia_hardware_goldfish::ControlDevice>::Mixin,
-                ddk::GetProtocolable>;
+    ddk::Device<Control, ddk::Messageable<fuchsia_hardware_goldfish::ControlDevice>::Mixin>;
 
-class Control : public ControlType,
-                public ddk::GoldfishControlProtocol<Control, ddk::base_protocol> {
+class Control : public ControlType {
  public:
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
-  explicit Control(zx_device_t* parent);
+  explicit Control(zx_device_t* parent, async_dispatcher_t* dispatcher);
   ~Control();
 
   zx_status_t Bind();
@@ -87,10 +85,6 @@ class Control : public ControlType,
 
   // Device protocol implementation.
   void DdkRelease();
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
-  zx_status_t GoldfishControlGetColorBuffer(zx::vmo vmo, uint32_t* out_id);
-  zx_status_t GoldfishControlCreateSyncFence(zx::eventpair event);
-  zx_status_t GoldfishControlConnectToPipeDevice(zx::channel channel);
 
   // Used by heaps. Removes a specific heap from the linked list.
   void RemoveHeap(Heap* heap);
@@ -139,7 +133,6 @@ class Control : public ControlType,
 
   fbl::Mutex lock_;
   fidl::WireSyncClient<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe_;
-  ddk::GoldfishControlProtocolClient control_;
   fidl::WireSyncClient<fuchsia_hardware_goldfish::AddressSpaceDevice> address_space_;
   fidl::WireSyncClient<fuchsia_hardware_goldfish::SyncDevice> sync_;
   fidl::SyncClient<fuchsia_sysmem2::Allocator> sysmem_;
@@ -166,6 +159,12 @@ class Control : public ControlType,
     uint32_t memory_property;
   };
   std::map<uint32_t, BufferHandleInfo> buffer_handle_info_ TA_GUARDED(lock_);
+
+  // The outgoing services are dispatched onto `dispatcher_`.
+  async_dispatcher_t* dispatcher_;
+
+  component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_goldfish::ControlDevice> bindings_;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(Control);
 };

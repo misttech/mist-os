@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <fuchsia/hardware/goldfish/control/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/time.h>
 #include <lib/async/cpp/wait.h>
@@ -90,33 +89,39 @@ zx_status_t Display::Create(void* ctx, zx_device_t* device) {
 }
 
 Display::Display(zx_device_t* parent)
-    : DisplayType(parent), loop_(&kAsyncLoopConfigNeverAttachToThread) {
-  if (parent) {
-    control_ = parent;
-  }
-}
+    : DisplayType(parent), loop_(&kAsyncLoopConfigNeverAttachToThread) {}
 
 Display::~Display() { loop_.Shutdown(); }
 
 zx_status_t Display::Bind() {
   fbl::AutoLock lock(&lock_);
 
-  if (!control_.is_valid()) {
-    zxlogf(ERROR, "%s: no control protocol", kTag);
-    return ZX_ERR_NOT_SUPPORTED;
+  zx::result<fidl::ClientEnd<fuchsia_hardware_goldfish::ControlDevice>>
+      connect_control_service_result =
+          DdkConnectFidlProtocol<fuchsia_hardware_goldfish::ControlService::Device>();
+  if (connect_control_service_result.is_error()) {
+    zxlogf(ERROR, "Failed to connect to the goldfish Control FIDL service: %s",
+           connect_control_service_result.status_string());
+    return connect_control_service_result.status_value();
   }
+  control_ = fidl::WireSyncClient(std::move(connect_control_service_result).value());
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>();
   if (endpoints.is_error()) {
     return endpoints.status_value();
   }
 
-  auto channel = endpoints->server.TakeChannel();
-
-  zx_status_t status = control_.ConnectToPipeDevice(std::move(channel));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: could not connect to pipe device: %s", kTag, zx_status_get_string(status));
-    return status;
+  fidl::WireResult pipe_connect_result =
+      control_->ConnectToGoldfishPipe(std::move(endpoints->server));
+  if (!pipe_connect_result.ok()) {
+    zxlogf(ERROR, "Failed to call FIDL ConnectToGoldfishPipe: %s",
+           pipe_connect_result.error().FormatDescription().c_str());
+    return pipe_connect_result.error().status();
+  }
+  if (pipe_connect_result.value().is_error()) {
+    zxlogf(ERROR, "Failed to connect to the goldfish pipe protocol: %s",
+           zx_status_get_string(pipe_connect_result.value().error_value()));
+    return pipe_connect_result.value().error_value();
   }
 
   pipe_ = fidl::WireSyncClient(std::move(endpoints->client));
@@ -125,7 +130,7 @@ zx_status_t Display::Bind() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  status = InitSysmemAllocatorClientLocked();
+  zx_status_t status = InitSysmemAllocatorClientLocked();
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: cannot initialize sysmem allocator: %s", kTag, zx_status_get_string(status));
     return status;
@@ -137,18 +142,22 @@ zx_status_t Display::Bind() {
     return endpoints.status_value();
   }
 
-  channel = endpoints->server.TakeChannel();
-
-  status = control_.ConnectToPipeDevice(std::move(channel));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: could not connect to pipe device: %s", kTag, zx_status_get_string(status));
-    return status;
+  fidl::WireResult render_control_pipe_connect_result =
+      control_->ConnectToGoldfishPipe(std::move(endpoints->server));
+  if (!render_control_pipe_connect_result.ok()) {
+    zxlogf(ERROR, "Failed to call FIDL ConnectToGoldfishPipe: %s",
+           render_control_pipe_connect_result.error().FormatDescription().c_str());
+    return render_control_pipe_connect_result.error().status();
   }
-
-  fidl::WireSyncClient pipe_client{std::move(endpoints->client)};
+  if (render_control_pipe_connect_result.value().is_error()) {
+    zxlogf(ERROR, "Failed to connect to the goldfish pipe protocol: %s",
+           zx_status_get_string(render_control_pipe_connect_result.value().error_value()));
+    return render_control_pipe_connect_result.value().error_value();
+  }
+  fidl::WireSyncClient render_control_pipe_client{std::move(endpoints->client)};
 
   rc_ = std::make_unique<RenderControl>();
-  status = rc_->InitRcPipe(std::move(pipe_client));
+  status = rc_->InitRcPipe(std::move(render_control_pipe_client));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: RenderControl failed to initialize: %d", kTag, status);
     return ZX_ERR_NOT_SUPPORTED;
@@ -620,11 +629,16 @@ zx_status_t Display::PresentPrimaryDisplayConfig(const DisplayConfig& display_co
     }
 
     fbl::AutoLock lock(&lock_);
-    status = control_.CreateSyncFence(std::move(event_sync_device));
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to call render control command CreateSyncFence: %s",
-             zx_status_get_string(status));
+    fidl::WireResult result = control_->CreateSyncFence(std::move(event_sync_device));
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to call FIDL CreateSyncFence: %s",
+             result.error().FormatDescription().c_str());
       return status;
+    }
+    if (result.value().is_error()) {
+      zxlogf(ERROR, "Failed to create SyncFence: %s",
+             zx_status_get_string(result.value().error_value()));
+      return result.value().error_value();
     }
   }
 
@@ -678,13 +692,24 @@ void Display::DisplayControllerImplApplyConfiguration(const display_config_t** d
     {
       fbl::AutoLock lock(&lock_);
 
-      uint32_t render_control_encoded_color_buffer_id = kInvalidHostColorBufferId.value();
-      zx_status_t status =
-          control_.GetColorBuffer(std::move(vmo), &render_control_encoded_color_buffer_id);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to get color buffer: %s", zx_status_get_string(status));
+      fidl::WireResult result = control_->GetBufferHandle(std::move(vmo));
+      if (!result.ok()) {
+        zxlogf(ERROR, "Failed to call FIDL GetBufferHandle: %s",
+               result.error().FormatDescription().c_str());
         return;
       }
+      if (result.value().res != ZX_OK) {
+        zxlogf(ERROR, "Failed to get ColorBuffer handle: %s",
+               zx_status_get_string(result.value().res));
+        return;
+      }
+      if (result.value().type != fuchsia_hardware_goldfish::BufferHandleType::kColorBuffer) {
+        zxlogf(ERROR, "Buffer handle type invalid. Expected ColorBuffer, actual %" PRIu32,
+               static_cast<uint32_t>(result.value().type));
+        return;
+      }
+
+      uint32_t render_control_encoded_color_buffer_id = result.value().id;
       color_buffer->host_color_buffer_id =
           ToHostColorBufferId(render_control_encoded_color_buffer_id);
 

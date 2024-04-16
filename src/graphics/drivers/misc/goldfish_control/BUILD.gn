@@ -20,13 +20,15 @@ driver_bind_rules("goldfish_control_composite-bind") {
 
 common_deps = [
   ":goldfish_control_composite-bind",
-  "//sdk/banjo/fuchsia.hardware.goldfish.control:fuchsia.hardware.goldfish.control_banjo_cpp",
   "//sdk/fidl/fuchsia.hardware.goldfish:fuchsia.hardware.goldfish_cpp",
   "//sdk/fidl/fuchsia.hardware.goldfish.pipe:fuchsia.hardware.goldfish.pipe_cpp",
   "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
   "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+  "//sdk/lib/component/outgoing/cpp",
+  "//sdk/lib/driver/runtime:driver_runtime_cpp",
   "//sdk/lib/fit-promise",
   "//src/devices/lib/driver",
+  "//src/devices/lib/driver:driver_runtime",
   "//src/devices/lib/goldfish/pipe_headers",
   "//src/lib/ddk",
   "//src/lib/ddktl",
@@ -103,6 +105,7 @@ test("goldfish-control-device-test") {
            "//zircon/system/ulib/fzl",
            "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
            "//zircon/system/ulib/sync",
+           "//zircon/system/ulib/sync:sync-cpp",
            "//zircon/system/ulib/zircon-internal",
            "//zircon/system/ulib/zx",
          ]

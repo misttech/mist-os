@@ -238,3 +238,7 @@ closed protocol ControlDevice {
         server server_end:fuchsia.hardware.goldfish.pipe.GoldfishPipe;
     }) -> () error zx.Status;
 };
+
+service ControlService {
+    device client_end:ControlDevice;
+};

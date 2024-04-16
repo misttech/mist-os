@@ -11,13 +11,14 @@
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
-#include <fuchsia/hardware/goldfish/control/cpp/banjo.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/async/cpp/task.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fzl/vmo-mapper.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
@@ -375,6 +376,7 @@ class ControlDeviceTest : public testing::Test, public loop_fixture::RealLoop {
  public:
   ControlDeviceTest()
       : loop_(&kAsyncLoopConfigNeverAttachToThread),
+        device_loop_(&kAsyncLoopConfigNeverAttachToThread),
         pipe_server_loop_(&kAsyncLoopConfigNeverAttachToThread),
         address_space_server_loop_(&kAsyncLoopConfigNeverAttachToThread),
         sync_server_loop_(&kAsyncLoopConfigNeverAttachToThread),
@@ -440,15 +442,21 @@ class ControlDeviceTest : public testing::Test, public loop_fixture::RealLoop {
     fake_parent_->AddFidlService(fuchsia_hardware_sysmem::Service::Name,
                                  std::move(endpoints->client), "sysmem");
 
+    device_loop_.StartThread("device-loop");
     pipe_server_loop_.StartThread("goldfish-pipe-fidl-server");
     address_space_server_loop_.StartThread("goldfish-address-space-fidl-server");
     sync_server_loop_.StartThread("goldfish-sync-fidl-server");
     sysmem_server_loop_.StartThread("sysmem-fidl-server");
 
-    auto dut = std::make_unique<Control>(fake_parent_.get());
-    PerformBlockingWork([&]() { ASSERT_EQ(dut->Bind(), ZX_OK); });
-    // The device will be deleted by MockDevice when the test ends.
-    dut.release();
+    libsync::Completion device_bound;
+    async::PostTask(device_loop_.dispatcher(), [this, &device_bound] {
+      auto dut = std::make_unique<Control>(fake_parent_.get(), device_loop_.dispatcher());
+      ZX_ASSERT(dut->Bind() == ZX_OK);
+      // The device will be deleted by MockDevice when the test ends.
+      dut.release();
+      device_bound.Signal();
+    });
+    PerformBlockingWork([&device_bound] { device_bound.Wait(); });
 
     ASSERT_EQ(fake_parent_->child_count(), 1u);
     auto fake_dut = fake_parent_->GetLatestChild();
@@ -472,13 +480,19 @@ class ControlDeviceTest : public testing::Test, public loop_fixture::RealLoop {
 
   void TearDown() override {
     device_async_remove(dut_->zxdev());
-    mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+    libsync::Completion device_released;
+    async::PostTask(device_loop_.dispatcher(), [this, &device_released] {
+      mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+      device_released.Signal();
+    });
+    device_released.Wait();
   }
 
  protected:
   Control* dut_ = nullptr;
 
   async::Loop loop_;
+  async::Loop device_loop_;
   async::Loop pipe_server_loop_;
   async::Loop address_space_server_loop_;
   async::Loop sync_server_loop_;

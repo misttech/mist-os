@@ -12,6 +12,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/ddk/trace/event.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/defer.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <zircon/syscalls.h>
@@ -43,7 +44,8 @@ constexpr uint32_t kInvalidBufferHandle = 0U;
 
 // static
 zx_status_t Control::Create(void* ctx, zx_device_t* device) {
-  auto control = std::make_unique<Control>(device);
+  async_dispatcher_t* async_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  auto control = std::make_unique<Control>(device, async_dispatcher);
 
   zx_status_t status = control->Bind();
   if (status == ZX_OK) {
@@ -53,12 +55,10 @@ zx_status_t Control::Create(void* ctx, zx_device_t* device) {
   return status;
 }
 
-Control::Control(zx_device_t* parent) : ControlType(parent) {
+Control::Control(zx_device_t* parent, async_dispatcher_t* dispatcher)
+    : ControlType(parent), dispatcher_(dispatcher), outgoing_(dispatcher_) {
   // Initialize parent protocols.
   Init();
-
-  goldfish_control_protocol_t self{&goldfish_control_protocol_ops_, this};
-  control_ = ddk::GoldfishControlProtocolClient(&self);
 }
 
 Control::~Control() {
@@ -317,8 +317,39 @@ zx_status_t Control::Bind() {
   heaps_.push_back(std::move(host_visible_heap));
   RegisterAndBindHeap(fuchsia_sysmem::wire::HeapType::kGoldfishHostVisible, host_visible_heap_ptr);
 
-  status =
-      DdkAdd(ddk::DeviceAddArgs("goldfish-control").set_proto_id(ZX_PROTOCOL_GOLDFISH_CONTROL));
+  zx::result<> add_service_result = outgoing_.AddService<fuchsia_hardware_goldfish::ControlService>(
+      fuchsia_hardware_goldfish::ControlService::InstanceHandler({
+          .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+      }));
+  if (add_service_result.is_error()) {
+    zxlogf(ERROR, "Failed to add goldfish ControlService to the outgoing directory: %s",
+           add_service_result.status_string());
+    return add_service_result.status_value();
+  }
+
+  zx::result directory_endpoints_result = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (directory_endpoints_result.is_error()) {
+    zxlogf(ERROR, "Failed to create fuchsia.io/Directory endpoints: %s",
+           directory_endpoints_result.status_string());
+    return directory_endpoints_result.status_value();
+  }
+  auto [directory_client, directory_server] = std::move(directory_endpoints_result).value();
+
+  zx::result<> serve_result = outgoing_.Serve(std::move(directory_server));
+  if (serve_result.is_error()) {
+    zxlogf(ERROR, "Failed to serve the outgoing directory: %s", serve_result.status_string());
+    return serve_result.status_value();
+  }
+
+  const char* kOffersArray[] = {
+      fuchsia_hardware_goldfish::ControlService::Name,
+  };
+  const cpp20::span<const char*> kOffers(kOffersArray);
+
+  status = DdkAdd(ddk::DeviceAddArgs("goldfish-control")
+                      .set_fidl_service_offers(kOffers)
+                      .set_outgoing_dir(directory_client.TakeChannel())
+                      .set_proto_id(ZX_PROTOCOL_GOLDFISH_CONTROL));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd() failed: %s", kTag, zx_status_get_string(status));
   }
@@ -560,12 +591,24 @@ void Control::CreateBuffer2(CreateBuffer2RequestView request,
 
 void Control::CreateSyncFence(CreateSyncFenceRequestView request,
                               CreateSyncFenceCompleter::Sync& completer) {
-  zx_status_t status = GoldfishControlCreateSyncFence(std::move(request->event));
+  fbl::AutoLock lock(&lock_);
+  uint64_t glsync = 0;
+  uint64_t syncthread = 0;
+  zx_status_t status = CreateSyncKHRLocked(&glsync, &syncthread);
   if (status != ZX_OK) {
-    completer.ReplyError(status);
-  } else {
-    completer.ReplySuccess();
+    zxlogf(ERROR, "CreateSyncFence: cannot call rcCreateSyncKHR, status=%d", status);
+    completer.ReplyError(ZX_ERR_INTERNAL);
+    return;
   }
+
+  auto result = sync_timeline_->TriggerHostWait(glsync, syncthread, std::move(request->event));
+  if (!result.ok()) {
+    zxlogf(ERROR, "TriggerHostWait: FIDL call failed, status=%d", result.status());
+    completer.ReplyError(ZX_ERR_INTERNAL);
+    return;
+  }
+
+  completer.ReplySuccess();
 }
 
 void Control::GetBufferHandle(GetBufferHandleRequestView request,
@@ -680,65 +723,6 @@ void Control::ConnectToGoldfishPipe(ConnectToGoldfishPipeRequestView request,
 }
 
 void Control::DdkRelease() { delete this; }
-
-zx_status_t Control::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
-  fbl::AutoLock lock(&lock_);
-
-  switch (proto_id) {
-    case ZX_PROTOCOL_GOLDFISH_CONTROL: {
-      control_.GetProto(static_cast<goldfish_control_protocol_t*>(out_protocol));
-      return ZX_OK;
-    }
-    default:
-      return ZX_ERR_NOT_SUPPORTED;
-  }
-}
-
-zx_status_t Control::GoldfishControlGetColorBuffer(zx::vmo vmo, uint32_t* out_id) {
-  auto buffer_key_result = GetBufferKeyForVmo(vmo);
-  if (!buffer_key_result.is_ok()) {
-    return buffer_key_result.error_value();
-  }
-  auto& buffer_key = buffer_key_result.value();
-
-  fbl::AutoLock lock(&lock_);
-
-  auto it = buffer_handles_.find(buffer_key);
-  if (it == buffer_handles_.end()) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  *out_id = it->second;
-  return ZX_OK;
-}
-
-zx_status_t Control::GoldfishControlCreateSyncFence(zx::eventpair event) {
-  fbl::AutoLock lock(&lock_);
-  uint64_t glsync = 0;
-  uint64_t syncthread = 0;
-  zx_status_t status = CreateSyncKHRLocked(&glsync, &syncthread);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "CreateSyncFence: cannot call rcCreateSyncKHR, status=%d", status);
-    return ZX_ERR_INTERNAL;
-  }
-
-  auto result = sync_timeline_->TriggerHostWait(glsync, syncthread, std::move(event));
-  if (!result.ok()) {
-    zxlogf(ERROR, "TriggerHostWait: FIDL call failed, status=%d", result.status());
-    return ZX_ERR_INTERNAL;
-  }
-  return ZX_OK;
-}
-
-zx_status_t Control::GoldfishControlConnectToPipeDevice(zx::channel channel) {
-  zx_status_t status = device_connect_fragment_fidl_protocol(
-      parent(), "goldfish-pipe", fuchsia_hardware_goldfish_pipe::Service::Name,
-      fuchsia_hardware_goldfish_pipe::Service::Device::Name, channel.release());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to bind channel: %s", kTag, zx_status_get_string(status));
-  }
-  return status;
-}
 
 int32_t Control::WriteLocked(uint32_t cmd_size, int32_t* consumed_size) {
   TRACE_DURATION("gfx", "Control::Write", "cmd_size", cmd_size);
