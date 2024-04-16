@@ -847,22 +847,6 @@ of the most recent update.
 
 From //build/info/info.gni:17
 
-### build_libvulkan_img_rgx
-
-Targets that will be built as IMG vulkan ICDS.
-
-**Current value (from the default):** `[]`
-
-From //src/graphics/lib/magma/gnbuild/magma.gni:36
-
-### build_libvulkan_vsi_vip
-
-Targets that will be built as verisilicon vulkan ICDS.
-
-**Current value (from the default):** `[]`
-
-From //src/graphics/lib/magma/gnbuild/magma.gni:33
-
 ### build_only_labels
 
 These labels are added as dependencies of '//:default', but not as a
@@ -1164,7 +1148,7 @@ from infra builds, and later inspection.
 
 **Current value (from the default):** `"//out/not-default/comparison-reports"`
 
-From //build/toolchain/rbe.gni:195
+From //build/toolchain/rbe.gni:196
 
 ### compress_debuginfo
 
@@ -1329,7 +1313,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:190
+From //build/toolchain/rbe.gni:191
 
 ### cxx_rbe_download_obj_files
 
@@ -1341,7 +1325,7 @@ and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:202
+From //build/toolchain/rbe.gni:203
 
 ### cxx_rbe_enable
 
@@ -1354,7 +1338,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:143
+From //build/toolchain/rbe.gni:144
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -1362,7 +1346,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:143
+From //build/toolchain/rbe.gni:144
 
 ### cxx_rbe_exec_strategy
 
@@ -1385,7 +1369,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:166
+From //build/toolchain/rbe.gni:167
 
 ### cxx_rbe_minimalist_wrapper
 
@@ -1395,7 +1379,7 @@ This flag is only meaningful when `cxx_rbe_enable` is true.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:148
+From //build/toolchain/rbe.gni:149
 
 ### data_filesystem_format
 
@@ -3150,12 +3134,6 @@ If true, excludes syscalls with the [testonly] attribute.
 
 From //zircon/vdso/vdso.gni:9
 
-### expat_build_root
-
-**Current value (from the default):** `"//third_party/expat"`
-
-From //src/graphics/lib/magma/gnbuild/magma.gni:12
-
 ### experimental_cxx_version
 
 **NOTE:** This is for **experimentation only** and should not normally be
@@ -4437,7 +4415,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:249
+From //build/toolchain/rbe.gni:250
 
 ### link_rbe_enable
 
@@ -4451,7 +4429,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:211
+From //build/toolchain/rbe.gni:212
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -4459,7 +4437,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:211
+From //build/toolchain/rbe.gni:212
 
 ### link_rbe_exec_strategy
 
@@ -4482,7 +4460,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:229
+From //build/toolchain/rbe.gni:230
 
 ### llvm_prefix
 
@@ -4536,12 +4514,6 @@ injected that way can override that option's setting in this list.
 
 From //build/config/sanitizers/sanitizer_default_options.gni:35
 
-### magma_build_root
-
-**Current value (from the default):** `"//src/graphics/lib/magma"`
-
-From //src/graphics/lib/magma/gnbuild/magma.gni:11
-
 ### magma_debug
 
 **Current value (from the default):** `false`
@@ -4554,7 +4526,7 @@ Enable this to include fuchsia tracing capability
 
 **Current value (from the default):** `true`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:19
+From //src/graphics/lib/magma/gnbuild/magma.gni:12
 
 ### magma_openvx_include
 
@@ -4562,7 +4534,7 @@ The path to OpenVX headers
 
 **Current value (from the default):** `""`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:25
+From //src/graphics/lib/magma/gnbuild/magma.gni:15
 
 ### magma_openvx_package
 
@@ -4570,13 +4542,7 @@ The path to an OpenVX implementation
 
 **Current value (from the default):** `""`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:28
-
-### magma_python_path
-
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/third_party/mako"`
-
-From //src/graphics/lib/magma/gnbuild/magma.gni:16
+From //src/graphics/lib/magma/gnbuild/magma.gni:18
 
 ### max_blob_contents_size
 
@@ -4688,18 +4654,6 @@ precommitted (which is not done by default).
 **Current value (from the default):** `false`
 
 From //src/graphics/drivers/msd-arm-mali/src/BUILD.gn:23
-
-### msd_build_root
-
-**Current value (from the default):** `"//src/graphics/drivers"`
-
-From //src/graphics/lib/magma/gnbuild/magma.gni:13
-
-### msd_intel_gen_build_root
-
-**Current value (from the default):** `"//src/graphics/drivers/msd-intel-gen"`
-
-From //src/graphics/lib/magma/gnbuild/magma.gni:14
 
 ### msd_intel_gen_enable_hardware_unit_tests
 
@@ -5516,14 +5470,6 @@ From //build/images/tools/fastboot.gni:6
 **Current value (from the default):** `"//prebuilt/third_party/go/linux-x64"`
 
 From //build/go/go_build.gni:28
-
-### prebuilt_libvulkan_img_path
-
-The path to a prebuilt libvulkan.so for an IMG GPU.
-
-**Current value (from the default):** `""`
-
-From //src/graphics/lib/magma/gnbuild/magma.gni:22
 
 ### product_assembly_overrides
 
@@ -7124,10 +7070,11 @@ From //build/config/rust/BUILD.gn:33
 Set to true to emit additional .rmeta files when compiling Rust rlibs.
 The .rmeta metadata files can be used by downstream build actions
 to quickly evaluate transitive dependencies (and remote inputs).
+This is required to support skipping downloads of rlibs.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:131
+From //build/toolchain/rbe.gni:132
 
 ### rust_incremental
 
@@ -7205,7 +7152,7 @@ rlibs from remote Rust build actions.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:135
+From //build/toolchain/rbe.gni:136
 
 ### rust_rbe_download_unstripped_binaries
 
