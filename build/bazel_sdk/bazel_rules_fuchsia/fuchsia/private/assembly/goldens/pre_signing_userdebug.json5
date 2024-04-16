@@ -98,6 +98,21 @@
                         ],
                     },
                 },
+
+                // Ensure sshd configuration matches expectations for userdebug builds.
+                {
+                    source: {
+                        PackageFar: [
+                            "meta/data/sshd-host/sshd_config",
+                        ],
+                    },
+                    state: "Present",
+                    content_checks: {
+                        matches_golden: [
+                            "sshd_config_userdebug",
+                        ],
+                    },
+                },
             ],
         },
     ],

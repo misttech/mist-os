@@ -9,3 +9,17 @@ These checks are run downstream by the signing server, which maintains an equiva
 In order to deduplicate the policy, the signing server should run the Scrutiny verifiers at signing time. The effort to enable this is tracked at b/311208337.
 
 Please consult with the security team if any checks need to be updated or removed.
+
+## Pre-signing Golden Files
+
+sshd_config_userdebug - this golden file acts a change detector for third_party/openssh-portable/fuchsia/sshd_config. This is currently how the security team ensures a secure sshd configuration for userdebug builds.
+
+To change this file, a migration strategy is recommended as follows:
+1. Notify the security team so back-end changes can be prepared.
+2. Add a copy of the updated sshd_config to the pre_signing/ folder in this dir.
+3. Update the pre_signing_userdebug.json5 policy file to add an entry for the updated golden in the matches_golden check.
+4. Land the CL for steps (2) and (3)
+5. Land the sshd_config change to openssh-portable.
+6. Remove the previous sshd_config_userdebug golden file.
+7. Rename the updated sshd_config to sshd_config_userdebug.
+8. Update pre_signing_userdebug.json5 to only use the new sshd_config_userdebug file in the matches_golden check.
