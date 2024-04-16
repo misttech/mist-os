@@ -60,7 +60,7 @@ pub fn initialize(opts: PublishOptions<'_>) -> Result<(), PublishError> {
             crate::ingest_log_events().expect("ingest log events");
         }
         if opts.install_panic_hook {
-            crate::install_panic_hook();
+            crate::install_panic_hook(opts.panic_prefix);
         }
     });
     Ok(())

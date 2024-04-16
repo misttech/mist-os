@@ -84,6 +84,7 @@ pub struct Transformer {
     logging: bool,
     logging_blocking: bool,
     logging_tags: LoggingTags,
+    panic_prefix: LitStr,
     interest: Interest,
     add_test_attr: bool,
 }
@@ -95,6 +96,7 @@ struct Args {
     logging_blocking: bool,
     logging_tags: LoggingTags,
     interest: Interest,
+    panic_prefix: Option<LitStr>,
     add_test_attr: bool,
 }
 
@@ -240,6 +242,7 @@ impl Parse for Args {
             logging: true,
             logging_blocking: false,
             logging_tags: LoggingTags::default(),
+            panic_prefix: None,
             interest: Interest::default(),
             add_test_attr: true,
         };
@@ -257,6 +260,7 @@ impl Parse for Args {
                 "logging_blocking" => args.logging_blocking = get_bool_arg(&input, true)?,
                 "logging_tags" => args.logging_tags = get_logging_tags(&input)?,
                 "logging_minimum_severity" => args.interest = get_interest_arg(&input)?,
+                "logging_panic_prefix" => args.panic_prefix = Some(get_arg(&input)?),
                 "add_test_attr" => args.add_test_attr = get_bool_arg(&input, true)?,
                 x => return err(format!("unknown argument: {}", x)),
             }
@@ -316,6 +320,8 @@ impl Transformer {
             (_, Some(true) | None, false, _) => return err("must be async to use >1 thread"),
         };
 
+        let panic_prefix =
+            args.panic_prefix.unwrap_or_else(|| LitStr::new("PANIC", sig.ident.span()));
         Ok(Transformer {
             executor,
             attrs,
@@ -325,6 +331,7 @@ impl Transformer {
             logging: args.logging,
             logging_blocking: args.logging_blocking,
             logging_tags: args.logging_tags,
+            panic_prefix,
             interest: args.interest,
             add_test_attr: args.add_test_attr,
         })
@@ -344,6 +351,7 @@ impl Finish for Transformer {
         let inputs = self.sig.inputs;
         let logging_blocking = self.logging_blocking;
         let mut logging_tags = self.logging_tags;
+        let panic_prefix = self.panic_prefix;
         let interest = self.interest;
 
         let mut func_attrs = Vec::new();
@@ -353,42 +361,32 @@ impl Finish for Transformer {
             quote! { func }
         } else if self.executor.is_test() {
             logging_tags.tags.insert(0, format!("{ident}"));
+            let logging_options = quote! {
+                ::fuchsia::LoggingOptions {
+                    blocking: #logging_blocking,
+                    interest: #interest,
+                    tags: &[#logging_tags],
+                    panic_prefix: #panic_prefix,
+                }
+            };
             if self.executor.is_some() {
-                quote! {
-                    ::fuchsia::init_logging_for_test_with_executor(func, ::fuchsia::LoggingOptions {
-                        blocking: #logging_blocking,
-                        interest: #interest,
-                        tags: &[#logging_tags],
-                    })
-                }
+                quote!(::fuchsia::init_logging_for_test_with_executor(func, #logging_options))
             } else {
-                quote! {
-                    ::fuchsia::init_logging_for_test_with_threads(func, ::fuchsia::LoggingOptions {
-                        blocking: #logging_blocking,
-                        interest: #interest,
-                        tags: &[#logging_tags],
-                    })
-                }
+                quote!(::fuchsia::init_logging_for_test_with_threads(func, #logging_options))
             }
         } else {
+            let logging_options = quote! {
+                ::fuchsia::LoggingOptions {
+                    blocking: #logging_blocking,
+                    interest: #interest,
+                    tags: &[#logging_tags],
+                    panic_prefix: #panic_prefix,
+                }
+            };
             if self.executor.is_some() {
-                quote! {
-                    ::fuchsia::init_logging_for_component_with_executor(
-                        func, ::fuchsia::LoggingOptions {
-                            blocking: #logging_blocking,
-                            interest: #interest,
-                            tags: &[#logging_tags],
-                        })
-                }
+                quote!(::fuchsia::init_logging_for_component_with_executor(func, #logging_options))
             } else {
-                quote! {
-                    ::fuchsia::init_logging_for_component_with_threads(
-                        func, ::fuchsia::LoggingOptions {
-                            blocking: #logging_blocking,
-                            interest: #interest,
-                            tags: &[#logging_tags],
-                        })
-                }
+                quote!(::fuchsia::init_logging_for_component_with_threads(func, #logging_options))
             }
         };
 

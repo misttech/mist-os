@@ -55,10 +55,11 @@ pub(crate) fn ingest_log_events() -> Result<(), PublishError> {
 }
 
 /// Adds a panic hook which will log an `ERROR` log with the panic information.
-pub(crate) fn install_panic_hook() {
+pub(crate) fn install_panic_hook(prefix: Option<&'static str>) {
     let previous_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        tracing::error!({ %info }, "PANIC");
+        let prefix = prefix.unwrap_or("PANIC");
+        tracing::error!({ %info }, "{prefix}");
         previous_hook(info);
     }));
 }
@@ -69,6 +70,7 @@ pub struct PublishOptions<'t> {
     pub(crate) publisher: PublisherOptions<'t>,
     pub(crate) ingest_log_events: bool,
     pub(crate) install_panic_hook: bool,
+    pub(crate) panic_prefix: Option<&'static str>,
 }
 
 impl<'t> Default for PublishOptions<'t> {
@@ -77,6 +79,7 @@ impl<'t> Default for PublishOptions<'t> {
             publisher: PublisherOptions::default(),
             ingest_log_events: true,
             install_panic_hook: true,
+            panic_prefix: None,
         }
     }
 }
@@ -95,6 +98,12 @@ impl<'t> PublishOptions<'t> {
     /// Default: true.
     pub fn ingest_log_events(mut self, enable: bool) -> Self {
         self.ingest_log_events = enable;
+        self
+    }
+
+    /// Override the default string prefix for a logged panic message.
+    pub fn panic_prefix(mut self, prefix: &'static str) -> Self {
+        self.panic_prefix = Some(prefix);
         self
     }
 }

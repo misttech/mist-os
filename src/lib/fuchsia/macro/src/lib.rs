@@ -17,6 +17,7 @@ use transformer::Transformer;
 ///  - `logging_tags` - optional list of string to be used as tags for logs. Default: None.
 ///  - `logging_minimum_severity` - optional minimum severity to be set for logs. Default: None,
 ///                                 the logging library will choose it (typically `info`).
+///  - `logging_panic_prefix` - optional string indicating the panic message prefix to log
 ///
 /// The main function can return either () or a Result<(), E> where E is an error type.
 #[proc_macro_attribute]
@@ -37,6 +38,7 @@ pub fn main(args: TokenStream, input: TokenStream) -> TokenStream {
 ///  - `logging_tags` - optional list of string to be used as tags for logs. Default: None.
 ///  - `logging_minimum_severity` - optional minimum severity to be set for logs. Default: None,
 ///                                 the logging library will choose it (typically `info`).
+///  - `logging_panic_prefix` - optional string indicating the panic message prefix to log
 ///  - `allow_stalls`  - boolean toggle for whether the async test is allowed to stall during
 ///                      execution (if true), or whether the function must complete without pausing
 ///                      (if false).

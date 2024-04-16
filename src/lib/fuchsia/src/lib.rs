@@ -40,6 +40,9 @@ pub struct LoggingOptions<'a> {
     ///
     /// NOTE: this is ignored on `host`.
     pub blocking: bool,
+
+    /// String to include in logged panic messages.
+    pub panic_prefix: &'static str,
 }
 
 #[cfg(not(target_os = "fuchsia"))]
@@ -49,6 +52,7 @@ impl<'a> From<LoggingOptions<'a>> for diagnostics_log::PublishOptions<'a> {
         if let Some(severity) = logging.interest.min_severity {
             options = options.minimum_severity(severity);
         }
+        options = options.panic_prefix(logging.panic_prefix);
         options
     }
 }
@@ -61,6 +65,7 @@ impl<'a> From<LoggingOptions<'a>> for diagnostics_log::PublishOptions<'a> {
         if let Some(severity) = logging.interest.min_severity {
             options = options.minimum_severity(severity);
         }
+        options = options.panic_prefix(logging.panic_prefix);
         options
     }
 }

@@ -142,7 +142,7 @@ fn initialize_publishing(opts: PublishOptions<'_>) -> Result<Publisher, PublishE
     }
 
     if opts.install_panic_hook {
-        crate::install_panic_hook();
+        crate::install_panic_hook(opts.panic_prefix);
     }
 
     Ok(publisher)
@@ -216,6 +216,7 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
             },
         ingest_log_events,
         install_panic_hook,
+        panic_prefix,
     } = opts;
     let tags = tags.into_iter().map(|s| s.to_string()).collect::<Vec<_>>();
 
@@ -232,6 +233,7 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
             },
             ingest_log_events,
             install_panic_hook,
+            panic_prefix,
         };
         let mut exec = fuchsia_async::LocalExecutor::new();
         let mut publisher = initialize_publishing(options).expect("initialize logging");
