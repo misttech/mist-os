@@ -13,10 +13,6 @@ const MAX_DEVICE_PATH_LEN uint64 = 1024;
 const MAX_DRIVER_NAME_LEN uint64 = 32;
 /// Maximum length for a driver path
 const MAX_DRIVER_PATH_LEN uint64 = 1024;
-/// Maximum device power states. In future this should account
-/// for performance states.
-const MAX_DEVICE_POWER_STATES uint32 = 5;
-const MIN_DEVICE_POWER_STATES uint32 = 2; // D0 & D3COLD
 
 @deprecated("devices will be services in the future")
 type DeviceSignal = strict bits : uint32 {
@@ -30,95 +26,6 @@ type DeviceSignal = strict bits : uint32 {
     ERROR = 0x08000000; // ZX_USER_SIGNAL_3
     /// Indicates the device has hung up on the current connection.
     HANGUP = 0x10000000; // ZX_USER_SIGNAL_4
-};
-
-type DevicePowerState = strict enum : uint8 {
-    /// Mandatory Working state. Device is fully functional, can take I/O,
-    /// issue interrupts. This state is mandatory for all devices
-    /// The device enters into this state by default, when powered on.
-    DEVICE_POWER_STATE_D0 = 0;
-    /// [OPTIONAL] Device is not working when in this state. It cannot process
-    /// I/O nor issue interrupts, unless it is armed for some special interrupts
-    /// that can wake up the system/device. When in this state, the restore time
-    /// of getting back to working state is less than other low-power states
-    /// Power savings in this state are lesser than other low power states.
-    /// Device may retain some hardware context and full initialization
-    /// may not be needed when resuming from this state.
-    DEVICE_POWER_STATE_D1 = 1;
-    /// [OPTIONAL] Device is not working when in this state. It cannot process
-    /// I/O nor issue interrupts, unless it is armed for some special interrupts
-    /// that can wake up the system/device. When in this state, the restore time
-    /// of getting back to working state is more than DEVICE_POWER_STATE_D1 and
-    /// less than restore time of getting back from DEVICE_POWER_STATE_D3HOT,
-    /// DEVICE_POWER_STATE_D3COLD. Power savings in this state are lesser
-    /// than DEVICE_POWER_STATE_D3COLD, DEVICE_POWER_STATE_D3HOT.
-    /// Device may retain some hardware context and full initialization
-    /// may not be needed when resuming from this state.
-    DEVICE_POWER_STATE_D2 = 2;
-    /// [OPTIONAL] Device is not working when in this state. It cannot process
-    /// I/O nor issue interrupts, unless it is armed for some special interrupts
-    /// that can wake up the system/device. When in this state, the restore time
-    /// of getting back to working state is more than DEVICE_POWER_STATE_D1,
-    /// DEVICE_POWER_STATE_D3HOT and less than restore time of getting back from
-    /// DEVICE_POWER_STATE_D3COLD. Power savings in this state are lesser
-    /// than DEVICE_POWER_STATE_D3COLD. Device has no context and full initialization
-    /// by the device driver when resuming from this state.
-    /// Although the device is completely off, it is still powered on and is enumerable.
-    DEVICE_POWER_STATE_D3HOT = 3;
-    /// [MANDATORY] Device is not working when in this state. It cannot process
-    /// I/O nor issue interrupts, unless it is armed for some special interrupts
-    /// that can wake up the system/device. When in this state, the restore time
-    /// of getting back to working state is more than all other low power states.
-    /// Power savings are more compared to all other low-power states.
-    /// Device has no context and full initialization by the device driver when
-    /// resuming from this state. In this state, the power to this device is turned off.
-    /// Device may be powered by other auxiliary supplies to support wake capability.
-    DEVICE_POWER_STATE_D3COLD = 4;
-};
-
-/// [MANDATORY] Default performance state when the device is in DEVICE_POWER_STATE_D0
-const DEVICE_PERFORMANCE_STATE_P0 uint32 = 0;
-
-// TODO(ravoorir): This should be table when the Controller protocol moves off of simple layout.
-type DevicePowerStateInfo = struct {
-    state_id DevicePowerState;
-
-    /// Is this state supported?
-    is_supported bool;
-
-    /// Restore time for coming out of this state to working D0 state.
-    restore_latency int64;
-
-    /// Is this device wakeup_capable?
-    wakeup_capable bool;
-
-    /// Deepest system system sleep state that the device can wake the system from.
-    system_wake_state int32;
-};
-
-/// Performance state info for a device. A performance state is relevant only
-/// when the device is in non-sleeping working device power state.
-type DevicePerformanceStateInfo = struct {
-    state_id int32;
-    /// Restore time for coming out of this state to fully working performance state.
-    restore_latency int64;
-    /// Is this state supported?
-    is_supported bool;
-    // TODO(ravoorir): Explore how more device specific metadata can be saved here.
-    // Maybe a union of metadata coming from different devices.
-};
-
-type SystemPowerStateInfo = struct {
-    // TODO(ravoorir): This can be removed when all clients move away from the suspend_flag.
-    suspend_flag uint32;
-    /// Should wakeup be enabled from this system state?
-    wakeup_enable bool;
-
-    /// Device power state that the device should be in, for this system power state.
-    dev_state DevicePowerState;
-    /// Performance state that the device should be in, for this system power state.
-    /// Only applicable, if the dev_state is a working state (DEVICE_POWER_STATE_D0).
-    performance_state uint32;
 };
 
 /// Interface for manipulating a device in a devhost

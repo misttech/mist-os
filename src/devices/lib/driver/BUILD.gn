@@ -177,7 +177,6 @@ shared_library("driver") {
     "//src/devices/tests/ddk-firmware-test:*",
     "//src/devices/tests/ddk-lifecycle:*",
     "//src/devices/tests/ddk-metadata-test:*",
-    "//src/devices/tests/ddk-power:*",
     "//src/devices/tests/ddk-topology-test:*",
     "//src/devices/tests/device-watcher:*",
     "//src/devices/tests/driver-inspect-test:*",

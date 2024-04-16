@@ -202,8 +202,6 @@
 //src/devices/tests/ddk-firmware-test:ddk-firmware-test
 //src/devices/tests/ddk-lifecycle:ddk-lifecycle-test-driver
 //src/devices/tests/ddk-metadata-test:fuchsia_driver
-//src/devices/tests/ddk-power:ddk-power-test-child-driver
-//src/devices/tests/ddk-power:ddk-power-test-driver
 //src/devices/tests/ddk-topology-test:ddk-topology-test
 //src/devices/tests/driver-inspect-test:fuchsia_driver
 //src/devices/tests/driver-multiname-test:parent_device
