@@ -92,3 +92,40 @@ selects.config_setting_group(
         ":cpu_riscv64",
     ],
 )
+
+# Variants based configuration
+[
+    selects.config_setting_group(
+        name = "is_%s_api_%s" % (
+            cpu,
+            target_api.api_level,
+        ),
+        match_all = [
+            "@platforms//os:fuchsia",
+            ":cpu_%s" % cpu,
+            ":api_level_%s" % target_api.api_level,
+        ],
+    )
+    for target_api in INTERNAL_ONLY_VALID_TARGET_APIS
+    for cpu in [
+        "arm64",
+        "x64",
+        "riscv64",
+    ]
+]
+
+# Configuration for API level HEAD
+[
+    selects.config_setting_group(
+        name = "is_%s_api_HEAD" % cpu,
+        match_all = [
+            "@platforms//os:fuchsia",
+            ":cpu_%s" % cpu,
+        ],
+    )
+    for cpu in [
+        "arm64",
+        "x64",
+        "riscv64",
+    ]
+]

@@ -36,7 +36,6 @@ _SDK_TEMPLATES = {
     "companion_host_tool": "//fuchsia/workspace/sdk_templates:companion_host_tool.BUILD.template",
     "component_manifest": "//fuchsia/workspace/sdk_templates:component_manifest.BUILD.template",
     "component_manifest_collection": "//fuchsia/workspace/sdk_templates:component_manifest_collection.BUILD.template",
-    "constraint": "//fuchsia/workspace/sdk_templates:constraint.BUILD.template",
     "export_all_files": "//fuchsia/workspace/sdk_templates:export_all_files.BUILD.template",
     "ffx_subtool": "//fuchsia/workspace/sdk_templates:ffx_subtool.BUILD.template",
     "fidl_library": "//fuchsia/workspace/sdk_templates:fidl_library.BUILD.template",
@@ -525,12 +524,16 @@ def _fuchsia_api_level_constraint(api_level, default = "//conditions:default"):
         return default
     return "//fuchsia/constraints:api_level_%s" % api_level
 
+def _get_api_level(variant):
+    api_level = variant["api_level"]
+    return "HEAD" if _is_undefined_api_level(api_level) else api_level
+
 def _is_undefined_api_level(api_level):
-    return api_level in (-1, "unversioned")
+    return api_level in (-1, "unversioned", "HEAD")
 
 def _api_level_deprecation_message(api_level):
     if _is_undefined_api_level(api_level):
-        return "\"Warning: Dependencies with unspecified API levels are being used, incompatibility may occur.\""
+        return "\"Warning: Dependencies with unstable API levels are being used, incompatibility may occur.\""
     return "None"
 
 # We can't just do f"//:{file}" for file srcs, since the relative dir may have a
@@ -611,14 +614,14 @@ def _generate_package_build_rules(ctx, meta, relative_dir, build_file, process_c
     name = _get_target_name(meta["name"])
     package_variants = [
         struct(
-            name = "%s_%s_api_%s" % (name, variant["arch"], variant["api_level"]),
+            name = "%s_%s_api_%s" % (name, variant["arch"], _get_api_level(variant)),
             files = variant["files"],
             manifest = variant["manifest_file"],
-            deprecation = _api_level_deprecation_message(variant["api_level"]),
-            constraint = "is_%s_api_%s" % (variant["arch"], variant["api_level"]),
+            deprecation = _api_level_deprecation_message(_get_api_level(variant)),
+            constraint = "is_%s_api_%s" % (variant["arch"], _get_api_level(variant)),
             os = "@platforms//os:fuchsia",
             cpu = _FUCHSIA_CPU_CONSTRAINT_MAP[variant["arch"]],
-            api_level = _fuchsia_api_level_constraint(variant["api_level"], None),
+            api_level = _fuchsia_api_level_constraint(_get_api_level(variant), None),
         )
         for variant in meta["variants"]
     ]
@@ -633,19 +636,10 @@ def _generate_package_build_rules(ctx, meta, relative_dir, build_file, process_c
         })
         process_context.files_to_copy[meta["_meta_sdk_root"]].extend(variant.files)
 
-        # Write merged constraint definitions.
-        _merge_template(ctx, build_file, _sdk_template_path(ctx, "constraint"), {
-            "{{name}}": variant.constraint,
-            "{{match_all}}": _get_starlark_list([
-                variant.os,
-                variant.cpu,
-            ] + ([variant.api_level] if variant.api_level else [])),
-        })
-
     _merge_template(ctx, build_file, _sdk_template_path(ctx, "select_alias"), {
         "{{name}}": name,
         "{{select_map}}": _get_starlark_dict({
-            ":%s" % variant.constraint: ":%s" % variant.name
+            "@fuchsia_sdk//fuchsia/constraints:%s" % variant.constraint: ":%s" % variant.name
             for variant in package_variants
         }),
     })
