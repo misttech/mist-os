@@ -169,6 +169,7 @@ def _scrutiny_validation(
         pb_out_dir,
         platform_scrutiny_config.pre_signing_policy,
         platform_scrutiny_config.pre_signing_goldens_dir,
+        platform_scrutiny_config.pre_signing_goldens,
     ))
     if not is_recovery:
         deps += _verify_route_sources(
@@ -452,7 +453,8 @@ def _verify_pre_signing(
         ffx_tool,
         pb_out_dir,
         pre_signing_policy_file,
-        pre_signing_goldens_dir):
+        pre_signing_goldens_dir,
+        pre_signing_goldens):
     stamp_file = ctx.actions.declare_file(label_name + "_pre_signing.stamp")
     ffx_isolate_dir = ctx.actions.declare_directory(label_name + "_pre_signing.ffx")
     _ffx_invocation = []
@@ -472,7 +474,11 @@ def _verify_pre_signing(
         "set -e",
         " ".join(_ffx_invocation),
     ]
-    inputs = [ffx_tool, pb_out_dir, pre_signing_policy_file]
+
+    # The pre_signing_goldens file list is only specified to avoid providing a dir build input
+    # to bazel. This avoids the "dependency checking of directories is unsound" warning.
+    # The scrutiny invocation itself expects a dir path to be provided.
+    inputs = [ffx_tool, pb_out_dir, pre_signing_policy_file] + pre_signing_goldens
     ctx.actions.run_shell(
         inputs = inputs,
         outputs = [stamp_file, ffx_isolate_dir],

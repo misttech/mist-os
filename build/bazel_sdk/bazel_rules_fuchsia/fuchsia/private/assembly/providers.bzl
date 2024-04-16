@@ -147,6 +147,7 @@ FuchsiaScrutinyConfigInfo = provider(
         "structured_config_policy": "File describing the policy of structured config",
         "pre_signing_policy": "File describing the policy of checks required before signing",
         "pre_signing_goldens_dir": "Path to directory containing golden files for pre-signing checks",
+        "pre_signing_goldens": "List of golden files for pre-signing checks to be used as build inputs",
     },
 )
 
