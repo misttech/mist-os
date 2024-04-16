@@ -246,7 +246,7 @@ impl<I: IpExt, E> Connection<I, E> {
 
 /// Fields common to both [`ConnectionExclusive`] and [`ConnectionShared`].
 #[derive(Debug)]
-pub(crate) struct ConnectionCommon<I: IpExt, E> {
+pub struct ConnectionCommon<I: IpExt, E> {
     /// The 5-tuple for the connection in the original direction. This is
     /// arbitrary, and is just the direction where a packet was first seen.
     pub(crate) original_tuple: Tuple<I>,
@@ -268,7 +268,7 @@ pub(crate) struct ConnectionCommon<I: IpExt, E> {
 /// out-of-sync with the table (e.g. by changing the tuples once the connection
 /// has been inserted).
 #[derive(Debug)]
-pub(crate) struct ConnectionExclusive<I: IpExt, E> {
+pub struct ConnectionExclusive<I: IpExt, E> {
     pub(crate) inner: ConnectionCommon<I, E>,
 }
 
@@ -297,7 +297,7 @@ impl<I: IpExt, E: Default> From<Tuple<I>> for ConnectionExclusive<I, E> {
 /// itself, will be depending on them not to change. Fields must be accessed
 /// through the associated methods.
 #[derive(Debug)]
-pub(crate) struct ConnectionShared<I: IpExt, E> {
+pub struct ConnectionShared<I: IpExt, E> {
     inner: ConnectionCommon<I, E>,
 }
 

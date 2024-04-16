@@ -17,6 +17,9 @@ mod matchers;
 mod packets;
 mod state;
 
+/// A connection as tracked by conntrack.
+pub type ConntrackConnection<I> = conntrack::Connection<I, state::ConntrackExternalData>;
+
 pub use api::FilterApi;
 pub use context::{FilterBindingsTypes, FilterContext, FilterIpContext};
 pub use logic::{FilterHandler, FilterImpl, ProofOfEgressCheck, Verdict};
@@ -30,8 +33,8 @@ pub use packets::{
 };
 pub use state::{
     validation::{ValidRoutines, ValidationError},
-    Action, ConntrackExternalData, Hook, IpRoutines, NatRoutines, Routine, Routines, Rule, State,
-    UninstalledRoutine,
+    Action, ConntrackExternalData, FilterIpMetadata, Hook, IpRoutines, NatRoutines, Routine,
+    Routines, Rule, State, UninstalledRoutine,
 };
 
 /// Testing-related utilities for use by other crates.

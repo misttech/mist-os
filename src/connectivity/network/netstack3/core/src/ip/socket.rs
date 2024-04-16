@@ -534,9 +534,8 @@ where
     // after the LOCAL_EGRESS hook since the packet may have been changed.
     let mut packet = crate::filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), *proto, &body);
 
-    let packet_metadata = IpLayerPacketMetadata::<I>::default();
-    // TODO(https://fxbug.dev/328063820): Pass packet metadata
-    match core_ctx.filter_handler().local_egress_hook(&mut packet, &device) {
+    let mut packet_metadata = IpLayerPacketMetadata::default();
+    match core_ctx.filter_handler().local_egress_hook(&mut packet, &device, &mut packet_metadata) {
         crate::filter::Verdict::Drop => return Ok(()),
         crate::filter::Verdict::Accept => {}
     }

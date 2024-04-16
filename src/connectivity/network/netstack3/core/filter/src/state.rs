@@ -295,3 +295,19 @@ impl<I: IpExt, DeviceClass: Debug> Inspectable for State<I, DeviceClass> {
         });
     }
 }
+
+/// A trait for interacting with the pieces of packet metadata that are
+/// important for filtering.
+pub trait FilterIpMetadata<I: IpExt> {
+    /// Removes the conntrack connection, if it exists.
+    fn take_conntrack_connection(
+        &mut self,
+    ) -> Option<conntrack::Connection<I, ConntrackExternalData>>;
+
+    /// Puts a new conntrack connection into the metadata struct, returning the
+    /// previous value.
+    fn replace_conntrack_connection(
+        &mut self,
+        conn: conntrack::Connection<I, ConntrackExternalData>,
+    ) -> Option<conntrack::Connection<I, ConntrackExternalData>>;
+}

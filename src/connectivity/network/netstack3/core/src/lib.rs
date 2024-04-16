@@ -117,9 +117,9 @@ pub mod filter {
         ValidationError,
     };
     pub(crate) use netstack3_filter::{
-        FilterContext, FilterHandler, FilterImpl, FilterIpContext, ForwardedPacket, IpPacket,
-        MaybeTransportPacket, NestedWithInnerIpPacket, RxPacket, State, TransportPacketSerializer,
-        TxPacket, Verdict,
+        ConntrackConnection, FilterContext, FilterHandler, FilterImpl, FilterIpContext,
+        FilterIpMetadata, ForwardedPacket, IpPacket, MaybeTransportPacket, NestedWithInnerIpPacket,
+        RxPacket, State, TransportPacketSerializer, TxPacket, Verdict,
     };
 }
 
