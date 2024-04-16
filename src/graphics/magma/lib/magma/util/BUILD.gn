@@ -29,7 +29,7 @@ source_set("macros") {
 
   public_configs = [
     ":magma_util_config",
-    "$magma_build_root:magma_src_include_config",
+    "//src/graphics/lib/magma:magma_src_include_config",
   ]
   public_deps = [ "//src/graphics/magma/lib/magma/platform:logger" ]
 
@@ -43,7 +43,7 @@ source_set("macros") {
 source_set("status") {
   visibility = visibility_list
 
-  public_configs = [ "$magma_build_root:magma_src_include_config" ]
+  public_configs = [ "//src/graphics/lib/magma:magma_src_include_config" ]
 
   sources = [ "status.h" ]
 
@@ -53,7 +53,7 @@ source_set("status") {
 source_set("thread") {
   visibility = visibility_list
 
-  public_configs = [ "$magma_build_root:magma_src_include_config" ]
+  public_configs = [ "//src/graphics/lib/magma:magma_src_include_config" ]
 
   sources = [ "thread.h" ]
 

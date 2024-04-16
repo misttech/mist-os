@@ -6,12 +6,12 @@ import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 source_set("mock") {
   public_configs = [
-    "$msd_intel_gen_build_root:msd_tests_include_config",
-    "$msd_intel_gen_build_root:msd_src_include_config",
+    "//src/graphics/drivers/msd-intel-gen:msd_tests_include_config",
+    "//src/graphics/drivers/msd-intel-gen:msd_src_include_config",
   ]
 
   public_deps = [
-    "$msd_intel_gen_build_root/src",
+    "//src/graphics/drivers/msd-intel-gen/src",
     "//src/graphics/magma:msd",
     "//src/graphics/magma/lib/magma/platform:buffer",
     "//src/graphics/magma/lib/magma/util:macros",

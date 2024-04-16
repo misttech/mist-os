@@ -62,7 +62,8 @@ driver_bind_rules("msd_intel_test_bind") {
 }
 
 source_set("msd_intel_entry") {
-  public_configs = [ "$msd_intel_gen_build_root:msd_src_include_config" ]
+  public_configs =
+      [ "//src/graphics/drivers/msd-intel-gen:msd_src_include_config" ]
   sources = [ "src/driver_entry.cc" ]
 
   deps = [
@@ -86,7 +87,8 @@ source_set("msd_intel_entry") {
 source_set("msd_intel_test_entry") {
   testonly = true
 
-  public_configs = [ "$msd_intel_gen_build_root:msd_src_include_config" ]
+  public_configs =
+      [ "//src/graphics/drivers/msd-intel-gen:msd_src_include_config" ]
   sources = [ "src/driver_entry.cc" ]
   defines = [ "MAGMA_TEST_DRIVER=1" ]
 
