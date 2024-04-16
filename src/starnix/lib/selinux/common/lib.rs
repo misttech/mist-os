@@ -264,6 +264,8 @@ class_permission_enum! {
         /// Permission to use a file as an entry point to the calling domain without performing a
         /// transition.
         ExecuteNoTrans("execute_no_trans"),
+        /// Permission to use a file as an entry point into the new domain on transition.
+        Entrypoint("entrypoint"),
     }
 }
 

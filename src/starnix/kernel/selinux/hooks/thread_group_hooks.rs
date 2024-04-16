@@ -6,6 +6,7 @@ use crate::task::Kernel;
 
 use selinux::{permission_check::PermissionCheck, InitialSid, SecurityId};
 use selinux_common::{FilePermission, ProcessPermission};
+use starnix_logging::log_debug;
 use starnix_uapi::{
     error,
     errors::Errno,
@@ -49,17 +50,18 @@ pub(crate) fn check_exec_access(
             FilePermission::ExecuteNoTrans,
         ) {
             // TODO(http://b/330904217): once filesystems are labeled, deny access.
+            log_debug!("execute_no_trans permission is denied, ignoring.");
         }
     } else {
         // Domain transition, check that transition is allowed.
         if !permission_check.has_permission(current_sid, new_sid, ProcessPermission::Transition) {
             return error!(EACCES);
         }
-        // TODO(http://b/320436714): Check executable permissions:
-        // - allow rule from `new_sid` to the executable's security context for entrypoint
-        //   permissions
-        // - allow rule from `current_sid` to the executable's security context for read
-        //   and execute permissions
+        // Check that the executable file has an entry point into the new domain.
+        if !permission_check.has_permission(new_sid, executable_sid, FilePermission::Entrypoint) {
+            // TODO(http://b/330904217): once filesystems are labeled, deny access.
+            log_debug!("entrypoint permission is denied, ignoring.");
+        }
     }
     Ok(Some(SeLinuxResolvedElfState { sid: new_sid }))
 }
@@ -278,9 +280,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn exec_access_allowed_for_allowed_transition_type() {
+    fn exec_transition_allowed_for_allowed_transition_type() {
         let security_server = security_server_with_policy();
-
         let current_sid = security_server
             .security_context_to_sid(b"u:object_r:exec_transition_source_t:s0")
             .expect("invalid security context");
@@ -310,16 +311,49 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn exec_access_denied_for_denied_transition_type() {
+    fn exec_transition_denied_for_transition_denied_type() {
         let security_server = security_server_with_policy();
         let current_sid = security_server
-            .security_context_to_sid(b"u:object_r:exec_transition_target_t:s0")
+            .security_context_to_sid(b"u:object_r:exec_transition_source_t:s0")
             .expect("invalid security context");
         let exec_sid = security_server
-            .security_context_to_sid(b"u:object_r:exec_transition_source_t:s0")
+            .security_context_to_sid(b"u:object_r:exec_transition_denied_target_t:s0")
             .expect("invalid security context");
         let executable_sid = security_server
             .security_context_to_sid(b"u:object_r:executable_file_trans_t:s0")
+            .expect("invalid security context");
+        let selinux_state = SeLinuxThreadGroupState {
+            current_sid: current_sid,
+            exec_sid: Some(exec_sid),
+            fscreate_sid: None,
+            keycreate_sid: None,
+            previous_sid: current_sid,
+            sockcreate_sid: None,
+        };
+
+        assert_eq!(
+            check_exec_access(
+                &security_server.as_permission_check(),
+                &selinux_state,
+                executable_sid
+            ),
+            error!(EACCES)
+        );
+    }
+
+    // TODO(http://b/330904217): reenable test once filesystems are labeled and access is denied.
+    #[ignore]
+    #[fuchsia::test]
+    fn exec_transition_denied_for_executable_with_no_entrypoint_perm() {
+        let security_server = security_server_with_policy();
+        let current_sid = security_server
+            .security_context_to_sid(b"u:object_r:exec_transition_source_t:s0")
+            .expect("invalid security context");
+        let exec_sid = security_server
+            .security_context_to_sid(b"u:object_r:exec_transition_target_t:s0")
+            .expect("invalid security context");
+        let executable_sid = security_server
+            .security_context_to_sid(b"u:object_r:executable_file_trans_no_entrypoint_t:s0")
             .expect("invalid security context");
         let selinux_state = SeLinuxThreadGroupState {
             current_sid: current_sid,

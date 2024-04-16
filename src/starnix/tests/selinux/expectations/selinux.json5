@@ -12,6 +12,7 @@
         {
             type: "expect_failure",
             matchers: [
+                // TODO(http://b/330904217): update `entrypoint` expectation to pass once filesystems are labeled correctly.
                 "*selinux_entrypoint*",
                 "*selinux_execshare*",
                 "*selinux_exectrace*",
