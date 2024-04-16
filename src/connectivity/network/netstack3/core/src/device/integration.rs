@@ -42,7 +42,7 @@ use crate::{
         PureIpDeviceCounters, RecvIpFrameMeta, WeakDeviceId,
     },
     error::{ExistsError, NotFoundError},
-    filter::{FilterHandler as _, FilterHandlerProvider as _, IpPacket},
+    filter::{IpPacket, ProofOfEgressCheck},
     for_any_device_id,
     ip::{
         device::{
@@ -172,6 +172,7 @@ impl<I: IpTypesIpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::F
         local_addr: SpecifiedAddr<<I as Ip>::Addr>,
         body: S,
         broadcast: Option<<I as IpTypesIpExt>::BroadcastMarker>,
+        ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), S>
     where
         S: Serializer + IpPacket<I>,
@@ -196,6 +197,7 @@ impl<
         local_addr: SpecifiedAddr<<I as Ip>::Addr>,
         body: S,
         broadcast: Option<<I as IpTypesIpExt>::BroadcastMarker>,
+        ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), S>
     where
         S: Serializer + IpPacket<I>,
@@ -1074,15 +1076,15 @@ fn send_ip_frame<BC, S, A, L>(
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
     local_addr: SpecifiedAddr<A>,
-    mut body: S,
+    body: S,
     broadcast: Option<<A::Version as IpTypesIpExt>::BroadcastMarker>,
 ) -> Result<(), S>
 where
     BC: BindingsContext,
-    S: Serializer + IpPacket<A::Version>,
+    S: Serializer,
     S::Buffer: BufferMut,
     A: IpAddress,
-    L: LockBefore<crate::lock_ordering::FilterState<A::Version>>
+    L: LockBefore<crate::lock_ordering::IpState<A::Version>>
         + LockBefore<crate::lock_ordering::LoopbackTxQueue>
         + LockBefore<crate::lock_ordering::PureIpDeviceTxQueue>,
     A::Version: EthernetIpExt + IpTypesIpExt,
@@ -1090,11 +1092,6 @@ where
         + NudHandler<A::Version, EthernetLinkDevice, BC>
         + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>,
 {
-    match core_ctx.filter_handler().egress_hook(&mut body, device) {
-        crate::filter::Verdict::Drop => return Ok(()),
-        crate::filter::Verdict::Accept => {}
-    }
-
     match device {
         DeviceId::Ethernet(id) => ethernet::send_ip_frame::<_, _, A, _>(
             core_ctx,

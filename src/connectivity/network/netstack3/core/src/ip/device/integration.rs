@@ -23,16 +23,19 @@ use net_types::{
     LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{EmptyBuf, Serializer};
-use packet_formats::icmp::{
-    ndp::{NeighborSolicitation, RouterSolicitation},
-    IcmpUnusedCode,
+use packet_formats::{
+    icmp::{
+        ndp::{NeighborSolicitation, RouterSolicitation},
+        IcmpUnusedCode,
+    },
+    ip::IpExt,
 };
 
 use crate::{
     context::{CounterContext, InstantContext},
     device::{AnyDevice, DeviceId, DeviceIdContext},
     error::{ExistsError, NotFoundError},
-    filter::MaybeTransportPacket,
+    filter::{FilterHandlerProvider, FilterImpl, MaybeTransportPacket},
     ip::{
         self,
         device::{
@@ -332,7 +335,7 @@ where
     }
 }
 
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     ip::IpDeviceStateContext<Ipv4, BC> for CoreCtx<'_, BC, L>
 {
     fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O {
@@ -1389,6 +1392,63 @@ where
     fn flush_neighbor_table(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId) {
         let Self { config: _, core_ctx } = self;
         NudIpHandler::<I, BC>::flush_neighbor_table(core_ctx, bindings_ctx, device_id)
+    }
+}
+
+impl<
+        'a,
+        I: IpExt,
+        Config,
+        BC: BindingsContext,
+        L: LockBefore<crate::lock_ordering::FilterState<I>>,
+    > FilterHandlerProvider<I, BC> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+{
+    type Handler<'b> = FilterImpl<'b, CoreCtx<'a, BC, L>> where Self: 'b;
+
+    fn filter_handler(&mut self) -> Self::Handler<'_> {
+        let Self { config: _, core_ctx } = self;
+        FilterHandlerProvider::filter_handler(core_ctx)
+    }
+}
+
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<
+        'a,
+        I: IpLayerIpExt,
+        Config,
+        BC: BindingsContext,
+        L: LockBefore<crate::lock_ordering::IpState<I>>,
+    > ip::IpDeviceStateContext<I, BC> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+{
+    fn with_next_packet_id<O, F: FnOnce(&<I as IpLayerIpExt>::PacketIdState) -> O>(
+        &self,
+        cb: F,
+    ) -> O {
+        let Self { config: _, core_ctx } = self;
+        ip::IpDeviceStateContext::<I, _>::with_next_packet_id(core_ctx, cb)
+    }
+
+    fn get_local_addr_for_remote(
+        &mut self,
+        device_id: &Self::DeviceId,
+        remote: Option<SpecifiedAddr<<I as Ip>::Addr>>,
+    ) -> Option<IpDeviceAddr<<I as Ip>::Addr>> {
+        let Self { config: _, core_ctx } = self;
+        ip::IpDeviceStateContext::<I, _>::get_local_addr_for_remote(core_ctx, device_id, remote)
+    }
+
+    fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8 {
+        let Self { config: _, core_ctx } = self;
+        ip::IpDeviceStateContext::<I, _>::get_hop_limit(core_ctx, device_id)
+    }
+
+    fn address_status_for_device(
+        &mut self,
+        dst_ip: SpecifiedAddr<<I as Ip>::Addr>,
+        device_id: &Self::DeviceId,
+    ) -> AddressStatus<<I as IpLayerIpExt>::AddressStatus> {
+        let Self { config: _, core_ctx } = self;
+        ip::IpDeviceStateContext::<I, _>::address_status_for_device(core_ctx, dst_ip, device_id)
     }
 }
 

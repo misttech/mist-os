@@ -41,6 +41,7 @@ use crate::{
             GmpStateMachine, GmpTypeLayout, IpExt, MulticastGroupSet, ProtocolSpecific,
             QueryTarget,
         },
+        IpLayerHandler,
     },
     Instant,
 };
@@ -73,7 +74,7 @@ pub(crate) trait IgmpStateContext<BC: IgmpBindingsContext<Self::DeviceId>>:
 
 /// The execution context for the Internet Group Management Protocol (IGMP).
 pub(crate) trait IgmpContext<BC: IgmpBindingsContext<Self::DeviceId>>:
-    DeviceIdContext<AnyDevice> + IpDeviceSendContext<Ipv4, BC>
+    DeviceIdContext<AnyDevice> + IpDeviceSendContext<Ipv4, BC> + IpLayerHandler<Ipv4, BC>
 {
     /// Calls the function with a mutable reference to the device's IGMP state
     /// and whether or not IGMP is enabled for the `device`.
@@ -401,9 +402,15 @@ where
     };
     let body = body.into_serializer().encapsulate(builder);
 
-    core_ctx
-        .send_ip_frame(bindings_ctx, &device, dst_ip.into_specified(), body, None)
-        .map_err(|_| IgmpError::SendFailure { addr: *group_addr })
+    crate::ip::IpLayerHandler::send_ip_frame(
+        core_ctx,
+        bindings_ctx,
+        &device,
+        dst_ip.into_specified(),
+        body,
+        None,
+    )
+    .map_err(|_| IgmpError::SendFailure { addr: *group_addr })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -543,7 +550,7 @@ mod tests {
     use alloc::vec::Vec;
     use assert_matches::assert_matches;
 
-    use net_types::{ethernet::Mac, ip::Ip as _};
+    use net_types::{ethernet::Mac, ip::Ip};
     use packet::{serialize::Buf, ParsablePacket as _};
     use packet_formats::{
         ethernet::EthernetFrameLengthCheck,
@@ -563,6 +570,7 @@ mod tests {
             testutil::FakeDeviceId,
             DeviceId,
         },
+        filter::{MaybeTransportPacket, ProofOfEgressCheck},
         ip::{
             device::{
                 config::{IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate},
@@ -573,6 +581,7 @@ mod tests {
                 QueryReceivedActions, ReportReceivedActions, ReportTimerExpiredActions,
             },
             testutil::FakeIpDeviceIdCtx,
+            types::IpTypesIpExt,
         },
         state::StackStateBuilder,
         testutil::{
@@ -675,6 +684,40 @@ mod tests {
         }
     }
 
+    impl IpLayerHandler<Ipv4, FakeBindingsCtx> for FakeCoreCtx {
+        fn send_ip_packet_from_device<S>(
+            &mut self,
+            _bindings_ctx: &mut FakeBindingsCtx,
+            _meta: crate::ip::SendIpPacketMeta<
+                Ipv4,
+                &Self::DeviceId,
+                Option<SpecifiedAddr<<Ipv4 as Ip>::Addr>>,
+            >,
+            _body: S,
+        ) -> Result<(), S>
+        where
+            S: Serializer + MaybeTransportPacket,
+            S::Buffer: BufferMut,
+        {
+            unimplemented!();
+        }
+
+        fn send_ip_frame<S>(
+            &mut self,
+            bindings_ctx: &mut FakeBindingsCtx,
+            device: &Self::DeviceId,
+            next_hop: SpecifiedAddr<<Ipv4 as Ip>::Addr>,
+            body: S,
+            broadcast: Option<<Ipv4 as IpTypesIpExt>::BroadcastMarker>,
+        ) -> Result<(), S>
+        where
+            S: Serializer + netstack3_filter::IpPacket<Ipv4>,
+            S::Buffer: BufferMut,
+        {
+            crate::ip::send_ip_frame(self, bindings_ctx, device, next_hop, body, broadcast)
+        }
+    }
+
     impl IpDeviceSendContext<Ipv4, FakeBindingsCtx> for FakeCoreCtx {
         fn send_ip_frame<S>(
             &mut self,
@@ -683,6 +726,7 @@ mod tests {
             local_addr: SpecifiedAddr<Ipv4Addr>,
             body: S,
             _broadcast: Option<()>,
+            ProofOfEgressCheck { .. }: ProofOfEgressCheck,
         ) -> Result<(), S>
         where
             S: Serializer,

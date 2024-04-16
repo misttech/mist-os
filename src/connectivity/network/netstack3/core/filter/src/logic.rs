@@ -20,6 +20,12 @@ pub enum Verdict {
     Drop,
 }
 
+/// A witness type to indicate that the egress filtering hook has been run.
+#[derive(Debug)]
+pub struct ProofOfEgressCheck {
+    _private_field_to_prevent_construction_outside_of_module: (),
+}
+
 pub(crate) struct Interfaces<'a, D> {
     pub ingress: Option<&'a D>,
     pub egress: Option<&'a D>,
@@ -123,7 +129,7 @@ pub trait FilterHandler<I: IpExt, BT: FilterBindingsTypes> {
 
     /// The egress hook intercepts all outgoing traffic after a routing decision
     /// has been made.
-    fn egress_hook<P, D>(&mut self, packet: &mut P, interface: &D) -> Verdict
+    fn egress_hook<P, D>(&mut self, packet: &mut P, interface: &D) -> (Verdict, ProofOfEgressCheck)
     where
         P: IpPacket<I>,
         D: InterfaceProperties<BT::DeviceClass>;
@@ -203,19 +209,22 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         })
     }
 
-    fn egress_hook<P, D>(&mut self, packet: &mut P, interface: &D) -> Verdict
+    fn egress_hook<P, D>(&mut self, packet: &mut P, interface: &D) -> (Verdict, ProofOfEgressCheck)
     where
         P: IpPacket<I>,
         D: InterfaceProperties<BT::DeviceClass>,
     {
         let Self(this) = self;
-        this.with_filter_state(|state| {
-            check_routines_for_hook(
-                &state.installed_routines.get().ip.egress,
-                packet,
-                Interfaces { ingress: None, egress: Some(interface) },
-            )
-        })
+        (
+            this.with_filter_state(|state| {
+                check_routines_for_hook(
+                    &state.installed_routines.get().ip.egress,
+                    packet,
+                    Interfaces { ingress: None, egress: Some(interface) },
+                )
+            }),
+            ProofOfEgressCheck { _private_field_to_prevent_construction_outside_of_module: () },
+        )
     }
 }
 
@@ -264,12 +273,19 @@ pub mod testutil {
             Verdict::Accept
         }
 
-        fn egress_hook<P, D>(&mut self, _: &mut P, _: &D) -> Verdict
+        fn egress_hook<P, D>(&mut self, _: &mut P, _: &D) -> (Verdict, ProofOfEgressCheck)
         where
             P: IpPacket<I>,
             D: InterfaceProperties<BT::DeviceClass>,
         {
-            Verdict::Accept
+            (Verdict::Accept, ProofOfEgressCheck::forge_proof_for_test())
+        }
+    }
+
+    impl ProofOfEgressCheck {
+        /// For tests where it's not feasible to run the egress hook.
+        pub(crate) fn forge_proof_for_test() -> Self {
+            ProofOfEgressCheck { _private_field_to_prevent_construction_outside_of_module: () }
         }
     }
 }
@@ -640,10 +656,12 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(
-            FilterImpl(&mut ctx).egress_hook(
-                &mut FakeIpPacket::<I, FakeTcpSegment>::arbitrary_value(),
-                &wlan_interface()
-            ),
+            FilterImpl(&mut ctx)
+                .egress_hook(
+                    &mut FakeIpPacket::<I, FakeTcpSegment>::arbitrary_value(),
+                    &wlan_interface()
+                )
+                .0,
             Verdict::Drop
         );
     }

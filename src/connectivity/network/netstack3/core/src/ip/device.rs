@@ -41,7 +41,7 @@ use crate::{
     },
     device::{self, AnyDevice, DeviceIdContext},
     error::{ExistsError, NotFoundError},
-    filter::IpPacket,
+    filter::{IpPacket, ProofOfEgressCheck},
     inspect::Inspectable,
     ip::{
         device::{
@@ -1101,6 +1101,7 @@ pub(crate) trait IpDeviceSendContext<I: IpTypesIpExt, BC>:
         local_addr: SpecifiedAddr<I::Addr>,
         body: S,
         broadcast: Option<I::BroadcastMarker>,
+        egress_proof: ProofOfEgressCheck,
     ) -> Result<(), S>
     where
         S: Serializer + IpPacket<I>,

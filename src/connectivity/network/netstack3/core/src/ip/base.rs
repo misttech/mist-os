@@ -47,7 +47,7 @@ use crate::{
     data_structures::token_bucket::TokenBucket,
     device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
     filter::{
-        FilterBindingsTypes, FilterHandler as _, FilterHandlerProvider, ForwardedPacket,
+        FilterBindingsTypes, FilterHandler as _, FilterHandlerProvider, ForwardedPacket, IpPacket,
         MaybeTransportPacket, NestedWithInnerIpPacket,
     },
     inspect::{Inspectable, Inspector},
@@ -884,11 +884,9 @@ impl<
             + IpLayerBindingsContext<I, CC::DeviceId>
             + IpSocketBindingsContext,
         CC: IpLayerContext<I, BC>
+            + IpLayerEgressContext<I, BC>
             + device::IpDeviceConfigurationContext<I, BC>
-            + IpDeviceStateContext<I, BC>
-            + NonTestCtxMarker
-            + IpDeviceSendContext<I, BC>
-            + FilterHandlerProvider<I, BC>,
+            + NonTestCtxMarker,
     > IpSocketContext<I, BC> for CC
 {
     fn lookup_route(
@@ -986,9 +984,6 @@ pub(crate) trait IpTransportDispatchContext<I: IpLayerIpExt, BC>:
 }
 
 /// A marker trait for all the contexts required for IP ingress.
-///
-/// This is a shorthand for all the traits required to operate on an ingress IP
-/// frame.
 pub(crate) trait IpLayerIngressContext<
     I: IpLayerIpExt + IcmpHandlerIpExt,
     BC: IpLayerBindingsContext<I, Self::DeviceId>,
@@ -1022,6 +1017,32 @@ impl<
             + FilterHandlerProvider<I, BC>,
     > IpLayerIngressContext<I, BC> for CC
 where
+    Self::DeviceId: crate::filter::InterfaceProperties<BC::DeviceClass>,
+{
+    type DeviceId_ = Self::DeviceId;
+}
+
+/// A marker trait for all the contexts required for IP egress.
+pub(crate) trait IpLayerEgressContext<I, BC>:
+    IpDeviceSendContext<I, BC, DeviceId = Self::DeviceId_> + FilterHandlerProvider<I, BC>
+where
+    I: IpLayerIpExt,
+    BC: FilterBindingsTypes,
+{
+    // This is working around the fact that currently, where clauses are only
+    // elaborated for supertraits, and not, for example, bounds on associated types
+    // as we have here.
+    //
+    // See https://github.com/rust-lang/rust/issues/20671#issuecomment-1905186183
+    // for more discussion.
+    type DeviceId_: crate::filter::InterfaceProperties<BC::DeviceClass> + StrongId + Debug;
+}
+
+impl<I, BC, CC> IpLayerEgressContext<I, BC> for CC
+where
+    I: IpLayerIpExt,
+    BC: FilterBindingsTypes,
+    CC: IpDeviceSendContext<I, BC> + FilterHandlerProvider<I, BC>,
     Self::DeviceId: crate::filter::InterfaceProperties<BC::DeviceClass>,
 {
     type DeviceId_ = Self::DeviceId;
@@ -1785,6 +1806,30 @@ fn dispatch_receive_ipv6_packet<
     }
 }
 
+pub(crate) fn send_ip_frame<I, CC, BC, S>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
+    next_hop: SpecifiedAddr<I::Addr>,
+    mut body: S,
+    broadcast: Option<I::BroadcastMarker>,
+) -> Result<(), S>
+where
+    I: IpLayerIpExt,
+    BC: FilterBindingsTypes,
+    CC: IpLayerEgressContext<I, BC>,
+    S: Serializer + IpPacket<I>,
+    S::Buffer: BufferMut,
+{
+    let (verdict, proof) = core_ctx.filter_handler().egress_hook(&mut body, device);
+    match verdict {
+        crate::filter::Verdict::Drop => return Ok(()),
+        crate::filter::Verdict::Accept => {}
+    }
+
+    core_ctx.send_ip_frame(bindings_ctx, device, next_hop, body, broadcast, proof)
+}
+
 /// Drop a packet and undo the effects of parsing it.
 ///
 /// `drop_packet_and_undo_parse!` takes a `$packet` and a `$buffer` which the
@@ -2085,7 +2130,8 @@ pub(crate) fn receive_ipv4_packet<
                 packet.set_ttl(ttl - 1);
                 let (src, dst, proto, meta) = packet.into_metadata();
                 let packet = ForwardedPacket::new(src, dst, proto, meta, buffer);
-                match IpDeviceSendContext::<Ipv4, _>::send_ip_frame(
+
+                match send_ip_frame(
                     core_ctx,
                     bindings_ctx,
                     &dst_device,
@@ -2396,14 +2442,10 @@ pub(crate) fn receive_ipv6_packet<
                 packet.set_ttl(ttl - 1);
                 let (src, dst, proto, meta) = packet.into_metadata();
                 let packet = ForwardedPacket::new(src, dst, proto, meta, buffer);
-                if let Err(packet) = IpDeviceSendContext::<Ipv6, _>::send_ip_frame(
-                    core_ctx,
-                    bindings_ctx,
-                    &dst_device,
-                    next_hop,
-                    packet,
-                    None,
-                ) {
+
+                if let Err(packet) =
+                    send_ip_frame(core_ctx, bindings_ctx, &dst_device, next_hop, packet, None)
+                {
                     // TODO(https://fxbug.dev/42167236): Encode the MTU error more
                     // obviously in the type system.
                     core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.mtu_exceeded);
@@ -2793,12 +2835,30 @@ pub(crate) trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     where
         S: Serializer + MaybeTransportPacket,
         S::Buffer: BufferMut;
+
+    /// Send an IP packet that doesn't require the encapsulation and other
+    /// processing of [`send_ip_packet_from_device`] from the device specified
+    /// in `meta`.
+    // TODO(https://fxbug.dev/333908066): The packets going through this
+    // function only hit the EGRESS filter hook, bypassing LOCAL_EGRESS.
+    // Refactor callers and other functions to prevent this.
+    fn send_ip_frame<S>(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device: &Self::DeviceId,
+        next_hop: SpecifiedAddr<I::Addr>,
+        body: S,
+        broadcast: Option<I::BroadcastMarker>,
+    ) -> Result<(), S>
+    where
+        S: Serializer + IpPacket<I>,
+        S::Buffer: BufferMut;
 }
 
 impl<
         I: IpLayerIpExt,
         BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        CC: IpDeviceStateContext<I, BC> + IpDeviceSendContext<I, BC> + NonTestCtxMarker,
+        CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I, BC>,
     > IpLayerHandler<I, BC> for CC
 {
     fn send_ip_packet_from_device<S>(
@@ -2812,6 +2872,21 @@ impl<
         S::Buffer: BufferMut,
     {
         send_ip_packet_from_device(self, bindings_ctx, meta, body)
+    }
+
+    fn send_ip_frame<S>(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device: &Self::DeviceId,
+        next_hop: SpecifiedAddr<I::Addr>,
+        body: S,
+        broadcast: Option<I::BroadcastMarker>,
+    ) -> Result<(), S>
+    where
+        S: Serializer + IpPacket<I>,
+        S::Buffer: BufferMut,
+    {
+        send_ip_frame(self, bindings_ctx, device, next_hop, body, broadcast)
     }
 }
 
@@ -2834,7 +2909,7 @@ pub(crate) fn send_ip_packet_from_device<I, BC, CC, S>(
 where
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
-    CC: IpDeviceStateContext<I, BC> + IpDeviceSendContext<I, BC>,
+    CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I, BC>,
     S: Serializer + MaybeTransportPacket,
     S::Buffer: BufferMut,
 {
@@ -2869,12 +2944,10 @@ where
 
     if let Some(mtu) = mtu {
         let body = NestedWithInnerIpPacket::new(body.with_size_limit(mtu as usize));
-        core_ctx
-            .send_ip_frame(bindings_ctx, device, next_hop, body, broadcast)
+        send_ip_frame(core_ctx, bindings_ctx, device, next_hop, body, broadcast)
             .map_err(|ser| ser.into_inner().into_inner())
     } else {
-        core_ctx
-            .send_ip_frame(bindings_ctx, device, next_hop, body, broadcast)
+        send_ip_frame(core_ctx, bindings_ctx, device, next_hop, body, broadcast)
             .map_err(|ser| ser.into_inner())
     }
 }

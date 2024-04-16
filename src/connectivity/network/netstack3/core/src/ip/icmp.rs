@@ -3087,6 +3087,7 @@ mod tests {
             },
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
             testutil::DualStackSendIpPacketMeta,
+            types::IpTypesIpExt,
             types::RoutableIpAddr,
             IpCounters, IpLayerIpExt,
         },
@@ -4168,6 +4169,21 @@ mod tests {
             _meta: SendIpPacketMeta<Ipv6, &Self::DeviceId, Option<SpecifiedAddr<Ipv6Addr>>>,
             _body: S,
         ) -> Result<(), S> {
+            unimplemented!()
+        }
+
+        fn send_ip_frame<S>(
+            &mut self,
+            _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
+            _device: &Self::DeviceId,
+            _next_hop: SpecifiedAddr<<Ipv6 as Ip>::Addr>,
+            _body: S,
+            _broadcast: Option<<Ipv6 as IpTypesIpExt>::BroadcastMarker>,
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
             unimplemented!()
         }
     }

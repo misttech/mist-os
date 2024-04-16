@@ -46,6 +46,7 @@ use crate::{
             GmpStateMachine, GmpTypeLayout, IpExt, MulticastGroupSet, ProtocolSpecific,
             QueryTarget,
         },
+        IpLayerHandler,
     },
     Instant,
 };
@@ -75,7 +76,7 @@ pub(crate) trait MldStateContext<BC: MldBindingsContext<Self::DeviceId>>:
 
 /// The execution context for the Multicast Listener Discovery (MLD) protocol.
 pub(crate) trait MldContext<BC: MldBindingsContext<Self::DeviceId>>:
-    DeviceIdContext<AnyDevice> + IpDeviceSendContext<Ipv6, BC>
+    DeviceIdContext<AnyDevice> + IpDeviceSendContext<Ipv6, BC> + IpLayerHandler<Ipv6, BC>
 {
     /// Calls the function with a mutable reference to the device's MLD state
     /// and whether or not MLD is enabled for the `device`.
@@ -430,16 +431,22 @@ fn send_mld_packet<
             .unwrap(),
         );
 
-    core_ctx
-        .send_ip_frame(bindings_ctx, &device, dst_ip.into_specified(), body, None)
-        .map_err(|_| MldError::SendFailure { addr: group_addr.into() })
+    crate::ip::IpLayerHandler::send_ip_frame(
+        core_ctx,
+        bindings_ctx,
+        &device,
+        dst_ip.into_specified(),
+        body,
+        None,
+    )
+    .map_err(|_| MldError::SendFailure { addr: group_addr.into() })
 }
 
 #[cfg(test)]
 mod tests {
 
     use assert_matches::assert_matches;
-    use net_types::ethernet::Mac;
+    use net_types::{ethernet::Mac, ip::Ip as _};
     use packet::{BufferMut, ParseBuffer};
     use packet_formats::{
         ethernet::EthernetFrameLengthCheck,
@@ -458,6 +465,7 @@ mod tests {
             testutil::FakeDeviceId,
             DeviceId,
         },
+        filter::ProofOfEgressCheck,
         ip::{
             device::{
                 config::{IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate},
@@ -469,6 +477,7 @@ mod tests {
                 QueryReceivedActions, QueryReceivedGenericAction,
             },
             testutil::FakeIpDeviceIdCtx,
+            types::IpTypesIpExt,
         },
         state::StackStateBuilder,
         testutil::{
@@ -576,6 +585,40 @@ mod tests {
         }
     }
 
+    impl IpLayerHandler<Ipv6, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
+        fn send_ip_packet_from_device<S>(
+            &mut self,
+            _bindings_ctx: &mut FakeBindingsCtxImpl,
+            _meta: crate::ip::SendIpPacketMeta<
+                Ipv6,
+                &Self::DeviceId,
+                Option<SpecifiedAddr<<Ipv6 as Ip>::Addr>>,
+            >,
+            _body: S,
+        ) -> Result<(), S>
+        where
+            S: Serializer + MaybeTransportPacket,
+            S::Buffer: BufferMut,
+        {
+            unimplemented!();
+        }
+
+        fn send_ip_frame<S>(
+            &mut self,
+            bindings_ctx: &mut FakeBindingsCtxImpl,
+            device: &Self::DeviceId,
+            next_hop: SpecifiedAddr<<Ipv6 as Ip>::Addr>,
+            body: S,
+            broadcast: Option<<Ipv6 as IpTypesIpExt>::BroadcastMarker>,
+        ) -> Result<(), S>
+        where
+            S: Serializer + netstack3_filter::IpPacket<Ipv6>,
+            S::Buffer: BufferMut,
+        {
+            crate::ip::send_ip_frame(self, bindings_ctx, device, next_hop, body, broadcast)
+        }
+    }
+
     impl IpDeviceSendContext<Ipv6, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn send_ip_frame<S>(
             &mut self,
@@ -584,6 +627,7 @@ mod tests {
             local_addr: SpecifiedAddr<Ipv6Addr>,
             body: S,
             _broadcast: Option<Never>,
+            ProofOfEgressCheck { .. }: ProofOfEgressCheck,
         ) -> Result<(), S>
         where
             S: Serializer,

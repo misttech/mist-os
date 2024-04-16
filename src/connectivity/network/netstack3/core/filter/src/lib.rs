@@ -19,7 +19,7 @@ mod state;
 
 pub use api::FilterApi;
 pub use context::{FilterBindingsTypes, FilterContext, FilterIpContext};
-pub use logic::{FilterHandler, FilterImpl, Verdict};
+pub use logic::{FilterHandler, FilterImpl, ProofOfEgressCheck, Verdict};
 pub use matchers::{
     AddressMatcher, AddressMatcherType, InterfaceMatcher, InterfaceProperties, PacketMatcher,
     PortMatcher, TransportProtocolMatcher,
