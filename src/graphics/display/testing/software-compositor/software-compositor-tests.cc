@@ -70,7 +70,12 @@ TEST(ClearCanvas, NoConversionBgra) {
   for (size_t bytes_index = 0; bytes_index < canvas_bytes.size(); bytes_index += 4) {
     cpp20::span<uint8_t> pixel_actual(canvas_bytes.begin() + bytes_index, 4);
     std::array<uint8_t, 4> pixel_expected = {1, 2, 3, 255};
-    EXPECT_THAT(pixel_actual, testing::ElementsAreArray(pixel_expected));
+    // TODO(https://fxbug.dev/333768776): Revert back to EXPECT_THAT once the clang regression is
+    // figured out.
+    EXPECT_EQ(pixel_actual[0], pixel_expected[0]);
+    EXPECT_EQ(pixel_actual[1], pixel_expected[1]);
+    EXPECT_EQ(pixel_actual[2], pixel_expected[2]);
+    EXPECT_EQ(pixel_actual[3], pixel_expected[3]);
   }
 }
 
@@ -98,7 +103,12 @@ TEST(ClearCanvas, ConversionRgbaToBgra) {
   for (size_t bytes_index = 0; bytes_index < canvas_bytes.size(); bytes_index += 4) {
     cpp20::span<uint8_t> pixel_actual(canvas_bytes.begin() + bytes_index, 4);
     std::array<uint8_t, 4> pixel_expected = {3, 2, 1, 255};
-    EXPECT_THAT(pixel_actual, testing::ElementsAreArray(pixel_expected));
+    // TODO(https://fxbug.dev/333768776): Revert back to EXPECT_THAT once the clang regression is
+    // figured out.
+    EXPECT_EQ(pixel_actual[0], pixel_expected[0]);
+    EXPECT_EQ(pixel_actual[1], pixel_expected[1]);
+    EXPECT_EQ(pixel_actual[2], pixel_expected[2]);
+    EXPECT_EQ(pixel_actual[3], pixel_expected[3]);
   }
 }
 
@@ -126,7 +136,12 @@ TEST(ClearCanvas, ConversionBgraToRgba) {
   for (size_t bytes_index = 0; bytes_index < canvas_bytes.size(); bytes_index += 4) {
     cpp20::span<uint8_t> pixel_actual(canvas_bytes.begin() + bytes_index, 4);
     std::array<uint8_t, 4> pixel_expected = {3, 2, 1, 255};
-    EXPECT_THAT(pixel_actual, testing::ElementsAreArray(pixel_expected));
+    // TODO(https://fxbug.dev/333768776): Revert back to EXPECT_THAT once the clang regression is
+    // figured out.
+    EXPECT_EQ(pixel_actual[0], pixel_expected[0]);
+    EXPECT_EQ(pixel_actual[1], pixel_expected[1]);
+    EXPECT_EQ(pixel_actual[2], pixel_expected[2]);
+    EXPECT_EQ(pixel_actual[3], pixel_expected[3]);
   }
 }
 
@@ -194,7 +209,12 @@ TEST(CompositeImageLayers, NoConversionBgra) {
   for (size_t bytes_index = 0; bytes_index < canvas_bytes.size(); bytes_index += 4) {
     cpp20::span<uint8_t> pixel_actual(canvas_bytes.begin() + bytes_index, 4);
     std::array<uint8_t, 4> pixel_expected = {0, 0, 255, 255};
-    EXPECT_THAT(pixel_actual, testing::ElementsAreArray(pixel_expected));
+    // TODO(https://fxbug.dev/333768776): Revert back to EXPECT_THAT once the clang regression is
+    // figured out.
+    EXPECT_EQ(pixel_actual[0], pixel_expected[0]);
+    EXPECT_EQ(pixel_actual[1], pixel_expected[1]);
+    EXPECT_EQ(pixel_actual[2], pixel_expected[2]);
+    EXPECT_EQ(pixel_actual[3], pixel_expected[3]);
   }
 }
 
@@ -262,7 +282,12 @@ TEST(CompositeImageLayers, NoConversionRgba) {
   for (size_t bytes_index = 0; bytes_index < canvas_bytes.size(); bytes_index += 4) {
     cpp20::span<uint8_t> pixel_actual(canvas_bytes.begin() + bytes_index, 4);
     std::array<uint8_t, 4> pixel_expected = {255, 0, 0, 255};
-    EXPECT_THAT(pixel_actual, testing::ElementsAreArray(pixel_expected));
+    // TODO(https://fxbug.dev/333768776): Revert back to EXPECT_THAT once the clang regression is
+    // figured out.
+    EXPECT_EQ(pixel_actual[0], pixel_expected[0]);
+    EXPECT_EQ(pixel_actual[1], pixel_expected[1]);
+    EXPECT_EQ(pixel_actual[2], pixel_expected[2]);
+    EXPECT_EQ(pixel_actual[3], pixel_expected[3]);
   }
 }
 
@@ -330,7 +355,12 @@ TEST(CompositeImageLayers, ConversionRgbaToBgra) {
   for (size_t bytes_index = 0; bytes_index < canvas_bytes.size(); bytes_index += 4) {
     cpp20::span<uint8_t> pixel_actual(canvas_bytes.begin() + bytes_index, 4);
     std::array<uint8_t, 4> pixel_expected = {255, 0, 0, 255};
-    EXPECT_THAT(pixel_actual, testing::ElementsAreArray(pixel_expected));
+    // TODO(https://fxbug.dev/333768776): Revert back to EXPECT_THAT once the clang regression is
+    // figured out.
+    EXPECT_EQ(pixel_actual[0], pixel_expected[0]);
+    EXPECT_EQ(pixel_actual[1], pixel_expected[1]);
+    EXPECT_EQ(pixel_actual[2], pixel_expected[2]);
+    EXPECT_EQ(pixel_actual[3], pixel_expected[3]);
   }
 }
 
@@ -411,8 +441,13 @@ TEST(CompositeImageLayers, SetDestinationFrame) {
                           (col >= kImageLeft) && (col < kImageLeft + kImageWidth);
       std::array<uint8_t, 4> pixel_expected = in_rectangle ? std::array<uint8_t, 4>{255, 0, 0, 255}
                                                            : std::array<uint8_t, 4>{0, 0, 0, 255};
-      EXPECT_THAT(pixel_actual, testing::ElementsAreArray(pixel_expected))
-          << "Pixels differ at row " << row << " column " << col;
+      // TODO(https://fxbug.dev/333768776): Revert back to EXPECT_THAT once the clang regression is
+      // figured out.
+      SCOPED_TRACE(testing::Message() << "Pixels differ at row" << row << " column " << col);
+      EXPECT_EQ(pixel_actual[0], pixel_expected[0]);
+      EXPECT_EQ(pixel_actual[1], pixel_expected[1]);
+      EXPECT_EQ(pixel_actual[2], pixel_expected[2]);
+      EXPECT_EQ(pixel_actual[3], pixel_expected[3]);
     }
   }
 }
@@ -526,8 +561,12 @@ TEST(CompositeImageLayers, MultipleLayersNoOverlapRgba) {
       bool is_blue = col < 640;
       std::array<uint8_t, 4> pixel_expected =
           is_blue ? std::array<uint8_t, 4>{0, 0, 255, 255} : std::array<uint8_t, 4>{255, 0, 0, 255};
-      EXPECT_THAT(pixel_actual, testing::ElementsAreArray(pixel_expected))
-          << "Pixels differ at row " << row << " column " << col;
+      // TODO(https://fxbug.dev/333768776): Revert back to EXPECT_THAT once the clang regression is
+      // figured out.
+      EXPECT_EQ(pixel_actual[0], pixel_expected[0]);
+      EXPECT_EQ(pixel_actual[1], pixel_expected[1]);
+      EXPECT_EQ(pixel_actual[2], pixel_expected[2]);
+      EXPECT_EQ(pixel_actual[3], pixel_expected[3]);
     }
   }
 }
@@ -645,8 +684,12 @@ TEST(CompositeImageLayers, MultipleLayersOverlapNoAlphaRgba) {
       std::array<uint8_t, 4> pixel_expected = is_blue  ? std::array<uint8_t, 4>{0, 0, 255, 255}
                                               : is_red ? std::array<uint8_t, 4>{255, 0, 0, 255}
                                                        : std::array<uint8_t, 4>{0, 0, 0, 255};
-      EXPECT_THAT(pixel_actual, testing::ElementsAreArray(pixel_expected))
-          << "Pixels differ at row " << row << " column " << col;
+      // TODO(https://fxbug.dev/333768776): Revert back to EXPECT_THAT once the clang regression is
+      // figured out.
+      EXPECT_EQ(pixel_actual[0], pixel_expected[0]);
+      EXPECT_EQ(pixel_actual[1], pixel_expected[1]);
+      EXPECT_EQ(pixel_actual[2], pixel_expected[2]);
+      EXPECT_EQ(pixel_actual[3], pixel_expected[3]);
     }
   }
 }
@@ -762,8 +805,12 @@ TEST(CompositeImageLayers, MultipleLayersNoAlphaMixedRgbaAndBgra) {
       bool is_blue = col < 640;
       std::array<uint8_t, 4> pixel_expected =
           is_blue ? std::array<uint8_t, 4>{0, 0, 255, 255} : std::array<uint8_t, 4>{255, 0, 0, 255};
-      EXPECT_THAT(pixel_actual, testing::ElementsAreArray(pixel_expected))
-          << "Pixels differ at row " << row << " column " << col;
+      // TODO(https://fxbug.dev/333768776): Revert back to EXPECT_THAT once the clang regression is
+      // figured out.
+      EXPECT_EQ(pixel_actual[0], pixel_expected[0]);
+      EXPECT_EQ(pixel_actual[1], pixel_expected[1]);
+      EXPECT_EQ(pixel_actual[2], pixel_expected[2]);
+      EXPECT_EQ(pixel_actual[3], pixel_expected[3]);
     }
   }
 }
