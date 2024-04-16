@@ -32,8 +32,9 @@ pub struct ServeCommand {
     #[argh(option, default = "default_address()")]
     pub address: SocketAddr,
 
-    /// location of pm-built repo.
-    /// Default is "FUCHSIA_BUILD_DIR/amber-files"
+    /// location of the package repo.
+    /// Default is given by the build directory
+    /// obtained from the ffx context, e.g. "out/default"
     #[argh(option)]
     pub repo_path: Option<Utf8PathBuf>,
 

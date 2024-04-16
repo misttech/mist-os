@@ -243,7 +243,6 @@ $ ffx doctor --restart-daemon"#,
                 let repo_path = if let Some(repo_path) = repo_path {
                     repo_path
                 } else {
-                    // Default to "FUCHSIA_BUILD_DIR/amber-files"
                     let fuchsia_build_dir = self.context.build_dir().unwrap_or(&Path::new(""));
                     let fuchsia_build_dir =
                         Utf8Path::from_path(fuchsia_build_dir).with_context(|| {

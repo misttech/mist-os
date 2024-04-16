@@ -491,6 +491,7 @@ while true; do
       fx-command-exec ffx ${ffx_flags[@]} repository serve \
         --address [::]:${port} \
         --repository "${source_name}" \
+        --repo-path "${repo_dir}" \
         --alias "fuchsia.com" \
         --alias "chromium.org"
       exit 0
