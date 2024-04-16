@@ -82,17 +82,6 @@ closed protocol GoldfishPipe {
     strict GetBti() -> (resource struct {
         bti zx.Handle:BTI;
     }) error zx.Status;
-
-    /// Create a sysmem connection - used to implement fuchsia.hardware.sysmem.
-    strict ConnectSysmem(resource struct {
-        connection zx.Handle:CHANNEL;
-    }) -> () error zx.Status;
-
-    /// Register a sysmem heap.
-    strict RegisterSysmemHeap(resource struct {
-        heap uint64;
-        connection zx.Handle:CHANNEL;
-    }) -> () error zx.Status;
 };
 
 service Service {

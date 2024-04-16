@@ -80,13 +80,8 @@ zx_status_t PipeDevice::Create(void* ctx, zx_device_t* parent) {
   }
   auto pipe_device = std::make_unique<goldfish::PipeDevice>(
       parent, std::move(acpi.value()), fdf::Dispatcher::GetCurrent()->async_dispatcher());
-  zx_status_t status = pipe_device->ConnectToSysmem();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to connect to sysmem fidl: %s", zx_status_get_string(status));
-    return status;
-  }
 
-  status = pipe_device->Bind();
+  zx_status_t status = pipe_device->Bind();
   if (status != ZX_OK) {
     return status;
   }
@@ -314,27 +309,6 @@ zx_status_t PipeDevice::GetBti(zx::bti* out_bti) {
   return bti_.duplicate(ZX_RIGHT_SAME_RIGHTS, out_bti);
 }
 
-zx_status_t PipeDevice::ConnectSysmem(zx::channel connection) {
-  TRACE_DURATION("gfx", "PipeDevice::ConnectSysmem");
-  // We can't use DdkConnectFragmentFidlProtocol here because it wants to create the endpoints but
-  // we only have the server_end here.
-  using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV1;
-  auto status = device_connect_fragment_fidl_protocol(parent_, "sysmem", ServiceMember::ServiceName,
-                                                      ServiceMember::Name, connection.release());
-  if (status != ZX_OK) {
-    return status;
-  }
-  return ZX_OK;
-}
-
-zx_status_t PipeDevice::RegisterSysmemHeap(uint64_t heap, zx::channel connection) {
-  TRACE_DURATION("gfx", "PipeDevice::RegisterSysmemHeap");
-
-  auto result = hardware_sysmem_->RegisterHeap(
-      heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap>(std::move(connection)));
-  return result.status();
-}
-
 int PipeDevice::IrqHandler() {
   while (true) {
     zx_status_t status = irq_.wait(nullptr);
@@ -367,16 +341,6 @@ int PipeDevice::IrqHandler() {
   }
 
   return 0;
-}
-
-zx_status_t PipeDevice::ConnectToSysmem() {
-  zx::result hardware_sysmem_result =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem");
-  if (hardware_sysmem_result.is_error()) {
-    return hardware_sysmem_result.status_value();
-  }
-  hardware_sysmem_ = fidl::WireSyncClient(std::move(*hardware_sysmem_result));
-  return ZX_OK;
 }
 
 PipeDevice::Pipe::Pipe(zx_paddr_t paddr, zx::pmt pmt, zx::event pipe_event)
@@ -516,26 +480,6 @@ void PipeChildDevice::GetBti(GetBtiCompleter::Sync& completer) {
   zx_status_t status = parent_->GetBti(&bti);
   if (status == ZX_OK) {
     completer.ReplySuccess(std::move(bti));
-  } else {
-    completer.Close(status);
-  }
-}
-
-void PipeChildDevice::ConnectSysmem(ConnectSysmemRequestView request,
-                                    ConnectSysmemCompleter::Sync& completer) {
-  zx_status_t status = parent_->ConnectSysmem(std::move(request->connection));
-  if (status == ZX_OK) {
-    completer.ReplySuccess();
-  } else {
-    completer.Close(status);
-  }
-}
-
-void PipeChildDevice::RegisterSysmemHeap(RegisterSysmemHeapRequestView request,
-                                         RegisterSysmemHeapCompleter::Sync& completer) {
-  zx_status_t status = parent_->RegisterSysmemHeap(request->heap, std::move(request->connection));
-  if (status == ZX_OK) {
-    completer.ReplySuccess();
   } else {
     completer.Close(status);
   }

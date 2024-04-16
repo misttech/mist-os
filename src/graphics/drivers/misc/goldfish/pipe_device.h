@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/io-buffer.h>
@@ -56,13 +55,8 @@ class PipeDevice : public DeviceType {
   void Open(int32_t id);
   void Exec(int32_t id);
   zx_status_t GetBti(zx::bti* out_bti);
-  zx_status_t ConnectSysmem(zx::channel connection);
-  zx_status_t RegisterSysmemHeap(uint64_t heap, zx::channel connection);
 
   int IrqHandler();
-
-  // Connect to the sysmem fidl protocol.
-  zx_status_t ConnectToSysmem();
 
  private:
   struct Pipe {
@@ -76,7 +70,6 @@ class PipeDevice : public DeviceType {
     zx::event pipe_event;
   };
 
-  fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem_;
   acpi::Client acpi_fidl_;
   zx::interrupt irq_;
   zx::bti bti_;
@@ -126,10 +119,6 @@ class PipeChildDevice : public PipeChildDeviceType,
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) override;
   void Exec(ExecRequestView request, ExecCompleter::Sync& completer) override;
   void GetBti(GetBtiCompleter::Sync& completer) override;
-  void ConnectSysmem(ConnectSysmemRequestView request,
-                     ConnectSysmemCompleter::Sync& completer) override;
-  void RegisterSysmemHeap(RegisterSysmemHeapRequestView request,
-                          RegisterSysmemHeapCompleter::Sync& completer) override;
 
  private:
   PipeDevice* const parent_;

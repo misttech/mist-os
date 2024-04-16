@@ -6,8 +6,6 @@
 
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
@@ -48,13 +46,6 @@ constexpr zx_device_prop_t kDefaultPipeDeviceProps[] = {
     {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_GOLDFISH_PIPE_CONTROL},
 };
 constexpr const char* kDefaultPipeDeviceName = "goldfish-pipe";
-
-using fuchsia_sysmem::wire::HeapType;
-constexpr HeapType kSysmemHeaps[] = {
-    HeapType::kSystemRam,
-    HeapType::kGoldfishDeviceLocal,
-    HeapType::kGoldfishHostVisible,
-};
 
 // MMIO Registers of goldfish pipe.
 // The layout should match the register offsets defined in pipe_device.cc.
@@ -115,42 +106,6 @@ class VmoMapping {
   void* ptr_ = nullptr;
 };
 
-class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
- public:
-  FakeSysmem() = default;
-
-  void RegisterHeap(RegisterHeapRequestView request,
-                    RegisterHeapCompleter::Sync& completer) override {
-    if (heap_request_koids_.find(request->heap) != heap_request_koids_.end()) {
-      completer.Close(ZX_ERR_ALREADY_BOUND);
-      return;
-    }
-
-    if (!request->heap_connection.is_valid()) {
-      completer.Close(ZX_ERR_BAD_HANDLE);
-      return;
-    }
-
-    zx_info_handle_basic_t info;
-    request->heap_connection.handle()->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr,
-                                                nullptr);
-    heap_request_koids_[request->heap] = info.koid;
-  }
-
-  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) final {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  std::map<uint64_t, zx_koid_t> heap_request_koids_;
-};
-
-struct IncomingNamespace {
-  IncomingNamespace() : outgoing(async_get_default_dispatcher()) {}
-
-  FakeSysmem fake_sysmem;
-  component::OutgoingDirectory outgoing;
-};
-
 // Test suite creating fake PipeDevice on a mock ACPI bus.
 class PipeDeviceTest : public zxtest::Test {
  public:
@@ -158,7 +113,6 @@ class PipeDeviceTest : public zxtest::Test {
       // The IncomingNamespace must live on a different thread because the
       // pipe-device makes synchronous FIDL calls to it.
       : ns_loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-        ns_(ns_loop_.dispatcher(), std::in_place),
         fake_root_(MockDevice::FakeRootParent()),
         test_loop_(&kAsyncLoopConfigAttachToCurrentThread) {}
 
@@ -208,24 +162,8 @@ class PipeDeviceTest : public zxtest::Test {
 
     fake_root_->AddProtocol(ZX_PROTOCOL_ACPI, nullptr, nullptr, "acpi");
 
-    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-
-    ns_.SyncCall([&endpoints](IncomingNamespace* ns) {
-      zx::result service_result = ns->outgoing.AddService<fuchsia_hardware_sysmem::Service>(
-          fuchsia_hardware_sysmem::Service::InstanceHandler({
-              .sysmem = ns->fake_sysmem.bind_handler(async_get_default_dispatcher()),
-          }));
-      ASSERT_EQ(service_result.status_value(), ZX_OK);
-
-      ASSERT_OK(ns->outgoing.Serve(std::move(endpoints.server)).status_value());
-    });
-
-    fake_root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name, std::move(endpoints.client),
-                               "sysmem");
-
     auto dut = std::make_unique<PipeDevice>(fake_root_.get(), std::move(acpi_client.value()),
                                             test_loop_.dispatcher());
-    ASSERT_OK(dut->ConnectToSysmem());
     ASSERT_OK(dut->Bind());
     dut_ = dut.release();
 
@@ -258,7 +196,6 @@ class PipeDeviceTest : public zxtest::Test {
 
  protected:
   async::Loop ns_loop_;
-  async_patterns::TestDispatcherBound<IncomingNamespace> ns_;
   acpi::mock::Device mock_acpi_fidl_;
 
   std::shared_ptr<MockDevice> fake_root_;
@@ -407,45 +344,6 @@ TEST_F(PipeDeviceTest, GetBti) {
       acpi_bti_.get_info(ZX_INFO_BTI, &acpi_bti_info, sizeof(acpi_bti_info), nullptr, nullptr));
 
   ASSERT_FALSE(memcmp(&goldfish_bti_info, &acpi_bti_info, sizeof(zx_info_bti_t)));
-}
-
-// TODO(https://fxbug.dev/42073955): Re-enable the test once the flake is fixed.
-TEST_F(PipeDeviceTest, DISABLED_ConnectToSysmem) {
-  ASSERT_OK(dut_child_->Bind(kDefaultPipeDeviceProps, kDefaultPipeDeviceName));
-  dut_child_.release();
-
-  zx::channel sysmem_server, sysmem_client;
-  ASSERT_OK(zx::channel::create(0u, &sysmem_server, &sysmem_client));
-
-  zx::bti bti;
-  client_->ConnectSysmem(std::move(sysmem_server)).Then([&](auto& result) {
-    ASSERT_OK(result.status());
-  });
-  test_loop_.RunUntilIdle();
-
-  ASSERT_NO_FATAL_FAILURE();
-
-  for (const auto& heap : kSysmemHeaps) {
-    zx::channel heap_server, heap_client;
-    zx_koid_t server_koid = ZX_KOID_INVALID;
-    ASSERT_OK(zx::channel::create(0u, &heap_server, &heap_client));
-
-    zx_info_handle_basic_t info;
-    ASSERT_OK(heap_server.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
-    server_koid = info.koid;
-
-    uint64_t heap_id = static_cast<uint64_t>(heap);
-    client_->RegisterSysmemHeap(heap_id, std::move(heap_server)).Then([](auto& result) {
-      ASSERT_OK(result.status());
-    });
-    test_loop_.RunUntilIdle();
-    ns_.SyncCall([heap_id, server_koid](IncomingNamespace* ns) {
-      ASSERT_TRUE(ns->fake_sysmem.heap_request_koids_.find(heap_id) !=
-                  ns->fake_sysmem.heap_request_koids_.end());
-      ASSERT_NE(ns->fake_sysmem.heap_request_koids_.at(heap_id), ZX_KOID_INVALID);
-      ASSERT_EQ(ns->fake_sysmem.heap_request_koids_.at(heap_id), server_koid);
-    });
-  }
 }
 
 TEST_F(PipeDeviceTest, ChildDevice) {

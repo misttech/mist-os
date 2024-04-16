@@ -32,10 +32,6 @@ class FakePipe : public fidl::WireServer<fuchsia_hardware_goldfish_pipe::Goldfis
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) override;
   void Exec(ExecRequestView request, ExecCompleter::Sync& completer) override;
   void GetBti(GetBtiCompleter::Sync& completer) override;
-  void ConnectSysmem(ConnectSysmemRequestView request,
-                     ConnectSysmemCompleter::Sync& completer) override;
-  void RegisterSysmemHeap(RegisterSysmemHeapRequestView request,
-                          RegisterSysmemHeapCompleter::Sync& completer) override;
 
   // FakePipe stores a queue of byte vectors for PIPE_CMD_READ commands.
   // Every time it receives a PIPE_CMD_READ command, it will pop a byte vector

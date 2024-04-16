@@ -17,6 +17,6 @@ node "irq000" {
   fuchsia.hardware.interrupt.Service == fuchsia.hardware.interrupt.Service.ZirconTransport;
 }
 
-node "sysmem" {
+optional node "sysmem" {
   fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }

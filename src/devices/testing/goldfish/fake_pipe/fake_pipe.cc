@@ -200,16 +200,6 @@ void FakePipe::GetBti(GetBtiCompleter::Sync& completer) {
   completer.ReplySuccess(std::move(bti));
 }
 
-void FakePipe::ConnectSysmem(ConnectSysmemRequestView request,
-                             ConnectSysmemCompleter::Sync& completer) {
-  completer.ReplySuccess();
-}
-
-void FakePipe::RegisterSysmemHeap(RegisterSysmemHeapRequestView request,
-                                  RegisterSysmemHeapCompleter::Sync& completer) {
-  completer.ReplySuccess();
-}
-
 zx_status_t FakePipe::SetUpPipeDevice() {
   fbl::AutoLock lock(&lock_);
 

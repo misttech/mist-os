@@ -140,16 +140,6 @@ class FakePipe : public fidl::WireServer<fuchsia_hardware_goldfish_pipe::Goldfis
     completer.ReplySuccess(std::move(bti));
   }
 
-  void ConnectSysmem(ConnectSysmemRequestView request,
-                     ConnectSysmemCompleter::Sync& completer) override {
-    completer.ReplySuccess();
-  }
-
-  void RegisterSysmemHeap(RegisterSysmemHeapRequestView request,
-                          RegisterSysmemHeapCompleter::Sync& completer) override {
-    completer.ReplySuccess();
-  }
-
   zx_status_t SetUpPipeDevice() {
     if (!pipe_io_buffer_.is_valid()) {
       zx_status_t status = PrepareIoBuffer();
