@@ -10,8 +10,8 @@ source_set("devfs") {
     "devfs.h",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp",
-    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",

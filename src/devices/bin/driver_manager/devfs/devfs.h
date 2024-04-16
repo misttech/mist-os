@@ -6,7 +6,7 @@
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_DEVFS_DEVFS_H_
 
 #include <fidl/fuchsia.device.fs/cpp/wire.h>
-#include <fidl/fuchsia.device.manager/cpp/wire.h>
+#include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async/dispatcher.h>
 #include <lib/component/incoming/cpp/clone.h>

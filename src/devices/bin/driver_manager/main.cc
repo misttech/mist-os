@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
-#include <fidl/fuchsia.device.manager/cpp/fidl.h>
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
