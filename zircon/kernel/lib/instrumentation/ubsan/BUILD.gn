@@ -21,6 +21,8 @@ source_set("runtime") {
     configs -= [ "//build/config/sanitizers:ubsan" ]
     sources = [
       "runtime.cc",
+      "ubsan-handlers.h",
+      "ubsan-report.h",
       "ubsan-types.h",
     ]
     deps = [
