@@ -16,6 +16,7 @@ use {
         test_suite::{Suite, SuiteRealm, TestRunBuilder},
     },
     fidl::endpoints::ControlHandle,
+    fidl::Error,
     fidl_fuchsia_component_resolution::ResolverProxy,
     fidl_fuchsia_test_manager as ftest_manager,
     fidl_fuchsia_test_manager::{QueryEnumerateInRealmResponder, QueryEnumerateResponder},
@@ -27,8 +28,8 @@ use {
     tracing::warn,
 };
 
-/// Start test manager and serve it over `stream`.
-pub async fn run_test_manager(
+/// Start `RunBuilder` server and serve it over `stream`.
+pub async fn run_test_manager_run_builder_server(
     mut stream: ftest_manager::RunBuilderRequestStream,
     resolver: Arc<ResolverProxy>,
     above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
@@ -169,7 +170,7 @@ impl QueryResponder {
     }
 }
 
-/// Start test manager and serve it over `stream`.
+/// Start `Query` server and serve it over `stream`.
 pub async fn run_test_manager_query_server(
     mut stream: ftest_manager::QueryRequestStream,
     resolver: Arc<ResolverProxy>,
@@ -196,7 +197,7 @@ pub async fn run_test_manager_query_server(
                             "Cannot add suite {}, invalid realm. Closing connection. error: {}",
                             test_url, e
                         );
-                        let _ = responder.send(Err(LaunchError::InvalidArgs));
+                        responder.send(Err(LaunchError::InvalidArgs)).ok();
                         break;
                     }
                 };
@@ -204,7 +205,7 @@ pub async fn run_test_manager_query_server(
                     Ok(offers) => offers,
                     Err(e) => {
                         warn!("Cannot add suite {}, invalid offers. error: {}", test_url, e);
-                        let _ = responder.send(Err(LaunchError::InvalidArgs));
+                        responder.send(Err(LaunchError::InvalidArgs)).ok();
                         break;
                     }
                 };
@@ -226,7 +227,7 @@ pub async fn run_test_manager_query_server(
             Ok(c) => c,
             Err(e) => {
                 warn!("Cannot query test, invalid iterator {}: {}", test_url, e);
-                let _ = responder.send(Err(LaunchError::InvalidArgs));
+                responder.send(Err(LaunchError::InvalidArgs)).ok();
                 break;
             }
         };
@@ -251,7 +252,7 @@ pub async fn run_test_manager_query_server(
                 let suite = match suite_instance.connect_to_suite() {
                     Ok(proxy) => proxy,
                     Err(e) => {
-                        let _ = responder.send(Err(e.into()));
+                        responder.send(Err(e.into())).ok();
                         continue;
                     }
                 };
@@ -271,37 +272,39 @@ pub async fn run_test_manager_query_server(
                                 Err(())
                             }
                         }) {
-                            let _ = responder.send(Ok(()));
+                            responder.send(Ok(())).ok();
                             let mut names = names.chunks(NAMES_CHUNK);
                             while let Ok(Some(request)) = iterator.try_next().await {
                                 match request {
                                     ftest_manager::CaseIteratorRequest::GetNext { responder } => {
                                         match names.next() {
                                             Some(names) => {
-                                                let _ = responder.send(
-                                                    &names
-                                                        .into_iter()
-                                                        .map(|s| ftest_manager::Case {
-                                                            name: Some(s.into()),
-                                                            ..Default::default()
-                                                        })
-                                                        .collect::<Vec<_>>(),
-                                                );
+                                                responder
+                                                    .send(
+                                                        &names
+                                                            .into_iter()
+                                                            .map(|s| ftest_manager::Case {
+                                                                name: Some(s.into()),
+                                                                ..Default::default()
+                                                            })
+                                                            .collect::<Vec<_>>(),
+                                                    )
+                                                    .ok();
                                             }
                                             None => {
-                                                let _ = responder.send(&[]);
+                                                responder.send(&[]).ok();
                                             }
                                         }
                                     }
                                 }
                             }
                         } else {
-                            let _ = responder.send(Err(LaunchError::CaseEnumeration));
+                            responder.send(Err(LaunchError::CaseEnumeration)).ok();
                         }
                     }
                     Err(err) => {
                         warn!(?err, "cannot enumerate tests for {}", test_url);
-                        let _ = responder.send(Err(LaunchError::CaseEnumeration));
+                        responder.send(Err(LaunchError::CaseEnumeration)).ok();
                     }
                 }
                 if let Err(err) = t.await {
@@ -309,7 +312,7 @@ pub async fn run_test_manager_query_server(
                 }
             }
             Err(e) => {
-                let _ = responder.send(Err(e.into()));
+                responder.send(Err(e.into())).ok();
             }
         }
     }
@@ -351,4 +354,287 @@ pub async fn serve_early_boot_profiles(
         }
     }
     Ok(())
+}
+
+/// Start `TestCaseEnumerator` server and serve it over `stream`.
+pub async fn run_test_manager_test_case_enumerator_server(
+    mut stream: ftest_manager::TestCaseEnumeratorRequestStream,
+    resolver: Arc<ResolverProxy>,
+    above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
+    root_diagnostics: &RootDiagnosticNode,
+) -> Result<(), TestManagerError> {
+    while let Some(req) = stream.try_next().await.map_err(TestManagerError::Stream)? {
+        match req {
+            ftest_manager::TestCaseEnumeratorRequest::Enumerate {
+                test_suite_url,
+                options,
+                iterator,
+                responder,
+            } => {
+                let realm = if let Some(realm_options) = options.realm_options {
+                    let realm_proxy = match realm_options
+                        .realm
+                        .map(|r| r.into_proxy())
+                        .unwrap_or(Err(Error::NotNullable))
+                    {
+                        Ok(r) => r,
+                        Err(e) => {
+                            warn!(
+                                "Cannot enumerate test cases {}, invalid realm. Closing connection. error: {}",
+                                test_suite_url, e
+                            );
+                            responder.send(Err(LaunchError::InvalidArgs)).ok();
+                            break;
+                        }
+                    };
+                    let offers = match realm_options
+                        .offers
+                        .map(map_offers)
+                        .unwrap_or(Err(Error::NotNullable.into()))
+                    {
+                        Ok(offers) => offers,
+                        Err(e) => {
+                            warn!(
+                                "Cannot enumerate test cases {}, invalid offers. error: {}",
+                                test_suite_url, e
+                            );
+                            responder.send(Err(LaunchError::InvalidArgs)).ok();
+                            break;
+                        }
+                    };
+                    let test_collection = match realm_options.test_collection {
+                        Some(test_collection) => test_collection,
+                        None => {
+                            warn!(
+                                "Cannot enumerate test cases {}, missing test collection.",
+                                test_suite_url
+                            );
+                            responder.send(Err(LaunchError::InvalidArgs)).ok();
+                            break;
+                        }
+                    };
+                    Some(SuiteRealm { realm_proxy, offers, test_collection })
+                } else {
+                    None
+                };
+
+                let iterator = match iterator.into_stream() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!("Cannot query test, invalid iterator {}: {}", test_suite_url, e);
+                        responder.send(Err(LaunchError::InvalidArgs)).ok();
+                        break;
+                    }
+                };
+                let (_processor, sender) = DebugDataProcessor::new(DebugDataDirectory::Isolated {
+                    parent: constants::ISOLATED_TMP,
+                });
+                let diagnostics = root_diagnostics.child();
+                let launch_fut = facet::get_suite_facets(test_suite_url.clone(), resolver.clone())
+                    .and_then(|facets| {
+                        RunningSuite::launch(
+                            &test_suite_url,
+                            facets,
+                            resolver.clone(),
+                            above_root_capabilities_for_test.clone(),
+                            sender,
+                            &diagnostics,
+                            &realm,
+                        )
+                    });
+                match launch_fut.await {
+                    Ok(suite_instance) => {
+                        let suite = match suite_instance.connect_to_suite() {
+                            Ok(proxy) => proxy,
+                            Err(e) => {
+                                responder.send(Err(e.into())).ok();
+                                continue;
+                            }
+                        };
+                        let enumeration_result = enumerate_test_cases(&suite, None).await;
+                        let t = fasync::Task::spawn(suite_instance.destroy(diagnostics));
+                        match enumeration_result {
+                            Ok(invocations) => {
+                                if let Ok(names) = invocations
+                                    .into_iter()
+                                    .map(|i| i.name.ok_or(()))
+                                    .collect::<Result<Vec<String>, ()>>()
+                                {
+                                    responder.send(Ok(())).ok();
+                                    drain_test_case_names(iterator, names).await;
+                                } else {
+                                    responder.send(Err(LaunchError::CaseEnumeration)).ok();
+                                }
+                            }
+                            Err(err) => {
+                                warn!(?err, "cannot enumerate tests for {}", test_suite_url);
+                                responder.send(Err(LaunchError::CaseEnumeration)).ok();
+                            }
+                        }
+                        if let Err(err) = t.await {
+                            warn!(?err, "Error destroying test realm for {}", test_suite_url);
+                        }
+                    }
+                    Err(e) => {
+                        responder.send(Err(e.into())).ok();
+                    }
+                }
+            }
+
+            ftest_manager::TestCaseEnumeratorRequest::_UnknownMethod {
+                ordinal,
+                control_handle,
+                ..
+            } => {
+                warn!("Unknown query request received: {}, closing connection", ordinal);
+                control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
+                break;
+            }
+        };
+    }
+    Ok(())
+}
+
+async fn drain_test_case_names(
+    mut iterator: ftest_manager::TestCaseIteratorRequestStream,
+    names: Vec<String>,
+) {
+    const NAMES_CHUNK: usize = 50;
+    let mut names = names.chunks(NAMES_CHUNK);
+    while let Ok(Some(request)) = iterator.try_next().await {
+        match request {
+            ftest_manager::TestCaseIteratorRequest::GetNext { responder } => match names.next() {
+                Some(names) => {
+                    responder
+                        .send(
+                            &names
+                                .into_iter()
+                                .map(|s| ftest_manager::TestCase {
+                                    name: Some(s.into()),
+                                    ..Default::default()
+                                })
+                                .collect::<Vec<_>>(),
+                        )
+                        .ok();
+                }
+                None => {
+                    responder.send(&[]).ok();
+                }
+            },
+        }
+    }
+}
+
+/// Start `SuiteRunner` server and serve it over `stream`.
+pub async fn run_test_manager_suite_runner_server(
+    mut stream: ftest_manager::SuiteRunnerRequestStream,
+    resolver: Arc<ResolverProxy>,
+    above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
+    root_diagnostics: &RootDiagnosticNode,
+) -> Result<(), TestManagerError> {
+    while let Some(req) = stream.try_next().await.map_err(TestManagerError::Stream)? {
+        match req {
+            ftest_manager::SuiteRunnerRequest::Run {
+                test_suite_url,
+                options,
+                controller,
+                control_handle,
+            } => {
+                let realm = if let Some(realm_options) = options.realm_options {
+                    let realm_proxy = match realm_options
+                        .realm
+                        .map(|r| r.into_proxy())
+                        .unwrap_or(Err(Error::NotNullable))
+                    {
+                        Ok(r) => r,
+                        Err(e) => {
+                            warn!(
+                                "Cannot add suite {}, invalid realm. Closing connection. error: {}",
+                                test_suite_url, e
+                            );
+                            control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
+                            break;
+                        }
+                    };
+                    let offers = match realm_options
+                        .offers
+                        .map(map_offers)
+                        .unwrap_or(Err(Error::NotNullable.into()))
+                    {
+                        Ok(offers) => offers,
+                        Err(e) => {
+                            warn!(
+                                "Cannot add suite {}, invalid offers. error: {}",
+                                test_suite_url, e
+                            );
+                            control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
+                            break;
+                        }
+                    };
+                    let test_collection = match realm_options.test_collection {
+                        Some(test_collection) => test_collection,
+                        None => {
+                            warn!("Cannot add suite {}, missing test collection.", test_suite_url);
+                            control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
+                            break;
+                        }
+                    };
+                    Some(SuiteRealm { realm_proxy, offers, test_collection })
+                } else {
+                    None
+                };
+
+                let controller = match controller.into_stream() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!("Invalid builder controller. Closing connection. error: {}", e);
+                        control_handle.shutdown_with_epitaph(zx::Status::BAD_HANDLE);
+                        break;
+                    }
+                };
+
+                let suite = Suite {
+                    realm: realm.into(),
+                    test_url: test_suite_url,
+                    options: ftest_manager::RunOptions {
+                        run_disabled_tests: options.run_disabled_tests,
+                        parallel: options.max_concurrent_test_case_runs,
+                        arguments: options.arguments,
+                        timeout: options.timeout,
+                        case_filters_to_run: options.test_case_filters,
+                        log_iterator: options.logs_iterator_type.map(convert),
+                        log_interest: options.log_interest,
+                        ..Default::default()
+                    },
+                    controller,
+                    resolver: resolver.clone(),
+                    above_root_capabilities_for_test: above_root_capabilities_for_test.clone(),
+                    facets: facet::ResolveStatus::Unresolved,
+                };
+
+                let diagnostics = root_diagnostics.child();
+
+                suite.run(diagnostics, options.accumulate_debug_data.unwrap_or(false)).await;
+            }
+
+            ftest_manager::SuiteRunnerRequest::_UnknownMethod {
+                ordinal, control_handle, ..
+            } => {
+                warn!("Unknown run builder request received: {}, closing connection", ordinal);
+                control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
+                break;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn convert(item: ftest_manager::LogsIteratorType) -> ftest_manager::LogsIteratorOption {
+    match item {
+        ftest_manager::LogsIteratorType::Batch => ftest_manager::LogsIteratorOption::BatchIterator,
+        ftest_manager::LogsIteratorType::Socket => {
+            ftest_manager::LogsIteratorOption::SocketBatchIterator
+        }
+        _ => todo!(),
+    }
 }

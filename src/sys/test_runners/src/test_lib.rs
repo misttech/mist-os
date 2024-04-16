@@ -220,6 +220,9 @@ pub async fn process_events(
             test_manager_test_lib::SuiteEventPayload::TestCaseLog { .. } => {
                 panic!("not supported yet!")
             }
+            test_manager_test_lib::SuiteEventPayload::DebugData { .. } => {
+                panic!("not supported yet!")
+            }
         }
     }
     execution_task.await.context("test execution failed")?;

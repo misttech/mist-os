@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::run_events::RunEvent,
+    crate::run_events::{RunEvent, SuiteEvents},
     anyhow::Error,
     fidl::endpoints::{create_proxy, create_request_stream, Proxy},
     fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync,
@@ -104,6 +104,34 @@ pub(crate) async fn serve_directory(
     serve_iterator(dir_path, directory, iterator).await
 }
 
+pub(crate) async fn serve_directory_for_suite(
+    dir_path: &str,
+    mut event_sender: mpsc::Sender<Result<SuiteEvents, ftest_manager::LaunchError>>,
+) -> Result<(), Error> {
+    let directory =
+        fuchsia_fs::directory::open_in_namespace(dir_path, fuchsia_fs::OpenFlags::RIGHT_READABLE)?;
+    {
+        let file_stream = fuchsia_fs::directory::readdir_recursive(
+            &directory,
+            Some(fasync::Duration::from_seconds(DEBUG_DATA_TIMEOUT_SECONDS)),
+        )
+        .filter_map(|entry| filter_map_filename(entry, dir_path));
+        pin_mut!(file_stream);
+        if file_stream.next().await.is_none() {
+            // No files to serve.
+            return Ok(());
+        }
+
+        drop(file_stream);
+    }
+
+    let (client, iterator) = create_request_stream::<ftest_manager::DebugDataIteratorMarker>()?;
+    let _ = event_sender.send(Ok(SuiteEvents::debug_data(client).into())).await;
+    event_sender.disconnect(); // No need to hold this open while we serve the iterator.
+
+    serve_iterator(dir_path, directory, iterator).await
+}
+
 /// Serves the |DebugDataIterator| protocol by serving all the files contained under
 /// |dir_path|.
 ///
@@ -162,8 +190,12 @@ pub(crate) async fn serve_iterator(
 #[cfg(test)]
 mod test {
     use {
-        super::*, crate::run_events::RunEventPayload, fuchsia_async as fasync,
-        std::collections::HashSet, tempfile::tempdir, test_diagnostics::collect_string_from_socket,
+        super::*,
+        crate::run_events::{RunEventPayload, SuiteEventPayload},
+        fuchsia_async as fasync,
+        std::collections::HashSet,
+        tempfile::tempdir,
+        test_diagnostics::collect_string_from_socket,
     };
 
     async fn serve_iterator_from_tmp(
@@ -218,6 +250,106 @@ mod test {
 
     #[fuchsia::test]
     async fn serve_iterator_multiple_responses() {
+        let num_files_served = ITERATOR_BATCH_SIZE * 2;
+
+        let dir = tempdir().unwrap();
+        for idx in 0..num_files_served {
+            fuchsia_fs::file::write_in_namespace(
+                &dir.path().join(format!("file-{:?}", idx)).to_string_lossy(),
+                &format!("test-{:?}", idx),
+            )
+            .await
+            .expect("write to file");
+        }
+
+        let (client, task) = serve_iterator_from_tmp(&dir).await;
+
+        let proxy = client.expect("client to be returned");
+
+        let mut all_files = vec![];
+        loop {
+            let mut next = proxy.get_next().await.expect("get next");
+            if next.is_empty() {
+                break;
+            }
+            all_files.append(&mut next);
+        }
+
+        let file_contents: HashSet<_> = futures::stream::iter(all_files)
+            .then(|ftest_manager::DebugData { name, socket, .. }| async move {
+                let contents =
+                    collect_string_from_socket(socket.unwrap()).await.expect("read socket");
+                (name.unwrap(), contents)
+            })
+            .collect()
+            .await;
+
+        let expected_files: HashSet<_> = (0..num_files_served)
+            .map(|idx| (format!("file-{:?}", idx), format!("test-{:?}", idx)))
+            .collect();
+
+        assert_eq!(file_contents, expected_files);
+        drop(proxy);
+        task.await.expect("iterator server should not fail");
+    }
+
+    async fn serve_iterator_for_suite_from_tmp(
+        dir: &tempfile::TempDir,
+    ) -> (Option<ftest_manager::DebugDataIteratorProxy>, fasync::Task<Result<(), Error>>) {
+        let (send, mut recv) = mpsc::channel(0);
+        let dir_path = dir.path().to_str().unwrap().to_string();
+        let task =
+            fasync::Task::local(async move { serve_directory_for_suite(&dir_path, send).await });
+        let proxy = recv.next().await.map(|event| {
+            if let SuiteEventPayload::DebugData(client) = event.unwrap().into_payload() {
+                Some(client.into_proxy().expect("into proxy"))
+            } else {
+                None // Event is not a DebugData
+            }
+            .unwrap()
+        });
+        (proxy, task)
+    }
+
+    #[fuchsia::test]
+    async fn serve_iterator_for_suite_empty_dir_returns_no_client() {
+        let dir = tempdir().unwrap();
+        let (client, task) = serve_iterator_for_suite_from_tmp(&dir).await;
+        assert!(client.is_none());
+        task.await.expect("iterator server should not fail");
+    }
+
+    #[fuchsia::test]
+    async fn serve_iterator_for_suite_single_response() {
+        let dir = tempdir().unwrap();
+        fuchsia_fs::file::write_in_namespace(&dir.path().join("file").to_string_lossy(), "test")
+            .await
+            .expect("write to file");
+
+        let (client, task) = serve_iterator_for_suite_from_tmp(&dir).await;
+
+        let proxy = client.expect("client to be returned");
+
+        let mut values = proxy.get_next().await.expect("get next");
+        assert_eq!(1usize, values.len());
+        let ftest_manager::DebugData { name, socket, .. } = values.pop().unwrap();
+        assert_eq!(Some("file".to_string()), name);
+        let contents = collect_string_from_socket(socket.unwrap()).await.expect("read socket");
+        assert_eq!("test", contents);
+
+        let values = proxy.get_next().await.expect("get next");
+        assert_eq!(values, vec![]);
+
+        // Calling again is okay and should also return empty vector.
+        let values = proxy.get_next().await.expect("get next");
+        assert_eq!(values, vec![]);
+
+        drop(proxy);
+        task.await.expect("iterator server should not fail");
+    }
+
+    #[fuchsia::test]
+    async fn serve_iterator_for_suite_multiple_responses() {
         let num_files_served = ITERATOR_BATCH_SIZE * 2;
 
         let dir = tempdir().unwrap();
