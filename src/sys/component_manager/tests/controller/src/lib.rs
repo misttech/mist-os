@@ -22,7 +22,7 @@ use {
     std::sync::{Arc, Mutex},
     vfs::{
         directory::entry_container::Directory as _, execution_scope::ExecutionScope,
-        file::vmo::read_only, pseudo_directory, ToObjectRequest,
+        file::vmo::read_only, pseudo_directory,
     },
 };
 
@@ -340,58 +340,40 @@ pub async fn start_with_dict() {
         .connect_to_protocol_at_exposed_dir::<fsandbox::FactoryMarker>()
         .expect("failed to connect to fuchsia.component.sandbox.Factory");
 
-    // StartChild dictionary entries must be Open capabilities.
-    // TODO(https://fxbug.dev/319542502): Consider using the external Router type, once it exists
-    let (echo_openable_client, mut echo_openable_stream) =
-        create_request_stream::<fio::OpenableMarker>().unwrap();
+    // StartChild dictionary entries must be Sender capabilities.
+    let (receiver_client, mut receiver_stream) =
+        create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
 
-    // Serve the `fidl.examples.routing.echo.Echo` protocol on the Openable.
+    // Serve the `fidl.examples.routing.echo.Echo` protocol on the Sender.
     let task_group = Mutex::new(fasync::TaskGroup::new());
-    let echo_service =
-        vfs::service::endpoint(move |_scope: ExecutionScope, channel: fuchsia_async::Channel| {
-            let mut task_group = task_group.lock().unwrap();
-            task_group.spawn(async move {
-                let server_end = ServerEnd::<fecho::EchoMarker>::new(channel.into());
-                let mut stream = server_end.into_stream().unwrap();
-                while let Some(fecho::EchoRequest::EchoString { value, responder }) =
-                    stream.try_next().await.unwrap()
-                {
-                    responder.send(value.as_ref().map(|s| &**s)).unwrap();
-                }
-            });
-        });
-
     let _task = fasync::Task::spawn(async move {
-        while let Some(fio::OpenableRequest::Open {
-            flags,
-            mode: _,
-            path: _,
-            object,
-            control_handle: _,
-        }) = echo_openable_stream.try_next().await.unwrap()
-        {
-            flags.to_object_request(object).handle(|object_request| {
-                vfs::service::serve(
-                    echo_service.clone(),
-                    ExecutionScope::new(),
-                    &flags,
-                    object_request,
-                )
-            });
+        loop {
+            match receiver_stream.try_next().await.unwrap() {
+                Some(fsandbox::ReceiverRequest::Receive { channel, control_handle: _ }) => {
+                    let mut task_group = task_group.lock().unwrap();
+                    task_group.spawn(async move {
+                        let server_end = ServerEnd::<fecho::EchoMarker>::new(channel);
+                        let mut stream = server_end.into_stream().unwrap();
+                        while let Some(fecho::EchoRequest::EchoString { value, responder }) =
+                            stream.try_next().await.unwrap()
+                        {
+                            responder.send(value.as_ref().map(|s| &**s)).unwrap();
+                        }
+                    });
+                }
+                _ => panic!(),
+            }
         }
     });
 
-    // Convert the Openable to an Open capability, also represented as an Openable.
-    let (echo_open_cap_client, echo_open_cap_server) = create_endpoints::<fio::OpenableMarker>();
-    let () = factory
-        .create_open(echo_openable_client, echo_open_cap_server)
-        .await
-        .expect("failed to call CreateOpen");
+    // Create a sender from our receiver.
+    let sender_client =
+        factory.create_sender(receiver_client).await.expect("failed to call CreateOpen");
 
     let dictionary_client = factory.create_dictionary().await.unwrap();
     let dictionary_client = dictionary_client.into_proxy().unwrap();
     dictionary_client
-        .insert("fidl.examples.routing.echo.Echo", fsandbox::Capability::Open(echo_open_cap_client))
+        .insert("fidl.examples.routing.echo.Echo", fsandbox::Capability::Sender(sender_client))
         .await
         .unwrap()
         .unwrap();
@@ -545,17 +527,10 @@ pub async fn get_exposed_dictionary() {
 
     controller_proxy.get_exposed_dictionary(server_end).await.unwrap().unwrap();
     let echo_cap = exposed_dict.get(fecho::EchoMarker::DEBUG_NAME).await.unwrap().unwrap();
-    let fsandbox::Capability::Open(echo_open) = echo_cap else { panic!("wrong type") };
-    let echo_open = echo_open.into_proxy().unwrap();
+    let fsandbox::Capability::Sender(echo_sender) = echo_cap else { panic!("wrong type") };
+    let echo_sender = echo_sender.into_proxy().unwrap();
     let (echo_proxy, server_end) = create_proxy::<fecho::EchoMarker>().unwrap();
-    echo_open
-        .open(
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            ".",
-            server_end.into_channel().into(),
-        )
-        .unwrap();
+    echo_sender.send_(server_end.into_channel().into()).unwrap();
     let response = echo_proxy.echo_string(Some("hello")).await.unwrap().unwrap();
     assert_eq!(response, "hello");
 }

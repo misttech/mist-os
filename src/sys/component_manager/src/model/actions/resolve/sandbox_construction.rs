@@ -485,7 +485,7 @@ fn use_from_parent_router(
                     match additions.and_then(|a| a.get_capability(&source_path)) {
                         // There's an addition to the program input dictionary for this
                         // capability, let's use it.
-                        Some(Capability::Open(o)) => Router::new_ok(o),
+                        Some(Capability::Sender(s)) => Router::new_ok(s),
                         // There's no addition to the program input dictionary for this
                         // capability, let's use the component input dictionary.
                         _ => component_input_capability,

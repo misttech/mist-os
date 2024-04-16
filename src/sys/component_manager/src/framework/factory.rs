@@ -16,7 +16,7 @@ use {
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::prelude::*,
     lazy_static::lazy_static,
-    sandbox::{Dict, Directory, Open, Receiver},
+    sandbox::{Dict, Directory, Receiver},
     std::sync::Arc,
     tracing::warn,
 };
@@ -87,10 +87,6 @@ impl FactoryCapabilityHost {
                 let client_end = self.create_dictionary();
                 responder.send(client_end)?;
             }
-            fsandbox::FactoryRequest::CreateOpen { client_end, server_end, responder } => {
-                self.create_open(client_end, server_end);
-                responder.send()?;
-            }
             fsandbox::FactoryRequest::CreateDirectory { client_end, responder } => {
                 let capability = self.create_directory(client_end);
                 responder.send(capability)?;
@@ -114,16 +110,6 @@ impl FactoryCapabilityHost {
         let sender_client_end_koid = sender_server.basic_info().unwrap().related_koid;
         sender.serve_and_register(sender_server.into_stream().unwrap(), sender_client_end_koid);
         sender_client
-    }
-
-    fn create_open(
-        &self,
-        openable_client: ClientEnd<fio::OpenableMarker>,
-        openable_server: ServerEnd<fio::OpenableMarker>,
-    ) {
-        let open: Open = openable_client.into();
-        let client_end_koid = openable_server.basic_info().unwrap().related_koid;
-        open.serve_and_register(openable_server.into_stream().unwrap(), client_end_koid);
     }
 
     fn create_directory(

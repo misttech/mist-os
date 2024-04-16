@@ -36,8 +36,7 @@ type Capability = flexible resource union {
     4: cloneable client_end:fuchsia.unknown.Cloneable;
     5: dictionary client_end:Dictionary;
     6: sender client_end:Sender;
-    7: open client_end:fuchsia.io.Openable;
-    8: directory client_end:fuchsia.io.Directory;
+    7: directory client_end:fuchsia.io.Directory;
 };
 
 /// The maximum length of a dictionary key. This should coincide with
@@ -182,16 +181,6 @@ open protocol Factory {
     flexible CreateDictionary() -> (resource struct {
         dictionary client_end:Dictionary;
     });
-
-    /// Creates an [`Open`] capability that issues Open calls on
-    /// an another [`Openable`].
-    ///
-    /// This registers the `Openable` as a sandbox capability,
-    /// represented by the client end peer of `server_end`.
-    flexible CreateOpen(resource struct {
-        client_end client_end:fuchsia.io.Openable;
-        server_end server_end:fuchsia.io.Openable;
-    }) -> ();
 
     /// Creates a [`Directory`] capability from a [`client_end:fuchsia.io.Directory`], and
     /// registers it as a sandbox capability.

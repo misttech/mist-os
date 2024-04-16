@@ -189,7 +189,7 @@ impl From<Open> for ClientEnd<fio::OpenableMarker> {
 
 impl From<Open> for fsandbox::Capability {
     fn from(open: Open) -> Self {
-        Self::Open(open.into())
+        Self::Sender(crate::Sender::new_sendable(open).into())
     }
 }
 

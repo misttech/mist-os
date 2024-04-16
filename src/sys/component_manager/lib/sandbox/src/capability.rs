@@ -148,9 +148,6 @@ impl TryFrom<fsandbox::Capability> for Capability {
                 }
                 Ok(any)
             }
-            fsandbox::Capability::Open(client_end) => {
-                try_from_handle_in_registry(client_end.as_handle_ref())
-            }
             fsandbox::Capability::Directory(client_end) => {
                 let mut any = try_from_handle_in_registry(client_end.as_handle_ref())?;
                 // Cache the client end so it can be reused in future conversions to FIDL.
