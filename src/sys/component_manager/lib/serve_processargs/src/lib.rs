@@ -24,7 +24,7 @@ pub enum Delivery {
     /// As a result, a namespace entry will be created in the resulting processargs, corresponding
     /// to the parent directory, e.g. "/svc/foo".
     ///
-    /// For example, installing a `sandbox::Open` at "/svc/fuchsia.examples.Echo" will
+    /// For example, installing a `sandbox::Sender` at "/svc/fuchsia.examples.Echo" will
     /// cause the framework to spin up a `fuchsia.io/Directory` implementation backing "/svc",
     /// containing a filesystem object named "fuchsia.examples.Echo".
     ///
@@ -38,7 +38,7 @@ pub enum Delivery {
     /// [Delivery::NamespaceEntry] is that the former will create a namespace entry at the parent
     /// directory.
     ///
-    /// For example, installing a `sandbox::Open` at "/data" will result in a namespace entry
+    /// For example, installing a `sandbox::Directory` at "/data" will result in a namespace entry
     /// at "/data". A request will be sent to the capability when the user writes to the
     /// namespace entry.
     NamespaceEntry(cm_types::Path),
@@ -181,35 +181,20 @@ fn validate_handle_type(handle_type: HandleType) -> Result<(), DeliveryError> {
 mod test_util {
     use {
         fidl::endpoints::ServerEnd,
-        fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
-        fuchsia_zircon::HandleBased,
-        sandbox::{OneShotHandle, Open},
+        fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+        sandbox::{Receiver, Sender},
         std::sync::Arc,
         vfs::{
             directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
             execution_scope::ExecutionScope,
             path::Path,
             remote::RemoteLike,
-            service,
         },
     };
 
-    pub struct Receiver(pub async_channel::Receiver<OneShotHandle>);
-
-    pub fn multishot() -> (Open, Receiver) {
-        let (sender, receiver) = async_channel::unbounded::<OneShotHandle>();
-
-        let open_fn = move |scope: ExecutionScope, channel: fasync::Channel| {
-            let sender = sender.clone();
-            scope.spawn(async move {
-                let capability = OneShotHandle::from(channel.into_zx_channel().into_handle());
-                let _ = sender.send(capability).await;
-            });
-        };
-
-        let open = Open::new(service::endpoint(open_fn));
-
-        (open, Receiver(receiver))
+    pub fn multishot() -> (Sender, Receiver) {
+        let (receiver, sender) = Receiver::new();
+        (sender, receiver)
     }
 
     pub fn mock_dir() -> (Arc<impl DirectoryEntry>, async_channel::Receiver<(Path, zx::Channel)>) {
@@ -494,15 +479,15 @@ mod tests {
     /// connections to that protocol.
     #[fuchsia::test]
     async fn test_namespace_object_end_to_end() -> Result<()> {
-        let (open, receiver) = multishot();
+        let (sender, receiver) = multishot();
         let peer_closed_open = multishot().0;
 
         let mut processargs = ProcessArgs::new();
         let dict = Dict::new();
         {
             let mut entries = dict.lock_entries();
-            entries.insert("normal".parse().unwrap(), Capability::Open(open));
-            entries.insert("closed".parse().unwrap(), Capability::Open(peer_closed_open));
+            entries.insert("normal".parse().unwrap(), sender.into());
+            entries.insert("closed".parse().unwrap(), peer_closed_open.into());
         }
         let delivery_map = hashmap! {
             "normal".parse().unwrap() => DeliveryMapEntry::Delivery(
@@ -538,7 +523,7 @@ mod tests {
         fdio::service_connect_at(&dir, "fuchsia.Normal", server_end).unwrap();
 
         // Make sure the server_end is received, and test connectivity.
-        let server_end: zx::Channel = receiver.0.recv().await.unwrap().get_handle().unwrap().into();
+        let server_end: zx::Channel = receiver.receive().await.unwrap().channel.into();
         client_end.signal_peer(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
         server_end.wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST).unwrap();
 
@@ -556,13 +541,13 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_namespace_scope_shutdown() -> Result<()> {
-        let (open, receiver) = multishot();
+        let (sender, receiver) = multishot();
 
         let mut processargs = ProcessArgs::new();
         let dict = Dict::new();
         {
             let mut entries = dict.lock_entries();
-            entries.insert("normal".parse().unwrap(), Capability::Open(open));
+            entries.insert("normal".parse().unwrap(), sender.into());
         }
         let delivery_map = hashmap! {
             "normal".parse().unwrap() => DeliveryMapEntry::Delivery(
@@ -585,7 +570,7 @@ mod tests {
         fdio::service_connect_at(&dir, "fuchsia.Normal", server_end).unwrap();
 
         // Make sure the server_end is received, and test connectivity.
-        let server_end: zx::Channel = receiver.0.recv().await.unwrap().get_handle().unwrap().into();
+        let server_end: zx::Channel = receiver.receive().await.unwrap().channel.into();
         client_end.signal_peer(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
         server_end.wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST).unwrap();
 

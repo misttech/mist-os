@@ -174,16 +174,17 @@ mod tests {
         crate::test_util::multishot,
         anyhow::Result,
         assert_matches::assert_matches,
-        fidl::{endpoints::Proxy, AsHandleRef, Peered},
+        fidl::{endpoints::Proxy, Peered},
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_fs::directory::DirEntry,
         fuchsia_zircon as zx,
+        fuchsia_zircon::AsHandleRef,
         futures::StreamExt,
     };
 
-    fn open_cap() -> Capability {
-        let (open, _receiver) = multishot();
-        Capability::Open(open)
+    fn sender_cap() -> Capability {
+        let (sender, _receiver) = multishot();
+        Capability::Sender(sender)
     }
 
     fn ns_path(str: &str) -> NamespacePath {
@@ -197,7 +198,7 @@ mod tests {
     fn parents_valid(paths: Vec<&str>) -> Result<(), BuildNamespaceError> {
         let mut shadow = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
         for p in paths {
-            shadow.add_object(open_cap(), &path(p))?;
+            shadow.add_object(sender_cap(), &path(p))?;
         }
         Ok(())
     }
@@ -212,21 +213,21 @@ mod tests {
         assert_matches!(parents_valid(vec!["/a", "/b", "/c"]), Ok(()));
 
         let mut shadow = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        shadow.add_object(open_cap(), &path("/svc/foo")).unwrap();
-        assert_matches!(shadow.add_object(open_cap(), &path("/svc/foo/bar")), Err(_));
+        shadow.add_object(sender_cap(), &path("/svc/foo")).unwrap();
+        assert_matches!(shadow.add_object(sender_cap(), &path("/svc/foo/bar")), Err(_));
 
         let mut shadow = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        shadow.add_object(open_cap(), &path("/svc/foo")).unwrap();
-        assert_matches!(shadow.add_entry(open_cap(), &ns_path("/svc2")), Ok(_));
+        shadow.add_object(sender_cap(), &path("/svc/foo")).unwrap();
+        assert_matches!(shadow.add_entry(sender_cap(), &ns_path("/svc2")), Ok(_));
     }
 
     #[fuchsia::test]
     async fn test_duplicate_object() {
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        namespace.add_object(open_cap(), &path("/svc/a")).expect("");
+        namespace.add_object(sender_cap(), &path("/svc/a")).expect("");
         // Adding again will fail.
         assert_matches!(
-            namespace.add_object(open_cap(), &path("/svc/a")),
+            namespace.add_object(sender_cap(), &path("/svc/a")),
             Err(BuildNamespaceError::NamespaceError(NamespaceError::Duplicate(path)))
             if path.to_string() == "/svc/a"
         );
@@ -235,10 +236,10 @@ mod tests {
     #[fuchsia::test]
     async fn test_duplicate_entry() {
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        namespace.add_entry(open_cap(), &ns_path("/svc/a")).expect("");
+        namespace.add_entry(sender_cap(), &ns_path("/svc/a")).expect("");
         // Adding again will fail.
         assert_matches!(
-            namespace.add_entry(open_cap(), &ns_path("/svc/a")),
+            namespace.add_entry(sender_cap(), &ns_path("/svc/a")),
             Err(BuildNamespaceError::NamespaceError(NamespaceError::Duplicate(path)))
             if path.to_string() == "/svc/a"
         );
@@ -247,9 +248,9 @@ mod tests {
     #[fuchsia::test]
     async fn test_duplicate_object_and_entry() {
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        namespace.add_object(open_cap(), &path("/svc/a")).expect("");
+        namespace.add_object(sender_cap(), &path("/svc/a")).expect("");
         assert_matches!(
-            namespace.add_entry(open_cap(), &ns_path("/svc/a")),
+            namespace.add_entry(sender_cap(), &ns_path("/svc/a")),
             Err(BuildNamespaceError::NamespaceError(NamespaceError::Shadow(path)))
             if path.to_string() == "/svc/a"
         );
@@ -260,9 +261,9 @@ mod tests {
     #[fuchsia::test]
     async fn test_duplicate_entry_at_object_parent() {
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        namespace.add_object(open_cap(), &path("/foo/bar")).expect("");
+        namespace.add_object(sender_cap(), &path("/foo/bar")).expect("");
         assert_matches!(
-            namespace.add_entry(open_cap(), &ns_path("/foo")),
+            namespace.add_entry(sender_cap(), &ns_path("/foo")),
             Err(BuildNamespaceError::NamespaceError(NamespaceError::Duplicate(path)))
             if path.to_string() == "/foo"
         );
@@ -274,9 +275,9 @@ mod tests {
     #[fuchsia::test]
     async fn test_duplicate_object_parent_at_entry() {
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        namespace.add_entry(open_cap(), &ns_path("/foo")).expect("");
+        namespace.add_entry(sender_cap(), &ns_path("/foo")).expect("");
         assert_matches!(
-            namespace.add_object(open_cap(), &path("/foo/bar")),
+            namespace.add_object(sender_cap(), &path("/foo/bar")),
             Err(BuildNamespaceError::NamespaceError(NamespaceError::Duplicate(path)))
             if path.to_string() == "/foo/bar"
         );
@@ -291,10 +292,10 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_one_sender_end_to_end() {
-        let (open, receiver) = multishot();
+        let (sender, receiver) = multishot();
 
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        namespace.add_object(Capability::Open(open), &path("/svc/a")).unwrap();
+        namespace.add_object(sender.into(), &path("/svc/a")).unwrap();
         let ns = namespace.serve().unwrap();
 
         let mut ns = ns.flatten();
@@ -315,7 +316,7 @@ mod tests {
             .unwrap();
 
         // Make sure the server_end is received, and test connectivity.
-        let server_end: zx::Channel = receiver.0.recv().await.unwrap().get_handle().unwrap().into();
+        let server_end: zx::Channel = receiver.receive().await.unwrap().channel.into();
         client_end.signal_peer(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
         server_end.wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST).unwrap();
     }
@@ -324,8 +325,8 @@ mod tests {
     async fn test_two_senders_in_same_namespace_entry() {
         let scope = ExecutionScope::new();
         let mut namespace = NamespaceBuilder::new(scope.clone(), ignore_not_found());
-        namespace.add_object(open_cap(), &path("/svc/a")).unwrap();
-        namespace.add_object(open_cap(), &path("/svc/b")).unwrap();
+        namespace.add_object(sender_cap(), &path("/svc/a")).unwrap();
+        namespace.add_object(sender_cap(), &path("/svc/b")).unwrap();
         let ns = namespace.serve().unwrap();
 
         let mut ns = ns.flatten();
@@ -349,8 +350,8 @@ mod tests {
     #[fuchsia::test]
     async fn test_two_senders_in_different_namespace_entries() {
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        namespace.add_object(open_cap(), &path("/svc1/a")).unwrap();
-        namespace.add_object(open_cap(), &path("/svc2/b")).unwrap();
+        namespace.add_object(sender_cap(), &path("/svc1/a")).unwrap();
+        namespace.add_object(sender_cap(), &path("/svc2/b")).unwrap();
         let ns = namespace.serve().unwrap();
 
         let ns = ns.flatten();
@@ -384,7 +385,7 @@ mod tests {
     async fn test_not_found() {
         let (not_found_sender, mut not_found_receiver) = unbounded();
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), not_found_sender);
-        namespace.add_object(open_cap(), &path("/svc/a")).unwrap();
+        namespace.add_object(sender_cap(), &path("/svc/a")).unwrap();
         let ns = namespace.serve().unwrap();
 
         let mut ns = ns.flatten();
