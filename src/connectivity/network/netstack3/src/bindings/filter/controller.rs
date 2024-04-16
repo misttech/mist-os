@@ -24,7 +24,8 @@ pub(super) struct Rule {
 /// same priority, the routine that was installed earlier will be evaluated
 /// first. This atomic counter is incremented on addition of each routine,
 /// giving us a monotonically increasing value we can use to sort routines in
-/// order of installation.
+/// order of installation. It's also useful for providing a unique ID to Core
+/// for each uninstalled routine.
 static ROUTINE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug, Clone, Derivative)]
@@ -46,9 +47,21 @@ pub(super) struct InstalledNatRoutine {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub(super) enum IpRoutineType {
+    Installed(InstalledIpRoutine),
+    Uninstalled(usize),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum NatRoutineType {
+    Installed(InstalledNatRoutine),
+    Uninstalled(usize),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub(super) enum RoutineType {
-    Ip(Option<InstalledIpRoutine>),
-    Nat(Option<InstalledNatRoutine>),
+    Ip(IpRoutineType),
+    Nat(NatRoutineType),
 }
 
 impl RoutineType {
@@ -56,8 +69,10 @@ impl RoutineType {
         // The `InstalledIpRoutine` or `InstalledNatRoutine` configuration is
         // optional, and when omitted, signifies an uninstalled routine.
         match self {
-            Self::Ip(Some(_)) | Self::Nat(Some(_)) => true,
-            Self::Ip(None) | Self::Nat(None) => false,
+            Self::Ip(IpRoutineType::Installed(_)) | Self::Nat(NatRoutineType::Installed(_)) => true,
+            Self::Ip(IpRoutineType::Uninstalled(_)) | Self::Nat(NatRoutineType::Uninstalled(_)) => {
+                false
+            }
         }
     }
 }
@@ -65,18 +80,24 @@ impl RoutineType {
 impl From<fnet_filter_ext::RoutineType> for RoutineType {
     fn from(routine_type: fnet_filter_ext::RoutineType) -> Self {
         match routine_type {
-            fnet_filter_ext::RoutineType::Ip(installation) => Self::Ip(installation.map(
-                |fnet_filter_ext::InstalledIpRoutine { hook, priority }| InstalledIpRoutine {
-                    hook,
-                    priority,
-                    installation_order: ROUTINE_COUNTER.fetch_add(1, Ordering::SeqCst),
+            fnet_filter_ext::RoutineType::Ip(installation) => Self::Ip(installation.map_or(
+                IpRoutineType::Uninstalled(ROUTINE_COUNTER.fetch_add(1, Ordering::Relaxed)),
+                |fnet_filter_ext::InstalledIpRoutine { hook, priority }| {
+                    IpRoutineType::Installed(InstalledIpRoutine {
+                        hook,
+                        priority,
+                        installation_order: ROUTINE_COUNTER.fetch_add(1, Ordering::Relaxed),
+                    })
                 },
             )),
-            fnet_filter_ext::RoutineType::Nat(installation) => Self::Nat(installation.map(
-                |fnet_filter_ext::InstalledNatRoutine { hook, priority }| InstalledNatRoutine {
-                    hook,
-                    priority,
-                    installation_order: ROUTINE_COUNTER.fetch_add(1, Ordering::SeqCst),
+            fnet_filter_ext::RoutineType::Nat(installation) => Self::Nat(installation.map_or(
+                NatRoutineType::Uninstalled(ROUTINE_COUNTER.fetch_add(1, Ordering::Relaxed)),
+                |fnet_filter_ext::InstalledNatRoutine { hook, priority }| {
+                    NatRoutineType::Installed(InstalledNatRoutine {
+                        hook,
+                        priority,
+                        installation_order: ROUTINE_COUNTER.fetch_add(1, Ordering::Relaxed),
+                    })
                 },
             )),
         }
@@ -86,16 +107,26 @@ impl From<fnet_filter_ext::RoutineType> for RoutineType {
 impl From<&RoutineType> for fnet_filter_ext::RoutineType {
     fn from(routine_type: &RoutineType) -> Self {
         match routine_type {
-            RoutineType::Ip(installation) => Self::Ip(installation.as_ref().map(
-                |InstalledIpRoutine { hook, priority, installation_order: _ }| {
-                    fnet_filter_ext::InstalledIpRoutine { hook: *hook, priority: *priority }
-                },
-            )),
-            RoutineType::Nat(installation) => Self::Nat(installation.as_ref().map(
-                |InstalledNatRoutine { hook, priority, installation_order: _ }| {
-                    fnet_filter_ext::InstalledNatRoutine { hook: *hook, priority: *priority }
-                },
-            )),
+            RoutineType::Ip(routine_type) => Self::Ip(match routine_type {
+                IpRoutineType::Uninstalled(_) => None,
+                IpRoutineType::Installed(InstalledIpRoutine {
+                    hook,
+                    priority,
+                    installation_order: _,
+                }) => {
+                    Some(fnet_filter_ext::InstalledIpRoutine { hook: *hook, priority: *priority })
+                }
+            }),
+            RoutineType::Nat(routine_type) => Self::Nat(match routine_type {
+                NatRoutineType::Uninstalled(_) => None,
+                NatRoutineType::Installed(InstalledNatRoutine {
+                    hook,
+                    priority,
+                    installation_order: _,
+                }) => {
+                    Some(fnet_filter_ext::InstalledNatRoutine { hook: *hook, priority: *priority })
+                }
+            }),
         }
     }
 }

@@ -3,9 +3,12 @@
 // found in the LICENSE file.
 
 use net_types::ip::{Ipv4, Ipv6};
-use netstack3_base::ContextPair;
+use netstack3_base::{ContextPair, Inspector};
+use tracing::info;
 
-use crate::{FilterBindingsTypes, FilterContext, Routines, ValidRoutines, ValidationError};
+use crate::{
+    FilterBindingsTypes, FilterContext, FilterIpContext, Routines, ValidRoutines, ValidationError,
+};
 
 /// The filtering API.
 pub struct FilterApi<C>(C);
@@ -20,7 +23,9 @@ impl<C> FilterApi<C> {
 impl<C> FilterApi<C>
 where
     C: ContextPair,
-    C::CoreContext: FilterContext<C::BindingsContext>,
+    C::CoreContext: FilterContext<C::BindingsContext>
+        + FilterIpContext<Ipv4, C::BindingsContext>
+        + FilterIpContext<Ipv6, C::BindingsContext>,
     C::BindingsContext: FilterBindingsTypes,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
@@ -42,16 +47,36 @@ where
         v4: Routines<Ipv4, <C::BindingsContext as FilterBindingsTypes>::DeviceClass, RuleInfo>,
         v6: Routines<Ipv6, <C::BindingsContext as FilterBindingsTypes>::DeviceClass, RuleInfo>,
     ) -> Result<(), ValidationError<RuleInfo>> {
-        let v4 = ValidRoutines::new(v4)?;
-        let v6 = ValidRoutines::new(v6)?;
+        let (v4_installed, v4_uninstalled) = ValidRoutines::new(v4)?;
+        let (v6_installed, v6_uninstalled) = ValidRoutines::new(v6)?;
 
-        tracing::info!("updating filtering state:\nv4: {:?}\nv6: {:?}", v4.get(), v6.get());
+        info!(
+            "updating filtering state:\nv4: {:?}\nv6: {:?}",
+            v4_installed.get(),
+            v6_installed.get(),
+        );
 
-        self.core_ctx().with_all_filter_state_mut(|state_v4, state_v6| {
-            state_v4.routines = v4;
-            state_v6.routines = v6;
+        self.core_ctx().with_all_filter_state_mut(|v4, v6| {
+            v4.installed_routines = v4_installed;
+            v4.uninstalled_routines = v4_uninstalled;
+            v6.installed_routines = v6_installed;
+            v6.uninstalled_routines = v6_uninstalled;
         });
 
         Ok(())
+    }
+
+    /// Exports filtering state into `inspector`.
+    pub fn inspect_state<N: Inspector>(&mut self, inspector: &mut N) {
+        inspector.record_child("IPv4", |inspector| {
+            FilterIpContext::<Ipv4, _>::with_filter_state(self.core_ctx(), |state| {
+                inspector.delegate_inspectable(state);
+            });
+        });
+        inspector.record_child("IPv6", |inspector| {
+            FilterIpContext::<Ipv6, _>::with_filter_state(self.core_ctx(), |state| {
+                inspector.delegate_inspectable(state);
+            });
+        });
     }
 }

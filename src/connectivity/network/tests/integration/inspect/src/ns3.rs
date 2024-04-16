@@ -6,9 +6,11 @@
 // Needed for invocations of the `assert_data_tree` macro.
 #![recursion_limit = "256"]
 
-use std::{collections::HashMap, convert::TryFrom as _, time::Duration};
+use std::{collections::HashMap, convert::TryFrom as _, num::NonZeroU64, time::Duration};
 
 use assert_matches::assert_matches;
+use fidl_fuchsia_net_filter as fnet_filter;
+use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
 use fidl_fuchsia_posix_socket as fposix_socket;
 
 use net_declare::{fidl_mac, fidl_subnet, std_ip_v4, std_ip_v6};
@@ -16,7 +18,10 @@ use net_types::{
     ip::{IpAddress, IpInvariant, IpVersion, Ipv4, Ipv6},
     AddrAndPortFormatter, Witness as _,
 };
-use netstack_testing_common::{constants, get_inspect_data, realms::TestSandboxExt as _};
+use netstack_testing_common::{
+    constants, get_inspect_data,
+    realms::{Netstack3, TestSandboxExt as _},
+};
 use netstack_testing_macros::netstack_test;
 use packet_formats::ethernet::testutil::ETHERNET_HDR_LEN_NO_TAG;
 use test_case::test_case;
@@ -34,9 +39,9 @@ enum TcpSocketState {
 #[test_case(TcpSocketState::Listener; "listener")]
 #[test_case(TcpSocketState::Connected; "connected")]
 async fn inspect_tcp_sockets<I: net_types::ip::Ip>(name: &str, socket_state: TcpSocketState) {
-    type N = netstack_testing_common::realms::Netstack3;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
     let network = sandbox.create_network("net").await.expect("failed to create network");
 
     let interfaces_state = realm
@@ -305,9 +310,9 @@ async fn inspect_datagram_sockets<I: net_types::ip::Ip + TestIpExt>(
     proto: fposix_socket::DatagramSocketProtocol,
     socket_state: SocketState,
 ) {
-    type N = netstack_testing_common::realms::Netstack3;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
 
     // Ensure ns3 has started and that there is a Socket to collect inspect data about.
     let socket = realm.datagram_socket(I::DOMAIN, proto).await.expect("create datagram socket");
@@ -364,9 +369,9 @@ async fn inspect_datagram_sockets<I: net_types::ip::Ip + TestIpExt>(
 
 #[netstack_test]
 async fn inspect_routes(name: &str) {
-    type N = netstack_testing_common::realms::Netstack3;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
 
     let interfaces_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
@@ -441,10 +446,10 @@ async fn inspect_routes(name: &str) {
 
 #[netstack_test]
 async fn inspect_devices(name: &str) {
-    type N = netstack_testing_common::realms::Netstack3;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
-    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
 
     // Install netdevice device so that non-Loopback device Inspect properties can be asserted upon.
     const NETDEV_NAME: &str = "test-eth";
@@ -587,10 +592,9 @@ async fn inspect_devices(name: &str) {
 
 #[netstack_test]
 async fn inspect_counters(name: &str) {
-    type N = netstack_testing_common::realms::Netstack3;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let _network = sandbox.create_network("net").await.expect("failed to create network");
-    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
 
     // Send a packet over loopback to increment Tx and Rx count by 1.
     let sender = realm
@@ -897,4 +901,204 @@ async fn inspect_counters(name: &str) {
             },
         }
     })
+}
+
+#[netstack_test]
+async fn inspect_filtering_state(name: &str) {
+    use fnet_filter_ext::{
+        Action, AddressMatcher, AddressMatcherType, Change, Controller, ControllerId, Domain,
+        InstalledIpRoutine, InterfaceMatcher, IpHook, Matchers, Namespace, NamespaceId,
+        PortMatcher, Resource, Routine, RoutineId, RoutineType, Rule, RuleId,
+        TransportProtocolMatcher,
+    };
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+
+    let control = realm
+        .connect_to_protocol::<fnet_filter::ControlMarker>()
+        .expect("connect to filter control");
+    let id = ControllerId(String::from("inspect"));
+    let mut controller = Controller::new(&control, &id).await.expect("open filter controller");
+
+    // By default, the netstack should report all the filtering hooks for both
+    // IP versions, but have no filtering state configured.
+    let data =
+        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
+            .await
+            .expect("inspect data should be present");
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("got inspect data: {:#?}", data);
+    diagnostics_assertions::assert_data_tree!(data, "root": contains {
+        "Filtering State": {
+            "IPv4": {
+                "ingress": {},
+                "local_ingress": {},
+                "forwarding": {},
+                "local_egress": {},
+                "egress": {},
+                "uninstalled": {},
+            },
+            "IPv6": {
+                "ingress": {},
+                "local_ingress": {},
+                "forwarding": {},
+                "local_egress": {},
+                "egress": {},
+                "uninstalled": {},
+            },
+        }
+    });
+
+    let namespace = NamespaceId(String::from("test-namespace"));
+    let ingress_routine = RoutineId { namespace: namespace.clone(), name: String::from("ingress") };
+    let egress_routine = RoutineId { namespace: namespace.clone(), name: String::from("egress") };
+    let target_routine_name = String::from("target");
+    controller
+        .push_changes(
+            [
+                Resource::Namespace(Namespace { id: namespace.clone(), domain: Domain::AllIp }),
+                Resource::Routine(Routine {
+                    id: ingress_routine.clone(),
+                    routine_type: RoutineType::Ip(Some(InstalledIpRoutine {
+                        hook: IpHook::Ingress,
+                        priority: -10,
+                    })),
+                }),
+                Resource::Rule(Rule {
+                    id: RuleId { routine: ingress_routine.clone(), index: 20 },
+                    matchers: Matchers {
+                        in_interface: Some(InterfaceMatcher::Id(NonZeroU64::new(1).unwrap())),
+                        ..Default::default()
+                    },
+                    action: Action::Drop,
+                }),
+                Resource::Rule(Rule {
+                    id: RuleId { routine: ingress_routine, index: 10 },
+                    matchers: Matchers {
+                        transport_protocol: Some(TransportProtocolMatcher::Tcp {
+                            src_port: None,
+                            dst_port: Some(PortMatcher::new(22, 22, /* invert */ false).unwrap()),
+                        }),
+                        ..Default::default()
+                    },
+                    action: Action::Drop,
+                }),
+                Resource::Routine(Routine {
+                    id: RoutineId { namespace, name: target_routine_name.clone() },
+                    routine_type: RoutineType::Ip(None),
+                }),
+                Resource::Routine(Routine {
+                    id: egress_routine.clone(),
+                    routine_type: RoutineType::Ip(Some(InstalledIpRoutine {
+                        hook: IpHook::Egress,
+                        priority: -10,
+                    })),
+                }),
+                Resource::Rule(Rule {
+                    id: RuleId { routine: egress_routine, index: 0 },
+                    matchers: Matchers {
+                        dst_addr: Some(AddressMatcher {
+                            matcher: AddressMatcherType::Subnet(
+                                fidl_subnet!("127.0.0.0/8").try_into().unwrap(),
+                            ),
+                            invert: false,
+                        }),
+                        ..Default::default()
+                    },
+                    action: Action::Jump(target_routine_name),
+                }),
+            ]
+            .into_iter()
+            .map(Change::Create)
+            .collect(),
+        )
+        .await
+        .expect("push filter changes");
+    controller.commit().await.expect("commit filter changes");
+
+    let data =
+        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
+            .await
+            .expect("inspect data should be present");
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("got inspect data: {:#?}", data);
+    diagnostics_assertions::assert_data_tree!(data, "root": contains {
+        "Filtering State": {
+            "IPv4": {
+                "ingress": {
+                    "0": {
+                        "0": {
+                            "matchers": {
+                                "transport_protocol": "TransportProtocolMatcher { \
+                                    proto: TCP, \
+                                    src_port: None, \
+                                    dst_port: Some(PortMatcher { range: 22..=22, invert: false }) \
+                                }",
+                            },
+                            "action": "Drop",
+                        },
+                        "1": {
+                            "matchers": {
+                                "in_interface": "Id(1)",
+                            },
+                            "action": "Drop",
+                        },
+                    },
+                },
+                "local_ingress": {},
+                "forwarding": {},
+                "local_egress": {},
+                "egress": {
+                    "0": {
+                        "0": {
+                            // Note that this rule is only included in the IPv4 filtering state
+                            // because it has an address matcher with an IPv4 subnet.
+                            "matchers": {
+                                "dst_address": "AddressMatcher { \
+                                    matcher: Subnet(127.0.0.0/8), \
+                                    invert: false \
+                                }",
+                            },
+                            "action": "Jump(UninstalledRoutine(2))",
+                        },
+                    },
+                },
+                // Because the uninstalled routine is only jumped to from an IPv4 routine, it
+                // only exists in the IPv4 filtering state.
+                "uninstalled": {
+                    "2": {},
+                },
+            },
+            "IPv6": {
+                "ingress": {
+                    "0": {
+                        "0": {
+                            "matchers": {
+                                "transport_protocol": "TransportProtocolMatcher { \
+                                    proto: TCP, \
+                                    src_port: None, \
+                                    dst_port: Some(PortMatcher { range: 22..=22, invert: false }) \
+                                }",
+                            },
+                            "action": "Drop",
+                        },
+                        "1": {
+                            "matchers": {
+                                "in_interface": "Id(1)",
+                            },
+                            "action": "Drop",
+                        },
+                    },
+                },
+                "local_ingress": {},
+                "forwarding": {},
+                "local_egress": {},
+                "egress": {
+                    "0": {},
+                },
+                "uninstalled": {},
+            },
+        }
+    });
 }

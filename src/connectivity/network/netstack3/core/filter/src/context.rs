@@ -69,9 +69,14 @@ pub(crate) mod testutil {
 
     impl<I: IpExt> FakeCtx<I> {
         pub fn with_ip_routines(routines: IpRoutines<I, FakeDeviceClass, ()>) -> Self {
-            let valid_state = ValidRoutines::new(Routines { ip: routines, ..Default::default() })
-                .expect("invalid state");
-            Self(State { routines: valid_state, conntrack: conntrack::Table::new() })
+            let (installed_routines, uninstalled_routines) =
+                ValidRoutines::new(Routines { ip: routines, ..Default::default() })
+                    .expect("invalid state");
+            Self(State {
+                installed_routines,
+                uninstalled_routines,
+                conntrack: conntrack::Table::new(),
+            })
         }
     }
 

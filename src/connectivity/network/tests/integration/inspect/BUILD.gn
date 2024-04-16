@@ -50,6 +50,7 @@ rustc_test("netstack3_inspect_tests") {
   edition = "2021"
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
     "//src/connectivity/lib/net-declare",
@@ -59,6 +60,7 @@ rustc_test("netstack3_inspect_tests") {
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/lib/fuchsia-async",
+    "//src/lib/network/fidl_fuchsia_net_filter_ext",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:libc",

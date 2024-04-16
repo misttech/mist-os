@@ -236,3 +236,9 @@ pub(crate) fn counters(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     ctx.api().counters().inspect_stack_counters(&mut BindingsInspector::new(inspector.root()));
     inspector
 }
+
+pub(crate) fn filtering_state(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
+    let inspector = fuchsia_inspect::Inspector::new(Default::default());
+    ctx.api().filter().inspect_state(&mut BindingsInspector::new(inspector.root()));
+    inspector
+}

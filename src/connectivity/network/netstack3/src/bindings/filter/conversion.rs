@@ -13,7 +13,10 @@ use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 use packet_formats::ip::IpExt;
 
 use crate::bindings::filter::{
-    controller::{InstalledIpRoutine, InstalledNatRoutine, Namespace, Routine, Rule},
+    controller::{
+        InstalledIpRoutine, InstalledNatRoutine, IpRoutineType, Namespace, NatRoutineType, Routine,
+        Rule,
+    },
     CommitError,
 };
 use matchers::{ConversionResult, IpVersionMismatchError, TryConvertToCoreState as _};
@@ -317,7 +320,7 @@ impl<I: IpExt> CoreUninstalledRoutines<I> {
         //
         // (NB: by this point, `Jump` targets have already been validated to refer
         // to existing uninstalled routines.)
-        let UninstalledRoutine { routine_type, rules } =
+        let UninstalledRoutine { routine_type, rules, id } =
             uninstalled_routines.remove(name).ok_or_else(|| {
                 CommitError::CyclicalRoutineGraph(fnet_filter_ext::RoutineId {
                     namespace: namespace.to_owned(),
@@ -348,7 +351,7 @@ impl<I: IpExt> CoreUninstalledRoutines<I> {
         )?;
 
         // Insert the resulting converted routine in the `core_uninstalled` state.
-        let target = CoreUninstalledRoutine::new(rules);
+        let target = CoreUninstalledRoutine::new(rules, id);
         let uninstalled = match routine_type {
             RoutineType::Ip => &mut self.ip,
             RoutineType::Nat => &mut self.nat,
@@ -410,6 +413,7 @@ enum RoutineType {
 struct UninstalledRoutine {
     routine_type: RoutineType,
     rules: BTreeMap<u32, Rule>,
+    id: usize,
 }
 
 /// Converts a controller's state to the equivalent `netstack3_core` state.
@@ -430,38 +434,38 @@ pub(super) fn convert_to_core(
             |(mut installed, mut uninstalled), (name, routine)| {
                 let Routine { routine_type, rules } = routine;
                 match routine_type {
-                    super::controller::RoutineType::Ip(None) => {
+                    super::controller::RoutineType::Ip(IpRoutineType::Uninstalled(id)) => {
                         assert_matches!(
                             uninstalled.insert(
                                 name,
-                                UninstalledRoutine { routine_type: RoutineType::Ip, rules },
+                                UninstalledRoutine { routine_type: RoutineType::Ip, rules, id },
                             ),
                             None
                         );
                     }
-                    super::controller::RoutineType::Nat(None) => {
+                    super::controller::RoutineType::Nat(NatRoutineType::Uninstalled(id)) => {
                         assert_matches!(
                             uninstalled.insert(
                                 name,
-                                UninstalledRoutine { routine_type: RoutineType::Nat, rules },
+                                UninstalledRoutine { routine_type: RoutineType::Nat, rules, id },
                             ),
                             None
                         );
                     }
-                    super::controller::RoutineType::Ip(Some(installation)) => {
+                    super::controller::RoutineType::Ip(IpRoutineType::Installed(installation)) => {
                         installed.push(InstalledRoutine {
                             name,
                             routine_type: InstalledRoutineType::Ip(installation),
                             rules,
                         })
                     }
-                    super::controller::RoutineType::Nat(Some(installation)) => {
-                        installed.push(InstalledRoutine {
-                            name,
-                            routine_type: InstalledRoutineType::Nat(installation),
-                            rules,
-                        })
-                    }
+                    super::controller::RoutineType::Nat(NatRoutineType::Installed(
+                        installation,
+                    )) => installed.push(InstalledRoutine {
+                        name,
+                        routine_type: InstalledRoutineType::Nat(installation),
+                        rules,
+                    }),
                 }
                 (installed, uninstalled)
             },

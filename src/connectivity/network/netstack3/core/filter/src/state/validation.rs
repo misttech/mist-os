@@ -5,9 +5,11 @@
 use alloc::{
     collections::{hash_map::Entry, HashMap},
     sync::Arc,
+    vec::Vec,
 };
 use core::fmt::Debug;
 
+use assert_matches::assert_matches;
 use derivative::Derivative;
 use packet_formats::ip::IpExt;
 
@@ -37,8 +39,9 @@ impl<I: IpExt, DeviceClass> ValidRoutines<I, DeviceClass> {
 }
 
 impl<I: IpExt, DeviceClass: Clone + Debug> ValidRoutines<I, DeviceClass> {
-    /// Validates the provide state and creates a new `ValidState` or returns a
-    /// `ValidationError` if the state is invalid.
+    /// Validates the provide state and creates a new `ValidRoutines` along with a
+    /// list of all uninstalled routines that are referred to from an installed
+    /// routine. Returns a `ValidationError` if the state is invalid.
     ///
     /// The provided state must not contain any cyclical routine graphs (formed by
     /// rules with jump actions). The behavior in this case is unspecified but could
@@ -48,9 +51,10 @@ impl<I: IpExt, DeviceClass: Clone + Debug> ValidRoutines<I, DeviceClass> {
     ///
     /// Panics if the provided state includes cyclic routine graphs.
     pub fn new<RuleInfo: Clone>(
-        state: Routines<I, DeviceClass, RuleInfo>,
-    ) -> Result<Self, ValidationError<RuleInfo>> {
-        let Routines { ip: ip_routines, nat: nat_routines } = &state;
+        routines: Routines<I, DeviceClass, RuleInfo>,
+    ) -> Result<(Self, Vec<UninstalledRoutine<I, DeviceClass, ()>>), ValidationError<RuleInfo>>
+    {
+        let Routines { ip: ip_routines, nat: nat_routines } = &routines;
 
         // Ensure that no rule has a matcher that is unavailable in the context in which
         // the rule will be evaluated.
@@ -72,7 +76,9 @@ impl<I: IpExt, DeviceClass: Clone + Debug> ValidRoutines<I, DeviceClass> {
         // appended. For example, NAT rules are not allowed outside of NAT
         // routines, and the TPROXY action is only allowed in the INGRESS hook.
 
-        Ok(Self(state.strip_debug_info()))
+        let mut index = UninstalledRoutineIndex::default();
+        let routines = routines.strip_debug_info(&mut index);
+        Ok((Self(routines), index.into_values()))
     }
 }
 
@@ -112,8 +118,8 @@ fn validate_routine<I: IpExt, DeviceClass, RuleInfo: Clone>(
         match action {
             Action::Accept | Action::Drop | Action::Return => {}
             Action::Jump(target) => {
-                let UninstalledRoutine(inner) = target;
-                validate_routine(&*inner, unavailable_matcher)?
+                let UninstalledRoutine { routine, id: _ } = target;
+                validate_routine(&*routine, unavailable_matcher)?
             }
         }
     }
@@ -160,15 +166,24 @@ impl<I: IpExt, DeviceClass: Clone + Debug + Debug, RuleInfo: Clone>
         assert_eq!(previous, Some(ConvertedRoutine::InProgress));
         converted
     }
+
+    fn into_values(self) -> Vec<UninstalledRoutine<I, DeviceClass, ()>> {
+        self.index
+            .into_values()
+            .map(|routine| assert_matches!(routine, ConvertedRoutine::Done(routine) => routine))
+            .collect()
+    }
 }
 
 impl<I: IpExt, DeviceClass: Clone + Debug, RuleInfo: Clone> Routines<I, DeviceClass, RuleInfo> {
-    fn strip_debug_info(self) -> Routines<I, DeviceClass, ()> {
+    fn strip_debug_info(
+        self,
+        index: &mut UninstalledRoutineIndex<I, DeviceClass, RuleInfo>,
+    ) -> Routines<I, DeviceClass, ()> {
         let Self { ip: ip_routines, nat: nat_routines } = self;
-        let mut index = UninstalledRoutineIndex::default();
         Routines {
-            ip: ip_routines.strip_debug_info(&mut index),
-            nat: nat_routines.strip_debug_info(&mut index),
+            ip: ip_routines.strip_debug_info(index),
+            nat: nat_routines.strip_debug_info(index),
         }
     }
 }
@@ -247,8 +262,11 @@ impl<I: IpExt, DeviceClass: Clone + Debug, RuleInfo: Clone> Action<I, DeviceClas
             Self::Jump(target) => {
                 let converted = index.get_or_insert_with(target.clone(), |index| {
                     // Recursively strip debug info from the target routine.
-                    let UninstalledRoutine(ref inner) = target;
-                    UninstalledRoutine(Arc::new(Routine::clone(&*inner).strip_debug_info(index)))
+                    let UninstalledRoutine { ref routine, id } = target;
+                    UninstalledRoutine {
+                        routine: Arc::new(Routine::clone(&*routine).strip_debug_info(index)),
+                        id,
+                    }
                 });
                 Action::Jump(converted)
             }
@@ -258,7 +276,7 @@ impl<I: IpExt, DeviceClass: Clone + Debug, RuleInfo: Clone> Action<I, DeviceClas
 
 #[cfg(test)]
 mod tests {
-    use alloc::{vec, vec::Vec};
+    use alloc::vec;
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
@@ -347,15 +365,18 @@ mod tests {
             routines: vec![Routine {
                 rules: vec![Rule {
                     matcher: PacketMatcher::default(),
-                    action: Action::Jump(UninstalledRoutine::new(vec![rule(
-                        PacketMatcher {
-                            in_interface: Some(InterfaceMatcher::DeviceClass(
-                                FakeDeviceClass::Ethernet,
-                            )),
-                            ..Default::default()
-                        },
-                        RuleId::Invalid,
-                    )])),
+                    action: Action::Jump(UninstalledRoutine::new(
+                        vec![rule(
+                            PacketMatcher {
+                                in_interface: Some(InterfaceMatcher::DeviceClass(
+                                    FakeDeviceClass::Ethernet,
+                                )),
+                                ..Default::default()
+                            },
+                            RuleId::Invalid,
+                        )],
+                        0,
+                    )),
                     validation_info: RuleId::Valid,
                 }],
             }],
@@ -369,15 +390,18 @@ mod tests {
             routines: vec![Routine {
                 rules: vec![Rule {
                     matcher: PacketMatcher::default(),
-                    action: Action::Jump(UninstalledRoutine::new(vec![rule(
-                        PacketMatcher {
-                            out_interface: Some(InterfaceMatcher::DeviceClass(
-                                FakeDeviceClass::Ethernet,
-                            )),
-                            ..Default::default()
-                        },
-                        RuleId::Invalid,
-                    )])),
+                    action: Action::Jump(UninstalledRoutine::new(
+                        vec![rule(
+                            PacketMatcher {
+                                out_interface: Some(InterfaceMatcher::DeviceClass(
+                                    FakeDeviceClass::Ethernet,
+                                )),
+                                ..Default::default()
+                            },
+                            RuleId::Invalid,
+                        )],
+                        0,
+                    )),
                     validation_info: RuleId::Valid,
                 }],
             }],
@@ -396,7 +420,8 @@ mod tests {
     #[test]
     fn strip_debug_info_reuses_uninstalled_routines() {
         // Two routines in the hook jump to the same uninstalled routine.
-        let uninstalled_routine = UninstalledRoutine::<Ipv4, FakeDeviceClass, _>::new(Vec::new());
+        let uninstalled_routine =
+            UninstalledRoutine::<Ipv4, FakeDeviceClass, _>::new(Vec::new(), 0);
         let hook = Hook {
             routines: vec![
                 Routine {

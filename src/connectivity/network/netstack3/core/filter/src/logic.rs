@@ -146,7 +146,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         let Self(this) = self;
         this.with_filter_state(|state| {
             check_routines_for_hook(
-                &state.routines.get().ip.ingress,
+                &state.installed_routines.get().ip.ingress,
                 packet,
                 Interfaces { ingress: Some(interface), egress: None },
             )
@@ -161,7 +161,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         let Self(this) = self;
         this.with_filter_state(|state| {
             check_routines_for_hook(
-                &state.routines.get().ip.local_ingress,
+                &state.installed_routines.get().ip.local_ingress,
                 packet,
                 Interfaces { ingress: Some(interface), egress: None },
             )
@@ -181,7 +181,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         let Self(this) = self;
         this.with_filter_state(|state| {
             check_routines_for_hook(
-                &state.routines.get().ip.forwarding,
+                &state.installed_routines.get().ip.forwarding,
                 packet,
                 Interfaces { ingress: Some(in_interface), egress: Some(out_interface) },
             )
@@ -196,7 +196,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         let Self(this) = self;
         this.with_filter_state(|state| {
             check_routines_for_hook(
-                &state.routines.get().ip.local_egress,
+                &state.installed_routines.get().ip.local_egress,
                 packet,
                 Interfaces { ingress: None, egress: Some(interface) },
             )
@@ -211,7 +211,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         let Self(this) = self;
         this.with_filter_state(|state| {
             check_routines_for_hook(
-                &state.routines.get().ip.egress,
+                &state.installed_routines.get().ip.egress,
                 packet,
                 Interfaces { ingress: None, egress: Some(interface) },
             )
@@ -320,7 +320,7 @@ mod tests {
             rules: vec![
                 Rule::new(
                     PacketMatcher::default(),
-                    Action::Jump(UninstalledRoutine::new(Vec::new())),
+                    Action::Jump(UninstalledRoutine::new(Vec::new(), 0)),
                 ),
                 Rule::new(PacketMatcher::default(), Action::Drop),
             ],
@@ -390,10 +390,10 @@ mod tests {
                 // Jump to a routine that accepts all traffic.
                 Rule::new(
                     PacketMatcher::default(),
-                    Action::Jump(UninstalledRoutine::new(vec![Rule::new(
-                        PacketMatcher::default(),
-                        Action::Accept,
-                    )])),
+                    Action::Jump(UninstalledRoutine::new(
+                        vec![Rule::new(PacketMatcher::default(), Action::Accept)],
+                        0,
+                    )),
                 ),
                 // Drop all traffic.
                 Rule::new(PacketMatcher::default(), Action::Drop),
@@ -470,10 +470,10 @@ mod tests {
         let routine = Routine {
             rules: vec![Rule::new(
                 PacketMatcher::default(),
-                Action::Jump(UninstalledRoutine::new(vec![Rule::new(
-                    PacketMatcher::default(),
-                    Action::Drop,
-                )])),
+                Action::Jump(UninstalledRoutine::new(
+                    vec![Rule::new(PacketMatcher::default(), Action::Drop)],
+                    0,
+                )),
             )],
         };
         assert_eq!(
@@ -491,10 +491,10 @@ mod tests {
             rules: vec![
                 Rule::new(
                     PacketMatcher::default(),
-                    Action::Jump(UninstalledRoutine::new(vec![Rule::new(
-                        PacketMatcher::default(),
-                        Action::Accept,
-                    )])),
+                    Action::Jump(UninstalledRoutine::new(
+                        vec![Rule::new(PacketMatcher::default(), Action::Accept)],
+                        0,
+                    )),
                 ),
                 Rule::new(PacketMatcher::default(), Action::Drop),
             ],
@@ -514,10 +514,10 @@ mod tests {
             rules: vec![
                 Rule::new(
                     PacketMatcher::default(),
-                    Action::Jump(UninstalledRoutine::new(vec![Rule::new(
-                        PacketMatcher::default(),
-                        Action::Return,
-                    )])),
+                    Action::Jump(UninstalledRoutine::new(
+                        vec![Rule::new(PacketMatcher::default(), Action::Return)],
+                        0,
+                    )),
                 ),
                 Rule::new(PacketMatcher::default(), Action::Drop),
             ],
