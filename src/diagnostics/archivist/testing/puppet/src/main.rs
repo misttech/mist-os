@@ -138,9 +138,10 @@ async fn handle_puppet_request(
         fpuppet::PuppetRequest::Crash { message, .. } => {
             panic!("{message}");
         }
-        fpuppet::PuppetRequest::EmitExampleInspectData { .. } => {
+        fpuppet::PuppetRequest::EmitExampleInspectData { responder } => {
             let mut inspect_data = server.inspect_data.lock().await;
             inspect_data.write_to(component::inspector().root());
+            responder.send()?;
             Ok(())
         }
         fpuppet::PuppetRequest::RecordLazyValues { key, responder } => {

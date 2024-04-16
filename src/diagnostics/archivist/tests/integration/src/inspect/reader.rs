@@ -150,7 +150,7 @@ async fn unified_reader() -> Result<(), Error> {
     .expect("create realm");
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, "puppet").await.unwrap();
-    puppet.emit_example_inspect_data().unwrap();
+    puppet.emit_example_inspect_data().await.unwrap();
 
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
@@ -213,7 +213,7 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
     .expect("create base topology");
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, "test_component").await.unwrap();
-    puppet.emit_example_inspect_data().unwrap();
+    puppet.emit_example_inspect_data().await.unwrap();
 
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
@@ -267,7 +267,7 @@ async fn feedback_disabled_pipeline() -> Result<(), Error> {
     .expect("create base topology");
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, "test_component").await.unwrap();
-    puppet.emit_example_inspect_data().unwrap();
+    puppet.emit_example_inspect_data().await.unwrap();
 
     assert!(!pipeline_is_filtered(realm_proxy, 2, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
 
@@ -285,7 +285,7 @@ async fn feedback_pipeline_missing_selectors() -> Result<(), Error> {
     .expect("create base topology");
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, "test_component").await.unwrap();
-    puppet.emit_example_inspect_data().unwrap();
+    puppet.emit_example_inspect_data().await.unwrap();
 
     assert!(!pipeline_is_filtered(realm_proxy, 2, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
 
@@ -306,7 +306,7 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
     .expect("create base topology");
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, "test_component").await.unwrap();
-    puppet.emit_example_inspect_data().unwrap();
+    puppet.emit_example_inspect_data().await.unwrap();
 
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.

@@ -83,7 +83,7 @@ open protocol InspectPuppet {
     ///
     /// TODO(https://fuchsia.dev/302716196): Split this into several methods
     /// tests can call to explicitly emit the same data as this method.
-    flexible EmitExampleInspectData();
+    flexible EmitExampleInspectData() -> ();
 };
 
 /// Records values on a lazy inspect node.

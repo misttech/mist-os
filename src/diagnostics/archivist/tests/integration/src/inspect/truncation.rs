@@ -23,7 +23,7 @@ async fn accessor_truncation_test() {
     for (i, x) in itertools::iproduct!(0..3, letters.iter()) {
         let puppet =
             test_topology::connect_to_puppet(&realm_proxy, &format!("child_{x}{i}")).await.unwrap();
-        puppet.emit_example_inspect_data().unwrap();
+        puppet.emit_example_inspect_data().await.unwrap();
     }
 
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
