@@ -6,10 +6,8 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::{
     borrow::Borrow,
     cmp::Ordering,
-    convert::Infallible as Never,
     fmt::Debug,
     hash::Hash,
-    marker::PhantomData,
     num::{NonZeroU32, NonZeroU8},
     sync::atomic::{self, AtomicU16},
 };
@@ -42,8 +40,8 @@ use tracing::{debug, trace};
 
 use crate::{
     context::{
-        CoreTimerContext, CounterContext, EventContext, InstantContext, NonTestCtxMarker,
-        TimerBindingsTypes, TimerContext2, TimerHandler, TracingContext,
+        CoreTimerContext, CounterContext, EventContext, InstantContext, NestedIntoCoreTimerCtx,
+        NonTestCtxMarker, TimerContext2, TimerHandler, TracingContext,
     },
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
@@ -1522,10 +1520,10 @@ impl<I: IpLayerIpExt, DeviceId, BC: TimerContext2 + IpStateBindingsTypes>
     pub fn new<CC: CoreTimerContext<IpLayerTimerId, BC>>(bindings_ctx: &mut BC) -> Self {
         Self {
             table: Default::default(),
-            fragment_cache: Mutex::new(IpPacketFragmentCache::new::<IpLayerTimerCtx<CC>>(
-                bindings_ctx,
-            )),
-            pmtu_cache: Mutex::new(PmtuCache::new::<IpLayerTimerCtx<CC>>(bindings_ctx)),
+            fragment_cache: Mutex::new(
+                IpPacketFragmentCache::new::<NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx),
+            ),
+            pmtu_cache: Mutex::new(PmtuCache::new::<NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx)),
             counters: Default::default(),
         }
     }
@@ -1554,31 +1552,6 @@ impl<I: Ip> From<FragmentTimerId<I>> for IpLayerTimerId {
 impl<I: Ip> From<PmtuTimerId<I>> for IpLayerTimerId {
     fn from(timer: PmtuTimerId<I>) -> IpLayerTimerId {
         I::map_ip(timer, IpLayerTimerId::PmtuTimeoutv4, IpLayerTimerId::PmtuTimeoutv6)
-    }
-}
-
-/// An uninstantiable type providing timer ID conversion for the IP layer.
-struct IpLayerTimerCtx<CC>(Never, PhantomData<CC>);
-
-impl<I, CC, BT> CoreTimerContext<FragmentTimerId<I>, BT> for IpLayerTimerCtx<CC>
-where
-    I: Ip,
-    CC: CoreTimerContext<IpLayerTimerId, BT>,
-    BT: TimerBindingsTypes,
-{
-    fn convert_timer(timer: FragmentTimerId<I>) -> BT::DispatchId {
-        CC::convert_timer(IpLayerTimerId::from(timer))
-    }
-}
-
-impl<I, CC, BT> CoreTimerContext<PmtuTimerId<I>, BT> for IpLayerTimerCtx<CC>
-where
-    BT: TimerBindingsTypes,
-    I: Ip,
-    CC: CoreTimerContext<IpLayerTimerId, BT>,
-{
-    fn convert_timer(timer: PmtuTimerId<I>) -> BT::DispatchId {
-        CC::convert_timer(IpLayerTimerId::from(timer))
     }
 }
 
@@ -3183,6 +3156,8 @@ impl<
 #[cfg(test)]
 pub(crate) mod testutil {
     use super::*;
+
+    use core::marker::PhantomData;
 
     use derivative::Derivative;
     use net_types::ip::IpInvariant;

@@ -7,7 +7,7 @@
 pub(crate) mod local_timer_heap;
 pub(crate) mod testutil;
 
-use core::{fmt::Debug, time::Duration};
+use core::{convert::Infallible as Never, fmt::Debug, marker::PhantomData, time::Duration};
 
 use crate::inspect::InspectableValue;
 
@@ -151,15 +151,31 @@ pub trait CoreTimerContext<T, BT: TimerBindingsTypes> {
     }
 }
 
-/// A timer context that performs conversions based on `Into` implementations.
-pub struct IntoCoreTimerCtx;
+/// An uninstantiable type that performs conversions based on `Into`
+/// implementations.
+pub enum IntoCoreTimerCtx {}
 
 impl<T, BT> CoreTimerContext<T, BT> for IntoCoreTimerCtx
 where
     BT: TimerBindingsTypes,
     T: Into<BT::DispatchId>,
 {
-    fn convert_timer(dispatch_id: T) -> <BT as TimerBindingsTypes>::DispatchId {
+    fn convert_timer(dispatch_id: T) -> BT::DispatchId {
         dispatch_id.into()
+    }
+}
+
+/// An uninstantiable type that performs conversions based on `Into`
+/// implementations and an available outer [`CoreTimerContext`] `CC`.
+pub struct NestedIntoCoreTimerCtx<CC, N>(Never, PhantomData<(CC, N)>);
+
+impl<CC, N, T, BT> CoreTimerContext<T, BT> for NestedIntoCoreTimerCtx<CC, N>
+where
+    BT: TimerBindingsTypes,
+    CC: CoreTimerContext<N, BT>,
+    T: Into<N>,
+{
+    fn convert_timer(dispatch_id: T) -> BT::DispatchId {
+        CC::convert_timer(dispatch_id.into())
     }
 }
