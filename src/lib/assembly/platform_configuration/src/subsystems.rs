@@ -320,7 +320,12 @@ fn configure_subsystems(
 
     session::SessionConfig::define_configuration(
         context,
-        &(&config.platform.session, &config.product.session_url),
+        // TODO(https://fxbug.dev/326086827): remove this hack, it's just for a soft transition
+        &(
+            &config.platform.session,
+            &config.product.session_url,
+            &config.platform.input_groups.group2,
+        ),
         builder,
     )
     .context("Configuring the 'session' subsystem")?;
