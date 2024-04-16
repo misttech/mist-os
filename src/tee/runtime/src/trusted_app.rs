@@ -4,7 +4,7 @@
 
 use std::{collections::BTreeMap, ops::AddAssign};
 
-use crate::params::TEEParams;
+use crate::params::ParamAdapter;
 use crate::ta_loader::{SessionContext, TAInterface};
 use anyhow::Error;
 use fidl_fuchsia_tee::{OpResult, Parameter, ReturnOrigin};
@@ -42,11 +42,13 @@ impl<T: TAInterface> TrustedApp<T> {
         parameter_set: Vec<Parameter>,
     ) -> Result<(u32, OpResult), Error> {
         let mut session_context = std::ptr::null_mut();
-        let mut tee_params = TEEParams::new();
-        let (param_types, mut params) = tee_params.import_from_fidl(parameter_set)?;
-        let ta_result =
-            self.interface.open_session(param_types, params.as_mut_ptr(), &mut session_context);
-        let return_params = vec![]; // TODO: export 'params' to FIDL types to return to the caller.
+        let (mut adapter, param_types) = ParamAdapter::from_fidl(parameter_set)?;
+        let ta_result = self.interface.open_session(
+            param_types,
+            adapter.tee_params_mut().as_mut_ptr(),
+            &mut session_context,
+        );
+        let return_params = adapter.export_to_fidl()?;
         let session_id = self.allocate_session_id();
         let _ = self.sessions.insert(session_id, session_context);
         let op_result = OpResult {
@@ -78,15 +80,14 @@ impl<T: TAInterface> TrustedApp<T> {
             Some(session_context) => session_context,
             None => anyhow::bail!("Invalid session id"),
         };
-        let mut tee_params = TEEParams::new();
-        let (param_types, mut params) = tee_params.import_from_fidl(parameter_set)?;
+        let (mut adapter, param_types) = ParamAdapter::from_fidl(parameter_set)?;
         let ta_result = self.interface.invoke_command(
             *session_context,
             command,
             param_types,
-            params.as_mut_ptr(),
+            adapter.tee_params_mut().as_mut_ptr(),
         );
-        let return_params = vec![]; // TODO: export 'params' to FIDL type to return to caller.
+        let return_params = adapter.export_to_fidl()?;
         let op_result = OpResult {
             return_code: Some(ta_result as u64),
             return_origin: Some(ReturnOrigin::TrustedApplication),
