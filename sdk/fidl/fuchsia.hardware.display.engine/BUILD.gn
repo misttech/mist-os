@@ -14,6 +14,7 @@ fidl("fuchsia.hardware.display.engine") {
     "//sdk/fidl/fuchsia.hardware.display.types",
     "//sdk/fidl/fuchsia.hardware.i2cimpl",
     "//sdk/fidl/fuchsia.images2",
+    "//sdk/fidl/fuchsia.sysmem",
     "//zircon/vdso/zx",
   ]
   contains_drivers = true

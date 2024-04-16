@@ -6,6 +6,7 @@ library fuchsia.hardware.display.engine;
 using fuchsia.hardware.display.types;
 using fuchsia.hardware.i2cimpl;
 using fuchsia.images2;
+using fuchsia.sysmem;
 using zx;
 
 type ColorConversion = strict bits : uint32 {
@@ -97,10 +98,7 @@ open protocol Engine {
     flexible ImportBufferCollection(resource struct {
         buffer_collection_id BufferCollectionId;
 
-        // TODO(https://fxbug.dev/42171012): This is a client end channel of FIDL protocol
-        // fuchsia.sysmem.BufferCollectionToken. The raw channel needs to be
-        // replaced with FIDL client end once banjo to FIDL migration finishes.
-        collection_token zx.Handle:CHANNEL;
+        collection_token client_end:fuchsia.sysmem.BufferCollectionToken;
     }) -> () error zx.Status;
 
     /// Release an imported buffer collection.

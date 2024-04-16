@@ -185,15 +185,16 @@ zx::result<DriverCaptureImageId> Driver::ImportImageForCapture(
   return zx::ok(ToDriverCaptureImageId(banjo_capture_image_handle));
 }
 
-zx::result<> Driver::ImportBufferCollection(DriverBufferCollectionId collection_id,
-                                            zx::channel collection_token) {
+zx::result<> Driver::ImportBufferCollection(
+    DriverBufferCollectionId collection_id,
+    fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> collection_token) {
   if (use_engine_) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
   zx_status_t banjo_status = dc_.ImportBufferCollection(
-      ToBanjoDriverBufferCollectionId(collection_id), std::move(collection_token));
+      ToBanjoDriverBufferCollectionId(collection_id), std::move(collection_token).TakeChannel());
   return zx::make_result(banjo_status);
 }
 

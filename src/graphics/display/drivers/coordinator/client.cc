@@ -245,7 +245,7 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       controller_->GetNextDriverBufferCollectionId();
   zx::result<> import_result = controller_->driver()->ImportBufferCollection(
-      driver_buffer_collection_id, request->buffer_collection_token.TakeChannel());
+      driver_buffer_collection_id, std::move(request->buffer_collection_token));
   if (import_result.is_error()) {
     zxlogf(WARNING, "Cannot import BufferCollection to display driver: %s",
            import_result.status_string());

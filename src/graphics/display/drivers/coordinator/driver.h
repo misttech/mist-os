@@ -62,8 +62,9 @@ class Driver : public ddk::Device<Driver> {
                                         DriverBufferCollectionId collection_id, uint32_t index);
   zx::result<DriverCaptureImageId> ImportImageForCapture(DriverBufferCollectionId collection_id,
                                                          uint32_t index);
-  zx::result<> ImportBufferCollection(DriverBufferCollectionId collection_id,
-                                      zx::channel collection_token);
+  zx::result<> ImportBufferCollection(
+      DriverBufferCollectionId collection_id,
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> collection_token);
   zx::result<> ReleaseBufferCollection(DriverBufferCollectionId collection_id);
   zx::result<> SetBufferCollectionConstraints(const ImageBufferUsage& usage,
                                               DriverBufferCollectionId collection_id);
