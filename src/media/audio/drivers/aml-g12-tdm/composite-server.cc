@@ -136,16 +136,14 @@ zx_status_t AudioCompositeServer::ConfigEngine(size_t index, size_t dai_index, b
   // Sample format is PCM signed.
   pcm_formats.sample_formats(std::vector{fuchsia_hardware_audio::SampleFormat::kPcmSigned});
 
-  // Bits per slot supported on DAI are supported in Ring Buffer as bytes per sample.
-  auto v = supported_dai_formats_[dai_index].bits_per_slot();
-  std::transform(v.begin(), v.end(), v.begin(), [](const uint8_t bits_per_slot) -> uint8_t {
-    ZX_ASSERT(bits_per_slot % 8 == 0);
-    return bits_per_slot / 8;
-  });
-  pcm_formats.bytes_per_sample(v);
+  // Bits per slot supported on Ring Buffer.
+  pcm_formats.bytes_per_sample(AmlTdmConfigDevice::GetSupportedRingBufferBytesPerSlot());
 
-  // Bits per sample supported on DAI are supported in Ring Buffer.
-  pcm_formats.valid_bits_per_sample(supported_dai_formats_[dai_index].bits_per_sample());
+  // Valid bits per sample supported on Ring Buffer.
+  auto v = AmlTdmConfigDevice::GetSupportedRingBufferBytesPerSlot();
+  std::transform(v.begin(), v.end(), v.begin(),
+                 [](const uint8_t bytes_per_slot) -> uint8_t { return bytes_per_slot * 8; });
+  pcm_formats.valid_bits_per_sample(v);
 
   supported_ring_buffer_formats_[index] = std::move(pcm_formats);
 

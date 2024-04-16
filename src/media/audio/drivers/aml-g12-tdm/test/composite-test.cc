@@ -833,6 +833,15 @@ TEST_F(AmlG12CompositeTest, GetRingBufferFormats) {
     ASSERT_TRUE(ring_buffer_formats_result.is_ok());
     // There is at least one entry reported.
     ASSERT_GE(1, ring_buffer_formats_result->ring_buffer_formats().size());
+    // Only 2 bytes per sample supported.
+    auto& first_format = ring_buffer_formats_result->ring_buffer_formats()[0];
+    ASSERT_TRUE(first_format.pcm_supported_formats());
+    auto& first_pcm_format = *first_format.pcm_supported_formats();
+    ASSERT_TRUE(first_pcm_format.bytes_per_sample());
+    ASSERT_EQ(1, first_pcm_format.bytes_per_sample()->size());
+    ASSERT_EQ(2, (*first_pcm_format.bytes_per_sample())[0]);
+    ASSERT_EQ(1, first_pcm_format.valid_bits_per_sample()->size());
+    ASSERT_EQ(16, (*first_pcm_format.valid_bits_per_sample())[0]);
   }
 }
 

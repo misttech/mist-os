@@ -26,6 +26,7 @@ class AmlTdmConfigDevice {
     return {8'000, 16'000, 32'000, 48'000, 96'000};
   }
   static uint32_t GetDefaultFrameRate() { return 48'000; }
+  static std::vector<uint8_t> GetSupportedRingBufferBytesPerSlot() { return {2}; }
   static std::vector<uint8_t> GetSupportedBitsPerSlot() { return {16, 32}; }
   static std::vector<uint8_t> GetSupportedBitsPerSample() { return {16, 32}; }
   static std::vector<fuchsia_hardware_audio::DaiFrameFormat> GetFidlSupportedFrameFormats() {
