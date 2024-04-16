@@ -59,6 +59,7 @@ impl ComponentBuilder {
         let args = vec![
             "compile".into(),
             "--features=allow_long_names".into(),
+            "--features=dictionaries".into(),
             "--includeroot".into(),
             include_path.as_ref().to_string(),
             "--includepath".into(),
@@ -126,6 +127,7 @@ mod tests {
                     "args": [
                         "compile",
                         "--features=allow_long_names",
+                        "--features=dictionaries",
                         "--includeroot",
                         "include/path",
                         "--includepath",

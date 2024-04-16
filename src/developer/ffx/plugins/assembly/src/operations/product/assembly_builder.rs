@@ -1641,6 +1641,7 @@ mod tests {
                     "args": [
                         "compile",
                         "--features=allow_long_names",
+                        "--features=dictionaries",
                         "--includeroot",
                         vars.outdir.join("bundle/compiled_packages/include").as_str(),
                         "--includepath",
@@ -1667,6 +1668,7 @@ mod tests {
                     "args": [
                         "compile",
                         "--features=allow_long_names",
+                        "--features=dictionaries",
                         "--includeroot",
                         vars.outdir.join("bundle/compiled_packages/include").as_str(),
                         "--includepath",
