@@ -156,7 +156,25 @@ impl ArchivistRealmFactory {
                         Route::new()
                             .capability(
                                 Capability::protocol::<PuppetMarker>()
-                                    .as_(decl.unique_protocol_alias()),
+                                    .as_(unique_puppet_protocol_name(&decl)),
+                            )
+                            .capability(
+                                Capability::protocol_by_name(format!(
+                                    "{}.nested_one",
+                                    InspectPuppetMarker::PROTOCOL_NAME
+                                ))
+                                .as_(
+                                    unique_puppet_child_inspect_protocol_name(&decl, "nested_one"),
+                                ),
+                            )
+                            .capability(
+                                Capability::protocol_by_name(format!(
+                                    "{}.nested_two",
+                                    InspectPuppetMarker::PROTOCOL_NAME
+                                ))
+                                .as_(
+                                    unique_puppet_child_inspect_protocol_name(&decl, "nested_two"),
+                                ),
                             )
                             .from(&puppet)
                             .to(Ref::parent()),
@@ -166,7 +184,15 @@ impl ArchivistRealmFactory {
                 builder
                     .add_route(
                         Route::new()
-                            .capability(Capability::protocol_by_name(decl.unique_protocol_alias()))
+                            .capability(Capability::protocol_by_name(unique_puppet_protocol_name(
+                                &decl,
+                            )))
+                            .capability(Capability::protocol_by_name(
+                                unique_puppet_child_inspect_protocol_name(&decl, "nested_one"),
+                            ))
+                            .capability(Capability::protocol_by_name(
+                                unique_puppet_child_inspect_protocol_name(&decl, "nested_two"),
+                            ))
                             .from(&test_realm)
                             .to(Ref::parent()),
                     )
@@ -177,16 +203,12 @@ impl ArchivistRealmFactory {
     }
 }
 
-trait PuppetDeclExt {
-    // A unique alias for the puppet's protocol.
-    //
-    // The test suite connects to the puppet using this alias.
-    fn unique_protocol_alias(&self) -> String;
+fn unique_puppet_protocol_name(decl: &PuppetDecl) -> String {
+    let name = decl.name.as_ref().unwrap();
+    format!("{}.{}", PuppetMarker::PROTOCOL_NAME, name)
 }
 
-impl PuppetDeclExt for PuppetDecl {
-    fn unique_protocol_alias(&self) -> String {
-        let name = self.name.as_ref().unwrap();
-        format!("{}.{}", PuppetMarker::PROTOCOL_NAME, name)
-    }
+fn unique_puppet_child_inspect_protocol_name(decl: &PuppetDecl, nested_name: &str) -> String {
+    let name = decl.name.as_ref().unwrap();
+    format!("{}.{name}.{nested_name}", InspectPuppetMarker::PROTOCOL_NAME)
 }

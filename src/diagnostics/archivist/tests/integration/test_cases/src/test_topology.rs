@@ -10,8 +10,7 @@ use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_testing_harness as fharness;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component_test::{
-    Capability, ChildOptions, ChildRef, RealmBuilder, RealmBuilderParams, Ref, Route,
-    SubRealmBuilder,
+    Capability, ChildOptions, RealmBuilder, RealmBuilderParams, Ref, Route, SubRealmBuilder,
 };
 use realm_proxy_client::RealmProxyClient;
 
@@ -176,24 +175,6 @@ pub async fn create(opts: Options) -> Result<(RealmBuilder, SubRealmBuilder), Er
     builder.add_route(archivist_to_parent.from(&test_realm).to(Ref::parent())).await?;
 
     Ok((builder, test_realm))
-}
-
-pub async fn add_eager_child(
-    test_realm: &SubRealmBuilder,
-    name: &str,
-    url: &str,
-) -> Result<ChildRef, Error> {
-    let child_ref = test_realm.add_child(name, url, ChildOptions::new().eager()).await?;
-    test_realm
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
-                .from(Ref::child("archivist"))
-                .to(&child_ref),
-        )
-        .await?;
-    Ok(child_ref)
 }
 
 pub async fn expose_test_realm_protocol(builder: &RealmBuilder, test_realm: &SubRealmBuilder) {

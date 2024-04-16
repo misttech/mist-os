@@ -5,22 +5,6 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
-rustc_binary("stub_inspect_component_bin") {
-  testonly = true
-  output_name = "stub_inspect_component"
-  edition = "2021"
-  source_root = "src/stub_inspect_component.rs"
-  deps = [
-    "//src/lib/diagnostics/inspect/runtime/rust",
-    "//src/lib/diagnostics/inspect/rust",
-    "//src/lib/fuchsia",
-    "//third_party/rust_crates:tracing",
-  ]
-
-  sources = [ "src/stub_inspect_component.rs" ]
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
-}
-
 rustc_binary("log_on_interest_bin") {
   testonly = true
   output_name = "log_on_interest"
@@ -38,18 +22,6 @@ rustc_binary("log_on_interest_bin") {
 
   sources = [ "src/log_on_interest.rs" ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
-}
-
-fuchsia_component("stub_inspect_component") {
-  testonly = true
-  deps = [ ":stub_inspect_component_bin" ]
-  manifest = "meta/stub_inspect_component.cml"
-}
-
-fuchsia_component("component_with_children") {
-  testonly = true
-  deps = [ ":stub_inspect_component_bin" ]
-  manifest = "meta/component_with_children.cml"
 }
 
 fuchsia_component("log_on_interest_component") {
@@ -88,9 +60,7 @@ fuchsia_component("socket-puppet") {
 group("components") {
   testonly = true
   deps = [
-    ":component_with_children",
     ":log_on_interest_component",
     ":socket-puppet",
-    ":stub_inspect_component",
   ]
 }

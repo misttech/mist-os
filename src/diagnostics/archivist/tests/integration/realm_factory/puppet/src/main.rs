@@ -32,6 +32,7 @@ use tracing::{debug, error, info, warn};
 
 enum IncomingServices {
     Puppet(fpuppet::PuppetRequestStream),
+    InspectPuppet(fpuppet::InspectPuppetRequestStream),
 }
 
 // `logging = false` allows us to set the global default trace dispatcher
@@ -50,12 +51,17 @@ async fn main() -> Result<(), Error> {
     let publish_options = inspect_runtime::PublishOptions::default();
     _inspect_publish_task = inspect_runtime::publish(component::inspector(), publish_options);
 
-    fs.dir("svc").add_fidl_service(IncomingServices::Puppet);
+    fs.dir("svc")
+        .add_fidl_service(IncomingServices::Puppet)
+        .add_fidl_service(IncomingServices::InspectPuppet);
     fs.take_and_serve_directory_handle()?;
     fs.for_each_concurrent(0, |service| async {
         match service {
             IncomingServices::Puppet(s) => {
                 serve_puppet(puppet_server.clone(), s).await;
+            }
+            IncomingServices::InspectPuppet(s) => {
+                serve_inspect_puppet(puppet_server.clone(), s).await;
             }
         }
     })
@@ -102,6 +108,23 @@ impl PuppetServer {
             inspect_data: Mutex::new(ExampleInspectData::default()),
         }
     }
+
+    async fn emit_example_inspect_data(&self) {
+        let mut inspect_data = self.inspect_data.lock().await;
+        inspect_data.write_to(component::inspector().root());
+    }
+
+    fn record_string(&self, key: String, value: String) {
+        component::inspector().root().record_string(key, value);
+    }
+
+    fn record_int(&self, key: String, value: i64) {
+        component::inspector().root().record_int(key, value);
+    }
+
+    fn set_health_ok(&self) {
+        component::health().set_ok();
+    }
 }
 
 // Notifies the puppet when log interest changes.
@@ -130,6 +153,44 @@ async fn serve_puppet(server: Arc<PuppetServer>, mut stream: fpuppet::PuppetRequ
     }
 }
 
+async fn serve_inspect_puppet(
+    server: Arc<PuppetServer>,
+    mut stream: fpuppet::InspectPuppetRequestStream,
+) {
+    while let Ok(Some(request)) = stream.try_next().await {
+        handle_inspect_puppet_request(server.clone(), request)
+            .await
+            .unwrap_or_else(|e| error!(?e, "handle_puppet_request"));
+    }
+}
+
+async fn handle_inspect_puppet_request(
+    server: Arc<PuppetServer>,
+    request: fpuppet::InspectPuppetRequest,
+) -> Result<(), Error> {
+    match request {
+        fpuppet::InspectPuppetRequest::EmitExampleInspectData { responder } => {
+            server.emit_example_inspect_data().await;
+            responder.send()?;
+            Ok(())
+        }
+        fpuppet::InspectPuppetRequest::RecordString { key, value, .. } => {
+            server.record_string(key, value);
+            Ok(())
+        }
+        fpuppet::InspectPuppetRequest::RecordInt { key, value, .. } => {
+            server.record_int(key, value);
+            Ok(())
+        }
+        fpuppet::InspectPuppetRequest::SetHealthOk { responder } => {
+            server.set_health_ok();
+            responder.send()?;
+            Ok(())
+        }
+        fpuppet::InspectPuppetRequest::_UnknownMethod { .. } => unreachable!(),
+    }
+}
+
 async fn handle_puppet_request(
     server: Arc<PuppetServer>,
     request: fpuppet::PuppetRequest,
@@ -139,8 +200,7 @@ async fn handle_puppet_request(
             panic!("{message}");
         }
         fpuppet::PuppetRequest::EmitExampleInspectData { responder } => {
-            let mut inspect_data = server.inspect_data.lock().await;
-            inspect_data.write_to(component::inspector().root());
+            server.emit_example_inspect_data().await;
             responder.send()?;
             Ok(())
         }
@@ -151,15 +211,15 @@ async fn handle_puppet_request(
             Ok(())
         }
         fpuppet::PuppetRequest::RecordString { key, value, .. } => {
-            component::inspector().root().record_string(key, value);
+            server.record_string(key, value);
             Ok(())
         }
         fpuppet::PuppetRequest::RecordInt { key, value, .. } => {
-            component::inspector().root().record_int(key, value);
+            server.record_int(key, value);
             Ok(())
         }
         fpuppet::PuppetRequest::SetHealthOk { responder } => {
-            component::health().set_ok();
+            server.set_health_ok();
             responder.send()?;
             Ok(())
         }
