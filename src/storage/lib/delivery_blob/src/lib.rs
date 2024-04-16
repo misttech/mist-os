@@ -22,7 +22,11 @@
 //! file.write_all(&payload).unwrap();
 
 use {
-    crate::{compression::ChunkedArchive, format::SerializedType1Blob},
+    crate::{
+        compression::{ChunkedArchive, ChunkedDecompressor},
+        format::SerializedType1Blob,
+    },
+    static_assertions::assert_eq_size,
     thiserror::Error,
     zerocopy::{AsBytes, Ref},
 };
@@ -32,6 +36,9 @@ use fuchsia_zircon as zx;
 
 pub mod compression;
 mod format;
+
+// This library assumes usize is large enough to hold a u64.
+assert_eq_size!(usize, u64);
 
 /// Prefix used for writing delivery blobs. Should be prepended to the Merkle root of the blob.
 pub const DELIVERY_PATH_PREFIX: &'static str = "v1-";
@@ -57,6 +64,24 @@ pub fn generate_to(
     }
 }
 
+/// Returns the decompressed size of `delivery_blob`, delivery blob type is auto detected.
+pub fn decompressed_size(delivery_blob: &[u8]) -> Result<u64, DecompressError> {
+    let header = DeliveryBlobHeader::parse(delivery_blob)?.ok_or(DecompressError::NeedMoreData)?;
+    match header.delivery_type {
+        DeliveryBlobType::Type1 => Type1Blob::decompressed_size(delivery_blob),
+        _ => Err(DecompressError::DeliveryBlob(DeliveryBlobError::InvalidType)),
+    }
+}
+
+/// Decompress a delivery blob in `delivery_blob`, delivery blob type is auto detected.
+pub fn decompress(delivery_blob: &[u8]) -> Result<Vec<u8>, DecompressError> {
+    let header = DeliveryBlobHeader::parse(delivery_blob)?.ok_or(DecompressError::NeedMoreData)?;
+    match header.delivery_type {
+        DeliveryBlobType::Type1 => Type1Blob::decompress(delivery_blob),
+        _ => Err(DecompressError::DeliveryBlob(DeliveryBlobError::InvalidType)),
+    }
+}
+
 /// Obtain the file path to use when writing `blob_name` as a delivery blob.
 pub fn delivery_blob_path(blob_name: impl std::fmt::Display) -> String {
     format!("{}{}", DELIVERY_PATH_PREFIX, blob_name)
@@ -72,6 +97,18 @@ pub enum DeliveryBlobError {
 
     #[error("Integrity/checksum or other validity checks failed.")]
     IntegrityError,
+}
+
+#[derive(Debug, Error)]
+pub enum DecompressError {
+    #[error("DeliveryBlob error")]
+    DeliveryBlob(#[from] DeliveryBlobError),
+
+    #[error("ChunkedArchive error")]
+    ChunkedArchive(#[from] compression::ChunkedArchiveError),
+
+    #[error("Need more data")]
+    NeedMoreData,
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -93,6 +130,20 @@ impl From<DeliveryBlobError> for zx::Status {
 pub struct DeliveryBlobHeader {
     pub delivery_type: DeliveryBlobType,
     pub header_length: u32,
+}
+
+impl DeliveryBlobHeader {
+    /// Attempt to parse `data` as a delivery blob. On success, returns validated blob header.
+    /// **WARNING**: This function does not verify that the payload is complete. Only the full
+    /// header of a delivery blob are required to be present in `data`.
+    pub fn parse(data: &[u8]) -> Result<Option<DeliveryBlobHeader>, DeliveryBlobError> {
+        let Some((serialized_header, _metadata_and_payload)) =
+            Ref::<_, format::SerializedHeader>::new_unaligned_from_prefix(data)
+        else {
+            return Ok(None);
+        };
+        serialized_header.decode().map(Some)
+    }
 }
 
 /// Type of delivery blob.
@@ -221,6 +272,35 @@ impl Type1Blob {
         };
         serialized_header.decode().map(|metadata| Some((metadata, payload)))
     }
+
+    /// Return the decompressed size of the blob without decompressing it.
+    pub fn decompressed_size(delivery_blob: &[u8]) -> Result<u64, DecompressError> {
+        let (header, payload) = Self::parse(delivery_blob)?.ok_or(DecompressError::NeedMoreData)?;
+        if !header.is_compressed {
+            return Ok(header.payload_length as u64);
+        }
+
+        let (seek_table, _chunk_data) =
+            compression::decode_archive(payload, header.payload_length)?
+                .ok_or(DecompressError::NeedMoreData)?;
+        Ok(seek_table.into_iter().map(|chunk| chunk.decompressed_range.len() as u64).sum())
+    }
+
+    /// Decompress a Type 1 delivery blob in `delivery_blob`.
+    pub fn decompress(delivery_blob: &[u8]) -> Result<Vec<u8>, DecompressError> {
+        let (header, payload) = Self::parse(delivery_blob)?.ok_or(DecompressError::NeedMoreData)?;
+        if !header.is_compressed {
+            return Ok(payload.into());
+        }
+
+        let (seek_table, chunk_data) = compression::decode_archive(payload, header.payload_length)?
+            .ok_or(DecompressError::NeedMoreData)?;
+        let mut decompressor = ChunkedDecompressor::new(seek_table)?;
+        let mut decompressed = vec![];
+        let mut chunk_callback = |chunk: &[u8]| decompressed.extend_from_slice(chunk);
+        decompressor.update(chunk_data, &mut chunk_callback)?;
+        Ok(decompressed)
+    }
 }
 
 #[cfg(test)]
@@ -238,6 +318,7 @@ mod tests {
         let (header, _) = Type1Blob::parse(&delivery_blob).unwrap().unwrap();
         assert!(!header.is_compressed);
         assert_eq!(header.payload_length, data.len());
+        assert_eq!(Type1Blob::decompress(&delivery_blob).unwrap(), data);
     }
 
     #[test]
@@ -251,6 +332,7 @@ mod tests {
         // Payload is not very compressible, so we expect it to be larger than the original.
         assert!(header.is_compressed);
         assert!(header.payload_length > data.len());
+        assert_eq!(Type1Blob::decompress(&delivery_blob).unwrap(), data);
     }
 
     #[test]
@@ -264,6 +346,7 @@ mod tests {
         let (header, _) = Type1Blob::parse(&delivery_blob).unwrap().unwrap();
         assert!(!header.is_compressed);
         assert_eq!(header.payload_length, data.len());
+        assert_eq!(Type1Blob::decompress(&delivery_blob).unwrap(), data);
     }
 
     #[test]
@@ -274,5 +357,6 @@ mod tests {
         // Payload should be compressed and smaller than the original input.
         assert!(header.is_compressed);
         assert!(header.payload_length < data.len());
+        assert_eq!(Type1Blob::decompress(&delivery_blob).unwrap(), data);
     }
 }

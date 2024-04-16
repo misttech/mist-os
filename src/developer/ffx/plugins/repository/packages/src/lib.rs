@@ -307,18 +307,13 @@ async fn extract_archive_impl(cmd: ExtractArchiveSubCommand) -> Result<()> {
     let fetch_blob = |hash: Hash| {
         let repo = &repo;
         async move {
-            let mut blob_resource = repo
-                .fetch_blob(&hash.to_string())
-                .await
-                .with_context(|| format!("fetching blob {hash}"))?;
-            let mut buf = vec![];
-            blob_resource
-                .read_to_end(&mut buf)
+            let blob = repo
+                .read_blob_decompressed(&hash)
                 .await
                 .with_context(|| format!("reading blob {hash}"))?;
             Ok::<(u64, Box<dyn Read>), anyhow::Error>((
-                blob_resource.total_len(),
-                Box::new(Cursor::new(buf)),
+                blob.len().try_into()?,
+                Box::new(Cursor::new(blob)),
             ))
         }
     };
@@ -425,7 +420,7 @@ mod test {
         )
         .await;
 
-        let blobs_path = tmp.path().join("repository/blobs");
+        let blobs_path = tmp.path().join("repository/blobs/1");
 
         let pkg1_hash = &PKG1_HASH[..MAX_HASH];
         let pkg1_path = blobs_path.join(PKG1_HASH);
@@ -465,7 +460,7 @@ mod test {
         )
         .await;
 
-        let blobs_path = tmp.path().join("repository/blobs");
+        let blobs_path = tmp.path().join("repository/blobs/1");
 
         let pkg1_hash = &PKG1_HASH;
         let pkg1_path = blobs_path.join(PKG1_HASH);
@@ -505,7 +500,7 @@ mod test {
         )
         .await;
 
-        let blobs_path = tmp.path().join("repository/blobs");
+        let blobs_path = tmp.path().join("repository/blobs/1");
 
         let pkg1_hash = &PKG1_HASH[..MAX_HASH];
         let pkg1_path = blobs_path.join(PKG1_HASH);
@@ -546,7 +541,7 @@ mod test {
         )
         .await;
 
-        let blobs_path = tmp.path().join("repository/blobs");
+        let blobs_path = tmp.path().join("repository/blobs/1");
 
         let pkg1_hash = &PKG1_HASH[..MAX_HASH];
         let pkg1_path = blobs_path.join(PKG1_HASH);
@@ -599,7 +594,7 @@ mod test {
         )
         .await;
 
-        let blobs_path = tmp.path().join("repository/blobs");
+        let blobs_path = tmp.path().join("repository/blobs/1");
 
         let pkg1_hash = &PKG1_HASH;
         let pkg1_path = blobs_path.join(PKG1_HASH);
@@ -652,7 +647,7 @@ mod test {
         )
         .await;
 
-        let blobs_path = tmp.path().join("repository/blobs");
+        let blobs_path = tmp.path().join("repository/blobs/1");
 
         let pkg1_hash = &PKG1_HASH[..MAX_HASH];
         let pkg1_path = blobs_path.join(PKG1_HASH);

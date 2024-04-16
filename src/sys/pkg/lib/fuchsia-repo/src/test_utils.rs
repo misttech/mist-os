@@ -288,26 +288,6 @@ pub async fn make_repo_dir(metadata_dir: &Path, blobs_dir: &Path) {
     let build_tmp = tempfile::tempdir().unwrap();
     let build_path = build_tmp.path();
 
-    let packages = ["package1", "package2"].map(|name| {
-        let (meta_far_path, manifest) = make_package_manifest(name, build_path, Vec::new());
-
-        // Copy the package blobs into the blobs directory.
-        let mut meta_far_merkle = None;
-        for blob in manifest.blobs() {
-            let merkle = blob.merkle.to_string();
-
-            if blob.path == "meta/" {
-                meta_far_merkle = Some(merkle.clone());
-            }
-
-            let mut src = std::fs::File::open(&blob.source_path).unwrap();
-            let mut dst = std::fs::File::create(blobs_dir.join(merkle)).unwrap();
-            std::io::copy(&mut src, &mut dst).unwrap();
-        }
-
-        (name, meta_far_path, meta_far_merkle.unwrap())
-    });
-
     // Write TUF metadata
     let repo =
         FileSystemRepositoryBuilder::<Pouf1>::new(metadata_dir).targets_prefix("targets").build();
@@ -327,12 +307,39 @@ pub async fn make_repo_dir(metadata_dir: &Path, blobs_dir: &Path) {
         .unwrap();
 
     // Add all the packages to the metadata.
-    for (name, meta_far_path, meta_far_merkle) in packages {
+    for name in ["package1", "package2"] {
+        let (meta_far_path, manifest) = make_package_manifest(name, build_path, Vec::new());
+
+        // Copy the package blobs into the blobs directory.
+        let mut meta_far_merkle = None;
+        for blob in manifest.blobs() {
+            let merkle = blob.merkle.to_string();
+
+            if blob.path == "meta/" {
+                meta_far_merkle = Some(merkle.clone());
+            }
+
+            let mut src = std::fs::File::open(&blob.source_path).unwrap();
+            let mut dst = std::fs::File::create(blobs_dir.join(&merkle)).unwrap();
+            std::io::copy(&mut src, &mut dst).unwrap();
+
+            let blob_type = delivery_blob::DeliveryBlobType::Type1;
+            crate::repository::file_system::generate_delivery_blob(
+                blob.source_path.as_str().into(),
+                &Utf8PathBuf::from_path_buf(
+                    blobs_dir.join(format!("{}/{merkle}", u32::from(blob_type))),
+                )
+                .unwrap(),
+                blob_type,
+            )
+            .await
+            .unwrap();
+        }
         builder = builder
             .add_target_with_custom(
                 TargetPath::new(format!("{name}/0")).unwrap(),
                 AllowStdIo::new(File::open(meta_far_path).unwrap()),
-                hashmap! { "merkle".into() => meta_far_merkle.into() },
+                hashmap! { "merkle".into() => meta_far_merkle.unwrap().into() },
             )
             .await
             .unwrap();

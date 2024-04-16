@@ -6,6 +6,7 @@ use {
     crate::{range::Range, resource::Resource},
     anyhow::Result,
     camino::{Utf8Path, Utf8PathBuf},
+    delivery_blob::DeliveryBlobType,
     fuchsia_merkle::Hash,
     futures::{future::BoxFuture, stream::BoxStream},
     serde::{Deserialize, Serialize},
@@ -17,7 +18,7 @@ use {
     url::ParseError,
 };
 
-mod file_system;
+pub(crate) mod file_system;
 mod pm;
 
 #[cfg(test)]
@@ -110,14 +111,16 @@ pub trait RepoProvider: TufRepositoryProvider<Pouf1> + Debug + Send + Sync {
         Err(anyhow::anyhow!("Watching not supported for this repo type"))
     }
 
-    /// Get the length of a blob in this repository.
-    fn blob_len<'a>(&'a self, path: &str) -> BoxFuture<'a, anyhow::Result<u64>>;
-
     /// Get the modification time of a blob in this repository if available.
     fn blob_modification_time<'a>(
         &'a self,
         path: &str,
     ) -> BoxFuture<'a, anyhow::Result<Option<SystemTime>>>;
+
+    /// Get the type of delivery blobs in this repository.
+    fn blob_type(&self) -> DeliveryBlobType {
+        DeliveryBlobType::Type1
+    }
 }
 
 pub trait RepoStorage: TufRepositoryStorage<Pouf1> + Send + Sync {
@@ -173,17 +176,17 @@ macro_rules! impl_provider {
                 (**self).watch()
             }
 
-            /// Get the length of a blob in this repository.
-            fn blob_len<'a>(&'a self, path: &str) -> BoxFuture<'a, anyhow::Result<u64>> {
-                (**self).blob_len(path)
-            }
-
             /// Get the modification time of a blob in this repository if available.
             fn blob_modification_time<'a>(
                 &'a self,
                 path: &str,
             ) -> BoxFuture<'a, anyhow::Result<Option<SystemTime>>> {
                 (**self).blob_modification_time(path)
+            }
+
+            /// Get the type of delivery blobs in this repository.
+            fn blob_type(&self) -> DeliveryBlobType {
+                (**self).blob_type()
             }
         }
     };

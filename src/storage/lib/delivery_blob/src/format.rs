@@ -11,7 +11,7 @@
 use {
     bitflags::bitflags,
     crc::Hasher32 as _,
-    static_assertions::{assert_eq_size, const_assert_eq},
+    static_assertions::const_assert_eq,
     zerocopy::{
         byteorder::{LE, U32, U64},
         AsBytes, FromBytes, FromZeros, NoCell, Unaligned,
@@ -19,9 +19,6 @@ use {
 };
 
 use crate::{DeliveryBlobError, DeliveryBlobHeader, DeliveryBlobType, Type1Blob};
-
-// This library assumes usize is large enough to hold a u64.
-assert_eq_size!(usize, u64);
 
 /// Delivery blob magic number (0xfc1ab10b or "Fuchsia Blob" in big-endian).
 const DELIVERY_BLOB_MAGIC: [u8; 4] = [0xfc, 0x1a, 0xb1, 0x0b];
@@ -55,7 +52,7 @@ impl From<&Type1Blob> for SerializedType1Flags {
 /// Serialized header of an RFC 0207 compliant delivery blob.
 #[derive(AsBytes, FromZeros, FromBytes, NoCell, Unaligned, Clone, Copy, Debug)]
 #[repr(C)]
-struct SerializedHeader {
+pub(crate) struct SerializedHeader {
     magic: [u8; 4],
     delivery_type: U32<LE>,
     header_length: U32<LE>,

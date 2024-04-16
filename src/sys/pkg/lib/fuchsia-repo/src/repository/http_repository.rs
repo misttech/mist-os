@@ -202,14 +202,6 @@ where
         self.fetch_from(&self.blob_repo_url, resource_path, range)
     }
 
-    fn blob_len<'a>(&'a self, path: &str) -> BoxFuture<'a, Result<u64>> {
-        // FIXME(https://fxbug.dev/42180702): It may be more efficient to try to make a HEAD request and
-        // see if that includes the content length before falling back to us requesting the blob and
-        // dropping the stream.
-        let fut = self.fetch_blob_range(path, Range::Full);
-        async move { Ok(fut.await?.total_len()) }.boxed()
-    }
-
     fn blob_modification_time<'a>(
         &'a self,
         _path: &str,

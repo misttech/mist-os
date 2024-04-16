@@ -250,13 +250,6 @@ where
         self.get(&self.blob_repo_url, resource_path, range)
     }
 
-    fn blob_len<'a>(&'a self, path: &str) -> BoxFuture<'a, Result<u64, anyhow::Error>> {
-        // FIXME(https://fxbug.dev/42181387): The gcs library does not expose a more efficient API for
-        // determining the blob size.
-        let fut = self.fetch_blob_range(path, Range::Full);
-        async move { Ok(fut.await?.total_len()) }.boxed()
-    }
-
     fn blob_modification_time<'a>(
         &'a self,
         _path: &str,

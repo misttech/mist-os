@@ -312,15 +312,6 @@ impl RepoProvider for FileSystemRepository {
         Ok(WatchStream { _watcher: watcher, receiver }.boxed())
     }
 
-    fn blob_len<'a>(&'a self, path: &str) -> BoxFuture<'a, Result<u64>> {
-        let file_path = sanitize_path(&self.blob_repo_path, path);
-        async move {
-            let file_path = file_path?;
-            Ok(fs::metadata(&file_path)?.len())
-        }
-        .boxed()
-    }
-
     fn blob_modification_time<'a>(
         &'a self,
         path: &str,
@@ -331,6 +322,10 @@ impl RepoProvider for FileSystemRepository {
             Ok(Some(fs::metadata(&file_path)?.modified()?))
         }
         .boxed()
+    }
+
+    fn blob_type(&self) -> DeliveryBlobType {
+        self.delivery_blob_type
     }
 }
 
@@ -551,7 +546,7 @@ async fn copy_blob(src: &Utf8Path, dst: &Utf8Path) -> Result<()> {
     set_blob_read_only(dst).await
 }
 
-async fn generate_delivery_blob(
+pub(crate) async fn generate_delivery_blob(
     src: &Utf8Path,
     dst: &Utf8Path,
     blob_type: DeliveryBlobType,

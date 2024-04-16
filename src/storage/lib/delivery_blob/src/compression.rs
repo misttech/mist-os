@@ -10,7 +10,6 @@ use {
     crc::Hasher32,
     itertools::Itertools,
     rayon::prelude::*,
-    static_assertions::assert_eq_size,
     std::ops::Range,
     thiserror::Error,
     zerocopy::{
@@ -18,8 +17,6 @@ use {
         AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned,
     },
 };
-
-assert_eq_size!(usize, u64);
 
 #[derive(Debug, Error)]
 pub enum ChunkedArchiveError {

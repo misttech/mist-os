@@ -186,7 +186,8 @@ pub async fn repo_package_manifest_list(
                 blobs_dir.as_std_path(),
                 package.hash,
                 manifests_dir.as_std_path(),
-            )?;
+            )
+            .context("creating package manifest")?;
 
             package_manifest
                 .write_with_relative_paths(&package_manifest_path)
@@ -1396,10 +1397,10 @@ mod tests {
             pb_client.list_packages().await.unwrap().sort(),
         );
 
-        for entry in std::fs::read_dir(&pb_blobs_dir).unwrap() {
+        for entry in std::fs::read_dir(&pb_blobs_dir.join("1")).unwrap() {
             let entry = entry.unwrap();
             let blob = entry.file_name().into_string().unwrap();
-            let repo_blob_path = repo_dir.join("repository").join("blobs").join(blob);
+            let repo_blob_path = repo_dir.join("repository/blobs/1").join(blob);
 
             assert_eq!(
                 std::fs::read(entry.path()).unwrap(),

@@ -165,6 +165,45 @@ where
         self.tuf_client.remote_repo().fetch_blob_range(path, range).await
     }
 
+    pub fn delivery_blob_path(&self, hash: &Hash) -> String {
+        format!("{}/{hash}", u32::from(self.blob_type()))
+    }
+
+    /// Return a Vec of the blob decompressed.
+    pub async fn read_blob_decompressed(&self, hash: &Hash) -> Result<Vec<u8>> {
+        let path = self.delivery_blob_path(hash);
+        let mut delivery_blob = vec![];
+        self.fetch_blob(&path)
+            .await
+            .with_context(|| format!("fetching blob {path}"))?
+            .read_to_end(&mut delivery_blob)
+            .await
+            .with_context(|| format!("reading blob {path}"))?;
+        delivery_blob::decompress(&delivery_blob)
+            .with_context(|| format!("decompressing blob {path}"))
+    }
+
+    async fn blob_decompressed_size(&self, hash: &Hash) -> Result<u64> {
+        let path = self.delivery_blob_path(hash);
+        let mut delivery_blob = vec![];
+        let mut blob_resource =
+            self.fetch_blob(&path).await.with_context(|| format!("fetching blob {path}"))?;
+
+        while let Some(chunk) = blob_resource.stream.try_next().await? {
+            delivery_blob.extend_from_slice(&chunk);
+            match delivery_blob::decompressed_size(&delivery_blob) {
+                Ok(len) => {
+                    return Ok(len);
+                }
+                Err(delivery_blob::DecompressError::NeedMoreData) => {}
+                Err(e) => {
+                    return Err(e).with_context(|| format!("parsing delivery blob {path}"));
+                }
+            }
+        }
+        Err(anyhow!("blob {path} too small"))
+    }
+
     /// Return the target description for a TUF target path.
     pub async fn get_target_description(
         &self,
@@ -300,14 +339,8 @@ where
     ) -> BoxFuture<'a, Result<Vec<PackageEntry>>> {
         async move {
             // Read the meta.far.
-            let hash_str = hash.to_string();
-            let mut meta_far_bytes = vec![];
-            self.fetch_blob(&hash_str)
-                .await
-                .with_context(|| format!("fetching blob {hash}"))?
-                .read_to_end(&mut meta_far_bytes)
-                .await
-                .with_context(|| format!("reading blob {hash}"))?;
+            let meta_far_bytes =
+                self.read_blob_decompressed(hash).await.context("reading meta.far")?;
             let size: u64 = meta_far_bytes.len().try_into()?;
 
             let mut archive =
@@ -317,7 +350,7 @@ where
             let modified = self
                 .tuf_client
                 .remote_repo()
-                .blob_modification_time(&hash_str)
+                .blob_modification_time(&self.delivery_blob_path(hash))
                 .await?
                 .map(|x| -> anyhow::Result<u64> {
                     Ok(x.duration_since(SystemTime::UNIX_EPOCH)?.as_secs())
@@ -351,17 +384,12 @@ where
                         .contents()
                         .iter()
                         .map(|(name, hash)| async move {
-                            let hash_str = hash.to_string();
-                            let blob_size = self
-                                .tuf_client
-                                .remote_repo()
-                                .blob_len(&hash_str)
-                                .await
-                                .with_context(|| format!("fetching length of blob {hash}"))?;
+                            let blob_size =
+                                self.blob_decompressed_size(hash).await.with_context(|| {
+                                    format!("getting decompressed size of blob {hash}")
+                                })?;
                             let modified = self
-                                .tuf_client
-                                .remote_repo()
-                                .blob_modification_time(&hash_str)
+                                .blob_modification_time(&self.delivery_blob_path(hash))
                                 .await?
                                 .map(|x| -> anyhow::Result<u64> {
                                     Ok(x.duration_since(SystemTime::UNIX_EPOCH)?.as_secs())
@@ -508,10 +536,6 @@ where
 
     fn watch(&self) -> Result<BoxStream<'static, ()>> {
         self.tuf_client.remote_repo().watch()
-    }
-
-    fn blob_len<'a>(&'a self, path: &str) -> BoxFuture<'a, Result<u64>> {
-        self.tuf_client.remote_repo().blob_len(path)
     }
 
     fn blob_modification_time<'a>(
@@ -692,8 +716,8 @@ mod tests {
         repo.update().await.unwrap();
 
         // Look up the timestamp for the meta.far for the modified setting.
-        let pkg1_modified = get_modtime(dir.join("repository").join("blobs").join(PKG1_HASH));
-        let pkg2_modified = get_modtime(dir.join("repository").join("blobs").join(PKG2_HASH));
+        let pkg1_modified = get_modtime(dir.join("repository/blobs/1").join(PKG1_HASH));
+        let pkg2_modified = get_modtime(dir.join("repository/blobs/1").join(PKG2_HASH));
 
         let mut packages = repo.list_packages().await.unwrap();
 
@@ -772,7 +796,7 @@ mod tests {
         repo.update().await.unwrap();
 
         // Look up the timestamps for the blobs.
-        let blob_dir = dir.join("repository").join("blobs");
+        let blob_dir = dir.join("repository/blobs/1");
         let meta_far_modified = get_modtime(blob_dir.join(PKG1_HASH));
 
         let bin_modified = get_modtime(blob_dir.join(PKG1_BIN_HASH));

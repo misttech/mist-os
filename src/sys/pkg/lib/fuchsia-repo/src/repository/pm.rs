@@ -144,15 +144,15 @@ impl RepoProvider for PmRepository {
         self.repo.watch()
     }
 
-    fn blob_len<'a>(&'a self, path: &str) -> BoxFuture<'a, Result<u64>> {
-        self.repo.blob_len(path)
-    }
-
     fn blob_modification_time<'a>(
         &'a self,
         path: &str,
     ) -> BoxFuture<'a, Result<Option<SystemTime>>> {
         self.repo.blob_modification_time(path)
+    }
+
+    fn blob_type(&self) -> DeliveryBlobType {
+        self.repo.blob_type()
     }
 }
 
