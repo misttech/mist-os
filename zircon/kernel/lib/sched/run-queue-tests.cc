@@ -563,4 +563,48 @@ TEST(RunQueueTests, HybridWorkWithBandwidthForFlexible) {
   threadA.Tick(Duration{2});
 }
 
+TEST(RunQueueTests, ThreadStateManagement) {
+  TestThread threadA{{Period(5), Capacity(1)}, Start(0)};
+  TestThread threadB{{Period(10), Capacity(2)}, Start(0)};
+
+  EXPECT_EQ(sched::ThreadState::kInitial, threadA.state());
+  EXPECT_EQ(sched::ThreadState::kInitial, threadB.state());
+
+  sched::RunQueue<TestThread> queue;
+  queue.Queue(threadA, Start(0));
+  queue.Queue(threadB, Start(0));
+
+  EXPECT_EQ(sched::ThreadState::kReady, threadA.state());
+  EXPECT_EQ(sched::ThreadState::kReady, threadB.state());
+
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(0));
+    EXPECT_EQ(&threadA, next);
+    EXPECT_EQ(Time{1}, preemption);
+    threadA.Tick(Duration{1});
+  }
+
+  EXPECT_EQ(sched::ThreadState::kRunning, threadA.state());
+  EXPECT_EQ(sched::ThreadState::kReady, threadB.state());
+
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(1));
+    EXPECT_EQ(&threadB, next);
+    EXPECT_EQ(Time{3}, preemption);
+    threadB.Tick(Duration{2});
+  }
+
+  EXPECT_EQ(sched::ThreadState::kReady, threadA.state());
+  EXPECT_EQ(sched::ThreadState::kRunning, threadB.state());
+
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(3));
+    EXPECT_EQ(nullptr, next);
+    EXPECT_EQ(Time{5}, preemption);
+  }
+
+  EXPECT_EQ(sched::ThreadState::kReady, threadA.state());
+  EXPECT_EQ(sched::ThreadState::kReady, threadB.state());
+}
+
 }  // namespace

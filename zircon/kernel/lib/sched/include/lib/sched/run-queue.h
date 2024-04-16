@@ -98,12 +98,14 @@ class RunQueue {
       thread.Reactivate(now);
     }
     ready_.insert(&thread);
+    thread.set_state(ThreadState::kReady);
   }
 
   // Dequeues the thread from the run queue (provided the thread was already
   // contained).
   void Dequeue(Thread& thread) {
     ZX_DEBUG_ASSERT(thread.IsQueued());
+    ZX_DEBUG_ASSERT(thread.state() == ThreadState::kReady);
     ready_.erase(thread);
     ready_firm_utilization_ -= thread.firm_utilization();
     ready_flexible_demand_ -= thread.flexible_weight();
@@ -151,6 +153,7 @@ class RunQueue {
     } else {
       if (next) {
         Dequeue(*next);
+        next->set_state(ThreadState::kRunning);
       }
       if (current_) {
         Queue(*current_, now);

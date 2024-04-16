@@ -8,12 +8,18 @@
 
 #include <gtest/gtest.h>
 
+#include "lib/sched/thread-base.h"
 #include "test-thread.h"
 
 namespace {
 
 using Duration = sched::Duration;
 using Time = sched::Time;
+
+TEST(ThreadBaseTests, InitialState) {
+  TestThread thread{{Period(10), Capacity(5)}, Start(0)};
+  EXPECT_EQ(sched::ThreadState::kInitial, thread.state());
+}
 
 TEST(ThreadBaseTests, Start) {
   {

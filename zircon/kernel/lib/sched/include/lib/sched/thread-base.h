@@ -57,6 +57,18 @@ struct BandwidthParameters {
   FlexibleWeight flexible_weight;
 };
 
+// The scheduling state of a thread.
+enum class ThreadState : uint8_t {
+  // The thread is in its initialed state and not yet schedulable.
+  kInitial,
+
+  // The thread is schedulable and not yet running.
+  kReady,
+
+  // The thread is currently running (or selected to be run).
+  kRunning,
+};
+
 // The base thread class from which we expect schedulable thread types to
 // inherit (following the 'Curiously Recurring Template Pattern'). This class
 // manages the scheduler-related thread state of interest to this library.
@@ -95,6 +107,12 @@ class ThreadBase {
   // period.
   constexpr Duration time_slice_used() const { return time_slice_used_; }
 
+  // Returns the scheduling state of the thread.
+  constexpr ThreadState state() const { return state_; }
+
+  // Sets the scheduling state of the thread.
+  void set_state(ThreadState state) { state_ = state; }
+
   // Whether the thread is active at the provided time (i.e., whether that time
   // falls within the current activation period).
   constexpr bool IsActive(Time now) const { return start() <= now && now < finish(); }
@@ -126,6 +144,8 @@ class ThreadBase {
   FlexibleWeight flexible_weight_{0};
   Time start_{Time::Min()};
   Duration time_slice_used_{0};
+
+  ThreadState state_ = ThreadState::kInitial;
 
   // Encapsulates the state specific to the run queue.
   struct RunQueueState {
