@@ -33,8 +33,7 @@ import (
 )
 
 const (
-	gcemClientBinary  = "./gcem_client"
-	gceSerialEndpoint = "ssh-serialport.googleapis.com:9600"
+	gcemClientBinary = "./gcem_client"
 )
 
 // gceSerial is a ReadWriteCloser that talks to a GCE serial port via SSH.
@@ -306,6 +305,12 @@ func (g *GCE) provisionSSHKey(ctx context.Context) error {
 	return nil
 }
 
+func getSerialEndpoint(zone string) string {
+	zoneParts := strings.Split(zone, "-")
+	region := strings.ToLower(strings.Join(zoneParts[:len(zoneParts)-1], "-"))
+	return fmt.Sprintf("%s-ssh-serialport.googleapis.com:9600", region)
+}
+
 func (g *GCE) connectToSerial() error {
 	username := fmt.Sprintf(
 		"%s.%s.%s.%s.%s",
@@ -315,7 +320,7 @@ func (g *GCE) connectToSerial() error {
 		g.currentUser,
 		"replay-from=0",
 	)
-	serial, err := newGCESerial(g.opts.SSHKey, username, gceSerialEndpoint)
+	serial, err := newGCESerial(g.opts.SSHKey, username, getSerialEndpoint(g.config.Zone))
 	g.serial = serial
 	return err
 }
