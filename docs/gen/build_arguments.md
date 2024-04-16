@@ -8809,13 +8809,13 @@ TODO(https://fxbug.dev/42146493) - remove once external sync FD extensions fully
 
 **Current value (from the default):** `false`
 
-From //third_party/mesa/src/intel/vulkan/BUILD.gn:27
+From //third_party/mesa/src/intel/vulkan/BUILD.gn:29
 
 ### anv_enable_raytracing
 
 **Current value (from the default):** `false`
 
-From //third_party/mesa/src/intel/vulkan/BUILD.gn:28
+From //third_party/mesa/src/intel/vulkan/BUILD.gn:30
 
 ### anv_use_max_ram
 
@@ -8823,7 +8823,7 @@ Give maximum possible memory to Vulkan heap
 
 **Current value (from the default):** `false`
 
-From //third_party/mesa/src/intel/vulkan/BUILD.gn:31
+From //third_party/mesa/src/intel/vulkan/BUILD.gn:33
 
 ### build_libvulkan_goldfish
 
