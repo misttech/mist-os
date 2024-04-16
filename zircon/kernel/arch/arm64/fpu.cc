@@ -81,12 +81,12 @@ static void arm64_fpu_save_regs(Thread* t) {
   // These are 32-bit values, but the msr instruction always uses a
   // 64-bit destination register.
   uint64_t fpcr, fpsr;
-  __asm__(
+  __asm__ volatile(
       ".arch_extension fp\n"
       "mrs %0, fpcr\n"
       ".arch_extension nofp\n"
       : "=r"(fpcr));
-  __asm__(
+  __asm__ volatile(
       ".arch_extension fp\n"
       "mrs %0, fpsr\n"
       ".arch_extension nofp\n"
