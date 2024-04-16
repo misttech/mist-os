@@ -50,6 +50,12 @@ async fn main() {
     }
 
     dhcp_server
+        .set_option(&fnet_dhcp::Option_::Router(vec![constants::SERVER_STATIC_IP]))
+        .await
+        .expect("failed to call fnet_dhcp::Server::set_option")
+        .expect("failed to set option");
+
+    dhcp_server
         .start_serving()
         .await
         .expect("failed to call fnet_dhcp::Server::start")
