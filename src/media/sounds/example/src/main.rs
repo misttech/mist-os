@@ -109,35 +109,13 @@ async fn main() -> Result<()> {
 
 /// Creates a file channel from a resource file.
 async fn resource_file(name: &str) -> Result<fidl::endpoints::ClientEnd<fio::FileMarker>> {
-    let open = |directory| {
-        use fidl::endpoints::Proxy as _;
-
-        let proxy = fuchsia_fs::file::open_in_namespace(
-            &format!("{directory}/{name}"),
-            fio::OpenFlags::RIGHT_READABLE,
-        )?;
-
-        Ok::<_, anyhow::Error>(proxy.into_channel().unwrap())
-    };
-
-    // We try two paths here, because normal components see their package data resources in
-    // /pkg/data and shell tools see them in /pkgfs/packages/<pkg>>/0/data.
-    let pkg = open("/pkg/data")?;
-    let pkgfs = open("/pkgfs/packages/soundplayer_example/0/data")?;
-
-    let file = futures::select! {
-        signals = pkg.on_closed().fuse() => {
-            let _: zx::Signals = signals?;
-            pkgfs
-        }
-        signals = pkgfs.on_closed().fuse() => {
-            let _: zx::Signals = signals?;
-            pkg
-        }
-    }
-    .into_zx_channel();
-
-    Ok::<_, anyhow::Error>(file.into())
+    use fidl::endpoints::Proxy as _;
+    let path = format!("/pkg/data/{name}");
+    let file = fuchsia_fs::file::open_in_namespace(&path, fio::OpenFlags::RIGHT_READABLE)
+        .with_context(|| format!("opening resource file: {path}"))?
+        .into_client_end()
+        .unwrap();
+    Ok(file)
 }
 
 /// Creates a file channel from a file name.
