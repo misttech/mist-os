@@ -4,10 +4,51 @@
 
 use anyhow::{anyhow, Result};
 use errors::ffx_bail;
-use ffx_core::ffx_plugin;
+use ffx_config::EnvironmentContext;
 use ffx_emulator_commands::get_engine_by_name;
 use ffx_emulator_config::EngineConsoleType;
 use ffx_emulator_console_args::ConsoleCommand;
+use fho::{FfxMain, FfxTool, SimpleWriter};
+
+/// Sub-sub tool for `emu console`
+#[derive(FfxTool)]
+pub struct EmuConsoleTool {
+    #[command]
+    cmd: ConsoleCommand,
+    _context: EnvironmentContext,
+}
+
+// Since this is a part of a legacy plugin, add
+// the legacy entry points. If and when this
+// is migrated to a subcommand, this macro can be
+// removed.
+fho::embedded_plugin!(EmuConsoleTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for EmuConsoleTool {
+    type Writer = SimpleWriter;
+
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        let console = match get_console_type(&self.cmd) {
+            Ok(c) => c,
+            Err(e) => ffx_bail!("{:?}", e),
+        };
+        let mut name: Option<String> = self.cmd.name.clone();
+        match get_engine_by_name(&mut name).await {
+            Ok(Some(engine)) => engine.attach(console),
+            Ok(None) => {
+                if let Some(name) = self.cmd.name {
+                    println!("Instance {name} not found.");
+                } else {
+                    println!("No instances found");
+                }
+
+                Ok(())
+            }
+            Err(e) => ffx_bail!("{:?}", e),
+        }
+    }
+}
 
 fn get_console_type(cmd: &ConsoleCommand) -> Result<EngineConsoleType> {
     let mut result = cmd.console_type;
@@ -36,27 +77,6 @@ fn get_console_type(cmd: &ConsoleCommand) -> Result<EngineConsoleType> {
         result = EngineConsoleType::Serial;
     }
     Ok(result)
-}
-
-#[ffx_plugin("emu.console.enabled")]
-pub async fn console(mut cmd: ConsoleCommand) -> fho::Result<()> {
-    let console = match get_console_type(&cmd) {
-        Ok(c) => c,
-        Err(e) => ffx_bail!("{:?}", e),
-    };
-    match get_engine_by_name(&mut cmd.name).await {
-        Ok(Some(engine)) => engine.attach(console),
-        Ok(None) => {
-            if let Some(name) = cmd.name {
-                println!("Instance {name} not found.");
-            } else {
-                println!("No instances found");
-            }
-
-            Ok(())
-        }
-        Err(e) => ffx_bail!("{:?}", e),
-    }
 }
 
 #[cfg(test)]
