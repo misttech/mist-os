@@ -2,49 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, AsHandleRef};
-use futures::task::AtomicWaker;
+use fuchsia_zircon as zx;
 use rustc_hash::FxHashMap as HashMap;
-use std::{
-    ops::Deref,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-    },
-    task::{Context, Poll},
-    u64, usize,
-};
+use std::{ops::Deref, sync::Arc, u64, usize};
 
 use super::common::EHandle;
-
-/// Clears `signal` on `atomic_signals`, then schedules a packet to wake `task` when the object
-/// referred to by `handle` asserts `signal` or `OBJECT_PEER_CLOSED`.  If `atomic_signals` contains
-/// `OBJECT_PEER_CLOSED` already, wakes `task` immediately. To avoid unnecessary packets, does
-/// nothing if `signal` was already cleared.  If a packet is scheduled, the `OBJECT_PEER_CLOSED`
-/// signal is _always_ included as a signal of interest.
-pub fn need_signal_or_peer_closed(
-    cx: &mut Context<'_>,
-    task: &AtomicWaker,
-    atomic_signals: &AtomicU32,
-    signal: zx::Signals,
-    handle: zx::HandleRef<'_>,
-    port: &zx::Port,
-    key: u64,
-) -> Poll<Result<(), zx::Status>> {
-    task.register(cx.waker());
-    let old =
-        zx::Signals::from_bits_truncate(atomic_signals.fetch_and(!signal.bits(), Ordering::SeqCst));
-    if old.contains(zx::Signals::OBJECT_PEER_CLOSED) {
-        // We don't want to return an error here because even though the peer has closed, the
-        // object could still have queued messages that can be read.
-        Poll::Ready(Ok(()))
-    } else {
-        if old.contains(signal) {
-            schedule_packet(handle, port, key, signal | zx::Signals::OBJECT_PEER_CLOSED)?;
-        }
-        Poll::Pending
-    }
-}
 
 /// A trait for handling the arrival of a packet on a `zx::Port`.
 ///
@@ -97,15 +59,6 @@ impl<T> PacketReceiverMap<T> {
     pub fn contains(&self, key: usize) -> bool {
         self.mapping.contains_key(&key)
     }
-}
-
-pub fn schedule_packet(
-    handle: zx::HandleRef<'_>,
-    port: &zx::Port,
-    key: u64,
-    signals: zx::Signals,
-) -> Result<(), zx::Status> {
-    handle.wait_async_handle(port, key, signals, zx::WaitAsyncOpts::empty())
 }
 
 /// A registration of a `PacketReceiver`.

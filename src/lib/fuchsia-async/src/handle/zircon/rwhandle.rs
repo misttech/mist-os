@@ -8,13 +8,9 @@ use {
         OnSignalsRef,
     },
     fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::task::AtomicWaker,
     std::{
-        sync::{
-            atomic::{AtomicU32, Ordering},
-            Arc,
-        },
-        task::{ready, Context, Poll},
+        sync::{Arc, Mutex},
+        task::{ready, Context, Poll, Waker},
     },
 };
 
@@ -112,10 +108,12 @@ pub trait WritableHandle {
     fn need_writable(&self, cx: &mut Context<'_>) -> Poll<Result<(), zx::Status>>;
 }
 
-struct RWPacketReceiver {
-    signals: AtomicU32,
-    read_task: AtomicWaker,
-    write_task: AtomicWaker,
+struct RWPacketReceiver(Mutex<Inner>);
+
+struct Inner {
+    signals: zx::Signals,
+    read_task: Option<Waker>,
+    write_task: Option<Waker>,
 }
 
 impl PacketReceiver for RWPacketReceiver {
@@ -126,21 +124,34 @@ impl PacketReceiver for RWPacketReceiver {
             return;
         };
 
-        let old =
-            zx::Signals::from_bits_truncate(self.signals.fetch_or(new.bits(), Ordering::SeqCst));
+        // We wake the tasks when the lock isn't held in case the wakers need the same lock.
+        let mut read_task = None;
+        let mut write_task = None;
+        {
+            let mut inner = self.0.lock().unwrap();
+            let old = inner.signals;
+            inner.signals |= new;
 
-        let became_readable = new.contains(OBJECT_READABLE) && !old.contains(OBJECT_READABLE);
-        let became_writable = new.contains(OBJECT_WRITABLE) && !old.contains(OBJECT_WRITABLE);
-        let became_closed = new.contains(OBJECT_PEER_CLOSED) && !old.contains(OBJECT_PEER_CLOSED);
+            let became_readable = new.contains(OBJECT_READABLE) && !old.contains(OBJECT_READABLE);
+            let became_writable = new.contains(OBJECT_WRITABLE) && !old.contains(OBJECT_WRITABLE);
+            let became_closed =
+                new.contains(OBJECT_PEER_CLOSED) && !old.contains(OBJECT_PEER_CLOSED);
 
+            if became_readable || became_closed {
+                read_task = inner.read_task.take();
+            }
+            if became_writable || became_closed {
+                write_task = inner.write_task.take();
+            }
+        }
         // *NOTE*: This is the only safe place to wake wakers.  In any other location, there is a
         // risk that locks are held which might be required when the waker is woken.  It is safe to
         // wake here because this is called from the executor when no locks are held.
-        if became_readable || became_closed {
-            self.read_task.wake();
+        if let Some(read_task) = read_task {
+            read_task.wake();
         }
-        if became_writable || became_closed {
-            self.write_task.wake();
+        if let Some(write_task) = write_task {
+            write_task.wake();
         }
     }
 }
@@ -165,17 +176,17 @@ where
         let ehandle = EHandle::local();
 
         let initial_signals = OBJECT_READABLE | OBJECT_WRITABLE;
-        let receiver = ehandle.register_receiver(Arc::new(RWPacketReceiver {
+        let receiver = ehandle.register_receiver(Arc::new(RWPacketReceiver(Mutex::new(Inner {
             // Optimistically assume that the handle is readable and writable.
             // Reads and writes will be attempted before queueing a packet.
             // This makes handles slightly faster to read/write the first time
             // they're accessed after being created, provided they start off as
             // readable or writable. In return, there will be an extra wasted
             // syscall per read/write if the handle is not readable or writable.
-            signals: AtomicU32::new(initial_signals.bits()),
-            read_task: AtomicWaker::new(),
-            write_task: AtomicWaker::new(),
-        }));
+            signals: initial_signals,
+            read_task: None,
+            write_task: None,
+        }))));
 
         RWHandle { handle, receiver }
     }
@@ -197,8 +208,7 @@ where
 
     /// Returns true if the object received the `OBJECT_PEER_CLOSED` signal.
     pub fn is_closed(&self) -> bool {
-        let signals =
-            zx::Signals::from_bits_truncate(self.receiver().signals.load(Ordering::Relaxed));
+        let signals = self.receiver().0.lock().unwrap().signals;
         if signals.contains(OBJECT_PEER_CLOSED) {
             return true;
         }
@@ -236,18 +246,34 @@ where
     fn need_signal(
         &self,
         cx: &mut Context<'_>,
-        task: &AtomicWaker,
+        for_read: bool,
         signal: zx::Signals,
     ) -> Poll<Result<(), zx::Status>> {
-        crate::runtime::need_signal_or_peer_closed(
-            cx,
-            task,
-            &self.receiver.signals,
-            signal,
-            self.handle.as_handle_ref(),
-            self.receiver.port(),
-            self.receiver.key(),
-        )
+        let mut inner = self.receiver.0.lock().unwrap();
+        let old = inner.signals;
+        if old.contains(zx::Signals::OBJECT_PEER_CLOSED) {
+            // We don't want to return an error here because even though the peer has closed, the
+            // object could still have queued messages that can be read.
+            Poll::Ready(Ok(()))
+        } else {
+            let waker = cx.waker().clone();
+            if for_read {
+                inner.read_task = Some(waker);
+            } else {
+                inner.write_task = Some(waker);
+            }
+            if old.contains(signal) {
+                inner.signals &= !signal;
+                std::mem::drop(inner);
+                self.handle.wait_async_handle(
+                    self.receiver.port(),
+                    self.receiver.key(),
+                    signal | zx::Signals::OBJECT_PEER_CLOSED,
+                    zx::WaitAsyncOpts::empty(),
+                )?;
+            }
+            Poll::Pending
+        }
     }
 }
 
@@ -257,21 +283,20 @@ where
 {
     fn poll_readable(&self, cx: &mut Context<'_>) -> Poll<Result<ReadableState, zx::Status>> {
         loop {
-            let signals =
-                zx::Signals::from_bits_truncate(self.receiver().signals.load(Ordering::SeqCst));
+            let signals = self.receiver().0.lock().unwrap().signals;
             match (signals.contains(OBJECT_READABLE), signals.contains(OBJECT_PEER_CLOSED)) {
                 (true, false) => return Poll::Ready(Ok(ReadableState::Readable)),
                 (false, true) => return Poll::Ready(Ok(ReadableState::Closed)),
                 (true, true) => return Poll::Ready(Ok(ReadableState::ReadableAndClosed)),
                 (false, false) => {
-                    ready!(self.need_signal(cx, &self.receiver.read_task, OBJECT_READABLE)?)
+                    ready!(self.need_signal(cx, true, OBJECT_READABLE)?)
                 }
             }
         }
     }
 
     fn need_readable(&self, cx: &mut Context<'_>) -> Poll<Result<(), zx::Status>> {
-        self.need_signal(cx, &self.receiver.read_task, OBJECT_READABLE)
+        self.need_signal(cx, true, OBJECT_READABLE)
     }
 }
 
@@ -281,20 +306,19 @@ where
 {
     fn poll_writable(&self, cx: &mut Context<'_>) -> Poll<Result<WritableState, zx::Status>> {
         loop {
-            let signals =
-                zx::Signals::from_bits_truncate(self.receiver().signals.load(Ordering::SeqCst));
+            let signals = self.receiver().0.lock().unwrap().signals;
             match (signals.contains(OBJECT_WRITABLE), signals.contains(OBJECT_PEER_CLOSED)) {
                 (_, true) => return Poll::Ready(Ok(WritableState::Closed)),
                 (true, _) => return Poll::Ready(Ok(WritableState::Writable)),
                 (false, false) => {
-                    ready!(self.need_signal(cx, &self.receiver.write_task, OBJECT_WRITABLE)?)
+                    ready!(self.need_signal(cx, false, OBJECT_WRITABLE)?)
                 }
             }
         }
     }
 
     fn need_writable(&self, cx: &mut Context<'_>) -> Poll<Result<(), zx::Status>> {
-        self.need_signal(cx, &self.receiver.write_task, OBJECT_WRITABLE)
+        self.need_signal(cx, false, OBJECT_WRITABLE)
     }
 }
 
