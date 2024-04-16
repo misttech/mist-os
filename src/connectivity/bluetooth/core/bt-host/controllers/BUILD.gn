@@ -55,8 +55,8 @@ source_set("tests") {
     ":controllers",
     "//src/connectivity/bluetooth/core/bt-host/fidl:fake_hci_test_fixture",
     "//src/connectivity/bluetooth/core/bt-host/testing",
+    "//src/connectivity/bluetooth/core/bt-host/testing:loop_fixture",
     "//src/connectivity/bluetooth/core/bt-host/testing:test_helpers",
-    "//src/lib/testing/loop_fixture",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]

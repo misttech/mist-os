@@ -11,8 +11,8 @@
 #include "gmock/gmock.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/fake_vendor_server.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/loop_fixture.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace bt::controllers {
 
@@ -23,9 +23,9 @@ const StaticByteBuffer kSetAclPriorityNormalCommand(0x00);
 const StaticByteBuffer kSetAclPrioritySourceCommand(0x01);
 const StaticByteBuffer kSetAclPrioritySinkCommand(0x02);
 
-class FidlControllerTest : public ::gtest::TestLoopFixture {
+class FidlControllerTest : public bt::testing::TestLoopFixture {
  public:
-  void SetUp() {
+  void SetUp() override {
     fhbt::VendorHandle vendor;
 
     fake_vendor_server_.emplace(vendor.NewRequest(), dispatcher());
