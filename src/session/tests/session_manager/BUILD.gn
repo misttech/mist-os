@@ -18,16 +18,28 @@ rustc_test("test") {
 
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
+    "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_rust",
+    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
+    "//sdk/fidl/fuchsia.session:fuchsia.session_rust",
+    "//sdk/fidl/fuchsia.session.power:fuchsia.session.power_rust",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
+    "//src/power/system-activity-governor/integration/testing/fidl:test.suspendcontrol_rust",
+    "//src/power/system-activity-governor/integration/testing/fidl:test.systemactivitygovernor_rust",
     "//src/session/bin/session_manager:lib",
     "//src/sys/lib/cm_rust",
+    "//src/testing/realm_proxy/client",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
   ]
 
   sources = [ "src/main.rs" ]
@@ -40,12 +52,22 @@ fuchsia_component("component") {
   deps = [ ":test" ]
 }
 
+fuchsia_component("use-power-fidl") {
+  testonly = true
+  component_name = "use-power-fidl"
+  manifest = "meta/use-power-fidl.cml"
+}
+
 fuchsia_test_package("package") {
   package_name = "session-manager-integration-tests"
   test_components = [ ":component" ]
-  subpackages = [ "//src/session/examples/hello-world-session" ]
+  subpackages = [
+    "//src/session/examples/hello-world-session",
+    "//src/power/system-activity-governor/integration/testing/realm-factory",
+  ]
   deps = [
     ":bogus_session_manager_test_config_values",
+    ":use-power-fidl",
     "//src/session/bin/session_manager:session_manager_comp",
   ]
 }

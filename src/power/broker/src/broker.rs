@@ -563,7 +563,10 @@ impl Catalog {
             if let Some(default_level) = self.topology.minimum_level(element_id) {
                 default_level
             } else {
-                tracing::error!("calculate_required_level: no minimum_level for {:?}", element_id);
+                // TODO(https://fxbug.dev/333930405): This can be `tracing::error!` again if
+                // dropping a lease after its corresponding element is gone is handled properly.
+                // See `session-manager-integration-test.cm` that exercises that case.
+                tracing::warn!("calculate_required_level: no minimum_level for {:?}", element_id);
                 BinaryPowerLevel::Off.into_primitive()
             }
         }
