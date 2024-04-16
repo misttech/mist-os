@@ -14,14 +14,20 @@ use fidl_fuchsia_audio_controller as fac;
 use fidl_fuchsia_audio_device as fadevice;
 use fidl_fuchsia_hardware_audio as fhaudio;
 use fuchsia_audio::{
-    device::{DevfsSelector, RegistrySelector},
+    device::{DevfsSelector, RegistrySelector, Selector},
     stop_listener, Format,
 };
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
 use fuchsia_zircon::{self as zx};
 use futures::{AsyncWriteExt, StreamExt};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::{
+    collections::{btree_map, BTreeMap},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex, Weak,
+    },
+    time::Duration,
+};
 
 // TODO(https://fxbug.dev/332322792): Replace with an integer conversion.
 const SECONDS_PER_NANOSECOND: f64 = 1.0 / 10_u64.pow(9) as f64;
@@ -138,7 +144,7 @@ impl DeviceControl for RegistryDevice {
 }
 
 /// Connects to the device protocol for a device in devfs.
-pub fn connect_to_devfs_device(devfs: DevfsSelector) -> Result<Box<dyn DeviceControl>, Error> {
+fn connect_to_devfs_device(devfs: DevfsSelector) -> Result<Box<dyn DeviceControl>, Error> {
     let protocol_path = devfs.path().join("device_protocol");
 
     match devfs.0.device_type {
@@ -166,7 +172,7 @@ pub fn connect_to_devfs_device(devfs: DevfsSelector) -> Result<Box<dyn DeviceCon
     }
 }
 
-pub async fn connect_to_registry_device(
+async fn connect_to_registry_device(
     selector: RegistrySelector,
 ) -> Result<Box<dyn DeviceControl>, Error> {
     let control_creator = connect_to_protocol::<fadevice::ControlCreatorMarker>()
@@ -187,16 +193,76 @@ pub async fn connect_to_registry_device(
     Ok(Box::new(RegistryDevice::new(proxy)))
 }
 
+async fn connect_device_control(
+    selector: Selector,
+) -> Result<Box<dyn DeviceControl>, ControllerError> {
+    match selector {
+        Selector::Devfs(selector) => connect_to_devfs_device(selector),
+        Selector::Registry(selector) => connect_to_registry_device(selector).await,
+    }
+    .map_err(|err| {
+        ControllerError::new(
+            fac::Error::DeviceNotReachable,
+            format!("Failed to connect to device with error: {err}"),
+        )
+    })
+}
+
+pub struct DeviceControlConnector {
+    device_controls: BTreeMap<Selector, Weak<Mutex<Box<dyn DeviceControl>>>>,
+}
+
+impl DeviceControlConnector {
+    pub fn new() -> Self {
+        Self { device_controls: BTreeMap::new() }
+    }
+
+    /// Returns a [DeviceControl] connection to the device identified by `selector`.
+    ///
+    /// If the connection already exists from a previous call to `connect`, returns
+    /// the existing shared [DeviceControl]. Otherwise, creates a new connection,
+    /// stores it for subsequent calls, and return it.
+    pub async fn connect(
+        &mut self,
+        selector: Selector,
+    ) -> Result<Arc<Mutex<Box<dyn DeviceControl>>>, ControllerError> {
+        match self.device_controls.entry(selector) {
+            btree_map::Entry::Vacant(entry) => {
+                let selector = entry.key().clone();
+                let device_control = Arc::new(Mutex::new(connect_device_control(selector).await?));
+                let _ = entry.insert(Arc::downgrade(&device_control));
+                Ok(device_control)
+            }
+            btree_map::Entry::Occupied(mut entry) => {
+                match entry.get().upgrade() {
+                    Some(device_control) => Ok(device_control),
+                    None => {
+                        let selector = entry.key().clone();
+                        let device_control =
+                            Arc::new(Mutex::new(connect_device_control(selector).await?));
+                        // Replace with a live connection.
+                        let _ = entry.insert(Arc::downgrade(&device_control));
+                        Ok(device_control)
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub struct Device {
-    pub device_controller: Box<dyn DeviceControl>,
+    pub device_controller: Arc<Mutex<Box<dyn DeviceControl>>>,
 }
 
 impl Device {
-    pub fn new(device_controller: Box<dyn DeviceControl>) -> Self {
+    pub fn new(device_controller: Arc<Mutex<Box<dyn DeviceControl>>>) -> Self {
         Self { device_controller }
     }
+
     pub fn set_gain(&mut self, gain_state: fhaudio::GainState) -> Result<(), Error> {
         self.device_controller
+            .lock()
+            .unwrap()
             .set_gain(gain_state)
             .map_err(|e| anyhow!("Error setting device gain state: {e}"))
     }
@@ -209,7 +275,8 @@ impl Device {
         let spec = socket.read_header().await?;
         let format = Format::from(spec);
 
-        let ring_buffer = self.device_controller.create_ring_buffer(element_id, format).await?;
+        let ring_buffer =
+            self.device_controller.lock().unwrap().create_ring_buffer(element_id, format).await?;
 
         let mut silenced_frames = 0u64;
         let mut late_wakeups = 0;
@@ -368,7 +435,8 @@ impl Device {
         duration: Option<Duration>,
         cancel_server: Option<ServerEnd<fac::RecordCancelerMarker>>,
     ) -> Result<fac::RecorderRecordResponse, ControllerError> {
-        let ring_buffer = self.device_controller.create_ring_buffer(element_id, format).await?;
+        let ring_buffer =
+            self.device_controller.lock().unwrap().create_ring_buffer(element_id, format).await?;
 
         // Hardware might not use all bytes in vmo. Only want to read frames hardware will write to.
         let bytes_in_rb = ring_buffer.vmo_buffer().data_size_bytes();

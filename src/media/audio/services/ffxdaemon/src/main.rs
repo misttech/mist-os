@@ -11,7 +11,7 @@ mod ring_buffer;
 mod wav_socket;
 
 use capturer::Capturer;
-use device::{Device, DeviceControl};
+use device::{Device, DeviceControlConnector};
 use renderer::Renderer;
 use wav_socket::WavSocket;
 
@@ -23,7 +23,10 @@ use fuchsia_audio::{device::Selector, Format};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{component, health::Reporter};
 use futures::{StreamExt, TryStreamExt};
-use std::time::Duration;
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use tracing::error;
 
 /// Wraps all hosted protocols into a single type that can be matched against and dispatched.
@@ -34,6 +37,7 @@ enum IncomingRequest {
 }
 
 pub async fn handle_play_request(
+    device_control_connector: Arc<Mutex<DeviceControlConnector>>,
     request: fac::PlayerPlayRequest,
 ) -> Result<fac::PlayerPlayResponse, ControllerError> {
     let destination = request.destination.ok_or_else(|| {
@@ -72,8 +76,8 @@ pub async fn handle_play_request(
                 )
             })?;
 
-            let device_controller = connect_to_device(selector).await?;
-            let mut device = Device::new(device_controller);
+            let device_control = device_control_connector.lock().unwrap().connect(selector).await?;
+            let mut device = Device::new(device_control);
 
             device.play(ring_buffer_element_id, wav_socket).await
         }
@@ -84,12 +88,15 @@ pub async fn handle_play_request(
     }
 }
 
-async fn serve_player(mut stream: fac::PlayerRequestStream) -> Result<(), Error> {
+async fn serve_player(
+    device_control_connector: Arc<Mutex<DeviceControlConnector>>,
+    mut stream: fac::PlayerRequestStream,
+) -> Result<(), Error> {
     while let Ok(Some(request)) = stream.try_next().await {
         let request_name = request.method_name();
         match request {
             fac::PlayerRequest::Play { payload, responder } => {
-                let result = handle_play_request(payload).await;
+                let result = handle_play_request(device_control_connector.clone(), payload).await;
 
                 if let Err(ref err) = result {
                     error!(%err, "Failed to play");
@@ -103,6 +110,7 @@ async fn serve_player(mut stream: fac::PlayerRequestStream) -> Result<(), Error>
 }
 
 pub async fn handle_record_request(
+    device_control_connector: Arc<Mutex<DeviceControlConnector>>,
     request: fac::RecorderRecordRequest,
 ) -> Result<fac::RecorderRecordResponse, ControllerError> {
     let source = request.source.ok_or_else(|| {
@@ -144,8 +152,8 @@ pub async fn handle_record_request(
                 )
             })?;
 
-            let device_controller = connect_to_device(selector).await?;
-            let mut device = Device::new(device_controller);
+            let device_control = device_control_connector.lock().unwrap().connect(selector).await?;
+            let mut device = Device::new(device_control);
 
             device
                 .record(ring_buffer_element_id, format, wav_socket, duration, request.canceler)
@@ -157,12 +165,15 @@ pub async fn handle_record_request(
     }
 }
 
-async fn serve_recorder(mut stream: fac::RecorderRequestStream) -> Result<(), Error> {
+async fn serve_recorder(
+    device_control_connector: Arc<Mutex<DeviceControlConnector>>,
+    mut stream: fac::RecorderRequestStream,
+) -> Result<(), Error> {
     while let Ok(Some(request)) = stream.try_next().await {
         let request_name = request.method_name();
         match request {
             fac::RecorderRequest::Record { payload, responder } => {
-                let result = handle_record_request(payload).await;
+                let result = handle_record_request(device_control_connector.clone(), payload).await;
 
                 if let Err(ref err) = result {
                     error!(%err, "Failed to record");
@@ -176,7 +187,10 @@ async fn serve_recorder(mut stream: fac::RecorderRequestStream) -> Result<(), Er
 }
 
 // TODO(b/298683668) this will be removed, replaced by client direct calls.
-async fn serve_device_control(mut stream: fac::DeviceControlRequestStream) -> Result<(), Error> {
+async fn serve_device_control(
+    device_control_connector: Arc<Mutex<DeviceControlConnector>>,
+    mut stream: fac::DeviceControlRequestStream,
+) -> Result<(), Error> {
     while let Ok(Some(request)) = stream.try_next().await {
         let request_name = request.method_name();
         let request_result = match request {
@@ -188,8 +202,9 @@ async fn serve_device_control(mut stream: fac::DeviceControlRequestStream) -> Re
                     .map_err(|msg| anyhow!("invalid selector: {msg}"))?;
                 let gain_state = payload.gain_state.ok_or(anyhow!("No gain state specified"))?;
 
-                let device_controller = connect_to_device(selector).await?;
-                let mut device = Device::new(device_controller);
+                let device_control =
+                    device_control_connector.lock().unwrap().connect(selector).await?;
+                let mut device = Device::new(device_control);
 
                 device.set_gain(gain_state)?;
                 responder.send(Ok(())).map_err(|e| anyhow!("Error sending response: {e}"))
@@ -205,19 +220,6 @@ async fn serve_device_control(mut stream: fac::DeviceControlRequestStream) -> Re
         }
     }
     Ok(())
-}
-
-async fn connect_to_device(selector: Selector) -> Result<Box<dyn DeviceControl>, ControllerError> {
-    match selector {
-        Selector::Devfs(selector) => device::connect_to_devfs_device(selector),
-        Selector::Registry(selector) => device::connect_to_registry_device(selector).await,
-    }
-    .map_err(|err| {
-        ControllerError::new(
-            fac::Error::DeviceNotReachable,
-            format!("Failed to connect to device with error: {err}"),
-        )
-    })
 }
 
 #[fuchsia::main(logging = true)]
@@ -239,22 +241,29 @@ async fn main() -> Result<(), Error> {
 
     component::health().set_ok();
 
+    let device_control_connector = Arc::new(Mutex::new(DeviceControlConnector::new()));
+
     service_fs
-        .for_each_concurrent(None, |request: IncomingRequest| async {
-            match request {
-                IncomingRequest::DeviceControl(stream) => {
-                    if let Err(err) = serve_device_control(stream).await {
-                        error!(%err, "Failed to serve DeviceControl protocol");
+        .for_each_concurrent(None, |request: IncomingRequest| {
+            let device_control_connector = device_control_connector.clone();
+            async {
+                match request {
+                    IncomingRequest::DeviceControl(stream) => {
+                        if let Err(err) =
+                            serve_device_control(device_control_connector, stream).await
+                        {
+                            error!(%err, "Failed to serve DeviceControl protocol");
+                        }
                     }
-                }
-                IncomingRequest::Player(stream) => {
-                    if let Err(err) = serve_player(stream).await {
-                        error!(%err, "Failed to serve Player protocol");
+                    IncomingRequest::Player(stream) => {
+                        if let Err(err) = serve_player(device_control_connector, stream).await {
+                            error!(%err, "Failed to serve Player protocol");
+                        }
                     }
-                }
-                IncomingRequest::Recorder(stream) => {
-                    if let Err(err) = serve_recorder(stream).await {
-                        error!(%err, "Failed to serve Recorder protocol");
+                    IncomingRequest::Recorder(stream) => {
+                        if let Err(err) = serve_recorder(device_control_connector, stream).await {
+                            error!(%err, "Failed to serve Recorder protocol");
+                        }
                     }
                 }
             }

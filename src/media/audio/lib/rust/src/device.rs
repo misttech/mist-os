@@ -168,7 +168,7 @@ impl FromStr for Direction {
 }
 
 /// Identifies a single audio device.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Selector {
     Devfs(DevfsSelector),
     Registry(RegistrySelector),
@@ -202,7 +202,7 @@ impl From<Selector> for fac::DeviceSelector {
 }
 
 /// Identifies a device backed by a hardware driver protocol in devfs.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DevfsSelector(pub fac::Devfs);
 
 impl DevfsSelector {
@@ -252,7 +252,7 @@ impl From<DevfsSelector> for fac::DeviceSelector {
 }
 
 /// Identifies a device available through the `fuchsia.audio.device/Registry` protocol.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RegistrySelector(pub fadevice::TokenId);
 
 impl RegistrySelector {
