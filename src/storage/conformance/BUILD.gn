@@ -16,6 +16,7 @@ group("tests") {
     ":io_conformance_util_tests",
     "//src/storage/conformance/conformance_harness/cppvfs:cppvfs-io1-conformance-test",
     "//src/storage/conformance/conformance_harness/fxfs:fxfs-conformance-test",
+    "//src/storage/conformance/conformance_harness/memfs:memfs-conformance-test",
     "//src/storage/conformance/conformance_harness/minfs:minfs-io1-conformance-test",
     "//src/storage/conformance/conformance_harness/rustvfs:rustvfs-io1-conformance-test",
     "//src/storage/conformance/conformance_harness/sdkcpp:sdkcpp-conformance-test",
