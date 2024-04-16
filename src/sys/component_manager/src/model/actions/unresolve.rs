@@ -4,14 +4,13 @@
 
 use {
     crate::model::{
-        actions::{shutdown::do_shutdown, Action, ActionKey, ActionSet, ShutdownType},
+        actions::{shutdown::do_shutdown, Action, ActionKey, ShutdownType},
         component::instance::InstanceState,
         component::ComponentInstance,
         error::{ActionError, UnresolveActionError},
         hooks::{Event, EventPayload},
     },
     async_trait::async_trait,
-    futures::future::join_all,
     std::sync::Arc,
 };
 
@@ -38,7 +37,7 @@ impl Action for UnresolveAction {
 }
 
 // Implement the UnresolveAction by resetting the state from unresolved to unresolved and emitting
-// an Unresolved event. Unresolve the component's resolved children if any.
+// an Unresolved event.
 async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ActionError> {
     // We want to shut down the component without invoking a full shutdown action, as the
     // unresolved state of a component is viewed as unreachable from the shutdown state by the
@@ -49,42 +48,18 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ActionEr
     // UnresolvedInstanceState from InstanceState::Shutdown.
     do_shutdown(component, ShutdownType::Instance).await?;
 
-    if !component.lock_state().await.is_shut_down() {
-        return Err(
-            UnresolveActionError::InstanceRunning { moniker: component.moniker.clone() }.into()
-        );
-    }
-
-    // Unresolve all children
-    let children = {
-        let state = component.lock_state().await;
-        match *state {
-            InstanceState::Shutdown(ref state, _) => state.children.clone(),
-            InstanceState::Destroyed => {
-                return Err(UnresolveActionError::InstanceDestroyed {
-                    moniker: component.moniker.clone(),
-                }
-                .into())
-            }
-            _ => {
-                panic!("component {} was moved to unexpected state {:?}", component.moniker, state)
-            }
-        }
-    };
-    let mut futures = vec![];
-    for (_name, child) in children {
-        futures
-            .push(async move { ActionSet::register(child.clone(), UnresolveAction::new()).await });
-    }
-    // Run all the futures, and then return the first error if there were any.
-    join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))?;
-
     // Move this component back to the Unresolved state. The state may have changed during the time
-    // taken for the children to unresolve, so recheck here.
+    // between the do_shutdown call and now, so recheck here.
     {
         let mut state = component.lock_state().await;
         if let InstanceState::Destroyed = &*state {
             return Err(UnresolveActionError::InstanceDestroyed {
+                moniker: component.moniker.clone(),
+            }
+            .into());
+        }
+        if !state.is_shut_down() {
+            return Err(UnresolveActionError::InstanceRunning {
                 moniker: component.moniker.clone(),
             }
             .into());
@@ -117,7 +92,7 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ActionEr
 pub mod tests {
     use {
         crate::model::{
-            actions::test_utils::{is_destroyed, is_discovered, is_resolved},
+            actions::test_utils::{is_destroyed, is_discovered, is_resolved, is_shutdown},
             actions::{ActionSet, ShutdownAction, ShutdownType, UnresolveAction},
             component::{ComponentInstance, StartReason},
             error::{ActionError, UnresolveActionError},
@@ -167,10 +142,13 @@ pub mod tests {
             .await
             .expect("unresolve failed");
         assert!(is_resolved(&component_root).await);
-        // Unresolved recursively, so children in Discovered state.
+        // Component a is back in the discovered state
         assert!(is_discovered(&component_a).await);
-        assert!(is_discovered(&component_b).await);
-        assert!(is_discovered(&component_c).await);
+        // The original descendents of component a have been placed in a Shutdown state.
+        assert!(is_shutdown(&component_b).await);
+        assert!(is_shutdown(&component_c).await);
+        // Component a itself is now unresolved, and thus does not have children anymore.
+        assert_matches!(component_a.find(&vec!["b"].try_into().unwrap()).await, None);
 
         // Unresolve again, which is ok because UnresolveAction is idempotent.
         assert_matches!(
@@ -222,11 +200,14 @@ pub mod tests {
             .await
             .expect("unresolve failed");
 
-        // Unresolved recursively, so children in Discovered state.
+        // Component a is back in the discovered state
         assert!(is_discovered(&component_a).await);
-        assert!(is_discovered(&component_b).await);
-        assert!(is_discovered(&component_c).await);
-        assert!(is_discovered(&component_d).await);
+        // The original descendents of component a have been placed in a Shutdown state.
+        assert!(is_shutdown(&component_b).await);
+        assert!(is_shutdown(&component_c).await);
+        assert!(is_shutdown(&component_d).await);
+        // Component a itself is now unresolved, and thus does not have children anymore.
+        assert_matches!(component_a.find(&vec!["b"].try_into().unwrap()).await, None);
     }
 
     async fn setup_unresolve_test_event_stream(
@@ -281,11 +262,7 @@ pub mod tests {
             actions.register_no_wait(&component_a, UnresolveAction::new()).await
         };
 
-        // Confirm that the Unresolved events are emitted in the expected recursive order.
-        event_stream
-            .wait_until(EventType::Unresolved, vec!["a", "b"].try_into().unwrap())
-            .await
-            .unwrap();
+        // Component a is then unresolved.
         event_stream
             .wait_until(EventType::Unresolved, vec!["a"].try_into().unwrap())
             .await

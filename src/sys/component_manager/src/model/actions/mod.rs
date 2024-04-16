@@ -522,4 +522,9 @@ pub(crate) mod test_utils {
         let state = component.lock_state().await;
         matches!(*state, InstanceState::Unresolved(_))
     }
+
+    pub async fn is_shutdown(component: &ComponentInstance) -> bool {
+        let state = component.lock_state().await;
+        matches!(*state, InstanceState::Shutdown(_, _))
+    }
 }

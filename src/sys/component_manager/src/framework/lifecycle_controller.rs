@@ -293,7 +293,7 @@ mod tests {
     use {
         super::*,
         crate::model::{
-            actions::test_utils::{is_discovered, is_resolved},
+            actions::test_utils::{is_discovered, is_resolved, is_shutdown},
             testing::test_helpers::TestEnvironmentBuilder,
         },
         cm_rust_testing::ComponentDeclBuilder,
@@ -437,8 +437,9 @@ mod tests {
         assert!(is_resolved(&component_b).await);
 
         lifecycle_proxy.unresolve_instance(".").await.unwrap().unwrap();
-        assert!(is_discovered(&component_a).await);
-        assert!(is_discovered(&component_b).await);
+        assert!(is_discovered(&root).await);
+        assert!(is_shutdown(&component_a).await);
+        assert!(is_shutdown(&component_b).await);
 
         assert_eq!(
             lifecycle_proxy.unresolve_instance("./nonesuch").await.unwrap(),
@@ -447,8 +448,9 @@ mod tests {
 
         // Unresolve again, which is ok because UnresolveAction is idempotent.
         assert_eq!(lifecycle_proxy.unresolve_instance(".").await.unwrap(), Ok(()));
-        assert!(is_discovered(&component_a).await);
-        assert!(is_discovered(&component_b).await);
+        assert!(is_discovered(&root).await);
+        assert!(is_shutdown(&component_a).await);
+        assert!(is_shutdown(&component_b).await);
     }
 
     #[fuchsia::test]

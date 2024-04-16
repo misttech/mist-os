@@ -1557,16 +1557,18 @@ pub mod tests {
         // Resolve each component.
         test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
-        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
+        let _component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
+        let _component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
+        let _component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
 
         // Just unresolve component a and children
         assert_matches!(component_a.unresolve().await, Ok(()));
+        // component a is now resolved
         assert!(is_discovered(&component_a).await);
-        assert!(is_discovered(&component_b).await);
-        assert!(is_discovered(&component_c).await);
-        assert!(is_discovered(&component_d).await);
+        // Component a no longer has children, due to not being resolved
+        assert_matches!(component_a.find(&vec!["b"].try_into().unwrap()).await, None);
+        assert_matches!(component_a.find(&vec!["b", "c"].try_into().unwrap()).await, None);
+        assert_matches!(component_a.find(&vec!["b", "d"].try_into().unwrap()).await, None);
 
         // Unresolve again, which is ok because UnresolveAction is idempotent.
         assert_matches!(component_a.unresolve().await, Ok(()));
@@ -2542,9 +2544,9 @@ pub mod tests {
         // Resolve each component.
         test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
-        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
+        let _component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
+        let _component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
+        let _component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
 
         // Now they can all be found.
         assert_matches!(root.find_resolved(&vec!["a"].try_into().unwrap()).await, Some(_));
@@ -2566,21 +2568,16 @@ pub mod tests {
             None
         );
 
-        // Unresolve, recursively.
+        // Unresolve component a, this causes it to stop having children and drop component b after
+        // shutting it down.
         ActionSet::register(component_a.clone(), UnresolveAction::new())
             .await
             .expect("unresolve failed");
 
-        // Unresolved recursively, so children in Discovered state.
-        assert!(is_discovered(&component_a).await);
-        assert!(is_discovered(&component_b).await);
-        assert!(is_discovered(&component_c).await);
-        assert!(is_discovered(&component_d).await);
-
-        assert_matches!(root.find_resolved(&vec!["a"].try_into().unwrap()).await, None);
-        assert_matches!(root.find_resolved(&vec!["a", "b"].try_into().unwrap()).await, None);
-        assert_matches!(root.find_resolved(&vec!["a", "b", "c"].try_into().unwrap()).await, None);
-        assert_matches!(root.find_resolved(&vec!["a", "b", "d"].try_into().unwrap()).await, None);
+        // Because component a is not resolved, it does not have children
+        assert_matches!(component_a.find(&vec!["b"].try_into().unwrap()).await, None);
+        assert_matches!(component_a.find(&vec!["b", "c"].try_into().unwrap()).await, None);
+        assert_matches!(component_a.find(&vec!["b", "d"].try_into().unwrap()).await, None);
     }
 
     /// If a component is not started, a call to `open_outgoing` should start the component
