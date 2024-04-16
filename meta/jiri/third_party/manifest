@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <imports>
+    <localimport file="icu"/>
+  </imports>
+  <projects>
+    <!-- Third Party -->
+    <project name="boringssl"
+             gitsubmoduleof="fuchsia"
+             path="third_party/boringssl/src"
+             remote="https://boringssl.googlesource.com/boringssl"
+             gerrithost="https://boringssl-review.googlesource.com"
+             revision="a4c3f8de4406c2382e43e88a638882fb1a32da32"/>
+    <project name="llvm-project/libc"
+             gitsubmoduleof="fuchsia"
+             path="third_party/llvm-libc/src"
+             remote="https://llvm.googlesource.com/llvm-project/libc"
+             revision="7c154553332eb3989d25dd3f5dbfe2dc6c48d5cf"/>
+    <project name="third_party/lz4"
+             gitsubmoduleof="fuchsia"
+             path="third_party/lz4"
+             remote="https://fuchsia.googlesource.com/third_party/lz4"
+             gerrithost="https://fuchsia-review.googlesource.com"
+             revision="5ff839680134437dbf4678f3d0c7b371d84f4964"/>
+    <project name="third_party/rapidjson"
+             gitsubmoduleof="fuchsia"
+             path="third_party/rapidjson"
+             remote="https://fuchsia.googlesource.com/third_party/rapidjson"
+             revision="f74d358476aec62d9e85e9852f2b5b5e528935e0"
+             gerrithost="https://fuchsia-review.googlesource.com"/>
+    <project name="third_party/re2"
+             gitsubmoduleof="fuchsia"
+             path="third_party/re2/src"
+             remote="https://fuchsia.googlesource.com/third_party/re2"
+             gerrithost="https://fuchsia-review.googlesource.com"
+             revision="123d379e288f3c113c26dca952d78ad5f4fc98fd"/>
+    <project name="third_party/zstd"
+             gitsubmoduleof="fuchsia"
+             path="third_party/zstd/src"
+             remote="https://fuchsia.googlesource.com/third_party/zstd"
+             gerrithost="https://fuchsia-review.googlesource.com"
+             revision="63779c798237346c2b245c546c40b72a5a5913fe"/>
+  </projects>
+</manifest>

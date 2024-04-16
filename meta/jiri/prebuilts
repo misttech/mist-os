@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <!--
+  Configuration of prebuilt packages needed by the stem.
+  The CIPD version hashes in this manifest are updated automatically by Fuchsia Global Integration bots.
+  To manually fetch packages after local edits to this file, please regenerate
+  the corresponding lock files first by running:
+  `//integration/update-lockfiles.sh`
+  Then fetch the packages:
+  `jiri fetch-packages -local-manifest=true`
+  -->
+  <imports>
+    <localimport file="toolchain"/>
+  </imports>
+  <packages>
+    <!--
+        ************************************************************
+        Third-party tools and data used to build and test.
+        ************************************************************
+    -->
+    <!-- QEMU
+         Recipe:    https://fuchsia.googlesource.com/infra/recipes/+/refs/heads/main/recipes/contrib/qemu.py
+         Builders:  https://ci.chromium.org/p/fuchsia/builders/ci/qemu-arm64-linux
+                    https://ci.chromium.org/p/fuchsia/builders/ci/qemu-x64-linux
+                    https://ci.chromium.org/p/fuchsia/builders/ci/qemu-x64-mac
+    -->
+    <package name="fuchsia/third_party/qemu/${platform}"
+             version="git_revision:1600b9f46b1bd08b00fe86c46ef6dbb48cbe10d6"
+             platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
+             path="prebuilt/third_party/qemu/{{.OS}}-{{.Arch}}"/>
+  </packages>
+</manifest>
