@@ -5,8 +5,6 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//src/diagnostics/archivist/configs.gni")
-import(
-    "//src/diagnostics/archivist/testing/realm-factory/fuchsia_configured_component.gni")
 
 rustc_binary("bin") {
   testonly = true
@@ -17,12 +15,12 @@ rustc_binary("bin") {
     "src/realm_factory.rs",
   ]
   deps = [
+    "fidl:fuchsia.archivist.test_rust",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",
-    "//src/diagnostics/archivist/testing/fidl:fuchsia.archivist.test_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
@@ -36,27 +34,39 @@ rustc_binary("bin") {
   ]
 }
 
-fuchsia_component("archivist-realm-factory-component") {
+fuchsia_component("archivist_realm_factory_component") {
   testonly = true
-  component_name = "realm-factory"
-  manifest = "meta/realm-factory.cml"
+  component_name = "realm_factory"
+  manifest = "meta/realm_factory.cml"
   deps = [ ":bin" ]
 }
 
-fuchsia_configured_component("archivist-component") {
+fuchsia_component_manifest("archivist_manifest") {
   testonly = true
   component_name = "archivist"
   manifest = "meta/archivist.cml"
-  config_values = embedded_config
-  deps = [ "//src/diagnostics/archivist:bin" ]
 }
 
-fuchsia_package("realm-factory") {
-  package_name = "archivist-realm-factory"
+fuchsia_component("archivist_component") {
+  testonly = true
+  deps = [ "//src/diagnostics/archivist:bin" ]
+  component_name = "archivist"
+  cm_label = ":archivist_manifest"
+}
+
+fuchsia_structured_config_values("archivist_config") {
+  testonly = true
+  cm_label = ":archivist_manifest"
+  values = embedded_config
+}
+
+fuchsia_package("pkg") {
+  package_name = "archivist_realm_factory"
   testonly = true
   deps = [
-    ":archivist-component",
-    ":archivist-realm-factory-component",
+    ":archivist_component",
+    ":archivist_config",
+    ":archivist_realm_factory_component",
     ":do_not_filter_feedback",
     ":filter_feedback",
     ":filter_lowpan",
@@ -67,7 +77,7 @@ fuchsia_package("realm-factory") {
     # `metadata.component_url` property that gets overwritten by realm builder,
     # whereas the inspect data for a subpackaged component uses a stable,
     # relative URL for this property.
-    "//src/diagnostics/archivist/testing/puppet",
+    "puppet",
   ]
 }
 

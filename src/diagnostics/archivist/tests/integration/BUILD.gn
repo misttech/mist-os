@@ -16,7 +16,7 @@ fuchsia_test_package("archivist_integration_tests") {
   test_components = [ ":integration_tests_component" ]
   subpackages = [
     "test_cases:pkg",
-    "//src/diagnostics/archivist/testing/realm-factory",
+    "realm_factory:pkg",
   ]
 }
 

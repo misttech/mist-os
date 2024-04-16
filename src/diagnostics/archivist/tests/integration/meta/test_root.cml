@@ -9,7 +9,7 @@
     children: [
         {
             name: "realm_factory",
-            url: "archivist-realm-factory#meta/realm-factory.cm",
+            url: "archivist_realm_factory#meta/realm_factory.cm",
         },
         {
             name: "test_cases",
