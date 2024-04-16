@@ -1,0 +1,101 @@
+# Copyrigh 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_test.gni")
+import("//src/diagnostics/archivist/build/pipeline.gni")
+
+rustc_test("bin") {
+  output_name = "archivist_integration_test_cases"
+  edition = "2021"
+  deps = [
+    "components/fidl:fidl_rust",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
+    "//src/diagnostics/archivist:lib",
+    "//src/diagnostics/archivist/testing/fidl:fuchsia.archivist.test_rust",
+    "//src/lib/diagnostics/data/rust",
+    "//src/lib/diagnostics/log/message/rust",
+    "//src/lib/diagnostics/log/rust",
+    "//src/lib/diagnostics/reader/rust",
+    "//src/lib/diagnostics/selectors",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-component-test",
+    "//src/lib/syslog/rust:syslog-listener",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/sys/lib/cm_rust",
+    "//src/sys/lib/component-events",
+    "//src/testing/realm_proxy/client",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:difference",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  sources = [
+    "src/assert.rs",
+    "src/constants.rs",
+    "src/inspect/mod.rs",
+    "src/inspect/reader.rs",
+    "src/inspect/recursive_glob.rs",
+    "src/inspect/truncation.rs",
+    "src/lib.rs",
+    "src/logs/attribution.rs",
+    "src/logs/basic.rs",
+    "src/logs/budget.rs",
+    "src/logs/crash.rs",
+    "src/logs/interest.rs",
+    "src/logs/lifecycle.rs",
+    "src/logs/lifecycle_stop.rs",
+    "src/logs/mod.rs",
+    "src/logs/selectors.rs",
+    "src/logs/sorting.rs",
+    "src/logs/utils.rs",
+    "src/puppet.rs",
+    "src/test_topology.rs",
+    "src/utils.rs",
+  ]
+  inputs = [
+    "test_data/empty_result_golden.json",
+    "test_data/unified_reader_all_golden.json",
+    "test_data/pipeline_reader_all_golden.json",
+    "test_data/unified_reader_full_filter_golden.json",
+    "test_data/pipeline_reader_nonoverlapping_selectors_golden.json",
+    "test_data/unified_reader_single_value_golden.json",
+    "test_data/pipeline_reader_single_value_golden.json",
+  ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+}
+
+fuchsia_component("archivist_integration_test_cases_component") {
+  testonly = true
+  component_name = "test_cases"
+  deps = [ ":bin" ]
+  manifest = "meta/test_cases.cml"
+}
+
+fuchsia_package("pkg") {
+  testonly = true
+  package_name = "archivist_integration_test_cases"
+  deps = [
+    ":archivist_integration_test_cases_component",
+    "components",
+    "//src/diagnostics/archivist/testing/realm-factory:archivist-component",
+  ]
+  subpackages = [ "//src/diagnostics/archivist/testing/realm-factory" ]
+}

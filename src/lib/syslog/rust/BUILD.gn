@@ -25,7 +25,7 @@ rustc_library("syslog-listener") {
   visibility = [
     "//examples/diagnostics/logs/rust:*",
     "//src/diagnostics/archivist:*",
-    "//src/diagnostics/archivist/tests/integration:*",
+    "//src/diagnostics/archivist/tests/integration/test_cases:*",
     "//src/diagnostics/log_listener:*",
     "//src/lib/syslog/rust:*",
     "//src/recovery/system:*",

@@ -1,0 +1,67 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/testing/realm_proxy/client/meta/realm_proxy.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    children: [
+        {
+            name: "realm_factory",
+            url: "archivist-realm-factory#meta/realm-factory.cm",
+        },
+        {
+            name: "test_cases",
+            url: "archivist_integration_test_cases#meta/test_cases.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.archivist.test.RealmFactory" ],
+            from: "#realm_factory",
+            to: "#test_cases",
+        },
+        {
+            protocol: [ "fuchsia.boot.ReadOnlyLog" ],
+            from: "parent",
+            to: [ "#realm_factory" ],
+        },
+        {
+            protocol: [ "fuchsia.logger.Log" ],
+            from: "parent",
+            to: [ "#test_cases" ],
+        },
+        {
+            protocol: [ "fuchsia.tracing.provider.Registry" ],
+            from: "parent",
+            to: [
+                "#realm_factory",
+                "#test_cases",
+            ],
+            availability: "optional",
+        },
+        {
+            event_stream: [
+                "started",
+                "stopped",
+            ],
+            from: "parent",
+            to: [ "#test_cases" ],
+        },
+        {
+            event_stream: [ "capability_requested" ],
+            from: "parent",
+            to: [
+                "#realm_factory",
+                "#test_cases",
+            ],
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#test_cases",
+        },
+    ],
+}

@@ -38,7 +38,7 @@ rustc_binary("bin") {
 
 fuchsia_component("archivist-realm-factory-component") {
   testonly = true
-  component_name = "archivist-realm-factory"
+  component_name = "realm-factory"
   manifest = "meta/realm-factory.cml"
   deps = [ ":bin" ]
 }
