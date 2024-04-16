@@ -11,6 +11,8 @@
 
 #define DRIVER_NAME "test-child-2"
 
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
+
 typedef struct {
   zx_device_t* zxdev;
 } test_t;
@@ -54,7 +56,7 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
       .ctx = test,
       .ops = &test_device_protocol,
       .props = child_props,
-      .prop_count = countof(child_props),
+      .prop_count = ARRAY_SIZE(child_props),
       .flags = DEVICE_ADD_MUST_ISOLATE | DEVICE_ADD_ALLOW_MULTI_COMPOSITE,
   };
 

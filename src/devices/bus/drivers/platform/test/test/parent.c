@@ -12,6 +12,8 @@
 
 #define DRIVER_NAME "test-parent"
 
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
+
 typedef struct {
   zx_device_t* zxdev;
 } test_t;
@@ -52,7 +54,7 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
       .ctx = test,
       .ops = &test_device_protocol,
       .props = child_props,
-      .prop_count = countof(child_props),
+      .prop_count = ARRAY_SIZE(child_props),
   };
 
   status = device_add(parent, &child_args, &test->zxdev);
@@ -74,7 +76,7 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
       .ctx = test,
       .ops = &test_device_protocol,
       .props = node_props,
-      .prop_count = countof(node_props),
+      .prop_count = ARRAY_SIZE(node_props),
   };
 
   status = device_add(parent, &node_args, &test->zxdev);
