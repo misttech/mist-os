@@ -41,6 +41,24 @@ constexpr uint32_t VULKAN_ONLY = 1;
 
 constexpr uint32_t kInvalidBufferHandle = 0U;
 
+zx::result<> RegisterAndBindHeap(
+    fidl::UnownedClientEnd<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
+    fuchsia_sysmem::wire::HeapType heap_type, Heap* heap) {
+  auto [heap_client, heap_server] = fidl::Endpoints<fuchsia_hardware_sysmem::Heap>::Create();
+
+  fidl::OneWayStatus register_result =
+      fidl::WireCall(hardware_sysmem)
+          ->RegisterHeap(static_cast<uint64_t>(heap_type), std::move(heap_client));
+  if (!register_result.ok()) {
+    zxlogf(ERROR, "Failed to register Heap to sysmem: %s",
+           register_result.FormatDescription().c_str());
+    return zx::error(register_result.status());
+  }
+
+  heap->Bind(std::move(heap_server).TakeChannel());
+  return zx::ok();
+}
+
 }  // namespace
 
 // static
@@ -268,23 +286,6 @@ zx_status_t Control::InitSyncDeviceLocked() {
   return ZX_OK;
 }
 
-zx_status_t Control::RegisterAndBindHeap(fuchsia_sysmem::wire::HeapType heap_type, Heap* heap) {
-  zx::channel heap_request, heap_connection;
-  zx_status_t status = zx::channel::create(0, &heap_request, &heap_connection);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: zx::channel:create() failed: %d", kTag, status);
-    return status;
-  }
-  auto result =
-      pipe_->RegisterSysmemHeap(static_cast<uint64_t>(heap_type), std::move(heap_connection));
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: failed to register sysmem heap: %s", kTag, result.status_string());
-    return result.status();
-  }
-  heap->Bind(std::move(heap_request));
-  return ZX_OK;
-}
-
 zx_status_t Control::Bind() {
   fbl::AutoLock lock(&lock_);
 
@@ -306,17 +307,39 @@ zx_status_t Control::Bind() {
     return status;
   }
 
+  zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>> connect_hardware_sysmem_result =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem");
+  if (connect_hardware_sysmem_result.is_error()) {
+    zxlogf(ERROR, "Failed to connect to fuchsia.hardware.sysmem/Sysmem protocol: %s",
+           connect_hardware_sysmem_result.status_string());
+    return connect_hardware_sysmem_result.status_value();
+  }
+  fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem =
+      std::move(connect_hardware_sysmem_result).value();
+
   // Serve goldfish device-local heap allocations.
   std::unique_ptr<DeviceLocalHeap> device_local_heap = DeviceLocalHeap::Create(this);
   DeviceLocalHeap* device_local_heap_ptr = device_local_heap.get();
+  zx::result<> bind_device_local_heap_result = RegisterAndBindHeap(
+      hardware_sysmem, fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal, device_local_heap_ptr);
+  if (bind_device_local_heap_result.is_error()) {
+    zxlogf(ERROR, "Failed to bind Goldfish Device Local heap: %s",
+           bind_device_local_heap_result.status_string());
+    return bind_device_local_heap_result.status_value();
+  }
   heaps_.push_back(std::move(device_local_heap));
-  RegisterAndBindHeap(fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal, device_local_heap_ptr);
 
   // Serve goldfish host-visible heap allocations.
   std::unique_ptr<HostVisibleHeap> host_visible_heap = HostVisibleHeap::Create(this);
   HostVisibleHeap* host_visible_heap_ptr = host_visible_heap.get();
+  zx::result<> bind_host_visible_heap_result = RegisterAndBindHeap(
+      hardware_sysmem, fuchsia_sysmem::wire::HeapType::kGoldfishHostVisible, host_visible_heap_ptr);
+  if (bind_host_visible_heap_result.is_error()) {
+    zxlogf(ERROR, "Failed to bind Goldfish Host Visible heap: %s",
+           bind_host_visible_heap_result.status_string());
+    return bind_host_visible_heap_result.status_value();
+  }
   heaps_.push_back(std::move(host_visible_heap));
-  RegisterAndBindHeap(fuchsia_sysmem::wire::HeapType::kGoldfishHostVisible, host_visible_heap_ptr);
 
   zx::result<> add_control_service_result =
       outgoing_.AddService<fuchsia_hardware_goldfish::ControlService>(

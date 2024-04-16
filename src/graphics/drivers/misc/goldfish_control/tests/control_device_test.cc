@@ -22,11 +22,13 @@
 #include <lib/zx/bti.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
+#include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
 
 #include <cstdlib>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 
@@ -48,14 +50,6 @@ namespace {
 // TODO(https://fxbug.dev/42161009): Use //src/devices/lib/goldfish/fake_pipe instead.
 class FakePipe : public fidl::WireServer<fuchsia_hardware_goldfish_pipe::GoldfishPipe> {
  public:
-  struct HeapInfo {
-    fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_client_end;
-    bool is_registered = false;
-    bool cpu_supported = false;
-    bool ram_supported = false;
-    bool inaccessible_supported = false;
-  };
-
   void Create(CreateCompleter::Sync& completer) override {
     zx::vmo vmo;
     zx_status_t status = zx::vmo::create(PAGE_SIZE, 0u, &vmo);
@@ -153,20 +147,12 @@ class FakePipe : public fidl::WireServer<fuchsia_hardware_goldfish_pipe::Goldfis
 
   void RegisterSysmemHeap(RegisterSysmemHeapRequestView request,
                           RegisterSysmemHeapCompleter::Sync& completer) override {
-    heap_info_[request->heap] = {};
-    heap_info_[request->heap].heap_client_end =
-        fidl::ClientEnd<fuchsia_hardware_sysmem::Heap>(std::move(request->connection));
     completer.ReplySuccess();
   }
 
   zx_status_t SetUpPipeDevice() {
-    zx_status_t status = HandleSysmemEvents();
-    if (status != ZX_OK) {
-      return status;
-    }
-
     if (!pipe_io_buffer_.is_valid()) {
-      status = PrepareIoBuffer();
+      zx_status_t status = PrepareIoBuffer();
       if (status != ZX_OK) {
         return status;
       }
@@ -193,55 +179,11 @@ class FakePipe : public fidl::WireServer<fuchsia_hardware_goldfish_pipe::Goldfis
 
   uint32_t CurrentBufferHandle() { return buffer_id_; }
 
-  const std::unordered_map<uint64_t, HeapInfo>& heap_info() const { return heap_info_; }
-
   const std::vector<std::vector<uint8_t>>& io_buffer_contents() const {
     return io_buffer_contents_;
   }
 
  private:
-  class SysmemHeapEventHandler : public fidl::WireSyncEventHandler<fuchsia_hardware_sysmem::Heap> {
-   public:
-    SysmemHeapEventHandler() = default;
-    void OnRegister(fidl::WireEvent<fuchsia_hardware_sysmem::Heap::OnRegister>* message) override {
-      if (handler != nullptr) {
-        handler(message);
-      }
-    }
-    void SetOnRegisterHandler(
-        fit::function<void(fidl::WireEvent<fuchsia_hardware_sysmem::Heap::OnRegister>*)>
-            new_handler) {
-      handler = std::move(new_handler);
-    }
-
-   private:
-    fit::function<void(fidl::WireEvent<fuchsia_hardware_sysmem::Heap::OnRegister>*)> handler;
-  };
-
-  zx_status_t HandleSysmemEvents() {
-    zx_status_t status = ZX_OK;
-    for (auto& kv : heap_info_) {
-      SysmemHeapEventHandler handler;
-      handler.SetOnRegisterHandler(
-          [this,
-           heap = kv.first](fidl::WireEvent<fuchsia_hardware_sysmem::Heap::OnRegister>* message) {
-            auto& heap_info = heap_info_[heap];
-            heap_info.is_registered = true;
-            heap_info.cpu_supported =
-                message->properties.coherency_domain_support().cpu_supported();
-            heap_info.ram_supported =
-                message->properties.coherency_domain_support().ram_supported();
-            heap_info.inaccessible_supported =
-                message->properties.coherency_domain_support().inaccessible_supported();
-          });
-      status = handler.HandleOneEvent(kv.second.heap_client_end).status();
-      if (status != ZX_OK) {
-        break;
-      }
-    }
-    return status;
-  }
-
   zx_status_t PrepareIoBuffer() {
     uint64_t num_pinned_vmos = 0u;
     std::vector<fake_bti_pinned_vmo_info_t> pinned_vmos;
@@ -284,7 +226,6 @@ class FakePipe : public fidl::WireServer<fuchsia_hardware_goldfish_pipe::Goldfis
 
   int32_t buffer_id_ = 0;
 
-  std::unordered_map<uint64_t, HeapInfo> heap_info_;
   std::vector<std::vector<uint8_t>> io_buffer_contents_;
 };
 
@@ -330,8 +271,70 @@ class FakeSysmemAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::
   FakeHardwareSysmem& parent_;
 };
 
+class SysmemHeapEventHandler : public fidl::WireSyncEventHandler<fuchsia_hardware_sysmem::Heap> {
+ public:
+  SysmemHeapEventHandler() = default;
+  void OnRegister(fidl::WireEvent<fuchsia_hardware_sysmem::Heap::OnRegister>* message) override {
+    if (handler != nullptr) {
+      handler(message);
+    }
+  }
+  void SetOnRegisterHandler(
+      fit::function<void(fidl::WireEvent<fuchsia_hardware_sysmem::Heap::OnRegister>*)>
+          new_handler) {
+    handler = std::move(new_handler);
+  }
+
+ private:
+  fit::function<void(fidl::WireEvent<fuchsia_hardware_sysmem::Heap::OnRegister>*)> handler;
+};
+
 class FakeHardwareSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
  public:
+  struct HeapInfo {
+    bool is_registered = false;
+    bool cpu_supported = false;
+    bool ram_supported = false;
+    bool inaccessible_supported = false;
+  };
+
+  // Blocks until all heaps listed in `heaps` are connected with a Heap server
+  // connection.
+  //
+  // Must run on a dispatcher different from the one `FakeHardwareSysmem` is
+  // bound to.
+  void WaitUntilAllHeapsAreConnected(const std::vector<fuchsia_sysmem::HeapType>& heaps) {
+    for (const fuchsia_sysmem::HeapType heap_type : heaps) {
+      while (!IsHeapConnected(static_cast<uint64_t>(heap_type))) {
+        static constexpr zx::duration kStep = zx::msec(1);
+        zx::nanosleep(zx::deadline_after(kStep));
+      }
+    }
+  }
+
+  // Must be called after `WaitUntilAllHeapsAreConnected()`.
+  zx_status_t SetupHeaps() {
+    std::lock_guard lock(mutex_);
+    for (const auto& [heap_type, heap_client] : heap_clients_) {
+      HeapInfo& heap = heap_info_[heap_type];
+      SysmemHeapEventHandler handler;
+      handler.SetOnRegisterHandler(
+          [&heap](fidl::WireEvent<fuchsia_hardware_sysmem::Heap::OnRegister>* message) {
+            heap.is_registered = true;
+            heap.cpu_supported = message->properties.coherency_domain_support().cpu_supported();
+            heap.ram_supported = message->properties.coherency_domain_support().ram_supported();
+            heap.inaccessible_supported =
+                message->properties.coherency_domain_support().inaccessible_supported();
+          });
+
+      zx_status_t status = handler.HandleOneEvent(heap_client).status();
+      if (status != ZX_OK) {
+        return status;
+      }
+    }
+    return ZX_OK;
+  }
+
   void AddFakeVmoInfo(const zx::vmo& vmo, BufferKey buffer_key) {
     zx_koid_t koid = fsl::GetKoid(vmo.get());
     ZX_ASSERT(koid != ZX_KOID_INVALID);
@@ -348,14 +351,36 @@ class FakeHardwareSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_s
     return iter->second;
   }
 
+  void RegisterHeap(RegisterHeapRequestView request,
+                    RegisterHeapCompleter::Sync& completer) override {
+    std::lock_guard lock(mutex_);
+    heap_clients_[request->heap] = std::move(request->heap_connection);
+  }
+
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
     ADD_FAILURE() << "unexpected call to " << name;
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
+  std::unordered_map<uint64_t, HeapInfo> CloneHeapInfo() const {
+    std::lock_guard lock(mutex_);
+    return heap_info_;
+  }
+
  private:
+  bool IsHeapConnected(uint64_t heap) {
+    std::lock_guard lock(mutex_);
+    return heap_clients_.find(heap) != heap_clients_.end();
+  }
+
   using VmoInfoMap = std::unordered_map<zx_koid_t, BufferKey>;
+
+  mutable std::mutex mutex_;
   VmoInfoMap vmo_infos_;
+
+  std::unordered_map<uint64_t, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap>> heap_clients_
+      __TA_GUARDED(mutex_);
+  std::unordered_map<uint64_t, HeapInfo> heap_info_ __TA_GUARDED(mutex_);
 };
 
 void FakeSysmemAllocator::GetVmoInfo(::fuchsia_sysmem2::wire::AllocatorGetVmoInfoRequest* request,
@@ -462,6 +487,11 @@ class ControlDeviceTest : public testing::Test, public loop_fixture::RealLoop {
     auto fake_dut = fake_parent_->GetLatestChild();
     dut_ = fake_dut->GetDeviceContext<Control>();
 
+    hardware_sysmem_.WaitUntilAllHeapsAreConnected({
+        fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal,
+        fuchsia_sysmem::wire::HeapType::kGoldfishHostVisible,
+    });
+    ASSERT_OK(hardware_sysmem_.SetupHeaps());
     ASSERT_OK(pipe_.SetUpPipeDevice());
     ASSERT_TRUE(pipe_.IsPipeReady());
 
@@ -514,7 +544,8 @@ class ControlDeviceTest : public testing::Test, public loop_fixture::RealLoop {
 };
 
 TEST_F(ControlDeviceTest, Bind) {
-  const auto& heaps = pipe_.heap_info();
+  const std::unordered_map<uint64_t, FakeHardwareSysmem::HeapInfo> heaps =
+      hardware_sysmem_.CloneHeapInfo();
   ASSERT_EQ(heaps.size(), 2u);
   ASSERT_TRUE(heaps.find(static_cast<uint64_t>(
                   fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal)) != heaps.end());
@@ -523,13 +554,11 @@ TEST_F(ControlDeviceTest, Bind) {
 
   const auto& device_local_heap_info =
       heaps.at(static_cast<uint64_t>(fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal));
-  EXPECT_TRUE(device_local_heap_info.heap_client_end.is_valid());
   EXPECT_TRUE(device_local_heap_info.is_registered);
   EXPECT_TRUE(device_local_heap_info.inaccessible_supported);
 
   const auto& host_visible_heap_info =
       heaps.at(static_cast<uint64_t>(fuchsia_sysmem::wire::HeapType::kGoldfishHostVisible));
-  EXPECT_TRUE(host_visible_heap_info.heap_client_end.is_valid());
   EXPECT_TRUE(host_visible_heap_info.is_registered);
   EXPECT_TRUE(host_visible_heap_info.cpu_supported);
 }

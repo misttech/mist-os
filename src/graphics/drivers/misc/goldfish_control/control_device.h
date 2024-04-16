@@ -97,11 +97,6 @@ class Control : public ControlType {
   zx_status_t InitPipeDeviceLocked() TA_REQ(lock_);
   zx_status_t InitSyncDeviceLocked() TA_REQ(lock_);
 
-  // Create a pair of channel and register a sysmem Heap of |heap_type| using
-  // the channel pair. The client-side channel is sent to sysmem, and the
-  // server-side channel is bound to |heap|.
-  zx_status_t RegisterAndBindHeap(fuchsia_sysmem::wire::HeapType heap_type, Heap* heap);
-
   // TODO(https://fxbug.dev/42161642): Remove these pipe IO functions and use
   // //src/devices/lib/goldfish/pipe_io instead.
   int32_t WriteLocked(uint32_t cmd_size, int32_t* consumed_size) TA_REQ(lock_);
