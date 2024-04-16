@@ -106,3 +106,34 @@ pub fn load_ta(name: &std::ffi::CStr) -> Result<impl TAInterface, Error> {
         },
     })
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    // The C string literal syntax c"foo" isn't supported by #[fuchsia::test] so
+    // we use a helper function instead to construct &CStrs from literals.
+    // TODO(https://fxbug.dev/332964901): Remove this and use C-string literals
+    // once supported.
+    fn c_str<'a>(s: &'a [u8]) -> &'a std::ffi::CStr {
+        std::ffi::CStr::from_bytes_with_nul(s).unwrap()
+    }
+
+    #[fuchsia::test]
+    fn load_missing_so() {
+        let result = load_ta(c_str(b"libta_loader_test_missing.so\0"));
+        assert!(result.is_err());
+    }
+
+    #[fuchsia::test]
+    fn load_ta_missing_entry_points() {
+        let result = load_ta(c_str(b"libta_loader_test_missing_entry_points.so\0"));
+        assert!(result.is_err());
+    }
+
+    #[fuchsia::test]
+    fn load_ta_complete() {
+        let result = load_ta(c_str(b"libta_loader_test_complete.so\0"));
+        assert!(!result.is_err());
+    }
+}

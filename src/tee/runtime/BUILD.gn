@@ -52,8 +52,21 @@ fuchsia_unittest_component("runtime-test-component") {
   component_name = "tee-runtime-test"
 }
 
+shared_library("ta_loader_test_missing_entry_points") {
+  sources = [ "ta_loader_tests/ta_create_entry_point.cc" ]
+}
+
+shared_library("ta_loader_test_complete") {
+  sources = [ "ta_loader_tests/ta_all_entry_points.cc" ]
+}
+
 fuchsia_test_package("tee-runtime-tests-package") {
   test_components = [ ":runtime-test-component" ]
+  package_name = "tee-runtime-tests"
+  deps = [
+    ":ta_loader_test_complete",
+    ":ta_loader_test_missing_entry_points",
+  ]
 }
 
 group("tests") {
