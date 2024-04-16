@@ -5071,7 +5071,8 @@ mod tests {
             },
             testutil::DualStackSendIpPacketMeta,
             types::{ResolvedRoute, RoutableIpAddr},
-            HopLimits, IpTransportContext, ResolveRouteError, SendIpPacketMeta,
+            HopLimits, IpLayerPacketMetadata, IpTransportContext, ResolveRouteError,
+            SendIpPacketMeta,
         },
         sync::Mutex,
         testutil::ContextPair,
@@ -5484,6 +5485,7 @@ mod tests {
             bindings_ctx: &mut BC,
             SendIpPacketMeta {  device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             body: SS,
+            _packet_metadata: IpLayerPacketMetadata<I>,
         ) -> Result<(), SS>
         where
             SS: Serializer,

@@ -582,6 +582,7 @@ mod tests {
             },
             testutil::FakeIpDeviceIdCtx,
             types::IpTypesIpExt,
+            IpLayerPacketMetadata,
         },
         state::StackStateBuilder,
         testutil::{
@@ -714,7 +715,15 @@ mod tests {
             S: Serializer + netstack3_filter::IpPacket<Ipv4>,
             S::Buffer: BufferMut,
         {
-            crate::ip::send_ip_frame(self, bindings_ctx, device, next_hop, body, broadcast)
+            crate::ip::send_ip_frame(
+                self,
+                bindings_ctx,
+                device,
+                next_hop,
+                body,
+                broadcast,
+                IpLayerPacketMetadata::default(),
+            )
         }
     }
 

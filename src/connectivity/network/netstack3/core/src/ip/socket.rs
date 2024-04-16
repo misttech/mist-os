@@ -24,8 +24,8 @@ use crate::{
     ip::{
         device::{state::IpDeviceStateIpExt, IpDeviceAddr},
         types::{NextHop, ResolvedRoute, RoutableIpAddr},
-        EitherDeviceId, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt, ResolveRouteError,
-        SendIpPacketMeta,
+        EitherDeviceId, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt, IpLayerPacketMetadata,
+        ResolveRouteError, SendIpPacketMeta,
     },
     socket::address::SocketIpAddr,
     trace_duration,
@@ -374,6 +374,7 @@ where
         bindings_ctx: &mut BC,
         meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
         body: S,
+        packet_metadata: IpLayerPacketMetadata<I>,
     ) -> Result<(), S>
     where
         S: TransportPacketSerializer,
@@ -532,6 +533,9 @@ where
     // TODO(https://fxbug.dev/318717702): when we implement NAT, perform re-routing
     // after the LOCAL_EGRESS hook since the packet may have been changed.
     let mut packet = crate::filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), *proto, &body);
+
+    let packet_metadata = IpLayerPacketMetadata::<I>::default();
+    // TODO(https://fxbug.dev/328063820): Pass packet metadata
     match core_ctx.filter_handler().local_egress_hook(&mut packet, &device) {
         crate::filter::Verdict::Drop => return Ok(()),
         crate::filter::Verdict::Accept => {}
@@ -560,6 +564,7 @@ where
             mtu,
         },
         body,
+        packet_metadata,
     )
     .map_err(|s| (s, IpSockSendError::Mtu))
 }
@@ -1149,6 +1154,7 @@ pub(crate) mod testutil {
             _bindings_ctx: &mut BC,
             _meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             _body: S,
+            _packet_metadata: IpLayerPacketMetadata<I>,
         ) -> Result<(), S> {
             panic!("FakeIpSocketCtx can't send packets, wrap it in a FakeCoreCtx instead");
         }
@@ -1189,6 +1195,7 @@ pub(crate) mod testutil {
             bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState, ()>,
             SendIpPacketMeta {  device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             body: SS,
+            _packet_metadata: IpLayerPacketMetadata<I>,
         ) -> Result<(), SS>
         where
             SS: Serializer,
@@ -1644,6 +1651,7 @@ pub(crate) mod testutil {
             _bindings_ctx: &mut BC,
             _meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             _body: S,
+            _packet_metadata: IpLayerPacketMetadata<I>,
         ) -> Result<(), S> {
             panic!("FakeDualStackIpSocketCtx can't send packets, wrap it in a FakeCoreCtx instead");
         }
@@ -1687,6 +1695,7 @@ pub(crate) mod testutil {
             bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState, ()>,
             SendIpPacketMeta {  device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             body: SS,
+            _packet_metadata: IpLayerPacketMetadata<I>,
         ) -> Result<(), SS>
         where
             SS: Serializer,

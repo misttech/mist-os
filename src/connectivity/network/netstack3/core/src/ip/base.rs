@@ -8,6 +8,7 @@ use core::{
     cmp::Ordering,
     fmt::Debug,
     hash::Hash,
+    marker::PhantomData,
     num::{NonZeroU32, NonZeroU8},
     sync::atomic::{self, AtomicU16},
 };
@@ -130,6 +131,15 @@ impl TransportReceiveError {
 enum TransportReceiveErrorInner {
     ProtocolUnsupported,
     PortUnreachable,
+}
+
+/// Sidecar metadata passed along with the packet.
+///
+/// NOTE: This metadata may be reset after a packet goes through reassembly, and
+/// consumers must be able to handle this case.
+#[derive(Default)]
+pub struct IpLayerPacketMetadata<I: packet_formats::ip::IpExt> {
+    _marker: PhantomData<I>,
 }
 
 /// An [`Ip`] extension trait adding functionality specific to the IP layer.
@@ -908,12 +918,13 @@ impl<
             SpecifiedAddr<I::Addr>,
         >,
         body: S,
+        packet_metadata: IpLayerPacketMetadata<I>,
     ) -> Result<(), S>
     where
         S: Serializer + MaybeTransportPacket,
         S::Buffer: BufferMut,
     {
-        send_ip_packet_from_device(self, bindings_ctx, meta.into(), body)
+        send_ip_packet_from_device(self, bindings_ctx, meta.into(), body, packet_metadata)
     }
 }
 
@@ -1627,6 +1638,7 @@ fn dispatch_receive_ipv4_packet<
     proto: Ipv4Proto,
     body: B,
     parse_metadata: Option<ParseMetadata>,
+    packet_metadata: IpLayerPacketMetadata<Ipv4>,
 ) {
     core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet);
 
@@ -1640,6 +1652,8 @@ fn dispatch_receive_ipv4_packet<
         | None => (),
     }
 
+    // TODO(https://fxbug.dev/328063820): Pass packet metadata.
+    let _ = packet_metadata;
     match core_ctx.filter_handler().local_ingress_hook(
         &mut crate::filter::RxPacket::new(src_ip, dst_ip.get(), proto, &body),
         device,
@@ -1725,6 +1739,7 @@ fn dispatch_receive_ipv6_packet<
     proto: Ipv6Proto,
     body: B,
     parse_metadata: Option<ParseMetadata>,
+    packet_metadata: IpLayerPacketMetadata<Ipv6>,
 ) {
     // TODO(https://fxbug.dev/42095067): Once we support multiple extension
     // headers in IPv6, we will need to verify that the callers of this
@@ -1744,6 +1759,8 @@ fn dispatch_receive_ipv6_packet<
         | None => (),
     }
 
+    // TODO(https://fxbug.dev/328063820): Pass packet metadata.
+    let _ = packet_metadata;
     match core_ctx.filter_handler().local_ingress_hook(
         &mut crate::filter::RxPacket::new(src_ip.get(), dst_ip.get(), proto, &body),
         device,
@@ -1813,6 +1830,7 @@ pub(crate) fn send_ip_frame<I, CC, BC, S>(
     next_hop: SpecifiedAddr<I::Addr>,
     mut body: S,
     broadcast: Option<I::BroadcastMarker>,
+    packet_metadata: IpLayerPacketMetadata<I>,
 ) -> Result<(), S>
 where
     I: IpLayerIpExt,
@@ -1821,6 +1839,8 @@ where
     S: Serializer + IpPacket<I>,
     S::Buffer: BufferMut,
 {
+    // TODO(https://fxbug.dev/328063820): Pass packet metadata
+    let _ = packet_metadata;
     let (verdict, proof) = core_ctx.filter_handler().egress_hook(&mut body, device);
     match verdict {
         crate::filter::Verdict::Drop => return Ok(()),
@@ -1852,7 +1872,7 @@ macro_rules! drop_packet_and_undo_parse {
 /// ready to do so. If the packet isn't fragmented, or a packet was reassembled,
 /// attempt to dispatch the packet.
 macro_rules! process_fragment {
-    ($core_ctx:expr, $bindings_ctx:expr, $dispatch:ident, $device:ident, $frame_dst:expr, $buffer:expr, $packet:expr, $src_ip:expr, $dst_ip:expr, $ip:ident) => {{
+    ($core_ctx:expr, $bindings_ctx:expr, $dispatch:ident, $device:ident, $frame_dst:expr, $buffer:expr, $packet:expr, $src_ip:expr, $dst_ip:expr, $ip:ident, $packet_metadata:expr) => {{
         match FragmentHandler::<$ip, _>::process_fragment::<&mut [u8]>(
             $core_ctx,
             $bindings_ctx,
@@ -1874,6 +1894,7 @@ macro_rules! process_fragment {
                     proto,
                     $buffer,
                     Some(meta),
+                    $packet_metadata,
                 );
             }
             // Ready to reassemble a packet.
@@ -1895,7 +1916,13 @@ macro_rules! process_fragment {
                         // TODO(joshlf):
                         // - Check for already-expired TTL?
                         let (_, _, proto, meta) = packet.into_metadata();
-                        $dispatch::<_, Buf<Vec<u8>>, _>(
+                        // Since each fragment had its own packet metadata, it's
+                        // not clear what metadata to use for the reassembled
+                        // packet. Resetting the metadata is the safest bet,
+                        // though it means downstream consumers must be aware of
+                        // this case.
+                        let packet_metadata = IpLayerPacketMetadata::default();
+                        $dispatch::<_, Buf<Vec<u8>>, _,>(
                             $core_ctx,
                             $bindings_ctx,
                             $device,
@@ -1905,6 +1932,7 @@ macro_rules! process_fragment {
                             proto,
                             buffer,
                             Some(meta),
+                            packet_metadata,
                         );
                     }
                     // TODO(ghanan): Handle reassembly errors, remove
@@ -2076,6 +2104,8 @@ pub(crate) fn receive_ipv4_packet<
 
     // TODO(ghanan): Act upon options.
 
+    let packet_metadata = IpLayerPacketMetadata::default();
+    // TODO(https://fxbug.dev/328063820): Pass packet metadata.
     match core_ctx.filter_handler().ingress_hook(&mut packet, device) {
         crate::filter::Verdict::Drop => return,
         crate::filter::Verdict::Accept => {}
@@ -2109,7 +2139,8 @@ pub(crate) fn receive_ipv4_packet<
                 packet,
                 src_ip,
                 dst_ip,
-                Ipv4
+                Ipv4,
+                packet_metadata
             );
         }
         ReceivePacketAction::Forward { dst: Destination { device: dst_device, next_hop } } => {
@@ -2122,6 +2153,7 @@ pub(crate) fn receive_ipv4_packet<
             if ttl > 1 {
                 trace!("receive_ipv4_packet: forwarding");
 
+                // TODO(https://fxbug.dev/328063820): Pass packet metadata.
                 match core_ctx.filter_handler().forwarding_hook(&mut packet, device, &dst_device) {
                     crate::filter::Verdict::Drop => return,
                     crate::filter::Verdict::Accept => {}
@@ -2138,6 +2170,7 @@ pub(crate) fn receive_ipv4_packet<
                     next_hop,
                     packet,
                     broadcast,
+                    packet_metadata,
                 ) {
                     Ok(()) => (),
                     Err(p) => {
@@ -2320,6 +2353,8 @@ pub(crate) fn receive_ipv6_packet<
         }
     };
 
+    let packet_metadata = IpLayerPacketMetadata::default();
+    // TODO(https://fxbug.dev/328063820): Pass packet metadata.
     match core_ctx.filter_handler().ingress_hook(&mut packet, device) {
         crate::filter::Verdict::Drop => return,
         crate::filter::Verdict::Accept => {}
@@ -2371,6 +2406,7 @@ pub(crate) fn receive_ipv6_packet<
                         proto,
                         buffer,
                         Some(meta),
+                        packet_metadata,
                     );
                 }
                 Ipv6PacketAction::ProcessFragment => {
@@ -2404,7 +2440,8 @@ pub(crate) fn receive_ipv6_packet<
                         packet,
                         src_ip,
                         dst_ip,
-                        Ipv6
+                        Ipv6,
+                        packet_metadata
                     );
                 }
             }
@@ -2429,6 +2466,7 @@ pub(crate) fn receive_ipv6_packet<
                     Ipv6PacketAction::ProcessFragment => unreachable!("When forwarding packets, we should only ever look at the hop by hop options extension header (if present)"),
                 }
 
+                // TODO(https://fxbug.dev/328063820): Pass packet metadata.
                 match core_ctx.filter_handler().forwarding_hook(&mut packet, device, &dst_device) {
                     crate::filter::Verdict::Drop => return,
                     crate::filter::Verdict::Accept => {}
@@ -2443,9 +2481,15 @@ pub(crate) fn receive_ipv6_packet<
                 let (src, dst, proto, meta) = packet.into_metadata();
                 let packet = ForwardedPacket::new(src, dst, proto, meta, buffer);
 
-                if let Err(packet) =
-                    send_ip_frame(core_ctx, bindings_ctx, &dst_device, next_hop, packet, None)
-                {
+                if let Err(packet) = send_ip_frame(
+                    core_ctx,
+                    bindings_ctx,
+                    &dst_device,
+                    next_hop,
+                    packet,
+                    None,
+                    packet_metadata,
+                ) {
                     // TODO(https://fxbug.dev/42167236): Encode the MTU error more
                     // obviously in the type system.
                     core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.mtu_exceeded);
@@ -2878,7 +2922,7 @@ impl<
         S: Serializer + MaybeTransportPacket,
         S::Buffer: BufferMut,
     {
-        send_ip_packet_from_device(self, bindings_ctx, meta, body)
+        send_ip_packet_from_device(self, bindings_ctx, meta, body, IpLayerPacketMetadata::default())
     }
 
     fn send_ip_frame<S>(
@@ -2893,7 +2937,15 @@ impl<
         S: Serializer + IpPacket<I>,
         S::Buffer: BufferMut,
     {
-        send_ip_frame(self, bindings_ctx, device, next_hop, body, broadcast)
+        send_ip_frame(
+            self,
+            bindings_ctx,
+            device,
+            next_hop,
+            body,
+            broadcast,
+            IpLayerPacketMetadata::default(),
+        )
     }
 }
 
@@ -2912,6 +2964,7 @@ pub(crate) fn send_ip_packet_from_device<I, BC, CC, S>(
         Option<SpecifiedAddr<I::Addr>>,
     >,
     body: S,
+    packet_metadata: IpLayerPacketMetadata<I>,
 ) -> Result<(), S>
 where
     I: IpLayerIpExt,
@@ -2951,10 +3004,10 @@ where
 
     if let Some(mtu) = mtu {
         let body = NestedWithInnerIpPacket::new(body.with_size_limit(mtu as usize));
-        send_ip_frame(core_ctx, bindings_ctx, device, next_hop, body, broadcast)
+        send_ip_frame(core_ctx, bindings_ctx, device, next_hop, body, broadcast, packet_metadata)
             .map_err(|ser| ser.into_inner().into_inner())
     } else {
-        send_ip_frame(core_ctx, bindings_ctx, device, next_hop, body, broadcast)
+        send_ip_frame(core_ctx, bindings_ctx, device, next_hop, body, broadcast, packet_metadata)
             .map_err(|ser| ser.into_inner())
     }
 }
@@ -3236,8 +3289,6 @@ impl<
 #[cfg(test)]
 pub(crate) mod testutil {
     use super::*;
-
-    use core::marker::PhantomData;
 
     use derivative::Derivative;
     use net_types::ip::IpInvariant;

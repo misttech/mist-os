@@ -3089,7 +3089,7 @@ mod tests {
             testutil::DualStackSendIpPacketMeta,
             types::IpTypesIpExt,
             types::RoutableIpAddr,
-            IpCounters, IpLayerIpExt,
+            IpCounters, IpLayerIpExt, IpLayerPacketMetadata,
         },
         state::StackStateBuilder,
         testutil::{Ctx, TestIpExt, FAKE_CONFIG_V4, FAKE_CONFIG_V6},
@@ -4050,6 +4050,7 @@ mod tests {
             bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
             meta: SendIpPacketMeta<I, &FakeDeviceId, SpecifiedAddr<I::Addr>>,
             body: S,
+            packet_metadata: IpLayerPacketMetadata<I>,
         ) -> Result<(), S>
         where
             S: Serializer + MaybeTransportPacket,
@@ -4060,6 +4061,7 @@ mod tests {
                 bindings_ctx,
                 meta,
                 body,
+                packet_metadata,
             )
         }
     }

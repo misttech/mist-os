@@ -361,7 +361,7 @@ mod tests {
             let Ctx { core_ctx, bindings_ctx } = &mut ctx;
             assert_matches!(bindings_ctx.copy_ethernet_frames()[..], []);
 
-            crate::ip::send_ip_packet_from_device::<Ipv6, _, _, _>(
+            crate::ip::IpLayerHandler::<Ipv6, _>::send_ip_packet_from_device(
                 &mut core_ctx.context(),
                 bindings_ctx,
                 SendIpPacketMeta {
@@ -1155,7 +1155,7 @@ mod tests {
             );
             let (mut core_ctx, bindings_ctx) = ctx.contexts();
             assert_eq!(get_ipv6_hop_limit(&mut core_ctx, device_id).get(), hop_limit);
-            crate::ip::send_ip_packet_from_device::<Ipv6, _, _, _>(
+            crate::ip::IpLayerHandler::<Ipv6, _>::send_ip_packet_from_device(
                 &mut core_ctx,
                 bindings_ctx,
                 SendIpPacketMeta {
