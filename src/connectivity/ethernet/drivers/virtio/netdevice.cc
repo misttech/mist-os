@@ -383,6 +383,13 @@ void NetworkDevice::NetworkDeviceImplStop(network_device_impl_stop_callback call
       auto iter = tx_return.begin();
       {
         std::lock_guard lock(tx_lock_);
+        // Free all TX ring entries to prevent the IRQ handler from completing these buffers.
+        tx_.IrqRingUpdate([this](vring_used_elem* used_elem) {
+          []() __TA_ASSERT(tx_lock_) {}();
+          const uint16_t id = static_cast<uint16_t>(used_elem->id & 0xffff);
+          tx_.FreeDesc(id);
+        });
+
         for (int i = 0; i < kMaxDepth; ++i) {
           if (tx_in_flight_active_[i]) {
             *iter++ = {
@@ -405,6 +412,13 @@ void NetworkDevice::NetworkDeviceImplStop(network_device_impl_stop_callback call
       auto parts_iter = rx_return_parts.begin();
       {
         std::lock_guard lock(rx_lock_);
+        // Free all RX ring entries to prevent the IRQ handler from completing these buffers.
+        rx_.IrqRingUpdate([this](vring_used_elem* used_elem) {
+          []() __TA_ASSERT(rx_lock_) {}();
+          const uint16_t id = static_cast<uint16_t>(used_elem->id & 0xffff);
+          rx_.FreeDesc(id);
+        });
+
         while (!rx_in_flight_.Empty()) {
           Descriptor d = rx_in_flight_.Pop();
           *iter++ = {

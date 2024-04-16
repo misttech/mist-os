@@ -379,6 +379,60 @@ TEST_F(NetworkDeviceTests, Stop) {
   }
 }
 
+TEST_F(NetworkDeviceTests, StopDuringIrqUpdate) {
+  ASSERT_NO_FATAL_FAILURE(StartDevice());
+  ASSERT_NO_FATAL_FAILURE(PrepareVmo());
+
+  std::array<tx_buffer_t, NetworkDevice::kMaxDepth> tx_buffers;
+  std::array<rx_space_buffer_t, NetworkDevice::kMaxDepth> rx_spaces;
+
+  constexpr buffer_region_t kPlaceholderRegion = {
+      .vmo = kVmoId,
+      .offset = 0,
+      .length = NetworkDevice::kFrameSize,
+  };
+
+  for (uint32_t i = 0; i < tx_buffers.size(); ++i) {
+    tx_buffers[i] = {.id = i,
+                     .data_list = &kPlaceholderRegion,
+                     .data_count = 1,
+                     .meta = kFrameMetadata,
+                     .head_length = device().virtio_header_len()};
+  }
+
+  for (uint32_t i = 0; i < rx_spaces.size(); ++i) {
+    rx_spaces[i] = {.id = i, .region = kPlaceholderRegion};
+  }
+
+  // Queue some rx and tx buffers so we observe them being returned on stop.
+  device().NetworkDeviceImplQueueRxSpace(rx_spaces.data(), rx_spaces.size());
+  device().NetworkDeviceImplQueueTx(tx_buffers.data(), tx_buffers.size());
+
+  // Populate TX descriptors in the ring to indicate that everything was transmitted so that
+  // IrqRingUpdate has something to do.
+  vring& tx_ring = tx_vring();
+  for (const auto& tx_buffer : tx_buffers) {
+    tx_ring.used[tx_ring.used->idx++] = {.idx = static_cast<uint16_t>(tx_buffer.id)};
+  }
+
+  // Also Populate RX descriptors in the ring to indicate that everything was received.
+  vring& rx_ring = rx_vring();
+  for (const auto& rx_space : rx_spaces) {
+    rx_ring.used[rx_ring.used->idx++] = {.idx = static_cast<uint16_t>(rx_space.id)};
+  }
+
+  // Now call Stop first to return all buffers.
+  libsync::Completion stop_called;
+  device().NetworkDeviceImplStop(
+      [](void* cookie) { reinterpret_cast<libsync::Completion*>(cookie)->Signal(); }, &stop_called);
+  stop_called.Wait();
+
+  // Then behave as if an IRQ ring update was pending but blocked on one of the locks in Stop and is
+  // now allowed to continue running. If the TX or RX ring is not correctly cleared in Stop this
+  // will trigger an assertion and crash.
+  device().IrqRingUpdate();
+}
+
 TEST_F(NetworkDeviceTests, UpdateStatus) {
   const struct {
     const char* name;
