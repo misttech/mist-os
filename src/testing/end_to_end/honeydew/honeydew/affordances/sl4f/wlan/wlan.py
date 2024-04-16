@@ -5,7 +5,6 @@
 """Wlan affordance implementation using SL4F."""
 
 import enum
-import logging
 from collections.abc import Mapping
 
 from honeydew.interfaces.affordances.wlan import wlan
@@ -14,20 +13,40 @@ from honeydew.typing.wlan import (
     BssDescription,
     BssType,
     ChannelBandwidth,
+    ClientStatusConnected,
+    ClientStatusConnecting,
+    ClientStatusIdle,
     ClientStatusResponse,
     CountryCodeList,
     Protection,
     QueryIfaceResponse,
-    ServingApInfo,
     WlanChannel,
     WlanMacRole,
 )
 
-_LOGGER: logging.Logger = logging.getLogger(__name__)
+STATUS_IDLE_KEY = "Idle"
+STATUS_CONNECTING_KEY = "Connecting"
+
+# We need to convert the string we receive from the wlan facade to an intEnum
+# because serde gives us a string.
+string_to_int_enum_map: dict[str, int] = {
+    "Unknown": 0,
+    "Open": 1,
+    "Wep": 2,
+    "Wpa1": 3,
+    "Wpa1Wpa2PersonalTkipOnly": 4,
+    "Wpa2PersonalTkipOnly": 5,
+    "Wpa1Wpa2Personal": 6,
+    "Wpa2Personal": 7,
+    "Wpa2Wpa3Personal": 8,
+    "Wpa3Personal": 9,
+    "Wpa2Enterprise": 10,
+    "Wpa3Enterprise": 11,
+}
 
 
 def _get_int(m: Mapping[str, object], key: str) -> int:
-    val = m[key]
+    val = m.get(key)
     if not isinstance(val, int):
         raise TypeError(f'Expected "{val}" to be int, got {type(val)}')
     return val
@@ -90,7 +109,7 @@ class Wlan(wlan.Wlan):
         resp: dict[str, object] = self._sl4f.run(
             method=_Sl4fMethods.CONNECT, params=method_params
         )
-        result = resp.get("result", False)
+        result = resp.get("result")
 
         if not isinstance(result, bool):
             raise TypeError(f'Expected "result" to be bool, got {type(result)}')
@@ -163,7 +182,7 @@ class Wlan(wlan.Wlan):
         resp = self._sl4f.run(
             method=_Sl4fMethods.GET_COUNTRY, params=method_params
         )
-        result = resp.get("result", "")
+        result = resp.get("result")
 
         if not isinstance(result, str):
             raise TypeError(f'Expected "result" to be str, got {type(result)}')
@@ -183,7 +202,7 @@ class Wlan(wlan.Wlan):
         resp: dict[str, object] = self._sl4f.run(
             method=_Sl4fMethods.GET_IFACE_ID_LIST
         )
-        result: object = resp.get("result", [])
+        result: object = resp.get("result")
 
         if not isinstance(result, list):
             raise TypeError(f'Expected "result" to be list, got {type(result)}')
@@ -203,7 +222,7 @@ class Wlan(wlan.Wlan):
         resp: dict[str, object] = self._sl4f.run(
             method=_Sl4fMethods.GET_PHY_ID_LIST
         )
-        result: object = resp.get("result", [])
+        result: object = resp.get("result")
 
         if not isinstance(result, list):
             raise TypeError(f'Expected "result" to be list, got {type(result)}')
@@ -228,23 +247,23 @@ class Wlan(wlan.Wlan):
         resp: dict[str, object] = self._sl4f.run(
             method=_Sl4fMethods.QUERY_IFACE, params=method_params
         )
-        result: object = resp.get("result", {})
+        result: object = resp.get("result")
 
         if not isinstance(result, dict):
             raise TypeError(f'Expected "result" to be dict, got {type(result)}')
 
-        if not isinstance(result["sta_addr"], list):
+        sta_addr = result.get("sta_addr")
+        if not isinstance(sta_addr, list):
             raise TypeError(
-                'Expected "sta_addr" to be list, '
-                f'got {type(result["sta_addr"])}'
+                'Expected "sta_addr" to be list, ' f"got {type(sta_addr)}"
             )
 
         return QueryIfaceResponse(
-            role=WlanMacRole(result["role"]),
+            role=WlanMacRole(result.get("role", None)),
             id=_get_int(result, "id"),
             phy_id=_get_int(result, "phy_id"),
             phy_assigned_id=_get_int(result, "phy_assigned_id"),
-            sta_addr=result["sta_addr"],
+            sta_addr=sta_addr,
         )
 
     def scan_for_bss_info(self) -> dict[str, BssDescription]:
@@ -273,29 +292,35 @@ class Wlan(wlan.Wlan):
                     f'Expected "bss_block" to be dict, got {type(bss)}'
                 )
 
-            if not isinstance(bss["bssid"], list):
+            bssid = bss.get("bssid")
+            if not isinstance(bssid, list):
                 raise TypeError(
-                    f'Expected "bssid" to be list, got {type(bss["bssid"])}'
+                    f'Expected "bssid" to be list, got {type(bssid)}'
                 )
 
-            if not isinstance(bss["ies"], list):
+            ies = bss.get("ies")
+            if not isinstance(ies, list):
+                raise TypeError(f'Expected "ies" to be list, got {type(ies)}')
+
+            channel = bss.get("channel")
+            if not isinstance(channel, dict):
                 raise TypeError(
-                    f'Expected "ies" to be list, got {type(bss["ies"])}'
+                    f'Expected "channel" to be dict, got {type(channel)}'
                 )
 
-            channel = WlanChannel(
-                primary=_get_int(bss["channel"], "primary"),
-                cbw=ChannelBandwidth(bss["channel"]["cbw"]),
-                secondary80=_get_int(bss["channel"], "secondary80"),
+            wlan_channel = WlanChannel(
+                primary=_get_int(channel, "primary"),
+                cbw=ChannelBandwidth(channel.get("cbw", None)),
+                secondary80=_get_int(channel, "secondary80"),
             )
 
             bss_block = BssDescription(
-                bssid=bss["bssid"],
-                bss_type=BssType(bss["bss_type"]),
+                bssid=bssid,
+                bss_type=BssType(bss.get("bss_type", None)),
                 beacon_period=_get_int(bss, "beacon_period"),
                 capability_info=_get_int(bss, "capability_info"),
-                ies=bss["ies"],
-                channel=channel,
+                ies=ies,
+                channel=wlan_channel,
                 rssi_dbm=_get_int(bss, "rssi_dbm"),
                 snr_db=_get_int(bss, "snr_db"),
             )
@@ -320,60 +345,72 @@ class Wlan(wlan.Wlan):
         """Request connection status
 
         Returns:
-            ClientStatusResponse state summary and
-            status of various networks connections.
+            ClientStatusResponse which can be any one of three  things:
+            ClientStatusConnected, ClientStatusConnecting, ClientStatusIdle.
 
         Raises:
             errors.Sl4fError: On failure.
             TypeError: If any of the return values are not of the expected type.
+            ValueError: If none of the possible results are present.
         """
         resp: dict[str, object] = self._sl4f.run(method=_Sl4fMethods.STATUS)
-        result: object = resp.get("result", None)
+        result: object = resp.get("result")
 
         if not isinstance(result, dict):
             raise TypeError(f'Expected "result" to be dict, got {type(result)}')
 
-        if not isinstance(result["Connected"], dict):
-            raise TypeError(
-                'Expected "Connected" to be dict,'
-                f'got {type(result["Connected"])}'
+        # Only one of these keys in result should be present.
+        if STATUS_IDLE_KEY in result:
+            return ClientStatusIdle()
+        elif STATUS_CONNECTING_KEY in result:
+            ssid = result.get("Connecting")
+            if not isinstance(ssid, list):
+                raise TypeError(
+                    f'Expected "connecting" to be list, got "{type(ssid)}"'
+                )
+            return ClientStatusConnecting(ssid=ssid)
+        else:
+            connected = result.get("Connected")
+            if not isinstance(connected, dict):
+                raise TypeError(
+                    f'Expected "connected" to be dict, got {type(connected)}'
+                )
+
+            channel = connected.get("channel")
+            if not isinstance(channel, dict):
+                raise TypeError(
+                    f'Expected "channel" to be dict, got {type(channel)}'
+                )
+
+            wlan_channel = WlanChannel(
+                primary=_get_int(channel, "primary"),
+                cbw=ChannelBandwidth(channel.get("cbw", None)),
+                secondary80=_get_int(channel, "secondary80"),
             )
 
-        if not isinstance(result["Connecting"], list):
-            raise TypeError(
-                'Expected "Connecting" to be list, '
-                f'got {type(result["Connecting"])}'
+            bssid = connected.get("bssid")
+            if not isinstance(bssid, list):
+                raise TypeError(
+                    f'Expected "bssid" to be list, got {type(bssid)}'
+                )
+
+            ssid = connected.get("ssid")
+            if not isinstance(ssid, list):
+                raise TypeError(f'Expected "ssid" to be list, got {type(ssid)}')
+
+            protection = connected.get("protection")
+            if not isinstance(protection, str):
+                raise TypeError(
+                    f'Expected "protection" to be str, got {type(protection)}'
+                )
+
+            return ClientStatusConnected(
+                bssid=bssid,
+                ssid=ssid,
+                rssi_dbm=_get_int(connected, "rssi_dbm"),
+                snr_db=_get_int(connected, "snr_db"),
+                channel=wlan_channel,
+                protection=Protection(
+                    string_to_int_enum_map.get(protection, 0)
+                ),
             )
-
-        channel = WlanChannel(
-            primary=result["Connected"]["channel"]["primary"],
-            cbw=ChannelBandwidth(result["Connected"]["channel"]["cbw"]),
-            secondary80=result["Connected"]["channel"]["secondary80"],
-        )
-
-        if not isinstance(result["Connected"]["bssid"], list):
-            raise TypeError(
-                'Expected "bssid" to be list, '
-                f'got {type(result["Connected"]["bssid"])}'
-            )
-
-        if not isinstance(result["Connected"]["ssid"], list):
-            raise TypeError(
-                'Expected "ssid" to be list, '
-                f'got {type(result["Connected"]["ssid"])}'
-            )
-
-        serving_ap_info = ServingApInfo(
-            bssid=result["Connected"]["bssid"],
-            ssid=result["Connected"]["ssid"],
-            rssi_dbm=_get_int(result["Connected"], "rssi_dbm"),
-            snr_db=_get_int(result["Connected"], "snr_db"),
-            channel=channel,
-            protection=Protection(result["Connected"]["protection"]),
-        )
-
-        return ClientStatusResponse(
-            connected=serving_ap_info,
-            connecting=result["Connecting"],
-            idle=result["Idle"],
-        )

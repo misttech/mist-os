@@ -4,7 +4,6 @@
 # found in the LICENSE file.
 """Wlan policy affordance implementation using SL4F."""
 
-import logging
 from collections.abc import Mapping
 from enum import StrEnum
 
@@ -22,11 +21,9 @@ from honeydew.typing.wlan import (
     WlanClientState,
 )
 
-_LOGGER: logging.Logger = logging.getLogger(__name__)
-
 
 def _get_str(m: Mapping[str, object], key: str) -> str:
-    val = m[key]
+    val = m.get(key)
     if not isinstance(val, str):
         raise TypeError(f'Expected "{val}" to be str, got {type(val)}')
     return val
@@ -85,7 +82,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         resp: dict[str, object] = self._sl4f.run(
             method=_Sl4fMethods.CONNECT, params=method_params
         )
-        result: object = resp.get("result", "")
+        result: object = resp.get("result")
 
         if not isinstance(result, str):
             raise TypeError(f'Expected "result" to be str, got {type(result)}')
@@ -114,7 +111,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         resp: dict[str, object] = self._sl4f.run(
             method=_Sl4fMethods.GET_SAVED_NETWORKS
         )
-        result: object = resp.get("result", [])
+        result: object = resp.get("result")
 
         if not isinstance(result, list):
             raise TypeError(f'Expected "result" to be list, got {type(result)}')
@@ -163,28 +160,30 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         resp: dict[str, object] = self._sl4f.run(
             method=_Sl4fMethods.GET_UPDATE, timeout=timeout
         )
-        result: object = resp.get("result", {})
+        result: object = resp.get("result")
 
         if not isinstance(result, dict):
             raise TypeError(f'Expected "result" to be dict, got {type(result)}')
 
-        if not isinstance(result["networks"], list):
+        networks = result.get("networks")
+        if not isinstance(networks, list):
             raise TypeError(
                 'Expected "networks" to be list, '
-                f'got {type(result["networks"])}'
+                f'got {type(result.get("networks"))}'
             )
 
         network_states: list[NetworkState] = []
-        for n in result["networks"]:
-            state: str | None = n["state"]
-            status: str | None = n["status"]
+        for network in networks:
+            state: str | None = network.get("state")
+            status: str | None = network.get("status")
             if state is None:
                 state = ConnectionState.DISCONNECTED
             if status is None:
                 status = DisconnectStatus.CONNECTION_STOPPED
 
-            ssid: str = n["id"]["ssid"]
-            security_type: str = n["id"]["type_"]
+            net_id = network.get("id")
+            ssid: str = net_id.get("ssid")
+            security_type: str = net_id.get("type_")
 
             network_states.append(
                 NetworkState(
@@ -198,7 +197,8 @@ class WlanPolicy(wlan_policy.WlanPolicy):
             )
 
         return ClientStateSummary(
-            state=WlanClientState(result["state"]), networks=network_states
+            state=WlanClientState(result.get("state", None)),
+            networks=network_states,
         )
 
     def remove_all_networks(self) -> None:
@@ -276,7 +276,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         resp: dict[str, object] = self._sl4f.run(
             method=_Sl4fMethods.GET_SAVED_NETWORKS
         )
-        result: object = resp.get("result", [])
+        result: object = resp.get("result")
 
         if not isinstance(result, list):
             raise TypeError(f'Expected "result" to be list, got {type(result)}')

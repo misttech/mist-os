@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
+from typing import Protocol
 
 
 # pylint: disable=line-too-long
@@ -123,14 +124,14 @@ class Protection(enum.IntEnum):
     OPEN = 1
     WEP = 2
     WPA1 = 3
-    WPA1WPA2PERSONALTKIPONLY = 4
-    WPA2PERSONALTKIPONLY = 5
-    WPA1WPA2PERSONAL = 6
-    WPA2PERSONAL = 7
-    WPA2WPA3PERSONAL = 8
-    WPA3PERSONAL = 9
-    WPA2ENTERPRISE = 0
-    WPA3ENTERPRISE = 1
+    WPA1_WPA2_PERSONAL_TKIP_ONLY = 4
+    WPA2_PERSONAL_TKIP_ONLY = 5
+    WPA1_WPA2_PERSONAL = 6
+    WPA2_PERSONAL = 7
+    WPA2_WPA3_PERSONAL = 8
+    WPA3_PERSONAL = 9
+    WPA2_ENTERPRISE = 10
+    WPA3_ENTERPRISE = 11
 
 
 @dataclass(frozen=True)
@@ -201,21 +202,6 @@ class ClientStateSummary:
 
 
 @dataclass(frozen=True)
-class ServingApInfo:
-    """ServingApInfo, returned as a part of ClientStatusResponse.
-
-    Defined by https://cs.opensource.google/fuchsia/fuchsia/+/main:src/testing/sl4f/src/wlan/types.rs
-    """
-
-    bssid: list[int]
-    ssid: list[int]
-    rssi_dbm: int
-    snr_db: int
-    channel: WlanChannel
-    protection: Protection
-
-
-@dataclass(frozen=True)
 class WlanChannel:
     """Wlan channel information.
 
@@ -259,15 +245,41 @@ class BssDescription:
 
 
 @dataclass(frozen=True)
-class ClientStatusResponse:
-    """ClientStatusResponse returned from a status request.
+class ClientStatusResponse(Protocol):
+    def status(self) -> str:
+        ...
+
+
+@dataclass(frozen=True)
+class ClientStatusConnected(ClientStatusResponse):
+    """ServingApInfo, returned as a part of ClientStatusResponse.
 
     Defined by https://cs.opensource.google/fuchsia/fuchsia/+/main:src/testing/sl4f/src/wlan/types.rs
     """
 
-    connected: ServingApInfo
-    connecting: list[int]
-    idle: str
+    bssid: list[int]
+    ssid: list[int]
+    rssi_dbm: int
+    snr_db: int
+    channel: WlanChannel
+    protection: Protection
+
+    def status(self) -> str:
+        return "Connected"
+
+
+@dataclass(frozen=True)
+class ClientStatusConnecting(ClientStatusResponse):
+    ssid: list[int]
+
+    def status(self) -> str:
+        return "Connecting"
+
+
+@dataclass(frozen=True)
+class ClientStatusIdle(ClientStatusResponse):
+    def status(self) -> str:
+        return "Idle"
 
 
 class CountryCodeList(enum.StrEnum):

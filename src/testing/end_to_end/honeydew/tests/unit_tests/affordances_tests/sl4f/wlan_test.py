@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.affordances.sl4f.wlan.py."""
 
+import logging
 import unittest
 from unittest import mock
 
@@ -13,10 +14,11 @@ from honeydew.typing.wlan import (
     BssDescription,
     BssType,
     ChannelBandwidth,
-    ClientStatusResponse,
+    ClientStatusConnected,
+    ClientStatusConnecting,
+    ClientStatusIdle,
     Protection,
     QueryIfaceResponse,
-    ServingApInfo,
     WlanChannel,
     WlanMacRole,
 )
@@ -254,7 +256,13 @@ class WlanSL4FTests(unittest.TestCase):
     def test_scan_for_bss_info_failure_bssid_not_list(self) -> None:
         """Test for Wlan.scan_for_bss_info()."""
         self.sl4f_obj.run.return_value = {
-            "result": {"bss": {"bssid": "not_list", "ies": [1, 2]}}
+            "result": {
+                "test_bss": {
+                    "bssid": "not_list",
+                    "ies": [1, 2],
+                    "channel": {"primary": 1, "cbw": 0, "secondary80": 1},
+                }
+            }
         }
 
         with self.assertRaises(TypeError):
@@ -264,9 +272,30 @@ class WlanSL4FTests(unittest.TestCase):
     def test_scan_for_bss_info_failure_ies_not_list(self) -> None:
         """Test for Wlan.scan_for_bss_info()."""
         self.sl4f_obj.run.return_value = {
-            "result": {"bss": {"bssid": [1, 2], "ies": "not_list"}}
+            "result": {
+                "test_bss": {
+                    "bssid": [1, 2],
+                    "ies": "not_list",
+                    "channel": {"primary": 1, "cbw": 0, "secondary80": 1},
+                }
+            }
         }
 
+        with self.assertRaises(TypeError):
+            self.wlan_obj.scan_for_bss_info()
+        self.sl4f_obj.run.assert_called()
+
+    def test_scan_for_bss_info_failure_channel_not_dict(self) -> None:
+        """Test for Wlan.scan_for_bss_info()."""
+        self.sl4f_obj.run.return_value = {
+            "result": {
+                "test_bss": {
+                    "bssid": [1, 2],
+                    "ies": [1, 2],
+                    "channel": "not_dict",
+                }
+            }
+        }
         with self.assertRaises(TypeError):
             self.wlan_obj.scan_for_bss_info()
         self.sl4f_obj.run.assert_called()
@@ -276,13 +305,27 @@ class WlanSL4FTests(unittest.TestCase):
         self.wlan_obj.set_region("US")
         self.sl4f_obj.run.assert_called()
 
-    def test_status_success(self) -> None:
+    def test_status_idle_success(self) -> None:
+        """Test for Wlan.status()."""
+        self.sl4f_obj.run.return_value = {"result": {"Idle": None}}
+        expected_value = ClientStatusIdle()
+        self.assertEqual(self.wlan_obj.status(), expected_value)
+        self.sl4f_obj.run.assert_called()
+
+    def test_status_connecting_success(self) -> None:
+        """Test for Wlan.status()."""
+        self.sl4f_obj.run.return_value = {"result": {"Connecting": [1, 2, 3]}}
+        expected_value = ClientStatusConnecting(ssid=[1, 2, 3])
+        self.assertEqual(self.wlan_obj.status(), expected_value)
+        self.sl4f_obj.run.assert_called()
+
+    def test_status_connected_success(self) -> None:
         """Test for Wlan.status()."""
         self.sl4f_obj.run.return_value = {
             "result": {
                 "Connected": {
                     "bssid": [1, 2],
-                    "ssid": [2, 3],
+                    "ssid": [1, 2],
                     "rssi_dbm": 4,
                     "snr_db": 5,
                     "channel": {
@@ -290,28 +333,21 @@ class WlanSL4FTests(unittest.TestCase):
                         "cbw": "Cbw20",
                         "secondary80": 3,
                     },
-                    "protection": 1,
+                    "protection": "Open",
                 },
-                "Connecting": [1, 2, 3],
-                "Idle": "test",
             }
         }
-
-        expected_value = ClientStatusResponse(
-            connected=ServingApInfo(
-                bssid=[1, 2],
-                ssid=[2, 3],
-                rssi_dbm=4,
-                snr_db=5,
-                channel=WlanChannel(
-                    primary=1,
-                    cbw=ChannelBandwidth.CBW20,
-                    secondary80=3,
-                ),
-                protection=Protection.OPEN,
+        expected_value = ClientStatusConnected(
+            bssid=[1, 2],
+            ssid=[1, 2],
+            rssi_dbm=4,
+            snr_db=5,
+            channel=WlanChannel(
+                primary=1,
+                cbw=ChannelBandwidth.CBW20,
+                secondary80=3,
             ),
-            connecting=[1, 2, 3],
-            idle="test",
+            protection=Protection.OPEN,
         )
 
         self.assertEqual(self.wlan_obj.status(), expected_value)
@@ -325,6 +361,14 @@ class WlanSL4FTests(unittest.TestCase):
             self.wlan_obj.status()
         self.sl4f_obj.run.assert_called()
 
+    def test_status_failure_connecting_not_list(self) -> None:
+        """Test for Wlan.status()."""
+        self.sl4f_obj.run.return_value = {"result": {"Connecting": "not_list"}}
+
+        with self.assertRaises(TypeError):
+            self.wlan_obj.status()
+        self.sl4f_obj.run.assert_called()
+
     def test_status_failure_connected_not_dict(self) -> None:
         """Test for Wlan.status()."""
         self.sl4f_obj.run.return_value = {"result": {"Connected": "not_dict"}}
@@ -333,24 +377,15 @@ class WlanSL4FTests(unittest.TestCase):
             self.wlan_obj.status()
         self.sl4f_obj.run.assert_called()
 
-    def test_status_failure_connecting_not_list(self) -> None:
+    def test_status_failure_connected_channel_not_dict(self) -> None:
         """Test for Wlan.status()."""
         self.sl4f_obj.run.return_value = {
             "result": {
                 "Connected": {
-                    "bssid": "not_list",
+                    "bssid": [1, 2],
                     "ssid": [2, 3],
-                    "rssi_dbm": 4,
-                    "snr_db": 5,
-                    "channel": {
-                        "primary": 1,
-                        "cbw": "Cbw20",
-                        "secondary80": 3,
-                    },
-                    "protection": 1,
-                },
-                "Connecting": "not_list",
-                "Idle": "test",
+                    "channel": "not_dict",
+                }
             }
         }
 
@@ -358,24 +393,19 @@ class WlanSL4FTests(unittest.TestCase):
             self.wlan_obj.status()
         self.sl4f_obj.run.assert_called()
 
-    def test_status_failure_bssid_not_list(self) -> None:
+    def test_status_failure_connected_bssid_not_list(self) -> None:
         """Test for Wlan.status()."""
         self.sl4f_obj.run.return_value = {
             "result": {
                 "Connected": {
                     "bssid": "not_list",
                     "ssid": [2, 3],
-                    "rssi_dbm": 4,
-                    "snr_db": 5,
                     "channel": {
                         "primary": 1,
                         "cbw": "Cbw20",
                         "secondary80": 3,
                     },
-                    "protection": 1,
-                },
-                "Connecting": [1, 2, 3],
-                "Idle": "test",
+                }
             }
         }
 
@@ -383,24 +413,40 @@ class WlanSL4FTests(unittest.TestCase):
             self.wlan_obj.status()
         self.sl4f_obj.run.assert_called()
 
-    def test_status_failure_ssid_not_list(self) -> None:
+    def test_status_failure_connected_ssid_not_list(self) -> None:
         """Test for Wlan.status()."""
         self.sl4f_obj.run.return_value = {
             "result": {
                 "Connected": {
                     "bssid": [1, 2],
                     "ssid": "not_list",
-                    "rssi_dbm": 4,
-                    "snr_db": 5,
+                    "channel": {
+                        "primary": 1,
+                        "cbw": "Cbw20",
+                        "secondary80": 3,
+                    },
+                }
+            }
+        }
+
+        with self.assertRaises(TypeError):
+            self.wlan_obj.status()
+        self.sl4f_obj.run.assert_called()
+
+    def test_status_failure_connected_protection_not_str(self) -> None:
+        """Test for Wlan.status()."""
+        self.sl4f_obj.run.return_value = {
+            "result": {
+                "Connected": {
+                    "bssid": [1, 2],
+                    "ssid": [1, 2],
                     "channel": {
                         "primary": 1,
                         "cbw": "Cbw20",
                         "secondary80": 3,
                     },
                     "protection": 1,
-                },
-                "Connecting": [1, 2, 3],
-                "Idle": "test",
+                }
             }
         }
 
