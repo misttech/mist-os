@@ -24,6 +24,8 @@
 
 #include "resources.h"
 
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
+
 // TODO: dynamically compute this based on what it returns
 #define MAX_CPUS 32
 
@@ -261,7 +263,7 @@ static zx_status_t memstats(zx_handle_t info_resource) {
       stats.other_bytes,
   };
   char line[128] = {};
-  for (unsigned int i = 0; i < countof(fields); i++) {
+  for (unsigned int i = 0; i < ARRAY_SIZE(fields); i++) {
     const char unit = 'M';
     char buf[MAX_FORMAT_SIZE_LEN];
     format_size_fixed(buf, sizeof(buf), fields[i], unit);
