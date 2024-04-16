@@ -7,7 +7,7 @@ import("//build/zircon/zx_library.gni")
 
 zx_library("sync") {
   sdk = "static"
-  sdk_publishable = true
+  sdk_publishable = "partner"
   sdk_headers = [
     "lib/sync/internal/condition-template.h",
     "lib/sync/internal/mutex-internal.h",

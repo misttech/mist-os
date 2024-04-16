@@ -84,7 +84,7 @@ sdk_source_set("trace-engine-headersonly") {
 # The default version for the normal case.
 trace_engine_library("trace-engine") {
   sdk = "shared"
-  sdk_publishable = true
+  sdk_publishable = "partner"
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   extra_configs = [ "//build/config:Wno-conversion" ]

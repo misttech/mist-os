@@ -8,7 +8,7 @@ zx_library("mmio-ptr") {
   sources = []
 
   sdk = "source"
-  sdk_publishable = true
+  sdk_publishable = "partner"
   sdk_headers = [ "lib/mmio-ptr/mmio-ptr.h" ]
 }
 

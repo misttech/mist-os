@@ -18,7 +18,7 @@ import("//build/toolchain/toolchain_environment.gni")
 #
 # * When building with a Zircon-specific toolchain, it will create a source_set()
 #   if the global `is_kernel` is true (meaning building part of the kernel), or
-#   a static_library() target otherwise. Teh values of `sdk`, `sdk_publishable`
+#   a static_library() target otherwise. The values of `sdk`, `sdk_publishable`
 #   and `sdk_headers` will be ignored entirely.
 #
 #   This will also create a :headers sub-target, a group used to give access
@@ -30,10 +30,12 @@ import("//build/toolchain/toolchain_environment.gni")
 #
 # * When not using a Zircon-specific toolchain, which means the library is built
 #   either as a Fuchsia user binary or a host binary, `sdk` must be set to determine
-#   the shape of the library, as well as `sdk_headers to list the library's public
+#   the shape of the library, as must `sdk_headers to list the library's public
 #   headers, relative to its `include` sub-directory.
 #
-#   If `sdk_publishable` is true, the library will be part of the Fuchsia SDK.
+#   If `sdk_publishable` is present, an sdk_*() template will be used, enabling
+#   the library to be part of the Fuchsia SDK. The value of `sdk_publishable`
+#   must be a valid SDK category.
 #
 #   Any :headers sub-targets that appear in public_deps will be rewritten into
 #   a dependency to the library itself, e.g.:
@@ -54,17 +56,15 @@ import("//build/toolchain/toolchain_environment.gni")
 #     source set, static library or shared library with the Fuchsia build.
 #     This is required, except when building with Zircon-specific toolchains.
 #     Note that this name is confusing for historical reasons, because using
-#     this parameter does not make this library exported to the Fuchsia SDK
-#     (see `sdk_publishable` below for this).
-#     Type: "static" or "shared" or "source"
+#     this parameter does not alone make this library exported to the Fuchsia
+#     SDK (see `sdk_publishable` below for this).
+#     TODO(https://fxbug.dev/333125197): Rename this parameter.
+#     Values: "static" or "shared" or "source"
 #
 #   sdk_publishable
-#     Optional: Indicates that this library can be added to the Fuchsia SDK.
-#     When false, the library is not added to the SDK. When true, it is added
-#     to the SDK with a "partner" category. Otherwise, a string value may be
-#     used to specify another category (e.g. `sdk_publishable` = "cts"`).
-#     Type: bool, or a string indicating an SDK category.
-#     Default: false
+#     Optional: Indicates that this library can be added to the Fuchsia SDK
+#     and in which SDK category.
+#     Type: string indicating an SDK category.
 #
 #   sdk_area (optional)
 #     [string] The API area responsible for maintaining this library.
@@ -95,6 +95,10 @@ template("zx_library") {
     "sdk_publishable",
   ]
 
+  # TODO(https://fxbug.dev/333125197): Move this such that it is only applied
+  # when needed and does not silently ignore parameters that will never be used
+  # (i.e., for non-sdkable targets). Update the documentation above to indicate
+  # when it is supported.
   not_needed(invoker,
              [
                "sdk_name",
@@ -167,14 +171,12 @@ template("zx_library") {
         "The `sdk` argument is needed to build a zx_library() with a Fuchsia or host toolchain ($current_toolchain)")
     shape = invoker.sdk
 
-    sdkable =
-        defined(invoker.sdk_publishable) && invoker.sdk_publishable != false
+    sdkable = defined(invoker.sdk_publishable)
     if (sdkable) {
-      if (invoker.sdk_publishable == true) {
-        sdk_category = "partner"
-      } else {
-        sdk_category = invoker.sdk_publishable
-      }
+      assert(
+          invoker.sdk_publishable == "${invoker.sdk_publishable}",
+          "Must be an SDK category name if specified - received: ${invoker.sdk_publishable}")
+      sdk_category = invoker.sdk_publishable
     }
 
     extra_target_args = {

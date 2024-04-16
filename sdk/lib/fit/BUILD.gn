@@ -6,7 +6,7 @@ import("//build/zircon/migrated_targets.gni")
 
 zx_library("fit") {
   sdk = "source"
-  sdk_publishable = true
+  sdk_publishable = "partner"
   sdk_headers = [
     "lib/fit/defer.h",
     "lib/fit/function.h",

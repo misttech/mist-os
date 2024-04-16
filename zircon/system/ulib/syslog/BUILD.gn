@@ -80,7 +80,7 @@ syslog_headers = [
 
 zx_library("syslog") {
   sdk = "shared"
-  sdk_publishable = true
+  sdk_publishable = "partner"
   sdk_headers = syslog_headers
 
   sources = [
@@ -111,7 +111,7 @@ zx_library("syslog") {
 
 zx_library("syslog-headers") {
   sdk = "static"
-  sdk_publishable = true
+  sdk_publishable = "partner"
   sdk_headers = syslog_headers
   visibility = syslog_headers_visibility_allowlist
 }

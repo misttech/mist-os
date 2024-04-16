@@ -8,7 +8,7 @@ assert(is_fuchsia)
 
 zx_library("async-default") {
   sdk = "shared"
-  sdk_publishable = true
+  sdk_publishable = "partner"
   sdk_headers = [ "lib/async/default.h" ]
   sources = [ "default.c" ]
   public_deps = [

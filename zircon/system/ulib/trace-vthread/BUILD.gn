@@ -37,7 +37,7 @@ zx_library("trace-vthread") {
     "trace-vthread/internal/event_vthread.h",
     "trace-vthread/event_vthread.h",
   ]
-  sdk_publishable = true
+  sdk_publishable = "partner"
   sources = [ "event_vthread.cc" ]
   sdk_headers_for_internal_use = [ "trace-vthread/internal/event_vthread.h" ]
   public_deps = [

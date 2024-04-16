@@ -124,7 +124,7 @@ trace_provider_library("trace-provider") {
 # TODO(https://fxbug.dev/42096938): Add start.cc to this library in order to match the
 # non-shared version of the library.
 trace_provider_library("trace-provider-so") {
-  sdk_publishable = true
+  sdk_publishable = "partner"
   sdk = "shared"
 
   defines = [ "SHARED_LIBRARY" ]
