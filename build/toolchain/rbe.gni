@@ -128,7 +128,8 @@ declare_args() {
   # Set to true to emit additional .rmeta files when compiling Rust rlibs.
   # The .rmeta metadata files can be used by downstream build actions
   # to quickly evaluate transitive dependencies (and remote inputs).
-  rust_emit_rmeta = false
+  # This is required to support skipping downloads of rlibs.
+  rust_emit_rmeta = true
 
   # TODO(b/42084033): Controls whether or not to download (intermediate)
   # rlibs from remote Rust build actions.
