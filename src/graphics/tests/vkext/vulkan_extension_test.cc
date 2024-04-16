@@ -6,6 +6,8 @@
 
 #include <lib/fdio/directory.h>
 
+#include <cstddef>
+
 #include <fbl/algorithm.h>
 
 #include "src/graphics/tests/common/utils.h"
@@ -537,6 +539,33 @@ void VulkanExtensionTest::WriteLinearImage(vk::DeviceMemory memory, bool is_cohe
 
   for (uint32_t i = 0; i < width * height; i++) {
     reinterpret_cast<uint32_t *>(addr)[i] = fill;
+  }
+
+  if (!is_coherent) {
+    auto range = vk::MappedMemoryRange().setMemory(memory).setSize(VK_WHOLE_SIZE);
+    EXPECT_EQ(vk::Result::eSuccess, ctx_->device()->flushMappedMemoryRanges(1, &range));
+  }
+
+  ctx_->device()->unmapMemory(memory);
+}
+
+void VulkanExtensionTest::WriteLinearColorImageComplete(vk::DeviceMemory memory, vk::Image image,
+                                                        bool is_coherent, uint32_t width,
+                                                        uint32_t height, uint32_t fill) {
+  void *addr;
+  vk::Result result =
+      ctx_->device()->mapMemory(memory, 0 /* offset */, VK_WHOLE_SIZE, vk::MemoryMapFlags{}, &addr);
+  ASSERT_EQ(vk::Result::eSuccess, result);
+
+  auto layout = ctx_->device()->getImageSubresourceLayout(
+      image, vk::ImageSubresource(vk::ImageAspectFlagBits::eColor, 0, 0));
+
+  for (uint32_t y = 0; y < height; y++) {
+    for (uint32_t x = 0; x < width; x++) {
+      uint8_t *ptr =
+          static_cast<uint8_t *>(addr) + static_cast<size_t>(x * 4) + y * layout.rowPitch;
+      *reinterpret_cast<uint32_t *>(ptr) = fill;
+    }
   }
 
   if (!is_coherent) {

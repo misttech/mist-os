@@ -43,6 +43,9 @@ class VulkanExtensionTest : public testing::Test {
   bool IsMemoryTypeCoherent(uint32_t memoryTypeIndex);
   void WriteLinearImage(vk::DeviceMemory memory, bool is_coherent, uint32_t width, uint32_t height,
                         uint32_t fill);
+  // Completely fill miplevel 0, array layer 0 of a 4 byte-per-pixel color image.
+  void WriteLinearColorImageComplete(vk::DeviceMemory memory, vk::Image image, bool is_coherent,
+                                     uint32_t width, uint32_t height, uint32_t fill);
   void CheckLinearImage(vk::DeviceMemory memory, bool is_coherent, uint32_t width, uint32_t height,
                         uint32_t fill);
 

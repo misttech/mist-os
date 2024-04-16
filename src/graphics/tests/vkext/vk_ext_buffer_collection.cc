@@ -862,8 +862,9 @@ TEST_F(VulkanExtensionTest, BadRequiredFormatFeatures2) {
 
   auto [vulkan_token] = MakeSharedCollection<1>();
 
-  // TODO(fxbug.dev/321072153): Lavapipe doesn't support `VK_FORMAT_G8_B8R8_2PLANE_420_UNORM`, so
-  // we use RGBA when Lavapipe is detected via `UseCpuGpu()`.
+  // TODO(https://fxbug.dev/321072153): Lavapipe doesn't support
+  // `VK_FORMAT_G8_B8R8_2PLANE_420_UNORM`, so we use RGBA when Lavapipe is detected via
+  // `UseCpuGpu()`.
   const VkFormat kFormat =
       !SupportsSysmemYuv() ? VK_FORMAT_R8G8B8A8_UNORM : VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
   bool is_yuv = kFormat == VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
@@ -1726,6 +1727,262 @@ TEST_F(VulkanExtensionTest, OptimalCopy) {
   EXPECT_EQ(vk::Result::eSuccess, vulkan_context().queue().waitIdle());
 
   CheckLinearImage(dst_memory.get(), dst_is_coherent, kDefaultWidth, kDefaultHeight, kPattern);
+}
+
+// Test that the correct pixels are written to with linear images with non-packed strides.
+TEST_F(VulkanExtensionTest, LinearNonPackedStride) {
+  ASSERT_TRUE(Initialize());
+
+  if (!SupportsSysmemRenderableLinear()) {
+    GTEST_SKIP();
+  }
+
+  constexpr bool kUseProtectedMemory = false;
+  constexpr uint32_t kPattern = 0xaabbccdd;
+  constexpr size_t kBytesPerPixel = 4;
+
+  vk::UniqueImage image;
+  vk::UniqueDeviceMemory memory;
+  bool src_is_coherent;
+
+  fuchsia::sysmem::BufferCollectionInfo_2 sysmem_collection;
+  {
+    auto [vulkan_token, sysmem_token] = MakeSharedCollection<2>();
+    constexpr bool kUseLinear = true;
+
+    vk::ImageCreateInfo image_create_info = GetDefaultImageCreateInfo(
+        kUseProtectedMemory, kDefaultFormat, kDefaultWidth, kDefaultHeight, kUseLinear);
+    image_create_info.setUsage(vk::ImageUsageFlagBits::eTransferSrc |
+                               vk::ImageUsageFlagBits::eColorAttachment);
+    image_create_info.setInitialLayout(vk::ImageLayout::ePreinitialized);
+
+    vk::ImageFormatConstraintsInfoFUCHSIA format_constraints =
+        GetDefaultRgbImageFormatConstraintsInfo();
+    format_constraints.imageCreateInfo = image_create_info;
+
+    UniqueBufferCollection collection = CreateVkBufferCollectionForImage(
+        std::move(vulkan_token), format_constraints,
+        vk::ImageConstraintsInfoFlagBitsFUCHSIA::eCpuReadOften |
+            vk::ImageConstraintsInfoFlagBitsFUCHSIA::eCpuWriteOften);
+
+    fuchsia::sysmem::ImageFormatConstraints bgra_image_constraints;
+    bgra_image_constraints.required_min_coded_width = 64;
+    bgra_image_constraints.required_min_coded_height = 64;
+    bgra_image_constraints.required_max_coded_width = 64;
+    bgra_image_constraints.required_max_coded_height = 64;
+    bgra_image_constraints.max_coded_width = 8192;
+    bgra_image_constraints.max_coded_height = 8192;
+    bgra_image_constraints.max_bytes_per_row = 0xffffffff;
+    bgra_image_constraints.bytes_per_row_divisor = 1024;
+    bgra_image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::R8G8B8A8;
+    bgra_image_constraints.pixel_format.has_format_modifier = true;
+    bgra_image_constraints.pixel_format.format_modifier.value =
+        fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
+    bgra_image_constraints.color_spaces_count = 1;
+    bgra_image_constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::SRGB;
+
+    EXPECT_LT(kDefaultWidth * 4, bgra_image_constraints.bytes_per_row_divisor);
+    fuchsia::sysmem::BufferCollectionConstraints constraints;
+    constraints.usage.cpu = fuchsia::sysmem::cpuUsageRead;
+    constraints.has_buffer_memory_constraints = true;
+    constraints.buffer_memory_constraints.cpu_domain_supported = true;
+    constraints.buffer_memory_constraints.ram_domain_supported = true;
+    constraints.image_format_constraints_count = 1;
+    constraints.image_format_constraints[0] = bgra_image_constraints;
+    sysmem_collection = AllocateSysmemCollection(constraints, std::move(sysmem_token));
+
+    ASSERT_TRUE(InitializeDirectImage(*collection, image_create_info));
+
+    std::optional<uint32_t> init_img_memory_result = InitializeDirectImageMemory(*collection);
+    ASSERT_TRUE(init_img_memory_result);
+    uint32_t memoryTypeIndex = init_img_memory_result.value();
+    src_is_coherent = IsMemoryTypeCoherent(memoryTypeIndex);
+
+    image = std::move(vk_image_);
+    memory = std::move(vk_device_memory_);
+
+    WriteLinearColorImageComplete(memory.get(), image.get(), src_is_coherent, kDefaultWidth,
+                                  kDefaultHeight, kPattern);
+  }
+
+  size_t bytes_per_row = fbl::round_up(
+      std::max(kDefaultWidth * kBytesPerPixel,
+               static_cast<size_t>(
+                   sysmem_collection.settings.image_format_constraints.min_bytes_per_row)),
+      sysmem_collection.settings.image_format_constraints.bytes_per_row_divisor);
+  auto layout = vulkan_context().device()->getImageSubresourceLayout(
+      image.get(), vk::ImageSubresource(vk::ImageAspectFlagBits::eColor, 0, 0));
+  EXPECT_EQ(bytes_per_row, layout.rowPitch);
+  vk::UniqueCommandPool command_pool;
+  {
+    auto info =
+        vk::CommandPoolCreateInfo().setQueueFamilyIndex(vulkan_context().queue_family_index());
+    auto result = vulkan_context().device()->createCommandPoolUnique(info);
+    ASSERT_EQ(vk::Result::eSuccess, result.result);
+    command_pool = std::move(result.value);
+  }
+
+  std::vector<vk::UniqueCommandBuffer> command_buffers;
+  {
+    auto info = vk::CommandBufferAllocateInfo()
+                    .setCommandPool(command_pool.get())
+                    .setLevel(vk::CommandBufferLevel::ePrimary)
+                    .setCommandBufferCount(1);
+    auto result = vulkan_context().device()->allocateCommandBuffersUnique(info);
+    ASSERT_EQ(vk::Result::eSuccess, result.result);
+    command_buffers = std::move(result.value);
+  }
+
+  {
+    auto info = vk::CommandBufferBeginInfo();
+    EXPECT_EQ(vk::Result::eSuccess, command_buffers[0]->begin(&info));
+  }
+
+  vk::UniqueRenderPass render_pass;
+  {
+    std::array<vk::AttachmentDescription, 1> attachments;
+    auto &color_attachment = attachments[0];
+    color_attachment.format = static_cast<vk::Format>(kDefaultFormat);
+    color_attachment.initialLayout = vk::ImageLayout::ePreinitialized;
+    color_attachment.loadOp = vk::AttachmentLoadOp::eClear;
+    color_attachment.samples = vk::SampleCountFlagBits::e1;
+    color_attachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+    color_attachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+    color_attachment.storeOp = vk::AttachmentStoreOp::eStore;
+    color_attachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+
+    vk::AttachmentReference color_attachment_ref;
+    color_attachment_ref.attachment = 0;
+    color_attachment_ref.layout = vk::ImageLayout::eColorAttachmentOptimal;
+    vk::SubpassDescription subpass;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &color_attachment_ref;
+    subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+
+    vk::RenderPassCreateInfo render_pass_info;
+    render_pass_info.attachmentCount = 1;
+    render_pass_info.pAttachments = &color_attachment;
+    render_pass_info.pSubpasses = &subpass;
+    render_pass_info.subpassCount = 1;
+    auto result = vulkan_context().device()->createRenderPassUnique(render_pass_info);
+    ASSERT_EQ(vk::Result::eSuccess, result.result);
+    render_pass = std::move(result.value);
+  }
+  vk::UniqueImageView image_view;
+  {
+    vk::ImageSubresourceRange range;
+    range.aspectMask = vk::ImageAspectFlagBits::eColor;
+    range.layerCount = 1;
+    range.levelCount = 1;
+    vk::ImageViewCreateInfo info;
+    info.image = *image;
+    info.viewType = vk::ImageViewType::e2D;
+    info.format = static_cast<vk::Format>(kDefaultFormat);
+    info.subresourceRange = range;
+
+    auto result = vulkan_context().device()->createImageViewUnique(info);
+    ASSERT_EQ(vk::Result::eSuccess, result.result);
+    image_view = std::move(result.value);
+  }
+  vk::UniqueFramebuffer frame_buffer;
+  {
+    vk::FramebufferCreateInfo create_info;
+    create_info.renderPass = *render_pass;
+    create_info.attachmentCount = 1;
+    std::array<vk::ImageView, 1> attachments{*image_view};
+    create_info.setAttachments(attachments);
+    create_info.width = kDefaultWidth;
+    create_info.height = kDefaultHeight;
+    create_info.layers = 1;
+    auto result = vulkan_context().device()->createFramebufferUnique(create_info);
+    ASSERT_EQ(vk::Result::eSuccess, result.result);
+    frame_buffer = std::move(result.value);
+  }
+
+  // Clear everything but the first line (which should stay the same).
+  vk::RenderPassBeginInfo render_pass_info;
+  vk::ClearValue clear_color;
+  clear_color.color = std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f};
+  render_pass_info.renderPass = *render_pass;
+  render_pass_info.renderArea =
+      vk::Rect2D(vk::Offset2D(0, 1), vk::Extent2D(kDefaultWidth, kDefaultHeight - 1));
+  render_pass_info.clearValueCount = 1;
+  render_pass_info.pClearValues = &clear_color;
+  render_pass_info.framebuffer = *frame_buffer;
+
+  // Clears and stores the framebuffer.
+  command_buffers[0]->beginRenderPass(render_pass_info, vk::SubpassContents::eInline);
+  command_buffers[0]->endRenderPass();
+
+  {
+    auto range = vk::ImageSubresourceRange()
+                     .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                     .setLevelCount(1)
+                     .setLayerCount(1);
+    auto barrier = vk::ImageMemoryBarrier()
+                       .setImage(image.get())
+                       .setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
+                       .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentRead |
+                                         vk::AccessFlagBits::eColorAttachmentWrite)
+                       .setOldLayout(vk::ImageLayout::eColorAttachmentOptimal)
+                       .setNewLayout(vk::ImageLayout::eGeneral)
+                       .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_FOREIGN_EXT)
+                       .setSubresourceRange(range);
+    command_buffers[0]->pipelineBarrier(
+        vk::PipelineStageFlagBits::eColorAttachmentOutput, /* srcStageMask */
+        vk::PipelineStageFlagBits::eColorAttachmentOutput, /* dstStageMask */
+        vk::DependencyFlagBits::eByRegion, 0 /* memoryBarrierCount */,
+        nullptr /* pMemoryBarriers */, 0 /* bufferMemoryBarrierCount */,
+        nullptr /* pBufferMemoryBarriers */, 1 /* imageMemoryBarrierCount */, &barrier);
+  }
+
+  EXPECT_EQ(vk::Result::eSuccess, command_buffers[0]->end());
+
+  {
+    auto command_buffer_temp = command_buffers[0].get();
+    auto info = vk::SubmitInfo().setCommandBufferCount(1).setPCommandBuffers(&command_buffer_temp);
+    EXPECT_EQ(vk::Result::eSuccess, vulkan_context().queue().submit(1, &info, vk::Fence()));
+  }
+
+  EXPECT_EQ(vk::Result::eSuccess, vulkan_context().queue().waitIdle());
+
+  ASSERT_TRUE(sysmem_collection.settings.has_image_format_constraints);
+  {
+    void *addr;
+    vk::Result result = ctx_->device()->mapMemory(*memory, 0 /* offset */, VK_WHOLE_SIZE,
+                                                  vk::MemoryMapFlags{}, &addr);
+    ASSERT_EQ(vk::Result::eSuccess, result);
+
+    if (!src_is_coherent) {
+      auto range = vk::MappedMemoryRange().setMemory(*memory).setSize(VK_WHOLE_SIZE);
+      EXPECT_EQ(vk::Result::eSuccess, ctx_->device()->invalidateMappedMemoryRanges(1, &range));
+    }
+
+    uint32_t error_count = 0;
+    constexpr uint32_t kMaxErrors = 10;
+    bool skip = false;
+    for (size_t y = 0; (y < kDefaultHeight) && !skip; y++) {
+      for (size_t x = 0; (x < kDefaultWidth) && !skip; x++) {
+        size_t byte_offset =
+            GetImageByteOffset(x, y, sysmem_collection, kDefaultWidth, kDefaultHeight);
+        uint32_t *pixel_addr =
+            reinterpret_cast<uint32_t *>(reinterpret_cast<uint8_t *>(addr) + byte_offset);
+        // The first line should keep the original pattern, but everything else should be filled to
+        // all 1s. If the row pitch is calculated incorrectly by the driver then it will write to
+        // the wrong bytes.
+        uint32_t fill = (y == 0) ? kPattern : 0xffffffff;
+        EXPECT_EQ(fill, *pixel_addr) << "byte_offset " << byte_offset << " x " << x << " y " << y;
+        if (*pixel_addr != fill) {
+          error_count++;
+          if (error_count > kMaxErrors) {
+            printf("Skipping reporting remaining errors\n");
+            skip = true;
+          }
+        }
+      }
+    }
+    ctx_->device()->unmapMemory(*memory);
+  }
 }
 
 }  // namespace
