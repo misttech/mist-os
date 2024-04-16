@@ -15,7 +15,7 @@ pub struct TargetPackageTool {
     dash_launcher_proxy: fho::Deferred<fdash::LauncherProxy>,
 }
 
-#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Eq)]
+#[derive(ArgsInfo, FromArgs, Debug)]
 #[argh(
     subcommand,
     name = "target-package",
@@ -26,14 +26,14 @@ pub struct TargetPackageCommand {
     subcommand: TargetPackageSubCommand,
 }
 
-#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Eq)]
+#[derive(ArgsInfo, FromArgs, Debug)]
 #[argh(subcommand)]
 pub enum TargetPackageSubCommand {
     Explore(ExploreCommand),
 }
 
 // TODO(https://fxbug.dev/42079178) Make the explore command a separate subtool.
-#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Eq)]
+#[derive(ArgsInfo, FromArgs, Debug)]
 #[argh(
     subcommand,
     name = "explore",
@@ -89,6 +89,19 @@ pub struct ExploreCommand {
     /// execute a command instead of reading from stdin.
     /// the exit code of the command will be forwarded to the host.
     pub command: Option<String>,
+
+    #[argh(option, default = "fdash::FuchsiaPkgResolver::Full", from_str_fn(parse_resolver))]
+    /// the resolver to use when resolving package URLs with scheme "fuchsia-pkg".
+    /// Possible values are "base" and "full". Defaults to "full".
+    pub fuchsia_pkg_resolver: fdash::FuchsiaPkgResolver,
+}
+
+fn parse_resolver(flag: &str) -> Result<fdash::FuchsiaPkgResolver, String> {
+    Ok(match flag {
+        "base" => fdash::FuchsiaPkgResolver::Base,
+        "full" => fdash::FuchsiaPkgResolver::Full,
+        _ => return Err("supported fuchisa-pkg resolvers are: 'base' and 'full'".into()),
+    })
 }
 
 #[async_trait::async_trait(?Send)]
@@ -107,7 +120,7 @@ impl fho::FfxMain for TargetPackageTool {
 }
 
 async fn explore(command: ExploreCommand, dash_launcher: fdash::LauncherProxy) -> fho::Result<()> {
-    let ExploreCommand { url, subpackages, tools, command } = command;
+    let ExploreCommand { url, subpackages, tools, command, fuchsia_pkg_resolver } = command;
 
     let (client, server) = fidl::Socket::create_stream();
     let stdout = if command.is_some() {
@@ -116,7 +129,14 @@ async fn explore(command: ExploreCommand, dash_launcher: fdash::LauncherProxy) -
         socket_to_stdio::Stdout::raw()?
     };
     let () = dash_launcher
-        .explore_package_over_socket(&url, &subpackages, server, &tools, command.as_deref())
+        .explore_package_over_socket2(
+            fuchsia_pkg_resolver,
+            &url,
+            &subpackages,
+            server,
+            &tools,
+            command.as_deref(),
+        )
         .await
         .bug_context("fidl error launching dash")?
         .map_err(|e| match e {
