@@ -9,8 +9,6 @@
 
 #include <utility>
 
-#include <fbl/ref_ptr.h>
-
 #include "lib/fidl/cpp/binding.h"
 #include "lib/fidl/cpp/interface_request.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"

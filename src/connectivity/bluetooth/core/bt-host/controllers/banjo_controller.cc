@@ -84,7 +84,7 @@ BanjoController::BanjoController(ddk::BtHciProtocolClient hci_proto,
     : hci_proto_(hci_proto),
       vendor_proto_(vendor_proto),
       dispatcher_(dispatcher),
-      callback_data_(fbl::AdoptRef(new CallbackData{.dispatcher = dispatcher})) {}
+      callback_data_(pw::IntrusivePtr(new CallbackData{.dispatcher = dispatcher})) {}
 
 BanjoController::~BanjoController() { CleanUp(); }
 

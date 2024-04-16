@@ -41,6 +41,7 @@ static_library("fidl") {
 
   public_deps = [
     ":helpers",
+    "$dir_pw_intrusive_ptr",
     "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_hlcpp",
     "//sdk/fidl/fuchsia.bluetooth.gatt:fuchsia.bluetooth.gatt_hlcpp",
     "//sdk/fidl/fuchsia.bluetooth.gatt2:fuchsia.bluetooth.gatt2_hlcpp",
@@ -49,7 +50,6 @@ static_library("fidl") {
     "//sdk/lib/fit-promise",
     "//src/connectivity/bluetooth/core/bt-host:stack",
     "//src/connectivity/bluetooth/lib/fidl",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -90,7 +90,6 @@ source_set("adapter_test_fixture") {
     "//src/connectivity/bluetooth/core/bt-host/testing:fake_controller",
     "//src/connectivity/bluetooth/core/bt-host/testing:loop_fixture",
     "//third_party/pigweed/backends/pw_async_fuchsia:dispatcher",
-    "//zircon/system/ulib/fbl",
   ]
 }
 

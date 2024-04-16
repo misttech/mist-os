@@ -16,6 +16,7 @@
 #include "lib/fidl/cpp/binding.h"
 #include "lib/fidl/cpp/interface_ptr.h"
 #include "lib/fpromise/result.h"
+#include "pw_intrusive_ptr/intrusive_ptr.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/host_error.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/uuid.h"
@@ -682,7 +683,7 @@ void ProfileServer::ConnectSco(::fuchsia::bluetooth::bredr::ProfileConnectScoReq
   }
   auto params = params_result.value();
 
-  auto sco_request = fbl::MakeRefCounted<ScoRequest>();
+  pw::IntrusivePtr<ScoRequest> sco_request = pw::MakeRefCounted<ScoRequest>();
   client.set_error_handler(
       [sco_request](zx_status_t status) { sco_request->request_handle.reset(); });
   sco_request->receiver = std::move(client);
@@ -838,7 +839,7 @@ void ProfileServer::OnServiceFound(
 }
 
 void ProfileServer::OnScoConnectionResult(
-    fbl::RefPtr<ScoRequest> request,  // NOLINT(performance-unnecessary-value-param)
+    pw::IntrusivePtr<ScoRequest> request,  // NOLINT(performance-unnecessary-value-param)
     bt::sco::ScoConnectionManager::AcceptConnectionResult result) {
   auto receiver = std::move(request->receiver);
 

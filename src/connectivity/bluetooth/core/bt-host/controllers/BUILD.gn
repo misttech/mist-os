@@ -39,7 +39,6 @@ source_set("banjo_controller") {
     "//src/connectivity/bluetooth/core/bt-host/transport",
     "//src/lib/ddk",
     "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
 

@@ -40,7 +40,6 @@ source_set("sources") {
     "//src/connectivity/bluetooth/lib/fidl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
   ]

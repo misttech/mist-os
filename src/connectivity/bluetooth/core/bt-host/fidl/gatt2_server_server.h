@@ -7,8 +7,6 @@
 
 #include <fuchsia/bluetooth/gatt2/cpp/fidl.h>
 
-#include <fbl/macros.h>
-
 #include "lib/zx/eventpair.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/gatt2_server_ids.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/server_base.h"

@@ -54,7 +54,6 @@ class GattServerServer : public GattServerBase<fuchsia::bluetooth::gatt::Server>
                               bt::gatt::PeerId peer_id, bool notify, bool indicate);
 
   // The mapping between service identifiers and FIDL Service implementations.
-  // TODO(armansito): Consider using fbl::HashTable.
   std::unordered_map<uint64_t, std::unique_ptr<LocalServiceImpl>> services_;
 
   // Keep this as the last member to make sure that all weak pointers are

@@ -7,9 +7,8 @@
 
 #include <fuchsia/bluetooth/bredr/cpp/fidl.h>
 
-#include <fbl/ref_counted.h>
-
 #include "lib/fidl/cpp/binding.h"
+#include "pw_intrusive_ptr/intrusive_ptr.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/server_base.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/bredr_connection_manager.h"
@@ -126,7 +125,7 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
     fit::callback<void(fuchsia::bluetooth::bredr::RxPacketStatus, std::vector<uint8_t>)> read_cb_;
   };
 
-  struct ScoRequest : public fbl::RefCounted<ScoRequest> {
+  struct ScoRequest : public pw::RefCounted<ScoRequest> {
     std::optional<bt::gap::BrEdrConnectionManager::ScoRequestHandle> request_handle;
     fuchsia::bluetooth::bredr::ScoConnectionReceiverPtr receiver;
     std::vector<fuchsia::bluetooth::bredr::ScoConnectionParameters> parameters;
@@ -157,7 +156,7 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
                       const std::map<bt::sdp::AttributeId, bt::sdp::DataElement>& attributes);
 
   // Callback for SCO connections requests.
-  void OnScoConnectionResult(fbl::RefPtr<ScoRequest> request,
+  void OnScoConnectionResult(pw::IntrusivePtr<ScoRequest> request,
                              bt::sco::ScoConnectionManager::AcceptConnectionResult);
 
   // Callback when clients close their audio direction extension.

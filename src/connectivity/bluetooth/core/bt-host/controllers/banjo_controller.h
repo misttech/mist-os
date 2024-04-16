@@ -13,11 +13,9 @@
 
 #include <mutex>
 
-#include <fbl/ref_counted.h>
-#include <fbl/ref_ptr.h>
-
 #include "pw_bluetooth/controller.h"
 #include "pw_bluetooth/vendor.h"
+#include "pw_intrusive_ptr/intrusive_ptr.h"
 
 namespace bt::controllers {
 
@@ -73,7 +71,7 @@ class BanjoController final : public pw::bluetooth::Controller {
 
   // Used by Banjo callbacks to detect stack destruction & to dispatch callbacks onto the bt-host
   // thread.
-  struct CallbackData : public fbl::RefCounted<CallbackData> {
+  struct CallbackData : public pw::RefCounted<CallbackData> {
     // Lock to guard reads/writes to the |dispatcher| pointer variable below (not the underlying
     // dispatcher). Calls to async::PostTask and async::WaitBase::Begin should be considered reads,
     // and require the lock to be held.
@@ -137,7 +135,7 @@ class BanjoController final : public pw::bluetooth::Controller {
 
   async_dispatcher_t* dispatcher_;
 
-  fbl::RefPtr<CallbackData> callback_data_;
+  pw::IntrusivePtr<CallbackData> callback_data_;
 };
 
 }  // namespace bt::controllers
