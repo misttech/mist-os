@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
-#include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 
 #include <memory>
 #include <optional>
@@ -25,7 +24,6 @@
 #include "src/media/audio/services/device_registry/observer_server.h"
 #include "src/media/audio/services/device_registry/provider_server.h"
 #include "src/media/audio/services/device_registry/registry_server.h"
-#include "src/media/audio/services/device_registry/ring_buffer_server.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_composite.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
@@ -33,7 +31,7 @@
 
 namespace media_audio {
 
-inline void LogFidlClientError(fidl::UnbindInfo error, std::string tag = "") {
+inline void LogFidlClientError(fidl::UnbindInfo error, const std::string& tag = "") {
   if (error.status() != ZX_OK && error.status() != ZX_ERR_PEER_CLOSED) {
     FX_LOGS(WARNING) << tag << ":" << error;
   } else {
@@ -104,6 +102,7 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
   std::unique_ptr<TestServerAndNaturalAsyncClient<ProviderServer>> CreateTestProviderServer() {
     auto [client_end, server_end] = CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Provider>();
     auto server = adr_service_->CreateProviderServer(std::move(server_end));
+    provider_fidl_error_status().reset();
     auto client = fidl::Client<fuchsia_audio_device::Provider>(std::move(client_end), dispatcher(),
                                                                provider_fidl_handler_.get());
     return std::make_unique<TestServerAndNaturalAsyncClient<ProviderServer>>(
@@ -118,14 +117,13 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
       parent()->provider_fidl_error_status_ = error.status();
     }
   };
-  std::unique_ptr<ProviderFidlHandler> provider_fidl_handler_ =
-      std::make_unique<ProviderFidlHandler>(static_cast<AudioDeviceRegistryServerTestBase*>(this));
-  std::optional<zx_status_t> provider_fidl_error_status_;
+  std::optional<zx_status_t>& provider_fidl_error_status() { return provider_fidl_error_status_; }
 
   // Registry support
   std::unique_ptr<TestServerAndNaturalAsyncClient<RegistryServer>> CreateTestRegistryServer() {
     auto [client_end, server_end] = CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Registry>();
     auto server = adr_service_->CreateRegistryServer(std::move(server_end));
+    registry_fidl_error_status().reset();
     auto client = fidl::Client<fuchsia_audio_device::Registry>(std::move(client_end), dispatcher(),
                                                                registry_fidl_handler_.get());
     return std::make_unique<TestServerAndNaturalAsyncClient<RegistryServer>>(
@@ -140,9 +138,7 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
       parent()->registry_fidl_error_status_ = error.status();
     }
   };
-  std::unique_ptr<RegistryFidlHandler> registry_fidl_handler_ =
-      std::make_unique<RegistryFidlHandler>(static_cast<AudioDeviceRegistryServerTestBase*>(this));
-  std::optional<zx_status_t> registry_fidl_error_status_;
+  std::optional<zx_status_t>& registry_fidl_error_status() { return registry_fidl_error_status_; }
 
   // ControlCreator support
   class ControlCreatorFidlHandler
@@ -156,29 +152,29 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
       parent()->control_creator_fidl_error_status_ = error.status();
     }
   };
-  std::unique_ptr<ControlCreatorFidlHandler> control_creator_fidl_handler_ =
-      std::make_unique<ControlCreatorFidlHandler>(
-          static_cast<AudioDeviceRegistryServerTestBase*>(this));
-  std::optional<zx_status_t> control_creator_fidl_error_status_;
-
   std::unique_ptr<TestServerAndNaturalAsyncClient<ControlCreatorServer>>
   CreateTestControlCreatorServer() {
     auto [client_end, server_end] =
         CreateNaturalAsyncClientOrDie<fuchsia_audio_device::ControlCreator>();
     auto server = adr_service_->CreateControlCreatorServer(std::move(server_end));
+    control_creator_fidl_error_status().reset();
     auto client = fidl::Client<fuchsia_audio_device::ControlCreator>(
         std::move(client_end), dispatcher(), control_creator_fidl_handler_.get());
     return std::make_unique<TestServerAndNaturalAsyncClient<ControlCreatorServer>>(
         test_loop(), std::move(server), std::move(client));
   }
+  std::optional<zx_status_t>& control_creator_fidl_error_status() {
+    return control_creator_fidl_error_status_;
+  }
 
   // Observer support
   std::unique_ptr<TestServerAndNaturalAsyncClient<ObserverServer>> CreateTestObserverServer(
-      std::shared_ptr<Device> observed_device) {
+      const std::shared_ptr<Device>& observed_device) {
     auto [client_end, server_end] = CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
     auto server = adr_service_->CreateObserverServer(std::move(server_end), observed_device);
+    observer_fidl_error_status().reset();
     auto client = fidl::Client<fuchsia_audio_device::Observer>(std::move(client_end), dispatcher(),
-                                                               observer_fidl_handler_.get());
+                                                               observer_fidl_handler().get());
     return std::make_unique<TestServerAndNaturalAsyncClient<ObserverServer>>(
         test_loop(), std::move(server), std::move(client));
   }
@@ -192,18 +188,20 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
       parent()->observer_fidl_error_status_ = error.status();
     }
   };
-  std::unique_ptr<ObserverFidlHandler> observer_fidl_handler_ =
-      std::make_unique<ObserverFidlHandler>(static_cast<AudioDeviceRegistryServerTestBase*>(this));
-  std::optional<zx_status_t> observer_fidl_error_status_;
+  const std::unique_ptr<ObserverFidlHandler>& observer_fidl_handler() {
+    return observer_fidl_handler_;
+  }
+  std::optional<zx_status_t>& observer_fidl_error_status() { return observer_fidl_error_status_; }
 
   // Control support
   std::unique_ptr<TestServerAndNaturalAsyncClient<ControlServer>> CreateTestControlServer(
-      std::shared_ptr<Device> device_to_control) {
+      const std::shared_ptr<Device>& device_to_control) {
     auto [client_end, server_end] = CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Control>();
     auto server = adr_service_->CreateControlServer(std::move(server_end), device_to_control);
     FX_CHECK(server) << "ControlServer is NULL";
+    control_fidl_error_status().reset();
     auto client = fidl::Client<fuchsia_audio_device::Control>(std::move(client_end), dispatcher(),
-                                                              control_fidl_handler_.get());
+                                                              control_fidl_handler().get());
     return std::make_unique<TestServerAndNaturalAsyncClient<ControlServer>>(
         test_loop(), std::move(server), std::move(client));
   }
@@ -216,9 +214,10 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
       parent()->control_fidl_error_status_ = error.status();
     }
   };
-  std::unique_ptr<ControlFidlHandler> control_fidl_handler_ =
-      std::make_unique<ControlFidlHandler>(static_cast<AudioDeviceRegistryServerTestBase*>(this));
-  std::optional<zx_status_t> control_fidl_error_status_;
+  const std::unique_ptr<ControlFidlHandler>& control_fidl_handler() {
+    return control_fidl_handler_;
+  }
+  std::optional<zx_status_t>& control_fidl_error_status() { return control_fidl_error_status_; }
 
   // RingBuffer support
   class RingBufferFidlHandler : public fidl::AsyncEventHandler<fuchsia_audio_device::RingBuffer>,
@@ -231,27 +230,54 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
       parent()->ring_buffer_fidl_error_status_ = error.status();
     }
   };
+  const std::unique_ptr<RingBufferFidlHandler>& ring_buffer_fidl_handler() {
+    return ring_buffer_fidl_handler_;
+  }
+
+  // General members
+  std::shared_ptr<media_audio::AudioDeviceRegistry> adr_service() { return adr_service_; }
+
+ private:
+  std::unique_ptr<ProviderFidlHandler> provider_fidl_handler_ =
+      std::make_unique<ProviderFidlHandler>(static_cast<AudioDeviceRegistryServerTestBase*>(this));
+  std::optional<zx_status_t> provider_fidl_error_status_;
+
+  std::unique_ptr<RegistryFidlHandler> registry_fidl_handler_ =
+      std::make_unique<RegistryFidlHandler>(static_cast<AudioDeviceRegistryServerTestBase*>(this));
+  std::optional<zx_status_t> registry_fidl_error_status_;
+
+  std::unique_ptr<ControlCreatorFidlHandler> control_creator_fidl_handler_ =
+      std::make_unique<ControlCreatorFidlHandler>(
+          static_cast<AudioDeviceRegistryServerTestBase*>(this));
+  std::optional<zx_status_t> control_creator_fidl_error_status_;
+
+  std::unique_ptr<ObserverFidlHandler> observer_fidl_handler_ =
+      std::make_unique<ObserverFidlHandler>(static_cast<AudioDeviceRegistryServerTestBase*>(this));
+  std::optional<zx_status_t> observer_fidl_error_status_;
+
+  std::unique_ptr<ControlFidlHandler> control_fidl_handler_ =
+      std::make_unique<ControlFidlHandler>(static_cast<AudioDeviceRegistryServerTestBase*>(this));
+  std::optional<zx_status_t> control_fidl_error_status_;
+
   std::unique_ptr<RingBufferFidlHandler> ring_buffer_fidl_handler_ =
       std::make_unique<RingBufferFidlHandler>(
           static_cast<AudioDeviceRegistryServerTestBase*>(this));
   std::optional<zx_status_t> ring_buffer_fidl_error_status_;
 
-  // General members
   std::shared_ptr<FidlThread> server_thread_ =
       FidlThread::CreateFromCurrentThread("test_server_thread", dispatcher());
 
   std::shared_ptr<media_audio::AudioDeviceRegistry> adr_service_ =
       std::make_shared<media_audio::AudioDeviceRegistry>(server_thread_);
 
- private:
   // Create a FakeStreamConfig that can mock a real device that has been detected, using default
   // settings. From here, the fake StreamConfig can be customized before it is enabled.
   std::shared_ptr<FakeStreamConfig> CreateFakeStreamConfig(bool is_input = false) {
     EXPECT_EQ(dispatcher(), test_loop().dispatcher());
     auto stream_config_endpoints = fidl::Endpoints<fuchsia_hardware_audio::StreamConfig>::Create();
     auto fake_stream = std::make_shared<FakeStreamConfig>(
-        stream_config_endpoints.server.TakeChannel(),
-        stream_config_endpoints.client.TakeChannel(), dispatcher());
+        stream_config_endpoints.server.TakeChannel(), stream_config_endpoints.client.TakeChannel(),
+        dispatcher());
     fake_stream->set_is_input(is_input);
     return fake_stream;
   }

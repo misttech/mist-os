@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
-#include <zircon/errors.h>
-
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/signal_processing_utils.h"

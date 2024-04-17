@@ -10,14 +10,9 @@
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/test_base.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/test_base.h>
-#include <lib/async/cpp/time.h>
-#include <lib/fidl/cpp/binding_set.h>
-#include <lib/fpromise/result.h>
-#include <lib/fzl/vmo-mapper.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/time.h>
-#include <lib/zx/vmo.h>
 #include <zircon/errors.h>
 
 #include <cstring>

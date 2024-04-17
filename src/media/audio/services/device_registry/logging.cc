@@ -4,7 +4,7 @@
 
 #include "src/media/audio/services/device_registry/logging.h"
 
-#include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
@@ -513,7 +513,7 @@ void LogCompositeProperties(const fuchsia_hardware_audio::CompositeProperties& c
 
 void LogElementStateInternal(
     const std::optional<fuchsia_hardware_audio_signalprocessing::ElementState>& element_state,
-    std::string indent) {
+    const std::string& indent) {
   if (!element_state.has_value()) {
     FX_LOGS(INFO) << indent << "                      <none>  (during device initialization)";
     return;

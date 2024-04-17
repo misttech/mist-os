@@ -6,7 +6,6 @@
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_COMMON_UNITTEST_H_
 
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
-#include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 
 #include "src/media/audio/services/device_registry/basic_types.h"
 

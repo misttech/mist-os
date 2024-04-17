@@ -4,11 +4,10 @@
 
 #include "src/media/audio/services/device_registry/provider_server.h"
 
-#include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <lib/fit/internal/result.h>
-#include <lib/syslog/cpp/macros.h>
 
-#include <optional>
+#include <utility>
 
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/device.h"
@@ -26,10 +25,11 @@ std::shared_ptr<ProviderServer> ProviderServer::Create(
     std::shared_ptr<AudioDeviceRegistry> parent) {
   ADR_LOG_STATIC(kLogProviderServerMethods);
 
-  return BaseFidlServer::Create(std::move(thread), std::move(server_end), parent);
+  return BaseFidlServer::Create(std::move(thread), std::move(server_end), std::move(parent));
 }
 
-ProviderServer::ProviderServer(std::shared_ptr<AudioDeviceRegistry> parent) : parent_(parent) {
+ProviderServer::ProviderServer(std::shared_ptr<AudioDeviceRegistry> parent)
+    : parent_(std::move(parent)) {
   ADR_LOG_METHOD(kLogObjectLifetimes);
   ++count_;
   LogObjectCounts();

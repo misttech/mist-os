@@ -9,6 +9,7 @@
 
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 #include "src/media/audio/services/device_registry/provider_server.h"
+#include "zircon/errors.h"
 
 namespace media_audio {
 namespace {
@@ -48,8 +49,9 @@ TEST_F(ProviderServerCodecWarningTest, MissingDeviceName) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 TEST_F(ProviderServerCodecWarningTest, EmptyDeviceName) {
@@ -75,8 +77,9 @@ TEST_F(ProviderServerCodecWarningTest, EmptyDeviceName) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 TEST_F(ProviderServerCodecWarningTest, MissingDeviceType) {
@@ -102,8 +105,9 @@ TEST_F(ProviderServerCodecWarningTest, MissingDeviceType) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 TEST_F(ProviderServerCodecWarningTest, MissingDriverClient) {
@@ -128,8 +132,9 @@ TEST_F(ProviderServerCodecWarningTest, MissingDriverClient) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 TEST_F(ProviderServerCodecWarningTest, InvalidDriverClient) {
@@ -154,8 +159,10 @@ TEST_F(ProviderServerCodecWarningTest, InvalidDriverClient) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  ASSERT_TRUE(provider_fidl_error_status().has_value());
+  EXPECT_EQ(*provider_fidl_error_status(), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(ProviderServerCodecWarningTest, WrongDriverClient) {
@@ -183,8 +190,9 @@ TEST_F(ProviderServerCodecWarningTest, WrongDriverClient) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 /////////////////////
@@ -215,8 +223,9 @@ TEST_F(ProviderServerCompositeWarningTest, MissingDeviceName) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 TEST_F(ProviderServerCompositeWarningTest, EmptyDeviceName) {
@@ -242,8 +251,9 @@ TEST_F(ProviderServerCompositeWarningTest, EmptyDeviceName) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 TEST_F(ProviderServerCompositeWarningTest, MissingDeviceType) {
@@ -269,8 +279,9 @@ TEST_F(ProviderServerCompositeWarningTest, MissingDeviceType) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 TEST_F(ProviderServerCompositeWarningTest, MissingDriverClient) {
@@ -295,8 +306,9 @@ TEST_F(ProviderServerCompositeWarningTest, MissingDriverClient) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 TEST_F(ProviderServerCompositeWarningTest, InvalidDriverClient) {
@@ -321,8 +333,10 @@ TEST_F(ProviderServerCompositeWarningTest, InvalidDriverClient) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  ASSERT_TRUE(provider_fidl_error_status().has_value());
+  EXPECT_EQ(*provider_fidl_error_status(), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(ProviderServerCompositeWarningTest, WrongDriverClient) {
@@ -350,8 +364,9 @@ TEST_F(ProviderServerCompositeWarningTest, WrongDriverClient) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 /////////////////////
@@ -384,8 +399,9 @@ TEST_F(ProviderServerDaiWarningTest, Unsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 /////////////////////
@@ -415,8 +431,8 @@ TEST_F(ProviderServerStreamConfigWarningTest, MissingDeviceName) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 }
 
 TEST_F(ProviderServerStreamConfigWarningTest, EmptyDeviceName) {
@@ -443,8 +459,9 @@ TEST_F(ProviderServerStreamConfigWarningTest, EmptyDeviceName) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 TEST_F(ProviderServerStreamConfigWarningTest, MissingDeviceType) {
@@ -471,8 +488,9 @@ TEST_F(ProviderServerStreamConfigWarningTest, MissingDeviceType) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 TEST_F(ProviderServerStreamConfigWarningTest, MissingDriverClient) {
@@ -497,8 +515,9 @@ TEST_F(ProviderServerStreamConfigWarningTest, MissingDriverClient) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 TEST_F(ProviderServerStreamConfigWarningTest, InvalidDriverClient) {
@@ -523,8 +542,10 @@ TEST_F(ProviderServerStreamConfigWarningTest, InvalidDriverClient) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  ASSERT_TRUE(provider_fidl_error_status().has_value());
+  EXPECT_EQ(*provider_fidl_error_status(), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(ProviderServerStreamConfigWarningTest, WrongDriverClient) {
@@ -551,8 +572,9 @@ TEST_F(ProviderServerStreamConfigWarningTest, WrongDriverClient) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 }  // namespace

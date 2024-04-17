@@ -19,6 +19,7 @@
 #include <optional>
 #include <utility>
 
+#include "lib/zx/result.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/ring_buffer_server.h"
@@ -208,8 +209,8 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
     element_id = *request.element_id();
     auto& rb_ids = device_->ring_buffer_endpoint_ids();
     if (rb_ids.find(element_id) == rb_ids.end()) {
-      ADR_WARN_METHOD()
-          << "required field 'element_id' does not refer to an ENDPOINT of type RING_BUFFER";
+      ADR_WARN_METHOD() << "required field 'element_id' (" << element_id
+                        << ") does not refer to an ENDPOINT of type RING_BUFFER";
       completer.Reply(
           fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kInvalidElementId));
       return;
@@ -217,14 +218,15 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
   }
 
   if (create_ring_buffer_completers_.find(element_id) != create_ring_buffer_completers_.end()) {
-    ADR_WARN_METHOD() << "previous `CreateRingBuffer` request has not yet completed";
+    ADR_WARN_METHOD() << "(element_id " << element_id
+                      << ") previous `CreateRingBuffer` request has not completed";
     completer.Reply(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kAlreadyPending));
     return;
   }
 
   if (!request.options()) {
-    ADR_WARN_METHOD() << "required field 'options' is missing";
+    ADR_WARN_METHOD() << "(element_id " << element_id << ") required field 'options' is missing";
     completer.Reply(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kInvalidOptions));
     return;
@@ -232,24 +234,27 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
   if (!request.options()->format() || !request.options()->format()->sample_type() ||
       !request.options()->format()->channel_count() ||
       !request.options()->format()->frames_per_second()) {
-    ADR_WARN_METHOD() << "required 'options.format' (or one of its required members) is missing";
+    ADR_WARN_METHOD() << "(element_id " << element_id
+                      << ") required 'options.format' (or one of its required members) is missing";
     completer.Reply(fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat));
     return;
   }
   if (!request.options()->ring_buffer_min_bytes()) {
-    ADR_WARN_METHOD() << "required field 'options.ring_buffer_min_bytes' is missing";
+    ADR_WARN_METHOD() << "(element_id " << element_id
+                      << ") required field 'options.ring_buffer_min_bytes' is missing";
     completer.Reply(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kInvalidMinBytes));
     return;
   }
   if (!request.ring_buffer_server()) {
-    ADR_WARN_METHOD() << "required field 'ring_buffer_server' is missing";
+    ADR_WARN_METHOD() << "(element_id " << element_id
+                      << ") required field 'ring_buffer_server' is missing";
     completer.Reply(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kInvalidRingBuffer));
     return;
   }
   if (TryGetRingBufferServer(element_id)) {
-    ADR_WARN_METHOD() << "device RingBuffer already exists";
+    ADR_WARN_METHOD() << "(element_id " << element_id << ") device RingBuffer already exists";
     completer.Reply(
         fit::error(fuchsia_audio_device::wire::ControlCreateRingBufferError::kAlreadyAllocated));
     return;
@@ -259,7 +264,8 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
       device_->SupportedDriverFormatForClientFormat(element_id, *request.options()->format());
   // Fail if device cannot satisfy the requested format.
   if (!driver_format) {
-    ADR_WARN_METHOD() << "device does not support the specified options";
+    ADR_WARN_METHOD() << "(element_id " << element_id
+                      << ") device does not support the specified options";
     completer.Reply(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kFormatMismatch));
     return;
@@ -275,7 +281,8 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
         if (create_ring_buffer_completers_.find(element_id) ==
             create_ring_buffer_completers_.end()) {
           ADR_WARN_OBJECT()
-              << "create_ring_buffer_completer_ gone by the time the CreateRingBuffer callback ran";
+              << "(element_id " << element_id
+              << ") create_ring_buffer_completer_ gone by the time the CreateRingBuffer callback ran";
           device_->DropRingBuffer(element_id);  //  Let this unwind the RingBufferServer.
           return;
         }
@@ -644,7 +651,7 @@ void ControlServer::GetTopologies(GetTopologiesCompleter::Sync& completer) {
   FX_CHECK(device_->info().has_value() &&
            device_->info()->signal_processing_topologies().has_value() &&
            !device_->info()->signal_processing_topologies()->empty());
-  completer.Reply(zx::success(*device_->info()->signal_processing_topologies()));
+  completer.Reply(zx::ok(*device_->info()->signal_processing_topologies()));
 }
 
 void ControlServer::WatchTopology(WatchTopologyCompleter::Sync& completer) {
@@ -773,7 +780,7 @@ void ControlServer::GetElements(GetElementsCompleter::Sync& completer) {
   FX_CHECK(device_->info().has_value() &&
            device_->info()->signal_processing_elements().has_value() &&
            !device_->info()->signal_processing_elements()->empty());
-  completer.Reply(zx::success(*device_->info()->signal_processing_elements()));
+  completer.Reply(zx::ok(*device_->info()->signal_processing_elements()));
 }
 
 void ControlServer::WatchElementState(WatchElementStateRequest& request,

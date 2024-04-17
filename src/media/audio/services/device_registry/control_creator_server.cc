@@ -4,11 +4,9 @@
 
 #include "src/media/audio/services/device_registry/control_creator_server.h"
 
-#include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <lib/fit/internal/result.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <optional>
 #include <utility>
 
 #include "src/media/audio/services/device_registry/audio_device_registry.h"

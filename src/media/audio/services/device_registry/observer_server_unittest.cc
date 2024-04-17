@@ -106,8 +106,8 @@ class ObserverServerCodecTest : public ObserverServerTest {
     auto fake_driver = std::make_shared<FakeCodec>(
         codec_endpoints.server.TakeChannel(), codec_endpoints.client.TakeChannel(), dispatcher());
 
-    adr_service_->AddDevice(Device::Create(
-        adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
+    adr_service()->AddDevice(Device::Create(
+        adr_service(), dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
         fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable())));
 
     RunLoopUntilIdle();
@@ -120,8 +120,8 @@ class ObserverServerCompositeTest : public ObserverServerTest {
   std::shared_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeComposite();
 
-    adr_service_->AddDevice(Device::Create(
-        adr_service_, dispatcher(), "Test composite name",
+    adr_service()->AddDevice(Device::Create(
+        adr_service(), dispatcher(), "Test composite name",
         fuchsia_audio_device::DeviceType::kComposite,
         DriverClient::WithComposite(
             fidl::ClientEnd<fuchsia_hardware_audio::Composite>(fake_driver->Enable()))));
@@ -141,9 +141,9 @@ class ObserverServerStreamConfigTest : public ObserverServerTest {
   std::shared_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeStreamConfigOutput();
 
-    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
-                                           fuchsia_audio_device::DeviceType::kOutput,
-                                           DriverClient::WithStreamConfig(fake_driver->Enable())));
+    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test output name",
+                                            fuchsia_audio_device::DeviceType::kOutput,
+                                            DriverClient::WithStreamConfig(fake_driver->Enable())));
 
     RunLoopUntilIdle();
     return fake_driver;
@@ -156,13 +156,13 @@ class ObserverServerStreamConfigTest : public ObserverServerTest {
 // Verify that an Observer client can drop cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerCodecTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
+  auto observer = CreateTestObserverServer(*adr_service()->devices().begin());
   ASSERT_EQ(ObserverServer::count(), 1u);
 
   (void)observer->client().UnbindMaybeGetEndpoint();
 
   RunLoopUntilIdle();
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 
   // No WARNING logging should occur during test case shutdown.
 }
@@ -170,14 +170,14 @@ TEST_F(ObserverServerCodecTest, CleanClientDrop) {
 // Verify that an Observer server can shutdown cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerCodecTest, CleanServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
+  auto observer = CreateTestObserverServer(*adr_service()->devices().begin());
   ASSERT_EQ(ObserverServer::count(), 1u);
 
   observer->server().Shutdown(ZX_ERR_PEER_CLOSED);
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(observer_fidl_error_status_.has_value());
-  EXPECT_EQ(*observer_fidl_error_status_, ZX_ERR_PEER_CLOSED);
+  ASSERT_TRUE(observer_fidl_error_status().has_value());
+  EXPECT_EQ(*observer_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 
   // No WARNING logging should occur during test case shutdown.
 }
@@ -186,8 +186,8 @@ TEST_F(ObserverServerCodecTest, CleanServerShutdown) {
 // directly create an Observer server and client synthetically via CreateTestObserverServer.
 TEST_F(ObserverServerCodecTest, Creation) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
@@ -196,7 +196,7 @@ TEST_F(ObserverServerCodecTest, Creation) {
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
   auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
-      std::move(observer_client_end), dispatcher(), observer_fidl_handler_.get());
+      std::move(observer_client_end), dispatcher(), observer_fidl_handler().get());
   bool received_callback = false;
 
   registry->client()
@@ -212,20 +212,20 @@ TEST_F(ObserverServerCodecTest, Creation) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_TRUE(observer_client.is_valid());
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that when an observed device is removed, the Observer is dropped.
 TEST_F(ObserverServerCodecTest, ObservedDeviceRemoved) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
 
@@ -237,8 +237,8 @@ TEST_F(ObserverServerCodecTest, ObservedDeviceRemoved) {
   EXPECT_EQ(*added_device_id, *removed_device_id);
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(observer_fidl_error_status_.has_value());
-  EXPECT_EQ(*observer_fidl_error_status_, ZX_ERR_PEER_CLOSED);
+  ASSERT_TRUE(observer_fidl_error_status().has_value());
+  EXPECT_EQ(*observer_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
 // Verify that the Observer receives the initial plug state of the observed device.
@@ -249,19 +249,19 @@ TEST_F(ObserverServerCodecTest, InitialPlugState) {
   fake_driver->InjectUnpluggedAt(initial_plug_time);
 
   RunLoopUntilIdle();
-  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
-                                         fuchsia_audio_device::DeviceType::kCodec,
-                                         DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
+                                          fuchsia_audio_device::DeviceType::kCodec,
+                                          DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
   bool received_callback = false;
@@ -282,20 +282,20 @@ TEST_F(ObserverServerCodecTest, InitialPlugState) {
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(initial_plug_time.get(), reported_plug_time.get());
   EXPECT_EQ(ObserverServer::count(), 1u);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that the Observer receives changes in the plug state of the observed device.
 TEST_F(ObserverServerCodecTest, PlugChange) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
   auto time_after_device_added = zx::clock::get_monotonic();
@@ -335,7 +335,7 @@ TEST_F(ObserverServerCodecTest, PlugChange) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(received_plug_time.get(), time_of_plug_change.get());
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that an Observer does not drop, if the observed device's Control client is dropped.
@@ -345,7 +345,7 @@ TEST_F(ObserverServerCodecTest, ObserverDoesNotDropIfClientControlDrops) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
 
@@ -364,7 +364,7 @@ TEST_F(ObserverServerCodecTest, ObserverDoesNotDropIfClientControlDrops) {
   RunLoopUntilIdle();
   EXPECT_EQ(ObserverServer::count(), 1u);
   EXPECT_TRUE(observer->client().is_valid());
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain),
@@ -378,7 +378,7 @@ TEST_F(ObserverServerCodecTest, GetTopologiesUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto observer = CreateTestObserverServer(device);
@@ -407,7 +407,7 @@ TEST_F(ObserverServerCodecTest, GetElementsUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto observer = CreateTestObserverServer(device);
@@ -435,13 +435,13 @@ TEST_F(ObserverServerCodecTest, GetElementsUnsupported) {
 // Verify that an Observer client can drop cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerCompositeTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
+  auto observer = CreateTestObserverServer(*adr_service()->devices().begin());
   ASSERT_EQ(ObserverServer::count(), 1u);
 
   (void)observer->client().UnbindMaybeGetEndpoint();
 
   RunLoopUntilIdle();
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 
   // No WARNING logging should occur during test case shutdown.
 }
@@ -449,14 +449,14 @@ TEST_F(ObserverServerCompositeTest, CleanClientDrop) {
 // Verify that an Observer server can shutdown cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerCompositeTest, CleanServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
+  auto observer = CreateTestObserverServer(*adr_service()->devices().begin());
   ASSERT_EQ(ObserverServer::count(), 1u);
 
   observer->server().Shutdown(ZX_ERR_PEER_CLOSED);
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(observer_fidl_error_status_.has_value());
-  EXPECT_EQ(*observer_fidl_error_status_, ZX_ERR_PEER_CLOSED);
+  ASSERT_TRUE(observer_fidl_error_status().has_value());
+  EXPECT_EQ(*observer_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 
   // No WARNING logging should occur during test case shutdown.
 }
@@ -465,8 +465,8 @@ TEST_F(ObserverServerCompositeTest, CleanServerShutdown) {
 // directly create an Observer server and client synthetically via CreateTestObserverServer.
 TEST_F(ObserverServerCompositeTest, Creation) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
@@ -475,7 +475,7 @@ TEST_F(ObserverServerCompositeTest, Creation) {
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
   auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
-      std::move(observer_client_end), dispatcher(), observer_fidl_handler_.get());
+      std::move(observer_client_end), dispatcher(), observer_fidl_handler().get());
   bool received_callback = false;
 
   registry->client()
@@ -491,20 +491,20 @@ TEST_F(ObserverServerCompositeTest, Creation) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_TRUE(observer_client.is_valid());
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that when an observed device is removed, the Observer is dropped.
 TEST_F(ObserverServerCompositeTest, ObservedDeviceRemoved) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
 
@@ -515,21 +515,21 @@ TEST_F(ObserverServerCompositeTest, ObservedDeviceRemoved) {
   EXPECT_EQ(*added_device_id, *removed_device_id);
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(observer_fidl_error_status_.has_value());
-  EXPECT_EQ(*observer_fidl_error_status_, ZX_ERR_PEER_CLOSED);
+  ASSERT_TRUE(observer_fidl_error_status().has_value());
+  EXPECT_EQ(*observer_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
 // Verify that the Observer receives the observed device's reference clock, and that it is valid.
 TEST_F(ObserverServerCompositeTest, GetReferenceClock) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
   bool received_callback = false;
@@ -545,7 +545,7 @@ TEST_F(ObserverServerCompositeTest, GetReferenceClock) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that an Observer does not drop, if an observed device's driver RingBuffer is dropped.
@@ -555,7 +555,7 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfDriverRingBufferDrops) 
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device);
   auto observer = CreateTestObserverServer(device);
@@ -586,7 +586,7 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfDriverRingBufferDrops) 
   RunLoopUntilIdle();
   EXPECT_EQ(ObserverServer::count(), 1u);
   EXPECT_TRUE(observer->client().is_valid());
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that an Observer does not drop, if an observed device's RingBuffer client is dropped.
@@ -596,7 +596,7 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientRingBufferDrops) 
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device);
   auto observer = CreateTestObserverServer(device);
@@ -627,7 +627,7 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientRingBufferDrops) 
   RunLoopUntilIdle();
   EXPECT_EQ(ObserverServer::count(), 1u);
   EXPECT_TRUE(observer->client().is_valid());
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that an Observer does not drop, if the observed device's Control client is dropped.
@@ -637,7 +637,7 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientControlDrops) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
 
@@ -657,7 +657,7 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientControlDrops) {
   RunLoopUntilIdle();
   EXPECT_EQ(ObserverServer::count(), 1u);
   EXPECT_TRUE(observer->client().is_valid());
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Retrieves the static list of Topologies and their properties.
@@ -668,7 +668,7 @@ TEST_F(ObserverServerCompositeTest, GetTopologies) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto initial_topologies = device->info()->signal_processing_topologies();
   ASSERT_TRUE(initial_topologies.has_value() && !initial_topologies->empty());
@@ -699,7 +699,7 @@ TEST_F(ObserverServerCompositeTest, GetElements) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto initial_elements = device->info()->signal_processing_elements();
   ASSERT_TRUE(initial_elements.has_value() && !initial_elements->empty());
@@ -729,7 +729,7 @@ TEST_F(ObserverServerCompositeTest, WatchTopologyInitial) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
   auto observer = CreateTestObserverServer(device);
@@ -756,7 +756,7 @@ TEST_F(ObserverServerCompositeTest, WatchTopologyNoChange) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
   auto observer = CreateTestObserverServer(device);
@@ -793,7 +793,7 @@ TEST_F(ObserverServerCompositeTest, WatchTopologyUpdate) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
   auto observer = CreateTestObserverServer(device);
@@ -850,7 +850,7 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateInitial) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
   auto observer = CreateTestObserverServer(device);
@@ -894,12 +894,11 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateNoChange) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
   auto observer = CreateTestObserverServer(device);
   auto& elements_from_device = element_map(device);
-  FX_LOGS(INFO) << "elements_from_device.size: " << elements_from_device.size();
   auto received_callback = false;
   std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>
       element_states;
@@ -944,12 +943,11 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
   auto observer = CreateTestObserverServer(device);
   auto& elements_from_device = element_map(device);
-  FX_LOGS(INFO) << "elements_from_device.size: " << elements_from_device.size();
   auto received_callback = false;
   std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>
       element_states;
@@ -1082,13 +1080,13 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
 // Verify that an Observer client can drop cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerStreamConfigTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
+  auto observer = CreateTestObserverServer(*adr_service()->devices().begin());
   ASSERT_EQ(ObserverServer::count(), 1u);
 
   (void)observer->client().UnbindMaybeGetEndpoint();
 
   RunLoopUntilIdle();
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 
   // No WARNING logging should occur during test case shutdown.
 }
@@ -1096,14 +1094,14 @@ TEST_F(ObserverServerStreamConfigTest, CleanClientDrop) {
 // Verify that an Observer server can shutdown cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerStreamConfigTest, CleanServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
+  auto observer = CreateTestObserverServer(*adr_service()->devices().begin());
   ASSERT_EQ(ObserverServer::count(), 1u);
 
   observer->server().Shutdown(ZX_ERR_PEER_CLOSED);
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(observer_fidl_error_status_.has_value());
-  EXPECT_EQ(*observer_fidl_error_status_, ZX_ERR_PEER_CLOSED);
+  ASSERT_TRUE(observer_fidl_error_status().has_value());
+  EXPECT_EQ(*observer_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 
   // No WARNING logging should occur during test case shutdown.
 }
@@ -1112,8 +1110,8 @@ TEST_F(ObserverServerStreamConfigTest, CleanServerShutdown) {
 // directly create an Observer server and client synthetically via CreateTestObserverServer.
 TEST_F(ObserverServerStreamConfigTest, Creation) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
@@ -1122,7 +1120,7 @@ TEST_F(ObserverServerStreamConfigTest, Creation) {
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
   auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
-      std::move(observer_client_end), dispatcher(), observer_fidl_handler_.get());
+      std::move(observer_client_end), dispatcher(), observer_fidl_handler().get());
   bool received_callback = false;
 
   registry->client()
@@ -1138,20 +1136,20 @@ TEST_F(ObserverServerStreamConfigTest, Creation) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_TRUE(observer_client.is_valid());
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that when an observed device is removed, the Observer is dropped.
 TEST_F(ObserverServerStreamConfigTest, ObservedDeviceRemoved) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
 
@@ -1162,8 +1160,8 @@ TEST_F(ObserverServerStreamConfigTest, ObservedDeviceRemoved) {
   EXPECT_EQ(*added_device_id, *removed_device_id);
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(observer_fidl_error_status_.has_value());
-  EXPECT_EQ(*observer_fidl_error_status_, ZX_ERR_PEER_CLOSED);
+  ASSERT_TRUE(observer_fidl_error_status().has_value());
+  EXPECT_EQ(*observer_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
 // Verify that the Observer receives the initial gain state of the observed device.
@@ -1177,19 +1175,19 @@ TEST_F(ObserverServerStreamConfigTest, InitialGainState) {
   }});
 
   RunLoopUntilIdle();
-  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
-                                         fuchsia_audio_device::DeviceType::kOutput,
-                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test output name",
+                                          fuchsia_audio_device::DeviceType::kOutput,
+                                          DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
   bool received_callback = false;
@@ -1207,20 +1205,20 @@ TEST_F(ObserverServerStreamConfigTest, InitialGainState) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that the Observer receives changes in the gain state of the observed device.
 TEST_F(ObserverServerStreamConfigTest, GainChange) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
   bool received_callback = false;
@@ -1262,7 +1260,7 @@ TEST_F(ObserverServerStreamConfigTest, GainChange) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that the Observer receives the initial plug state of the observed device.
@@ -1272,19 +1270,19 @@ TEST_F(ObserverServerStreamConfigTest, InitialPlugState) {
   fake_driver->InjectUnpluggedAt(initial_plug_time);
 
   RunLoopUntilIdle();
-  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
-                                         fuchsia_audio_device::DeviceType::kOutput,
-                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test output name",
+                                          fuchsia_audio_device::DeviceType::kOutput,
+                                          DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
   bool received_callback = false;
@@ -1301,21 +1299,21 @@ TEST_F(ObserverServerStreamConfigTest, InitialPlugState) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that the Observer receives changes in the plug state of the observed device.
 TEST_F(ObserverServerStreamConfigTest, PlugChange) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
   auto time_of_plug_change = zx::clock::get_monotonic();
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
   bool received_callback = false;
@@ -1350,20 +1348,20 @@ TEST_F(ObserverServerStreamConfigTest, PlugChange) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that the Observer receives the observed device's reference clock, and that it is valid.
 TEST_F(ObserverServerStreamConfigTest, GetReferenceClock) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
   bool received_callback = false;
@@ -1379,7 +1377,7 @@ TEST_F(ObserverServerStreamConfigTest, GetReferenceClock) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that an Observer does not drop, if the observed device's driver RingBuffer is dropped.
@@ -1390,7 +1388,7 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfDriverRingBufferDrop
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device);
   auto observer = CreateTestObserverServer(device);
@@ -1415,7 +1413,7 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfDriverRingBufferDrop
   RunLoopUntilIdle();
   EXPECT_EQ(ObserverServer::count(), 1u);
   EXPECT_TRUE(observer->client().is_valid());
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that an Observer does not drop, if the observed device's RingBuffer client is dropped.
@@ -1426,7 +1424,7 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientRingBufferDrop
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device);
   auto observer = CreateTestObserverServer(device);
@@ -1453,7 +1451,7 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientRingBufferDrop
   RunLoopUntilIdle();
   EXPECT_EQ(ObserverServer::count(), 1u);
   EXPECT_TRUE(observer->client().is_valid());
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that an Observer does not drop, if the observed device's Control client is dropped.
@@ -1464,7 +1462,7 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientControlDrops) 
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
 
@@ -1493,7 +1491,7 @@ TEST_F(ObserverServerStreamConfigTest, ObserverDoesNotDropIfClientControlDrops) 
   RunLoopUntilIdle();
   EXPECT_EQ(ObserverServer::count(), 1u);
   EXPECT_TRUE(observer->client().is_valid());
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // TODO(https://fxbug.dev/323270827): implement signalprocessing, including in the FakeStreamConfig
@@ -1507,7 +1505,7 @@ TEST_F(ObserverServerStreamConfigTest, GetTopologiesUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto observer = CreateTestObserverServer(device);
@@ -1536,7 +1534,7 @@ TEST_F(ObserverServerStreamConfigTest, GetElementsUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto observer = CreateTestObserverServer(device);

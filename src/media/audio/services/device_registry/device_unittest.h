@@ -7,12 +7,6 @@
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
-#include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
-#include <lib/fidl/cpp/client.h>
-#include <lib/fidl/cpp/enum.h>
-#include <lib/fidl/cpp/unified_messaging_declarations.h>
-#include <lib/fidl/cpp/wire/status.h>
-#include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
@@ -422,7 +416,7 @@ class CompositeTest : public DeviceTestBase {
   }
 
   static const std::unordered_map<ElementId, ElementRecord>& signal_processing_elements(
-      std::shared_ptr<Device> device) {
+      const std::shared_ptr<Device>& device) {
     return device->sig_proc_element_map_;
   }
 
@@ -657,8 +651,8 @@ class StreamConfigTest : public DeviceTestBase {
   std::shared_ptr<FakeStreamConfig> MakeFakeStreamConfig(bool is_input = false) {
     auto stream_config_endpoints = fidl::Endpoints<fuchsia_hardware_audio::StreamConfig>::Create();
     auto fake_stream = std::make_shared<FakeStreamConfig>(
-        stream_config_endpoints.server.TakeChannel(),
-        stream_config_endpoints.client.TakeChannel(), dispatcher());
+        stream_config_endpoints.server.TakeChannel(), stream_config_endpoints.client.TakeChannel(),
+        dispatcher());
     fake_stream->set_is_input(is_input);
     return fake_stream;
   }

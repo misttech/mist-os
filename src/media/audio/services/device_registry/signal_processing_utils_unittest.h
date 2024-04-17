@@ -7,8 +7,6 @@
 
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
-#include <fidl/fuchsia.hardware.audio/cpp/common_types.h>
-#include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 
 #include <vector>
 

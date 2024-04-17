@@ -4,7 +4,7 @@
 
 #include "src/media/audio/services/device_registry/signal_processing_utils.h"
 
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
 
 #include <gtest/gtest.h>
 

@@ -4,21 +4,14 @@
 
 #include "src/media/audio/services/device_registry/testing/fake_composite_ring_buffer.h"
 
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/test_base.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/test_base.h>
-#include <lib/fidl/cpp/unified_messaging_declarations.h>
-#include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fit/result.h>
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
 #include <zircon/errors.h>
-#include <zircon/time.h>
 
 #include <cstddef>
-#include <cstring>
 #include <optional>
 
 #include "src/media/audio/services/device_registry/basic_types.h"

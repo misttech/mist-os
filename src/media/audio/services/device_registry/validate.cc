@@ -4,7 +4,6 @@
 
 #include "src/media/audio/services/device_registry/validate.h"
 
-#include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
@@ -20,10 +19,6 @@
 #include "src/media/audio/services/device_registry/signal_processing_utils.h"
 
 namespace media_audio {
-
-// Frame rates must be listed in ascending order, but some drivers don't do this.
-// TODO(https://fxbug.dev/42068180): once this is fixed, clean out this workaround.
-inline constexpr bool kStrictFrameRateOrdering = true;
 
 namespace {
 
@@ -1095,12 +1090,12 @@ bool ValidateElements(
   }
 
   for (const auto& element : elements) {
-    if (auto status = ValidateElement(element); status != true) {
+    if (auto status = ValidateElement(element); !status) {
       return status;
     }
   }
 
-  return (MapElements(elements).empty() ? false : true);
+  return (!MapElements(elements).empty());
 }
 
 bool ValidateTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topology,

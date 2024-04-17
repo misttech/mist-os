@@ -16,6 +16,7 @@
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <algorithm>
 #include <cstdint>
@@ -33,7 +34,6 @@
 #include "src/media/audio/services/device_registry/observer_notify.h"
 #include "src/media/audio/services/device_registry/signal_processing_utils.h"
 #include "src/media/audio/services/device_registry/validate.h"
-#include "zircon/types.h"
 
 namespace media_audio {
 
@@ -391,13 +391,13 @@ bool Device::DropControl() {
   ADR_LOG_METHOD(kLogDeviceMethods || kLogNotifyMethods);
   FX_CHECK(state_ != State::DeviceInitializing);
 
-  // TODO drop ring buffers?
-
   auto control_notify = GetControlNotify();
   if (!control_notify) {
     ADR_LOG_METHOD(kLogNotifyMethods) << "already not controlled";
     return false;
   }
+
+  // Need to drop ring buffers here?
 
   control_notify_.reset();
   // We don't remove our ControlNotify from the observer list: we wait for it to self-invalidate.
@@ -1070,8 +1070,6 @@ void Device::RetrieveCurrentTopology() {
 
         // Save the topology and notify Observers, but only if this is a change in topology.
         if (!current_topology_id_.has_value() || *current_topology_id_ != topology_id) {
-          FX_LOGS(INFO) << "***** We believe that the topology_id changed from "
-                        << current_topology_id_.value_or(-1) << " to " << topology_id;
           current_topology_id_ = topology_id;
           ADR_LOG_OBJECT(kLogNotifyMethods)
               << "ForEachObserver => TopologyChanged: " << topology_id;
@@ -1130,8 +1128,6 @@ void Device::RetrieveElementState(ElementId element_id) {
           ADR_LOG_OBJECT(kLogNotifyMethods)
               << "Not sending ElementStateChanged: state is unchanged.";
         } else {
-          FX_LOGS(INFO) << "***** We believe that the state changed for element_id " << element_id;
-
           element_record->second.state = element_state;
           // Notify any Observers of this change in element state.
           ADR_LOG_OBJECT(kLogNotifyMethods)

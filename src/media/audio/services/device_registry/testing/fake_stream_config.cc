@@ -6,16 +6,12 @@
 
 #include <fuchsia/hardware/audio/cpp/fidl.h>
 #include <fuchsia/hardware/audio/signalprocessing/cpp/fidl.h>
-#include <lib/fidl/cpp/binding.h>
-#include <lib/fidl/cpp/unified_messaging_declarations.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
-#include <lib/zx/result.h>
 #include <zircon/errors.h>
 
-#include <audio-proto-utils/format-utils.h>
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/logging.h"

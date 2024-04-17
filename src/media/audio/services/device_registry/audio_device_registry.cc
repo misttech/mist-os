@@ -7,9 +7,7 @@
 #include <fidl/fuchsia.audio.device/cpp/markers.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/fidl/cpp/wire/internal/transport.h>
 #include <lib/syslog/cpp/macros.h>
-#include <zircon/errors.h>
 
 #include <memory>
 #include <utility>

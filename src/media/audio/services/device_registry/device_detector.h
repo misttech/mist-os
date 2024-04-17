@@ -7,8 +7,6 @@
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
-#include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
-#include <lib/fit/function.h>
 #include <lib/zx/result.h>
 
 #include <functional>
@@ -19,11 +17,6 @@
 #include "src/lib/fsl/io/device_watcher.h"
 
 namespace media_audio {
-
-// If true, we detect Composite devices directly (without CompositeConnector).
-// If false, we detect Composite devices via the "trampoline" CompositeConnector.
-// TODO(https://fxbug.dev/304551042): Convert VirtualAudioComposite to DFv2 and remove this flag.
-constexpr bool kDetectDFv2CompositeDevices = true;
 
 using DeviceDetectionHandler = std::function<void(
     std::string_view, fuchsia_audio_device::DeviceType, fuchsia_audio_device::DriverClient)>;

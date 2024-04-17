@@ -5,10 +5,10 @@
 #ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_VALIDATE_H_
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_VALIDATE_H_
 
-#include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <fidl/fuchsia.audio.device/cpp/common_types.h>
+#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
-#include <zircon/types.h>
 
 #include <unordered_map>
 

@@ -4,15 +4,13 @@
 
 #include "src/media/audio/services/device_registry/ring_buffer_server.h"
 
-#include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <fidl/fuchsia.audio.device/cpp/markers.h>
 #include <lib/fit/internal/result.h>
 #include <zircon/errors.h>
 
-#include <optional>
 #include <utility>
 
 #include "src/media/audio/services/common/base_fidl_server.h"
-#include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/control_server.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"

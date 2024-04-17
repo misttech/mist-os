@@ -10,9 +10,7 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <memory>
-#include <optional>
 #include <string_view>
-#include <utility>
 
 #include "src/media/audio/services/common/base_fidl_server.h"
 #include "src/media/audio/services/common/fidl_thread.h"

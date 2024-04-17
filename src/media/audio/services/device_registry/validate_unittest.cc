@@ -5,10 +5,8 @@
 #include "src/media/audio/services/device_registry/validate.h"
 
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
-#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/vmo.h>
 #include <zircon/errors.h>

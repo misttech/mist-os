@@ -9,9 +9,6 @@
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
-#include "src/media/audio/services/device_registry/testing/fake_codec.h"
-#include "src/media/audio/services/device_registry/testing/fake_composite.h"
-#include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
 namespace {
@@ -37,8 +34,8 @@ TEST_F(AudioDeviceRegistryServerTest, DeviceInitialization) {
       fuchsia_audio_device::DriverClient::WithStreamConfig(std::move(stream_config_client)));
 
   RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 3u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 3u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 }
 
 TEST_F(AudioDeviceRegistryServerTest, DeviceRemoval) {
@@ -60,16 +57,16 @@ TEST_F(AudioDeviceRegistryServerTest, DeviceRemoval) {
       fuchsia_audio_device::DriverClient::WithStreamConfig(std::move(stream_config_client)));
 
   RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 3u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 3u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 
   fake_codec->DropCodec();
   fake_composite->DropComposite();
   fake_stream->DropStreamConfig();
   RunLoopUntilIdle();
 
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 }
 
 /////////////////////
@@ -82,10 +79,10 @@ TEST_F(AudioDeviceRegistryServerTest, FindCodecByTokenId) {
                         fuchsia_audio_device::DriverClient::WithCodec(std::move(client)));
 
   RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
-  auto token_id = adr_service_->devices().begin()->get()->token_id();
+  EXPECT_EQ(adr_service()->devices().size(), 1u);
+  auto token_id = adr_service()->devices().begin()->get()->token_id();
 
-  EXPECT_EQ(adr_service_->FindDeviceByTokenId(token_id).first,
+  EXPECT_EQ(adr_service()->FindDeviceByTokenId(token_id).first,
             AudioDeviceRegistry::DevicePresence::Active);
 }
 
@@ -98,10 +95,10 @@ TEST_F(AudioDeviceRegistryServerTest, FindCompositeByTokenId) {
                         fuchsia_audio_device::DriverClient::WithComposite(std::move(client)));
 
   RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
-  auto token_id = adr_service_->devices().begin()->get()->token_id();
+  EXPECT_EQ(adr_service()->devices().size(), 1u);
+  auto token_id = adr_service()->devices().begin()->get()->token_id();
 
-  EXPECT_EQ(adr_service_->FindDeviceByTokenId(token_id).first,
+  EXPECT_EQ(adr_service()->FindDeviceByTokenId(token_id).first,
             AudioDeviceRegistry::DevicePresence::Active);
 }
 
@@ -115,10 +112,10 @@ TEST_F(AudioDeviceRegistryServerTest, FindStreamConfigByTokenId) {
                         fuchsia_audio_device::DriverClient::WithStreamConfig(std::move(client)));
 
   RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
-  auto token_id = adr_service_->devices().begin()->get()->token_id();
+  EXPECT_EQ(adr_service()->devices().size(), 1u);
+  auto token_id = adr_service()->devices().begin()->get()->token_id();
 
-  EXPECT_EQ(adr_service_->FindDeviceByTokenId(token_id).first,
+  EXPECT_EQ(adr_service()->FindDeviceByTokenId(token_id).first,
             AudioDeviceRegistry::DevicePresence::Active);
 }
 

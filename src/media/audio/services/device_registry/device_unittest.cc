@@ -6,9 +6,9 @@
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio/cpp/common_types.h>
-#include <fidl/fuchsia.audio/cpp/natural_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
-#include <lib/fidl/cpp/enum.h>
 #include <lib/zx/clock.h>
 #include <zircon/errors.h>
 
@@ -18,12 +18,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h"
-#include "fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h"
 #include "src/media/audio/services/device_registry/common_unittest.h"
 #include "src/media/audio/services/device_registry/device_unittest.h"
-#include "src/media/audio/services/device_registry/logging.h"
-#include "src/media/audio/services/device_registry/signal_processing_utils_unittest.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_composite.h"
 #include "src/media/audio/services/device_registry/testing/fake_composite_ring_buffer.h"
@@ -31,8 +27,6 @@
 #include "src/media/audio/services/device_registry/validate.h"
 
 namespace media_audio {
-
-using ::testing::Optional;
 
 /////////////////////
 // Codec tests
