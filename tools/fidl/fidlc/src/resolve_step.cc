@@ -452,37 +452,8 @@ void ResolveStep::ParseSyntheticReference(Reference& ref, Context context) {
 }
 
 void ResolveStep::ParseSourcedReference(Reference& ref, Context context) {
-  // TOOD(https://fxbug.dev/42157590): Move this information to the FIDL language spec.
-  //
-  // Below is an outline of FIDL scoping semantics. We navigate it by moving
-  // down and to the right. That is, if a rule succeeds, we proceed to the
-  // indented one below it (if there is none, SUCCESS); if a rule fails, we try
-  // the same-indentation one below it (if there is none, FAIL).
-  //
-  // - X
-  //     - Resolve X as a decl within the current library.
-  //     - Resolve X as a decl within the root library.
-  //     - Resolve X as a contextual bits/enum member, if context exists.
-  // - X.Y
-  //     - Resolve X as a decl within the current library.
-  //         - Resolve Y as a member of X.
-  //     - Resolve X as a library name or alias.
-  //         - Resolve Y as a decl within X.
-  // - x.Y.Z where x represents 1+ components
-  //     - Resolve x.Y as a library name or alias.
-  //         - Resolve Z as a decl within x.Y.
-  //     - Resolve x as a library name or alias.
-  //         - Resolve Y as a decl within x.
-  //             - Resolve Z as a member of Y.
-  //
-  // Note that if you import libraries A and A.B, you cannot refer to bits/enum
-  // member [library A].B.C because it is interpreted as decl [library A.B].C.
-  // To do so, you must remove or alias one of the imports. We implement this
-  // behavior even if [library A.B].C does not exist, since otherwise
-  // introducing it would result in breakage at a distance. For FIDL code that
-  // follow the linter naming conventions (lowercase library, CamelCase decl),
-  // this will never come up in practice.
-
+  // This implements the identifier resolution algorithm from
+  // https://fuchsia.dev/fuchsia-src/reference/fidl/language/language#resolution-algorithm
   const auto& components = ref.raw_sourced().components;
   Lookup lookup(this, ref);
   switch (components.size()) {

@@ -1,7 +1,7 @@
 # FIDL language specification
 
 This document is a specification of the Fuchsia Interface Definition Language
-(**FIDL**) syntax.
+(**FIDL**).
 
 For more information about FIDL's overall purpose, goals, and requirements,
 see [Overview][fidl-overview].
@@ -12,73 +12,71 @@ Also, see a modified [EBNF description of the FIDL grammar][fidl-grammar].
 
 ## Syntax
 
-FIDL provides a syntax for declaring named bits, constants, enums, structs,
-tables, unions, and protocols. These declarations are collected into libraries
-for distribution.
+FIDL provides a syntax for declaring data types and protocols. These
+declarations are collected into libraries for distribution.
 
-FIDL declarations are stored in plain text UTF-8 files. Each file consists of a
+FIDL declarations are stored in UTF-8 text files. Each file consists of a
 sequence of semicolon-delimited declarations. The order of declarations within a
-FIDL file, or among FIDL files within a library, is irrelevant. FIDL does not
-require (or support) forward declarations of any kind.
+FIDL file, or among FIDL files within a library, is irrelevant.
 
 ### Comments
 
-FIDL comments start with two (`//`) or three (`///`) forward slashes, continue
-to the end of the line, and can contain UTF-8 content (which is, of course, ignored).
-The three-forward-slash variant is a "documentation comment", and causes the comment
-text to be emitted into the generated code (as a comment, escaped correctly
-for the target language).
+FIDL comments start with two forward slashes (`//`) and continue to the end of
+the line. Comments that start with three forward slashes (`///`) are called
+documentation comments, and get emitted as comments in the generated bindings.
 
 ```fidl
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/language_reference.test.fidl" region_tag="comments" %}
 ```
 
-Note that documentation comments can also be provided via the [`@doc`
-attribute][doc-attribute].
-
 ### Keywords
 
-The following are keywords in FIDL.
+The following words have special meaning in FIDL:
 
 ```
-alias, as, bits, compose, const, enum, error, flexible, library, optional,
-protocol, resource, service, strict, struct, table, type, union, using.
+ajar, alias, as, bits, closed, compose, const, enum, error, false, flexible,
+library, open, optional, protocol, resource, service, strict, struct, table,
+true, type, union, using.
+```
+
+However, FIDL has no reserved keywords. For example:
+
+```fidl
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/language_reference.test.fidl" region_tag="keywords" %}
 ```
 
 ### Identifiers {#identifiers}
 
-FIDL _identifiers_ label declarations and their members. FIDL identifiers must
-match the regex `[a-zA-Z]([a-zA-Z0-9_]*[a-zA-Z0-9])?`. In words: identifiers
-must start with a letter, can contain letters, numbers, and underscores, but
-cannot end with an underscore.
+#### Library names
+
+FIDL _library names_ label [FIDL libraries](#libraries). They consist of one or
+more components separated by dots (`.`). Each component must match the regex
+`[a-z][a-z0-9]*`. In words: library name components must start with a lowercase
+letter, can contain lowercase letters, and numbers.
 
 ```fidl
-// a struct named "Foo"
-type Foo = struct {};
-
-// an enum named "enum", containing a single member
-type enum = enum { WITH_A_MEMBER = 1; };
-```
-
-Note: While using keywords as identifiers is supported, it can lead to
-confusion, and should therefore be considered on a case-by-case basis. See the
-`Names` section of the [Style Rubric][naming-style].
-
-FIDL _library names_ label [FIDL libraries](#libraries). FIDL library names
-consist of one or more elements each matching the regex `[a-z][a-z0-9]*`. In
-words: library name elements must start with a lowercase letter, can contain
-lowercase letters, and numbers (they cannot contain uppercase letters, nor
-underscores). Library names are used in [Qualified
-Identifiers](#qualified-identifiers).
-
-```fidl
-// a library named "foo"
+// A library named "foo".
 library foo;
 ```
 
-Identifiers and library names are case-sensitive.
+#### Identifiers
 
-### Qualified Identifiers {#qualified-identifiers}
+FIDL _identifiers_ label declarations and their members. They must match the
+regex `[a-zA-Z]([a-zA-Z0-9_]*[a-zA-Z0-9])?`. In words: identifiers must start
+with a letter, can contain letters, numbers, and underscores, but cannot end
+with an underscore.
+
+```fidl
+// A struct named "Foo".
+type Foo = struct {};
+```
+
+FIDL identifiers are case sensitive. However, identifiers must have unique
+_canonical forms_, otherwise the FIDL compiler will fail with [fi-0035:
+Canonical name collision](/reference/fidl/language/errcat#fi-0035). The
+canonical form of an identifier is obtained by converting it to `snake_case`.
+
+#### Qualified identifiers {#qualified-identifiers}
 
 FIDL always looks for unqualified symbols within the scope of the current
 library. To reference symbols in other libraries, they must be qualified by
@@ -111,34 +109,78 @@ type Color = struct {
 };
 ```
 
+#### Resolution algorithm {#resolution-algorithm}
+
+FIDL uses the following algorithm to resolve identifiers. When a "try resolving"
+step fails, it proceeds to the next step. When a "resolve" step fails, the
+compiler produces an error.
+
+* If it is unqualified:
+    1. Try resolving as a declaration in the current library.
+    2. Try resoving as a builtin declaration, e.g. `bool` refers to `fidl.bool`.
+    3. Resolve as a contextual bits/enum member, e.g. the `CHANNEL` in
+       `zx.handle:CHANNEL` refers to `zx.ObjType.Channel`.
+* If it is qualified as `X.Y`:
+    1. Try resolving `X` as a declaration within the current library:
+        1. Resolve `Y` as a member of `X`.
+    2. Resolve `X` as a library name or alias.
+        1. Resolve `Y` as a declaration in `X`.
+* If it is qualified as `x.Y.Z` where `x` represents one or more components:
+    1. Try resolving `x.Y` as a library name or alias:
+        1. Resolve `Z` as a declaration in `x.Y`.
+    2. Resolve `x` as a library name or alias:
+        1. Resolve `Y` as a declaration in `x`:
+            1. Resolve `Z` as a member of `x.Y`.
+
+Note: If you import libraries `X` and `X.Y`, and library `X` defines an enum
+named `Y`, you cannot refer to a member of that enum since `X.Y.Z` would be
+interpreted as the declaration `Z` from library `X.Y`, even if no such
+declaration exists. To refer to the enum member, you would have to remove or
+alias one of the imports. This should not come up in practice when following the
+[FIDL Style Guide][naming-style], which mandates `lowercase` library names and
+`UpperCamel` declaration names.
+
+#### Fully qualified names {#fqn}
+
+FIDL uses fully qualified names (abbreviated "FQN") to refer unambiguously to
+declarations and members. An FQN consts of a library name, a slash `/`, a
+declaration identifier, and optionally a dot `.` and member identifier. For
+example:
+
+* `fuchsia.io/MAX_BUF` refers to the `MAX_BUF` constant in library `fuchsia.io`.
+* `fuchsia.process/Launcher.Launch` refers to the `Launch` method in the
+  `Launcher` protocol of library `fuchsia.process`.
+
+FQNs are used in error messages, in the FIDL JSON intermediate representation,
+and in documentation comment cross references. They are also used as method
+selectors, which method ordinals are derived from.
+
 ### Literals
 
-FIDL supports integer, floating point, boolean, string, and enumeration literals, using
-a simplified syntax familiar to C programmers (see below for examples).
+FIDL supports the following kinds of literals:
+
+* Boolean: `true`, `false`
+* Integer: `0`, `-1`, `123`, `0xABC`, `0b101`, etc.
+* Floating point: `1.23`, `-0.01`, `1e5`, `2.0e-3`, etc.
+* String: `"hello"`, `"\\ \" \n \r \t \u{1f642}"`, etc.
 
 ### Constants {#constants}
 
-FIDL supports the following constant types: bits, booleans, signed and unsigned
-integers, floating point values, strings, and enumerations.
-The syntax is similar to C:
+FIDL allows defining constants for all types that support literals (boolean,
+integer, floating point, and string), and bits and enums. For example:
 
 ```fidl
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/language_reference.test.fidl" region_tag="consts" %}
 ```
 
-These declarations introduce a name within their scope.
-The constant's type must be either a primitive or an enum.
+Constant expressions are either literals, references to other constants,
+references to bits or enum members, or a combination of bits members separated
+by the pipe character (`|`). FIDL does not support any other arithmetic
+expressions such as `1 + 2`.
 
-Constant expressions are either literals or the names of other
-constant expressions.
+### Declaration separator
 
-> For greater clarity, there is no expression processing in FIDL; that is,
-> you *cannot* declare a constant as having the value `6 + 5`, for
-> example.
-
-### Declaration Separator
-
-FIDL uses the semi-colon **';'** to separate adjacent declarations within the
+FIDL uses the semicolon (`;`) to separate adjacent declarations within the
 file, much like C.
 
 ## Libraries {#libraries}
@@ -149,20 +191,21 @@ Libraries are named containers of FIDL declarations.
 // library identifier separated by dots
 library fuchsia.composition;
 
-// "using" to import library "fuchsia.buffers"
-using fuchsia.buffers;
+// "using" to import library "fuchsia.mem"
+using fuchsia.mem;
 
-// "using" to import library "fuchsia.geometry" and create a shortform called "geo"
+// "using" to import library "fuchsia.geometry" under the alias "geo"
 using fuchsia.geometry as geo;
 ```
 
-Libraries may declare that they use other libraries with a "using" declaration.
-This allows the library to refer to symbols defined in other libraries upon which
-they depend. Symbols imported this way may be accessed by:
+Libraries may declare that they use other libraries with a `using` declaration.
+This allows the library to refer to symbols defined in other libraries upon
+which they depend. Symbols imported this way may be accessed by qualifying them
+with the library name, as in `fuchsia.mem.Range`.
 
-*   qualifying them with the fully qualified library name (as in _"fuchsia.geometry.Rect"_),
-*   specifying just the library name (as in _"geometry.Rect"_), or,
-*   using a library alias (as in _"geo.Rect"_).
+A `using` declaration can also specify an alias with the `as` syntax. In this
+case, symbols in the other library can only be accessed by qualifying them with
+the alias, as in `geo.Rect` (using `fuchsia.geometry.Rect` would not work).
 
 In the source tree, each library consists of a directory with some number of
 **.fidl** files. The name of the directory is irrelevant to the FIDL compiler
@@ -172,17 +215,17 @@ not contain FIDL files for more than one library.
 The scope of `library` and `using` declarations is limited to a single file.
 Each individual file within a FIDL library must restate the `library`
 declaration together with any `using` declarations needed by that file.
+Libraries with multiple files [conventionally have an overview.fidl
+file][library-overview] containing only a `library` declaration along with
+attributes and a documentation comment.
 
 The library's name may be used by certain language bindings to provide scoping
-for symbols emitted by the code generator.
+for symbols emitted by the code generator. For example, the C++ bindings
+generator places declarations for the FIDL library `fuchsia.ui` within the C++
+namespace `fuchsia_ui`. Similarly, for languages such as Dart and Rust, which
+have their own module system, each FIDL library is compiled as a module.
 
-For example, the C++ bindings generator places declarations for the
-FIDL library `fuchsia.ui` within the C++ namespace
-`fuchsia::ui`. Similarly, for languages such as Dart and Rust, which
-have their own module system, each FIDL library is compiled as a
-module for that language.
-
-## Types and Type Declarations
+## Types and type declarations
 
 FIDL supports a number of builtin types as well as declarations of new types
 (e.g. structs, unions, type aliases) and protocols.
@@ -190,7 +233,7 @@ FIDL supports a number of builtin types as well as declarations of new types
 ### Primitives
 
 *   Simple value types.
-*   Never optional.
+*   Cannot be optional.
 
 The following primitive types are supported:
 
@@ -199,10 +242,7 @@ The following primitive types are supported:
 *    Unsigned integer        **`uint8 uint16 uint32 uint64`**
 *    IEEE 754 Floating-point **`float32 float64`**
 
-Numbers are suffixed with their size in bits, **`bool`** is 1
-byte.
-
-We also alias **`byte`** to mean **`uint8`** as a [built-in alias](#built-in-aliases).
+Numbers are suffixed with their size in bits, **`int8`** is 1 byte.
 
 #### Use
 
@@ -213,13 +253,11 @@ We also alias **`byte`** to mean **`uint8`** as a [built-in alias](#built-in-ali
 ### Bits {#bits}
 
 * Named bit types.
-* Discrete subset of bit values chosen from an underlying integer primitive
-  type.
-* Never optional.
+* Discrete subset of bit values chosen from an underlying integer type.
+* Cannot be optional.
 * Bits can either be [`strict` or `flexible`](#strict-vs-flexible).
 * Bits default to `flexible`.
-* `strict` bits must have at least one member (`flexible` bits can be
-  memberless).
+* `strict` bits must have at least one member (`flexible` bits can be empty).
 
 #### Operators
 
@@ -234,9 +272,8 @@ We also alias **`byte`** to mean **`uint8`** as a [built-in alias](#built-in-ali
 ### Enums {#enums}
 
 * Proper enumerated types.
-* Discrete subset of named values chosen from an underlying integer primitive
-  type.
-* Never optional.
+* Discrete subset of named values chosen from an underlying integer type.
+* Cannot be optional.
 * Enums can be [`strict` or `flexible`](#strict-vs-flexible).
 * Enums default to `flexible`.
 * `strict` enums must have at least one member (`flexible` enums can be
@@ -244,9 +281,9 @@ We also alias **`byte`** to mean **`uint8`** as a [built-in alias](#built-in-ali
 
 #### Declaration
 
-The ordinal index is **required** for each enum element. The underlying type of
+The ordinal is **required** for each enum element. The underlying type of
 an enum must be one of: **int8, uint8, int16, uint16, int32, uint32, int64,
-uint64**. If omitted, the underlying type is assumed to be **uint32**.
+uint64**. If omitted, the underlying type defaults to **uint32**.
 
 ```fidl
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/language_reference.test.fidl" region_tag="enums" %}
@@ -265,16 +302,14 @@ Enum types are denoted by their identifier, which may be qualified if needed.
 ### Arrays
 
 *   Fixed-length sequences of homogeneous elements.
-*   Elements can be of any type including: primitives, enums, arrays, strings,
-    vectors, handles, structs, tables, unions.
-*   Never optional themselves; may contain optional types.
+*   Elements can be of any type.
+*   Cannot be optional themselves; may contain optional types.
 
 #### Use
 
-Arrays are denoted **`array<T, N>`** where _T_ can
-be any FIDL type (including an array) and _N_ is a positive
-integer constant expression that specifies the number of elements in
-the array.
+Arrays are denoted **`array<T, N>`** where _T_ can be any FIDL type (including
+an array) and _N_ is a positive integer constant expression that specifies the
+number of elements in the array.
 
 ```fidl
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/language_reference.test.fidl" region_tag="arrays" %}
@@ -288,8 +323,8 @@ of the type. In other words, changing the parameter `_N_` is an
 
 *   Variable-length sequence of UTF-8 encoded characters representing text.
 *   Can be optional; absent strings and empty strings are distinct.
-*   Can specify a maximum size, e.g. **`string:40`** for a
-    maximum 40 byte string.
+*   Can specify a maximum size, e.g. **`string:40`** for a maximum 40 byte
+    string. By default, `string` means `string:MAX`, i.e unbounded.
 *   String literals support the escape sequences `\\`, `\"`, `\n`, `\r`, `\t`,
     and `\u{X}` where the `X` is 1 to 6 hex digits for a Unicode code point.
 *   May contain embedded `NUL` bytes, unlike traditional C strings.
@@ -323,8 +358,8 @@ parameter `_N_` is not an [ABI-breaking][compat] change.
 
 *   Variable-length sequence of homogeneous elements.
 *   Can be optional; absent vectors and empty vectors are distinct.
-*   Can specify a maximum size, e.g. **`vector<T>:40`** for a
-    maximum 40 element vector.
+*   Can specify a maximum size, e.g. **`vector<T>:40`** for a maximum 40 element
+    vector. By default, `vector<T>` means `vector<T>:MAX`, i.e. unbounded.
 *   There is no special case for vectors of bools. Each bool element takes one
     byte as usual.
 
@@ -490,7 +525,7 @@ Unions are denoted by their declared name (e.g. **Result**) and optionality:
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/language_reference.test.fidl" region_tag="unions-use" %}
 ```
 
-### Strict vs. Flexible {#strict-vs-flexible}
+### Strict vs. flexible {#strict-vs-flexible}
 
 FIDL type declarations can either have **strict** or **flexible** behavior:
 
@@ -524,7 +559,7 @@ More details are discussed in
 Note: A type that is both flexible and a [value type](#value-vs-resource) will
 not allow deserializing unknown data that contains handles.
 
-### Value vs. Resource {#value-vs-resource}
+### Value vs. resource {#value-vs-resource}
 
 Every FIDL type is either a **value type** or a **resource type**. Resource
 types include:
@@ -568,18 +603,15 @@ More details are discussed in [RFC-0057: Default No Handles][rfc-0057].
 ### Protocols {#protocols}
 
 *   Describe methods that can be invoked by sending messages over a channel.
-*   Methods are identified by their ordinal index. The compiler calculates the ordinal by
-    * Taking the SHA-256 hash of the string generated by concatenating:
-        * The UTF-8 encoded library name, with no trailing \0 character
-        * '.' (ASCII 0x2e)
-        * The UTF-8 encoded protocol name, with no trailing \0 character
-        * '/' (ASCII 0x2f)
-        * The UTF-8 encoded method name, with no trailing \0 character
-    * Extracting the upper 32 bits of the hash value, and
-    * Setting the upper bit of that value to 0.
-    * To coerce the compiler into generating a different value, methods can have
-      a `@selector` attribute.  The value of the `@selector` attribute will be
-      used in the place of the method name above.
+*   Methods are identified by their ordinal. The compiler calculates it by:
+    * Taking the SHA-256 hash of the method's [fully qualified name](#fqn).
+    * Extracting the first 8 bytes of the hash digest,
+    * Interpreting those bytes as a little endian integer,
+    * Setting the upper bit (i.e. last bit) of that value to 0.
+    * To override the ordinal, methods can have a `@selector` attribute. If the
+      attribute's argument is a valid FQN, it will be used in place of the FQN
+      above. Otherwise, it must be a valid identifier, and will be used in place
+      of the method name when constructing the FQN.
 *   Each method declaration states its arguments and results.
     *   If no results are declared, then the method is one-way: no response will
         be generated by the server.
@@ -622,7 +654,7 @@ optionality:
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/language_reference.test.fidl" region_tag="endpoints" %}
 ```
 
-### Protocol Composition {#protocol-composition}
+### Protocol composition {#protocol-composition}
 
 A protocol can include methods from other protocols.
 This is called composition: you compose one protocol from other protocols.
@@ -746,11 +778,6 @@ So, we create a protocol (`SystemClock`) that composes both:
 
 ### Unknown interactions {#unknown-interactions}
 
-Note: Unknown interaction handling is an experimental feature. Most libraries
-currently cannot use it. This notice will be updated when it is available for
-general use. Please contact fidl-dev@fuchsia.dev if you have questions about
-using it.
-
 Protocols can define how they react when they receive a method call or event
 which has an ordinal which isn't recognized. Unrecognized ordinals occur
 primarily when a client and server were built using different versions of a
@@ -845,20 +872,6 @@ compose other protocols that are at least as closed as it is:
 *   `ajar`: Can compose `ajar` and `closed` protocols.
 *   `closed`: Can only compose other `closed` protocols.
 
-#### Behavior prior to unknown interactions
-
-Before unknown interactions support was added to FIDL, all protocols behaved as
-if they were `closed` and all methods behaved as if they were `strict`. The
-default values for protocols and methods with the `unknown_interactions`
-experiment enabled are `open` and `flexible`. This means that to avoid changing
-from `closed` and `strict` to `open` and `flexible` when you enable
-`unknown_interactions`, you need to add explicit `closed` and `strict` modifiers
-to any existing protocols and methods.
-
-See the [compatibility
-guide](/docs/development/languages/fidl/guides/compatibility/README.md) for more
-information about migrating unknown interactions modifiers.
-
 ### Aliasing {#aliasing}
 
 Type aliasing is supported. For example:
@@ -882,38 +895,28 @@ Consider:
 Here, the `Message` struct contains a string of `MAX_SIZE` bytes called `baseline`,
 and a vector of up to `5` strings of `MAX_SIZE` called `chapters`.
 
-Note that **`byte`** is a built-in aliases, [see below](#built-in-aliases).
-
 <<../../../development/languages/fidl/widgets/_alias.md>>
 
-### Built-ins
+### Builtins
 
-FIDL provides several built-ins:
+FIDL provides the following builtins:
 
-* convenience types (**`byte`**)
-* `zx library` [see below](#zx-library)
+* Primitive types: `bool`, `int8`, `int16`, `int32`, `int64`, `uint8`, `uint16`,
+  `uint32`, `uint64`, `float32`, `float64`.
+* Other types: `string`, `client_end`, `server_end`.
+* Type templates: `array`, `vector`, `box`.
+* Aliases: `byte`.
+* Constraints: `optional`, `MAX`.
 
-#### Built-in aliases {#built-in-aliases}
+All builtins below to the `fidl` library. This library is always available and
+does not need to be imported with `using`. For example, if you declare a struct
+named `string`, you can refer to the original string type as `fidl.string`.
 
-The **`byte`** type is built-in, and is conceptually equivalent to:
+#### Library `zx` {#zx-library}
 
-```fidl
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/language_reference_builtin.test.fidl" region_tag="builtin" %}
-```
-
-When you refer to a name without specific scope, e.g.:
-
-```fidl
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/language_reference.test.fidl" region_tag="builtin-aliases" %}
-```
-
-we treat this as `builtin.byte` automatically (so long as there isn't a
-more-specific name in scope).
-
-#### ZX Library {#zx-library}
-
-The `fidlc` compiler automatically generates an internal [ZX library](library-zx.md)
-for you that contains commonly used Zircon definitions.
+Library `zx` is not built in, but it is treated specially by the compiler. It is
+defined in [//zircon/vdso/zx](/zircon/vdso/zx). Libraries import it with
+`using zx` and most commonly use the `zx.Handle` type.
 
 ### Inline layouts {#inline-layouts}
 
@@ -945,15 +948,15 @@ protocol Launcher {
 };
 ```
 
-When an inline layout is used, `fidlc` will reserve a name for it that is
+When an inline layout is used, FIDL will reserve a name for it that is
 guaranteed to be unique, based on the [naming context][naming-context] that the
 layout is used in. This results in the following reserved names:
 
 * For inline layouts used as the type of an outer layout member, the reserved
   name is simply the name of the corresponding member.
-    * In the example above, the name `Options` is reserved for the inlined
+    * In the example above, the name `Options` is reserved for the inline
       `table`.
-* For top level request/response types, `fidlc` concatenates the protocol name,
+* For top level request/response types, FIDL concatenates the protocol name,
   the method name, and then either `"Request"` or `"Response"` depending on
   where the type is used.
     * In the example above, the name `LauncherGenerateTerrainRequest` is
@@ -973,7 +976,6 @@ obtain a different reserved name:
 * Override the reserved name using the [`@generated_name`][generated-name-attr]
   attribute.
 
-<!-- xref -->
 [mixin]: https://en.wikipedia.org/wiki/Mixin
 [rfc-0023]: /docs/contribute/governance/rfcs/0023_compositional_model_protocols.md
 [rfc-0031]: /docs/contribute/governance/rfcs/0031_typed_epitaphs.md
@@ -993,3 +995,4 @@ obtain a different reserved name:
 [naming-context]: /docs/contribute/governance/rfcs/0050_syntax_revamp.md#layout-naming-contexts
 [generated-name-attr]: /docs/reference/fidl/language/attributes.md#generated-name
 [Life of a handle]: /docs/concepts/fidl/life-of-a-handle.md
+[library-overview]: /docs/development/languages/fidl/guides/style.md#library-overview

@@ -43,19 +43,9 @@ fidl("versioning") {
   available = [ "fuchsia:HEAD" ]
 }
 
-fidl("builtin") {
-  testonly = true
-  sources = [ "language_reference_builtin.test.fidl" ]
-  excluded_checks = [
-    "invalid-case-for-decl-name",
-    "wrong-prefix-for-platform-source-library",
-  ]
-}
-
 group("all") {
   testonly = true
   deps = [
-    ":builtin($fidl_toolchain)",
     ":fuchsia.examples.docs($fidl_toolchain)",
     ":versioning($fidl_toolchain)",
   ]

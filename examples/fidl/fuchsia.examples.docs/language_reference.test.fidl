@@ -36,6 +36,16 @@ type MyStruct = struct { // plain comment
 }; // and this is the last one!
 // [END comments]
 
+// [START keywords]
+// Declaring a struct named "struct" is allowed, though confusing.
+type struct = struct {};
+
+// Declaring a table field named "strict" is a more reasonable example.
+type Options = table {
+    1: strict bool;
+};
+// [END keywords]
+
 // [START consts]
 const ENABLED_FLAG bool = true;
 const OFFSET int8 = -33;
@@ -48,6 +58,7 @@ const USERNAME string = "squeenze";
 const MIN_TEMP float32 = -273.15;
 const CONVERSION_FACTOR float64 = 1.41421358;
 const MY_DRINK Beverage = Beverage.WATER;
+const FEATURES InfoFeatures = InfoFeatures.WLAN | InfoFeatures.SYNTH;
 // [END consts]
 
 // [START defaults]
@@ -341,13 +352,6 @@ type Message = struct {
     chapters Chapters;
 };
 // [END aliasing-usage]
-
-// [START builtin-aliases]
-type RawBytes = struct {
-    head byte;
-    rest vector<uint8>;
-};
-// [END builtin-aliases]
 
 // [START calculator]
 type DivisionError = strict enum : uint32 {
