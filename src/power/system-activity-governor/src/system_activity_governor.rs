@@ -37,6 +37,21 @@ enum IncomingRequest {
     Stats(fsuspend::StatsRequestStream),
 }
 
+#[derive(Copy, Clone)]
+enum BootControlLevel {
+    Inactive,
+    Active,
+}
+
+impl From<BootControlLevel> for fbroker::PowerLevel {
+    fn from(bc: BootControlLevel) -> Self {
+        match bc {
+            BootControlLevel::Inactive => 0,
+            BootControlLevel::Active => 1,
+        }
+    }
+}
+
 #[async_trait(?Send)]
 trait SuspendResumeListener {
     /// Gets the manager of suspend stats.
@@ -73,6 +88,7 @@ struct ExecutionStateManager {
 }
 
 impl ExecutionStateManager {
+    /// Creates a new ExecutionStateManager.
     fn new(execution_state: PowerElementContext, suspender: fhsuspend::SuspenderProxy) -> Self {
         Self {
             passive_dependency_token: execution_state.passive_dependency_token(),
@@ -86,29 +102,40 @@ impl ExecutionStateManager {
         }
     }
 
+    /// Sets the suspend resume listener.
+    /// The listener can only be set once. Subsequent calls will result in a panic.
     fn set_suspend_resume_listener(&self, suspend_resume_listener: Rc<dyn SuspendResumeListener>) {
-        let _ = self.suspend_resume_listener.set(suspend_resume_listener);
+        self.suspend_resume_listener
+            .set(suspend_resume_listener)
+            .map_err(|_| anyhow::anyhow!("suspend_resume_listener is already set"))
+            .unwrap();
     }
 
+    /// Gets a copy of the passive dependency token.
     fn passive_dependency_token(&self) -> fbroker::DependencyToken {
         self.passive_dependency_token
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
             .expect("failed to duplicate token")
     }
 
+    /// Sets the suspend state index that will be used when suspend is triggered.
     async fn set_suspend_state_index(&self, suspend_state_index: u64) {
         tracing::debug!(?suspend_state_index, "set_suspend_state_index: acquiring inner lock");
         self.inner.lock().await.suspend_state_index = suspend_state_index;
     }
 
+    /// Updates the power level of the execution state power element.
+    ///
+    /// Returns a Result that indicates whether the system should suspend or not.
+    /// If an error occurs while updating the power level, the error is forwarded to the caller.
     async fn update_current_level(&self, required_level: fbroker::PowerLevel) -> Result<bool> {
         tracing::debug!(?required_level, "update_current_level: acquiring inner lock");
         let mut inner = self.inner.lock().await;
-        tracing::debug!(?required_level, "update_current_level: updating current level");
 
+        tracing::debug!(?required_level, "update_current_level: updating current level");
         let res = inner.execution_state.current_level.update(required_level).await;
         if let Err(error) = res {
-            tracing::warn!(?error, "run_power_element: update_current_power_level failed");
+            tracing::warn!(?error, "update_current_level: current_level.update failed");
             return Err(error.into());
         }
 
@@ -124,14 +151,17 @@ impl ExecutionStateManager {
         }
     }
 
+    /// Gets a copy of the name of the execution state power element.
     async fn name(&self) -> String {
         self.inner.lock().await.execution_state.name().to_string()
     }
 
+    /// Gets a copy of the RequiredLevelProxy of the execution state power element.
     async fn required_level_proxy(&self) -> fbroker::RequiredLevelProxy {
         self.inner.lock().await.execution_state.required_level.clone()
     }
 
+    /// Attempts to suspend the system.
     async fn trigger_suspend(&self) {
         let listener = self.suspend_resume_listener.get().unwrap();
         {
@@ -386,6 +416,8 @@ pub struct SystemActivityGovernor {
     listeners: RefCell<Vec<fsystem::ActivityGovernorListenerProxy>>,
     /// The manager used to modify execution_state and trigger suspend.
     execution_state_manager: ExecutionStateManager,
+    /// The context used to manage the boot_control power element.
+    boot_control: PowerElementContext,
 }
 
 impl SystemActivityGovernor {
@@ -461,6 +493,21 @@ impl SystemActivityGovernor {
         .await
         .expect("PowerElementContext encountered error while building wake_handling");
 
+        let boot_control = PowerElementContext::builder(
+            topology,
+            "boot_control",
+            &[BootControlLevel::Inactive.into(), BootControlLevel::Active.into()],
+        )
+        .dependencies(vec![fbroker::LevelDependency {
+            dependency_type: fbroker::DependencyType::Active,
+            dependent_level: BootControlLevel::Active.into(),
+            requires_token: execution_state.active_dependency_token(),
+            requires_level: ExecutionStateLevel::Active.into_primitive(),
+        }])
+        .build()
+        .await
+        .expect("PowerElementContext encountered error while building wake_handling");
+
         let resp = suspender
             .get_suspend_states()
             .await
@@ -497,6 +544,7 @@ impl SystemActivityGovernor {
             suspend_stats,
             listeners: RefCell::new(Vec::new()),
             execution_state_manager: ExecutionStateManager::new(execution_state, suspender),
+            boot_control,
         }))
     }
 
@@ -509,7 +557,7 @@ impl SystemActivityGovernor {
                 let (es_suspend_tx, es_suspend_rx) = mpsc::channel(1);
                 self.run_suspend_task(es_suspend_rx);
                 self.run_execution_state(&elements_node, es_suspend_tx);
-                self.run_application_activity(&elements_node);
+                self.run_application_activity(&elements_node, &node);
                 self.run_full_wake_handling(&elements_node);
                 self.run_wake_handling(&elements_node);
                 self.run_execution_resume_latency(elements_node);
@@ -574,17 +622,53 @@ impl SystemActivityGovernor {
         .detach();
     }
 
-    fn run_application_activity(self: &Rc<Self>, inspect_node: &fuchsia_inspect::Node) {
+    fn run_application_activity(
+        self: &Rc<Self>,
+        inspect_node: &fuchsia_inspect::Node,
+        root_node: &fuchsia_inspect::Node,
+    ) {
         let application_activity_node = inspect_node.create_child("application_activity");
+        let booting_node = Rc::new(root_node.create_bool("booting", false));
         let this = self.clone();
 
         fasync::Task::local(async move {
+            let update_fn = Rc::new(default_update_fn(&this.application_activity));
+
+            tracing::info!("System is booting. Acquiring boot control lease.");
+            let boot_control_lease = this
+                .boot_control
+                .lessor
+                .lease(BootControlLevel::Active.into())
+                .await
+                .expect("Failed to acquire boot control lease");
+            booting_node.set(true);
+            let boot_control_lease = Rc::new(RefCell::new(Some(boot_control_lease)));
+
             run_power_element(
                 this.application_activity.name(),
                 &this.application_activity.required_level,
                 ApplicationActivityLevel::Inactive.into_primitive(),
                 application_activity_node,
-                default_update_fn(&this.application_activity),
+                Box::new(move |new_power_level: fbroker::PowerLevel| {
+                    let update_fn = update_fn.clone();
+                    let boot_control_lease = boot_control_lease.clone();
+                    let booting_node = booting_node.clone();
+
+                    async move {
+                        update_fn(new_power_level).await;
+
+                        // TODO(https://fxbug.dev/333699275): When the boot indication API is
+                        // available, this logic should be removed in favor of that.
+                        if new_power_level != ApplicationActivityLevel::Inactive.into_primitive()
+                            && boot_control_lease.borrow().is_some()
+                        {
+                            tracing::info!("System has booted. Dropping boot control lease.");
+                            boot_control_lease.borrow_mut().take();
+                            booting_node.set(false);
+                        }
+                    }
+                    .boxed_local()
+                }),
             )
             .await;
         })

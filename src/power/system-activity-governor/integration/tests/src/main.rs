@@ -236,52 +236,13 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
     set_up_default_suspender(&suspend_device).await;
     let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
 
-    // First watch should return immediately with default values.
-    let current_stats = stats.watch().await?;
-    assert_eq!(Some(0), current_stats.success_count);
-    assert_eq!(Some(0), current_stats.fail_count);
-    assert_eq!(None, current_stats.last_failed_error);
-    assert_eq!(None, current_stats.last_time_in_suspend);
-
-    block_until_inspect_matches!(
-        activity_governor_moniker,
-        root: {
-            power_elements: {
-                execution_state: {
-                    power_level: 0u64,
-                },
-                application_activity: {
-                    power_level: 0u64,
-                },
-                full_wake_handling: {
-                    power_level: 0u64,
-                },
-                wake_handling: {
-                    power_level: 0u64,
-                },
-                execution_resume_latency: contains {
-                    power_level: 0u64,
-                },
-            },
-            suspend_stats: {
-                success_count: 0u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: -1i64,
-                last_time_in_suspend_operations: -1i64,
-            },
-            "fuchsia.inspect.Health": contains {
-                status: "OK",
-            },
-        }
-    );
-
     let suspend_controller = create_suspend_topology(&realm).await?;
     let suspend_lease_control = lease(&suspend_controller, 1).await?;
 
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: {
+            booting: false,
             power_elements: {
                 execution_state: {
                     power_level: 2u64,
@@ -333,6 +294,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: {
+            booting: false,
             power_elements: {
                 execution_state: {
                     power_level: 0u64,
@@ -369,6 +331,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: {
+            booting: false,
             power_elements: {
                 execution_state: {
                     power_level: 2u64,
@@ -420,6 +383,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: {
+            booting: false,
             power_elements: {
                 execution_state: {
                     power_level: 0u64,
@@ -467,12 +431,35 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(None, current_stats.last_time_in_suspend);
 
+    {
+        // Trigger "boot complete" logic.
+        let suspend_controller = create_suspend_topology(&realm).await?;
+        lease(&suspend_controller, 1).await?;
+    }
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+    let suspend_device2 = suspend_device.clone();
+
     let wake_controller = create_wake_topology(&realm).await?;
+
+    fasync::Task::local(async move {
+        suspend_device2
+            .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+                suspend_duration: Some(2i64),
+                suspend_overhead: Some(1i64),
+                ..Default::default()
+            }))
+            .await
+            .unwrap()
+            .unwrap();
+    })
+    .detach();
+
     let wake_handling_lease_control = lease(&wake_controller, 1).await?;
 
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: {
+            booting: false,
             power_elements: {
                 execution_state: {
                     power_level: 1u64,
@@ -491,11 +478,11 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                 },
             },
             suspend_stats: {
-                success_count: 0u64,
+                success_count: 1u64,
                 fail_count: 0u64,
                 last_failed_error: 0u64,
-                last_time_in_suspend: -1i64,
-                last_time_in_suspend_operations: -1i64,
+                last_time_in_suspend: 2u64,
+                last_time_in_suspend_operations: 1u64,
             },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
@@ -518,6 +505,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: {
+            booting: false,
             power_elements: {
                 execution_state: {
                     power_level: 0u64,
@@ -536,7 +524,129 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                 },
             },
             suspend_stats: {
+                success_count: 2u64,
+                fail_count: 0u64,
+                last_failed_error: 0u64,
+                last_time_in_suspend: 2u64,
+                last_time_in_suspend_operations: 1u64,
+            },
+            "fuchsia.inspect.Health": contains {
+                status: "OK",
+            },
+        }
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_handling_claim(
+) -> Result<()> {
+    let (realm, activity_governor_moniker, suspend_device) = create_realm().await?;
+    set_up_default_suspender(&suspend_device).await;
+    let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
+
+    // First watch should return immediately with default values.
+    let current_stats = stats.watch().await?;
+    assert_eq!(Some(0), current_stats.success_count);
+    assert_eq!(Some(0), current_stats.fail_count);
+    assert_eq!(None, current_stats.last_failed_error);
+    assert_eq!(None, current_stats.last_time_in_suspend);
+
+    {
+        // Trigger "boot complete" logic.
+        let suspend_controller = create_suspend_topology(&realm).await?;
+        lease(&suspend_controller, 1).await?;
+    }
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+    let suspend_device2 = suspend_device.clone();
+
+    let wake_controller = create_full_wake_topology(&realm).await?;
+
+    fasync::Task::local(async move {
+        suspend_device2
+            .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+                suspend_duration: Some(2i64),
+                suspend_overhead: Some(1i64),
+                ..Default::default()
+            }))
+            .await
+            .unwrap()
+            .unwrap();
+    })
+    .detach();
+
+    let wake_handling_lease_control = lease(&wake_controller, 1).await?;
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: {
+            booting: false,
+            power_elements: {
+                execution_state: {
+                    power_level: 1u64,
+                },
+                application_activity: {
+                    power_level: 0u64,
+                },
+                full_wake_handling: {
+                    power_level: 1u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
+                },
+                execution_resume_latency: contains {
+                    power_level: 0u64,
+                },
+            },
+            suspend_stats: {
                 success_count: 1u64,
+                fail_count: 0u64,
+                last_failed_error: 0u64,
+                last_time_in_suspend: 2u64,
+                last_time_in_suspend_operations: 1u64,
+            },
+            "fuchsia.inspect.Health": contains {
+                status: "OK",
+            },
+        }
+    );
+
+    drop(wake_handling_lease_control);
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+    suspend_device
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+            suspend_duration: Some(2i64),
+            suspend_overhead: Some(1i64),
+            ..Default::default()
+        }))
+        .await
+        .unwrap()
+        .unwrap();
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: {
+            booting: false,
+            power_elements: {
+                execution_state: {
+                    power_level: 0u64,
+                },
+                application_activity: {
+                    power_level: 0u64,
+                },
+                full_wake_handling: {
+                    power_level: 0u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
+                },
+                execution_resume_latency: contains {
+                    power_level: 0u64,
+                },
+            },
+            suspend_stats: {
+                success_count: 2u64,
                 fail_count: 0u64,
                 last_failed_error: 0u64,
                 last_time_in_suspend: 2u64,
@@ -568,15 +678,6 @@ async fn test_activity_governor_shows_resume_latency_in_inspect() -> Result<()> 
         .unwrap()
         .unwrap();
 
-    let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
-
-    // First watch should return immediately with default values.
-    let current_stats = stats.watch().await?;
-    assert_eq!(Some(0), current_stats.success_count);
-    assert_eq!(Some(0), current_stats.fail_count);
-    assert_eq!(None, current_stats.last_failed_error);
-    assert_eq!(None, current_stats.last_time_in_suspend);
-
     let expected_latencies = vec![1000i64, 100i64, 10i64];
     let erl_controller = create_latency_topology(&realm, &expected_latencies).await?;
 
@@ -586,9 +687,10 @@ async fn test_activity_governor_shows_resume_latency_in_inspect() -> Result<()> 
         block_until_inspect_matches!(
             activity_governor_moniker,
             root: {
+                booting: true,
                 power_elements: {
                     execution_state: {
-                        power_level: 0u64,
+                        power_level: 2u64,
                     },
                     application_activity: {
                         power_level: 0u64,
@@ -650,6 +752,7 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: {
+            booting: false,
             power_elements: {
                 execution_state: {
                     power_level: 2u64,
@@ -700,6 +803,7 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: {
+            booting: false,
             power_elements: {
                 execution_state: {
                     power_level: 0u64,
@@ -763,6 +867,7 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: {
+            booting: false,
             power_elements: {
                 execution_state: {
                     power_level: 2u64,
@@ -805,6 +910,7 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: {
+            booting: false,
             power_elements: {
                 execution_state: {
                     power_level: 0u64,
@@ -891,11 +997,11 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
     })
     .detach();
 
-    let full_wake_controller = create_full_wake_topology(&realm).await?;
-
-    // Cycle execution_state power level to trigger a suspend/resume cycle.
-    let full_wake_lease_control = lease(&full_wake_controller, 1).await?;
-    drop(full_wake_lease_control);
+    {
+        let suspend_controller = create_suspend_topology(&realm).await?;
+        // Cycle execution_state power level to trigger a suspend/resume cycle.
+        lease(&suspend_controller, 1).await?;
+    }
 
     // OnSuspend and OnResume should have been called once.
     on_suspend_rx.next().await.unwrap();
@@ -924,6 +1030,7 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: {
+            booting: false,
             power_elements: {
                 execution_state: {
                     power_level: 0u64,
@@ -961,18 +1068,11 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
 async fn test_activity_governor_handles_listener_raising_power_levels() -> Result<()> {
     let (realm, activity_governor_moniker, suspend_device) = create_realm().await?;
     set_up_default_suspender(&suspend_device).await;
-
-    let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
 
-    // First watch should return immediately with default values.
-    let current_stats = stats.watch().await?;
-    assert_eq!(Some(0), current_stats.success_count);
-    assert_eq!(Some(0), current_stats.fail_count);
-    assert_eq!(None, current_stats.last_failed_error);
-    assert_eq!(None, current_stats.last_time_in_suspend);
-
     let suspend_controller = create_suspend_topology(&realm).await?;
+    // Trigger "boot complete" logic.
+    let suspend_lease = lease(&suspend_controller, 1).await.unwrap();
 
     let (listener_client_end, mut listener_stream) =
         fidl::endpoints::create_request_stream().unwrap();
@@ -1009,11 +1109,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
     })
     .detach();
 
-    let full_wake_controller = create_full_wake_topology(&realm).await?;
-
-    // Cycle execution_state power level to trigger a suspend/resume cycle.
-    let full_wake_lease_control = lease(&full_wake_controller, 1).await?;
-    drop(full_wake_lease_control);
+    drop(suspend_lease);
 
     // OnSuspend should have been called.
     on_suspend_rx.next().await.unwrap();
@@ -1029,16 +1125,11 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
         .unwrap()
         .unwrap();
 
-    let current_stats = stats.watch().await?;
-    assert_eq!(Some(1), current_stats.success_count);
-    assert_eq!(Some(0), current_stats.fail_count);
-    assert_eq!(None, current_stats.last_failed_error);
-    assert_eq!(Some(2), current_stats.last_time_in_suspend);
-
     // At this point, the listener should have raised the execution_state power level to 2.
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: {
+            booting: false,
             power_elements: {
                 execution_state: {
                     power_level: 2u64,
@@ -1086,10 +1177,11 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
         .unwrap()
         .unwrap();
 
-    // At this point, the listener should have raised the execution_state power level to 2.
+    // At this point, the listener should have raised the execution_state power level to 2 again.
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: {
+            booting: false,
             power_elements: {
                 execution_state: {
                     power_level: 2u64,
@@ -1205,6 +1297,96 @@ async fn test_activity_governor_blocks_lease_while_suspend_in_progress() -> Resu
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(Some(49), current_stats.last_time_in_suspend);
     assert_eq!(Some(51), current_stats.last_time_in_suspend_operations);
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_handles_boot_signal() -> Result<()> {
+    let (realm, activity_governor_moniker, suspend_device) = create_realm().await?;
+    set_up_default_suspender(&suspend_device).await;
+    let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
+
+    // First watch should return immediately with default values.
+    let current_stats = stats.watch().await?;
+    assert_eq!(Some(0), current_stats.success_count);
+    assert_eq!(Some(0), current_stats.fail_count);
+    assert_eq!(None, current_stats.last_failed_error);
+    assert_eq!(None, current_stats.last_time_in_suspend);
+
+    // Initial state should show execution_state is active and booting is true.
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: {
+            booting: true,
+            power_elements: {
+                execution_state: {
+                    power_level: 2u64,
+                },
+                application_activity: {
+                    power_level: 0u64,
+                },
+                full_wake_handling: {
+                    power_level: 0u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
+                },
+                execution_resume_latency: contains {
+                    power_level: 0u64,
+                },
+            },
+            suspend_stats: {
+                success_count: 0u64,
+                fail_count: 0u64,
+                last_failed_error: 0u64,
+                last_time_in_suspend: -1i64,
+                last_time_in_suspend_operations: -1i64,
+            },
+            "fuchsia.inspect.Health": contains {
+                status: "OK",
+            },
+        }
+    );
+
+    // Trigger "boot complete" signal.
+    let suspend_controller = create_suspend_topology(&realm).await?;
+    lease(&suspend_controller, 1).await.unwrap();
+
+    // Now execution_state should have dropped and booting is false.
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: {
+            booting: false,
+            power_elements: {
+                execution_state: {
+                    power_level: 0u64,
+                },
+                application_activity: {
+                    power_level: 0u64,
+                },
+                full_wake_handling: {
+                    power_level: 0u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
+                },
+                execution_resume_latency: contains {
+                    power_level: 0u64,
+                },
+            },
+            suspend_stats: {
+                success_count: 0u64,
+                fail_count: 0u64,
+                last_failed_error: 0u64,
+                last_time_in_suspend: -1i64,
+                last_time_in_suspend_operations: -1i64,
+            },
+            "fuchsia.inspect.Health": contains {
+                status: "OK",
+            },
+        }
+    );
 
     Ok(())
 }
