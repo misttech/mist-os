@@ -13,9 +13,11 @@
 #include <sys/xattr.h>
 #include <unistd.h>
 
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -164,6 +166,11 @@ class FuseServer {
     return true;
   }
 
+  void WaitForInit() {
+    std::unique_lock guard(init_mtx_);
+    init_cv_.wait(guard, [&]() { return init_done_; });
+  }
+
  protected:
   virtual testing::AssertionResult HandleFuseMessage(const std::vector<std::byte>& message) {
     const struct fuse_in_header* in_header =
@@ -181,6 +188,12 @@ class FuseServer {
         struct fuse_access_in access_in = {};
         memcpy(&access_in, in_payload, sizeof(access_in));
         OK_OR_RETURN(HandleAccess(in_header, &access_in, message));
+        break;
+      }
+      case FUSE_GETATTR: {
+        struct fuse_getattr_in getattr_in = {};
+        memcpy(&getattr_in, in_payload, sizeof(getattr_in));
+        OK_OR_RETURN(HandleGetAttr(in_header, &getattr_in, message));
         break;
       }
       case FUSE_LOOKUP: {
@@ -205,10 +218,24 @@ class FuseServer {
         OK_OR_RETURN(HandleRelease(in_header, &release_in, message));
         break;
       }
+      case FUSE_GETXATTR: {
+        OK_OR_RETURN(WriteDataFreeResponse(in_header, -ENOSYS));
+        break;
+      }
+      case FUSE_BATCH_FORGET:
+      case FUSE_FORGET:
+        // no-op; these don't expect a response.
+        break;
       default:
         return testing::AssertionFailure() << "Unknown FUSE opcode: " << in_header->opcode;
     }
     return testing::AssertionSuccess();
+  }
+
+  void NotifyInitWaiters() {
+    std::unique_lock guard(init_mtx_);
+    init_done_ = true;
+    init_cv_.notify_all();
   }
 
   virtual testing::AssertionResult HandleInit(const struct fuse_in_header* in_header,
@@ -217,7 +244,11 @@ class FuseServer {
     struct fuse_init_out init_out = {};
     init_out.major = FUSE_KERNEL_VERSION;
     init_out.minor = FUSE_KERNEL_MINOR_VERSION;
-    return WriteStructResponse(in_header, init_out);
+    OK_OR_RETURN(WriteStructResponse(in_header, init_out));
+
+    NotifyInitWaiters();
+
+    return testing::AssertionSuccess();
   }
 
   virtual testing::AssertionResult HandleAccess(const struct fuse_in_header* in_header,
@@ -226,13 +257,21 @@ class FuseServer {
     return WriteAckResponse(in_header);
   }
 
+  virtual testing::AssertionResult HandleGetAttr(const struct fuse_in_header* in_header,
+                                                 const struct fuse_getattr_in* getattr_in,
+                                                 const std::vector<std::byte>& message) {
+    fuse_attr_out attr_out = {};
+    PopulateDefaultAttr(in_header->nodeid, attr_out.attr);
+    return WriteStructResponse(in_header, attr_out);
+  }
+
   virtual testing::AssertionResult HandleLookup(const struct fuse_in_header* in_header,
                                                 const std::vector<std::byte>& message) {
-    struct fuse_entry_out entry_out = {};
-    entry_out.nodeid = next_nodeid_++;
-    entry_out.generation = 1;
-    entry_out.attr.ino = entry_out.nodeid;
-    entry_out.attr.mode = S_IFREG;
+    fuse_entry_out entry_out = {
+        .nodeid = next_nodeid_++,
+        .generation = 1,
+    };
+    PopulateDefaultAttr(entry_out.nodeid, entry_out.attr);
     return WriteStructResponse(in_header, entry_out);
   }
 
@@ -327,9 +366,25 @@ class FuseServer {
     return testing::AssertionSuccess();
   }
 
+  static void PopulateDefaultAttr(uint64_t ino, fuse_attr& attr) {
+    attr = {
+        .ino = ino,
+        // Consider the root node as a directory and everything else as a
+        // regular file. The node will also have read/write/exec permissions
+        // for the owning user, group and world. For current testing needs,
+        // this is sufficient.
+        .mode = static_cast<uint32_t>(ino == FUSE_ROOT_ID ? S_IFDIR : S_IFREG) | S_IRWXU | S_IRWXG |
+                S_IRWXO,
+    };
+  }
+
   test_helper::ScopedFD fuse_fd_;
   uint64_t next_fh_ = 1;
   uint64_t next_nodeid_ = 2;  // 1 is reserved for the root.
+
+  std::mutex init_mtx_;
+  std::condition_variable init_cv_;
+  bool init_done_ = false;
 };
 
 class FuseServerTest : public ::testing::Test {
@@ -700,25 +755,58 @@ TEST_F(FuseServerTest, OverlongHeaderLength) {
   fd.reset();
 }
 
-TEST_F(FuseServerTest, BypassUnimplementedAccess) {
-  class BypassUnimplementedAccessServer : public FuseServer {
+struct BypassAccessTestCase {
+  uint32_t want_init_flags;
+  int access_reply;
+  uint64_t max_access_count;
+};
+
+class FuseServerBypassAccessTest : public FuseServerTest,
+                                   public ::testing::WithParamInterface<BypassAccessTestCase> {};
+
+TEST_P(FuseServerBypassAccessTest, BypassAccess) {
+  const BypassAccessTestCase& test_case = GetParam();
+
+  class BypassAccessServer : public FuseServer {
    public:
+    BypassAccessServer(uint32_t want_init_flags, int access_reply)
+        : want_init_flags_(want_init_flags), access_reply_(access_reply) {}
+
     uint64_t AccessCount() { return calls_to_access_.load(std::memory_order_relaxed); }
 
    protected:
+    testing::AssertionResult HandleInit(const struct fuse_in_header* in_header,
+                                        const struct fuse_init_in* init_in,
+                                        const std::vector<std::byte>& message) override {
+      EXPECT_EQ(init_in->flags & want_init_flags_, want_init_flags_);
+
+      fuse_init_out init_out = {
+          .major = FUSE_KERNEL_VERSION,
+          .minor = FUSE_KERNEL_MINOR_VERSION,
+          .flags = want_init_flags_,
+      };
+      OK_OR_RETURN(WriteStructResponse(in_header, init_out));
+      NotifyInitWaiters();
+      return testing::AssertionSuccess();
+    }
+
     testing::AssertionResult HandleAccess(const struct fuse_in_header* in_header,
                                           const struct fuse_access_in* access_in,
                                           const std::vector<std::byte>& message) override {
       calls_to_access_.fetch_add(1, std::memory_order_relaxed);
-      return WriteDataFreeResponse(in_header, -ENOSYS);
+      return WriteDataFreeResponse(in_header, access_reply_);
     }
 
    private:
-    std::atomic_uint64_t calls_to_access_;
+    uint32_t want_init_flags_;
+    int access_reply_;
+    std::atomic_uint64_t calls_to_access_ = 0;
   };
 
-  std::shared_ptr<BypassUnimplementedAccessServer> server(new BypassUnimplementedAccessServer());
+  std::shared_ptr<BypassAccessServer> server(
+      new BypassAccessServer(test_case.want_init_flags, test_case.access_reply));
   ASSERT_TRUE(Mount(server));
+  server->WaitForInit();
   EXPECT_EQ(server->AccessCount(), 0u);
 
   // Run the checks in a separate thread where we drop the |CAP_DAC_OVERRIDE|
@@ -726,14 +814,15 @@ TEST_F(FuseServerTest, BypassUnimplementedAccess) {
   std::thread thrd([&]() {
     test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
 
-    auto check_access = [&](const char* file) {
+    auto check_access = [&, max_access_count = test_case.max_access_count](const char* file) {
       const std::string filename = GetMountDir() + "/" + file;
       ASSERT_EQ(access(filename.c_str(), R_OK), 0) << strerror(errno);
-      EXPECT_EQ(server->AccessCount(), 1u);
+      EXPECT_EQ(server->AccessCount(), max_access_count);
     };
 
     // No matter how many times we access a file, we should have only ever made
-    // the |FUSE_ACCESS| request once for the lifetime of the connection/server.
+    // the |FUSE_ACCESS| request |params.max_access_count| times for the lifetime
+    // of the connection/server.
     for (int i = 0; i < 3; ++i) {
       ASSERT_NO_FATAL_FAILURE(check_access("somefile1"));
     }
@@ -744,3 +833,14 @@ TEST_F(FuseServerTest, BypassUnimplementedAccess) {
   });
   thrd.join();
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    FuseServerBypassAccessTest, FuseServerBypassAccessTest,
+    testing::Values(
+        // The kernel should stop sending |FUSE_ACCESS| requests once we send an
+        // |ENOSYS| response.
+        BypassAccessTestCase{.want_init_flags = 0, .access_reply = -ENOSYS, .max_access_count = 1},
+        // The kernel should never send a |FUSE_ACCESS| request if we set the
+        // |FUSE_POSIX_ACL| init flag.
+        BypassAccessTestCase{
+            .want_init_flags = FUSE_POSIX_ACL, .access_reply = 0, .max_access_count = 0}));

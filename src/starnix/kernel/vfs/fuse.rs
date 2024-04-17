@@ -41,7 +41,10 @@ use starnix_uapi::{
 };
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
-    sync::{Arc, Weak},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Weak,
+    },
 };
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
@@ -123,7 +126,7 @@ pub fn new_fuse_fs(
     let fd = fs_args::parse::<FdNumber>(
         mount_options.remove(B("fd")).ok_or_else(|| errno!(EINVAL))?.as_ref(),
     )?;
-    let default_permissions = mount_options.remove(B("default_permissions")).is_some();
+    let default_permissions = mount_options.remove(B("default_permissions")).is_some().into();
     let connection = current_task
         .files
         .get(fd)?
@@ -151,7 +154,11 @@ pub fn new_fuse_fs(
     {
         let mut state = connection.lock();
         state.connect();
-        state.execute_operation(current_task, &fuse_node, FuseOperation::Init)?;
+        state.execute_operation(
+            current_task,
+            &fuse_node,
+            FuseOperation::Init { fs: Arc::downgrade(&fs) },
+        )?;
     }
     Ok(fs)
 }
@@ -180,7 +187,7 @@ pub fn new_fusectl_fs(
 #[derive(Debug)]
 struct FuseFs {
     connection: Arc<FuseConnection>,
-    default_permissions: bool,
+    default_permissions: AtomicBool,
 }
 
 impl FuseFs {
@@ -813,6 +820,9 @@ impl FileOps for FuseFileObject {
     }
 }
 
+// `FuseFs.default_permissions` is not used to synchronize anything.
+const DEFAULT_PERMISSIONS_ATOMIC_ORDERING: Ordering = Ordering::Relaxed;
+
 impl FsNodeOps for Arc<FuseNode> {
     fn check_access(
         &self,
@@ -821,7 +831,10 @@ impl FsNodeOps for Arc<FuseNode> {
         access: Access,
         info: &RwLock<FsNodeInfo>,
     ) -> Result<(), Errno> {
-        if FuseFs::from_fs(&node.fs())?.default_permissions {
+        if FuseFs::from_fs(&node.fs())?
+            .default_permissions
+            .load(DEFAULT_PERMISSIONS_ATOMIC_ORDERING)
+        {
             return node.default_check_access_impl(current_task, access, info.read());
         }
 
@@ -1474,7 +1487,7 @@ impl FuseMutableState {
             Entry::Occupied(e) => e,
             Entry::Vacant(_) => return error!(EINVAL),
         };
-        let operation = running_operation.get().operation;
+        let operation = &running_operation.get().operation;
         let is_async = operation.is_async();
         if header.error < 0 {
             log_trace!("Fuse: {operation:?} -> {header:?}");
@@ -1494,18 +1507,45 @@ impl FuseMutableState {
             let response = operation.parse_response(buffer)?;
             log_trace!("Fuse: {operation:?} -> {response:?}");
             if is_async {
-                if let FuseResponse::Init(init_out) = response {
-                    running_operation.remove();
-                    self.set_configuration(init_out.try_into()?);
-                } else {
-                    // Init is the only async operation.
-                    return error!(EINVAL);
-                }
+                let operation = running_operation.remove();
+                self.handle_async(operation, response)?;
             } else {
                 running_operation.get_mut().response = Some(Ok(response));
             }
         }
         Ok(data.bytes_read())
+    }
+
+    fn handle_async(
+        &mut self,
+        operation: RunningOperation,
+        response: FuseResponse,
+    ) -> Result<(), Errno> {
+        match (operation.operation, response) {
+            (RunningOperationKind::Init { fs }, FuseResponse::Init(init_out)) => {
+                let configuration = FuseConfiguration::try_from(init_out)?;
+                if configuration.flags.contains(FuseInitFlags::POSIX_ACL) {
+                    // Per libfuse's documentation on `FUSE_CAP_POSIX_ACL`,
+                    // the POSIX_ACL flag implicitly enables the
+                    // `default_permissions` mount option.
+                    if let Some(fs) = fs.upgrade() {
+                        FuseFs::from_fs(&fs)
+                            .expect("should only perform FUSE ops with FUSE fs")
+                            .default_permissions
+                            .store(true, DEFAULT_PERMISSIONS_ATOMIC_ORDERING)
+                    } else {
+                        log_warn!("failed to upgrade FuseFs when handling FUSE_INIT response");
+                        return error!(ENOTCONN);
+                    }
+                }
+                self.set_configuration(configuration);
+                Ok(())
+            }
+            operation => {
+                // Init is the only async operation.
+                panic!("Incompatible operation={operation:?}");
+            }
+        }
     }
 }
 
@@ -1520,12 +1560,6 @@ struct RunningOperation {
 impl From<RunningOperationKind> for RunningOperation {
     fn from(operation: RunningOperationKind) -> Self {
         Self { operation, response: None }
-    }
-}
-
-impl RunningOperationKind {
-    fn is_async(&self) -> bool {
-        matches!(self, Self::Init)
     }
 }
 
@@ -1577,29 +1611,46 @@ bitflags::bitflags! {
         const DO_READDIRPLUS = uapi::FUSE_DO_READDIRPLUS;
         const READDIRPLUS_AUTO = uapi::FUSE_READDIRPLUS_AUTO;
         const SETXATTR_EXT = uapi::FUSE_SETXATTR_EXT;
+        const POSIX_ACL = uapi::FUSE_POSIX_ACL;
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 enum RunningOperationKind {
     Access,
     Flush,
     Forget,
     GetAttr,
-    Init,
+    Init {
+        /// The FUSE fs that triggered this operation.
+        ///
+        /// `Weak` because the `FuseFs` holds an `Arc<FuseConnection>` which
+        /// may hold this operation.
+        fs: Weak<FileSystem>,
+    },
     Interrupt,
-    GetXAttr { size: u32 },
-    ListXAttr { size: u32 },
+    GetXAttr {
+        size: u32,
+    },
+    ListXAttr {
+        size: u32,
+    },
     Lookup,
     Mkdir,
     Mknod,
     Link,
-    Open { dir: bool },
+    Open {
+        dir: bool,
+    },
     Poll,
     Read,
-    Readdir { use_readdirplus: bool },
+    Readdir {
+        use_readdirplus: bool,
+    },
     Readlink,
-    Release { dir: bool },
+    Release {
+        dir: bool,
+    },
     RemoveXAttr,
     Seek,
     SetAttr,
@@ -1611,6 +1662,10 @@ enum RunningOperationKind {
 }
 
 impl RunningOperationKind {
+    fn is_async(&self) -> bool {
+        matches!(self, Self::Init { .. })
+    }
+
     fn opcode(&self) -> u32 {
         match self {
             Self::Access => uapi::fuse_opcode_FUSE_ACCESS,
@@ -1618,7 +1673,7 @@ impl RunningOperationKind {
             Self::Forget => uapi::fuse_opcode_FUSE_FORGET,
             Self::GetAttr => uapi::fuse_opcode_FUSE_GETATTR,
             Self::GetXAttr { .. } => uapi::fuse_opcode_FUSE_GETXATTR,
-            Self::Init => uapi::fuse_opcode_FUSE_INIT,
+            Self::Init { .. } => uapi::fuse_opcode_FUSE_INIT,
             Self::Interrupt => uapi::fuse_opcode_FUSE_INTERRUPT,
             Self::ListXAttr { .. } => uapi::fuse_opcode_FUSE_LISTXATTR,
             Self::Lookup => uapi::fuse_opcode_FUSE_LOOKUP,
@@ -1684,7 +1739,9 @@ impl RunningOperationKind {
                     Ok(FuseResponse::GetXAttr(FsString::new(buffer).into()))
                 }
             }
-            Self::Init => Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(&buffer))),
+            Self::Init { .. } => {
+                Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(&buffer)))
+            }
             Self::Lookup | Self::Mkdir | Self::Mknod | Self::Link | Self::Symlink => {
                 Ok(FuseResponse::Entry(Self::to_response::<uapi::fuse_entry_out>(&buffer)))
             }
@@ -1798,7 +1855,13 @@ enum FuseOperation {
     Flush(uapi::fuse_open_out),
     Forget(uapi::fuse_forget_in),
     GetAttr,
-    Init,
+    Init {
+        /// The FUSE fs that triggered this operation.
+        ///
+        /// `Weak` because the `FuseFs` holds an `Arc<FuseConnection>` which
+        /// may hold this operation.
+        fs: Weak<FileSystem>,
+    },
     Interrupt {
         /// Identifier of the operation to interrupt
         unique_id: u64,
@@ -1918,7 +1981,7 @@ impl FuseOperation {
                 len += Self::write_null_terminated(data, name)?;
                 Ok(len)
             }
-            Self::Init => {
+            Self::Init { .. } => {
                 let message = uapi::fuse_init_in {
                     major: uapi::FUSE_KERNEL_VERSION,
                     minor: uapi::FUSE_KERNEL_MINOR_VERSION,
@@ -2006,7 +2069,7 @@ impl FuseOperation {
             Self::Forget(_) => uapi::fuse_opcode_FUSE_FORGET,
             Self::GetAttr => uapi::fuse_opcode_FUSE_GETATTR,
             Self::GetXAttr { .. } => uapi::fuse_opcode_FUSE_GETXATTR,
-            Self::Init => uapi::fuse_opcode_FUSE_INIT,
+            Self::Init { .. } => uapi::fuse_opcode_FUSE_INIT,
             Self::Interrupt { .. } => uapi::fuse_opcode_FUSE_INTERRUPT,
             Self::ListXAttr(_) => uapi::fuse_opcode_FUSE_LISTXATTR,
             Self::Lookup { .. } => uapi::fuse_opcode_FUSE_LOOKUP,
@@ -2057,7 +2120,7 @@ impl FuseOperation {
             Self::GetXAttr { getxattr_in, .. } => {
                 RunningOperationKind::GetXAttr { size: getxattr_in.size }
             }
-            Self::Init => RunningOperationKind::Init,
+            Self::Init { fs } => RunningOperationKind::Init { fs: fs.clone() },
             Self::Interrupt { .. } => RunningOperationKind::Interrupt,
             Self::ListXAttr(getxattr_in) => {
                 RunningOperationKind::ListXAttr { size: getxattr_in.size }
@@ -2148,6 +2211,6 @@ impl FuseOperation {
     }
 
     fn is_async(&self) -> bool {
-        matches!(self, Self::Init)
+        matches!(self, Self::Init { .. })
     }
 }
