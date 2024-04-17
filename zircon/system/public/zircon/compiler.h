@@ -278,13 +278,6 @@
 // Get the offset of `field` from the beginning of the struct or class `type`.
 #define __offsetof(type, field) __builtin_offsetof(type, field)
 
-// Return the number of elements in the given C-style array.
-//
-// TODO: add type check
-#if !defined(countof) && !defined(__cplusplus)
-#define countof(a) (sizeof(a) / sizeof((a)[0]))
-#endif
-
 // Perform an arithmetic operation, returning "true" if the operation overflowed.
 //
 // Equivalent to: { *result = a + b; return _overflow_occurred; }
