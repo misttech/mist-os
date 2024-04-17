@@ -4,28 +4,25 @@
 use crate::call_async;
 use crate::event::Publisher;
 use crate::service_context::{ExternalServiceProxy, ServiceContext};
-use anyhow::{format_err, Context as _, Error};
+use anyhow::{anyhow, Context as _, Error};
+use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_media::AudioRenderUsage;
 use fidl_fuchsia_media_sounds::{PlayerMarker, PlayerProxy};
 use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
 use futures::lock::Mutex;
 use std::collections::HashSet;
-use std::fs::File;
 use std::sync::Arc;
 
 /// Creates a file-based sound from a resource file.
 fn resource_file(name: &str) -> Result<fidl::endpoints::ClientEnd<fio::FileMarker>, Error> {
-    // We try two paths here, because normal components see their config package data resources in
-    // /pkg/data and shell tools see them in /pkgfs/packages/config-data/0/meta/data/<pkg>.
-    Ok(fidl::endpoints::ClientEnd::<fio::FileMarker>::new(zx::Channel::from(fdio::transfer_fd(
-        File::open(format!("/config/data/{name}"))
-            .or_else(|_| {
-                File::open(format!("/pkgfs/packages/config-data/0/meta/data/setui_service/{name}"))
-            })
-            .context("Opening package data file")?,
-    )?)))
+    let path = format!("/config/data/{name}");
+    fuchsia_fs::file::open_in_namespace(&path, fio::OpenFlags::RIGHT_READABLE)
+        .with_context(|| format!("opening resource file: {path}"))?
+        .into_client_end()
+        .map_err(|_: fio::FileProxy| {
+            anyhow!("failed to convert new Proxy to ClientEnd for resource file {path}")
+        })
 }
 
 /// Establish a connection to the sound player and return the proxy representing the service.
@@ -60,13 +57,13 @@ pub(super) async fn play_sound<'a>(
     if added_files.lock().await.insert(file_name) {
         let sound_file_channel = match resource_file(file_name) {
             Ok(file) => Some(file),
-            Err(e) => return Err(format_err!("[earcons] Failed to convert sound file: {}", e)),
+            Err(e) => return Err(anyhow!("[earcons] Failed to convert sound file: {}", e)),
         };
         if let Some(file_channel) = sound_file_channel {
             match call_async!(sound_player_proxy => add_sound_from_file(id, file_channel)).await {
                 Ok(_) => tracing::debug!("[earcons] Added sound to Player: {}", file_name),
                 Err(e) => {
-                    return Err(format_err!("[earcons] Unable to add sound to Player: {}", e));
+                    return Err(anyhow!("[earcons] Unable to add sound to Player: {}", e));
                 }
             };
         }

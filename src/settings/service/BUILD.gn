@@ -56,7 +56,6 @@ icu_rustc_library("lib") {
     "//sdk/fidl/fuchsia.ui.types:fuchsia.ui.types_rust",
     "//src/lib/diagnostics/inspect/derive",
     "//src/lib/diagnostics/inspect/rust",
-    "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
