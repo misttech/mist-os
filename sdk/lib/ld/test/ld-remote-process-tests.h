@@ -71,8 +71,6 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   using Linker = RemoteDynamicLinker<>;
   using RemoteModule = RemoteLoadModule<>;
 
-  static zx::vmo GetTestVmo(std::string_view path);
-
   zx::vmo GetDepVmo(const RemoteModule::Soname& soname);
 
   template <class Diagnostics>
