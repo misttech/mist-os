@@ -6,7 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.media.drm") {
   sdk_category = "partner"
-  sdk_area = "Unknown"
+  sdk_area = "Media"
 
   sources = [
     "content_decryption.fidl",

@@ -9,7 +9,7 @@ fidl("fuchsia.media.sessions2") {
   excluded_checks = [ "vector-bounds-not-specified" ]
 
   sdk_category = "partner"
-  sdk_area = "Unknown"
+  sdk_area = "Media"
 
   sources = [
     "discovery.fidl",

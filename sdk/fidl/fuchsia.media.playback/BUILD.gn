@@ -9,7 +9,7 @@ fidl("fuchsia.media.playback") {
   excluded_checks = [ "string-bounds-not-specified" ]
 
   sdk_category = "partner"
-  sdk_area = "Unknown"
+  sdk_area = "Media"
 
   sources = [
     "overview.fidl",
