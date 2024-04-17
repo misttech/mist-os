@@ -43,6 +43,12 @@ source_set("gpu_control_server") {
 source_set("common_srcs") {
   configs += [ "//build/config:all_source" ]
   sources = [
+    "display-controller-banjo.cc",
+    "display-controller-banjo.h",
+    "display-coordinator-events-banjo.cc",
+    "display-coordinator-events-banjo.h",
+    "display-coordinator-events-interface.h",
+    "display-engine-interface.h",
     "display-engine.cc",
     "display-engine.h",
     "gpu-device-driver.cc",
@@ -55,6 +61,7 @@ source_set("common_srcs") {
   public_deps = [
     ":gpu_control_server",
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/bus/lib/virtio",

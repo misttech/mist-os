@@ -22,8 +22,12 @@
 
 #include <virtio/virtio.h>
 
+#include "src/graphics/display/drivers/virtio-guest/v1/display-controller-banjo.h"
+#include "src/graphics/display/drivers/virtio-guest/v1/display-coordinator-events-banjo.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-pci-device.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types-cpp/image-tiling-type.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
 #define USE_GTEST
@@ -207,8 +211,11 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
     auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
     fidl::BindServer(dispatcher(), std::move(sysmem_server), fake_sysmem_.get());
 
-    device_ =
-        std::make_unique<DisplayEngine>(nullptr, std::move(sysmem_client), std::move(gpu_device));
+    device_ = std::make_unique<DisplayEngine>(nullptr, &coordinator_events_,
+                                              std::move(sysmem_client), std::move(gpu_device));
+
+    banjo_controller_ =
+        std::make_unique<DisplayControllerBanjo>(device_.get(), &coordinator_events_);
 
     RunLoopUntilIdle();
   }
@@ -220,7 +227,7 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
 
   void ImportBufferCollection(display::DriverBufferCollectionId buffer_collection_id) {
     auto token_endpoints = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
-    EXPECT_OK(device_->DisplayControllerImplImportBufferCollection(
+    EXPECT_OK(banjo_controller_->DisplayControllerImplImportBufferCollection(
         display::ToBanjoDriverBufferCollectionId(buffer_collection_id),
         token_endpoints.client.TakeChannel()));
   }
@@ -229,13 +236,16 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
   std::vector<uint8_t> virtio_control_queue_buffer_pool_;
   std::vector<uint8_t> virtio_cursor_queue_buffer_pool_;
   std::unique_ptr<MockAllocator> fake_sysmem_;
+
+  DisplayCoordinatorEventsBanjo coordinator_events_;
   std::unique_ptr<DisplayEngine> device_;
+  std::unique_ptr<DisplayControllerBanjo> banjo_controller_;
 };
 
 TEST_F(VirtioGpuTest, ImportVmo) {
   display_controller_impl_protocol_t proto;
-  EXPECT_OK(device_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                    reinterpret_cast<void*>(&proto)));
+  EXPECT_OK(banjo_controller_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
+                                              reinterpret_cast<void*>(&proto)));
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
@@ -247,15 +257,15 @@ TEST_F(VirtioGpuTest, ImportVmo) {
   static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
-  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDisplayUsage,
+  EXPECT_OK(proto.ops->set_buffer_collection_constraints(banjo_controller_.get(), &kDisplayUsage,
                                                          kBanjoBufferCollectionId));
   RunLoopUntilIdle();
 
-  static constexpr image_metadata_t kDefaultImageMetadata = {
+  static constexpr display::ImageMetadata kDefaultImageMetadata({
       .width = 4,
       .height = 4,
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-  };
+      .tiling_type = display::kImageTilingTypeLinear,
+  });
   PerformBlockingWork([&] {
     zx::result<DisplayEngine::BufferInfo> buffer_info_result =
         device_->GetAllocatedBufferInfoForImage(kBufferCollectionId, /*index=*/0,
@@ -270,8 +280,8 @@ TEST_F(VirtioGpuTest, ImportVmo) {
 
 TEST_F(VirtioGpuTest, SetConstraints) {
   display_controller_impl_protocol_t proto;
-  EXPECT_OK(device_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                    reinterpret_cast<void*>(&proto)));
+  EXPECT_OK(banjo_controller_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
+                                              reinterpret_cast<void*>(&proto)));
 
   // Import buffer collection.
   zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
@@ -279,7 +289,7 @@ TEST_F(VirtioGpuTest, SetConstraints) {
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
-  EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kBanjoBufferCollectionId,
+  EXPECT_OK(proto.ops->import_buffer_collection(banjo_controller_.get(), kBanjoBufferCollectionId,
                                                 token_endpoints->client.handle()->get()));
   RunLoopUntilIdle();
 
@@ -287,7 +297,7 @@ TEST_F(VirtioGpuTest, SetConstraints) {
   static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
-  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDisplayUsage,
+  EXPECT_OK(proto.ops->set_buffer_collection_constraints(banjo_controller_.get(), &kDisplayUsage,
                                                          kBanjoBufferCollectionId));
   RunLoopUntilIdle();
 }
@@ -320,20 +330,22 @@ TEST_F(VirtioGpuTest, ImportBufferCollection) {
   ASSERT_TRUE(token2_endpoints.is_ok());
 
   display_controller_impl_protocol_t proto;
-  EXPECT_OK(device_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                    reinterpret_cast<void*>(&proto)));
+  EXPECT_OK(banjo_controller_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
+                                              reinterpret_cast<void*>(&proto)));
 
   // Test ImportBufferCollection().
   constexpr display::DriverBufferCollectionId kValidBufferCollectionId(1);
   constexpr uint64_t kBanjoValidBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kValidBufferCollectionId);
-  EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kBanjoValidBufferCollectionId,
+  EXPECT_OK(proto.ops->import_buffer_collection(banjo_controller_.get(),
+                                                kBanjoValidBufferCollectionId,
                                                 token1_endpoints.client.handle()->get()));
 
   // `collection_id` must be unused.
-  EXPECT_EQ(proto.ops->import_buffer_collection(device_.get(), kBanjoValidBufferCollectionId,
-                                                token2_endpoints->client.handle()->get()),
-            ZX_ERR_ALREADY_EXISTS);
+  EXPECT_EQ(
+      proto.ops->import_buffer_collection(banjo_controller_.get(), kBanjoValidBufferCollectionId,
+                                          token2_endpoints->client.handle()->get()),
+      ZX_ERR_ALREADY_EXISTS);
 
   RunLoopUntilIdle();
   EXPECT_TRUE(!allocator->GetActiveBufferCollectionTokenClients().empty());
@@ -354,9 +366,11 @@ TEST_F(VirtioGpuTest, ImportBufferCollection) {
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(2);
   constexpr uint64_t kBanjoInvalidBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
-  EXPECT_EQ(proto.ops->release_buffer_collection(device_.get(), kBanjoInvalidBufferCollectionId),
+  EXPECT_EQ(proto.ops->release_buffer_collection(banjo_controller_.get(),
+                                                 kBanjoInvalidBufferCollectionId),
             ZX_ERR_NOT_FOUND);
-  EXPECT_OK(proto.ops->release_buffer_collection(device_.get(), kBanjoValidBufferCollectionId));
+  EXPECT_OK(
+      proto.ops->release_buffer_collection(banjo_controller_.get(), kBanjoValidBufferCollectionId));
 
   RunLoopUntilIdle();
   EXPECT_TRUE(allocator->GetActiveBufferCollectionTokenClients().empty());
@@ -383,14 +397,14 @@ TEST_F(VirtioGpuTest, ImportImage) {
   ASSERT_TRUE(token1_endpoints.is_ok());
 
   display_controller_impl_protocol_t proto;
-  EXPECT_OK(device_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                    reinterpret_cast<void*>(&proto)));
+  EXPECT_OK(banjo_controller_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
+                                              reinterpret_cast<void*>(&proto)));
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
-  EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kBanjoBufferCollectionId,
+  EXPECT_OK(proto.ops->import_buffer_collection(banjo_controller_.get(), kBanjoBufferCollectionId,
                                                 token1_endpoints->client.handle()->get()));
 
   RunLoopUntilIdle();
@@ -400,7 +414,7 @@ TEST_F(VirtioGpuTest, ImportImage) {
   static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
-  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDisplayUsage,
+  EXPECT_OK(proto.ops->set_buffer_collection_constraints(banjo_controller_.get(), &kDisplayUsage,
                                                          kBanjoBufferCollectionId));
   RunLoopUntilIdle();
 
@@ -415,16 +429,16 @@ TEST_F(VirtioGpuTest, ImportImage) {
       display::ToBanjoDriverBufferCollectionId(kInvalidCollectionId);
   uint64_t image_handle = 0;
   PerformBlockingWork([&] {
-    EXPECT_EQ(
-        proto.ops->import_image(device_.get(), &kDefaultImageMetadata, kBanjoInvalidCollectionId,
-                                /*index=*/0, &image_handle),
-        ZX_ERR_NOT_FOUND);
+    EXPECT_EQ(proto.ops->import_image(banjo_controller_.get(), &kDefaultImageMetadata,
+                                      kBanjoInvalidCollectionId,
+                                      /*index=*/0, &image_handle),
+              ZX_ERR_NOT_FOUND);
   });
 
   // Invalid import: bad index
   uint32_t kInvalidIndex = 100;
   PerformBlockingWork([&] {
-    EXPECT_EQ(proto.ops->import_image(device_.get(), &kDefaultImageMetadata,
+    EXPECT_EQ(proto.ops->import_image(banjo_controller_.get(), &kDefaultImageMetadata,
                                       kBanjoBufferCollectionId, kInvalidIndex, &image_handle),
               ZX_ERR_OUT_OF_RANGE);
   });
@@ -433,7 +447,8 @@ TEST_F(VirtioGpuTest, ImportImage) {
   // can test the valid import case.
 
   // Release buffer collection.
-  EXPECT_OK(proto.ops->release_buffer_collection(device_.get(), kBanjoBufferCollectionId));
+  EXPECT_OK(
+      proto.ops->release_buffer_collection(banjo_controller_.get(), kBanjoBufferCollectionId));
 
   RunLoopUntilIdle();
   EXPECT_TRUE(allocator->GetActiveBufferCollectionTokenClients().empty());

@@ -21,20 +21,30 @@
 #include <ddktl/init-txn.h>
 #include <fbl/alloc_checker.h>
 
+#include "src/graphics/display/drivers/virtio-guest/v1/display-controller-banjo.h"
+#include "src/graphics/display/drivers/virtio-guest/v1/display-coordinator-events-banjo.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/display-engine.h"
 
 namespace virtio_display {
 
 // static
 zx_status_t GpuDeviceDriver::Create(zx_device_t* parent) {
-  zx::result<std::unique_ptr<DisplayEngine>> display_engine_result = DisplayEngine::Create(parent);
+  fbl::AllocChecker alloc_checker;
+  auto coordinator_events = fbl::make_unique_checked<DisplayCoordinatorEventsBanjo>(&alloc_checker);
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for DisplayCoordinatorEventsBanjo");
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  zx::result<std::unique_ptr<DisplayEngine>> display_engine_result =
+      DisplayEngine::Create(parent, coordinator_events.get());
   if (display_engine_result.is_error()) {
     // DisplayEngine::Create() logs on error.
     return display_engine_result.error_value();
   }
 
-  fbl::AllocChecker alloc_checker;
   auto driver = fbl::make_unique_checked<GpuDeviceDriver>(&alloc_checker, parent,
+                                                          std::move(coordinator_events),
                                                           std::move(display_engine_result).value());
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for GpuDeviceDriver");
@@ -53,8 +63,13 @@ zx_status_t GpuDeviceDriver::Create(zx_device_t* parent) {
 }
 
 GpuDeviceDriver::GpuDeviceDriver(zx_device_t* bus_device,
+                                 std::unique_ptr<DisplayCoordinatorEventsBanjo> coordinator_events,
                                  std::unique_ptr<DisplayEngine> display_engine)
-    : DdkDeviceType(bus_device), display_engine_(std::move(display_engine)) {
+    : DdkDeviceType(bus_device),
+      coordinator_events_(std::move(coordinator_events)),
+      display_engine_(std::move(display_engine)),
+      display_controller_banjo_(display_engine_.get(), coordinator_events_.get()) {
+  ZX_DEBUG_ASSERT(coordinator_events_);
   ZX_DEBUG_ASSERT(display_engine_);
 }
 
@@ -87,7 +102,7 @@ zx::result<> GpuDeviceDriver::Init() {
 }
 
 zx_status_t GpuDeviceDriver::DdkGetProtocol(uint32_t proto_id, void* out) {
-  return display_engine_->DdkGetProtocol(proto_id, out);
+  return display_controller_banjo_.DdkGetProtocol(proto_id, out);
 }
 
 void GpuDeviceDriver::DdkInit(ddk::InitTxn txn) {

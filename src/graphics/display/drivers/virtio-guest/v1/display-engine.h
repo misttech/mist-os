@@ -5,6 +5,8 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_DISPLAY_ENGINE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_DISPLAY_ENGINE_H_
 
+#include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
@@ -27,17 +29,23 @@
 #include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
 
+#include "src/graphics/display/drivers/virtio-guest/v1/display-coordinator-events-interface.h"
+#include "src/graphics/display/drivers/virtio-guest/v1/display-engine-interface.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-gpu-device.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-buffer-usage.h"
+#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
 namespace virtio_display {
 
 class Ring;
 
-class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, ddk::base_protocol> {
+class DisplayEngine final : public DisplayEngineInterface {
  public:
   struct BufferInfo {
     zx::vmo vmo = {};
@@ -47,16 +55,50 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
     fuchsia_images2::wire::PixelFormat pixel_format;
   };
 
-  static zx::result<std::unique_ptr<DisplayEngine>> Create(zx_device_t* bus_device);
+  static zx::result<std::unique_ptr<DisplayEngine>> Create(
+      zx_device_t* bus_device, DisplayCoordinatorEventsInterface* coordinator_events);
 
   // Exposed for testing. Production code must use the Create() factory method.
-  DisplayEngine(zx_device_t* bus_device, fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_client,
+  //
+  // `bus_device` and `coordinator_events` must not be null, and must outlive
+  // the newly created instance. `gpu_device` must not be null.
+  DisplayEngine(zx_device_t* bus_device, DisplayCoordinatorEventsInterface* coordinator_events,
+                fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_client,
                 std::unique_ptr<VirtioGpuDevice> gpu_device);
   ~DisplayEngine();
 
   zx_status_t Init();
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
   zx_status_t Start();
+
+  // DisplayEngineInterface:
+  void OnCoordinatorConnected() override;
+  zx::result<> ImportBufferCollection(
+      display::DriverBufferCollectionId driver_buffer_collection_id,
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> buffer_collection_token) override;
+  zx::result<> ReleaseBufferCollection(
+      display::DriverBufferCollectionId driver_buffer_collection_id) override;
+  zx::result<display::DriverImageId> ImportImage(
+      const display::ImageMetadata& image_metadata,
+      display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index) override;
+  zx::result<display::DriverCaptureImageId> ImportImageForCapture(
+      display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index) override;
+  void ReleaseImage(display::DriverImageId driver_image_id) override;
+  config_check_result_t CheckConfiguration(
+      cpp20::span<const display_config_t*> display_configs,
+      cpp20::span<client_composition_opcode_t> out_client_composition_opcodes,
+      size_t* out_client_composition_opcodes_actual) override;
+  void ApplyConfiguration(const display_config_t** display_configs, size_t display_count,
+                          const config_stamp_t* banjo_config_stamp) override;
+  void SetEld(display::DisplayId display_id, cpp20::span<const uint8_t> raw_eld) override;
+  zx::result<> SetBufferCollectionConstraints(
+      const display::ImageBufferUsage& image_buffer_usage,
+      display::DriverBufferCollectionId driver_buffer_collection_id) override;
+  zx::result<> SetDisplayPower(display::DisplayId display_id, bool power_on) override;
+  bool IsCaptureSupported() override;
+  zx::result<> StartCapture(display::DriverCaptureImageId capture_image_id) override;
+  zx::result<> ReleaseCapture(display::DriverCaptureImageId capture_image_id) override;
+  bool IsCaptureCompleted() override;
+  zx::result<> SetMinimumRgb(uint8_t minimum_rgb) override;
 
   // Finds the first display usable by this driver, in the `display_infos` list.
   //
@@ -67,60 +109,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
 
   zx::result<BufferInfo> GetAllocatedBufferInfoForImage(
       display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index,
-      const image_metadata_t& image_metadata) const;
-
-  void DisplayControllerImplSetDisplayControllerInterface(
-      const display_controller_interface_protocol_t* intf);
-  void DisplayControllerImplResetDisplayControllerInterface();
-
-  zx_status_t DisplayControllerImplImportBufferCollection(
-      uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
-  zx_status_t DisplayControllerImplReleaseBufferCollection(
-      uint64_t banjo_driver_buffer_collection_id);
-
-  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
-                                               uint64_t banjo_driver_buffer_collection_id,
-                                               uint32_t index, uint64_t* out_image_handle);
-
-  zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
-                                                         uint32_t index,
-                                                         uint64_t* out_capture_handle) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  void DisplayControllerImplReleaseImage(uint64_t image_handle);
-
-  config_check_result_t DisplayControllerImplCheckConfiguration(
-      const display_config_t** display_configs, size_t display_count,
-      client_composition_opcode_t* out_client_composition_opcodes_list,
-      size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual);
-
-  void DisplayControllerImplApplyConfiguration(const display_config_t** display_configs,
-                                               size_t display_count,
-                                               const config_stamp_t* banjo_config_stamp);
-
-  void DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
-                                   size_t raw_eld_count) {}  // No ELD required for non-HDA systems.
-
-  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
-      const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on);
-
-  bool DisplayControllerImplIsCaptureSupported() { return false; }
-
-  zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  bool DisplayControllerImplIsCaptureCompleted() { return false; }
-
-  zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+      const display::ImageMetadata& image_metadata) const;
 
   VirtioPciDevice& pci_device() { return gpu_device_->pci_device(); }
 
@@ -131,7 +120,8 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
           fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
   };
 
-  zx::result<display::DriverImageId> Import(zx::vmo vmo, const image_metadata& image_metadata,
+  zx::result<display::DriverImageId> Import(zx::vmo vmo,
+                                            const display::ImageMetadata& image_metadata,
                                             size_t offset, uint32_t pixel_size, uint32_t row_bytes,
                                             fuchsia_images2::wire::PixelFormat pixel_format);
 
@@ -152,11 +142,11 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
   thrd_t flush_thread_ = {};
   fbl::Mutex flush_lock_;
 
-  display_controller_interface_protocol_t dc_intf_ = {};
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
 
   zx_device_t* const bus_device_;
+  DisplayCoordinatorEventsInterface& coordinator_events_;
 
   // Imported sysmem buffer collections.
   std::unordered_map<display::DriverBufferCollectionId,

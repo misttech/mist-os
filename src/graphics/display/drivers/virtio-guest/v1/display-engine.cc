@@ -28,6 +28,7 @@
 
 #include <algorithm>
 #include <cinttypes>
+#include <cstdint>
 #include <cstring>
 #include <memory>
 #include <utility>
@@ -43,6 +44,9 @@
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-buffer-usage.h"
+#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types-cpp/image-tiling-type.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -55,30 +59,12 @@ constexpr display::DisplayId kDisplayId{1};
 
 }  // namespace
 
-// DDK level ops
-
 using imported_image_t = struct imported_image {
   uint32_t resource_id;
   zx::pmt pmt;
 };
 
-zx_status_t DisplayEngine::DdkGetProtocol(uint32_t proto_id, void* out) {
-  auto* proto = static_cast<ddk::AnyProtocol*>(out);
-  proto->ctx = this;
-  if (proto_id == ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL) {
-    proto->ops = &display_controller_impl_protocol_ops_;
-    return ZX_OK;
-  }
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
-    const display_controller_interface_protocol_t* intf) {
-  {
-    fbl::AutoLock al(&flush_lock_);
-    dc_intf_ = *intf;
-  }
-
+void DisplayEngine::OnCoordinatorConnected() {
   const uint32_t width = current_display_.scanout_info.geometry.width;
   const uint32_t height = current_display_.scanout_info.geometry.height;
 
@@ -113,20 +99,15 @@ void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
       .pixel_format_list = kSupportedFormats.data(),
       .pixel_format_count = kSupportedFormats.size(),
   };
-  display_controller_interface_on_displays_changed(intf, &args, 1, nullptr, 0);
-}
 
-void DisplayEngine::DisplayControllerImplResetDisplayControllerInterface() {
-  fbl::AutoLock al(&flush_lock_);
-  dc_intf_ = display_controller_interface_protocol_t{
-      .ops = nullptr,
-      .ctx = nullptr,
-  };
+  cpp20::span<const added_display_args_t> added_displays(&args, 1);
+  cpp20::span<const display::DisplayId> removed_display_ids;
+  coordinator_events_.OnDisplaysChanged(added_displays, removed_display_ids);
 }
 
 zx::result<DisplayEngine::BufferInfo> DisplayEngine::GetAllocatedBufferInfoForImage(
     display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index,
-    const image_metadata_t& image_metadata) const {
+    const display::ImageMetadata& image_metadata) const {
   const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& client =
       buffer_collections_.at(driver_buffer_collection_id);
   fidl::WireResult check_result = client->CheckBuffersAllocated();
@@ -183,8 +164,8 @@ zx::result<DisplayEngine::BufferInfo> DisplayEngine::GetAllocatedBufferInfoForIm
 
   const auto& format_constraints = collection_info.settings.image_format_constraints;
   uint32_t minimum_row_bytes;
-  if (!ImageFormatMinimumRowBytes(format_constraints, image_metadata.width, &minimum_row_bytes)) {
-    zxlogf(ERROR, "Invalid image width %" PRIu32 " for collection", image_metadata.width);
+  if (!ImageFormatMinimumRowBytes(format_constraints, image_metadata.width(), &minimum_row_bytes)) {
+    zxlogf(ERROR, "Invalid image width %" PRId32 " for collection", image_metadata.width());
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -197,13 +178,12 @@ zx::result<DisplayEngine::BufferInfo> DisplayEngine::GetAllocatedBufferInfoForIm
   });
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplImportBufferCollection(
-    uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
-  const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+zx::result<> DisplayEngine::ImportBufferCollection(
+    display::DriverBufferCollectionId driver_buffer_collection_id,
+    fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> buffer_collection_token) {
   if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
     zxlogf(ERROR, "Buffer Collection (id=%lu) already exists", driver_buffer_collection_id.value());
-    return ZX_ERR_ALREADY_EXISTS;
+    return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
 
   ZX_DEBUG_ASSERT_MSG(sysmem_.is_valid(), "sysmem allocator is not initialized");
@@ -212,64 +192,54 @@ zx_status_t DisplayEngine::DisplayControllerImplImportBufferCollection(
       fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
 
   auto bind_result = sysmem_->BindSharedCollection(
-      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(collection_token)),
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(buffer_collection_token)),
       std::move(collection_server_endpoint));
   if (!bind_result.ok()) {
     zxlogf(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
            bind_result.status_string());
-    return ZX_ERR_INTERNAL;
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
   buffer_collections_[driver_buffer_collection_id] =
       fidl::WireSyncClient(std::move(collection_client_endpoint));
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplReleaseBufferCollection(
-    uint64_t banjo_driver_buffer_collection_id) {
-  const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+zx::result<> DisplayEngine::ReleaseBufferCollection(
+    display::DriverBufferCollectionId driver_buffer_collection_id) {
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
     zxlogf(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
            driver_buffer_collection_id.value());
-    return ZX_ERR_NOT_FOUND;
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
   buffer_collections_.erase(driver_buffer_collection_id);
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplImportImage(
-    const image_metadata_t* image_metadata, uint64_t banjo_driver_buffer_collection_id,
-    uint32_t index, uint64_t* out_image_handle) {
-  const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+zx::result<display::DriverImageId> DisplayEngine::ImportImage(
+    const display::ImageMetadata& image_metadata,
+    display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index) {
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
     zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
            driver_buffer_collection_id.value());
-    return ZX_ERR_NOT_FOUND;
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
 
   zx::result<BufferInfo> buffer_info_result =
-      GetAllocatedBufferInfoForImage(driver_buffer_collection_id, index, *image_metadata);
+      GetAllocatedBufferInfoForImage(driver_buffer_collection_id, index, image_metadata);
   if (!buffer_info_result.is_ok()) {
-    return buffer_info_result.error_value();
+    return buffer_info_result.take_error();
   }
   BufferInfo& buffer_info = buffer_info_result.value();
-  zx::result<display::DriverImageId> import_result =
-      Import(std::move(buffer_info.vmo), *image_metadata, buffer_info.offset,
-             buffer_info.bytes_per_pixel, buffer_info.bytes_per_row, buffer_info.pixel_format);
-  if (import_result.is_ok()) {
-    *out_image_handle = display::ToBanjoDriverImageId(import_result.value());
-    return ZX_OK;
-  }
-  return import_result.error_value();
+  return Import(std::move(buffer_info.vmo), image_metadata, buffer_info.offset,
+                buffer_info.bytes_per_pixel, buffer_info.bytes_per_row, buffer_info.pixel_format);
 }
 
 zx::result<display::DriverImageId> DisplayEngine::Import(
-    zx::vmo vmo, const image_metadata_t& image_metadata, size_t offset, uint32_t pixel_size,
+    zx::vmo vmo, const display::ImageMetadata& image_metadata, size_t offset, uint32_t pixel_size,
     uint32_t row_bytes, fuchsia_images2::wire::PixelFormat pixel_format) {
-  if (image_metadata.tiling_type != IMAGE_TILING_TYPE_LINEAR) {
+  if (image_metadata.tiling_type() != display::kImageTilingTypeLinear) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -279,7 +249,7 @@ zx::result<display::DriverImageId> DisplayEngine::Import(
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  unsigned size = ZX_ROUNDUP(row_bytes * image_metadata.height, zx_system_get_page_size());
+  unsigned size = ZX_ROUNDUP(row_bytes * image_metadata.height(), zx_system_get_page_size());
   zx_paddr_t paddr;
   zx_status_t status = gpu_device_->bti().pin(ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, vmo, offset,
                                               size, &paddr, 1, &import_data->pmt);
@@ -289,7 +259,7 @@ zx::result<display::DriverImageId> DisplayEngine::Import(
   }
 
   zx::result<uint32_t> create_resource_result =
-      gpu_device_->Create2DResource(row_bytes / pixel_size, image_metadata.height, pixel_format);
+      gpu_device_->Create2DResource(row_bytes / pixel_size, image_metadata.height(), pixel_format);
   if (create_resource_result.is_error()) {
     zxlogf(ERROR, "Failed to allocate 2D resource: %s", create_resource_result.status_string());
     return create_resource_result.take_error();
@@ -307,30 +277,33 @@ zx::result<display::DriverImageId> DisplayEngine::Import(
   return zx::ok(image_id);
 }
 
-void DisplayEngine::DisplayControllerImplReleaseImage(uint64_t image_handle) {
-  delete reinterpret_cast<imported_image_t*>(image_handle);
+zx::result<display::DriverCaptureImageId> DisplayEngine::ImportImageForCapture(
+    display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index) {
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
-    const display_config_t** display_configs, size_t display_count,
-    client_composition_opcode_t* out_client_composition_opcodes_list,
-    size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
+void DisplayEngine::ReleaseImage(display::DriverImageId driver_image_id) {
+  delete reinterpret_cast<imported_image_t*>(driver_image_id.value());
+}
+
+config_check_result_t DisplayEngine::CheckConfiguration(
+    cpp20::span<const display_config_t*> display_configs,
+    cpp20::span<client_composition_opcode_t> out_client_composition_opcodes,
+    size_t* out_client_composition_opcodes_actual) {
   if (out_client_composition_opcodes_actual != nullptr) {
     *out_client_composition_opcodes_actual = 0;
   }
 
-  if (display_count != 1) {
-    ZX_DEBUG_ASSERT(display_count == 0);
+  if (display_configs.size() != 1) {
+    ZX_DEBUG_ASSERT(display_configs.size() == 0);
     return CONFIG_CHECK_RESULT_OK;
   }
   ZX_DEBUG_ASSERT(display::ToDisplayId(display_configs[0]->display_id) == kDisplayId);
 
-  ZX_DEBUG_ASSERT(client_composition_opcodes_count >= display_configs[0]->layer_count);
-  cpp20::span<client_composition_opcode_t> client_composition_opcodes(
-      out_client_composition_opcodes_list, display_configs[0]->layer_count);
-  std::fill(client_composition_opcodes.begin(), client_composition_opcodes.end(), 0);
+  ZX_DEBUG_ASSERT(out_client_composition_opcodes.size() >= display_configs[0]->layer_count);
+  std::fill(out_client_composition_opcodes.begin(), out_client_composition_opcodes.end(), 0);
   if (out_client_composition_opcodes_actual != nullptr) {
-    *out_client_composition_opcodes_actual = client_composition_opcodes.size();
+    *out_client_composition_opcodes_actual = out_client_composition_opcodes.size();
   }
 
   bool success;
@@ -353,17 +326,17 @@ config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
               display_configs[0]->cc_flags == 0 && layer->alpha_mode == ALPHA_DISABLE;
   }
   if (!success) {
-    client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+    out_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
     for (unsigned i = 1; i < display_configs[0]->layer_count; i++) {
-      client_composition_opcodes[i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
+      out_client_composition_opcodes[i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
     }
   }
   return CONFIG_CHECK_RESULT_OK;
 }
 
-void DisplayEngine::DisplayControllerImplApplyConfiguration(
-    const display_config_t** display_configs, size_t display_count,
-    const config_stamp_t* banjo_config_stamp) {
+void DisplayEngine::ApplyConfiguration(const display_config_t** display_configs,
+                                       size_t display_count,
+                                       const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(banjo_config_stamp);
   display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
   uint64_t handle = display_count == 0 || display_configs[0]->layer_count == 0
@@ -377,15 +350,19 @@ void DisplayEngine::DisplayControllerImplApplyConfiguration(
   }
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplSetBufferCollectionConstraints(
-    const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
-  const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+void DisplayEngine::SetEld(display::DisplayId display_id, cpp20::span<const uint8_t> raw_eld) {
+  // No ELD required for non-HDA systems.
+  return;
+}
+
+zx::result<> DisplayEngine::SetBufferCollectionConstraints(
+    const display::ImageBufferUsage& image_buffer_usage,
+    display::DriverBufferCollectionId driver_buffer_collection_id) {
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
     zxlogf(ERROR, "SetBufferCollectionConstraints: Cannot find imported buffer collection (id=%lu)",
            driver_buffer_collection_id.value());
-    return ZX_ERR_NOT_FOUND;
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
@@ -428,30 +405,49 @@ zx_status_t DisplayEngine::DisplayControllerImplSetBufferCollectionConstraints(
 
   if (status != ZX_OK) {
     zxlogf(ERROR, "virtio::DisplayEngine: Failed to set constraints");
-    return status;
+    return zx::error(status);
   }
 
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplSetDisplayPower(uint64_t display_id,
-                                                                bool power_on) {
-  return ZX_ERR_NOT_SUPPORTED;
+bool DisplayEngine::IsCaptureSupported() { return false; }
+
+zx::result<> DisplayEngine::SetDisplayPower(display::DisplayId display_id, bool power_on) {
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
+}
+
+zx::result<> DisplayEngine::StartCapture(display::DriverCaptureImageId capture_image_id) {
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
+}
+
+zx::result<> DisplayEngine::ReleaseCapture(display::DriverCaptureImageId capture_image_id) {
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
+}
+
+bool DisplayEngine::IsCaptureCompleted() { return false; }
+
+zx::result<> DisplayEngine::SetMinimumRgb(uint8_t minimum_rgb) {
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
 DisplayEngine::DisplayEngine(zx_device_t* bus_device,
+                             DisplayCoordinatorEventsInterface* coordinator_events,
                              fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_client,
                              std::unique_ptr<VirtioGpuDevice> gpu_device)
     : sysmem_(std::move(sysmem_client)),
       bus_device_(bus_device),
+      coordinator_events_(*coordinator_events),
       gpu_device_(std::move(gpu_device)) {
+  ZX_DEBUG_ASSERT(coordinator_events != nullptr);
   ZX_DEBUG_ASSERT(gpu_device_);
 }
 
 DisplayEngine::~DisplayEngine() { io_buffer_release(&gpu_req_); }
 
 // static
-zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(zx_device_t* bus_device) {
+zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
+    zx_device_t* bus_device, DisplayCoordinatorEventsInterface* coordinator_events) {
   zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> sysmem_client_result =
       DdkDeviceType::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1>(
           bus_device, "sysmem");
@@ -484,7 +480,8 @@ zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(zx_device_t* bu
   }
 
   auto display_engine = fbl::make_unique_checked<DisplayEngine>(
-      &alloc_checker, bus_device, std::move(sysmem_client_result).value(), std::move(gpu_device));
+      &alloc_checker, bus_device, coordinator_events, std::move(sysmem_client_result).value(),
+      std::move(gpu_device));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -549,13 +546,8 @@ void DisplayEngine::virtio_gpu_flusher() {
 
     {
       fbl::AutoLock al(&flush_lock_);
-      if (dc_intf_.ops) {
-        const uint64_t banjo_display_id = display::ToBanjoDisplayId(kDisplayId);
-        const config_stamp_t banjo_config_stamp =
-            display::ToBanjoConfigStamp(displayed_config_stamp_);
-        display_controller_interface_on_display_vsync(&dc_intf_, banjo_display_id, next_deadline,
-                                                      &banjo_config_stamp);
-      }
+      coordinator_events_.OnDisplayVsync(kDisplayId, zx::time(next_deadline),
+                                         displayed_config_stamp_);
     }
     next_deadline = zx_time_add_duration(next_deadline, period);
   }

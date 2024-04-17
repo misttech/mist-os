@@ -15,6 +15,8 @@
 
 #include <ddktl/device.h>
 
+#include "src/graphics/display/drivers/virtio-guest/v1/display-controller-banjo.h"
+#include "src/graphics/display/drivers/virtio-guest/v1/display-coordinator-events-banjo.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/display-engine.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/gpu-control-server.h"
 
@@ -30,7 +32,13 @@ class GpuDeviceDriver : public DdkDeviceType, public GpuControlServer::Owner {
   static zx_status_t Create(zx_device_t* parent);
 
   // Exposed for testing. Production code must use the Create() factory method.
-  explicit GpuDeviceDriver(zx_device_t* bus_device, std::unique_ptr<DisplayEngine> display_engine);
+  //
+  // `coordinator_events` must own the instance passed to the `display_engine`
+  // constructor. It follows that `coordinator_events` must be non-null and must
+  // outlive `display_engine`.
+  explicit GpuDeviceDriver(zx_device_t* bus_device,
+                           std::unique_ptr<DisplayCoordinatorEventsBanjo> coordinator_events,
+                           std::unique_ptr<DisplayEngine> display_engine);
 
   GpuDeviceDriver(const GpuDeviceDriver&) = delete;
   GpuDeviceDriver& operator=(const GpuDeviceDriver&) = delete;
@@ -54,7 +62,14 @@ class GpuDeviceDriver : public DdkDeviceType, public GpuControlServer::Owner {
                            std::function<void(cpp20::span<uint8_t>)> callback) override;
 
  private:
-  std::unique_ptr<DisplayEngine> display_engine_;
+  // Guaranteed to be non-null. Must outlive `display_engine_`.
+  const std::unique_ptr<DisplayCoordinatorEventsBanjo> coordinator_events_;
+
+  // Guaranteed to be non-null. Must outlive `display_controller_banjo_`.
+  const std::unique_ptr<DisplayEngine> display_engine_;
+
+  DisplayControllerBanjo display_controller_banjo_;
+
   std::unique_ptr<GpuControlServer> gpu_control_server_;
 
   // Used by DdkInit() for deferred initialization.
