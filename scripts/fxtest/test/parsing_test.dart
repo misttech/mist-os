@@ -42,7 +42,6 @@ void main() {
           'environments': [],
           'test': {
             'cpu': 'arm64',
-            'path': '/pkgfs/packages/component_test/0/test/component_test',
             'name': '//src/sys/component/test:component_test',
             'os': 'fuchsia',
             'package_url':
@@ -60,7 +59,6 @@ void main() {
       expect(tds, hasLength(1));
       expect(tds[0].packageUrl.toString(), testJson[0]['test']['package_url']);
       expect(tds[0].runtimeDeps, '');
-      expect(tds[0].path, testJson[0]['test']['path']);
       expect(tds[0].name, testJson[0]['test']['name']);
       expect(tds[0].cpu, testJson[0]['test']['cpu']);
       expect(tds[0].os, testJson[0]['test']['os']);
@@ -76,7 +74,6 @@ void main() {
           'environments': [],
           'test': {
             'cpu': 'arm64',
-            'path': '/pkgfs/packages/component_test/0/test/component_test',
             'name': '//src/sys/component/test:component_test',
             'os': 'fuchsia',
             'package_url':
@@ -94,7 +91,6 @@ void main() {
       expect(tds, hasLength(1));
       expect(tds[0].packageUrl.toString(), testJson[0]['test']['package_url']);
       expect(tds[0].runtimeDeps, '');
-      expect(tds[0].path, testJson[0]['test']['path']);
       expect(tds[0].name, testJson[0]['test']['name']);
       expect(tds[0].cpu, testJson[0]['test']['cpu']);
       expect(tds[0].os, testJson[0]['test']['os']);
@@ -109,7 +105,6 @@ void main() {
           'environments': [],
           'test': {
             'cpu': 'arm64',
-            'path': '/pkgfs/packages/component_test/0/test/component_test',
             'name': '//src/sys/component/test:component_test',
             'os': 'fuchsia',
             'package_url':
@@ -126,7 +121,6 @@ void main() {
       expect(tds, hasLength(1));
       expect(tds[0].packageUrl.toString(), testJson[0]['test']['package_url']);
       expect(tds[0].runtimeDeps, '');
-      expect(tds[0].path, testJson[0]['test']['path']);
       expect(tds[0].name, testJson[0]['test']['name']);
       expect(tds[0].cpu, testJson[0]['test']['cpu']);
       expect(tds[0].os, testJson[0]['test']['os']);
@@ -838,7 +832,6 @@ void main() {
           'environments': [],
           'test': {
             'cpu': 'arm64',
-            'path': '/pkgfs/packages/component_test/0/test/component_test',
             'name': '//src/sys/component/test:component_test',
             'os': 'fuchsia',
             'component_label': '//src/sys/component/test:test_component',
@@ -875,7 +868,6 @@ void main() {
           'environments': [],
           'test': {
             'cpu': 'arm64',
-            'path': '/pkgfs/packages/component_test/0/test/component_test',
             'name': '//src/sys/component/test:component_test',
             'os': 'fuchsia',
             'component_label': '//src/sys/component/test:test_component',
@@ -911,7 +903,6 @@ void main() {
           'environments': [],
           'test': {
             'cpu': 'arm64',
-            'path': '/pkgfs/packages/component_test/0/test/component_test',
             'name': '//src/sys/component/test:component_test',
             'os': 'fuchsia',
             'component_label': '//src/sys/component/test:test_component',
@@ -924,8 +915,6 @@ void main() {
           'environments': [],
           'test': {
             'cpu': 'arm64',
-            'path':
-                '/pkgfs/packages/second_component_test/0/test/component_test',
             'name': '//src/sys/component/test:component_test',
             'os': 'fuchsia',
             'component_label': '//src/sys/second_component/test:test_component',
