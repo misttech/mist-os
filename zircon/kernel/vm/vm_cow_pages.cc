@@ -314,7 +314,7 @@ VmCowPages::VmCowPages(const fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr,
       page_source_(ktl::move(page_source)),
       discardable_tracker_(ktl::move(discardable_tracker)) {
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
-  DEBUG_ASSERT(!(pmm_alloc_flags & PMM_ALLOC_FLAG_CAN_BORROW));
+  DEBUG_ASSERT(!(pmm_alloc_flags & PMM_ALLOC_FLAG_LOANED));
 }
 
 void VmCowPages::TransitionToAliveLocked() {
@@ -2451,9 +2451,9 @@ bool VmCowPages::LookupCursor::TargetZeroContentSupplyDirty(bool writing) const 
 zx::result<VmCowPages::LookupCursor::RequireResult>
 VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, DirtyState dirty_state,
                                                          LazyPageRequest* page_request) {
-  // The general pmm_alloc_flags_ are not allowed to contain the BORROW option, and this is relied
+  // The general pmm_alloc_flags_ are not allowed to contain the LOANED option, and this is relied
   // upon below to assume the page allocated cannot be loaned.
-  DEBUG_ASSERT(!(target_->pmm_alloc_flags_ & PMM_ALLOC_FLAG_CAN_BORROW));
+  DEBUG_ASSERT(!(target_->pmm_alloc_flags_ & PMM_ALLOC_FLAG_LOANED));
 
   vm_page_t* out_page = nullptr;
   zx_status_t status = AllocateCopyPage(target_->pmm_alloc_flags_, source->paddr(), alloc_list_,
@@ -5133,7 +5133,7 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
       // CAN_WAIT flag cannot be combined and so we remove it if it exists.
       uint32_t pmm_alloc_flags = pmm_alloc_flags_;
       pmm_alloc_flags &= ~PMM_ALLOC_FLAG_CAN_WAIT;
-      pmm_alloc_flags |= PMM_ALLOC_FLAG_MUST_BORROW | PMM_ALLOC_FLAG_CAN_BORROW;
+      pmm_alloc_flags |= PMM_ALLOC_FLAG_LOANED;
       vm_page_t* new_page;
       zx_status_t alloc_status = pmm_alloc_page(pmm_alloc_flags, &new_page);
       // If we got a loaned page, replace the page in src_page, else just continue with src_page
@@ -6432,9 +6432,9 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
     // Loaned page allocations will always precisely succeed or fail and the CAN_WAIT flag cannot be
     // combined and so we remove it if it exists.
     pmm_alloc_flags &= ~PMM_ALLOC_FLAG_CAN_WAIT;
-    pmm_alloc_flags |= PMM_ALLOC_FLAG_CAN_BORROW | PMM_ALLOC_FLAG_MUST_BORROW;
+    pmm_alloc_flags |= PMM_ALLOC_FLAG_LOANED;
   } else {
-    pmm_alloc_flags &= ~PMM_ALLOC_FLAG_CAN_BORROW;
+    pmm_alloc_flags &= ~PMM_ALLOC_FLAG_LOANED;
   }
 
   // We stack-own a loaned page from pmm_alloc_page() to SwapPageLocked() OR from SwapPageLocked()

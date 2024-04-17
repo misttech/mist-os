@@ -267,15 +267,11 @@ zx_status_t PmmNode::AllocPage(uint alloc_flags, vm_page_t** page_out, paddr_t* 
     Guard<Mutex> guard{&lock_};
     free_list_had_fill_pattern = all_free_pages_filled_;
 
-    // If the caller sets PMM_ALLOC_FLAG_MUST_BORROW, the caller must also set
-    // PMM_ALLOC_FLAG_CAN_BORROW, and must not set PMM_ALLOC_FLAG_CAN_WAIT.
+    // The PMM_ALLOC_FLAG_LOANED flag is not compatible with PMM_ALLOC_FLAG_CAN_WAIT
     DEBUG_ASSERT(
-        !(alloc_flags & PMM_ALLOC_FLAG_MUST_BORROW) ||
-        ((alloc_flags & PMM_ALLOC_FLAG_CAN_BORROW) && !((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT))));
-    const bool can_borrow = pmm_physical_page_borrowing_config()->is_any_borrowing_enabled() &&
-                            !!(alloc_flags & PMM_ALLOC_FLAG_CAN_BORROW);
-    const bool must_borrow = can_borrow && !!(alloc_flags & PMM_ALLOC_FLAG_MUST_BORROW);
-    const bool use_loaned_list = can_borrow && (!list_is_empty(&free_loaned_list_) || must_borrow);
+        !((alloc_flags & PMM_ALLOC_FLAG_LOANED) && (alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT)));
+    const bool use_loaned_list = pmm_physical_page_borrowing_config()->is_any_borrowing_enabled() &&
+                                 (alloc_flags & PMM_ALLOC_FLAG_LOANED);
     list_node* const which_list = use_loaned_list ? &free_loaned_list_ : &free_list_;
 
     // Note that we do not care if the allocation is happening from the loaned list or not since if
@@ -289,14 +285,14 @@ zx_status_t PmmNode::AllocPage(uint alloc_flags, vm_page_t** page_out, paddr_t* 
 
     page = list_remove_head_type(which_list, vm_page, queue_node);
     if (!page) {
-      if (!must_borrow) {
+      if (!use_loaned_list) {
         // Allocation failures from the regular free list are likely to become user-visible.
         ReportAllocFailureLocked();
       }
       return ZX_ERR_NO_MEMORY;
     }
 
-    DEBUG_ASSERT(can_borrow || !page->is_loaned());
+    DEBUG_ASSERT(use_loaned_list || !page->is_loaned());
     AllocPageHelperLocked(page);
 
     if (use_loaned_list) {
@@ -339,15 +335,6 @@ zx_status_t PmmNode::AllocPages(size_t count, uint alloc_flags, list_node* list)
     return status;
   }
 
-  // If the caller sets PMM_ALLOC_FLAG_MUST_BORROW, the caller must also set
-  // PMM_ALLOC_FLAG_CAN_BORROW, and must not set PMM_ALLOC_FLAG_CAN_WAIT.
-  DEBUG_ASSERT(
-      !(alloc_flags & PMM_ALLOC_FLAG_MUST_BORROW) ||
-      ((alloc_flags & PMM_ALLOC_FLAG_CAN_BORROW) && !((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT))));
-  const bool can_borrow = pmm_physical_page_borrowing_config()->is_any_borrowing_enabled() &&
-                          !!(alloc_flags & PMM_ALLOC_FLAG_CAN_BORROW);
-  const bool must_borrow = can_borrow && !!(alloc_flags & PMM_ALLOC_FLAG_MUST_BORROW);
-
   bool free_list_had_fill_pattern = false;
 
   {
@@ -355,88 +342,61 @@ zx_status_t PmmNode::AllocPages(size_t count, uint alloc_flags, list_node* list)
     Guard<Mutex> guard{&lock_};
     free_list_had_fill_pattern = all_free_pages_filled_;
 
-    uint64_t free_count;
-    if (must_borrow) {
-      free_count = 0;
-    } else {
-      free_count = free_count_.load(ktl::memory_order_relaxed);
-    }
-    uint64_t available_count = free_count;
-    uint64_t free_loaned_count = 0;
-    if (can_borrow) {
-      free_loaned_count = free_loaned_count_.load(ktl::memory_order_relaxed);
-      available_count += free_loaned_count;
-    }
+    // The PMM_ALLOC_FLAG_LOANED flag is not compatible with PMM_ALLOC_FLAG_CAN_WAIT
+    DEBUG_ASSERT(
+        !((alloc_flags & PMM_ALLOC_FLAG_LOANED) && (alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT)));
+    const bool use_loaned_list = pmm_physical_page_borrowing_config()->is_any_borrowing_enabled() &&
+                                 (alloc_flags & PMM_ALLOC_FLAG_LOANED);
+    list_node* const which_list = use_loaned_list ? &free_loaned_list_ : &free_list_;
+    uint64_t free_count = use_loaned_list ? free_loaned_count_.load(ktl::memory_order_relaxed)
+                                          : free_count_.load(ktl::memory_order_relaxed);
 
-    if (unlikely(count > available_count)) {
+    if (unlikely(count > free_count)) {
       if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && !never_return_should_wait_) {
         pmm_alloc_delayed.Add(1);
         return ZX_ERR_SHOULD_WAIT;
       }
-      if (!must_borrow) {
+      if (!use_loaned_list) {
         // Allocation failures from the regular free list are likely to become user-visible.
         ReportAllocFailureLocked();
       }
       return ZX_ERR_NO_MEMORY;
     }
-    // Prefer to allocate from loaned, if allowed by this allocation.  If loaned is not allowed by
-    // this allocation, free_loaned_count will be zero here.
-    DEBUG_ASSERT(can_borrow || !free_loaned_count);
-    DEBUG_ASSERT(!must_borrow || !free_count);
-    uint64_t from_loaned_free = ktl::min(count, free_loaned_count);
-    uint64_t from_free = count - from_loaned_free;
 
-    DecrementFreeCountLocked(from_free);
+    // For simplicity of oom state detection we decrement the free count and then check for whether
+    // we should wait or not. The error case is unlikely, and hence not performance critical, so
+    // having to redundantly re-increment is not a big deal.
+    if (use_loaned_list) {
+      DecrementFreeLoanedCountLocked(count);
+    } else {
+      DecrementFreeCountLocked(count);
+    }
 
-    // For simplicity of oom state detection we do this check after decrementing the free count,
-    // since the error case is unlikely and not performance critical. Even if no pages are being
-    // requested from the regular free list (if loaned pages can be used) we still fail in the oom
-    // state since we would prefer those loaned pages to be used to fulfill allocations that cannot
-    // be delayed.
     if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && InOomStateLocked() &&
         !never_return_should_wait_) {
-      IncrementFreeCountLocked(from_free);
+      // Loaned allocations do not support waiting, so we never have to undo the loaned count.
+      DEBUG_ASSERT(!use_loaned_list);
+      IncrementFreeCountLocked(count);
       pmm_alloc_delayed.Add(1);
       return ZX_ERR_SHOULD_WAIT;
     }
 
-    DecrementFreeLoanedCountLocked(from_loaned_free);
+    auto node = which_list;
+    while (count > 0) {
+      node = list_next(which_list, node);
+      DEBUG_ASSERT(use_loaned_list || !containerof(node, vm_page, queue_node)->is_loaned());
+      AllocPageHelperLocked(containerof(node, vm_page, queue_node));
+      --count;
+    }
 
-    do {
-      DEBUG_ASSERT(count == from_loaned_free + from_free);
-      list_node* which_list;
-      size_t which_count;
-      if (can_borrow && !list_is_empty(&free_loaned_list_)) {
-        which_list = &free_loaned_list_;
-        which_count = from_loaned_free;
-        from_loaned_free = 0;
-      } else {
-        DEBUG_ASSERT(!must_borrow);
-        which_list = &free_list_;
-        which_count = from_free;
-        from_free = 0;
-      }
-      count -= which_count;
-
-      DEBUG_ASSERT(which_count > 0);
-      auto node = which_list;
-      while (which_count > 0) {
-        node = list_next(which_list, node);
-        DEBUG_ASSERT(can_borrow || !containerof(node, vm_page, queue_node)->is_loaned());
-        AllocPageHelperLocked(containerof(node, vm_page, queue_node));
-        --which_count;
-      }
-
-      list_node tmp_list = LIST_INITIAL_VALUE(tmp_list);
-      list_split_after(which_list, node, &tmp_list);
-      if (list_is_empty(list)) {
-        list_move(which_list, list);
-      } else {
-        list_splice_after(which_list, list_peek_tail(list));
-      }
-      list_move(&tmp_list, which_list);
-      DEBUG_ASSERT(count == from_loaned_free + from_free);
-    } while (count > 0);
+    list_node tmp_list = LIST_INITIAL_VALUE(tmp_list);
+    list_split_after(which_list, node, &tmp_list);
+    if (list_is_empty(list)) {
+      list_move(which_list, list);
+    } else {
+      list_splice_after(which_list, list_peek_tail(list));
+    }
+    list_move(&tmp_list, which_list);
   }
 
   if (free_list_had_fill_pattern) {
@@ -539,8 +499,7 @@ zx_status_t PmmNode::AllocContiguous(const size_t count, uint alloc_flags, uint8
     alignment_log2 = PAGE_SIZE_SHIFT;
   }
 
-  DEBUG_ASSERT(!(alloc_flags & (PMM_ALLOC_FLAG_CAN_BORROW | PMM_ALLOC_FLAG_MUST_BORROW |
-                                PMM_ALLOC_FLAG_CAN_WAIT)));
+  DEBUG_ASSERT(!(alloc_flags & (PMM_ALLOC_FLAG_LOANED | PMM_ALLOC_FLAG_CAN_WAIT)));
   // pa and list must be valid pointers
   DEBUG_ASSERT(pa);
   DEBUG_ASSERT(list);

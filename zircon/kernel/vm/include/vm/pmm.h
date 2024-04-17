@@ -61,9 +61,9 @@ zx_status_t pmm_get_arena_info(size_t count, uint64_t i, pmm_arena_info_t* buffe
 #define PMM_ALLOC_FLAG_CAN_WAIT (1 << 1)
 // The default (flag not set) is to not allocate a loaned page, so that we don't end up with loaned
 // pages allocated for arbitrary purposes that prevent us from getting the loaned page back quickly.
-#define PMM_ALLOC_FLAG_CAN_BORROW (1 << 2)
-// Require a loaned page, and fail to allocate if a loaned page isn't available.
-#define PMM_ALLOC_FLAG_MUST_BORROW (1 << 3)
+// This flag switches to requiring a loaned page, and will fail if a loaned page isn't available,
+// even if there are other free pages available.
+#define PMM_ALLOC_FLAG_LOANED (1 << 2)
 
 // Allocate count pages of physical memory, adding to the tail of the passed list.
 // The list must be initialized.

@@ -113,8 +113,7 @@ class PageCache {
     DEBUG_ASSERT(per_cpu_caches_ != nullptr);
 
     // Fall back to the PMM for low mem/loaned pages.
-    if (alloc_flags &
-        (PMM_ALLOC_FLAG_LO_MEM | PMM_ALLOC_FLAG_MUST_BORROW | PMM_ALLOC_FLAG_CAN_BORROW)) {
+    if (alloc_flags & (PMM_ALLOC_FLAG_LO_MEM | PMM_ALLOC_FLAG_LOANED)) {
       list_node page_list = LIST_INITIAL_VALUE(page_list);
       const zx_status_t status = pmm_alloc_pages(page_count, alloc_flags, &page_list);
       if (status != ZX_OK) {
