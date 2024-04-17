@@ -989,11 +989,6 @@ class VmCowPages final : public VmHierarchyBase,
   // Places a newly added, not yet pinned, page into the appropriate page queue.
   void SetNotPinnedLocked(vm_page_t* page, uint64_t offset) TA_REQ(lock());
 
-  // Updates any meta data for accessing a page. Currently this moves pager backed pages around in
-  // the page queue to track which ones were recently accessed for the purposes of eviction. In
-  // terms of functional correctness this never has to be called.
-  void UpdateOnAccessLocked(vm_page_t* page, uint pf_flags) TA_REQ(lock());
-
   // Updates the page's dirty state to the one specified, and also moves the page between page
   // queues if required by the dirty state. |dirty_state| should be a valid dirty tracking state,
   // i.e. one of Clean, AwaitingClean, or Dirty.
@@ -1590,7 +1585,7 @@ class VmCowPages::LookupCursor {
   // updating. Increments the cursor.
   __ALWAYS_INLINE RequireResult CursorAsResult() TA_REQ(lock()) {
     if (mark_accessed_) {
-      owner()->UpdateOnAccessLocked(owner_cursor_->Page(), 0);
+      pmm_page_queues()->MarkAccessed(owner_cursor_->Page());
     }
     // Inform PageAsResult whether the owner_ is the target_, but otherwise let it calculate the
     // actual writability of the page.

@@ -909,16 +909,17 @@ void PageQueues::UpdateActiveInactiveLocked(PageQueue old_queue, PageQueue new_q
   MaybeTriggerAgingLocked(dps);
 }
 
-void PageQueues::MarkAccessed(vm_page_t* page) {
+void PageQueues::MarkAccessedContinued(vm_page_t* page) {
+  // Although we can get called with the zero page, it would not be in a reclaimable queue and so
+  // we should have returned in the MarkAccessed wrapper.
+  DEBUG_ASSERT(page != vm_get_zero_page());
+
   pq_accessed_normal.Add(1);
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
 
   auto queue_ref = page->object.get_page_queue_ref();
 
-  // The page can be the zero page, but in that case we'll return early below.
-  DEBUG_ASSERT(page != vm_get_zero_page() ||
-               queue_ref.load(ktl::memory_order_relaxed) < PageQueueReclaimDontNeed);
+  DeferPendingSignals dps{*this};
+  Guard<SpinLock, IrqSave> guard{&lock_};
 
   // We need to check the current queue to see if it is in the reclaimable range. Between checking
   // this and updating the queue it could change, however it would only change as a result of

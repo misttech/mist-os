@@ -140,7 +140,21 @@ class PageQueues {
   // Tells the page queue this page has been accessed, and it should have its position in the queues
   // updated. This method will take the internal page queues lock and should not be used for
   // accessed harvesting, where MarkAccessedDeferredCount should be used instead.
-  void MarkAccessed(vm_page_t* page);
+  void MarkAccessed(vm_page_t* page) {
+    // Can retrieve the queue ref and do a short circuit check for whether mark accessed is
+    // necessary. Although this check is racy, since we do not yet hold the lock, we will either:
+    //  * Race and fail to mark accessed - this is fine since racing implies a newly added page,
+    //    which would be added to the mru queue anyway.
+    //  * Race and attempt to spuriously mark accessed - this is fine as we will check again with
+    //    the lock held.
+    auto queue_ref = page->object.get_page_queue_ref();
+    const uint8_t queue = queue_ref.load(ktl::memory_order_relaxed);
+    if (queue < PageQueueReclaimDontNeed) {
+      return;
+    }
+    // With the early check complete, continue with the non-inlined longer body.
+    MarkAccessedContinued(page);
+  }
 
   // Provides access to the underlying lock, allowing _Locked variants to be called. Use of this is
   // highly discouraged as the underlying lock is a CriticalMutex which disables preemption.
@@ -632,6 +646,10 @@ class PageQueues {
   void LruThread();
   void MaybeTriggerLruProcessing() TA_EXCL(lock_);
   bool NeedsLruProcessing() const;
+
+  // MarkAccessed is split into a small inlinable portion that attempts to short circuit, and this
+  // main implementation that does the actual accessed marking if needed.
+  void MarkAccessedContinued(vm_page_t* page);
 
   // Returns true if a page is both in one of the Reclaim queues, and succeeds the passed in
   // validator, which takes a fbl::RefPtr<VmCowPages>.

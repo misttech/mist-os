@@ -2311,7 +2311,7 @@ zx_status_t VmCowPages::PrepareForWriteLocked(uint64_t offset, uint64_t len,
           // until the pager has a chance to respond to the DIRTY request.
           if (is_page_clean(page)) {
             AssertHeld(lock_ref());
-            UpdateOnAccessLocked(page, VMM_PF_FLAG_SW_FAULT);
+            pmm_page_queues()->MarkAccessed(page);
           }
         } else if (p->IsIntervalZero()) {
           if (p->IsIntervalStart() || p->IsIntervalSlot()) {
@@ -2395,25 +2395,6 @@ zx_status_t VmCowPages::PrepareForWriteLocked(uint64_t offset, uint64_t len,
   // The page source will never succeed synchronously.
   DEBUG_ASSERT(status != ZX_OK);
   return status;
-}
-
-void VmCowPages::UpdateOnAccessLocked(vm_page_t* page, uint pf_flags) {
-  PageQueues* pq = pmm_page_queues();
-  // We only care about updating on access if we can reclaim pages, which if reclamation is limited
-  // to pager backed can be skipped if eviction isn't possible.
-  if (pq->ReclaimIsOnlyPagerBacked() && !can_evict()) {
-    return;
-  }
-
-  // Don't make the page accessed for hardware faults. These accesses, if any actually end up
-  // happening, will be detected by the accessed bits in the page tables.
-  // For non hardware faults, the kernel might use the page directly through the physmap, which will
-  // not cause accessed information to be updated and so we consider it accessed at this point.
-  if (pf_flags & VMM_PF_FLAG_HW_FAULT) {
-    return;
-  }
-
-  pq->MarkAccessed(page);
 }
 
 inline VmCowPages::LookupCursor::RequireResult VmCowPages::LookupCursor::PageAsResultNoIncrement(
@@ -2659,7 +2640,7 @@ vm_page_t* VmCowPages::LookupCursor::MaybePage(bool will_write) {
   vm_page_t* page = CursorIsUsablePage(will_write) ? owner_cursor_->Page() : nullptr;
 
   if (page && mark_accessed_) {
-    owner()->UpdateOnAccessLocked(page, 0);
+    pmm_page_queues()->MarkAccessed(page);
   }
 
   IncrementCursor();
@@ -2806,7 +2787,7 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
     // Although we are not returning the page, the act of forking counts as an access, and this is
     // an access regardless of whether the final returned page should be considered accessed, so
     // ignore the mark_accessed_ check here.
-    owner()->UpdateOnAccessLocked(owner_cursor_->Page(), 0);
+    pmm_page_queues()->MarkAccessed(owner_cursor_->Page());
     if (!owner()->is_hidden_locked()) {
       // Directly copying the page from the owner into the target.
       return TargetAllocateCopyPageAsResult(owner_cursor_->Page(), DirtyState::Untracked,
@@ -6122,7 +6103,7 @@ bool VmCowPages::RemovePageForEvictionLocked(vm_page_t* page, uint64_t offset,
     // usage. A possible approach might involve moving to a separate queue when we skip the page for
     // eviction. Pages move out of said queue when accessed, and continue aging as other pages.
     // Pages in the queue are considered for eviction pre-OOM, but ignored otherwise.
-    UpdateOnAccessLocked(page, VMM_PF_FLAG_SW_FAULT);
+    pmm_page_queues()->MarkAccessed(page);
     vm_vmo_always_need_skipped_reclaim.Add(1);
     return false;
   }
@@ -6159,7 +6140,7 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
         ZX_CACHE_POLICY_CACHED) {
       // Cannot compress uncached mappings. To avoid this page remaining in the reclamation list we
       // simulate an access.
-      UpdateOnAccessLocked(page, VMM_PF_FLAG_SW_FAULT);
+      pmm_page_queues()->MarkAccessed(page);
       return false;
     }
   }
@@ -6286,7 +6267,7 @@ bool VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintActio
   if (high_priority_count_ != 0) {
     // Not allowed to reclaim. To avoid this page remaining in a reclamation list we simulate an
     // access.
-    UpdateOnAccessLocked(page, VMM_PF_FLAG_SW_FAULT);
+    pmm_page_queues()->MarkAccessed(page);
     return false;
   }
 
@@ -6299,7 +6280,7 @@ bool VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintActio
   // No other reclamation strategies, so to avoid this page remaining in a reclamation list we
   // simulate an access. Do not want to place it in the ReclaimFailed queue since our failure was
   // not based on page contents.
-  UpdateOnAccessLocked(page, VMM_PF_FLAG_SW_FAULT);
+  pmm_page_queues()->MarkAccessed(page);
   // Keep a count as having no reclamation strategy is probably a sign of miss-configuration.
   vm_vmo_no_reclamation_strategy.Add(1);
   return false;
