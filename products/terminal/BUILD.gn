@@ -30,16 +30,6 @@ product_assembly_configuration("terminal") {
 
     storage = {
       configure_fshost = true
-      filesystems = {
-        volume = {
-          fvm = {
-            data = {
-            }
-            blob = {
-            }
-          }
-        }
-      }
     }
 
     development_support = {

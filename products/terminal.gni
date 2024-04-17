@@ -78,11 +78,9 @@ legacy_cache_package_labels += [
   "//src/tests/fidl/dynsuite/server_suite/harness",
 ]
 
-fxfs_blob = false
-
 # Use the product assembly config target to specify the product configuration.
 fuchsia_product_assembly_config_label = "//products/terminal"
-zedboot_product_assembly_config_label = "//products/zedboot:zedboot_with_fvm"
+zedboot_product_assembly_config_label = "//products/zedboot"
 
 # Include the session framework
 core_realm_shards += [ "//src/session/bin/session_manager:terminal_core_shard" ]

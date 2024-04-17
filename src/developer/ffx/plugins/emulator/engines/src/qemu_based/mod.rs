@@ -234,9 +234,14 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                         Self::fvm_extend(&dest_path, target_size).await?;
                     }
                     DiskImage::Fxfs(_) => {
-                        let tmp = NamedTempFile::new_in(&instance_root).map_err(|e| bug!("{e}"))?;
-                        fs::copy(src_path, tmp.path())
-                            .map_err(|e| bug!("cannot stage Fxfs image: {e}"))?;
+                        let mut tmp =
+                            NamedTempFile::new_in(&instance_root).map_err(|e| bug!("{e}"))?;
+                        {
+                            let mut reader = std::fs::File::open(src_path)
+                                .map_err(|e| bug!("open failed: {e}"))?;
+                            std::io::copy(&mut reader, &mut tmp)
+                                .map_err(|e| bug!("cannot stage Fxfs image: {e}"))?;
+                        }
                         if original_size < target_size {
                             // Resize the image if needed.
                             tmp.as_file().set_len(target_size).map_err(|e| {
@@ -1201,6 +1206,13 @@ mod tests {
         std::fs::write(&emu_config.guest.kernel_image, "whatever").expect("writing kernel image");
         std::fs::write(emu_config.guest.disk_image.as_ref().unwrap(), EXPECTED_DATA)
             .expect("writing guest image");
+        // Make the input file read-only to ensure that the staged version is RW.
+        let mut perms = std::fs::metadata(&emu_config.guest.disk_image.as_ref().unwrap())
+            .expect("get permissions")
+            .permissions();
+        perms.set_readonly(true);
+        std::fs::set_permissions(&emu_config.guest.disk_image.as_ref().unwrap(), perms)
+            .expect("set permissions");
 
         emu_config.device.storage = DataAmount { units: DataUnits::Kilobytes, quantity: 4 };
 
@@ -1226,6 +1238,7 @@ mod tests {
         assert_eq!(disk_contents.len(), 4096);
         assert_eq!(&disk_contents[..EXPECTED_DATA.len()], EXPECTED_DATA);
         assert_eq!(&disk_contents[EXPECTED_DATA.len()..], &[0u8; 4096 - EXPECTED_DATA.len()]);
+        assert!(!disk_image.metadata().expect("get metadata").permissions().readonly());
 
         Ok(())
     }
