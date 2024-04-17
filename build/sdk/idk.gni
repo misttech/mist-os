@@ -264,6 +264,12 @@ template("idk") {
       _exported_dir_stamp,
     ]
 
+    # The exported dir is fully under our control and gets deleted by every
+    # invocation of this build rule.
+    hermetic_action_ignored_prefixes = [ _exported_dir ]
+
+    depfile = "${target_gen_dir}/${target_name}.d"
+
     args = []
 
     foreach(dir, _subbuild_dirs) {
@@ -279,6 +285,8 @@ template("idk") {
       rebase_path(_exported_dir, root_build_dir),
       "--stamp-file",
       rebase_path(_exported_dir_stamp, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
       "--host-arch",
       host_triple,
       "--release-version",
@@ -291,10 +299,6 @@ template("idk") {
         cpu,
       ]
     }
-
-    # TODO(https://fxbug.dev/333054435): Generate a depfile to make this
-    # hermetic.
-    hermetic_deps = false
 
     forward_variables_from(invoker,
                            [
