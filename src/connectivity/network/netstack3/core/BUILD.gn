@@ -9,6 +9,19 @@ import("//build/rust/rustc_test.gni")
 import(
     "//src/connectivity/network/netstack3/core/rustc_library_with_features.gni")
 
+_all_core_crates = [
+  "base:netstack3-base",
+  "base:netstack3-base-testutils",
+  "filter:netstack3-filter",
+  "filter:netstack3-filter-benchmarks",
+  "filter:netstack3-filter-instrumented",
+  "filter:netstack3-filter-testutils",
+  "filter:netstack3-filter-loom",
+  "sync:netstack3-sync",
+  "sync:netstack3-sync-instrumented",
+  "sync:netstack3-sync-loom",
+]
+
 rustc_library_with_features("netstack3-core") {
   version = "0.1.0"
   edition = "2021"
@@ -164,16 +177,20 @@ rustc_library_with_features("netstack3-core") {
       target_name = "netstack3-core-instrumented"
       features = [ "instrumented" ]
       with_unit_tests = true
-      deps += [ "sync:netstack3-sync-instrumented" ]
       non_test_deps = [
         "base:netstack3-base",
         "filter:netstack3-filter-instrumented",
+        "sync:netstack3-sync-instrumented",
       ]
       test_deps += [
         "base:netstack3-base-testutils",
         "filter:netstack3-filter-testutils",
+        "sync:netstack3-sync-instrumented",
         "//third_party/rust_crates:scopeguard",
       ]
+
+      # Guard against bad crate variants.
+      assert_no_deps = _all_core_crates - non_test_deps
 
       # TODO(https://fxbug.dev/42086491): Split up large tests.
       # Compiling the tests OOMs on RBE with these variants.
@@ -194,12 +211,18 @@ rustc_library_with_features("netstack3-core") {
         "instrumented",
         "testutils",
       ]
-      deps += [
+
+      _core_deps = [
         "base:netstack3-base-testutils",
-        "filter:netstack3-filter",
+        "filter:netstack3-filter-testutils",
         "sync:netstack3-sync-instrumented",
-        "//third_party/rust_crates:rand_xorshift",
       ]
+
+      deps += _core_deps
+      deps += [ "//third_party/rust_crates:rand_xorshift" ]
+
+      # Guard against bad crate variants.
+      assert_no_deps = _all_core_crates - _core_deps
     },
 
     # A variant of the netstack3-core library that is built for running
@@ -208,14 +231,22 @@ rustc_library_with_features("netstack3-core") {
       target_name = "netstack3-core-benchmarks"
       testonly = true
       features = []
-      deps += [
+
+      _core_deps = [
         "base:netstack3-base-testutils",
-        "filter:netstack3-filter-testutils",
+        "filter:netstack3-filter-benchmarks",
         "sync:netstack3-sync",
+      ]
+      deps += _core_deps
+      deps += [
         "//third_party/rust_crates:criterion",
         "//third_party/rust_crates:rand_xorshift",
       ]
       deps += test_deps
+
+      # Guard against bad crate variants.
+      assert_no_deps = _all_core_crates - _core_deps
+
       configs += [ ":benchmark" ]
     },
   ]
@@ -231,12 +262,17 @@ rustc_library_with_features("netstack3-core") {
           "instrumented",
           "testutils",
         ]
-        deps += [
+        _core_deps = [
           "base:netstack3-base-testutils",
           "filter:netstack3-filter-loom",
           "sync:netstack3-sync-loom",
-          "//third_party/rust_crates:rand_xorshift",
         ]
+        deps += _core_deps
+        deps += [ "//third_party/rust_crates:rand_xorshift" ]
+
+        # Guard against bad crate variants.
+        assert_no_deps = _all_core_crates - _core_deps
+
         configs += [ ":loom" ]
       },
     ]
@@ -312,6 +348,7 @@ if (is_fuchsia) {
     deps = [ ":fuzz-single-device" ]
   }
 }
+
 group("tests") {
   testonly = true
   public_deps = [
