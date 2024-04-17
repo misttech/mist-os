@@ -5025,10 +5025,10 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_declare::net_ip_v6;
     use net_types::{
-        ip::{AddrSubnet, Ip, Ipv4, Ipv6, Ipv6SourceAddr, Mtu},
-        LinkLocalAddr, Witness,
+        ip::{Ip, Ipv4, Ipv6, Ipv6SourceAddr, Mtu},
+        LinkLocalAddr,
     };
-    use packet::{Buf, BufferMut, ParseBuffer as _, Serializer};
+    use packet::{Buf, BufferMut, ParseBuffer as _};
     use packet_formats::{
         icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
         tcp::{TcpParseArgs, TcpSegment},
@@ -5044,7 +5044,7 @@ mod tests {
                 FakeNetworkContext, FakeTimerCtx, InstantAndData, PendingFrameData, StepResult,
                 WithFakeFrameContext, WithFakeTimerContext, WrappedFakeCoreCtx,
             },
-            ContextProvider, InstantContext as _, SendFrameContext,
+            ContextProvider, InstantContext as _,
         },
         device::{
             link::LinkDevice,
@@ -5052,33 +5052,22 @@ mod tests {
             testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
             DeviceLayerStateTypes,
         },
-        filter::FilterBindingsTypes,
+        filter::{FilterBindingsTypes, TransportPacketSerializer},
         ip::{
-            device::{
-                nud::LinkResolutionContext,
-                state::{
-                    DualStackIpDeviceState, IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressEntry,
-                    Ipv4DeviceState, Ipv6AddrConfig, Ipv6AddressEntry, Ipv6DadState,
-                    Ipv6DeviceState,
-                },
-                IpDeviceAddr,
-            },
+            device::{nud::LinkResolutionContext, state::IpDeviceStateIpExt},
             icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode},
-            socket::testutil::FakeDualStackIpSocketCtx,
             socket::{
-                testutil::{FakeDeviceConfig, FakeFilterDeviceId},
-                IpSocketBindingsContext, IpSocketContext, MmsError,
+                testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
+                IpSockSendError, IpSocketBindingsContext, MmsError, SendOptions,
             },
             testutil::DualStackSendIpPacketMeta,
-            types::{ResolvedRoute, RoutableIpAddr},
-            HopLimits, IpLayerPacketMetadata, IpTransportContext, ResolveRouteError,
-            SendIpPacketMeta,
+            HopLimits, IpTransportContext,
         },
         sync::Mutex,
         testutil::ContextPair,
         testutil::{
             new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng, MonotonicIdentifier,
-            TestIpExt, DEFAULT_INTERFACE_METRIC,
+            TestIpExt,
         },
         transport::tcp::{
             buffer::{
@@ -5143,11 +5132,6 @@ mod tests {
             >,
         >;
         fn recv_src_addr(addr: Self::Addr) -> Self::RecvSrcAddr;
-
-        fn new_device_state(
-            addrs: impl IntoIterator<Item = Self::Addr>,
-            prefix: u8,
-        ) -> DualStackIpDeviceState<TcpBindingsCtx<FakeDeviceId>>;
 
         fn converter() -> MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>;
     }
@@ -5214,7 +5198,7 @@ mod tests {
 
     type TcpCoreCtx<D, BT> = WrappedFakeCoreCtx<
         FakeDualStackTcpState<D, BT>,
-        FakeDualStackIpSocketCtx<D, BT>,
+        FakeDualStackIpSocketCtx<D>,
         DualStackSendIpPacketMeta<D>,
         D,
     >;
@@ -5234,7 +5218,7 @@ mod tests {
         }
     }
 
-    impl<D: FakeFilterDeviceId<()>> FakeNetworkContext for TcpCtx<D> {
+    impl<D: FakeStrongDeviceId> FakeNetworkContext for TcpCtx<D> {
         type TimerId = TimerId<D::Weak, TcpBindingsCtx<D>>;
         type SendMeta = DualStackSendIpPacketMeta<D>;
         type RecvMeta = DualStackSendIpPacketMeta<D>;
@@ -5430,11 +5414,11 @@ mod tests {
     impl<I, D, BC> TransportIpContext<I, BC> for TcpCoreCtx<D, BC>
     where
         I: TcpTestIpExt,
-        D: FakeFilterDeviceId<BC::DeviceClass>,
+        D: FakeStrongDeviceId,
         BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
-        FakeDualStackIpSocketCtx<D, BC>: TransportIpContext<I, BC, DeviceId = Self::DeviceId>,
+        FakeDualStackIpSocketCtx<D>: TransportIpContext<I, BC, DeviceId = Self::DeviceId>,
     {
-        type DevicesWithAddrIter<'a> = <FakeDualStackIpSocketCtx<D, BC> as TransportIpContext<I, BC>>::DevicesWithAddrIter<'a>
+        type DevicesWithAddrIter<'a> = <FakeDualStackIpSocketCtx<D> as TransportIpContext<I, BC>>::DevicesWithAddrIter<'a>
             where Self: 'a;
 
         fn get_devices_with_assigned_addr(
@@ -5464,51 +5448,47 @@ mod tests {
     }
 
     /// Delegate implementation to inner context.
-    impl<
-            I: TcpTestIpExt,
-            D: FakeStrongDeviceId,
-            BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
-        > IpSocketContext<I, BC> for TcpCoreCtx<D, BC>
+    impl<I: TcpTestIpExt, D: FakeStrongDeviceId, BC: TcpTestBindingsTypes<D>> IpSocketHandler<I, BC>
+        for TcpCoreCtx<D, BC>
     {
-        fn lookup_route(
+        fn new_ip_socket(
             &mut self,
             bindings_ctx: &mut BC,
-            device: Option<&Self::DeviceId>,
-            local_ip: Option<IpDeviceAddr<I::Addr>>,
-            addr: RoutableIpAddr<I::Addr>,
-        ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError> {
-            self.inner.get_mut().lookup_route(bindings_ctx, device, local_ip, addr)
+            device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
+            local_ip: Option<SocketIpAddr<I::Addr>>,
+            remote_ip: SocketIpAddr<I::Addr>,
+            proto: I::Proto,
+        ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
+            IpSocketHandler::<I, BC>::new_ip_socket(
+                &mut self.inner,
+                bindings_ctx,
+                device,
+                local_ip,
+                remote_ip,
+                proto,
+            )
         }
 
-        fn send_ip_packet<SS>(
+        fn send_ip_packet<S, O>(
             &mut self,
             bindings_ctx: &mut BC,
-            SendIpPacketMeta {  device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
-            body: SS,
-            _packet_metadata: IpLayerPacketMetadata<I>,
-        ) -> Result<(), SS>
+            socket: &IpSock<I, Self::WeakDeviceId>,
+            body: S,
+            mtu: Option<u32>,
+            options: &O,
+        ) -> Result<(), (S, IpSockSendError)>
         where
-            SS: Serializer,
-            SS::Buffer: BufferMut,
+            S: TransportPacketSerializer,
+            S::Buffer: BufferMut,
+            O: SendOptions<I>,
         {
-            let meta = SendIpPacketMeta::<I, _, _> {
-                device: device.clone(),
-                src_ip,
-                dst_ip,
-                broadcast,
-                next_hop,
-                proto,
-                ttl,
-                mtu,
-            }
-            .into();
-            self.inner.frames.send_frame(bindings_ctx, meta, body)
+            self.inner.send_ip_packet(bindings_ctx, socket, body, mtu, options)
         }
     }
 
     impl<D, BC> TcpDemuxContext<Ipv4, D::Weak, BC> for TcpCoreCtx<D, BC>
     where
-        D: FakeFilterDeviceId<BC::DeviceClass>,
+        D: FakeStrongDeviceId,
         BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
     {
         type IpTransportCtx<'a> = Self;
@@ -5538,7 +5518,7 @@ mod tests {
 
     impl<D, BC> TcpDemuxContext<Ipv6, D::Weak, BC> for TcpCoreCtx<D, BC>
     where
-        D: FakeFilterDeviceId<BC::DeviceClass>,
+        D: FakeStrongDeviceId,
         BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
     {
         type IpTransportCtx<'a> = Self;
@@ -5577,10 +5557,8 @@ mod tests {
         }
     }
 
-    impl<
-            D: FakeFilterDeviceId<BC::DeviceClass>,
-            BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
-        > TcpContext<Ipv6, BC> for TcpCoreCtx<D, BC>
+    impl<D: FakeStrongDeviceId, BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext>
+        TcpContext<Ipv6, BC> for TcpCoreCtx<D, BC>
     {
         type ThisStackIpTransportAndDemuxCtx<'a> = Self;
         type SingleStackIpTransportAndDemuxCtx<'a> = UninstantiableWrapper<Self>;
@@ -5657,10 +5635,8 @@ mod tests {
         }
     }
 
-    impl<
-            D: FakeFilterDeviceId<BC::DeviceClass>,
-            BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
-        > TcpContext<Ipv4, BC> for TcpCoreCtx<D, BC>
+    impl<D: FakeStrongDeviceId, BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext>
+        TcpContext<Ipv4, BC> for TcpCoreCtx<D, BC>
     {
         type ThisStackIpTransportAndDemuxCtx<'a> = Self;
         type SingleStackIpTransportAndDemuxCtx<'a> = Self;
@@ -5738,10 +5714,8 @@ mod tests {
         }
     }
 
-    impl<
-            D: FakeFilterDeviceId<BT::DeviceClass>,
-            BT: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
-        > TcpDualStackContext<Ipv6, FakeWeakDeviceId<D>, BT> for TcpCoreCtx<D, BT>
+    impl<D: FakeStrongDeviceId, BT: TcpTestBindingsTypes<D> + IpSocketBindingsContext>
+        TcpDualStackContext<Ipv6, FakeWeakDeviceId<D>, BT> for TcpCoreCtx<D, BT>
     {
         type Converter = Ipv6SocketIdToIpv4DemuxIdConverter;
         type DualStackIpTransportCtx<'a> = Self;
@@ -5837,29 +5811,6 @@ mod tests {
         fn recv_src_addr(addr: Self::Addr) -> Self::RecvSrcAddr {
             addr
         }
-
-        fn new_device_state(
-            addrs: impl IntoIterator<Item = Self::Addr>,
-            prefix: u8,
-        ) -> DualStackIpDeviceState<TcpBindingsCtx<FakeDeviceId>> {
-            let ipv4 = Ipv4DeviceState::default();
-            for addr in addrs {
-                let _addr_id = ipv4
-                    .ip_state
-                    .addrs
-                    .write()
-                    .add(Ipv4AddressEntry::new(
-                        AddrSubnet::new(addr, prefix).unwrap(),
-                        Ipv4AddrConfig::default(),
-                    ))
-                    .expect("failed to add address");
-            }
-            DualStackIpDeviceState {
-                ipv4,
-                ipv6: Default::default(),
-                metric: DEFAULT_INTERFACE_METRIC,
-            }
-        }
     }
 
     impl TcpTestIpExt for Ipv6 {
@@ -5870,30 +5821,6 @@ mod tests {
         }
         fn recv_src_addr(addr: Self::Addr) -> Self::RecvSrcAddr {
             Ipv6SourceAddr::new(addr).unwrap()
-        }
-
-        fn new_device_state(
-            addrs: impl IntoIterator<Item = Self::Addr>,
-            prefix: u8,
-        ) -> DualStackIpDeviceState<TcpBindingsCtx<FakeDeviceId>> {
-            let ipv6 = Ipv6DeviceState::default();
-            for addr in addrs {
-                let _addr_id = ipv6
-                    .ip_state
-                    .addrs
-                    .write()
-                    .add(Ipv6AddressEntry::new(
-                        AddrSubnet::new(addr, prefix).unwrap(),
-                        Ipv6DadState::Assigned,
-                        Ipv6AddrConfig::default(),
-                    ))
-                    .expect("failed to add address");
-            }
-            DualStackIpDeviceState {
-                ipv4: Default::default(),
-                ipv6,
-                metric: DEFAULT_INTERFACE_METRIC,
-            }
         }
     }
 
@@ -7545,15 +7472,11 @@ mod tests {
     {
         let addrs = [1, 2].map(|i| I::get_other_ip_address(i));
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::with_inner_and_outer_state(
-            FakeDualStackIpSocketCtx::<_, _>::with_devices_state(core::iter::once::<(
-                _,
-                _,
-                Vec<SpecifiedAddr<IpAddr>>,
-            )>((
-                FakeDeviceId,
-                I::new_device_state(addrs.iter().map(Witness::get), I::FAKE_CONFIG.subnet.prefix()),
-                vec![],
-            ))),
+            FakeDualStackIpSocketCtx::new(core::iter::once(FakeDeviceConfig {
+                device: FakeDeviceId,
+                local_ips: addrs.iter().cloned().map(SpecifiedAddr::<IpAddr>::from).collect(),
+                remote_ips: Default::default(),
+            })),
             FakeDualStackTcpState::default(),
         ));
         let mut api = ctx.tcp_api::<I>();

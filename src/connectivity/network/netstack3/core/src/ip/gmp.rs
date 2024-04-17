@@ -38,8 +38,6 @@ pub(crate) mod igmp;
 pub(crate) mod mld;
 
 use alloc::vec::Vec;
-#[cfg(test)]
-use core::num::NonZeroUsize;
 use core::{fmt::Debug, time::Duration};
 
 use assert_matches::assert_matches;
@@ -271,13 +269,6 @@ impl<A: IpAddress, T> MulticastGroupSet<A, T> {
 
     fn get_mut(&mut self, group: &MulticastAddr<A>) -> Option<&mut T> {
         self.inner.get_mut(group)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn iter_counts<'a>(
-        &'a self,
-    ) -> impl 'a + Iterator<Item = (&'a MulticastAddr<A>, NonZeroUsize)> {
-        self.inner.iter_with_counts().map(|(addr, _state, count)| (addr, count))
     }
 
     fn iter_mut<'a>(&'a mut self) -> impl 'a + Iterator<Item = (&'a MulticastAddr<A>, &'a mut T)> {
@@ -1257,75 +1248,6 @@ where
             }
         })
 }
-#[cfg(test)]
-mod testutil {
-    use net_types::{
-        ip::{GenericOverIp, Ip, IpAddress, IpInvariant},
-        MulticastAddr,
-    };
-
-    use crate::{
-        context::{testutil::FakeInstant, InstantContext, RngContext},
-        data_structures::ref_counted_hash_map::{InsertResult, RemoveResult},
-        ip::{
-            device::state::IpDeviceStateIpExt,
-            gmp::{GmpStateMachine, MulticastGroupSet, ProtocolSpecific},
-        },
-    };
-
-    #[derive(GenericOverIp)]
-    #[generic_over_ip(I, Ip)]
-    struct GroupWrapper<'a, I: IpDeviceStateIpExt>(
-        &'a mut MulticastGroupSet<I::Addr, I::GmpState<FakeInstant>>,
-    );
-
-    impl<A: IpAddress> MulticastGroupSet<A, <A::Version as IpDeviceStateIpExt>::GmpState<FakeInstant>>
-    where
-        A::Version: IpDeviceStateIpExt,
-    {
-        pub(crate) fn join_multicast_group<
-            BC: RngContext + InstantContext<Instant = FakeInstant>,
-        >(
-            &mut self,
-            bindings_ctx: &mut BC,
-            addr: MulticastAddr<A>,
-        ) {
-            fn new_state_machine<BC: RngContext + InstantContext, P: Default + ProtocolSpecific>(
-                bindings_ctx: &mut BC,
-            ) -> GmpStateMachine<BC::Instant, P> {
-                let now = bindings_ctx.now();
-                let (machine, _actions) =
-                    GmpStateMachine::join_group(&mut bindings_ctx.rng(), now, false);
-                machine
-            }
-
-            <A::Version as Ip>::map_ip(
-                (GroupWrapper(self), addr, IpInvariant(bindings_ctx)),
-                |(GroupWrapper(MulticastGroupSet { inner }), addr, IpInvariant(ctx))| {
-                    let _: InsertResult<_> =
-                        inner.insert_with(addr, || (new_state_machine(ctx).into(), ()));
-                },
-                |(GroupWrapper(MulticastGroupSet { inner }), addr, IpInvariant(ctx))| {
-                    let _: InsertResult<_> =
-                        inner.insert_with(addr, || (new_state_machine(ctx).into(), ()));
-                },
-            )
-        }
-
-        pub(crate) fn leave_multicast_group(&mut self, addr: MulticastAddr<A>) {
-            <A::Version as Ip>::map_ip(
-                (GroupWrapper(self), addr),
-                |(GroupWrapper(MulticastGroupSet { inner }), addr)| {
-                    let _: RemoveResult<_> = inner.remove(addr);
-                },
-                |(GroupWrapper(MulticastGroupSet { inner }), addr)| {
-                    let _: RemoveResult<_> = inner.remove(addr);
-                },
-            )
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use core::convert::Infallible as Never;

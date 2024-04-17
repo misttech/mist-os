@@ -757,9 +757,8 @@ pub trait InnerIcmpContext<I: socket::IpExt, BC: IcmpBindingsContext<I, Self::De
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
         + MulticastMembershipHandler<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
-        + IcmpStateContext
-        + CounterContext<IcmpTxCounters<I>>
-        + CounterContext<IcmpRxCounters<I>>;
+        + IcmpStateContext;
+
     // TODO(joshlf): If we end up needing to respond to these messages with new
     // outbound packets, then perhaps it'd be worth passing the original buffer
     // so that it can be reused?
@@ -947,7 +946,9 @@ fn receive_ip_transport_icmp_error<
     };
 
     let id = echo_request.message().id();
-    core_ctx.with_icmp_ctx_and_sockets_mut(|core_ctx, sockets| {
+    // NB: We extract out whether a socket was found to update the counter
+    // later, which simplifies the trait bounds on the inner context.
+    let delivered = core_ctx.with_icmp_ctx_and_sockets_mut(|_, sockets| {
             if let Some(conn) = sockets.socket_map.conns().get_by_addr(&ConnAddr {
                 ip: ConnIpAddr {
                     local: (original_src_ip, NonZeroU16::new(id).unwrap()),
@@ -955,9 +956,6 @@ fn receive_ip_transport_icmp_error<
                 },
                 device: None,
             }) {
-                core_ctx.increment(|counters: &IcmpRxCounters<I>| {
-                    &counters.error_delivered_to_socket
-                });
                 // NB: At the moment bindings has no need to consume ICMP
                 // errors, so we swallow them here.
                 debug!(
@@ -966,11 +964,16 @@ fn receive_ip_transport_icmp_error<
                     original_dst_ip,
                     original_src_ip,
                     conn
-                )
+                );
+                true
             } else {
                 trace!("IcmpIpTransportContext::receive_icmp_error: Got ICMP error message for nonexistent ICMP echo socket; either the socket responsible has since been removed, or the error message was sent in error or corrupted");
+                false
             }
-        })
+        });
+    if delivered {
+        core_ctx.increment(|counters: &IcmpRxCounters<I>| &counters.error_delivered_to_socket);
+    }
 }
 
 impl<
@@ -3078,18 +3081,16 @@ mod tests {
             DeviceId,
         },
         ip::{
-            device::{
-                state::{IpDeviceStateBindingsTypes, IpDeviceStateIpExt},
-                IpDeviceAddr,
-            },
+            device::state::IpDeviceStateIpExt,
             icmp::socket::{
                 IcmpEchoSocketApi, IcmpSocketId, IcmpSocketSet, IcmpSocketState, StateContext,
             },
-            socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
+            socket::{
+                testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
+                IpSock, IpSockCreationError, IpSockSendError, SendOptions,
+            },
             testutil::DualStackSendIpPacketMeta,
             types::IpTypesIpExt,
-            types::RoutableIpAddr,
-            IpCounters, IpLayerIpExt, IpLayerPacketMetadata,
         },
         state::StackStateBuilder,
         testutil::{Ctx, TestIpExt, FAKE_CONFIG_V4, FAKE_CONFIG_V6},
@@ -3099,85 +3100,15 @@ mod tests {
 
     /// The FakeCoreCtx held as the inner state of the [`WrappedFakeCoreCtx`] that
     /// is [`FakeCoreCtx`].
-    type FakeBufferCoreCtx<BT> = FakeCoreCtx<
-        FakeDualStackIpSocketCtx<FakeDeviceId, BT>,
+    type FakeBufferCoreCtx = FakeCoreCtx<
+        FakeDualStackIpSocketCtx<FakeDeviceId>,
         DualStackSendIpPacketMeta<FakeDeviceId>,
         FakeDeviceId,
     >;
 
-    impl<Inner, I: IpLayerIpExt, D, BT: IpDeviceStateBindingsTypes> CounterContext<IpCounters<I>>
-        for Wrapped<
-            Inner,
-            FakeCoreCtx<FakeDualStackIpSocketCtx<D, BT>, DualStackSendIpPacketMeta<D>, D>,
-        >
-    {
-        fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(self.as_ref().get_ref().get_common_counters::<I>())
-        }
-    }
-
-    impl<I: Ip, D, BT: IpDeviceStateBindingsTypes> CounterContext<IcmpTxCounters<I>>
-        for FakeCoreCtx<FakeDualStackIpSocketCtx<D, BT>, DualStackSendIpPacketMeta<D>, D>
-    {
-        fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(self.get_ref().icmp_tx_counters::<I>())
-        }
-    }
-
-    impl<Inner, I: Ip, D, BT: IpDeviceStateBindingsTypes> CounterContext<IcmpTxCounters<I>>
-        for Wrapped<
-            Inner,
-            FakeCoreCtx<FakeDualStackIpSocketCtx<D, BT>, DualStackSendIpPacketMeta<D>, D>,
-        >
-    {
-        fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(self.as_ref().get_ref().icmp_tx_counters::<I>())
-        }
-    }
-
-    impl<I: Ip, D, BT: IpDeviceStateBindingsTypes> CounterContext<IcmpRxCounters<I>>
-        for FakeCoreCtx<FakeDualStackIpSocketCtx<D, BT>, DualStackSendIpPacketMeta<D>, D>
-    {
-        fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(self.get_ref().icmp_rx_counters::<I>())
-        }
-    }
-
-    impl<Inner, I: Ip, D, BT: IpDeviceStateBindingsTypes> CounterContext<IcmpRxCounters<I>>
-        for Wrapped<
-            Inner,
-            FakeCoreCtx<FakeDualStackIpSocketCtx<D, BT>, DualStackSendIpPacketMeta<D>, D>,
-        >
-    {
-        fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(self.as_ref().get_ref().icmp_rx_counters::<I>())
-        }
-    }
-
-    impl<D, BT: IpDeviceStateBindingsTypes> CounterContext<NdpCounters>
-        for FakeCoreCtx<FakeDualStackIpSocketCtx<D, BT>, DualStackSendIpPacketMeta<D>, D>
-    {
-        fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.get_ref().ndp_counters)
-        }
-    }
-
-    impl<Inner, D, BT: IpDeviceStateBindingsTypes> CounterContext<NdpCounters>
-        for Wrapped<
-            Inner,
-            FakeCoreCtx<FakeDualStackIpSocketCtx<D, BT>, DualStackSendIpPacketMeta<D>, D>,
-        >
-    {
-        fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.as_ref().get_ref().ndp_counters)
-        }
-    }
-
     /// `FakeCoreCtx` specialized for ICMP.
-    type FakeIcmpCoreCtx<I> = Wrapped<
-        FakeIcmpCoreCtxState<I, FakeWeakDeviceId<FakeDeviceId>>,
-        FakeBufferCoreCtx<FakeIcmpBindingsCtx<I>>,
-    >;
+    type FakeIcmpCoreCtx<I> =
+        Wrapped<FakeIcmpCoreCtxState<I, FakeWeakDeviceId<FakeDeviceId>>, FakeBufferCoreCtx>;
 
     /// `FakeBindingsCtx` specialized for ICMP.
     type FakeIcmpBindingsCtx<I> = FakeBindingsCtx<(), (), FakeIcmpBindingsCtxState<I>, ()>;
@@ -3193,6 +3124,9 @@ mod tests {
         socket_set: IcmpSocketSet<I, FakeWeakDeviceId<FakeDeviceId>, FakeIcmpBindingsCtx<I>>,
         error_send_bucket: TokenBucket<FakeInstant>,
         receive_icmp_error: Vec<I::ErrorCode>,
+        rx_counters: IcmpRxCounters<I>,
+        tx_counters: IcmpTxCounters<I>,
+        ndp_counters: NdpCounters,
     }
 
     impl<I: socket::IpExt, D: device::WeakId> FakeIcmpCoreCtxState<I, D> {
@@ -3202,6 +3136,9 @@ mod tests {
                 bound_socket_map_and_allocator: Default::default(),
                 error_send_bucket: TokenBucket::new(errors_per_second),
                 receive_icmp_error: Default::default(),
+                rx_counters: Default::default(),
+                tx_counters: Default::default(),
+                ndp_counters: Default::default(),
             }
         }
     }
@@ -3220,13 +3157,31 @@ mod tests {
     }
 
     impl<I: datagram::IpExt> IcmpStateContext for FakeIcmpCoreCtx<I> {}
-    impl<BT: IpDeviceStateBindingsTypes> IcmpStateContext for FakeBufferCoreCtx<BT> {}
+    impl IcmpStateContext for FakeBufferCoreCtx {}
+
+    impl<I: socket::IpExt> CounterContext<IcmpRxCounters<I>> for FakeIcmpCoreCtx<I> {
+        fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
+            cb(&self.outer.rx_counters)
+        }
+    }
+
+    impl<I: socket::IpExt> CounterContext<IcmpTxCounters<I>> for FakeIcmpCoreCtx<I> {
+        fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
+            cb(&self.outer.tx_counters)
+        }
+    }
+
+    impl<I: socket::IpExt> CounterContext<NdpCounters> for FakeIcmpCoreCtx<I> {
+        fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
+            cb(&self.outer.ndp_counters)
+        }
+    }
 
     impl<I: datagram::IpExt + IpDeviceStateIpExt> InnerIcmpContext<I, FakeIcmpBindingsCtx<I>>
         for FakeIcmpCoreCtx<I>
     {
         type DualStackContext = UninstantiableWrapper<Self>;
-        type IpSocketsCtx<'a> = FakeBufferCoreCtx<FakeIcmpBindingsCtx<I>>;
+        type IpSocketsCtx<'a> = FakeBufferCoreCtx;
         fn receive_icmp_error(
             &mut self,
             _bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
@@ -3237,9 +3192,8 @@ mod tests {
             original_body: &[u8],
             err: I::ErrorCode,
         ) {
-            let Self { outer, inner } = self;
-            inner.increment(|counters: &IcmpRxCounters<I>| &counters.error);
-            outer.receive_icmp_error.push(err);
+            self.increment(|counters: &IcmpRxCounters<I>| &counters.error);
+            self.outer.receive_icmp_error.push(err);
             if original_proto == I::ICMP_IP_PROTO {
                 receive_ip_transport_icmp_error(
                     self,
@@ -3285,9 +3239,7 @@ mod tests {
         }
     }
 
-    impl<I: datagram::IpExt + IpDeviceStateIpExt> StateContext<I, FakeIcmpBindingsCtx<I>>
-        for FakeIcmpCoreCtx<I>
-    {
+    impl<I: datagram::IpExt> StateContext<I, FakeIcmpBindingsCtx<I>> for FakeIcmpCoreCtx<I> {
         type SocketStateCtx<'a> = FakeIcmpCoreCtx<I>;
 
         fn with_all_sockets_mut<
@@ -4031,38 +3983,34 @@ mod tests {
     impl_pmtu_handler!(FakeIcmpCoreCtx<Ipv4>, FakeIcmpBindingsCtx<Ipv4>, Ipv4);
     impl_pmtu_handler!(FakeIcmpCoreCtx<Ipv6>, FakeIcmpBindingsCtx<Ipv6>, Ipv6);
 
-    impl<I: datagram::IpExt + IpDeviceStateIpExt>
-        crate::ip::socket::IpSocketContext<I, FakeIcmpBindingsCtx<I>> for FakeIcmpCoreCtx<I>
+    impl<I: datagram::IpExt> crate::ip::socket::IpSocketHandler<I, FakeIcmpBindingsCtx<I>>
+        for FakeIcmpCoreCtx<I>
     {
-        fn lookup_route(
+        fn new_ip_socket(
             &mut self,
             bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
-            device: Option<&FakeDeviceId>,
-            local_ip: Option<IpDeviceAddr<I::Addr>>,
-            addr: RoutableIpAddr<I::Addr>,
-        ) -> Result<crate::ip::types::ResolvedRoute<I, FakeDeviceId>, crate::ip::ResolveRouteError>
-        {
-            self.inner.lookup_route(bindings_ctx, device, local_ip, addr)
+            device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
+            local_ip: Option<SocketIpAddr<I::Addr>>,
+            remote_ip: SocketIpAddr<I::Addr>,
+            proto: I::Proto,
+        ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
+            self.inner.new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
         }
 
-        fn send_ip_packet<S>(
+        fn send_ip_packet<S, O>(
             &mut self,
             bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
-            meta: SendIpPacketMeta<I, &FakeDeviceId, SpecifiedAddr<I::Addr>>,
+            socket: &IpSock<I, Self::WeakDeviceId>,
             body: S,
-            packet_metadata: IpLayerPacketMetadata<I>,
-        ) -> Result<(), S>
+            mtu: Option<u32>,
+            options: &O,
+        ) -> Result<(), (S, IpSockSendError)>
         where
-            S: Serializer + MaybeTransportPacket,
+            S: TransportPacketSerializer,
             S::Buffer: BufferMut,
+            O: SendOptions<I>,
         {
-            crate::ip::socket::IpSocketContext::<_, _>::send_ip_packet(
-                &mut self.inner,
-                bindings_ctx,
-                meta,
-                body,
-                packet_metadata,
-            )
+            self.inner.send_ip_packet(bindings_ctx, socket, body, mtu, options)
         }
     }
 
@@ -4287,20 +4235,14 @@ mod tests {
             for (ctr, expected) in assert_counters {
                 let actual = match *ctr {
                     "InnerIcmpContext::receive_icmp_error" => {
-                        core_ctx.inner.state.icmp_rx_counters::<Ipv4>().error.get()
+                        core_ctx.outer.rx_counters.error.get()
                     }
-                    "IcmpIpTransportContext::receive_icmp_error" => core_ctx
-                        .inner
-                        .state
-                        .icmp_rx_counters::<Ipv4>()
-                        .error_delivered_to_transport_layer
-                        .get(),
-                    "IcmpEchoBindingsContext::receive_icmp_error" => core_ctx
-                        .inner
-                        .state
-                        .icmp_rx_counters::<Ipv4>()
-                        .error_delivered_to_socket
-                        .get(),
+                    "IcmpIpTransportContext::receive_icmp_error" => {
+                        core_ctx.outer.rx_counters.error_delivered_to_transport_layer.get()
+                    }
+                    "IcmpEchoBindingsContext::receive_icmp_error" => {
+                        core_ctx.outer.rx_counters.error_delivered_to_socket.get()
+                    }
                     c => panic!("unrecognized counter: {c}"),
                 };
                 assert_eq!(actual, *expected, "wrong count for {ctr}");
@@ -4578,27 +4520,17 @@ mod tests {
             for (ctr, count) in assert_counters {
                 match *ctr {
                     "InnerIcmpContext::receive_icmp_error" => assert_eq!(
-                        core_ctx.inner.state.icmp_rx_counters::<Ipv6>().error.get(),
+                        core_ctx.outer.rx_counters.error.get(),
                         *count,
                         "wrong count for counter {ctr}",
                     ),
                     "IcmpIpTransportContext::receive_icmp_error" => assert_eq!(
-                        core_ctx
-                            .inner
-                            .state
-                            .icmp_rx_counters::<Ipv6>()
-                            .error_delivered_to_transport_layer
-                            .get(),
+                        core_ctx.outer.rx_counters.error_delivered_to_transport_layer.get(),
                         *count,
                         "wrong count for counter {ctr}",
                     ),
                     "IcmpEchoBindingsContext::receive_icmp_error" => assert_eq!(
-                        core_ctx
-                            .inner
-                            .state
-                            .icmp_rx_counters::<Ipv6>()
-                            .error_delivered_to_socket
-                            .get(),
+                        core_ctx.outer.rx_counters.error_delivered_to_socket.get(),
                         *count,
                         "wrong count for counter {ctr}",
                     ),
@@ -4967,31 +4899,25 @@ mod tests {
 
             for i in 0..ERRORS_PER_SECOND {
                 send(&mut ctx);
-                assert_eq!(ctx.core_ctx.inner.state.icmp_tx_counters::<I>().error.get(), i + 1);
+                assert_eq!(ctx.core_ctx.outer.tx_counters.error.get(), i + 1);
             }
 
-            assert_eq!(
-                ctx.core_ctx.inner.state.icmp_tx_counters::<I>().error.get(),
-                ERRORS_PER_SECOND
-            );
+            assert_eq!(ctx.core_ctx.outer.tx_counters.error.get(), ERRORS_PER_SECOND);
             send(&mut ctx);
-            assert_eq!(
-                ctx.core_ctx.inner.state.icmp_tx_counters::<I>().error.get(),
-                ERRORS_PER_SECOND
-            );
+            assert_eq!(ctx.core_ctx.outer.tx_counters.error.get(), ERRORS_PER_SECOND);
 
             // Test that, if we set a rate of 0, we are not able to send any
             // error messages regardless of how much time has elapsed.
 
             let mut ctx = with_errors_per_second(0);
             send(&mut ctx);
-            assert_eq!(ctx.core_ctx.inner.state.icmp_tx_counters::<I>().error.get(), 0);
+            assert_eq!(ctx.core_ctx.outer.tx_counters.error.get(), 0);
             ctx.bindings_ctx.sleep_skip_timers(Duration::from_secs(1));
             send(&mut ctx);
-            assert_eq!(ctx.core_ctx.inner.state.icmp_tx_counters::<I>().error.get(), 0);
+            assert_eq!(ctx.core_ctx.outer.tx_counters.error.get(), 0);
             ctx.bindings_ctx.sleep_skip_timers(Duration::from_secs(1));
             send(&mut ctx);
-            assert_eq!(ctx.core_ctx.inner.state.icmp_tx_counters::<I>().error.get(), 0);
+            assert_eq!(ctx.core_ctx.outer.tx_counters.error.get(), 0);
         }
 
         fn with_errors_per_second_v4(errors_per_second: u64) -> FakeIcmpCtx<Ipv4> {

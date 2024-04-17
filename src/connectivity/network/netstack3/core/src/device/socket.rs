@@ -1259,11 +1259,6 @@ mod tests {
         type WeakDeviceId = FakeWeakDeviceId<CC::DeviceId>;
     }
 
-    impl<D: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeCoreCtx<D> {
-        type DeviceId = D;
-        type WeakDeviceId = D::Weak;
-    }
-
     impl<
             'm,
             DeviceId: FakeStrongDeviceId,

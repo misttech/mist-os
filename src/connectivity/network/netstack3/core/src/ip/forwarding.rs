@@ -400,7 +400,7 @@ mod testutil_testonly {
     use alloc::collections::HashSet;
 
     use derivative::Derivative;
-    use net_types::ip::{IpAddress, IpInvariant, Ipv6};
+    use net_types::ip::IpAddress;
 
     use super::*;
 
@@ -474,33 +474,6 @@ mod testutil_testonly {
 
         fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
             !self.get_ref().disabled_devices.contains(device_id)
-        }
-    }
-
-    #[derive(Derivative)]
-    #[derivative(Default(bound = ""))]
-    pub(crate) struct DualStackForwardingTable<D> {
-        v4: ForwardingTable<Ipv4, D>,
-        v6: ForwardingTable<Ipv6, D>,
-    }
-
-    impl<D, I: Ip> AsRef<ForwardingTable<I, D>> for DualStackForwardingTable<D> {
-        fn as_ref(&self) -> &ForwardingTable<I, D> {
-            I::map_ip(
-                IpInvariant(self),
-                |IpInvariant(table)| &table.v4,
-                |IpInvariant(table)| &table.v6,
-            )
-        }
-    }
-
-    impl<D, I: Ip> AsMut<ForwardingTable<I, D>> for DualStackForwardingTable<D> {
-        fn as_mut(&mut self) -> &mut ForwardingTable<I, D> {
-            I::map_ip(
-                IpInvariant(self),
-                |IpInvariant(table)| &mut table.v4,
-                |IpInvariant(table)| &mut table.v6,
-            )
         }
     }
 }

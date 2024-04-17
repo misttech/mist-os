@@ -399,6 +399,23 @@ where
     type Type = NextHop<NewIp::Addr>;
 }
 
+impl<A> NextHop<A>
+where
+    A: IpAddress,
+    A::Version: IpTypesIpExt,
+{
+    pub(crate) fn into_next_hop_and_broadcast_marker(
+        self,
+        remote_ip: SpecifiedAddr<A>,
+    ) -> (SpecifiedAddr<A>, Option<<A::Version as IpTypesIpExt>::BroadcastMarker>) {
+        match self {
+            NextHop::RemoteAsNeighbor => (remote_ip, None),
+            NextHop::Gateway(gateway) => (gateway, None),
+            NextHop::Broadcast(marker) => (remote_ip, Some(marker)),
+        }
+    }
+}
+
 /// An IP Address that witnesses properties needed to be routed.
 pub type RoutableIpAddr<A> = SocketIpAddr<A>;
 

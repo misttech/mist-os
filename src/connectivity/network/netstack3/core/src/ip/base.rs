@@ -3317,7 +3317,7 @@ pub(crate) mod testutil {
         device::testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
     };
 
-    impl<S: AsRef<FakeIpDeviceIdCtx<D>>, Meta, D: StrongId + 'static> DeviceIdContext<AnyDevice>
+    impl<S, Meta, D: StrongId + 'static> DeviceIdContext<AnyDevice>
         for crate::context::testutil::FakeCoreCtx<S, Meta, D>
     where
         FakeIpDeviceIdCtx<D>: DeviceIdContext<AnyDevice, DeviceId = D, WeakDeviceId = D::Weak>,
@@ -3360,28 +3360,13 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<
-            I: packet_formats::ip::IpExt + IpTypesIpExt,
-            S,
-            Id,
-            Event: Debug,
-            DeviceId,
-            BindingsCtxState,
-        >
-        crate::context::SendFrameContext<
-            crate::context::testutil::FakeBindingsCtx<Id, Event, BindingsCtxState, ()>,
-            SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>,
-        >
+    impl<I: packet_formats::ip::IpExt + IpTypesIpExt, S, DeviceId, BC>
+        crate::context::SendFrameContext<BC, SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>>
         for crate::context::testutil::FakeCoreCtx<S, DualStackSendIpPacketMeta<DeviceId>, DeviceId>
     {
         fn send_frame<SS>(
             &mut self,
-            bindings_ctx: &mut crate::context::testutil::FakeBindingsCtx<
-                Id,
-                Event,
-                BindingsCtxState,
-                (),
-            >,
+            bindings_ctx: &mut BC,
             metadata: SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>,
             frame: SS,
         ) -> Result<(), SS>
@@ -3389,7 +3374,7 @@ pub(crate) mod testutil {
             SS: Serializer,
             SS::Buffer: BufferMut,
         {
-            self.send_frame(bindings_ctx, DualStackSendIpPacketMeta::from(metadata), frame)
+            self.frames.send_frame(bindings_ctx, DualStackSendIpPacketMeta::from(metadata), frame)
         }
     }
 

@@ -4948,7 +4948,7 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod test {
-    use core::{convert::Infallible as Never, ops::DerefMut as _};
+    use core::convert::Infallible as Never;
 
     use alloc::vec;
     use assert_matches::assert_matches;
@@ -4972,10 +4972,8 @@ mod test {
             MultipleDevicesId,
         },
         ip::{
-            device::state::{IpDeviceState, IpDeviceStateIpExt},
-            socket::testutil::{
-                FakeDeviceConfig, FakeDualStackIpSocketCtx, FakeFilterDeviceId, FakeIpSocketCtx,
-            },
+            device::state::IpDeviceStateIpExt,
+            socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx, FakeIpSocketCtx},
             testutil::DualStackSendIpPacketMeta,
             IpLayerIpExt, DEFAULT_HOP_LIMITS,
         },
@@ -5357,7 +5355,7 @@ mod test {
     type FakeSocketsState<I, D> = DatagramSocketSet<I, FakeWeakDeviceId<D>, FakeStateSpec>;
 
     type FakeInnerCoreCtx<D> = crate::context::testutil::FakeCoreCtx<
-        FakeDualStackIpSocketCtx<D, FakeBindingsCtx<(), (), (), ()>>,
+        FakeDualStackIpSocketCtx<D>,
         DualStackSendIpPacketMeta<D>,
         D,
     >;
@@ -5377,7 +5375,7 @@ mod test {
         }
     }
 
-    impl<D: FakeFilterDeviceId<()>, I: DatagramIpExt<D> + IpLayerIpExt>
+    impl<D: FakeStrongDeviceId, I: DatagramIpExt<D> + IpLayerIpExt>
         DatagramStateContext<I, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
         for FakeCoreCtx<I, D>
     {
@@ -5476,7 +5474,7 @@ mod test {
         ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext>;
     }
 
-    impl<D: FakeFilterDeviceId<()>> DualStackContextsIpExt<D> for Ipv4 {
+    impl<D: FakeStrongDeviceId> DualStackContextsIpExt<D> for Ipv4 {
         type DualStackContext =
             UninstantiableWrapper<Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>>;
         type NonDualStackContext = Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>;
@@ -5487,7 +5485,7 @@ mod test {
         }
     }
 
-    impl<D: FakeFilterDeviceId<()>> DualStackContextsIpExt<D> for Ipv6 {
+    impl<D: FakeStrongDeviceId> DualStackContextsIpExt<D> for Ipv6 {
         type DualStackContext = Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>;
         type NonDualStackContext =
             UninstantiableWrapper<Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>>;
@@ -5498,10 +5496,8 @@ mod test {
         }
     }
 
-    impl<
-            D: FakeFilterDeviceId<()>,
-            I: Ip + IpExt + IpDeviceStateIpExt + DualStackContextsIpExt<D>,
-        > DatagramBoundStateContext<I, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
+    impl<D: FakeStrongDeviceId, I: Ip + IpExt + IpDeviceStateIpExt + DualStackContextsIpExt<D>>
+        DatagramBoundStateContext<I, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
         for Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>
     {
         type IpSocketsCtx<'a> = FakeInnerCoreCtx<D>;
@@ -5570,7 +5566,7 @@ mod test {
         }
     }
 
-    impl<D: FakeFilterDeviceId<()>>
+    impl<D: FakeStrongDeviceId>
         DualStackDatagramBoundStateContext<Ipv6, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
         for Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>
     {
@@ -5713,13 +5709,10 @@ mod test {
         let HopLimits { mut unicast, multicast } = DEFAULT_HOP_LIMITS;
         unicast = unicast.checked_add(1).unwrap();
         {
-            let ip_socket_ctx = core_ctx.inner.inner.get_ref();
-            let device_state: &IpDeviceState<I, _> =
-                ip_socket_ctx.get_device_state(&device).as_ref();
-            let mut default_hop_limit = device_state.default_hop_limit.write();
-            let default_hop_limit = default_hop_limit.deref_mut();
-            assert_ne!(*default_hop_limit, unicast);
-            *default_hop_limit = unicast;
+            let ip_socket_ctx = core_ctx.inner.inner.get_mut();
+            let device_state = ip_socket_ctx.get_device_state_mut::<I>(&device);
+            assert_ne!(device_state.default_hop_limit, unicast);
+            device_state.default_hop_limit = unicast;
         }
         assert_eq!(
             get_ip_hop_limits(&mut core_ctx, &bindings_ctx, &unbound),
@@ -5856,7 +5849,7 @@ mod test {
     ) {
         let device_a = FakeReferencyDeviceId::default();
         let device_b = FakeReferencyDeviceId::default();
-        let mut core_ctx = FakeIpSocketCtx::<I, FakeReferencyDeviceId, _>::new(
+        let mut core_ctx = FakeIpSocketCtx::<I, FakeReferencyDeviceId>::new(
             [device_a.clone(), device_b.clone()].into_iter().map(|device| FakeDeviceConfig {
                 device,
                 local_ips: Default::default(),
@@ -5895,7 +5888,7 @@ mod test {
             (&device_b, multicast_addr2, true),
         ] {
             assert_eq!(
-                core_ctx.get_device_state(device).multicast_groups.read().contains(&addr),
+                core_ctx.get_device_state(device).is_in_multicast_group(&addr),
                 expected,
                 "device={:?}, addr={}",
                 device,
@@ -5919,7 +5912,7 @@ mod test {
             (&device_b, multicast_addr2, remove_device_b),
         ] {
             assert_eq!(
-                core_ctx.get_device_state(device).multicast_groups.read().contains(&addr),
+                core_ctx.get_device_state(device).is_in_multicast_group(&addr),
                 expected,
                 "device={:?}, addr={}",
                 device,

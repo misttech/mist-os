@@ -316,12 +316,6 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceAddresses<Instant, 
         self.addrs.iter()
     }
 
-    /// Finds the entry for `addr` if any.
-    #[cfg(test)]
-    pub(crate) fn find(&self, addr: &I::Addr) -> Option<&PrimaryRc<I::AssignedAddress<Instant>>> {
-        self.addrs.iter().find(|entry| &entry.addr().addr() == addr)
-    }
-
     /// Adds an IP address to this interface.
     pub(crate) fn add(
         &mut self,
@@ -988,7 +982,7 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv6DeviceAddressState> for Ipv
 pub(crate) mod testutil {
     use super::*;
 
-    use net_types::{ip::IpInvariant, Witness as _};
+    use net_types::ip::IpInvariant;
 
     impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> AsRef<Self> for IpDeviceState<I, BT> {
         fn as_ref(&self) -> &Self {
@@ -1018,35 +1012,6 @@ pub(crate) mod testutil {
                 |IpInvariant(dual_stack)| &mut dual_stack.ipv6.ip_state,
             )
         }
-    }
-
-    /// Adds an address and route for the size-1 subnet containing the address.
-    pub(crate) fn add_addr_subnet<A: IpAddress, BT: IpDeviceStateBindingsTypes>(
-        device_state: &mut IpDeviceState<A::Version, BT>,
-        ip: SpecifiedAddr<A>,
-    ) where
-        A::Version: IpDeviceStateIpExt,
-    {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        struct Wrap<I: IpDeviceStateIpExt, Instant: crate::Instant>(I::AssignedAddress<Instant>);
-        let Wrap(entry) = <A::Version as Ip>::map_ip(
-            ip.get(),
-            |ip| {
-                Wrap(Ipv4AddressEntry::new(
-                    AddrSubnet::new(ip, 32).unwrap(),
-                    Ipv4AddrConfig::default(),
-                ))
-            },
-            |ip| {
-                Wrap(Ipv6AddressEntry::new(
-                    AddrSubnet::new(ip, 128).unwrap(),
-                    Ipv6DadState::Assigned,
-                    Ipv6AddrConfig::default(),
-                ))
-            },
-        );
-        let _addr_id = device_state.addrs.get_mut().add(entry).expect("add address");
     }
 }
 
