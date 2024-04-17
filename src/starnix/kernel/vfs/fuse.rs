@@ -902,6 +902,7 @@ impl FsNodeOps for Arc<FuseNode> {
 
     fn mkdir(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -924,6 +925,7 @@ impl FsNodeOps for Arc<FuseNode> {
 
     fn create_symlink(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,

@@ -316,7 +316,14 @@ impl OverlayNode {
                     SymlinkTarget::Path(path) => path,
                 };
                 parent_upper.create_entry(current_task, name.as_ref(), |dir, mount, name| {
-                    dir.create_symlink(current_task, mount, name, link_path.as_ref(), info.cred())
+                    dir.create_symlink(
+                        locked,
+                        current_task,
+                        mount,
+                        name,
+                        link_path.as_ref(),
+                        info.cred(),
+                    )
                 })
             } else if info.mode.is_reg() && copy_mode == UpperCopyMode::CopyAll {
                 // Regular files need to be copied from lower FS to upper FS.
@@ -587,15 +594,15 @@ impl FsNodeOps for Arc<OverlayNode> {
 
     fn mkdir(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
         let new_upper_node =
-            self.create_entry(&mut locked, current_task, name, |locked, dir, temp_name| {
+            self.create_entry(locked, current_task, name, |locked, dir, temp_name| {
                 let entry =
                     dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
                         dir_node.mknod(
@@ -620,17 +627,24 @@ impl FsNodeOps for Arc<OverlayNode> {
 
     fn create_symlink(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
         target: &FsStr,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
         let new_upper_node =
-            self.create_entry(&mut locked, current_task, name, |_, dir, temp_name| {
+            self.create_entry(locked, current_task, name, |locked, dir, temp_name| {
                 dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
-                    dir_node.create_symlink(current_task, mount, name, target, owner.clone())
+                    dir_node.create_symlink(
+                        locked,
+                        current_task,
+                        mount,
+                        name,
+                        target,
+                        owner.clone(),
+                    )
                 })
             })?;
         Ok(self.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))

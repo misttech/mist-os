@@ -202,6 +202,7 @@ impl FsNodeOps for BpfFsDir {
 
     fn mkdir(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -231,6 +232,7 @@ impl FsNodeOps for BpfFsDir {
 
     fn create_symlink(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,

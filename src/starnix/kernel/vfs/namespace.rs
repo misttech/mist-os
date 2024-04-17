@@ -1130,16 +1130,20 @@ impl NamespaceNode {
     /// Create a symlink in the file system.
     ///
     /// To create another type of node, use `create_node`.
-    pub fn create_symlink(
+    pub fn create_symlink<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         name: &FsStr,
         target: &FsStr,
-    ) -> Result<NamespaceNode, Errno> {
+    ) -> Result<NamespaceNode, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         let owner = current_task.as_fscred();
         let entry =
             self.entry.create_entry(current_task, &self.mount, name, |dir, mount, name| {
-                dir.create_symlink(current_task, mount, name, target, owner)
+                dir.create_symlink(locked, current_task, mount, name, target, owner)
             })?;
         Ok(self.with_new_entry(entry))
     }

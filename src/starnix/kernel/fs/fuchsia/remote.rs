@@ -500,6 +500,7 @@ impl FsNodeOps for RemoteNode {
 
     fn mkdir(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -802,6 +803,7 @@ impl FsNodeOps for RemoteNode {
 
     fn create_symlink(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1810,7 +1812,7 @@ mod test {
         let fixture = TestFixture::new().await;
 
         {
-            let (kernel, current_task) = create_kernel_and_task();
+            let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
             let (server, client) = zx::Channel::create();
             fixture
                 .root()
@@ -1826,7 +1828,7 @@ mod test {
             .expect("new_fs failed");
             let ns = Namespace::new(fs);
             let root = ns.root();
-            root.create_symlink(&current_task, "symlink".into(), "target".into())
+            root.create_symlink(&mut locked, &current_task, "symlink".into(), "target".into())
                 .expect("symlink failed");
 
             let mut context = LookupContext::new(SymlinkMode::NoFollow);

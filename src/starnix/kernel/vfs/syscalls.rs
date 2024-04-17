@@ -1508,7 +1508,7 @@ pub fn sys_symlinkat(
         current_task,
         new_dir_fd,
         user_path,
-        |_, context, parent, basename| {
+        |locked, context, parent, basename| {
             // The path to a new symlink cannot end in `/`. That would imply that we are dereferencing
             // the symlink to a directory.
             //
@@ -1516,7 +1516,7 @@ pub fn sys_symlinkat(
             if context.must_be_directory {
                 return error!(ENOENT);
             }
-            parent.create_symlink(current_task, basename, target.as_ref())
+            parent.create_symlink(locked, current_task, basename, target.as_ref())
         },
     );
     res?;

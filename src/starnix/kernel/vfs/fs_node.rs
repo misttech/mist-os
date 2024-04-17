@@ -557,6 +557,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Create and return the given child node as a subdirectory.
     fn mkdir(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -567,6 +568,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Creates a symlink with the given `target` path.
     fn create_symlink(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -791,6 +793,7 @@ macro_rules! fs_node_impl_dir_readonly {
     () => {
         fn mkdir(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &crate::vfs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::vfs::FsStr,
@@ -815,6 +818,7 @@ macro_rules! fs_node_impl_dir_readonly {
 
         fn create_symlink(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &crate::vfs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::vfs::FsStr,
@@ -921,6 +925,7 @@ macro_rules! fs_node_impl_not_dir {
 
         fn mkdir(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &crate::vfs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::vfs::FsStr,
@@ -932,6 +937,7 @@ macro_rules! fs_node_impl_not_dir {
 
         fn create_symlink(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &crate::vfs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::vfs::FsStr,
@@ -1240,7 +1246,8 @@ impl FsNode {
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
 
         if mode.is_dir() {
-            self.ops().mkdir(self, current_task, name, mode, owner)
+            let mut locked = locked.cast_locked::<FileOpsCore>();
+            self.ops().mkdir(&mut locked, self, current_task, name, mode, owner)
         } else {
             // https://man7.org/linux/man-pages/man2/mknod.2.html says:
             //
@@ -1261,16 +1268,21 @@ impl FsNode {
         }
     }
 
-    pub fn create_symlink(
+    pub fn create_symlink<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
         target: &FsStr,
         owner: FsCred,
-    ) -> Result<FsNodeHandle, Errno> {
+    ) -> Result<FsNodeHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         self.check_access(current_task, mount, Access::WRITE)?;
-        self.ops().create_symlink(self, current_task, name, target, owner)
+        let mut locked = locked.cast_locked::<FileOpsCore>();
+        self.ops().create_symlink(&mut locked, self, current_task, name, target, owner)
     }
 
     pub fn create_tmpfile(
