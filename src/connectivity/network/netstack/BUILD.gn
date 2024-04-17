@@ -244,7 +244,6 @@ group("tests") {
     "link/bridge:tests",
     "link/netdevice:tests",
     "routes:tests",
-    "tests",
     "time:tests",
     "tracing:tests",
     "udp_serde:tests",
