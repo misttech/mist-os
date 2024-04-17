@@ -57,3 +57,11 @@ source_set("dfv1") {
     "//src/lib/ddk",
   ]
 }
+
+source_set("dfv2") {
+  sources = [ "log_dfv2.cc" ]
+  deps = [
+    ":pw_log",
+    "//sdk/lib/driver/logging/cpp",
+  ]
+}
