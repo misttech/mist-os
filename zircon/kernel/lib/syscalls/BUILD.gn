@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA
 # Copyright 2019 The Fuchsia Authors
 #
 # Use of this source code is governed by a MIT-style
@@ -18,10 +19,18 @@ zx_library("syscalls") {
   sources = []
 
   # Depend on the files generated from the syscall IDL.
-  public_deps = [ "//zircon/vdso:private" ]
+  if (is_mistos) {
+    public_deps = [ "//zircon/kernel/lib/mist-os/vdso:private" ]
+  } else {
+    public_deps = [ "//zircon/vdso:private" ]
+  }
 
   if (!kernel_no_userabi) {
-    deps = [ ":impl" ]
+    if (is_mistos) {
+      deps = [ ":impl_mistos" ]
+    } else {
+      deps = [ ":impl" ]
+    }
   }
 }
 
@@ -92,6 +101,38 @@ source_set("impl") {
   }
 }
 
+if (is_mistos) {
+  source_set("impl_mistos") {
+    visibility = [ ":*" ]
+    sources = [
+      "ddk.cc",
+      "ddk_${zircon_cpu}.cc",
+      "ddk_pci.cc",
+      "system_${zircon_cpu}.cc",
+    ]
+    deps = [
+      ":dispatch",
+      ":headers",
+      "//zircon/kernel/dev/udisplay",
+      "//zircon/kernel/lib/boot-options",
+      "//zircon/kernel/lib/console",
+      "//zircon/kernel/lib/fbl",
+      "//zircon/kernel/lib/gfxconsole",
+      "//zircon/kernel/lib/io",
+      "//zircon/kernel/lib/kpci",
+      "//zircon/kernel/lib/ktl",
+      "//zircon/kernel/lib/mist-os/userabi:headers",
+      "//zircon/kernel/object",
+    ]
+    if (current_cpu == "x64") {
+      deps += [
+        "//zircon/kernel/lib/acpi_lite",
+        "//zircon/kernel/platform/pc",
+      ]
+    }
+  }
+}
+
 # Only this file depends on vdso-valid-sysret.h.
 source_set("dispatch") {
   sources = [ "syscalls.cc" ]
@@ -101,4 +142,9 @@ source_set("dispatch") {
     "//zircon/kernel/lib/ktl",
     "//zircon/kernel/lib/userabi:headers",
   ]
+
+  if (is_mistos) {
+    deps -= [ "//zircon/kernel/lib/userabi:headers" ]
+    deps += [ "//zircon/kernel/lib/mist-os/userabi:headers" ]
+  }
 }

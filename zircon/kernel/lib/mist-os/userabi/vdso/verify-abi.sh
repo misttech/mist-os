@@ -1,0 +1,1 @@
+../../../userabi/vdso/verify-abi.sh

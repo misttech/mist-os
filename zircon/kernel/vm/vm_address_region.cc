@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA
 // Copyright 2016 The Fuchsia Authors
 //
 // Use of this source code is governed by a MIT-style
@@ -20,6 +21,7 @@
 #include <kernel/mp.h>
 #include <ktl/algorithm.h>
 #include <ktl/limits.h>
+#include <object/vm_object_dispatcher.h>
 #include <vm/fault.h>
 #include <vm/vm.h>
 #include <vm/vm_address_region_enumerator.h>

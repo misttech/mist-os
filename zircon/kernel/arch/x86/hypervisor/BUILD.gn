@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA
 # Copyright 2019 The Fuchsia Authors
 #
 # Use of this source code is governed by a MIT-style
@@ -23,6 +24,10 @@ source_set("hypervisor") {
     "//zircon/kernel/lib/syscalls:headers",
     "//zircon/kernel/platform/pc",
   ]
+
+  if (is_mistos) {
+    sources -= [ "vmcall.cc" ]
+  }
 }
 
 source_set("tests") {

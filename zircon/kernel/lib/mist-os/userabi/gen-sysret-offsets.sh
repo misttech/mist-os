@@ -1,0 +1,1 @@
+../../userabi/gen-sysret-offsets.sh

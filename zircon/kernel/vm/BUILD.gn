@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA
 # Copyright 2019 The Fuchsia Authors
 #
 # Use of this source code is governed by a MIT-style
@@ -69,6 +70,11 @@ zx_library("vm") {
     # TODO: testonly
     ":tests",
   ]
+
+  if (is_mistos) {
+    deps -= [ "//zircon/kernel/lib/userabi" ]
+    deps += [ "//zircon/kernel/lib/mist-os/userabi" ]
+  }
 
   defines = [
     "LZ4_STATIC_LINKING_ONLY",

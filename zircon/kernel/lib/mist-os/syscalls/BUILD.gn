@@ -1,0 +1,37 @@
+# Copyright 2024 Mist Tecnologia LTDA
+# Copyright 2019 The Fuchsia Authors
+#
+# Use of this source code is governed by a MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT
+
+import("//build/zircon/zircon_cpu.gni")
+import("//build/zircon/zx_library.gni")
+import("//zircon/kernel/params.gni")
+
+assert(is_kernel, current_toolchain)
+
+zx_library("syscalls") {
+  visibility = [ "//zircon/kernel/*" ]
+
+  # This can be used for headers only by the vDSO and test code.
+
+  sources = []
+
+  # Depend on the files generated from the syscall IDL.
+  public_deps = [ "//zircon/kernel/lib/mist-os/vdso:private" ]
+
+  if (!kernel_no_userabi) {
+    deps = [ ":impl" ]
+  }
+}
+
+source_set("impl") {
+  visibility = [ ":*" ]
+  sources = [ "test.cc" ]
+  deps = [
+    "//zircon/kernel/lib/syscalls:headers",
+    "//zircon/kernel/lib/user_copy",
+    "//zircon/kernel/object",
+  ]
+}

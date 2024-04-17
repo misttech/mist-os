@@ -1,0 +1,19 @@
+--- !ifs-v1
+IfsVersion:      3.0
+SoName:          liblinux.so
+Symbols:
+  - { Name: _zx_syscall_test_0, Type: Func }
+  - { Name: _zx_syscall_test_1, Type: Func }
+  - { Name: _zx_syscall_test_2, Type: Func }
+  - { Name: _zx_syscall_test_3, Type: Func }
+  - { Name: _zx_syscall_test_4, Type: Func }
+  - { Name: _zx_syscall_test_5, Type: Func }
+  - { Name: _zx_syscall_test_6, Type: Func }
+  - { Name: zx_syscall_test_0, Type: Func, Weak: true }
+  - { Name: zx_syscall_test_1, Type: Func, Weak: true }
+  - { Name: zx_syscall_test_2, Type: Func, Weak: true }
+  - { Name: zx_syscall_test_3, Type: Func, Weak: true }
+  - { Name: zx_syscall_test_4, Type: Func, Weak: true }
+  - { Name: zx_syscall_test_5, Type: Func, Weak: true }
+  - { Name: zx_syscall_test_6, Type: Func, Weak: true }
+...

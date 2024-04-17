@@ -1,0 +1,1 @@
+../../../userabi/vdso/syscalls-riscv64.S
