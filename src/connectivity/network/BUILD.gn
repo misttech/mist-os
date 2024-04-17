@@ -115,6 +115,12 @@ group("benchmarks") {
   ]
 }
 
+group("e2e_tests") {
+  testonly = true
+
+  deps = [ "//src/connectivity/network/testing/conformance/emulator:e2e_tests" ]
+}
+
 group("tests") {
   testonly = true
   deps = [
