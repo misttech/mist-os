@@ -6,19 +6,14 @@
 #define SRC_DEVICES_LIB_GOLDFISH_PIPE_IO_PIPE_IO_H_
 
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/io-buffer.h>
-#include <lib/fit/function.h>
-#include <lib/fpromise/result.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/result.h>
 
-#include <map>
 #include <vector>
 
-#include <ddktl/device.h>
 #include <fbl/mutex.h>
 
 namespace goldfish {

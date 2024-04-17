@@ -25,6 +25,7 @@ fuchsia_driver("goldfish-display-driver") {
     ":goldfish-display-bind",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
@@ -88,6 +89,7 @@ test("goldfish-unittests") {
     "//sdk/lib/fdio",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/testing/no_ddk",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gtest",

@@ -5,9 +5,7 @@
 #include "src/devices/lib/goldfish/pipe_io/pipe_io.h"
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
-#include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
-#include <lib/fpromise/result.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
@@ -21,6 +19,7 @@
 #include <fbl/auto_lock.h>
 
 #include "src/devices/lib/goldfish/pipe_headers/include/base.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
 
 namespace goldfish {
