@@ -137,19 +137,14 @@ impl TryFrom<fsandbox::Capability> for Capability {
                 Ok(any)
             }
             fsandbox::Capability::Directory(client_end) => {
-                let mut any = try_from_handle_in_registry(client_end.as_handle_ref())?;
-                // Cache the client end so it can be reused in future conversions to FIDL.
-                {
-                    match any {
-                        Capability::Directory(ref mut d) => {
-                            d.set_client_end(client_end);
-                        }
-                        _ => panic!(
-                            "BUG: registry has a non-Directory capability under a Directory koid"
-                        ),
-                    }
-                }
-                Ok(any)
+                let any = try_from_handle_in_registry(client_end.as_handle_ref())?;
+                match &any {
+                    Capability::Directory(_) => (),
+                    _ => panic!(
+                        "BUG: registry has a non-Directory capability under a Directory koid"
+                    ),
+                };
+                Ok(crate::Directory::new(client_end).into())
             }
             fsandbox::CapabilityUnknown!() => Err(RemoteError::UnknownVariant),
         }
