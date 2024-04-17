@@ -176,24 +176,3 @@ pub async fn create(opts: Options) -> Result<(RealmBuilder, SubRealmBuilder), Er
 
     Ok((builder, test_realm))
 }
-
-pub async fn expose_test_realm_protocol(builder: &RealmBuilder, test_realm: &SubRealmBuilder) {
-    test_realm
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.component.Realm"))
-                .from(Ref::framework())
-                .to(Ref::parent()),
-        )
-        .await
-        .unwrap();
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.component.Realm"))
-                .from(Ref::child("test"))
-                .to(Ref::parent()),
-        )
-        .await
-        .unwrap();
-}

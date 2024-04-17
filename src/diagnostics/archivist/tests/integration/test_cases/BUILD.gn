@@ -12,11 +12,7 @@ rustc_test("bin") {
   edition = "2021"
   deps = [
     "../realm_factory/fidl:fuchsia.archivist.test_rust",
-    "components/fidl:fidl_rust",
-    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
     "//src/diagnostics/archivist:lib",
@@ -96,7 +92,6 @@ fuchsia_package("pkg") {
     ":archivist_integration_test_cases_component",
     "../realm_factory:archivist_component",
     "../realm_factory:archivist_config",
-    "components",
   ]
   subpackages = [ "../realm_factory:pkg" ]
 }

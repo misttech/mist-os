@@ -3,4 +3,3 @@
 // found in the LICENSE file.
 
 pub const INTEGRATION_ARCHIVIST_URL: &str = "#meta/archivist.cm";
-pub const SOCKET_PUPPET_COMPONENT_URL: &str = "#meta/socket-puppet.cm";
