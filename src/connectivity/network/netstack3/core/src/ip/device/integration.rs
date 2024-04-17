@@ -32,7 +32,7 @@ use packet_formats::{
 };
 
 use crate::{
-    context::{CounterContext, InstantContext},
+    context::{CoreTimerContext, CounterContext, InstantContext},
     device::{AnyDevice, DeviceId, DeviceIdContext},
     error::{ExistsError, NotFoundError},
     filter::{FilterHandlerProvider, FilterImpl, MaybeTransportPacket},
@@ -48,18 +48,18 @@ use crate::{
                 Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6RouteDiscoveryContext,
                 Ipv6RouteDiscoveryState,
             },
-            router_solicitation::{RsContext, RsHandler},
+            router_solicitation::{RsContext, RsHandler, RsState},
             slaac::{
                 SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig,
                 SlaacContext, SlaacCounters,
             },
             state::{
                 DualStackIpDeviceState, IpDeviceConfiguration, IpDeviceFlags,
-                Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressFlags, Ipv6AddressState,
-                Ipv6DeviceConfiguration, SlaacConfig,
+                IpDeviceStateBindingsTypes, Ipv4DeviceConfiguration, Ipv6AddrConfig,
+                Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration, SlaacConfig,
             },
             AddressRemovedReason, DelIpAddr, IpAddressId, IpDeviceAddr, IpDeviceBindingsContext,
-            IpDeviceIpExt, IpDeviceStateContext, Ipv6DeviceAddr,
+            IpDeviceIpExt, IpDeviceStateContext, IpDeviceTimerId, Ipv6DeviceAddr,
         },
         gmp::{
             self,
@@ -72,7 +72,7 @@ use crate::{
         AddressStatus, IpLayerIpExt, IpStateContext, Ipv4PresentAddressStatus,
         Ipv6PresentAddressStatus, DEFAULT_TTL,
     },
-    BindingsContext, CoreCtx, StackState,
+    BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
 use super::state::Ipv6NetworkLearnedParameters;
@@ -315,13 +315,13 @@ impl<
 
 impl<
         's,
-        BC: InstantContext,
+        BT: IpDeviceStateBindingsTypes,
         I: Ip + IpLayerIpExt + IpDeviceIpExt,
         Devices: Iterator<Item = Accessor::DeviceId>,
-        Accessor: IpDeviceStateContext<I, BC> + GmpQueryHandler<I, BC>,
-    > Iterator for FilterPresentWithDevices<I, Devices, Accessor, BC>
+        Accessor: IpDeviceStateContext<I, BT> + GmpQueryHandler<I, BT>,
+    > Iterator for FilterPresentWithDevices<I, Devices, Accessor, BT>
 where
-    <I as IpDeviceIpExt>::State<BC>: 's,
+    <I as IpDeviceIpExt>::State<BT>: 's,
 {
     type Item = (Accessor::DeviceId, I::AddressStatus);
     fn next(&mut self) -> Option<Self::Item> {
@@ -881,13 +881,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
 {
     type LinkLayerAddr = <CoreCtx<'a, BC,  crate::lock_ordering::IpDeviceConfiguration<Ipv6>> as device::Ipv6DeviceContext<BC>>::LinkLayerAddr;
 
-    /// Calls the callback with a mutable reference to the remaining number of
-    /// router soliciations to send and the maximum number of router solications
-    /// to send.
-    fn with_rs_remaining_mut_and_max<
-        O,
-        F: FnOnce(&mut Option<NonZeroU8>, Option<NonZeroU8>) -> O,
-    >(
+    fn with_rs_state_mut_and_max<O, F: FnOnce(&mut RsState<BC>, Option<NonZeroU8>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
@@ -899,8 +893,6 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
         })
     }
 
-    /// Gets the device's link-layer address bytes, if the device supports
-    /// link-layer addressing.
     fn get_link_layer_addr_bytes(
         &mut self,
         device_id: &Self::DeviceId,
@@ -909,10 +901,6 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
         device::Ipv6DeviceContext::get_link_layer_addr_bytes(core_ctx, device_id)
     }
 
-    /// Sends an NDP Router Solicitation to the local-link.
-    ///
-    /// The callback is called with a source address suitable for an outgoing
-    /// router solicitation message and returns the message body.
     fn send_rs_packet<
         S: Serializer<Buffer = EmptyBuf> + MaybeTransportPacket,
         F: FnOnce(Option<UnicastAddr<Ipv6Addr>>) -> S,
@@ -1466,5 +1454,13 @@ impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::NudCounter
 impl<BC: BindingsContext, I: Ip, L> CounterContext<NudCounters<I>> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&NudCounters<I>) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::NudCounters<I>>())
+    }
+}
+
+impl<I: IpDeviceIpExt, BT: BindingsTypes, L> CoreTimerContext<IpDeviceTimerId<I, DeviceId<BT>>, BT>
+    for CoreCtx<'_, BT, L>
+{
+    fn convert_timer(dispatch_id: IpDeviceTimerId<I, DeviceId<BT>>) -> BT::DispatchId {
+        dispatch_id.into()
     }
 }

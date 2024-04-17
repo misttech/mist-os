@@ -27,13 +27,15 @@ use crate::{
         pure_ip::PureIpDevice,
         state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner},
         AnyDevice, BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, Device,
-        DeviceCollectionContext, DeviceCounters, DeviceId, DeviceIdContext, DeviceLayerStateTypes,
-        DeviceLayerTypes, DeviceProvider, DeviceReceiveFrameSpec, OriginTrackerContext,
+        DeviceCollectionContext, DeviceCounters, DeviceId, DeviceIdAnyCompatContext,
+        DeviceIdContext, DeviceLayerStateTypes, DeviceLayerTypes, DeviceProvider,
+        DeviceReceiveFrameSpec, OriginTrackerContext,
     },
     for_any_device_id,
     ip::{
         device::{
-            IpDeviceBindingsContext, IpDeviceConfigurationContext, Ipv6DeviceConfigurationContext,
+            IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceTimerId,
+            Ipv6DeviceConfigurationContext,
         },
         types::RawMetric,
     },
@@ -91,14 +93,24 @@ where
         properties: D::CreationProperties,
         metric: RawMetric,
         external_state: D::External<C::BindingsContext>,
-    ) -> <C::CoreContext as DeviceIdContext<D>>::DeviceId {
+    ) -> <C::CoreContext as DeviceIdContext<D>>::DeviceId
+    where
+        C::CoreContext: DeviceApiIpLayerCoreContext<D, C::BindingsContext>,
+    {
         debug!("adding {} device with {:?} metric:{metric}", D::DEBUG_TYPE, properties);
         let (core_ctx, bindings_ctx) = self.contexts();
         let origin = core_ctx.origin_tracker();
         let primary = BasePrimaryDeviceId::new(
             |weak_ref| {
-                IpLinkDeviceStateInner::new(
-                    D::new_link_state::<C::CoreContext, _>(bindings_ctx, weak_ref, properties),
+                let link = D::new_link_state::<C::CoreContext, _>(
+                    bindings_ctx,
+                    weak_ref.clone(),
+                    properties,
+                );
+                IpLinkDeviceStateInner::new::<_, C::CoreContext>(
+                    bindings_ctx,
+                    weak_ref.into(),
+                    link,
                     metric,
                     origin,
                 )
@@ -125,6 +137,7 @@ where
     where
         <C::BindingsContext as DeviceLayerStateTypes>::DeviceIdentifier: Default,
         D::External<C::BindingsContext>: Default,
+        C::CoreContext: DeviceApiIpLayerCoreContext<D, C::BindingsContext>,
     {
         self.add_device(Default::default(), properties, metric, Default::default())
     }
@@ -411,3 +424,20 @@ pub trait DeviceApiBindingsContext: DeviceLayerTypes + ReferenceNotifiers + Time
 
 impl<O> DeviceApiBindingsContext for O where O: DeviceLayerTypes + ReferenceNotifiers + TimerContext2
 {}
+
+/// A marker trait with traits required to tie the device layer with the IP
+/// layer to fulfill [`DeviceApi`].
+pub trait DeviceApiIpLayerCoreContext<D: Device, BC: DeviceLayerTypes>:
+    DeviceIdAnyCompatContext<D>
+    + CoreTimerContext<IpDeviceTimerId<Ipv6, <Self as DeviceIdContext<AnyDevice>>::DeviceId>, BC>
+{
+}
+
+impl<O, D, BC> DeviceApiIpLayerCoreContext<D, BC> for O
+where
+    D: Device,
+    BC: DeviceLayerTypes,
+    O: DeviceIdAnyCompatContext<D>
+        + CoreTimerContext<IpDeviceTimerId<Ipv6, <Self as DeviceIdContext<AnyDevice>>::DeviceId>, BC>,
+{
+}

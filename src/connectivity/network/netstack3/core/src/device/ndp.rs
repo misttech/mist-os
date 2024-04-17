@@ -537,9 +537,9 @@ mod tests {
         id: EthernetDeviceId<FakeBindingsCtx>,
     ) -> TimerId<crate::testutil::FakeBindingsCtx> {
         TimerId(TimerIdInner::Ipv6Device(
-            Ipv6DeviceTimerId::Rs(crate::ip::device::router_solicitation::RsTimerId {
-                device_id: id.into(),
-            })
+            Ipv6DeviceTimerId::Rs(crate::ip::device::router_solicitation::RsTimerId::new(
+                id.downgrade().into(),
+            ))
             .into(),
         ))
     }

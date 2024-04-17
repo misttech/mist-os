@@ -69,6 +69,37 @@ pub trait DeviceIdContext<D: Device> {
     type WeakDeviceId: WeakId<Strong = Self::DeviceId> + 'static;
 }
 
+/// A marker trait tying [`DeviceIdContext`] implementations.
+///
+/// To call into the IP layer, we need to be able to represent device
+/// identifiers in the [`AnyDevice`] domain. This trait is a statement that a
+/// [`DeviceIdContext`] in some domain `D` has its identifiers convertible into
+/// the [`AnyDevice`] domain with `From` bounds.
+///
+/// It is provided as a blanket implementation for [`DeviceIdContext`]s that
+/// fulfill the conversion.
+pub trait DeviceIdAnyCompatContext<D: Device>:
+    DeviceIdContext<D>
+    + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId_, WeakDeviceId = Self::WeakDeviceId_>
+{
+    type DeviceId_: StrongId<Weak = Self::WeakDeviceId_>
+        + From<<Self as DeviceIdContext<D>>::DeviceId>;
+    type WeakDeviceId_: WeakId<Strong = Self::DeviceId_>
+        + From<<Self as DeviceIdContext<D>>::WeakDeviceId>;
+}
+
+impl<CC, D> DeviceIdAnyCompatContext<D> for CC
+where
+    D: Device,
+    CC: DeviceIdContext<D> + DeviceIdContext<AnyDevice>,
+    <CC as DeviceIdContext<AnyDevice>>::WeakDeviceId:
+        From<<CC as DeviceIdContext<D>>::WeakDeviceId>,
+    <CC as DeviceIdContext<AnyDevice>>::DeviceId: From<<CC as DeviceIdContext<D>>::DeviceId>,
+{
+    type DeviceId_ = <CC as DeviceIdContext<AnyDevice>>::DeviceId;
+    type WeakDeviceId_ = <CC as DeviceIdContext<AnyDevice>>::WeakDeviceId;
+}
+
 pub(super) struct RecvIpFrameMeta<D, I: Ip> {
     /// The device on which the IP frame was received.
     pub(super) device: D,

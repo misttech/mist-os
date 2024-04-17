@@ -39,7 +39,7 @@ use crate::{
     context::{
         EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext, TimerHandler,
     },
-    device::{self, AnyDevice, DeviceIdContext},
+    device::{self, AnyDevice, DeviceIdContext, WeakId as _},
     error::{ExistsError, NotFoundError},
     filter::{IpPacket, ProofOfEgressCheck},
     inspect::Inspectable,
@@ -171,7 +171,7 @@ where
 pub enum Ipv6DeviceTimerId<D: device::StrongId> {
     Mld(MldDelayedReportTimerId<D>),
     Dad(DadTimerId<D>),
-    Rs(RsTimerId<D>),
+    Rs(RsTimerId<D::Weak>),
     RouteDiscovery(Ipv6DiscoveredRouteTimerId<D>),
     Slaac(SlaacTimerId<D>),
 }
@@ -194,7 +194,7 @@ impl<D: device::StrongId> Ipv6DeviceTimerId<D> {
         match self {
             Self::Mld(id) => Some(id.device_id().clone()),
             Self::Dad(id) => Some(id.device_id().clone()),
-            Self::Rs(id) => Some(id.device_id().clone()),
+            Self::Rs(id) => id.device_id().upgrade(),
             Self::RouteDiscovery(id) => Some(id.device_id().clone()),
             Self::Slaac(id) => Some(id.device_id().clone()),
         }
@@ -213,8 +213,8 @@ impl<D: device::StrongId> From<DadTimerId<D>> for Ipv6DeviceTimerId<D> {
     }
 }
 
-impl<D: device::StrongId> From<RsTimerId<D>> for Ipv6DeviceTimerId<D> {
-    fn from(id: RsTimerId<D>) -> Ipv6DeviceTimerId<D> {
+impl<D: device::StrongId> From<RsTimerId<D::Weak>> for Ipv6DeviceTimerId<D> {
+    fn from(id: RsTimerId<D::Weak>) -> Ipv6DeviceTimerId<D> {
         Ipv6DeviceTimerId::Rs(id)
     }
 }
@@ -258,13 +258,6 @@ impl_timer_context!(
 impl_timer_context!(
     D: device::StrongId,
     Ipv6DeviceTimerId<D>,
-    RsTimerId::<D>,
-    Ipv6DeviceTimerId::Rs(id),
-    id
-);
-impl_timer_context!(
-    D: device::StrongId,
-    Ipv6DeviceTimerId<D>,
     Ipv6DiscoveredRouteTimerId::<D>,
     Ipv6DeviceTimerId::RouteDiscovery(id),
     id
@@ -280,7 +273,7 @@ impl_timer_context!(
 impl<
         D: device::StrongId,
         BC,
-        CC: TimerHandler<BC, RsTimerId<D>>
+        CC: TimerHandler<BC, RsTimerId<D::Weak>>
             + TimerHandler<BC, Ipv6DiscoveredRouteTimerId<D>>
             + TimerHandler<BC, MldDelayedReportTimerId<D>>
             + TimerHandler<BC, SlaacTimerId<D>>
@@ -2074,7 +2067,7 @@ mod tests {
             let mut timers = vec![
                 (
                     TimerId(TimerIdInner::Ipv6Device(
-                        Ipv6DeviceTimerId::Rs(RsTimerId { device_id: device_id.clone() }).into(),
+                        Ipv6DeviceTimerId::Rs(RsTimerId::new(device_id.downgrade())).into(),
                     )),
                     ..,
                 ),

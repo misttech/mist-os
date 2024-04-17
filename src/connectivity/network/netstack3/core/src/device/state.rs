@@ -7,6 +7,8 @@
 use alloc::sync::Arc;
 use core::fmt::Debug;
 
+use net_types::ip::Ipv6;
+
 use crate::{
     context::{CoreTimerContext, TimerContext2},
     device::{
@@ -14,7 +16,10 @@ use crate::{
         OriginTracker,
     },
     inspect::Inspectable,
-    ip::{device::state::DualStackIpDeviceState, types::RawMetric},
+    ip::{
+        device::{state::DualStackIpDeviceState, IpDeviceTimerId},
+        types::RawMetric,
+    },
     sync::RwLock,
     sync::WeakRc,
 };
@@ -83,11 +88,17 @@ pub(crate) struct IpLinkDeviceStateInner<T, BT: DeviceLayerTypes> {
     pub(super) counters: DeviceCounters,
 }
 
-impl<T, BT: DeviceLayerTypes> IpLinkDeviceStateInner<T, BT> {
+impl<T, BC: DeviceLayerTypes + TimerContext2> IpLinkDeviceStateInner<T, BC> {
     /// Create a new `IpLinkDeviceState` with a link-specific state `link`.
-    pub(super) fn new(link: T, metric: RawMetric, origin: OriginTracker) -> Self {
+    pub(super) fn new<D: device::StrongId, CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D>, BC>>(
+        bindings_ctx: &mut BC,
+        device_id: D::Weak,
+        link: T,
+        metric: RawMetric,
+        origin: OriginTracker,
+    ) -> Self {
         Self {
-            ip: DualStackIpDeviceState::new(metric),
+            ip: DualStackIpDeviceState::new::<_, CC>(bindings_ctx, device_id, metric),
             link,
             origin,
             sockets: RwLock::new(HeldDeviceSockets::default()),

@@ -22,12 +22,17 @@ use net_types::{
 use packet_formats::utils::NonZeroDuration;
 
 use crate::{
-    context::InstantBindingsTypes,
+    context::{
+        CoreTimerContext, InstantBindingsTypes, NestedIntoCoreTimerCtx, TimerBindingsTypes,
+        TimerContext2,
+    },
+    device,
     inspect::{Inspectable, InspectableValue, Inspector},
     ip::{
         device::{
-            route_discovery::Ipv6RouteDiscoveryState, slaac::SlaacConfiguration, IpAddressId,
-            IpDeviceAddr, Ipv6DeviceAddr,
+            route_discovery::Ipv6RouteDiscoveryState, router_solicitation::RsState,
+            slaac::SlaacConfiguration, IpAddressId, IpDeviceAddr, IpDeviceTimerId, Ipv6DeviceAddr,
+            Ipv6DeviceTimerId,
         },
         gmp::{igmp::IgmpGroupState, mld::MldGroupState, MulticastGroupSet},
         types::{IpTypesIpExt, RawMetric},
@@ -586,12 +591,12 @@ impl<BT: IpDeviceStateBindingsTypes> LockFor<crate::lock_ordering::Ipv6DeviceRou
 impl<BT: IpDeviceStateBindingsTypes> LockFor<crate::lock_ordering::Ipv6DeviceRouterSolicitations>
     for DualStackIpDeviceState<BT>
 {
-    type Data = Option<NonZeroU8>;
-    type Guard<'l> = crate::sync::LockGuard<'l, Option<NonZeroU8>>
+    type Data = RsState<BT>;
+    type Guard<'l> = crate::sync::LockGuard<'l, RsState<BT>>
         where
             Self: 'l;
     fn lock(&self) -> Self::Guard<'_> {
-        self.ipv6.router_soliciations_remaining.lock()
+        self.ipv6.router_solicitations.lock()
     }
 }
 
@@ -637,17 +642,23 @@ impl Ipv6NetworkLearnedParameters {
 pub struct Ipv6DeviceState<BT: IpDeviceStateBindingsTypes> {
     pub(super) learned_params: RwLock<Ipv6NetworkLearnedParameters>,
     pub(super) route_discovery: Mutex<Ipv6RouteDiscoveryState>,
-    pub(super) router_soliciations_remaining: Mutex<Option<NonZeroU8>>,
+    pub(super) router_solicitations: Mutex<RsState<BT>>,
     pub(crate) ip_state: IpDeviceState<Ipv6, BT>,
     pub(crate) config: RwLock<Ipv6DeviceConfiguration>,
 }
 
-impl<BT: IpDeviceStateBindingsTypes> Default for Ipv6DeviceState<BT> {
-    fn default() -> Ipv6DeviceState<BT> {
+impl<BC: IpDeviceStateBindingsTypes + TimerContext2> Ipv6DeviceState<BC> {
+    pub fn new<D: device::StrongId, CC: CoreTimerContext<Ipv6DeviceTimerId<D>, BC>>(
+        bindings_ctx: &mut BC,
+        device_id: D::Weak,
+    ) -> Self {
         Ipv6DeviceState {
             learned_params: Default::default(),
             route_discovery: Default::default(),
-            router_soliciations_remaining: Default::default(),
+            router_solicitations: Mutex::new(RsState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(
+                bindings_ctx,
+                device_id,
+            )),
             ip_state: Default::default(),
             config: Default::default(),
         }
@@ -667,8 +678,8 @@ impl<BT: IpDeviceStateBindingsTypes> AsMut<IpDeviceState<Ipv6, BT>> for Ipv6Devi
 }
 
 /// Bindings types required for IP device state.
-pub trait IpDeviceStateBindingsTypes: InstantBindingsTypes {}
-impl<BT> IpDeviceStateBindingsTypes for BT where BT: InstantBindingsTypes {}
+pub trait IpDeviceStateBindingsTypes: InstantBindingsTypes + TimerBindingsTypes {}
+impl<BT> IpDeviceStateBindingsTypes for BT where BT: InstantBindingsTypes + TimerBindingsTypes {}
 
 /// IPv4 and IPv6 state combined.
 pub(crate) struct DualStackIpDeviceState<BT: IpDeviceStateBindingsTypes> {
@@ -682,9 +693,17 @@ pub(crate) struct DualStackIpDeviceState<BT: IpDeviceStateBindingsTypes> {
     pub metric: RawMetric,
 }
 
-impl<BT: InstantBindingsTypes> DualStackIpDeviceState<BT> {
-    pub(crate) fn new(metric: RawMetric) -> Self {
-        Self { ipv4: Default::default(), ipv6: Default::default(), metric }
+impl<BC: IpDeviceStateBindingsTypes + TimerContext2> DualStackIpDeviceState<BC> {
+    pub(crate) fn new<D: device::StrongId, CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D>, BC>>(
+        bindings_ctx: &mut BC,
+        device_id: D::Weak,
+        metric: RawMetric,
+    ) -> Self {
+        Self {
+            ipv4: Default::default(),
+            ipv6: Ipv6DeviceState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx, device_id),
+            metric,
+        }
     }
 }
 
