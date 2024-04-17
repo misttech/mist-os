@@ -174,6 +174,9 @@ class ExecutionEnvironment:
             raise EnvironmentError(f"No log files found in {self.out_dir}")
         return os.path.join(self.out_dir, matching[-1])
 
+    def log_to_stdout(self) -> bool:
+        return self.log_file == args.LOG_TO_STDOUT_OPTION
+
     def __hash__(self) -> int:
         return hash(self.fuchsia_dir)
 

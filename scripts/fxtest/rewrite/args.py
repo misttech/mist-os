@@ -12,6 +12,8 @@ import functools
 import termout
 import util.arg_option as arg_option
 
+LOG_TO_STDOUT_OPTION = "-"
+
 
 @dataclass
 class Flags:
