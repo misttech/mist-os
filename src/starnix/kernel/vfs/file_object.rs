@@ -795,8 +795,13 @@ pub fn default_ioctl(
                 return error!(ENOTTY);
             }
 
-            let size =
-                file.name.entry.node.refresh_info(current_task).map_err(|_| errno!(EINVAL))?.size;
+            let size = file
+                .name
+                .entry
+                .node
+                .fetch_and_refresh_info(current_task)
+                .map_err(|_| errno!(EINVAL))?
+                .size;
             let offset = usize::try_from(*file.offset.lock()).map_err(|_| errno!(EINVAL))?;
             let remaining =
                 if size < offset { 0 } else { i32::try_from(size - offset).unwrap_or(i32::MAX) };

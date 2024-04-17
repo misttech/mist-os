@@ -187,7 +187,7 @@ impl FsNodeOps for File {
         Ok(Box::new(VmoFile { vmo, size }))
     }
 
-    fn refresh_info<'a>(
+    fn fetch_and_refresh_info<'a>(
         &self,
         _node: &FsNode,
         _current_task: &CurrentTask,

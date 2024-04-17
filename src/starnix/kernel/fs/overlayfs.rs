@@ -706,14 +706,14 @@ impl FsNodeOps for Arc<OverlayNode> {
         Ok(())
     }
 
-    fn refresh_info<'a>(
+    fn fetch_and_refresh_info<'a>(
         &self,
         _node: &FsNode,
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         let mut lock = info.write();
-        *lock = self.main_entry().entry().node.refresh_info(current_task)?.clone();
+        *lock = self.main_entry().entry().node.fetch_and_refresh_info(current_task)?.clone();
         Ok(RwLockWriteGuard::downgrade(lock))
     }
 

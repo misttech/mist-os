@@ -501,10 +501,10 @@ impl FuseNode {
         }
 
         // Force a refresh of our cached attributes.
-        self.refresh_info_impl(current_task, info)
+        self.fetch_and_refresh_info_impl(current_task, info)
     }
 
-    fn refresh_info_impl<'a>(
+    fn fetch_and_refresh_info_impl<'a>(
         &self,
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
@@ -518,7 +518,7 @@ impl FuseNode {
                 return error!(EINVAL);
             };
         let mut info = info.write();
-        FuseNode::refresh_node_info(
+        FuseNode::set_node_info(
             &mut info,
             attr,
             attr_valid_to_duration(attr_valid, attr_valid_nsec)?,
@@ -527,7 +527,7 @@ impl FuseNode {
         Ok(RwLockWriteGuard::downgrade(info))
     }
 
-    fn refresh_node_info(
+    fn set_node_info(
         info: &mut FsNodeInfo,
         attributes: uapi::fuse_attr,
         attr_valid_duration: zx::Duration,
@@ -578,7 +578,7 @@ impl FuseNode {
         let node = node.fs().get_or_create_node(current_task, Some(entry.nodeid), |id| {
             let fuse_node = FuseNode::new(self.connection.clone(), entry.nodeid);
             let mut info = FsNodeInfo::default();
-            FuseNode::refresh_node_info(
+            FuseNode::set_node_info(
                 &mut info,
                 entry.attr,
                 attr_valid_to_duration(entry.attr_valid, entry.attr_valid_nsec)?,
@@ -1108,7 +1108,7 @@ impl FsNodeOps for Arc<FuseNode> {
                 } else {
                     return error!(EINVAL);
                 };
-            FuseNode::refresh_node_info(
+            FuseNode::set_node_info(
                 info,
                 attr,
                 attr_valid_to_duration(attr_valid, attr_valid_nsec)?,
@@ -1131,13 +1131,13 @@ impl FsNodeOps for Arc<FuseNode> {
         error!(ENOTSUP)
     }
 
-    fn refresh_info<'a>(
+    fn fetch_and_refresh_info<'a>(
         &self,
         _node: &FsNode,
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        self.refresh_info_impl(current_task, info)
+        self.fetch_and_refresh_info_impl(current_task, info)
     }
 
     fn get_xattr(
