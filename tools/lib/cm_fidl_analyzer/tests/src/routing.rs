@@ -552,7 +552,7 @@ mod tests {
                             .name("foo")
                             .target_name("foo")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target(offer_target_static_child("b")),
                     )
                     .service_default("foo")
                     .child_default("b")
@@ -592,7 +592,7 @@ mod tests {
                             .name("foo")
                             .target_name("foo")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target(offer_target_static_child("b")),
                     )
                     .service_default("foo")
                     .child_default("b")
@@ -669,8 +669,8 @@ mod tests {
                         OfferBuilder::service()
                             .name("foo")
                             .target_name("foo")
-                            .source(OfferSource::static_child("c".into()))
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .source(offer_source_static_child("c"))
+                            .target(offer_target_static_child("b")),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -1254,8 +1254,8 @@ mod tests {
         let a_offer_decl = OfferBuilder::directory()
             .name("baz_data")
             .target_name("foobar_data")
-            .source(OfferSource::static_child("b".to_string()))
-            .target(OfferTarget::static_child("c".to_string()))
+            .source(offer_source_static_child("b"))
+            .target(offer_target_static_child("c"))
             .rights(fio::R_STAR_DIR)
             .build();
         let b_expose_decl = ExposeBuilder::directory()
@@ -1418,7 +1418,7 @@ mod tests {
         let offer_storage_decl = OfferBuilder::storage()
             .name("cache")
             .source(OfferSource::Self_)
-            .target(OfferTarget::static_child("b".to_string()))
+            .target(offer_target_static_child("b"))
             .build();
         let use_storage_decl = UseBuilder::storage().name("cache").path("/storage").build();
         let components = vec![
@@ -1486,7 +1486,7 @@ mod tests {
         let offer_realm_decl = OfferBuilder::protocol()
             .name("fuchsia.component.Realm")
             .source(OfferSource::Framework)
-            .target(OfferTarget::static_child("b".to_string()))
+            .target(offer_target_static_child("b"))
             .build();
         let use_realm_decl = UseBuilder::protocol().name("fuchsia.component.Realm").build();
 
@@ -1541,7 +1541,7 @@ mod tests {
             .name("foo")
             .target_name("bar")
             .source(OfferSource::Parent)
-            .target(OfferTarget::static_child("b".to_string()))
+            .target(offer_target_static_child("b"))
             .build();
         let use_decl = UseBuilder::protocol().name("bar").path("/svc/hippo").build();
         let capability_decl = CapabilityBuilder::protocol()
@@ -1887,7 +1887,7 @@ mod tests {
             .name("foo_data")
             .target_name("bar_data")
             .source(OfferSource::Self_)
-            .target(OfferTarget::static_child("b".to_string()))
+            .target(offer_target_static_child("b"))
             .rights(fio::R_STAR_DIR)
             .build();
         let directory_decl =
@@ -2046,7 +2046,7 @@ mod tests {
         let offer_protocol_decl = OfferBuilder::protocol()
             .name("fuchsia.examples.Echo")
             .source(OfferSource::Void)
-            .target(OfferTarget::static_child("b".to_string()))
+            .target(offer_target_static_child("b"))
             .availability(Availability::Optional)
             .build();
 
@@ -2094,8 +2094,8 @@ mod tests {
 
         let offer_protocol_decl = OfferBuilder::protocol()
             .name("fuchsia.examples.Echo")
-            .source(OfferSource::static_child("c".to_string()))
-            .target(OfferTarget::static_child("b".to_string()))
+            .source(offer_source_static_child("c"))
+            .target(offer_target_static_child("b"))
             .build();
 
         let components = vec![

@@ -44,7 +44,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("cache")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .capability(
@@ -110,7 +110,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("cache")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .capability(
@@ -167,7 +167,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("cache")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .capability(
@@ -220,7 +220,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("cache")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .capability(
@@ -279,7 +279,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .name("data")
                             .target_name("minfs")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string()))
+                            .target_static_child("b")
                             .rights(fio::RW_STAR_DIR),
                     )
                     .child_default("b")
@@ -292,7 +292,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .child_default("c")
                     .capability(
@@ -352,7 +352,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .name("data")
                             .target_name("minfs")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string()))
+                            .target_static_child("b")
                             .rights(fio::RW_STAR_DIR)
                             .subdir("subdir_1"),
                     )
@@ -366,7 +366,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .child_default("c")
                     .capability(
@@ -434,7 +434,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .name("data")
                             .target_name("minfs")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string()))
+                            .target_static_child("b")
                             .rights(fio::RW_STAR_DIR),
                     )
                     .child_default("b")
@@ -447,7 +447,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .child_default("c")
                     .capability(
@@ -507,7 +507,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .capability(
@@ -525,7 +525,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("data")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .child_default("c")
                     .build(),
@@ -575,7 +575,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("cache")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -646,7 +646,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("cache")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -734,13 +734,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("cache")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .offer(
                         OfferBuilder::storage()
                             .name("data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -771,13 +771,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("data")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("d".to_string())),
+                            .target_static_child("d"),
                     )
                     .offer(
                         OfferBuilder::storage()
                             .name("cache")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("d".to_string())),
+                            .target_static_child("d"),
                     )
                     .use_(UseBuilder::storage().name("data").path("/storage"))
                     .use_(UseBuilder::storage().name("cache").path("/cache"))
@@ -866,7 +866,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("cache")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .capability(
@@ -920,7 +920,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::directory()
                             .name("data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string()))
+                            .target_static_child("b")
                             .rights(fio::RW_STAR_DIR),
                     )
                     .child_default("b")
@@ -1023,7 +1023,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .name("data")
                             .target_name("minfs")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string()))
+                            .target_static_child("b")
                             .rights(fio::RW_STAR_DIR),
                     )
                     .child_default("b")
@@ -1036,7 +1036,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .child_default("c")
                     .capability(
@@ -1088,7 +1088,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("cache")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .capability(
@@ -1171,7 +1171,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("cache")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .capability(
@@ -1190,7 +1190,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         OfferBuilder::storage()
                             .name("cache")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .child_default("c")
                     .build(),

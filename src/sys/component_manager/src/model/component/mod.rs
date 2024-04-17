@@ -1625,8 +1625,8 @@ pub mod tests {
     async fn shutdown_component_interface_no_dynamic() {
         let example_offer = OfferBuilder::directory()
             .name("foo")
-            .source(OfferSource::static_child("a".to_string()))
-            .target(OfferTarget::static_child("b".to_string()))
+            .source_static_child("a")
+            .target_static_child("b")
             .build();
         let example_capability = CapabilityBuilder::protocol().name("bar").build();
         let example_expose =
@@ -1693,8 +1693,8 @@ pub mod tests {
     async fn shutdown_component_interface_dynamic_children_and_offers() {
         let example_offer = OfferBuilder::directory()
             .name("foo")
-            .source(OfferSource::static_child("a".to_string()))
-            .target(OfferTarget::static_child("b".to_string()))
+            .source_static_child("a")
+            .target_static_child("b")
             .build();
 
         let components = vec![
@@ -1914,7 +1914,7 @@ pub mod tests {
         let example_offer = OfferBuilder::service()
             .name("foo")
             .source(OfferSource::Collection("coll".parse().unwrap()))
-            .target(OfferTarget::static_child("static_child".to_string()))
+            .target_static_child("static_child")
             .build();
 
         let components = vec![
@@ -2449,7 +2449,7 @@ pub mod tests {
                         OfferBuilder::protocol()
                             .name(flogger::LogSinkMarker::PROTOCOL_NAME)
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child(TEST_CHILD_NAME.to_string())),
+                            .target_static_child(TEST_CHILD_NAME),
                     )
                     .child_default(TEST_CHILD_NAME)
                     .build(),

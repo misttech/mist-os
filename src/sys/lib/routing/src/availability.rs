@@ -67,8 +67,9 @@ mod tests {
         super::*,
         cm_rust::{
             DependencyType, ExposeDecl, ExposeProtocolDecl, ExposeTarget, OfferDecl,
-            OfferProtocolDecl, OfferTarget,
+            OfferProtocolDecl,
         },
+        cm_rust_testing::*,
         test_case::test_case,
     };
 
@@ -77,7 +78,7 @@ mod tests {
             source: OfferSource::Parent,
             source_name: "fuchsia.examples.Echo".parse().unwrap(),
             source_dictionary: Default::default(),
-            target: OfferTarget::static_child("echo".to_string()),
+            target: offer_target_static_child("echo"),
             target_name: "fuchsia.examples.Echo".parse().unwrap(),
             dependency_type: DependencyType::Weak,
             availability,
@@ -89,7 +90,7 @@ mod tests {
             source: OfferSource::Void,
             source_name: "fuchsia.examples.Echo".parse().unwrap(),
             source_dictionary: Default::default(),
-            target: OfferTarget::static_child("echo".to_string()),
+            target: offer_target_static_child("echo"),
             target_name: "fuchsia.examples.Echo".parse().unwrap(),
             dependency_type: DependencyType::Weak,
             availability: Availability::Optional,

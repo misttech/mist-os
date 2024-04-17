@@ -51,13 +51,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         OfferBuilder::storage()
                             .name("data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .offer(
                         OfferBuilder::protocol()
                             .name("fuchsia.sys2.StorageAdmin")
                             .source(OfferSource::Capability("data".parse().unwrap()))
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -116,7 +116,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         OfferBuilder::directory()
                             .name("data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string()))
+                            .target_static_child("b")
                             .rights(fio::RW_STAR_DIR)
                             .subdir("foo"),
                     )
@@ -137,7 +137,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         OfferBuilder::protocol()
                             .name("fuchsia.sys2.StorageAdmin")
                             .source(OfferSource::Capability("storage".parse().unwrap()))
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .child_default("c")
                     .build(),
@@ -183,8 +183,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .offer(
                         OfferBuilder::protocol()
                             .name("fuchsia.sys2.StorageAdmin")
-                            .source(OfferSource::static_child("c".to_string()))
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .source_static_child("c")
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -215,7 +215,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         OfferBuilder::storage()
                             .name("data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("d".to_string())),
+                            .target_static_child("d"),
                     )
                     .expose(
                         ExposeBuilder::protocol()
@@ -274,7 +274,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         OfferBuilder::storage()
                             .name("data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .use_(
                         UseBuilder::protocol()
@@ -338,7 +338,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         OfferBuilder::storage()
                             .name("data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .use_(
                         UseBuilder::protocol()
@@ -401,7 +401,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         OfferBuilder::protocol()
                             .name("fuchsia.sys2.StorageAdmin")
                             .source(OfferSource::Capability("unrelated.protocol".parse().unwrap()))
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .build(),
@@ -448,8 +448,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .offer(
                         OfferBuilder::protocol()
                             .name("fuchsia.sys2.StorageAdmin")
-                            .source(OfferSource::static_child("c".to_string()))
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .source_static_child("c")
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -483,7 +483,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         OfferBuilder::storage()
                             .name("data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("d".to_string())),
+                            .target_static_child("d"),
                     )
                     .expose(
                         ExposeBuilder::protocol().name("fuchsia.sys2.StorageAdmin").source(
@@ -546,7 +546,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         OfferBuilder::storage()
                             .name("data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .use_(
                         UseBuilder::protocol()
@@ -607,7 +607,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                             .name("unrelated.protocol")
                             .target_name("fuchsia.sys2.StorageAdmin")
                             .source(OfferSource::Capability("data".parse().unwrap()))
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .build(),
@@ -653,8 +653,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .offer(
                         OfferBuilder::protocol()
                             .name("fuchsia.sys2.StorageAdmin")
-                            .source(OfferSource::static_child("c".to_string()))
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .source_static_child("c")
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -685,7 +685,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         OfferBuilder::storage()
                             .name("data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("d".to_string())),
+                            .target_static_child("d"),
                     )
                     .expose(
                         ExposeBuilder::protocol()

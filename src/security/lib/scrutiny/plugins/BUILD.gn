@@ -184,6 +184,7 @@ if (is_host) {
         "//src/lib/fuchsia",
         "//src/security/lib/scrutiny/config",
         "//src/security/lib/scrutiny/testing",
+        "//src/sys/lib/cm_rust/testing",
         "//third_party/rust_crates:assert_matches",
         "//third_party/rust_crates:tempfile",
         "//third_party/rust_crates:uuid",

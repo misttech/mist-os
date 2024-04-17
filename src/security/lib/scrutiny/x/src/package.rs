@@ -436,7 +436,10 @@ pub(crate) mod test {
                 source: cm::OfferSource::Parent,
                 source_name: "test_protocol".parse().unwrap(),
                 source_dictionary: Default::default(),
-                target: cm::OfferTarget::static_child("test_child".to_string()),
+                target: cm::OfferTarget::Child(cm::ChildRef {
+                    name: "test_child".into(),
+                    collection: None,
+                }),
                 target_name: "test_protocol".parse().unwrap(),
                 dependency_type: cm::DependencyType::Strong,
                 availability: cm::Availability::Required,

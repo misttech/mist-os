@@ -212,7 +212,7 @@ async fn capability_requested_event_at_parent() {
                     .name("foo")
                     .target_name("bar")
                     .source(OfferSource::Self_)
-                    .target(OfferTarget::static_child("b".to_string()))
+                    .target_static_child("b")
                 )
                 .use_(UseBuilder::event_stream()
                     .name("capability_requested")
@@ -305,7 +305,7 @@ async fn use_in_collection() {
                         .name("foo_data")
                         .target_name("hippo_data")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("b".to_string()))
+                        .target_static_child("b")
                         .rights(fio::R_STAR_DIR),
                 )
                 .offer(
@@ -313,7 +313,7 @@ async fn use_in_collection() {
                         .name("foo")
                         .target_name("hippo")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("b".to_string())),
+                        .target_static_child("b"),
                 )
                 .child_default("b")
                 .build(),
@@ -415,7 +415,7 @@ async fn use_in_collection_not_offered() {
                         .name("foo_data")
                         .target_name("hippo_data")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("b".to_string()))
+                        .target_static_child("b")
                         .rights(fio::R_STAR_DIR),
                 )
                 .offer(
@@ -423,7 +423,7 @@ async fn use_in_collection_not_offered() {
                         .name("foo")
                         .target_name("hippo")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("b".to_string())),
+                        .target_static_child("b"),
                 )
                 .child_default("b")
                 .build(),
@@ -497,7 +497,7 @@ async fn dynamic_offer_from_parent() {
                         .name("foo")
                         .target_name("hippo")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("b".to_string())),
+                        .target_static_child("b"),
                 )
                 .child_default("b")
                 .build(),
@@ -994,7 +994,7 @@ async fn dynamic_offer_to_static_offer() {
                     OfferBuilder::protocol()
                         .name("hippo")
                         .source(OfferSource::Parent)
-                        .target(OfferTarget::static_child("d".to_string())),
+                        .target_static_child("d"),
                 )
                 .child_default("d")
                 .build(),
@@ -1160,14 +1160,14 @@ async fn destroying_instance_blocks_on_routing() {
                 .offer(
                     OfferBuilder::protocol()
                         .name("foo")
-                        .source(OfferSource::static_child("c".into()))
-                        .target(OfferTarget::static_child("b".into())),
+                        .source_static_child("c")
+                        .target_static_child("b"),
                 )
                 .offer(
                     OfferBuilder::directory()
                         .name("foo_data")
-                        .source(OfferSource::static_child("c".into()))
-                        .target(OfferTarget::static_child("b".into())),
+                        .source_static_child("c")
+                        .target_static_child("b"),
                 )
                 .child_default("b")
                 .child_default("c")
@@ -1404,7 +1404,7 @@ async fn use_runner_from_grandparent_environment() {
                         .name("elf")
                         .target_name("dwarf")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("b".to_string())),
+                        .target_static_child("b"),
                 )
                 .runner_default("elf")
                 .build(),
@@ -1768,7 +1768,7 @@ async fn use_with_destroyed_parent() {
                     OfferBuilder::protocol()
                         .name("foo")
                         .source(OfferSource::Parent)
-                        .target(OfferTarget::static_child("c".to_string())),
+                        .target_static_child("c"),
                 )
                 .child_default("c")
                 .build(),
@@ -1842,8 +1842,8 @@ async fn use_from_destroyed_but_not_removed() {
                     OfferBuilder::protocol()
                         .name("bar")
                         .target_name("baz")
-                        .source(OfferSource::static_child("b".to_string()))
-                        .target(OfferTarget::static_child("c".to_string())),
+                        .source_static_child("b")
+                        .target_static_child("c"),
                 )
                 .child_default("b")
                 .child_default("c")
@@ -2406,7 +2406,7 @@ async fn offer_service_from_collection() {
                     OfferBuilder::service()
                         .name("foo")
                         .source(OfferSource::Collection("coll".parse().unwrap()))
-                        .target(OfferTarget::static_child("b".into())),
+                        .target_static_child("b"),
                 )
                 .collection_default("coll")
                 .child_default("b")
@@ -2451,7 +2451,7 @@ async fn offer_service_from_collections() {
             OfferBuilder::service()
                 .name("foo")
                 .source(OfferSource::Collection(coll.parse().unwrap()))
-                .target(OfferTarget::static_child("b".into()))
+                .target_static_child("b")
                 .build()
         })
         .collect();
@@ -2510,7 +2510,7 @@ async fn offer_service_from_collections_multilevel() {
             OfferBuilder::service()
                 .name("foo")
                 .source(OfferSource::Collection(coll.parse().unwrap()))
-                .target(OfferTarget::static_child("m".into()))
+                .target_static_child("m")
                 .build()
         })
         .collect();
@@ -2535,7 +2535,7 @@ async fn offer_service_from_collections_multilevel() {
                     OfferBuilder::service()
                         .name("foo")
                         .source(OfferSource::Parent)
-                        .target(OfferTarget::static_child("b".into())),
+                        .target_static_child("b"),
                 )
                 .child_default("b")
                 .build(),
@@ -2751,7 +2751,7 @@ async fn list_service_instances_from_collections() {
             OfferBuilder::service()
                 .name("foo")
                 .source(OfferSource::Collection(coll.parse().unwrap()))
-                .target(OfferTarget::static_child("client".into()))
+                .target_static_child("client")
                 .build()
         })
         .collect();
@@ -2881,8 +2881,8 @@ async fn use_service_from_sibling_collection() {
                 .offer(
                     OfferBuilder::service()
                         .name("my.service.Service")
-                        .source(OfferSource::static_child("c".to_string()))
-                        .target(OfferTarget::static_child("b".to_string())),
+                        .source_static_child("c")
+                        .target_static_child("b"),
                 )
                 .child(ChildBuilder::new().name("b"))
                 .child(ChildBuilder::new().name("c"))
@@ -3011,15 +3011,15 @@ async fn use_filtered_service_from_sibling() {
                 .offer(
                     OfferBuilder::service()
                         .name("my.service.Service")
-                        .source(OfferSource::static_child("b".to_string()))
-                        .target(OfferTarget::static_child("c".to_string()))
+                        .source_static_child("b")
+                        .target_static_child("c")
                         .source_instance_filter(vec!["variantinstance".to_string()]),
                 )
                 .offer(
                     OfferBuilder::service()
                         .name("my.service.Service")
-                        .source(OfferSource::static_child("b".to_string()))
-                        .target(OfferTarget::static_child("d".to_string()))
+                        .source_static_child("b")
+                        .target_static_child("d")
                         .renamed_instances(vec![NameMapping {
                             source_name: "default".to_string(),
                             target_name: "renamed_default".to_string(),
@@ -3149,15 +3149,15 @@ async fn use_filtered_aggregate_service_from_sibling() {
                 .offer(
                     OfferBuilder::service()
                         .name("my.service.Service")
-                        .source(OfferSource::static_child("b".to_string()))
-                        .target(OfferTarget::static_child("c".to_string()))
+                        .source_static_child("b")
+                        .target_static_child("c")
                         .source_instance_filter(vec!["variantinstance".to_string()]),
                 )
                 .offer(
                     OfferBuilder::service()
                         .name("my.service.Service")
-                        .source(OfferSource::static_child("b".to_string()))
-                        .target(OfferTarget::static_child("c".to_string()))
+                        .source_static_child("b")
+                        .target_static_child("c")
                         .source_instance_filter(vec!["renamed_default".to_string()])
                         .renamed_instances(vec![NameMapping {
                             source_name: "default".to_string(),
@@ -3266,7 +3266,7 @@ async fn use_anonymized_aggregate_service() {
                     OfferBuilder::service()
                         .name("my.service.Service")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("b".to_string())),
+                        .target_static_child("b"),
                 )
                 .service_default("my.service.Service")
                 .child(ChildBuilder::new().name("b"))
@@ -3278,26 +3278,26 @@ async fn use_anonymized_aggregate_service() {
                 .offer(
                     OfferBuilder::service()
                         .name("my.service.Service")
-                        .source(OfferSource::static_child("c".to_string()))
-                        .target(OfferTarget::static_child("e".to_string())),
+                        .source_static_child("c")
+                        .target_static_child("e"),
                 )
                 .offer(
                     OfferBuilder::service()
                         .name("my.service.Service")
-                        .source(OfferSource::static_child("d".to_string()))
-                        .target(OfferTarget::static_child("e".to_string())),
+                        .source_static_child("d")
+                        .target_static_child("e"),
                 )
                 .offer(
                     OfferBuilder::service()
                         .name("my.service.Service")
                         .source(OfferSource::Parent)
-                        .target(OfferTarget::static_child("e".to_string())),
+                        .target_static_child("e"),
                 )
                 .offer(
                     OfferBuilder::service()
                         .name("my.service.Service")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("e".to_string())),
+                        .target_static_child("e"),
                 )
                 .service_default("my.service.Service")
                 .child(ChildBuilder::new().name("c"))
@@ -3637,8 +3637,8 @@ async fn build_realm_for_capability_requested_tests(delivery: DeliveryType) -> R
                     OfferBuilder::protocol()
                         .name("foo_svc")
                         .target_name("foo_svc")
-                        .source(OfferSource::static_child("provider".into()))
-                        .target(OfferTarget::static_child("consumer".to_string()))
+                        .source_static_child("provider")
+                        .target_static_child("consumer")
                         .build(),
                 )
                 .offer(
@@ -3650,7 +3650,7 @@ async fn build_realm_for_capability_requested_tests(delivery: DeliveryType) -> R
                             collection: None,
                         })])
                         .source(OfferSource::Parent)
-                        .target(OfferTarget::static_child("provider".to_string())),
+                        .target_static_child("provider"),
                 )
                 .child(ChildBuilder::new().name("provider"))
                 .child(ChildBuilder::new().name("consumer"))

@@ -7,9 +7,7 @@ mod tests {
         crate::routing::RoutingTestBuilderForAnalyzer,
         cm_fidl_analyzer::route::VerifyRouteResult,
         cm_moniker::InstancedMoniker,
-        cm_rust::{
-            CapabilityDecl, CapabilityTypeName, OfferSource, OfferTarget, StorageDirectorySource,
-        },
+        cm_rust::{CapabilityDecl, CapabilityTypeName, OfferSource, StorageDirectorySource},
         cm_rust_testing::*,
         component_id_index::InstanceId,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
@@ -189,7 +187,7 @@ mod tests {
                         OfferBuilder::storage()
                             .name("cache")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("consumer".to_string())),
+                            .target(offer_target_static_child("consumer")),
                     )
                     .child_default("consumer")
                     .build(),
@@ -250,7 +248,7 @@ mod tests {
         let offer_directory_decl = OfferBuilder::directory()
             .name("data")
             .source(OfferSource::Self_)
-            .target(OfferTarget::static_child("storage_provider".to_string()))
+            .target(offer_target_static_child("storage_provider"))
             .rights(fio::RW_STAR_DIR)
             .build();
         let storage_decl = CapabilityBuilder::storage()
@@ -262,7 +260,7 @@ mod tests {
         let offer_storage_decl = OfferBuilder::storage()
             .name("cache")
             .source(OfferSource::Self_)
-            .target(OfferTarget::static_child("not_consumer".to_string()))
+            .target(offer_target_static_child("not_consumer"))
             .build();
         let components = vec![
             (

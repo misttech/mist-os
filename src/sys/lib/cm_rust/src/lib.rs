@@ -2361,12 +2361,6 @@ impl std::fmt::Display for OfferSource {
     }
 }
 
-impl OfferSource {
-    pub fn static_child(name: String) -> Self {
-        Self::Child(ChildRef { name: name.into(), collection: None })
-    }
-}
-
 impl FidlIntoNative<OfferSource> for fdecl::Ref {
     fn fidl_into_native(self) -> OfferSource {
         match self {
@@ -2603,11 +2597,6 @@ pub enum OfferTarget {
     Collection(Name),
     Capability(Name),
 }
-impl OfferTarget {
-    pub fn static_child(name: String) -> Self {
-        Self::Child(ChildRef { name: name.into(), collection: None })
-    }
-}
 
 impl std::fmt::Display for OfferTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -2685,6 +2674,14 @@ pub enum Error {
 #[cfg(test)]
 mod tests {
     use {super::*, difference::Changeset, fidl_fuchsia_component_decl as fdecl};
+
+    fn offer_source_static_child(name: &str) -> OfferSource {
+        OfferSource::Child(ChildRef { name: name.into(), collection: None })
+    }
+
+    fn offer_target_static_child(name: &str) -> OfferTarget {
+        OfferTarget::Child(ChildRef { name: name.into(), collection: None })
+    }
 
     macro_rules! test_try_from_decl {
         (
@@ -3434,7 +3431,7 @@ mod tests {
                             source: OfferSource::Parent,
                             source_name: "legacy_netstack".parse().unwrap(),
                             source_dictionary: "in/dict".parse().unwrap(),
-                            target: OfferTarget::static_child("echo".to_string()),
+                            target: offer_target_static_child("echo"),
                             target_name: "legacy_mynetstack".parse().unwrap(),
                             dependency_type: DependencyType::Weak,
                             availability: Availability::Required,
@@ -3461,14 +3458,14 @@ mod tests {
                             source: OfferSource::Parent,
                             source_name: "elf".parse().unwrap(),
                             source_dictionary: "in/dict".parse().unwrap(),
-                            target: OfferTarget::static_child("echo".to_string()),
+                            target: offer_target_static_child("echo"),
                             target_name: "elf2".parse().unwrap(),
                         }),
                         OfferDecl::Resolver(OfferResolverDecl {
                             source: OfferSource::Parent,
                             source_name: "pkg".parse().unwrap(),
                             source_dictionary: "in/dict".parse().unwrap(),
-                            target: OfferTarget::static_child("echo".to_string()),
+                            target: offer_target_static_child("echo"),
                             target_name: "pkg".parse().unwrap(),
                         }),
                         OfferDecl::Service(OfferServiceDecl {
@@ -3477,7 +3474,7 @@ mod tests {
                             source_dictionary: "in/dict".parse().unwrap(),
                             source_instance_filter: None,
                             renamed_instances: None,
-                            target: OfferTarget::static_child("echo".to_string()),
+                            target: offer_target_static_child("echo"),
                             target_name: "mynetstack1".parse().unwrap(),
                             availability: Availability::Required,
                         }),
@@ -3487,7 +3484,7 @@ mod tests {
                             source_dictionary: ".".parse().unwrap(),
                             source_instance_filter: None,
                             renamed_instances: None,
-                            target: OfferTarget::static_child("echo".to_string()),
+                            target: offer_target_static_child("echo"),
                             target_name: "mynetstack2".parse().unwrap(),
                             availability: Availability::Optional,
                         }),
@@ -3497,7 +3494,7 @@ mod tests {
                             source_dictionary: ".".parse().unwrap(),
                             source_instance_filter: Some(vec!["allowedinstance".to_string()]),
                             renamed_instances: Some(vec![NameMapping{source_name: "default".to_string(), target_name: "allowedinstance".to_string()}]),
-                            target: OfferTarget::static_child("echo".to_string()),
+                            target: offer_target_static_child("echo"),
                             target_name: "mynetstack3".parse().unwrap(),
                             availability: Availability::Required,
                         }),
@@ -3505,7 +3502,7 @@ mod tests {
                             source: OfferSource::Parent,
                             source_name: "bundle".parse().unwrap(),
                             source_dictionary: "in/dict".parse().unwrap(),
-                            target: OfferTarget::static_child("echo".to_string()),
+                            target: offer_target_static_child("echo"),
                             target_name: "mybundle".parse().unwrap(),
                             dependency_type: DependencyType::Weak,
                             availability: Availability::Required,
@@ -3712,7 +3709,7 @@ mod tests {
             input_type = fdecl::Ref,
             result = vec![
                 OfferSource::Self_,
-                OfferSource::static_child("foo".to_string()),
+                offer_source_static_child("foo"),
                 OfferSource::Framework,
                 OfferSource::Capability("foo".parse().unwrap()),
                 OfferSource::Parent,

@@ -201,6 +201,7 @@ mod tests {
             OfferSource, OfferTarget, ProgramDecl, UseDecl, UseDirectoryDecl, UseProtocolDecl,
             UseSource,
         },
+        cm_rust_testing::*,
         component_id_index::InstanceId,
         fidl::persist,
         fidl_fuchsia_component_decl as fdecl,
@@ -473,14 +474,14 @@ mod tests {
         let root_offer_good_dir = new_offer_directory_decl(
             OfferSource::Self_,
             good_dir_name.clone(),
-            OfferTarget::static_child(child_name.clone()),
+            offer_target_static_child(&child_name),
             good_dir_name.clone(),
             Some(offer_rights),
         );
         let root_offer_protocol = new_offer_protocol_decl(
-            OfferSource::static_child(missing_child_name.clone()),
+            offer_source_static_child(&missing_child_name),
             protocol_name.clone(),
-            OfferTarget::static_child(child_name.clone()),
+            offer_target_static_child(&child_name),
             protocol_name.clone(),
         );
         let root_good_dir_decl = new_directory_decl(good_dir_name.clone(), offer_rights);

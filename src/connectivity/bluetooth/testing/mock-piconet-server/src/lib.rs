@@ -885,13 +885,21 @@ mod tests {
         super::*,
         assert_matches::assert_matches,
         cm_rust::{
-            Availability, DependencyType, OfferDecl, OfferProtocolDecl, OfferSource, OfferTarget,
-            UseDecl, UseProtocolDecl, UseSource,
+            Availability, ChildRef, DependencyType, OfferDecl, OfferProtocolDecl, OfferSource,
+            OfferTarget, UseDecl, UseProtocolDecl, UseSource,
         },
         cm_types::Name,
         fidl_fuchsia_component_test as fctest,
         fuchsia_component_test::error::Error as RealmBuilderError,
     };
+
+    fn offer_source_static_child(name: &str) -> OfferSource {
+        OfferSource::Child(ChildRef { name: name.into(), collection: None })
+    }
+
+    fn offer_target_static_child(name: &str) -> cm_rust::OfferTarget {
+        OfferTarget::Child(ChildRef { name: name.into(), collection: None })
+    }
 
     async fn assert_realm_contains(builder: &RealmBuilder, child_name: &str) {
         let err = builder
@@ -1107,10 +1115,10 @@ mod tests {
         let profile_test_name = Name::new(bredr::ProfileTestMarker::PROTOCOL_NAME).unwrap();
         let root = builder.get_realm_decl().await.expect("failed to get root");
         let offer_profile_test = OfferDecl::Protocol(OfferProtocolDecl {
-            source: OfferSource::static_child(super::mock_piconet_server_moniker().to_string()),
+            source: offer_source_static_child(&super::mock_piconet_server_moniker()),
             source_name: profile_test_name.clone(),
             source_dictionary: Default::default(),
-            target: OfferTarget::static_child(member_spec.name.clone()),
+            target: offer_target_static_child(&member_spec.name),
             target_name: profile_test_name,
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1177,10 +1185,10 @@ mod tests {
 
         // Profile is offered by root to profile from interposer
         let profile_offer = OfferDecl::Protocol(OfferProtocolDecl {
-            source: OfferSource::static_child(interposer_name.clone()),
+            source: offer_source_static_child(&interposer_name),
             source_name: profile_capability_name.clone(),
             source_dictionary: Default::default(),
-            target: OfferTarget::static_child(profile_name.to_string()),
+            target: offer_target_static_child(&profile_name),
             target_name: profile_capability_name.clone(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1190,10 +1198,10 @@ mod tests {
 
         // ProfileTest is offered by root to interposer from Mock Piconet Server
         let profile_test_offer = OfferDecl::Protocol(OfferProtocolDecl {
-            source: OfferSource::static_child(super::mock_piconet_server_moniker().to_string()),
+            source: offer_source_static_child(&super::mock_piconet_server_moniker()),
             source_name: profile_test_name.clone(),
             source_dictionary: Default::default(),
-            target: OfferTarget::static_child(interposer_name.clone()),
+            target: offer_target_static_child(&interposer_name),
             target_name: profile_test_name.clone(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1206,7 +1214,7 @@ mod tests {
             source: OfferSource::Parent,
             source_name: log_capability_name.clone(),
             source_dictionary: Default::default(),
-            target: OfferTarget::static_child(profile_name.to_string()),
+            target: offer_target_static_child(&profile_name),
             target_name: log_capability_name.clone(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1246,20 +1254,20 @@ mod tests {
 
         // `Profile` is offered by root to bt-rfcomm from interposer.
         let profile_offer1 = OfferDecl::Protocol(OfferProtocolDecl {
-            source: OfferSource::static_child(interposer_name.clone()),
+            source: offer_source_static_child(&interposer_name),
             source_name: profile_capability_name.clone(),
             source_dictionary: Default::default(),
-            target: OfferTarget::static_child(bt_rfcomm_name.clone()),
+            target: offer_target_static_child(&bt_rfcomm_name),
             target_name: profile_capability_name.clone(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
         // `Profile` is offered from bt-rfcomm to profile.
         let profile_offer2 = OfferDecl::Protocol(OfferProtocolDecl {
-            source: OfferSource::static_child(bt_rfcomm_name.clone()),
+            source: offer_source_static_child(&bt_rfcomm_name),
             source_name: profile_capability_name.clone(),
             source_dictionary: Default::default(),
-            target: OfferTarget::static_child(profile_name.to_string()),
+            target: offer_target_static_child(&profile_name),
             target_name: profile_capability_name.clone(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1327,7 +1335,7 @@ mod tests {
             source: OfferSource::Parent,
             source_name: fake_cap3.clone().parse().unwrap(),
             source_dictionary: Default::default(),
-            target: OfferTarget::static_child(profile_name.to_string()),
+            target: offer_target_static_child(&profile_name),
             target_name: fake_cap3.parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,

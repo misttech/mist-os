@@ -1732,7 +1732,7 @@ mod tests {
                         OfferBuilder::service()
                             .name("my.service.Service")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("container".into()))
+                            .target_static_child("container")
                             .availability(cm_rust::Availability::Required),
                     )
                     .child_default("container")
@@ -1751,21 +1751,21 @@ mod tests {
                         OfferBuilder::service()
                             .name("my.service.Service")
                             .source(OfferSource::Collection("coll".parse().unwrap()))
-                            .target(OfferTarget::static_child("target".into()))
+                            .target_static_child("target")
                             .availability(cm_rust::Availability::Required),
                     )
                     .offer(
                         OfferBuilder::service()
                             .name("my.service.Service")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("target".into()))
+                            .target_static_child("target")
                             .availability(cm_rust::Availability::Required),
                     )
                     .offer(
                         OfferBuilder::service()
                             .name("my.service.Service")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("target".into()))
+                            .target_static_child("target")
                             .availability(cm_rust::Availability::Required),
                     )
                     .collection_default("coll")

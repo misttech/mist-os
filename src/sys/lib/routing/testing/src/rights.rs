@@ -28,8 +28,8 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         OfferBuilder::directory()
                             .name("bar_data")
                             .target_name("baz_data")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .source_static_child("b")
+                            .target_static_child("c")
                             .rights(fio::RW_STAR_DIR),
                     )
                     .child_default("b")
@@ -79,8 +79,8 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         OfferBuilder::directory()
                             .name("bar_data")
                             .target_name("baz_data")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .source_static_child("b")
+                            .target_static_child("c")
                             .rights(fio::W_STAR_DIR),
                     )
                     .child_default("b")
@@ -130,8 +130,8 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         OfferBuilder::directory()
                             .name("bar_data")
                             .target_name("baz_data")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .source_static_child("b")
+                            .target_static_child("c")
                             .rights(fio::R_STAR_DIR),
                     )
                     .child_default("b")
@@ -181,8 +181,8 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         OfferBuilder::directory()
                             .name("bar_data")
                             .target_name("baz_data")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .source_static_child("b")
+                            .target_static_child("c")
                             .rights(fio::RW_STAR_DIR),
                     )
                     .child_default("b")
@@ -232,8 +232,8 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         OfferBuilder::directory()
                             .name("bar_data")
                             .target_name("baz_data")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .source_static_child("b")
+                            .target_static_child("c")
                             .rights(fio::R_STAR_DIR),
                     )
                     .child_default("b")
@@ -283,8 +283,8 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         OfferBuilder::directory()
                             .name("bar_data")
                             .target_name("baz_data")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .source_static_child("b")
+                            .target_static_child("c")
                             .rights(fio::RW_STAR_DIR),
                     )
                     .child_default("b")
@@ -343,7 +343,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                             .name("foo_data")
                             .target_name("bar_data")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .build(),

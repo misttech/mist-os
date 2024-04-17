@@ -82,22 +82,22 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         .offer(
                             OfferBuilder::service()
                                 .name("fuchsia.examples.EchoService")
-                                .source(OfferSource::static_child("b".to_string()))
-                                .target(OfferTarget::static_child("c".to_string()))
+                                .source_static_child("b")
+                                .target_static_child("c")
                                 .availability(test_case.provider_availability),
                         )
                         .offer(
                             OfferBuilder::protocol()
                                 .name("fuchsia.examples.Echo")
-                                .source(OfferSource::static_child("b".to_string()))
-                                .target(OfferTarget::static_child("c".to_string()))
+                                .source_static_child("b")
+                                .target_static_child("c")
                                 .availability(test_case.provider_availability),
                         )
                         .offer(
                             OfferBuilder::directory()
                                 .name("dir")
-                                .source(OfferSource::static_child("b".to_string()))
-                                .target(OfferTarget::static_child("c".to_string()))
+                                .source_static_child("b")
+                                .target_static_child("c")
                                 .rights(fio::R_STAR_DIR)
                                 .availability(test_case.provider_availability),
                         )
@@ -118,14 +118,14 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             OfferBuilder::storage()
                                 .name("cache")
                                 .source(OfferSource::Self_)
-                                .target(OfferTarget::static_child("c".to_string()))
+                                .target_static_child("c")
                                 .availability(test_case.provider_availability),
                         )
                         .offer(
                             OfferBuilder::event_stream()
                                 .name("started")
                                 .source(OfferSource::Parent)
-                                .target(OfferTarget::static_child("c".to_string()))
+                                .target_static_child("c")
                                 .availability(test_case.provider_availability),
                         )
                         .child_default("b")
@@ -246,7 +246,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
         }
         for test_case in &[
             TestCase {
-                source: OfferSource::static_child("b".to_string()),
+                source: offer_source_static_child("b"),
                 storage_source: Some(OfferSource::Self_),
                 offer_availability: Availability::Optional,
                 use_availability: Availability::Required,
@@ -284,21 +284,21 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             OfferBuilder::service()
                                 .name("fuchsia.examples.EchoService")
                                 .source(test_case.source.clone())
-                                .target(OfferTarget::static_child("c".to_string()))
+                                .target_static_child("c")
                                 .availability(test_case.offer_availability),
                         )
                         .offer(
                             OfferBuilder::protocol()
                                 .name("fuchsia.examples.Echo")
                                 .source(test_case.source.clone())
-                                .target(OfferTarget::static_child("c".to_string()))
+                                .target_static_child("c")
                                 .availability(test_case.offer_availability),
                         )
                         .offer(
                             OfferBuilder::directory()
                                 .name("dir")
                                 .source(test_case.source.clone())
-                                .target(OfferTarget::static_child("c".to_string()))
+                                .target_static_child("c")
                                 .rights(fio::Operations::CONNECT)
                                 .availability(test_case.offer_availability),
                         )
@@ -312,7 +312,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                                         .map(Clone::clone)
                                         .unwrap_or(test_case.source.clone()),
                                 )
-                                .target(OfferTarget::static_child("c".to_string()))
+                                .target_static_child("c")
                                 .availability(test_case.offer_availability),
                         )
                         .capability(

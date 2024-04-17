@@ -103,7 +103,7 @@ async fn framework_directory_rights() {
                     OfferBuilder::directory()
                         .name("foo_data")
                         .source(OfferSource::Framework)
-                        .target(OfferTarget::static_child("b".to_string()))
+                        .target_static_child("b")
                         .subdir("foo"),
                 )
                 .child_default("b")
@@ -135,7 +135,7 @@ async fn framework_directory_incompatible_rights() {
                     OfferBuilder::directory()
                         .name("foo_data")
                         .source(OfferSource::Framework)
-                        .target(OfferTarget::static_child("b".to_string()))
+                        .target_static_child("b")
                         .subdir("foo"),
                 )
                 .child_default("b")

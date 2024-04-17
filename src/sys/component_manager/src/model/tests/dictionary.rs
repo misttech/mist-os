@@ -28,7 +28,7 @@ async fn use_protocol_from_dictionary() {
                     OfferBuilder::dictionary()
                         .name("parent_dict")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("mid".into())),
+                        .target_static_child("mid"),
                 )
                 .child_default("mid")
                 .build(),
@@ -109,7 +109,7 @@ async fn use_protocol_from_dictionary_not_found() {
                     OfferBuilder::dictionary()
                         .name("dict")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("leaf".into())),
+                        .target_static_child("leaf"),
                 )
                 .child_default("leaf")
                 .build(),
@@ -153,7 +153,7 @@ async fn use_protocol_from_dictionary_not_found() {
                         .name("dict")
                         .target_name("other_dict")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("leaf".into())),
+                        .target_static_child("leaf"),
                 )
                 .child_default("leaf")
                 .build(),
@@ -191,7 +191,7 @@ async fn use_directory_from_dictionary_not_supported() {
                     OfferBuilder::dictionary()
                         .name("parent_dict")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("leaf".into())),
+                        .target_static_child("leaf"),
                 )
                 .offer(
                     OfferBuilder::directory()
@@ -367,7 +367,7 @@ async fn use_protocol_from_nested_dictionary() {
                     OfferBuilder::dictionary()
                         .name("parent_dict")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("mid".into())),
+                        .target_static_child("mid"),
                 )
                 .child_default("mid")
                 .build(),
@@ -461,7 +461,7 @@ async fn offer_protocol_from_dictionary() {
                     OfferBuilder::dictionary()
                         .name("parent_dict")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("mid".into())),
+                        .target_static_child("mid"),
                 )
                 .child_default("mid")
                 .build(),
@@ -476,7 +476,7 @@ async fn offer_protocol_from_dictionary() {
                         .name("A")
                         .target_name("A_svc")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("leaf".into()))
+                        .target_static_child("leaf")
                         .from_dictionary("self_dict"),
                 )
                 .offer(
@@ -491,15 +491,15 @@ async fn offer_protocol_from_dictionary() {
                         .name("B")
                         .target_name("B_svc")
                         .source(OfferSource::Parent)
-                        .target(OfferTarget::static_child("leaf".into()))
+                        .target_static_child("leaf")
                         .from_dictionary("parent_dict"),
                 )
                 .offer(
                     OfferBuilder::protocol()
                         .name("C")
                         .target_name("C_svc")
-                        .source(OfferSource::static_child("provider".into()))
-                        .target(OfferTarget::static_child("leaf".into()))
+                        .source_static_child("provider")
+                        .target_static_child("leaf")
                         .from_dictionary("child_dict"),
                 )
                 .child_default("provider")
@@ -562,7 +562,7 @@ async fn offer_protocol_from_dictionary_not_found() {
                     OfferBuilder::dictionary()
                         .name("dict")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("mid".into())),
+                        .target_static_child("mid"),
                 )
                 .child_default("mid")
                 .build(),
@@ -575,7 +575,7 @@ async fn offer_protocol_from_dictionary_not_found() {
                         .name("A")
                         .target_name("A_svc")
                         .source(OfferSource::Parent)
-                        .target(OfferTarget::static_child("leaf".into()))
+                        .target_static_child("leaf")
                         .from_dictionary("dict"),
                 )
                 .child_default("leaf")
@@ -628,7 +628,7 @@ async fn offer_protocol_from_nested_dictionary() {
                     OfferBuilder::dictionary()
                         .name("parent_dict")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("mid".into())),
+                        .target_static_child("mid"),
                 )
                 .child_default("mid")
                 .build(),
@@ -644,7 +644,7 @@ async fn offer_protocol_from_nested_dictionary() {
                         .name("A")
                         .target_name("A_svc")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("leaf".into()))
+                        .target_static_child("leaf")
                         .from_dictionary("self_dict/nested"),
                 )
                 .offer(
@@ -665,15 +665,15 @@ async fn offer_protocol_from_nested_dictionary() {
                         .name("B")
                         .target_name("B_svc")
                         .source(OfferSource::Parent)
-                        .target(OfferTarget::static_child("leaf".into()))
+                        .target_static_child("leaf")
                         .from_dictionary("parent_dict/nested"),
                 )
                 .offer(
                     OfferBuilder::protocol()
                         .name("C")
                         .target_name("C_svc")
-                        .source(OfferSource::static_child("provider".into()))
-                        .target(OfferTarget::static_child("leaf".into()))
+                        .source_static_child("provider")
+                        .target_static_child("leaf")
                         .from_dictionary("child_dict/nested"),
                 )
                 .child_default("provider")
@@ -1031,7 +1031,7 @@ async fn offer_dictionary_to_dictionary() {
                     OfferBuilder::dictionary()
                         .name("parent_dict")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("mid".into())),
+                        .target_static_child("mid"),
                 )
                 .child_default("mid")
                 .build(),
@@ -1064,7 +1064,7 @@ async fn offer_dictionary_to_dictionary() {
                 .offer(
                     OfferBuilder::dictionary()
                         .name("child_dict")
-                        .source(OfferSource::static_child("leaf".into()))
+                        .source_static_child("leaf")
                         .target(OfferTarget::Capability("root_dict".parse().unwrap())),
                 )
                 .use_(
@@ -1127,7 +1127,7 @@ async fn extend_from_self() {
                     OfferBuilder::protocol()
                         .name("bar")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("leaf".into())),
+                        .target_static_child("leaf"),
                 )
                 .child_default("leaf")
                 .build(),
@@ -1209,7 +1209,7 @@ async fn extend_from_parent() {
                     OfferBuilder::dictionary()
                         .name("origin_dict")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("leaf".into())),
+                        .target_static_child("leaf"),
                 )
                 .child_default("leaf")
                 .build(),
@@ -1375,7 +1375,7 @@ async fn use_from_dictionary_availability_attenuated() {
                     OfferBuilder::dictionary()
                         .name("dict")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("leaf".into())),
+                        .target_static_child("leaf"),
                 )
                 .child_default("leaf")
                 .build(),
@@ -1464,20 +1464,20 @@ async fn use_from_dictionary_availability_invalid() {
                     OfferBuilder::dictionary()
                         .name("required_dict")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("leaf".into())),
+                        .target_static_child("leaf"),
                 )
                 .offer(
                     OfferBuilder::dictionary()
                         .name("optional_dict")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("leaf".into()))
+                        .target_static_child("leaf")
                         .availability(Availability::Optional),
                 )
                 .offer(
                     OfferBuilder::dictionary()
                         .name("dict_with_optional_nested")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("leaf".into())),
+                        .target_static_child("leaf"),
                 )
                 .child_default("leaf")
                 .build(),
@@ -1560,14 +1560,14 @@ async fn offer_from_dictionary_availability_attenuated() {
                     OfferBuilder::protocol()
                         .name("A")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("leaf".into()))
+                        .target_static_child("leaf")
                         .from_dictionary("dict"),
                 )
                 .offer(
                     OfferBuilder::protocol()
                         .name("B")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("leaf".into()))
+                        .target_static_child("leaf")
                         .from_dictionary("dict/nested"),
                 )
                 .child_default("leaf")
@@ -1647,20 +1647,20 @@ async fn offer_from_dictionary_availability_invalid() {
                     OfferBuilder::dictionary()
                         .name("required_dict")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("mid".into())),
+                        .target_static_child("mid"),
                 )
                 .offer(
                     OfferBuilder::dictionary()
                         .name("optional_dict")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("mid".into()))
+                        .target_static_child("mid")
                         .availability(Availability::Optional),
                 )
                 .offer(
                     OfferBuilder::dictionary()
                         .name("dict_with_optional_nested")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("mid".into())),
+                        .target_static_child("mid"),
                 )
                 .child_default("mid")
                 .build(),
@@ -1672,21 +1672,21 @@ async fn offer_from_dictionary_availability_invalid() {
                     OfferBuilder::protocol()
                         .name("A")
                         .source(OfferSource::Parent)
-                        .target(OfferTarget::static_child("leaf".into()))
+                        .target_static_child("leaf")
                         .from_dictionary("required_dict"),
                 )
                 .offer(
                     OfferBuilder::protocol()
                         .name("B")
                         .source(OfferSource::Parent)
-                        .target(OfferTarget::static_child("leaf".into()))
+                        .target_static_child("leaf")
                         .from_dictionary("optional_dict"),
                 )
                 .offer(
                     OfferBuilder::protocol()
                         .name("C")
                         .source(OfferSource::Parent)
-                        .target(OfferTarget::static_child("leaf".into()))
+                        .target_static_child("leaf")
                         .from_dictionary("dict_with_optional_nested/nested"),
                 )
                 .child_default("leaf")

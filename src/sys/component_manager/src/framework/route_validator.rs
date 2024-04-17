@@ -944,7 +944,7 @@ mod tests {
         let offer_from_collection_decl = OfferBuilder::service()
             .name("my_service")
             .source(OfferSource::Collection("coll".parse().unwrap()))
-            .target(OfferTarget::static_child("target".into()))
+            .target_static_child("target")
             .build();
         let expose_from_self_decl =
             ExposeBuilder::service().name("my_service").source(ExposeSource::Self_).build();
