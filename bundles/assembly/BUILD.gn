@@ -1888,7 +1888,6 @@ assembly_input_bundle("input_group_one") {
 
 assembly_input_bundle("input_group_two") {
   kernel_cmdline = [ "kernel.render-dlog-to-crashlog=true" ]
-  base_packages = []
   flexible_packages = [
     "//src/connectivity/location/emergency",
     "//src/media/sessions:mediasession",

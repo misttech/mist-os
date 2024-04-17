@@ -8,20 +8,15 @@ use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::session_config::PlatformSessionConfig;
 
 pub(crate) struct SessionConfig;
-impl DefineSubsystemConfiguration<(&PlatformSessionConfig, &String, &bool)> for SessionConfig {
+impl DefineSubsystemConfiguration<(&PlatformSessionConfig, &String)> for SessionConfig {
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        config: &(&PlatformSessionConfig, &String, &bool),
+        config: &(&PlatformSessionConfig, &String),
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        let session_config = config.0;
-        let session_url = config.1;
+        let (session_config, session_url) = *config;
 
-        // TODO(https://fxbug.dev/326086827): remove this hack, it's just for a
-        // soft transition
-        let input_group_2 = config.2;
-
-        if session_config.enabled || *input_group_2 {
+        if session_config.enabled {
             ensure!(
                 *context.feature_set_level == FeatureSupportLevel::Standard,
                 "The platform session manager is only supported in the default feature set level"
