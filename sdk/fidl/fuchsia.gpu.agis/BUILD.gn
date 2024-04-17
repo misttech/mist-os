@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.gpu.agis") {
   sources = [ "agis.fidl" ]
   sdk_category = "partner"
-  sdk_area = "Unknown"
+  sdk_area = "Graphics"
   public_deps = [ "//zircon/vdso/zx" ]
   enable_hlcpp = true
 }
