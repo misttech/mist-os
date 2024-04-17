@@ -15,7 +15,8 @@
 namespace ld::testing {
 
 // MockLoaderService is a mock interface for testing that specific requests
-// are made over the fuchsia.ldsvc.Loader protocol.
+// are made over the fuchsia.ldsvc.Loader protocol.  It is controlled by the
+// MockLoaderServiceForTest class (see below).
 //
 // This class initializes a mock server that serves the fuchsia.ldsvc.Loader
 // protocol and provides a reference to a FIDL client to make requests with.
@@ -50,10 +51,14 @@ class MockLoaderService {
   void Init();
 
   // Returns true if Init() has been called and succeeded.
-  bool Ready() const { return bool(mock_server_); }
+  bool Ready() const { return static_cast<bool>(mock_server_); }
 
+  // Tell the mock server to expect a LoadObject request for a VMO with `name`
+  // and to return the `expected_result`.
   void ExpectLoadObject(std::string_view name, zx::result<zx::vmo> expected_result);
 
+  // Tell the mock server to expect a Config request with `name` and to return
+  // `expected_result`.
   void ExpectConfig(std::string_view name, zx::result<> expected_result);
 
   fidl::ClientEnd<fuchsia_ldsvc::Loader>& client() { return mock_client_; }
@@ -66,6 +71,92 @@ class MockLoaderService {
   // The sequence guard enforces the fuchsia.ldsvc.Loader requests are made in
   // the order that Expect* functions are called.
   ::testing::InSequence sequence_guard_;
+};
+
+// MockLoaderForTest is used by tests to manage an instance of the
+// MockLoaderService. This class provides the public test API to prime the mock
+// loader with FIDL request expectations and the responses the mock loader
+// should return when receiving the request.
+//
+// MockLoaderForTest lazily initializes its mock_loader_ member, so tests must
+// call Init() before interacting with the mock loader service:
+//
+// ```
+// MockLoaderServiceForTest mock_;
+// ASSERT_NO_FATAL_FAILURE(mock_.Init());
+// mock_.ExpectLoadObject("foo.so", zx::ok(zx::vmo()));
+// ...
+// ```
+class MockLoaderServiceForTest {
+ public:
+  // TODO(caslyn): in a subsequent CL this will get reworked so that the logic
+  // to fetch a dependency and root module VMO will get baked into the
+  // MockLoaderServiceForTest class and callers will not be passing anything
+  // into the function call (the function call itself will describe what is
+  // being fetched).
+  template <typename GetVmo>
+  void Needed(std::initializer_list<std::string_view> names, GetVmo&& get_vmo) {
+    ASSERT_NO_FATAL_FAILURE(ReadyMock());
+    for (std::string_view name : names) {
+      // TODO(caslyn): the following three lines are repetitive in several
+      // functions, they can be combined into a single callable function in
+      // a future CL.
+      zx::vmo vmo;
+      ASSERT_NO_FATAL_FAILURE(vmo = get_vmo(name));
+      mock_loader_->ExpectLoadObject(name, zx::ok(std::move(vmo)));
+    }
+  }
+
+  template <typename GetVmo>
+  void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs,
+              GetVmo&& get_vmo) {
+    ASSERT_NO_FATAL_FAILURE(ReadyMock());
+    for (auto [name, found] : name_found_pairs) {
+      if (found) {
+        zx::vmo vmo;
+        ASSERT_NO_FATAL_FAILURE(vmo = get_vmo(name));
+        mock_loader_->ExpectLoadObject(name, zx::ok(std::move(vmo)));
+      } else {
+        mock_loader_->ExpectLoadObject(name, zx::error{ZX_ERR_NOT_FOUND});
+      }
+    }
+  }
+
+  void ExpectLoadObject(std::string_view name, zx::result<zx::vmo> expected_result) {
+    ASSERT_NO_FATAL_FAILURE(ReadyMock());
+    mock_loader_->ExpectLoadObject(name, std::move(expected_result));
+  }
+
+  template <typename GetVmo>
+  void ExpectLoadObject(std::string_view name, GetVmo&& get_vmo) {
+    ASSERT_NO_FATAL_FAILURE(ReadyMock());
+    zx::vmo vmo;
+    ASSERT_NO_FATAL_FAILURE(vmo = get_vmo(name));
+    mock_loader_->ExpectLoadObject(name, zx::ok(std::move(vmo)));
+  }
+
+  void ExpectConfig(std::string_view config) {
+    ASSERT_NO_FATAL_FAILURE(ReadyMock());
+    mock_loader_->ExpectConfig(config, zx::ok());
+  }
+
+  zx::channel GetLdsvc() {
+    zx::channel ldsvc;
+    if (mock_loader_) {
+      ldsvc = mock_loader_->client().TakeChannel();
+    }
+    return ldsvc;
+  }
+
+ private:
+  void ReadyMock() {
+    if (!mock_loader_) {
+      mock_loader_ = std::make_unique<MockLoaderService>();
+      ASSERT_NO_FATAL_FAILURE(mock_loader_->Init());
+    }
+  }
+
+  std::unique_ptr<MockLoaderService> mock_loader_;
 };
 
 }  // namespace ld::testing

@@ -5,6 +5,7 @@
 #ifndef LIB_LD_TEST_LD_LOAD_ZIRCON_LDSVC_TESTS_BASE_H_
 #define LIB_LD_TEST_LD_LOAD_ZIRCON_LDSVC_TESTS_BASE_H_
 
+#include <lib/elfldltl/testing/get-test-data.h>
 #include <lib/ld/testing/mock-loader-service.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
@@ -17,57 +18,49 @@
 namespace ld::testing {
 
 // This is the common base class for test fixtures that use a
-// fuchsia.ldsvc.Loader service.
+// fuchsia.ldsvc.Loader service and set expectations for the dependencies
+// loaded by it. This class proxies calls to the MockLoaderServiceForTest and
+// passes the function it should use to retrieve test VMO files.
 //
 // It takes calls giving ordered expectations for Loader service requests from
 // the process under test.  These must be used after Load() and before Run()
 // in test cases.
 class LdLoadZirconLdsvcTestsBase : public LdLoadTestsBase {
  public:
-  ~LdLoadZirconLdsvcTestsBase();
+  ~LdLoadZirconLdsvcTestsBase() = default;
 
   // Expect the dynamic linker to send a Config(config) message.
-  void LdsvcExpectConfig(std::string_view config);
+  void LdsvcExpectConfig(std::string_view config) { mock_.ExpectConfig(config); }
 
   // Expect the dynamic linker to send a LoadObject(name) request, and return
   // the given VMO (or error).
-  void LdsvcExpectLoadObject(std::string_view name, zx::result<zx::vmo> result);
+  void LdsvcExpectLoadObject(std::string_view name, zx::result<zx::vmo> result) {
+    mock_.ExpectLoadObject(name, std::move(result));
+  }
 
-  // This is shorthand for LdsvcExpectLoadObject with the VMO acquired from
-  // elfldltl::testing::GetTestLibVmo.
-  void LdsvcExpectLoadObject(std::string_view name);
+  // Prime the MockLoaderService with the VMO for `name`, acquired by GetVmo
+  // (see below), and expect the MockLoader to load that dependency for the test.
+  void LdsvcExpectLoadObject(std::string_view name) { mock_.ExpectLoadObject(name, GetVmo); }
 
   // This just is a shorthand for multiple LdsvcExpectLoadObject calls.
-  void Needed(std::initializer_list<std::string_view> names) {
-    for (std::string_view name : names) {
-      LdsvcExpectLoadObject(name);
-    }
-  }
+  void Needed(std::initializer_list<std::string_view> names) { mock_.Needed(names, GetVmo); }
 
   // This just is a shorthand for multiple LdsvcExpectLoadObject calls.
   void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs) {
-    for (auto [name, found] : name_found_pairs) {
-      if (found) {
-        LdsvcExpectLoadObject(name);
-      } else {
-        LdsvcExpectLoadObject(name, zx::error{ZX_ERR_NOT_FOUND});
-      }
-    }
+    mock_.Needed(name_found_pairs, GetVmo);
   }
 
- protected:
-  zx::channel GetLdsvc() {
-    zx::channel ldsvc;
-    if (mock_.Ready()) {
-      ldsvc = mock_.client().TakeChannel();
-    }
-    return ldsvc;
-  }
+  zx::channel GetLdsvc() { return mock_.GetLdsvc(); }
 
  private:
-  void ReadyMock();
+  // This function will be called by the MockLoaderServiceForTest to retrieve
+  // the VMO test files to prime the mock loader with.
+  static zx::vmo GetVmo(std::string_view name) {
+    const std::string path = std::filesystem::path("test") / "lib" / LD_TEST_LIBPREFIX / name;
+    return elfldltl::testing::GetTestLibVmo(path);
+  }
 
-  MockLoaderService mock_;
+  MockLoaderServiceForTest mock_;
 };
 
 }  // namespace ld::testing
