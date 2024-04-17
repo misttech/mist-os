@@ -63,6 +63,7 @@
             from: "#config",
             to: "#core",
             config: [
+                "fuchsia.http-client.StopOnIdleTimeoutMillis",
                 "fuchsia.memory.CaptureOnPressureChange",
                 "fuchsia.memory.CriticalCaptureDelay",
                 "fuchsia.memory.ImminentOomCaptureDelay",

@@ -41,9 +41,16 @@ pub struct PlatformNetworkConfig {
     #[serde(default)]
     pub google_maps_api_key_path: Option<Utf8PathBuf>,
 
+    /// Controls how long the http client will wait when it is idle before it
+    /// escrows its FIDL connections back to the component framework and exits.
+    /// If the value is negative or left out, then the http client will not
+    /// stop after it idles.
+    #[serde(default)]
+    pub http_client_stop_on_idle_timeout_millis: Option<i64>,
+
     /// Controls whether the unified binary for networking should be used.
     ///
-    /// The unified binary provides space savings for space-constrainted
+    /// The unified binary provides space savings for space-constrained
     /// products, trading off multiple small binaries for one large binary that
     /// is smaller than the sum of its separate parts thanks to linking
     /// optimizations.
