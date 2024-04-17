@@ -11,7 +11,7 @@ It's based on Zircon Kernel from Fuchsia/LK project.
 
 ## Set-up
 
-*NOTE*: As derived from Fuchsia some scripts/tools are still necessary (plan to remove in the future).
+_NOTE_: As derived from Fuchsia some scripts/tools are still necessary (plan to remove in the future).
 
 ```
 # Clone the REPO
@@ -22,15 +22,16 @@ curl -s "https://fuchsia.googlesource.com/jiri/+/HEAD/scripts/bootstrap_jiri?for
 
 # Update binary/packages dependencies using jiri
 cd mist-os
-export PATH=.jiri_root/bin:$PATH
+export PATH=$PWD/.jiri_root/bin:$PATH
 jiri update
 
 # Build the kernel
 make it
 
-# Buila and run qemu
+# Build and run qemu
 make it rain
 ```
+
 ## Repo
 
 The repo is a clone of Fuchsia original Repo from [here](https://fuchsia.googlesource.com/fuchsia).
