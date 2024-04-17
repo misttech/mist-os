@@ -5,6 +5,7 @@
 pub mod arguments;
 pub mod cpu_resource;
 pub mod debug_resource;
+pub mod debuglog_resource;
 pub mod energy_info_resource;
 pub mod factory_items;
 pub mod framebuffer_resource;

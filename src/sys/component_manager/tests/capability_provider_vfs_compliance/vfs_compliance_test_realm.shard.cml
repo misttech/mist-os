@@ -17,6 +17,7 @@
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.kernel.CpuResource",
+                "fuchsia.kernel.DebuglogResource",
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.EnergyInfoResource",
                 "fuchsia.kernel.FramebufferResource",

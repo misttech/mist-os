@@ -71,11 +71,12 @@ use {
     builtins::{arguments::Arguments as BootArguments, root_job::RootJob},
     builtins::{
         cpu_resource::CpuResource, debug_resource::DebugResource,
-        energy_info_resource::EnergyInfoResource, factory_items::FactoryItems,
-        framebuffer_resource::FramebufferResource, hypervisor_resource::HypervisorResource,
-        info_resource::InfoResource, iommu_resource::IommuResource, irq_resource::IrqResource,
-        items::Items, kernel_stats::KernelStats, mexec_resource::MexecResource,
-        mmio_resource::MmioResource, msi_resource::MsiResource, power_resource::PowerResource,
+        debuglog_resource::DebuglogResource, energy_info_resource::EnergyInfoResource,
+        factory_items::FactoryItems, framebuffer_resource::FramebufferResource,
+        hypervisor_resource::HypervisorResource, info_resource::InfoResource,
+        iommu_resource::IommuResource, irq_resource::IrqResource, items::Items,
+        kernel_stats::KernelStats, mexec_resource::MexecResource, mmio_resource::MmioResource,
+        msi_resource::MsiResource, power_resource::PowerResource,
         profile_resource::ProfileResource, root_resource::RootResource,
         vmex_resource::VmexResource,
     },
@@ -98,7 +99,7 @@ use {
     fuchsia_inspect::{component, health::Reporter, stats::InspectorExt, Inspector},
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
     fuchsia_zbi::{ZbiParser, ZbiType},
-    fuchsia_zircon::{self as zx, Clock, HandleBased, Resource},
+    fuchsia_zircon::{self as zx, Clock, Resource},
     futures::{future::BoxFuture, FutureExt, StreamExt},
     moniker::{Moniker, MonikerBase},
     std::sync::Arc,
@@ -671,15 +672,26 @@ impl BuiltinEnvironment {
             );
         }
 
-        // Set up ReadOnlyLog service.
-        let read_only_log = root_resource_handle.as_ref().map(|handle| {
-            ReadOnlyLog::new(
-                handle
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("Failed to duplicate root resource handle"),
-            )
-        });
-        if let Some(read_only_log) = read_only_log {
+        // Set up the ReadOnlyLog service.
+        let debuglog_resource = system_resource_handle
+            .as_ref()
+            .map(|handle| {
+                match handle.create_child(
+                    zx::ResourceKind::SYSTEM,
+                    None,
+                    zx::sys::ZX_RSRC_SYSTEM_DEBUGLOG_BASE,
+                    1,
+                    b"debuglog",
+                ) {
+                    Ok(resource) => Some(resource),
+                    Err(_) => None,
+                }
+            })
+            .flatten();
+
+        if let Some(debuglog_resource) = debuglog_resource {
+            let read_only_log = ReadOnlyLog::new(debuglog_resource);
+
             root_input_builder.add_builtin_protocol_if_enabled::<fboot::ReadOnlyLogMarker>(
                 move |stream| read_only_log.clone().serve(stream).boxed(),
             );
@@ -808,6 +820,28 @@ impl BuiltinEnvironment {
         if let Some(debug_resource) = debug_resource {
             root_input_builder.add_builtin_protocol_if_enabled::<fkernel::DebugResourceMarker>(
                 move |stream| debug_resource.clone().serve(stream).boxed(),
+            );
+        }
+
+        // Set up the DebuglogResource service.
+        let debuglog_resource = system_resource_handle
+            .as_ref()
+            .and_then(|handle| {
+                handle
+                    .create_child(
+                        zx::ResourceKind::SYSTEM,
+                        None,
+                        zx::sys::ZX_RSRC_SYSTEM_DEBUGLOG_BASE,
+                        1,
+                        b"debuglog",
+                    )
+                    .ok()
+            })
+            .map(DebuglogResource::new)
+            .and_then(Result::ok);
+        if let Some(debuglog_resource) = debuglog_resource {
+            root_input_builder.add_builtin_protocol_if_enabled::<fkernel::DebuglogResourceMarker>(
+                move |stream| debuglog_resource.clone().serve(stream).boxed(),
             );
         }
 

@@ -85,6 +85,16 @@
             {
                 source_moniker: "<component_manager>",
                 source: "component",
+                source_name: "fuchsia.kernel.DebuglogResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/testing/vfs-compliance-tests:**",
+                    "/bootstrap/pkg-drivers:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
                 source_name: "fuchsia.kernel.FramebufferResource",
                 capability: "protocol",
                 target_monikers: [
