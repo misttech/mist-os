@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2020 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -162,6 +163,8 @@ template("zircon_toolchain") {
     tc_target += "windows-msvc"
   } else if (invoker.os == "linux") {
     tc_target += "linux-gnu"
+  } else if (invoker.os == "mistos") {
+    tc_target += "fuchsia"
   } else {
     tc_target += invoker.os
   }
@@ -783,7 +786,7 @@ template("zircon_toolchain") {
 
     if (_toolchain_variant.with_shared || _toolchain_variant.is_pic_default) {
       # We don't support building shared libraries for host tools.
-      assert(invoker.os == "fuchsia",
+      assert(invoker.os == "fuchsia" || invoker.os == "mistos",
              "shared library creation not supported for ${invoker.os}")
 
       use_llvm_ifs = is_elf

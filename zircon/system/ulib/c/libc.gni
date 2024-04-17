@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2021 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -447,7 +448,11 @@ template("llvm_libc_source_set") {
 
       if (prefix == "fuchsia/") {
         local_sources += [ "$function.cc" ]
+      } else if (prefix == "mistos/") {
+        local_sources += [ "$function.cc" ]
       } else if (prefix == "fuchsia/$clang_cpu/") {
+        local_sources += [ "$clang_cpu/$function.cc" ]
+      } else if (prefix == "mistos/$clang_cpu/") {
         local_sources += [ "$clang_cpu/$function.cc" ]
       } else {
         sources += [ "$prefix$function.cpp" ]

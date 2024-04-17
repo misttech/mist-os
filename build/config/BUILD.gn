@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2016 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -20,7 +21,7 @@ if (support_rust) {
 }
 
 declare_args() {
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     # Controls whether the compiler emits full stack frames for function calls.
     # This reduces performance but increases the ability to generate good
     # stack traces, especially when we have bugs around unwind table generation.
@@ -36,7 +37,7 @@ declare_args() {
 }
 
 # No frame pointers for host compiles.
-if (!is_fuchsia) {
+if (!(is_fuchsia || is_mistos)) {
   enable_frame_pointers = false
 }
 
@@ -127,6 +128,8 @@ config("compiler") {
 
   if (current_os == "fuchsia") {
     configs += [ "//build/config/fuchsia:compiler" ]
+  } else if (current_os == "mistos") {
+    configs += [ "//build/config/mistos:compiler" ]
   } else {
     if (current_os == "linux") {
       configs += [ "//build/config/linux:compiler" ]
@@ -1172,6 +1175,8 @@ config("symbol_no_undefined") {
 config("shared_library_config") {
   if (current_os == "fuchsia") {
     configs = [ "//build/config/fuchsia:shared_library_config" ]
+  } else if (current_os == "mistos") {
+    configs = [ "//build/config/mistos:shared_library_config" ]
   } else if (current_os == "linux") {
     cflags = [ "-fPIC" ]
   } else if (current_os == "mac") {
@@ -1184,6 +1189,8 @@ config("executable_config") {
 
   if (current_os == "fuchsia") {
     configs += [ "//build/config/fuchsia:executable_config" ]
+  } else if (current_os == "mistos") {
+    configs += [ "//build/config/mistos:executable_config" ]
   } else if (current_os == "mac") {
     configs += [
       "//build/config/mac:mac_dynamic_flags",

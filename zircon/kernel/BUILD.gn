@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA
 # Copyright 2019 The Fuchsia Authors
 #
 # Use of this source code is governed by a MIT-style
@@ -49,7 +50,12 @@ if (current_toolchain == default_toolchain) {
   foreach(cpu, standard_fuchsia_cpus) {
     zircon_toolchain_suite("kernel_$cpu") {
       cpu = cpu
-      os = "fuchsia"
+      if (is_mistos) {
+        os = "mistos"
+      } else {
+        os = "fuchsia"
+      }
+
       environment = "kernel"
 
       if (cpu == "x64") {
@@ -227,11 +233,11 @@ config("standalone") {
     }
   }
 
-  if (is_gcc && current_os == "fuchsia") {
+  if (is_gcc && (current_os == "fuchsia" || current_os == "mistos")) {
     cflags += [ "-fpie" ]
   }
 
-  if (!is_gcc && current_os == "fuchsia") {
+  if (!is_gcc && (current_os == "fuchsia" || current_os == "mistos")) {
     # In the Fuchsia-target toolchains there's no way to prevent the
     # compiler driver from passing -pie, so negate it.  BFD ld doesn't
     # have --no-pie, but arm64-elf-gcc doesn't pass -pie either.
@@ -306,6 +312,10 @@ if (is_kernel) {
 
     if (kernel_no_userabi) {
       defines += [ "KERNEL_NO_USERABI" ]
+    }
+
+    if (is_mistos) {
+      defines += [ "_KERNEL_MISTOS" ]
     }
 
     cflags = [ "-fpie" ]

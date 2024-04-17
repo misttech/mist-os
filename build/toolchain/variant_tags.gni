@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2020 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -104,4 +105,9 @@ all_variant_tags = [
   # should only/never be applied to toolchains where current_os == "fuchsia".
   "fuchsia-excluded",
   "fuchsia-only",
+
+  # `mistos-only/excluded` are used to indicate that a given variant
+  # should only/never be applied to toolchains where current_os == "mistos".
+  "mistos-excluded",
+  "mistos-only",
 ]

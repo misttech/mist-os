@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2020 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -36,7 +37,12 @@ test("lazy_init-test") {
       "//zircon/system/ulib/zx",
     ]
   }
-  configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
+
+  if(is_mistos) {
+    configs += [ "//build/config/mistos:static_cpp_standard_library" ]
+  } else {
+    configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
+  }
 }
 
 fuchsia_unittest_package("lazy-init-test-pkg") {

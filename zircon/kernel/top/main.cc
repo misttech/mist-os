@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA
 // Copyright 2016 The Fuchsia Authors
 // Copyright (c) 2013-2015 Travis Geiselbrecht
 //
@@ -107,7 +108,11 @@ void lk_main(paddr_t handoff_paddr) {
 
   // At this point, the kernel command line and serial are set up.
 
+#if _KERNEL_MISTOS
+  dprintf(INFO, "\nwelcome to Zircon/mist-os kernel\n\n");
+#else
   dprintf(INFO, "\nwelcome to Zircon\n\n");
+#endif
   dprintf(SPEW, "KASLR: Kernel image at %p\n", __executable_start);
 
   // Perform any additional arch and platform-specific set up that needs to be done

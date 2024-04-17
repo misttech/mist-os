@@ -1,0 +1,61 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Copyright 2021 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+declare_args() {
+  # Specify a specific target API level for the platform build.
+  # When set to -1, the platform is built targeting HEAD with runtime support
+  # for all supported and sunset API levels.
+  # Must be -1 or a positive integer corresponding to currently supported
+  # (not sunset) API level. This is primarily used by the SDK.
+  # Not all targets support the non-default value. In particular, `:default`
+  # currently fails.
+  override_target_api_level = -1
+}
+
+assert(override_target_api_level == -1 || 0 < override_target_api_level,
+       "Override must be positive integers.")
+assert(override_target_api_level < 1000,
+       "Override must be a numbered API level.")
+
+# TODO(https://fxbug.dev/325448727): Move this value back into the if
+# statement below and prefix it with `_` once the bug is fixed.
+# Due to limitations in Clang, we use `UINT32_MAX` to represent the HEAD API
+# level. See zircon/availability.h.
+# TODO(https://fxbug.dev/321269965): Resolve this FIDL-Clang discrepancy.
+# LINT.IfChange(fuchsia_head_c_value)
+CLANG_FUCHSIA_HEAD_VALUE = 4294967295
+
+# LINT.ThenChange(//zircon/system/public/zircon/availability.h:fuchsia_head_c_value)
+
+if (override_target_api_level == -1) {
+  # The platform is built for "HEAD" by default. "HEAD" is an artificial API
+  # level that represents the bleeding edge of the Fuchsia API surface. It is
+  # not really meant to be used by SDK users unless they want to try some
+  # unreleased APIs.
+  clang_fuchsia_api_level = CLANG_FUCHSIA_HEAD_VALUE
+
+  # By default the FIDL APIs are compiled at the "LEGACY" level. This level is
+  # only meant to be used in the platform itself, SDK users aren't expected to
+  # target it. It's a higher level than the "HEAD" API level, in other words,
+  # "HEAD" is a subset of "LEGACY".
+  fidl_fuchsia_api_level = "LEGACY"
+
+  # Directory name to use for target API level.
+  target_cpu_dir_name_for_target_api_level = target_cpu
+
+  # Base path for library binaries in SDKs.
+  sdk_prebuilt_base_for_target_api_level =
+      "arch/${target_cpu_dir_name_for_target_api_level}"
+} else {
+  clang_fuchsia_api_level = override_target_api_level
+  fidl_fuchsia_api_level = "$override_target_api_level"
+
+  # If support for named API levels is added and `override_target_api_level` becomes a string,
+  # we will need to ensure the strings are normalized.
+  target_cpu_dir_name_for_target_api_level =
+      "${target_cpu}-api-${override_target_api_level}"
+  sdk_prebuilt_base_for_target_api_level =
+      "obj/${target_cpu_dir_name_for_target_api_level}"
+}

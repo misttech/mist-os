@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -123,7 +124,11 @@ if (current_toolchain == default_toolchain) {
   foreach(cpu, standard_fuchsia_cpus) {
     zircon_toolchain_suite("user.libc_$cpu") {
       cpu = cpu
-      os = "fuchsia"
+      if (is_mistos) {
+        os = "mistos"
+      } else {
+        os = "fuchsia"
+      }
       environment = "user.libc"
       with_shared = false
       is_pic_default = true

@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2016 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -35,6 +36,11 @@ declare_args() {
 if (target_os == "") {
   target_os = "fuchsia"
 }
+
+if (target_os == "mistos") {
+  target_os = "mistos"
+}
+
 if (target_cpu == "") {
   target_cpu = host_cpu
 }
@@ -54,6 +60,8 @@ host_platform = "${host_os}-${host_cpu}"
 
 if (target_os == "fuchsia") {
   target_toolchain = "//build/toolchain/fuchsia:${target_cpu}"
+} else if (target_os == "mistos") {
+  target_toolchain = "//build/toolchain/mistos:${target_cpu}"
 } else {
   assert(false, "Target OS not supported")
 }
@@ -187,6 +195,7 @@ if (toolchain_variant.instrumented) {
 is_android = false
 is_chromeos = false
 is_fuchsia = false
+is_mistos = false
 is_fuchsia_host = false
 is_host = false
 is_ios = false
@@ -208,6 +217,8 @@ is_fuchsia_tree = true
 
 if (current_os == "fuchsia") {
   is_fuchsia = true
+} else if (current_os == "mistos") {
+  is_mistos = true
 } else if (current_os == "linux") {
   is_linux = true
 } else if (current_os == "mac") {
@@ -230,6 +241,8 @@ if (defined(toolchain_variant.is_basic) && toolchain_variant.is_basic) {
 # Some library targets may be built as different type depending on the target
 # platform. This variable specifies the default library type for each target.
 if (is_fuchsia) {
+  default_library_type = "shared_library"
+} else if (is_mistos) {
   default_library_type = "shared_library"
 } else {
   default_library_type = "static_library"
@@ -453,6 +466,18 @@ if (zircon_toolchain == false) {
     ]
   }
 
+  if (is_mistos) {
+    default_common_binary_configs += [
+      "//build/config:auto_var_init",
+      "//build/config:icf",
+      "//build/config:thread_safety_annotations",
+
+      # TODO(mcgrathr): Perhaps restrict this to only affected code.
+      # For now, safest to do it everywhere.
+      "//build/config/mistos:zircon_asserts",
+    ]
+  }
+
   if (is_mac) {
     default_common_binary_configs += [ "//build/config/mac:compiler" ]
   }
@@ -490,6 +515,11 @@ if (zircon_toolchain == false) {
 
     default_executable_deps +=
         [ "//build/config/fuchsia:maybe_scudo_default_options" ]
+  }
+
+  if (current_os == "mistos") {
+    default_executable_deps +=
+        [ "//build/config/mistos:maybe_scudo_default_options" ]
   }
 
   if (toolchain_variant.is_pic_default) {
@@ -2393,7 +2423,7 @@ template("_fuchsia_binary") {
                              "visibility",
                            ])
 
-    if (is_fuchsia && zircon_toolchain == false) {
+    if ((is_fuchsia || is_mistos) && zircon_toolchain == false) {
       # Depend on runtime libraries provided by the sysroot and the toolchain.
       # This ensures the libraries are packaged up with the output of this
       # target.
@@ -3680,7 +3710,7 @@ template("source_set") {
                              "testonly",
                              "visibility",
                            ])
-    if (is_fuchsia && zircon_toolchain == false) {
+    if ((is_fuchsia || is_mistos) && zircon_toolchain == false) {
       if (!defined(deps)) {
         deps = []
       }
@@ -3711,7 +3741,7 @@ template("static_library") {
                              "visibility",
                            ])
 
-    if (is_fuchsia && zircon_toolchain == false) {
+    if ((is_fuchsia || is_mistos) && zircon_toolchain == false) {
       if (!defined(deps)) {
         deps = []
       }

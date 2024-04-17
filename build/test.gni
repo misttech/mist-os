@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2018 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -24,7 +25,7 @@ template("test") {
   if (defined(invoker.output_name)) {
     _output_name = invoker.output_name
   }
-  if (is_host || is_fuchsia) {
+  if (is_host || is_fuchsia || is_mistos) {
     _output_dir = root_out_dir
     if (defined(invoker.output_dir)) {
       _output_dir = invoker.output_dir
@@ -81,7 +82,7 @@ template("test") {
     output_name = _output_name
     testonly = true
 
-    if (is_fuchsia) {
+    if (is_fuchsia || is_mistos) {
       metadata = {
         # Used by the distribution_manifest template.
         distribution_entries = [

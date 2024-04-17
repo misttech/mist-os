@@ -1,8 +1,8 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2022 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/sdk/product_bundle.gni")
 import("//build/testing/test_spec.gni")
 import("//zircon/kernel/phys/qemu.gni")
 
@@ -217,7 +217,6 @@ template("boot_test") {
   image_manifest_target = "_boot_test.${target_name}.image_manifest"
   rebased_image_manifest_target =
       "_boot_test.${target_name}.rebased_image_manifest"
-  product_bundle_target = "$target_name.product_bundle"
 
   image_manifest = "${target_gen_dir}/${main_target}.images.json"
   generated_file(image_manifest_target) {
@@ -278,75 +277,6 @@ template("boot_test") {
     deps = [ ":$image_manifest_target" ]
   }
 
-  # If the boot test specifies an EFI disk image, then this should be regarded
-  # as the contents of a bootloader partition. Otherwise, default to the
-  # board-specific partition contents.
-  partition_contents = []
-  if (defined(invoker.efi_disk)) {
-    efi_disk_manifest_target = "_boot_test.${target_name}.efi_disk_manifest"
-    efi_disk_manifest = "${target_gen_dir}/${main_target}.efi_disks.json"
-    generated_file(efi_disk_manifest_target) {
-      testonly = true
-
-      data_keys = [ "images" ]
-      walk_keys = [ "images_barrier" ]
-      output_conversion = "json"
-
-      deps = [ invoker.efi_disk ]
-      outputs = [ efi_disk_manifest ]
-    }
-
-    partition_config_path =
-        "${target_out_dir}/${main_target}.partition_config.json"
-    partition_config_target =
-        "_boot_test.${target_name}.create_efi_partition_config"
-    action(partition_config_target) {
-      testonly = true
-
-      sources = [ efi_disk_manifest ]
-      outputs = [ partition_config_path ]
-
-      script = "//build/testing/boot_tests/create_efi_partition_config.py"
-      args = [
-        "--metadata",
-        rebase_path(sources[0], root_build_dir),
-        "--output",
-        rebase_path(outputs[0], root_build_dir),
-        "--hardware-revision",
-        current_cpu,
-      ]
-
-      deps = [ ":$efi_disk_manifest_target" ]
-    }
-
-    _partition_config_label = ":$partition_config_target"
-  } else {
-    _partition_config_label = "//boards/partitions:default($default_toolchain)"
-    if (has_board) {
-      assert(partitions_config_label != false,
-             "Need to define partitions_config_label")
-      _partition_config_label = partitions_config_label
-    }
-    partition_config_path =
-        get_label_info(_partition_config_label, "target_out_dir") + "/" +
-        get_label_info(_partition_config_label, "name") + ".json"
-    partition_contents = partitions_config_contents
-  }
-
-  product_bundle(product_bundle_target) {
-    testonly = true
-
-    name = main_target
-    system_a = rebased_image_manifest
-    partitions = partition_config_path
-    partitions_contents = partition_contents
-
-    deps = [
-      ":$rebased_image_manifest_target",
-      _partition_config_label,
-    ]
-  }
-
   # If host_cpu != target_cpu, then we make sure to define a separate boot
   # test for a target_cpu host in order to take advantage of KVM, HVF, etc.
   #
@@ -367,7 +297,6 @@ template("boot_test") {
       visibility = [ ":*" ]
       output_name = main_target
       label = ":$main_target"
-      deps = [ ":$product_bundle_target" ]
     }
 
     _boot_test("$main_target.emu") {
@@ -399,7 +328,6 @@ template("boot_test") {
       label = ":$main_target"
       forward_variables_from(invoker, "*")
       cpu_for_host = host_cpu
-      deps = [ ":$product_bundle_target" ]
     }
   }
 }

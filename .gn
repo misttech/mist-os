@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2016 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -36,6 +37,8 @@ no_check_targets = [ "//third_party/*" ]
 exec_script_whitelist = [
   "//build/config/fuchsia/BUILD.gn",
   "//build/config/fuchsia/platform_version.gni",
+  "//build/config/mistos/BUILD.gn",
+  "//build/config/mistos/platform_version.gni",
   "//build/config/mac/mac_sdk.gni",
   "//build/config/profile/BUILD.gn",
   "//build/config/sanitizers/BUILD.gn",
@@ -66,75 +69,4 @@ export_compile_commands = [ "//:default" ]
 # should define a flag that toggles on a behavior that implements the additional logic required by
 # Fuchsia to set the variables.
 default_args = {
-  # Specify Pigweed backends for Fuchsia.
-  pw_assert_BACKEND = "//third_party/pigweed/backends/pw_assert"
-  pw_log_BACKEND = "//third_party/pigweed/backends/pw_log"
-  pw_chrono_SYSTEM_CLOCK_BACKEND =
-      "//third_party/pigweed/src/pw_chrono_stl:system_clock"
-  pw_sync_MUTEX_BACKEND = "//third_party/pigweed/src/pw_sync_stl:mutex_backend"
-  pw_sys_io_BACKEND = "//third_party/pigweed/src/pw_sys_io_stdio"
-  pw_thread_SLEEP_BACKEND = "//third_party/pigweed/src/pw_thread_stl:sleep"
-
-  pw_sync_THREAD_NOTIFICATION_BACKEND = "//third_party/pigweed/src/pw_sync:binary_semaphore_thread_notification_backend"
-  pw_sync_TIMED_THREAD_NOTIFICATION_BACKEND = "//third_party/pigweed/src/pw_sync:binary_semaphore_timed_thread_notification_backend"
-  pw_chrono_SYSTEM_TIMER_BACKEND =
-      "//third_party/pigweed/src/pw_chrono_stl:system_timer"
-  pw_sync_BINARY_SEMAPHORE_BACKEND =
-      "//third_party/pigweed/src/pw_sync_stl:binary_semaphore_backend"
-
-  # Pigweed configs for Fuchsia.
-  pw_function_CONFIG =
-      "//third_party/pigweed/src/pw_function:enable_dynamic_allocation"
-
-  # Some Pigweed module implementations need to be link dependencies to avoid circular dependencies.
-  pw_build_LINK_DEPS = [
-    "//third_party/pigweed/src/pw_assert:impl",
-    "//third_party/pigweed/src/pw_log:impl",
-  ]
-
-  # Configures Pigweed to use Fuchsia source directly instead of Pigweed's copy.
-  dir_pw_third_party_fuchsia = "//"
-
-  # Configures Pigweed to use Fuchsia's boringssl target.
-  pw_third_party_boringssl_ALIAS = "//third_party/boringssl"
-
-  # Configures Pigweed to use Fuchsia's Emboss checkout.
-  dir_pw_third_party_emboss = "//third_party/github.com/google/emboss/src"
-
-  # Enable usage of the pw_async Pigweed module.
-  pw_async_EXPERIMENTAL_MODULE_VISIBILITY = [
-    "//third_party/pigweed/backends/pw_async_fuchsia:*",
-    "//third_party/pigweed:*",
-    "//src/connectivity/bluetooth/core/bt-host/*",
-  ]
-
-  pw_async_TASK_BACKEND = "//third_party/pigweed/backends/pw_async_fuchsia:task"
-
-  pw_async_FAKE_DISPATCHER_BACKEND =
-      "//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher"
-
-  # Use protoc from the Fuchsia build for Pigweed
-  pw_protobuf_compiler_PROTOC_TARGET = "//third_party/protobuf:protoc"
-  pw_protobuf_compiler_PROTOC_BINARY = "host_x64/protoc"
-
-  # Settings for pigweed's CHRE module.
-  dir_pw_third_party_chre = "//third_party/chre/src"
-  pw_chre_CONFIG = "//third_party/chre:chre_config"
-  pw_chre_PLATFORM_BACKEND = "//third_party/pigweed/src/pw_chre:chre_backend"
-  pw_chre_PLATFORM_BACKEND_HEADERS =
-      "//third_party/pigweed/src/pw_chre:chre_backend_headers"
-
-  pw_unit_test_MAIN = "//src/lib/fxl/test:gtest_main"
-  pw_unit_test_GOOGLETEST_BACKEND = "//third_party/googletest:gmock_no_testonly"
-  pw_unit_test_BACKEND = "//third_party/pigweed/src/pw_unit_test:googletest"
-  pw_unit_test_TESTONLY = true
-
-  # Point Pigweed's ICU target to Fuchsia's checkout.
-  dir_pw_third_party_icu = "//third_party/icu/default"
-
-  # This is a Pigweed build configuration argument that removes default configs
-  # from pw_* targets. Due to linker errors ("undefined symbol: typeinfo") when
-  # using source_set with pw_source_set, we need to remove the reduced_size
-  # config that adds the "-fno-rtti" flag.
-  remove_default_configs = [ "//third_party/pigweed/src/pw_build:reduced_size" ]
 }

@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -18,7 +19,7 @@ zx_library("zx") {
     "//src/zircon/lib/zircon:headers",
   ]
 
-  if (is_fuchsia && !is_kernel) {
+  if ((is_fuchsia || is_mistos) && !is_kernel) {
     sdk_headers += [
       "lib/zx/bti.h",
       "lib/zx/channel.h",

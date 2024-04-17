@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2018 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -98,11 +99,11 @@ if (is_fuchsia) {
 
 write_file(rustc_version_file, rustc_version_string)
 
-assert(
-    current_os == "mac" || current_os == "linux" || current_os == "fuchsia" ||
-        (current_os == "unknown" && current_cpu == "wasm32") ||
-        current_os == "win",
-    "current_os was neither mac, linux, unknown, nor fuchsia")
+assert(current_os == "mac" || current_os == "linux" ||
+           current_os == "fuchsia" || current_os == "mistos" ||
+           (current_os == "unknown" && current_cpu == "wasm32") ||
+           current_os == "win",
+       "current_os was neither mac, linux, unknown, nor fuchsia")
 assert(current_cpu == "x64" || current_cpu == "arm64" ||
        current_cpu == "wasm32" || current_cpu == "riscv64")
 if (current_os == "mac") {
@@ -112,6 +113,8 @@ if (current_os == "mac") {
 } else if (current_os == "win") {
   _suffix = "windows-msvc"
 } else if (current_os == "fuchsia") {
+  _suffix = rust_toolchain_triple_suffix
+} else if (current_os == "mistos") {
   _suffix = rust_toolchain_triple_suffix
 }
 if (current_cpu == "x64") {

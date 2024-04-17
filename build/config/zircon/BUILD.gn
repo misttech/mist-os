@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -102,9 +103,13 @@ config("compiler") {
   # This is done even if !is_fuchsia to catch cases like the kernel.efi
   # environment, where current_os != "fuchsia" but nonetheless Fuchsia-specific
   # code is built.
-  configs += [ "//build/config/fuchsia:compiler_fuchsia_api_level" ]
+  if (is_mistos) {
+    configs += [ "//build/config/mistos:compiler_fuchsia_api_level" ]
+  } else {
+    configs += [ "//build/config/fuchsia:compiler_fuchsia_api_level" ]
+  }
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     # ld.bfd doesn't support -z relro for the targets we use it for.
     if (!is_gcc || linker == "gold") {
       ldflags += [ "-Wl,-z,relro" ]
@@ -174,7 +179,7 @@ config("compiler") {
   cflags += compiler_flags
   ldflags += compiler_flags
 
-  if (is_fuchsia && build_id_format != "") {
+  if ((is_fuchsia || is_mistos) && build_id_format != "") {
     ldflags += [ "-Wl,--build-id=$build_id_format" ]
   }
 }
@@ -262,7 +267,7 @@ config("no_maybe_uninitialized") {
 }
 
 config("machine") {
-  if (is_fuchsia && is_gcc) {
+  if ((is_fuchsia || is_mistos) && is_gcc) {
     # TODO(https://fxbug.dev/42107211): Really need to get this nailed down once and for all
     # and set by default in the compiler driver (Clang at least).
     ldflags = [ "-Wl,-z,max-page-size=4096" ]

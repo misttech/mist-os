@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2018 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -218,7 +219,7 @@ template("test_spec") {
 
   # Set default environments: Emu for a fuchsia test, and VMs for linux and mac
   # tests.
-  if (is_fuchsia || is_kernel) {
+  if (is_fuchsia || is_mistos || is_kernel) {
     if (!defined(environments)) {
       environments = basic_envs
     }

@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA
 # Copyright 2020 The Fuchsia Authors
 #
 # Use of this source code is governed by a MIT-style
@@ -16,7 +17,11 @@ import("//zircon/system/ulib/hwreg/hwreg_asm_header.gni")
 if (current_toolchain == default_toolchain) {
   zircon_toolchain_suite("kernel.phys32") {
     cpu = "x64"
-    os = "fuchsia"
+    if (is_mistos) {
+      os = "mistos"
+    } else {
+      os = "fuchsia"
+    }
     environment = "kernel.phys32"
     with_shared = false
 

@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2020 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -270,6 +271,26 @@ template("variant_toolchain_suite") {
   exclude_tags += _fuchsia_exclude_tags
   exclude_tags -= _fuchsia_exclude_tags
   exclude_tags += _fuchsia_exclude_tags
+
+  # Ensure that `mistos-only` xor `excluded` are part or exclude_tags based on whether
+  # the `toolchain_os` is mistos.
+  if (defined(invoker.toolchain_os)) {
+    _is_mistos = invoker.toolchain_os == "mistos"
+  } else if (defined(invoker.os)) {
+    # Note that the zircon toolchain doesn't define `toolchain_os`. Instead they use `os`.
+    _is_mistos = invoker.os == "mistos"
+  } else {
+    assert(false,
+           "Unable to determine if toolchain $target_name targets mistos")
+  }
+  if (_is_mistos) {
+    _mistos_exclude_tags = [ "mistos-excluded" ]
+  } else {
+    _mistos_exclude_tags = [ "mistos-only" ]
+  }
+  exclude_tags += _mistos_exclude_tags
+  exclude_tags -= _mistos_exclude_tags
+  exclude_tags += _mistos_exclude_tags
 
   variants = []
   foreach(variant, all_toolchain_variants) {

@@ -1,10 +1,11 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
 declare_args() {
   # Identifier for the Core SDK.
-  sdk_id = read_file("//integration/MILESTONE", "trim string") + ".99991231.0.1"
+  sdk_id = read_file("//meta/MILESTONE", "trim string") + ".99991231.0.1"
 
   # Whether to cross-compile SDK tools for all supported host toolchains,
   # rather than just the current host toolchains.

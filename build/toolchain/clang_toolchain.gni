@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2016 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -444,6 +445,7 @@ template("clang_toolchain") {
     } else if (invoker.toolchain_os == "win") {
       _dylib_extension = ".dll"
     } else if (invoker.toolchain_os == "fuchsia" ||
+               invoker.toolchain_os == "mistos" ||
                invoker.toolchain_os == "linux") {
       _dylib_extension = ".so"
     } else {

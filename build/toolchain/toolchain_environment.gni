@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2021 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -7,6 +8,8 @@
 if (zircon_toolchain != false) {
   toolchain_environment = zircon_toolchain.environment
 } else if (is_fuchsia) {
+  toolchain_environment = "user"
+} else if (is_mistos) {
   toolchain_environment = "user"
 } else {
   toolchain_environment =

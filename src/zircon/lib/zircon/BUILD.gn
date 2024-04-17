@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2020 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -9,7 +10,7 @@ import("//build/toolchain/toolchain_environment.gni")
 # The vDSO ABI is provided at link time by a stub.  The actual runtime image
 # comes from the kernel and is not part of the build or SDK for userland at
 # all.  The kernel's internal build of the vDSO verifies that the ABI matches.
-if (is_fuchsia && toolchain_base_environment != "kernel") {
+if ((is_fuchsia || is_mistos) && toolchain_base_environment != "kernel") {
   ifs_shared_library("zircon") {
     abi = "zircon.ifs"
     public_deps = [ ":headers" ]

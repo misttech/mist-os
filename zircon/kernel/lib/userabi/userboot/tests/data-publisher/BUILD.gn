@@ -1,10 +1,11 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2022 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
 import("//build/testing/boot_tests/zbi_test_executable.gni")
 
-if (is_fuchsia) {
+if (is_fuchsia || is_mistos) {
   source_set("published-data") {
     public = [ "published-data.h" ]
   }

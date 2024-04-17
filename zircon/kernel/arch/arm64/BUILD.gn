@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA
 # Copyright 2019 The Fuchsia Authors
 #
 # Use of this source code is governed by a MIT-style
@@ -12,7 +13,11 @@ if (current_toolchain == default_toolchain) {
   # memory with the MMU disabled, at early boot.
   zircon_toolchain_suite("physmem_arm64") {
     cpu = "arm64"
-    os = "fuchsia"
+    if (is_mistos) {
+      os = "mistos"
+    } else {
+      os = "fuchsia"
+    }
     environment = "physmem"
     with_shared = false
     configs = [ "//zircon/kernel/arch/arm64:physmem_config" ]

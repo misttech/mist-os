@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2016 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -10,6 +11,9 @@ declare_args() {
 if (current_os == target_os && target_sysroot != "") {
   sysroot = target_sysroot
 } else if (is_fuchsia) {
+  import("//zircon/public/sysroot/cpp.gni")
+  sysroot = cpp_sysroot_dir
+} else if (is_mistos) {
   import("//zircon/public/sysroot/cpp.gni")
   sysroot = cpp_sysroot_dir
 } else if (is_linux) {
