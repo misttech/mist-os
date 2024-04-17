@@ -39,12 +39,6 @@ pub struct Dict {
     /// Tasks that serve [DictionaryIterator]s.
     #[derivative(Debug = "ignore")]
     iterator_tasks: fasync::TaskGroup,
-
-    /// The FIDL representation of this `Dict`.
-    ///
-    /// This will be `Some` if was previously converted into a `ClientEnd`, such as by calling
-    /// [into_fidl], and the capability is not currently in the registry.
-    client_end: Option<ClientEnd<fsandbox::DictionaryMarker>>,
 }
 
 impl Default for Dict {
@@ -53,7 +47,6 @@ impl Default for Dict {
             entries: Arc::new(Mutex::new(BTreeMap::new())),
             not_found: Arc::new(|_key: &str| {}),
             iterator_tasks: fasync::TaskGroup::new(),
-            client_end: None,
         }
     }
 }
@@ -64,7 +57,6 @@ impl Clone for Dict {
             entries: self.entries.clone(),
             not_found: self.not_found.clone(),
             iterator_tasks: fasync::TaskGroup::new(),
-            client_end: None,
         }
     }
 }
@@ -82,7 +74,6 @@ impl Dict {
             entries: Arc::new(Mutex::new(BTreeMap::new())),
             not_found: Arc::new(not_found),
             iterator_tasks: fasync::TaskGroup::new(),
-            client_end: None,
         }
     }
 
@@ -211,24 +202,14 @@ impl Dict {
             dict.serve_dict(stream).await.expect("failed to serve Dict");
         });
     }
-
-    /// Sets this Dict's client end to the provided one.
-    ///
-    /// This should only be used to put a remoted client end back into the Dict after it is removed
-    /// from the registry.
-    pub(crate) fn set_client_end(&mut self, client_end: ClientEnd<fsandbox::DictionaryMarker>) {
-        self.client_end = Some(client_end)
-    }
 }
 
 impl From<Dict> for ClientEnd<fsandbox::DictionaryMarker> {
-    fn from(mut dict: Dict) -> Self {
-        dict.client_end.take().unwrap_or_else(|| {
-            let (client_end, dict_stream) =
-                create_request_stream::<fsandbox::DictionaryMarker>().unwrap();
-            dict.serve_and_register(dict_stream, client_end.get_koid().unwrap());
-            client_end
-        })
+    fn from(dict: Dict) -> Self {
+        let (client_end, dict_stream) =
+            create_request_stream::<fsandbox::DictionaryMarker>().unwrap();
+        dict.serve_and_register(dict_stream, client_end.get_koid().unwrap());
+        client_end
     }
 }
 

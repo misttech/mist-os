@@ -121,31 +121,19 @@ impl TryFrom<fsandbox::Capability> for Capability {
                 try_from_handle_in_registry(client_end.as_handle_ref())
             }
             fsandbox::Capability::Dictionary(client_end) => {
-                let mut any = try_from_handle_in_registry(client_end.as_handle_ref())?;
-                // Cache the client end so it can be reused in future conversions to FIDL.
-                {
-                    match any {
-                        Capability::Dictionary(ref mut d) => {
-                            d.set_client_end(client_end);
-                        }
-                        _ => panic!("BUG: registry has a non-Dict capability under a Dict koid"),
-                    }
-                }
+                let any = try_from_handle_in_registry(client_end.as_handle_ref())?;
+                match &any {
+                    Capability::Dictionary(_) => (),
+                    _ => panic!("BUG: registry has a non-Dict capability under a Dict koid"),
+                };
                 Ok(any)
             }
             fsandbox::Capability::Sender(client_end) => {
-                let mut any = try_from_handle_in_registry(client_end.as_handle_ref())?;
-                // Cache the client end so it can be reused in future conversions to FIDL.
-                {
-                    match any {
-                        Capability::Sender(ref mut s) => {
-                            s.set_client_end(client_end);
-                        }
-                        _ => {
-                            panic!("BUG: registry has a non-Sender capability under a Sender koid")
-                        }
-                    }
-                }
+                let any = try_from_handle_in_registry(client_end.as_handle_ref())?;
+                match &any {
+                    Capability::Sender(_) => (),
+                    _ => panic!("BUG: registry has a non-Sender capability under a Sender koid"),
+                };
                 Ok(any)
             }
             fsandbox::Capability::Directory(client_end) => {
