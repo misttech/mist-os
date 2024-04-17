@@ -9,7 +9,7 @@ import subprocess
 from collections.abc import Iterable
 from typing import Any
 
-from honeydew.typing import custom_types, ffx
+from honeydew.typing import custom_types
 from honeydew.typing import ffx as ffx_types
 from honeydew.utils import properties
 

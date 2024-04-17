@@ -4,8 +4,8 @@
 """Data types that match the machine output of ffx."""
 from dataclasses import dataclass
 from typing import Any
-from honeydew.typing.custom_types import IpPort
 
+from honeydew.typing.custom_types import IpPort
 
 # LINT.IfChange
 

@@ -17,8 +17,8 @@ import fuchsia_controller_py as fuchsia_controller
 from honeydew import errors
 from honeydew.interfaces.transports import ffx as ffx_interface
 from honeydew.typing import custom_types
-from honeydew.utils import properties
 from honeydew.typing.ffx import TargetInfoData
+from honeydew.utils import properties
 
 _FFX_BINARY: str = "ffx"
 
