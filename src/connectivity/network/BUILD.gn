@@ -106,6 +106,15 @@ group("drivers") {
   deps = [ "drivers/network-device" ]
 }
 
+group("benchmarks") {
+  testonly = true
+  deps = [
+    "drivers/network-device/device:benchmarks",
+    "netstack3:benchmarks",
+    "tests/benchmarks",
+  ]
+}
+
 group("tests") {
   testonly = true
   deps = [

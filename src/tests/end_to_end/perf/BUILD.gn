@@ -145,9 +145,7 @@ if (is_host) {
 }
 
 _python_benchmarks += [
-  "//src/connectivity/network/drivers/network-device/device:benchmarks",
-  "//src/connectivity/network/netstack3:benchmarks",
-  "//src/connectivity/network/tests/benchmarks",
+  "//src/connectivity/network:benchmarks",
   "//src/devices/bin/driver_runtime/microbenchmarks",
   "//src/diagnostics:benchmarks",
   "//src/lib/diagnostics:benchmarks",
