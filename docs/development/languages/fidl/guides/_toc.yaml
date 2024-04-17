@@ -13,7 +13,7 @@ toc:
     path: /docs/development/languages/fidl/guides/api-design.md
   - title: "Maxing out pagination"
     path: /docs/development/languages/fidl/guides/max-out-pagination.md
-  - title: "Picking between LLCPP and HLCPP bindings"
+  - title: "Comparing new C++ and high-level C++ language bindings"
     path: /docs/development/languages/fidl/guides/c-family-comparison.md
   - title: "Viewing generated bindings code"
     path: /docs/development/languages/fidl/guides/generated-code.md

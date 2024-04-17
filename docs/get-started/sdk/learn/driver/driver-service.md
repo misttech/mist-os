@@ -58,7 +58,7 @@ to compile the FIDL library and generate C++ bindings:
 *   `fuchsia_fidl_library()`: Declares the `examples.qemuedu` FIDL
     library and describes the FIDL source files it includes.
 *   `fuchsia_fidl_llcpp_library()`: Describes the generated
-    [LLCPP (Low-Level C++) bindings][fidl-cpp-bindings] for components to
+    [C++ wirebindings][fidl-cpp-bindings] for components to
     interact with this FIDL library.
 
 `qemu_edu/fidl/BUILD.bazel`:
@@ -224,4 +224,4 @@ Congratulations! You've successfully exposed FIDL services from a Fuchsia driver
 
 [concepts-capabilities]: /docs/concepts/components/v2/capabilities/README.md
 [concepts-devfs]: /docs/concepts/drivers/driver_communication.md#service_discovery_using_devfs
-[fidl-cpp-bindings]: /docs/development/languages/fidl/guides/c-family-comparison.md
+[fidl-cpp-bindings]: /docs/reference/fidl/bindings/cpp-bindings.md

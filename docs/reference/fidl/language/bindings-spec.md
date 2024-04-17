@@ -517,8 +517,7 @@ components of a message are assembled into a contiguous chunk of memory (called
 "linearization"). The downside of such an approach is that it makes the bindings
 more rigid: changes to the FIDL wire format become more complex to implement.
 
-The [LLCPP bindings][llcpp] are the only binding that take this
-approach.
+The [C++ wire bindings] are the only binding that take this approach.
 
 ### Equality comparison {#equality-comparison}
 
@@ -661,7 +660,7 @@ ensuring their rights are the same.
 [go-generated-code-comment]: https://github.com/golang/go/issues/13560#issuecomment-288457920
 [attributes]: /docs/reference/fidl/language/attributes.md
 [Life of a handle]: /docs/concepts/fidl/life-of-a-handle.md
-[llcpp]: /docs/reference/fidl/bindings/cpp-bindings.md
+[C++ wire bindings]: /docs/reference/fidl/bindings/cpp-bindings.md
 [source-compatible]: /docs/development/languages/fidl/guides/compatibility/README.md#strict-flexible
 [soft-transitions]: /docs/contribute/governance/rfcs/0002_platform_versioning.md#terminology
 [strict-event]: /docs/contribute/governance/rfcs/0138_handling_unknown_interactions.md#changes-to-bindings

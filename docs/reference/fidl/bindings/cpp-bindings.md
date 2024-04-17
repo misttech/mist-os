@@ -1,5 +1,17 @@
 # New C++ bindings
 
+<!-- TODO(https://fxbug.dev/42054534): Document natural bindings here too. -->
+
+The new C++ bindings come in **natural** and **wire** variants. The natural
+bindings are optimized for safety and ergonomics, while the wire bindings are
+optimized for performance. Most code should should use the natural bindings.
+Only turn to the wire bindings when performance requirements demand it or when
+you need precise control over memory allocation.
+
+Note: This page currently only documents the wire bindings. See the [New C++
+bindings tutorials] and [Comparing new C++ and high-level C++ language bindings]
+for examples of the natural bindings.
+
 ## Libraries {#libraries}
 
 Given the library declaration:
@@ -38,15 +50,15 @@ The correspondence between FIDL primitive types and C++ types is outlined in
 
 ## Fields
 
-This section describes how the FIDL toolchain converts FIDL types to native
-types in LLCPP. These types can appear as members in an aggregate type or as
-parameters to a protocol method.
+This section describes how the FIDL toolchain converts FIDL types to C++ wire
+types. These types can appear as members in an aggregate type or as parameters
+to a protocol method.
 
 ### Built-in types {#builtins}
 
 The FIDL types are converted to C++ types based on the following table:
 
-|FIDL Type|LLCPP Type|
+|FIDL Type|C++ Wire Type|
 |--- |--- |
 |`bool`|`bool`, *(requires sizeof(bool) == 1)*|
 |`int8`|`int8_t`|
@@ -67,17 +79,16 @@ The FIDL types are converted to C++ types based on the following table:
 |`zx.Handle`|`zx::handle`|
 |`zx.Handle:S`|The corresponding zx type is used whenever possible. For example, `zx::vmo` or `zx::channel`.|
 
-Nullable built-in types do not have different generated types than their
-non-nullable counterparts in LLCPP, and are omitted from the table above.
+Optional vectors, strings, client/server ends, and handles have the same C++
+wire types as their non-optional counterparts.
 
 ### User defined types {#user-defined-types}
 
-In LLCPP, a user defined type (bits, enum, constant, struct, union, or table) is
-referred to using the generated class or variable (see [Type
-Definitions](#type-definitions)). The nullable version of a user defined type
-`T` is referred to using a `fidl::ObjectView` of the generated type *except*
-for unions, which simply use the generated type itself. Refer to the [LLCPP
-memory guide][llcpp-allocation] for information about `ObjectView`.
+The C++ wire bindings define a class for each user defined bits, enum, struct,
+table, and union. For strict enums, they define an `enum class` instead of a
+regular class. For unions, they use the same class to represent optional and
+non-optional values. For boxed structs, they use `fidl::ObjectView`. See [Memory
+ownership of wire domain objects] to learn more about `fidl::ObjectView`.
 
 ## Type definitions {#type-definitions}
 
@@ -199,7 +210,7 @@ struct Color {
 }
 ```
 
-LLCPP does not currently support default values, and instead zero-initializes
+The C++ bindings do not support default values, and instead they zero-initialize
 all fields of the struct.
 
 Example usage:
@@ -277,7 +288,8 @@ class:
 When a FIDL message containing a union with an unknown variant is decoded into
 `JsonValue`, `JsonValue::Which()` will return `JsonValue::Tag::kUnknown`.
 
-The LLCPP bindings do not store the raw bytes and handles of unknown variants.
+The C++ bindings bindings do not store the raw bytes and handles of unknown
+variants.
 
 Encoding a union with an unknown variant is not supported and will cause
 an encoding failure.
@@ -315,8 +327,8 @@ In order to build a table, three additional class is generated:
 `fidl::WireTableFrame<User>`.
 
 `fidl::WireTableFrame<User>` is a container for the table's internal storage,
-and is allocated separately from the builder because LLCPP maintains the object
-layout of the underlying wire format. It is only use internally by builders.
+and is allocated separately from the builder to maintain the object layout of
+the underlying wire format. It is only use internally by builders.
 
 `fidl::WireTableFrame<User>` has the following methods:
 
@@ -346,19 +358,19 @@ Example usage:
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/cpp/domain_objects/main.cc" region_tag="wire-tables" adjust_indentation="auto" exclude_regexp="^TEST|^}" %}
 ```
 
-In addition to assigning fields with `fidl::ObjectView`, any of the allocation
-strategies described in the [tutorial][llcpp-allocation] can also be used.
+In addition to assigning fields with `fidl::ObjectView`, you can use any of the
+allocation strategies described in [Memory ownership of wire domain objects].
 
 Note: Tables with unknown fields will decode successfully but will fail to
 encode.
 
 ### Inline layouts
 
-The generated C++ code uses the [the name reserved by `fidlc`][anon-names] for
+The generated C++ code uses the [the name chosen by `fidlc`][anon-names] for
 inline layouts.
 
-LLCPP also generates scoped names to refer to any inline layouts that were
-defined directly within a parent layout in FIDL. For example, for the FIDL:
+The C++ bindings also generate scoped names to refer to inline layouts. For
+example, for the FIDL:
 
 ```fidl
 type Outer = struct {
@@ -404,10 +416,10 @@ the rest of this section.
 
 ### Typed channel endpoints {#typed-channels}
 
-LLCPP sends and receives FIDL protocol messages over the
-[Zircon channel][zircon-channel] transport, which carry arbitrary blobs of bytes
-and handles. Rather than exposing raw endpoints, for instance `zx::channel`, the
-API exposes three templated endpoint classes:
+The C++ bindings send and receive FIDL protocol messages over the [Zircon
+channel][zircon-channel] transport, which carry arbitrary blobs of bytes and
+handles. Rather than exposing raw endpoints, for instance `zx::channel`, the API
+exposes three templated endpoint classes:
 
 * `fidl::ClientEnd<TicTacToe>`: the client endpoint of the `TicTacToe` protocol;
   it owns a `zx::channel`. Client bindings that require exclusive ownership of
@@ -495,8 +507,8 @@ protocol:
 
 ### Client {#client}
 
-The LLCPP bindings provides multiple ways to interact with a FIDL protocol as a
-client:
+The C++ wire bindings bindings provides multiple ways to interact with a FIDL
+protocol as a client:
 
 * `fidl::WireClient<TicTacToe>`: This class exposes thread-safe APIs for
   outgoing asynchronous and synchronous calls as well as asynchronous event
@@ -511,15 +523,14 @@ client:
   models compared to `WireClient`, but requires a two-phase shutdown pattern to
   prevent use-after-frees. Objects of this class may be destroyed on an
   arbitrary thread. It also supports use with a multi-threaded dispatcher. For
-  more details, see [LLCPP threading guide][llcpp-threading-guide].
+  more details, see the [New C++ bindings threading guide].
 * `fidl::WireSyncClient<TicTacToe>`: This class exposes purely synchronous APIs
   for outgoing calls as well as for event handling. It owns the client end of
   the channel.
 * `fidl::WireCall<TicTacToe>`: This class is identical to `WireSyncClient`
   except that it does not have ownership of the client end of the channel.
-  `WireCall` may be preferable to `WireSyncClient` when migrating code from the
-  C bindings to the LLCPP bindings, or when implementing C APIs that take raw
-  `zx_handle_t`s.
+  `WireCall` may be preferable to `WireSyncClient` when implementing C APIs that
+  take raw `zx_handle_t`s.
 
 #### WireClient {#async-client}
 
@@ -776,10 +787,10 @@ a `TicTacToe` server by providing a concrete implementation of
 * `virtual void MakeMove(MakeMoveRequestView request, MakeMoveCompleter::Sync&
   completer)`
 
-Refer to the [example LLCPP server][llcpp-server-example] for how to bind and
+Refer to the [example C++ server][cpp-server-example] for how to bind and
 set up a server implementation.
 
-The LLCPP bindings also provide functions for manually dispatching a message
+The C++ wire bindings also provide functions for manually dispatching a message
 given an implementation, `fidl::WireDispatch<TicTacToe>`:
 
 * `void fidl::WireDispatch<TicTacToe>(fidl::WireServer<TicTacToe>* impl,
@@ -798,7 +809,7 @@ For example:
 * `request->start_first`
 * `request->row`
 
-See [LLCPP memory guide][llcpp-allocation] for notes on request lifetime.
+See [Memory ownership of wire domain objects] for notes on request lifetime.
 
 #### Completers {#server-completers}
 
@@ -834,10 +845,10 @@ can be safely ignored.
 
 Finally, sync completers for two way methods can be converted to an async
 completer using the `ToAsync()` method. Async completers can out-live the scope
-of the handler by e.g. moving it into a lambda capture (see [LLCPP
-tutorial][llcpp-async-example] for example usage), allowing the server to
+of the handler by e.g. moving it into a lambda capture, allowing the server to
 respond to requests asynchronously. The async completer has the same methods for
-responding to the client as the sync completer.
+responding to the client as the sync completer. See [Responding to requests
+asynchronously] for example usage
 
 Note: Each `Completer` object must only be accessed by one thread at a time.
 Simultaneous access from multiple threads will result in a crash.
@@ -914,8 +925,8 @@ result in a run-time error.
 
 ### Events {#events}
 
-In LLCPP, events can be handled asynchronously or synchronously, depending
-on the type of [client](#client) being used.
+In the C++ bindings, events can be handled asynchronously or synchronously,
+depending on the type of [client](#client) being used.
 
 #### Async client {#async-event-handlers}
 
@@ -1186,10 +1197,10 @@ FIDL domain objects, are not yet supported (https://fxbug.dev/42163274).
 
 ## Test scaffolding {#test-scaffolding}
 
-The FIDL toolchain also generates a file suffixed with `_test_base.h` that
-contains convenience code for testing FIDL client and server implementations. To
-use these headers, depend on the generated test scaffolding library with a
-`_testing` suffix (`my_library_llcpp_testing` instead of `my_library_llcpp`).
+The FIDL toolchain also generates a file named `wire_test_base.h` that contains
+convenience code for testing FIDL client and server implementations. To use
+these headers, depend on the bindings target label with a `_testing` suffix
+(`my_library_cpp_testing` instead of `my_library_cpp`).
 
 ### Server test base
 
@@ -1238,16 +1249,15 @@ The test base provides an implementation for the virtual protocol events
 `OnOpponentMove`, which is implemented to just call
 `NotImplemented_("OnOpponentMove")`.
 
-
-<!-- xrefs -->
 [anon-names]: /docs/reference/fidl/language/language.md#inline-layouts
 [cpp-style]: https://google.github.io/styleguide/cppguide.html#Naming
 [generated-name-attr]: /docs/reference/fidl/language/attributes.md#generated-name
-[llcpp-allocation]: /docs/development/languages/fidl/tutorials/cpp/topics/wire-memory-ownership.md
-[llcpp-async-example]: /docs/development/languages/fidl/tutorials/cpp/topics/async-completer.md
-[llcpp-threading-guide]: /docs/development/languages/fidl/tutorials/cpp/topics/threading.md
-[llcpp-tutorial]: /docs/development/languages/fidl/tutorials/cpp
-[llcpp-server-example]: /examples/fidl/cpp/server/wire
+[Memory ownership of wire domain objects]: /docs/development/languages/fidl/tutorials/cpp/topics/wire-memory-ownership.md
+[Responding to requests asynchronously]: /docs/development/languages/fidl/tutorials/cpp/topics/async-completer.md
+[New C++ bindings threading guide]: /docs/development/languages/fidl/tutorials/cpp/topics/threading.md
+[New C++ bindings tutorials]: /docs/development/languages/fidl/tutorials/cpp
+[Comparing new C++ and high-level C++ language bindings]: /docs/development/languages/fidl/guides/c-family-comparison.md
+[cpp-server-example]: /examples/fidl/cpp/server/wire
 [lang-constants]: /docs/reference/fidl/language/language.md#constants
 [lang-bits]: /docs/reference/fidl/language/language.md#bits
 [lang-enums]: /docs/reference/fidl/language/language.md#enums
