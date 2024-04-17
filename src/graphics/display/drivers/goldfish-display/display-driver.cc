@@ -11,6 +11,7 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
@@ -137,10 +138,21 @@ zx::result<> DisplayDriver::Create(zx_device_t* parent) {
   }
   std::unique_ptr<RenderControl> render_control = std::move(create_render_control_result).value();
 
+  zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
+      fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options{},
+                                          "display-event-dispatcher", /*shutdown_handler=*/{});
+  if (create_dispatcher_result.is_error()) {
+    zxlogf(ERROR, "Failed to create display event dispatcher: %s",
+           create_dispatcher_result.status_string());
+    return create_dispatcher_result.take_error();
+  }
+  fdf::SynchronizedDispatcher display_event_dispatcher =
+      std::move(create_dispatcher_result).value();
+
   fbl::AllocChecker alloc_checker;
   auto display_engine = fbl::make_unique_checked<DisplayEngine>(
       &alloc_checker, std::move(control), std::move(pipe), std::move(sysmem_allocator),
-      std::move(render_control));
+      std::move(render_control), display_event_dispatcher.async_dispatcher());
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -152,8 +164,8 @@ zx::result<> DisplayDriver::Create(zx_device_t* parent) {
     return init_result.take_error();
   }
 
-  auto display_driver =
-      fbl::make_unique_checked<DisplayDriver>(&alloc_checker, parent, std::move(display_engine));
+  auto display_driver = fbl::make_unique_checked<DisplayDriver>(
+      &alloc_checker, parent, std::move(display_event_dispatcher), std::move(display_engine));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for DisplayDriver");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -170,9 +182,14 @@ zx::result<> DisplayDriver::Create(zx_device_t* parent) {
   return zx::ok();
 }
 
-DisplayDriver::DisplayDriver(zx_device_t* parent, std::unique_ptr<DisplayEngine> display_engine)
-    : DisplayType(parent), display_engine_(std::move(display_engine)) {
+DisplayDriver::DisplayDriver(zx_device_t* parent,
+                             fdf::SynchronizedDispatcher display_event_dispatcher,
+                             std::unique_ptr<DisplayEngine> display_engine)
+    : DisplayType(parent),
+      display_event_dispatcher_(std::move(display_event_dispatcher)),
+      display_engine_(std::move(display_engine)) {
   ZX_DEBUG_ASSERT(parent != nullptr);
+  ZX_DEBUG_ASSERT(display_event_dispatcher_.get() != nullptr);
   ZX_DEBUG_ASSERT(display_engine_ != nullptr);
 }
 

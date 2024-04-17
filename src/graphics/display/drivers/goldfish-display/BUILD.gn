@@ -24,6 +24,7 @@ fuchsia_driver("goldfish-display-driver") {
     ":common",
     ":goldfish-display-bind",
     "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
@@ -83,6 +84,7 @@ test("goldfish-unittests") {
     ":common",
     ":goldfish-display-bind",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_testing",
+    "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/fdio",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/testing/no_ddk",

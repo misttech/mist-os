@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_GOLDFISH_DISPLAY_DISPLAY_DRIVER_H_
 
 #include <lib/ddk/device.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/zx/result.h>
 
 #include <cstdint>
@@ -30,8 +31,10 @@ class DisplayDriver : public DisplayType {
   // Prefer to use the `Create()` factory method instead.
   //
   // `parent` must not be null.
+  // `display_event_dispatcher` must be valid.
   // `display_engine` must not be null.
-  explicit DisplayDriver(zx_device_t* parent, std::unique_ptr<DisplayEngine> display_engine);
+  explicit DisplayDriver(zx_device_t* parent, fdf::SynchronizedDispatcher display_event_dispatcher,
+                         std::unique_ptr<DisplayEngine> display_engine);
 
   DisplayDriver(const DisplayDriver&) = delete;
   DisplayDriver(DisplayDriver&&) = delete;
@@ -49,6 +52,9 @@ class DisplayDriver : public DisplayType {
   zx::result<> Bind();
 
  private:
+  // Must outlive `display_engine_`.
+  fdf::SynchronizedDispatcher display_event_dispatcher_;
+
   std::unique_ptr<DisplayEngine> display_engine_;
 };
 

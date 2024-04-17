@@ -58,19 +58,20 @@ constexpr uint32_t GL_BGRA_EXT = 0x80E1;
 DisplayEngine::DisplayEngine(fidl::ClientEnd<fuchsia_hardware_goldfish::ControlDevice> control,
                              fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe,
                              fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_allocator,
-                             std::unique_ptr<RenderControl> render_control)
+                             std::unique_ptr<RenderControl> render_control,
+                             async_dispatcher_t* display_event_dispatcher)
     : control_(std::move(control)),
       pipe_(std::move(pipe)),
       sysmem_allocator_client_(std::move(sysmem_allocator)),
       rc_(std::move(render_control)),
-      loop_(&kAsyncLoopConfigNeverAttachToThread) {
+      display_event_dispatcher_(std::move(display_event_dispatcher)) {
   ZX_DEBUG_ASSERT(control_.is_valid());
   ZX_DEBUG_ASSERT(pipe_.is_valid());
   ZX_DEBUG_ASSERT(sysmem_allocator_client_.is_valid());
   ZX_DEBUG_ASSERT(rc_ != nullptr);
 }
 
-DisplayEngine::~DisplayEngine() { loop_.Shutdown(); }
+DisplayEngine::~DisplayEngine() {}
 
 zx::result<> DisplayEngine::Initialize() {
   fbl::AutoLock lock(&lock_);
@@ -92,17 +93,10 @@ zx::result<> DisplayEngine::Initialize() {
     return zx::error(status);
   }
 
-  status = async::PostTask(loop_.dispatcher(), [this] { FlushPrimaryDisplay(loop_.dispatcher()); });
+  status = async::PostTask(display_event_dispatcher_,
+                           [this] { FlushPrimaryDisplay(display_event_dispatcher_); });
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to post display flush task on the display event loop: %s",
-           zx_status_get_string(status));
-    return zx::error(status);
-  }
-
-  // Start async event thread.
-  status = loop_.StartThread("goldfish_display_event_thread");
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to start thread for the display event loop: %s",
            zx_status_get_string(status));
     return zx::error(status);
   }
@@ -347,7 +341,7 @@ void DisplayEngine::DisplayControllerImplReleaseImage(uint64_t image_handle) {
     rc_->CloseColorBuffer(color_buffer->host_color_buffer_id);
   }
 
-  async::PostTask(loop_.dispatcher(), [this, color_buffer] {
+  async::PostTask(display_event_dispatcher_, [this, color_buffer] {
     if (primary_display_device_.incoming_config.has_value() &&
         primary_display_device_.incoming_config->color_buffer == color_buffer) {
       primary_display_device_.incoming_config = std::nullopt;
@@ -469,42 +463,43 @@ zx_status_t DisplayEngine::PresentPrimaryDisplayConfig(const DisplayConfig& disp
                                                             ZX_EVENTPAIR_SIGNALED, 0);
   async::WaitOnce& wait = primary_display_device_.pending_config_waits.back();
 
-  wait.Begin(loop_.dispatcher(), [this, event = std::move(event_display),
-                                  pending_config_stamp = display_config.config_stamp](
-                                     async_dispatcher_t* dispatcher, async::WaitOnce* current_wait,
-                                     zx_status_t status, const zx_packet_signal_t*) {
-    TRACE_DURATION("gfx", "DisplayEngine::SyncEventHandler", "config_stamp",
-                   pending_config_stamp.value());
-    if (status == ZX_ERR_CANCELED) {
-      zxlogf(INFO, "Wait for config stamp %lu cancelled.", pending_config_stamp.value());
-      return;
-    }
-    ZX_DEBUG_ASSERT_MSG(status == ZX_OK, "Invalid wait status: %d\n", status);
+  wait.Begin(
+      display_event_dispatcher_,
+      [this, event = std::move(event_display), pending_config_stamp = display_config.config_stamp](
+          async_dispatcher_t* dispatcher, async::WaitOnce* current_wait, zx_status_t status,
+          const zx_packet_signal_t*) {
+        TRACE_DURATION("gfx", "DisplayEngine::SyncEventHandler", "config_stamp",
+                       pending_config_stamp.value());
+        if (status == ZX_ERR_CANCELED) {
+          zxlogf(INFO, "Wait for config stamp %lu cancelled.", pending_config_stamp.value());
+          return;
+        }
+        ZX_DEBUG_ASSERT_MSG(status == ZX_OK, "Invalid wait status: %d\n", status);
 
-    // When the eventpair in |current_wait| is signalled, all the pending waits
-    // that are queued earlier than that eventpair will be removed from the list
-    // and the async WaitOnce will be cancelled.
-    // Note that the cancelled waits will return early and will not reach here.
-    ZX_DEBUG_ASSERT(std::any_of(primary_display_device_.pending_config_waits.begin(),
-                                primary_display_device_.pending_config_waits.end(),
-                                [current_wait](const async::WaitOnce& wait) {
-                                  return wait.object() == current_wait->object();
-                                }));
-    // Remove all the pending waits that are queued earlier than the current
-    // wait, and the current wait itself. In WaitOnce, the callback is moved to
-    // stack before current wait is removed, so it's safe to remove any item in
-    // the list.
-    for (auto it = primary_display_device_.pending_config_waits.begin();
-         it != primary_display_device_.pending_config_waits.end();) {
-      if (it->object() == current_wait->object()) {
-        primary_display_device_.pending_config_waits.erase(it);
-        break;
-      }
-      it = primary_display_device_.pending_config_waits.erase(it);
-    }
-    primary_display_device_.latest_config_stamp =
-        std::max(primary_display_device_.latest_config_stamp, pending_config_stamp);
-  });
+        // When the eventpair in |current_wait| is signalled, all the pending waits
+        // that are queued earlier than that eventpair will be removed from the list
+        // and the async WaitOnce will be cancelled.
+        // Note that the cancelled waits will return early and will not reach here.
+        ZX_DEBUG_ASSERT(std::any_of(primary_display_device_.pending_config_waits.begin(),
+                                    primary_display_device_.pending_config_waits.end(),
+                                    [current_wait](const async::WaitOnce& wait) {
+                                      return wait.object() == current_wait->object();
+                                    }));
+        // Remove all the pending waits that are queued earlier than the current
+        // wait, and the current wait itself. In WaitOnce, the callback is moved to
+        // stack before current wait is removed, so it's safe to remove any item in
+        // the list.
+        for (auto it = primary_display_device_.pending_config_waits.begin();
+             it != primary_display_device_.pending_config_waits.end();) {
+          if (it->object() == current_wait->object()) {
+            primary_display_device_.pending_config_waits.erase(it);
+            break;
+          }
+          it = primary_display_device_.pending_config_waits.erase(it);
+        }
+        primary_display_device_.latest_config_stamp =
+            std::max(primary_display_device_.latest_config_stamp, pending_config_stamp);
+      });
 
   // Update host-writeable display buffers before presenting.
   if (color_buffer->pinned_vmo.region_count() > 0) {
@@ -567,7 +562,7 @@ void DisplayEngine::DisplayControllerImplApplyConfiguration(
     // previously existed, we should cancel waiting events on the pending
     // color buffer and remove references to both pending and current color
     // buffers.
-    async::PostTask(loop_.dispatcher(), [this, config_stamp] {
+    async::PostTask(display_event_dispatcher_, [this, config_stamp] {
       primary_display_device_.pending_config_waits.clear();
       primary_display_device_.incoming_config = std::nullopt;
       primary_display_device_.latest_config_stamp =
@@ -631,7 +626,7 @@ void DisplayEngine::DisplayControllerImplApplyConfiguration(
     }
   }
 
-  async::PostTask(loop_.dispatcher(), [this, config_stamp, color_buffer] {
+  async::PostTask(display_event_dispatcher_, [this, config_stamp, color_buffer] {
     primary_display_device_.incoming_config = {
         .color_buffer = color_buffer,
         .config_stamp = config_stamp,
@@ -717,7 +712,7 @@ zx_status_t DisplayEngine::SetupPrimaryDisplay() {
     zxlogf(ERROR, "Render control host failed to set display pose: %d", status.value());
     return ZX_ERR_INTERNAL;
   }
-  primary_display_device_.expected_next_flush = async::Now(loop_.dispatcher());
+  primary_display_device_.expected_next_flush = async::Now(display_event_dispatcher_);
 
   return ZX_OK;
 }

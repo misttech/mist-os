@@ -9,9 +9,9 @@
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/ddk/device.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/result.h>
@@ -34,10 +34,12 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
  public:
   // `control`, `pipe`, `sysmem_allocator` must be valid.
   // `render_control` must not be null.
+  // `display_event_dispatcher` must be non-null and outlive `DisplayEngine`.
   explicit DisplayEngine(fidl::ClientEnd<fuchsia_hardware_goldfish::ControlDevice> control,
                          fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe,
                          fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_allocator,
-                         std::unique_ptr<RenderControl> render_control);
+                         std::unique_ptr<RenderControl> render_control,
+                         async_dispatcher_t* display_event_dispatcher);
 
   DisplayEngine(const DisplayEngine&) = delete;
   DisplayEngine(DisplayEngine&&) = delete;
@@ -191,7 +193,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   fbl::Mutex flush_lock_;
   ddk::DisplayControllerInterfaceProtocolClient dc_intf_ TA_GUARDED(flush_lock_);
 
-  async::Loop loop_;
+  async_dispatcher_t* const display_event_dispatcher_;
 };
 
 }  // namespace goldfish

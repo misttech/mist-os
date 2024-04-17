@@ -12,6 +12,8 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
 #include <lib/ddk/device.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/fdf/cpp/dispatcher.h>
 
 #include <array>
 #include <cstdio>
@@ -53,6 +55,12 @@ class GoldfishDisplayEngineTest : public testing::Test {
 
   void SetUp() override;
   void TearDown() override;
+
+ protected:
+  fdf_testing::DriverRuntime driver_runtime_;
+  fdf::UnownedSynchronizedDispatcher display_event_dispatcher_ =
+      driver_runtime_.StartBackgroundDispatcher();
+
   std::array<std::array<layer_t, kMaxLayerCount>, kDisplayCount> layer_ = {};
   std::array<const layer_t*, kDisplayCount> layer_ptrs = {};
 
@@ -79,9 +87,9 @@ void GoldfishDisplayEngineTest::SetUp() {
   allocator_binding_ =
       fidl::BindServer(loop_.dispatcher(), std::move(sysmem_server), &mock_allocator_);
 
-  display_engine_ =
-      std::make_unique<DisplayEngine>(std::move(control_client), std::move(pipe_client),
-                                      std::move(sysmem_client), std::make_unique<RenderControl>());
+  display_engine_ = std::make_unique<DisplayEngine>(
+      std::move(control_client), std::move(pipe_client), std::move(sysmem_client),
+      std::make_unique<RenderControl>(), display_event_dispatcher_->async_dispatcher());
 
   for (size_t i = 0; i < kDisplayCount; i++) {
     configs_ptrs_[i] = &configs_[i];
