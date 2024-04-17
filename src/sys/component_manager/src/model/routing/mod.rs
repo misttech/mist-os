@@ -204,9 +204,9 @@ pub async fn report_routing_failure(
                 Availability::Required => {
                     // TODO(https://fxbug.dev/42060474): consider changing this to `error!()`
                     warn!(
-                        "{availability} {request} was not available for target component `{}`: {}\n{}",
-                        &target.moniker, &err, ROUTE_ERROR_HELP
-                    );
+                    "{availability} {request} was not available for target component `{}`: {}\n{}",
+                    &target.moniker, &err, ROUTE_ERROR_HELP
+                );
                 }
                 Availability::Optional
                 | Availability::SameAsTarget
@@ -223,9 +223,9 @@ pub async fn report_routing_failure(
                     // `Required` capabilities to `error!()`, consider also
                     // changing this log for `Optional` to `warn!()`.
                     info!(
-                        "{availability} {request} was not available for target component `{}`: {}\n{}",
-                        &target.moniker, &err, ROUTE_ERROR_HELP
-                    );
+                    "{availability} {request} was not available for target component `{}`: {}\n{}",
+                    &target.moniker, &err, ROUTE_ERROR_HELP
+                );
                 }
             }
         })

@@ -372,7 +372,7 @@ impl AnonymizedAggregateServiceDir {
                             "Failed to route service capability from component, skipping",
                         );
                     })
-                    .await;
+                    .await
             }
         }
         Ok(())

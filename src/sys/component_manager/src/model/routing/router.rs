@@ -8,8 +8,6 @@ use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
 use async_trait::async_trait;
 use bedrock_error::{BedrockError, Explain};
 use cm_types::Availability;
-use cm_util::TaskGroup;
-use fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
@@ -17,13 +15,7 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 use sandbox::{AnyCapability, Capability, CapabilityTrait, Dict, Open};
 use std::{fmt, sync::Arc};
-use vfs::{
-    directory::entry::{self, DirectoryEntry, EntryInfo},
-    execution_scope::ExecutionScope,
-    path,
-    remote::RemoteLike,
-};
-use zx::HandleBased;
+use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo};
 
 /// Types that implement [`Routable`] let the holder asynchronously request
 /// capabilities from them.
@@ -158,21 +150,15 @@ impl Router {
     ///
     /// This is an alternative to [Dict::try_into_open] when the [Dict] contains [Router]s, since
     /// [Router] is not currently a type defined by the sandbox library.
-    pub fn dict_routers_to_open(
-        weak_component: &WeakComponentInstance,
-        dict: &Dict,
-        routing_task_group: TaskGroup,
-    ) -> Dict {
+    pub fn dict_routers_to_open(weak_component: &WeakComponentInstance, dict: &Dict) -> Dict {
         let entries = dict.lock_entries();
         let out = Dict::new();
         let mut out_entries = out.lock_entries();
         for (key, value) in &*entries {
             let value = match value {
-                Capability::Dictionary(dict) => Capability::Dictionary(Self::dict_routers_to_open(
-                    weak_component,
-                    dict,
-                    routing_task_group.clone(),
-                )),
+                Capability::Dictionary(dict) => {
+                    Capability::Dictionary(Self::dict_routers_to_open(weak_component, dict))
+                }
                 Capability::Router(r) => {
                     let router = Router::from_any(r.clone());
                     let request = Request {
@@ -186,8 +172,7 @@ impl Router {
                     Capability::Open(Open::new(router.into_directory_entry(
                         request,
                         fio::DirentType::Service,
-                        routing_task_group.clone(),
-                        |_| {},
+                        |_| None,
                     )))
                 }
                 other => other.clone(),
@@ -204,157 +189,89 @@ impl Router {
     /// `entry_type` is the type of the entry when the DirectoryEntry is accessed through a `fuchsia.io`
     /// connection.
     ///
-    /// Routing tasks are run on the `routing_task_group`.
+    /// Tasks are spawned on the component's execution scope.
     ///
     /// When routing failed while exercising the returned DirectoryEntry, errors will be
     /// sent to `errors_fn`.
-    pub fn into_directory_entry(
+    pub fn into_directory_entry<F>(
         self,
         request: Request,
         entry_type: fio::DirentType,
-        routing_task_group: TaskGroup,
-        errors_fn: impl Fn(ErrorCapsule) + Send + Sync + 'static,
-    ) -> Arc<dyn DirectoryEntry> {
+        errors_fn: F,
+    ) -> Arc<dyn DirectoryEntry>
+    where
+        for<'a> F: Fn(&'a BedrockError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
+    {
         struct RouterEntry<F> {
             router: Router,
             request: Request,
             entry_type: fio::DirentType,
-            routing_task_group: TaskGroup,
             errors_fn: F,
         }
 
-        impl<F: Fn(ErrorCapsule) + Send + Sync + 'static> DirectoryEntry for RouterEntry<F> {
+        impl<F> DirectoryEntry for RouterEntry<F>
+        where
+            for<'a> F: Fn(&'a BedrockError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
+        {
             fn entry_info(&self) -> EntryInfo {
                 EntryInfo::new(fio::INO_UNKNOWN, self.entry_type)
             }
 
             fn open_entry(
                 self: Arc<Self>,
-                request: entry::OpenRequest<'_>,
+                mut request: entry::OpenRequest<'_>,
             ) -> Result<(), zx::Status> {
-                request.open_remote(self)
+                if let Ok(target) = self.request.target.upgrade() {
+                    // Spawn this request on the component's execution scope so that it doesn't
+                    // block the namespace.
+                    request.set_scope(target.execution_scope.clone());
+                    request.spawn(self);
+                    Ok(())
+                } else {
+                    Err(zx::Status::NOT_FOUND)
+                }
             }
         }
 
-        impl<F: Fn(ErrorCapsule) + Send + Sync + 'static> RemoteLike for RouterEntry<F> {
-            fn open(
+        impl<F> DirectoryEntryAsync for RouterEntry<F>
+        where
+            for<'a> F: Fn(&'a BedrockError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
+        {
+            async fn open_entry_async(
                 self: Arc<Self>,
-                scope: ExecutionScope,
-                flags: fio::OpenFlags,
-                relative_path: path::Path,
-                server_end: ServerEnd<fio::NodeMarker>,
-            ) {
-                let this = self.clone();
-                self.routing_task_group.spawn(async move {
-                    // Request a capability from the `router`.
-                    let result = this.router.route(this.request.clone()).await;
-                    match result {
-                        Ok(capability) => {
-                            // HACK: Dict needs special casing because [Dict::try_into_open]
-                            // is unaware of [Router].
-                            let capability = match capability {
-                                Capability::Dictionary(d) => Router::dict_routers_to_open(
-                                    &this.request.target,
-                                    &d,
-                                    this.routing_task_group.clone(),
-                                )
-                                .into(),
-                                cap => cap,
-                            };
-                            match super::capability_into_open(capability.clone()) {
-                                Ok(open) => open.open(
-                                    scope,
-                                    flags,
-                                    relative_path,
-                                    server_end.into_channel(),
-                                ),
-                                Err(error) => (this.errors_fn)(ErrorCapsule {
-                                    error: error.into(),
-                                    open_request: OpenRequest {
-                                        flags,
-                                        relative_path,
-                                        server_end: server_end.into_channel(),
-                                    },
-                                }),
+                open_request: entry::OpenRequest<'_>,
+            ) -> Result<(), zx::Status> {
+                // Hold a guard to prevent this task from being dropped during component
+                // destruction.  This task is tied to the target component.
+                let _guard = open_request.scope().active_guard();
+
+                // Request a capability from the `router`.
+                let result = self.router.route(self.request.clone()).await;
+                let error = match result {
+                    Ok(capability) => {
+                        // HACK: Dict needs special casing because [Dict::try_into_open]
+                        // is unaware of [Router].
+                        let capability = match capability {
+                            Capability::Dictionary(d) => {
+                                Router::dict_routers_to_open(&self.request.target, &d).into()
                             }
-                        }
-                        Err(error) => {
-                            // Routing failed (e.g. broken route).
-                            (this.errors_fn)(ErrorCapsule {
-                                error,
-                                open_request: OpenRequest {
-                                    flags,
-                                    relative_path,
-                                    server_end: server_end.into_channel(),
-                                },
-                            });
+                            cap => cap,
+                        };
+                        match super::capability_into_open(capability.clone()) {
+                            Ok(open) => return open.open_entry(open_request),
+                            Err(error) => error,
                         }
                     }
-                });
+                    Err(error) => error, // Routing failed (e.g. broken route).
+                };
+                if let Some(fut) = (self.errors_fn)(&error) {
+                    fut.await;
+                }
+                Err(error.as_zx_status())
             }
         }
 
-        Arc::new(RouterEntry {
-            router: self.clone(),
-            request,
-            entry_type,
-            routing_task_group,
-            errors_fn,
-        })
-    }
-}
-
-/// [`ErrorCapsule `] holds an error from capability routing, and closes the
-/// server endpoint in the open request with an appropriate epitaph on drop.
-#[derive(Debug)]
-pub struct ErrorCapsule {
-    error: BedrockError,
-    open_request: OpenRequest,
-}
-
-impl ErrorCapsule {
-    /// Destructures the [`ErrorCapsule`] into the error and the open request
-    /// sent by the client when they connect to the requested capability. It is
-    /// provided here such that the endpoint may be closed with an appropriate
-    /// epitaph, which is now the responsibility of the caller.
-    pub fn manually_handle(mut self) -> (BedrockError, OpenRequest) {
-        (self.error.clone(), self.open_request.take())
-    }
-}
-
-impl fmt::Display for ErrorCapsule {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.error)
-    }
-}
-
-impl Drop for ErrorCapsule {
-    fn drop(&mut self) {
-        self.open_request.close(self.error.as_zx_status());
-    }
-}
-
-#[derive(Debug)]
-pub struct OpenRequest {
-    pub flags: fio::OpenFlags,
-    pub relative_path: vfs::path::Path,
-    pub server_end: zx::Channel,
-}
-
-impl OpenRequest {
-    fn take(&mut self) -> Self {
-        OpenRequest {
-            flags: self.flags.clone(),
-            relative_path: self.relative_path.clone(),
-            server_end: cm_util::channel::take_channel(&mut self.server_end),
-        }
-    }
-
-    fn close(&mut self, status: zx::Status) {
-        let server_end = cm_util::channel::take_channel(&mut self.server_end);
-        if !server_end.is_invalid_handle() {
-            let _ = server_end.close_with_epitaph(status);
-        }
+        Arc::new(RouterEntry { router: self.clone(), request, entry_type, errors_fn })
     }
 }
 
