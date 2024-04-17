@@ -66,7 +66,7 @@ class FileAccess:
 
         return output
 
-    def write_depfile(self, dep_file_path: Path, main_entry: Path):
+    def write_depfile(self, dep_file_path: Path, main_entry: Path) -> None:
         if not dep_file_path.parent.exists():
             dep_file_path.parent.mkdir(parents=True, exist_ok=True)
         with open(dep_file_path, "w") as dep_file:

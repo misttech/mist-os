@@ -6,7 +6,7 @@
 
 import dataclasses
 from pathlib import Path
-from typing import List
+from typing import Any, List
 
 
 @dataclasses.dataclass(frozen=True)
@@ -22,8 +22,9 @@ class GnLabel:
     """Whether the label has a local name, e.g. True for `//foo/bar:baz` but false for `//foo/bar/baz`"""
     is_local_name: bool = dataclasses.field(hash=False, compare=False)
     """The toolchain part of the label, e.g. `//toolchain` in `//foo/bar(//toolchain)`"""
-    toolchain: "GnLabel" = dataclasses.field(hash=False, compare=False)
+    toolchain: "GnLabel|None" = dataclasses.field(hash=False, compare=False)
 
+    @staticmethod
     def from_str(original_str: str) -> "GnLabel":
         """Constructs a GnLabel instance from a GN target label string"""
         assert original_str.startswith(
@@ -64,17 +65,17 @@ class GnLabel:
             gn_str.extend([":", name])
         if toolchain:
             gn_str.extend(["(", toolchain.gn_str, ")"])
-        gn_str = "".join(gn_str)
 
         return GnLabel(
-            gn_str=gn_str,
+            gn_str="".join(gn_str),
             name=name,
             is_local_name=is_local_name,
             path=path,
             toolchain=toolchain,
         )
 
-    def from_path(path: Path):
+    @staticmethod
+    def from_path(path: Path) -> "GnLabel":
         """Constructs a GnLabel instance from a Path object."""
         assert isinstance(
             path, Path
@@ -83,13 +84,15 @@ class GnLabel:
             return GnLabel.from_str("//")
         return GnLabel.from_str(f"//{path}")
 
-    def check_type(other) -> "GnLabel":
+    @staticmethod
+    def check_type(other: Any) -> "GnLabel":
         """Asserts that `other` is of type GnLabel"""
         assert isinstance(
             other, GnLabel
         ), f"{other} type {type(other)} is not {GnLabel}"
         return other
 
+    @staticmethod
     def check_types_in_list(list: List["GnLabel"]) -> List["GnLabel"]:
         """Asserts that all values in `list` are of type GnLabel"""
         for v in list:
@@ -135,7 +138,7 @@ class GnLabel:
         return f"https://cs.opensource.google/fuchsia/fuchsia/+/main:{path}"
 
     def is_host_target(self) -> bool:
-        return self.toolchain and self.toolchain.name.startswith("host_")
+        return bool(self.toolchain and self.toolchain.name.startswith("host_"))
 
     def is_3rd_party(self) -> bool:
         return "third_party" in self.gn_str or "thirdparty" in self.gn_str
@@ -175,6 +178,7 @@ class GnLabel:
     def __gt__(self, other: "GnLabel") -> bool:
         return self.gn_str > other.gn_str
 
+    @staticmethod
     def _resolve_dot_dot(path: str) -> str:
         """Resolves .. elements in a path string"""
         assert "//" not in path

@@ -17,7 +17,7 @@ from gn_license_metadata import GnLicenseMetadataDB
 from spdx_comparator import SpdxComparator
 
 
-def main():
+def main() -> int:
     """
     Generates licenses SPDX json file from GN license metadata.
     """
@@ -96,7 +96,7 @@ def main():
     log_level = args.log_level.upper()
 
     logging.basicConfig(
-        level=log_level, force="format='%(levelname)s:%(message)s'"
+        level=log_level, force=True, format="%(levelname)s:%(message)s"
     )
 
     fuchsia_source_path = Path(args.fuchsia_source_path).expanduser()

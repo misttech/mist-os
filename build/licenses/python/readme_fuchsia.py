@@ -13,7 +13,7 @@ from typing import ClassVar, Dict, List, Tuple, Any, Set
 @dataclasses.dataclass
 class Readme:
     readme_label: GnLabel
-    package_name: str
+    package_name: str | None
     license_files: Tuple[GnLabel]
 
     def from_text(
@@ -47,7 +47,9 @@ class Readme:
 @dataclasses.dataclass
 class ReadmesDB:
     file_access: FileAccess
-    cache: Dict[GnLabel, Readme] = dataclasses.field(default_factory=dict)
+    cache: Dict[GnLabel, Readme | None] = dataclasses.field(
+        default_factory=dict
+    )
 
     _barrier_dir_names: ClassVar[Set[str]] = set(
         [
@@ -59,7 +61,7 @@ class ReadmesDB:
         ]
     )
 
-    def find_readme_for_label(self, target_label: GnLabel) -> Readme:
+    def find_readme_for_label(self, target_label: GnLabel) -> Readme | None:
         GnLabel.check_type(target_label)
 
         logging.debug("Finding readme for %s", target_label)

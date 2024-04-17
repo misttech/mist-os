@@ -25,8 +25,9 @@ class CollectedLicense:
 
     public_name: str
     license_files: tuple[GnLabel]
-    debug_hint: str = dataclasses.field(hash=False, compare=False)
+    debug_hint: str = dataclasses.field(hash=False, compare=False, default="")
 
+    @staticmethod
     def create(
         public_name: str,
         license_files: Tuple[GnLabel],
@@ -43,7 +44,7 @@ class CollectedLicense:
     def __str__(self) -> str:
         return (
             """License(name='{name}', files=[{files}], hint='{hint}')""".format(
-                name=self.name,
+                name=self.public_name,
                 files=", ".join([str(f) for f in self.license_files]),
                 hint=self.debug_hint,
             )
@@ -144,7 +145,7 @@ class CollectorError:
 
     kind: CollectorErrorKind
     target_label: GnLabel
-    debug_hint: str = dataclasses.field(hash=False, compare=False, default=None)
+    debug_hint: str = dataclasses.field(hash=False, compare=False, default="")
 
 
 @dataclasses.dataclass(frozen=False)
@@ -188,7 +189,7 @@ class Collector:
     errors: List[CollectorError] = dataclasses.field(default_factory=list)
     stats: CollectorStats = dataclasses.field(default_factory=CollectorStats)
 
-    def _add_error(self, error: CollectorError):
+    def _add_error(self, error: CollectorError) -> None:
         logging.debug(
             "Collection error %s for %s: %s",
             error.kind.name,
@@ -197,7 +198,7 @@ class Collector:
         )
         self.errors.append(error)
 
-    def _add_license(self, lic: CollectedLicense):
+    def _add_license(self, lic: CollectedLicense) -> None:
         logging.debug(
             "Collected license %s %s: %s",
             lic.public_name,
@@ -210,7 +211,7 @@ class Collector:
 
     def _add_license_from_metadata(
         self, license_metadata_label: GnLabel, used_by_target: GnLabel
-    ):
+    ) -> None:
         if (
             license_metadata_label.without_toolchain()
             in _ignored_license_labels
@@ -301,7 +302,7 @@ class Collector:
         return True
 
     def _add_licenses_for_golib(
-        self, label: GnLabel, original_label=None
+        self, label: GnLabel, original_label: GnLabel | None = None
     ) -> bool:
         assert label.is_3p_golib()
 
@@ -364,7 +365,7 @@ class Collector:
             self._add_license(
                 CollectedLicense.create(
                     public_name="Fuchsia",
-                    license_files=tuple([self.default_license_file]),
+                    license_files=(self.default_license_file,),
                     collection_hint="Default license for non 3p targets",
                 )
             )
@@ -381,8 +382,9 @@ class Collector:
         resource_of: GnLabel = None,
         is_resource_of_target_with_licenses: bool = False,
     ) -> bool:
-        if label in self.scan_result_by_label:
-            return self.scan_result_by_label[label]
+        result = self.scan_result_by_label.get(label, None)
+        if result is not None:
+            return result
         elif not self.include_host_tools and label.is_host_target():
             logging.debug(
                 "Skipping host target %s since include_host_tools=False", label
@@ -393,12 +395,11 @@ class Collector:
         is_group_target = False
         resources = None
 
-        target_metadata: GnApplicableLicensesMetadata = None
-        if label in self.metadata_db.applicable_licenses_by_target:
+        target_metadata: GnApplicableLicensesMetadata = (
+            self.metadata_db.applicable_licenses_by_target.get(label, None)
+        )
+        if target_metadata is not None:
             self.stats.targets_scanned += 1
-            target_metadata = self.metadata_db.applicable_licenses_by_target[
-                label
-            ]
             is_group_target = target_metadata.is_group()
             resources = target_metadata.third_party_resources
 
@@ -482,7 +483,7 @@ class Collector:
                     CollectorError(
                         kind=CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES,
                         target_label=label,
-                        debug_hint=None,
+                        debug_hint="",
                     )
                 )
 
@@ -491,7 +492,7 @@ class Collector:
 
         return license_found
 
-    def collect(self):
+    def collect(self) -> None:
         # Reset
         self.stats = CollectorStats()
         self.errors.clear()
@@ -503,7 +504,7 @@ class Collector:
         ) in self.metadata_db.applicable_licenses_by_target.values():
             self._scan_label(target_metadata.target_label)
 
-    def log_errors(self, log_level: int, is_full_report: bool):
+    def log_errors(self, log_level: int, is_full_report: bool) -> None:
         errors_by_kind: Dict[
             CollectorErrorKind, List[CollectorError]
         ] = defaultdict(list)

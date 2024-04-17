@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 import re
 from typing import Any, Dict, List, Set
+from typing.re import Pattern as re_Pattern
 import hashlib
 from gn_label import GnLabel
 
@@ -23,12 +24,12 @@ class _ExtractedLicense:
     text_hash: str
 
     # Debugging fields: Not part of compare or hash
-    spdx_id: str = dataclasses.field(compare=False, hash=False, default=None)
-    url: str = dataclasses.field(compare=False, hash=False, default=None)
-    text_sample: str = dataclasses.field(
+    spdx_id: str = dataclasses.field(compare=False, hash=False, default="")
+    url: str | None = dataclasses.field(compare=False, hash=False, default=None)
+    text_sample: str = dataclasses.field(compare=False, hash=False, default="")
+    debug_hint: str | None = dataclasses.field(
         compare=False, hash=False, default=None
     )
-    debug_hint: str = dataclasses.field(compare=False, hash=False, default=None)
 
     def __gt__(self, other: "_ExtractedLicense") -> bool:
         return (
@@ -36,6 +37,7 @@ class _ExtractedLicense:
             > f"{other.path}-{other.name}-{other.text_hash}"
         )
 
+    @staticmethod
     def from_json_dict(input: Dict[str, Any]) -> "_ExtractedLicense":
         # Example SPDX license dict:
         # {
@@ -119,7 +121,7 @@ class _ExtractedLicense:
 
 
 # License path patterns that are expected to be missing
-_expected_missing: List[re.Pattern] = [
+_expected_missing: List[re_Pattern] = [
     re.compile(s)
     for s in [
         # COPYING and UNLICENSE files are not rust licenses
@@ -157,7 +159,7 @@ class SpdxComparator:
         default_factory=set
     )
 
-    def compare(self):
+    def compare(self) -> None:
         """Returns whether the files have the same licenses"""
         current_lics = self._read_spdx_licenses(self.current_file)
         legacy_lics = self._read_spdx_licenses(self.legacy_file)
@@ -189,7 +191,7 @@ class SpdxComparator:
                     self.expected_missing.add(lic)
                     self.missing.remove(lic)
 
-    def _read_spdx_licenses(self, path) -> Set[_ExtractedLicense]:
+    def _read_spdx_licenses(self, path: Path | str) -> Set[_ExtractedLicense]:
         with open(path, "r") as spdx_file:
             spdx_doc = json.load(spdx_file)
             output = set()
@@ -199,15 +201,15 @@ class SpdxComparator:
             return output
 
     def found_differences(self) -> bool:
-        return self.added or self.missing
+        return len(self.added) != 0 or len(self.missing) != 0
 
-    def log_differences(self, log_level: int, is_full_report: bool):
+    def log_differences(self, log_level: int, is_full_report: bool) -> None:
         message_lines = []
 
-        def report(s: str):
+        def report(s: str) -> None:
             message_lines.append(s)
 
-        def full_report(s: str):
+        def full_report(s: str) -> None:
             if is_full_report:
                 report(s)
 
