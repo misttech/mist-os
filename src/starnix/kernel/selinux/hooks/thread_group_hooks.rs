@@ -66,6 +66,12 @@ pub(crate) fn check_exec_access(
             // TODO(http://b/330904217): once filesystems are labeled, deny access.
             log_debug!("entrypoint permission is denied, ignoring.");
         }
+        // Check that ptrace permission is allowed if the process is traced.
+        if let Some(ptracer_sid) = selinux_state.ptracer_sid {
+            if !security_server.has_permission(ptracer_sid, new_sid, ProcessPermission::Ptrace) {
+                return error!(EACCES);
+            }
+        }
     }
     Ok(Some(SeLinuxResolvedElfState { sid: new_sid }))
 }
@@ -151,12 +157,22 @@ pub(crate) fn check_signal_access(
 }
 
 /// Checks if the task with `source_sid` is allowed to trace the task with `target_sid`.
-pub(crate) fn check_ptrace_access(
+pub(crate) fn check_ptrace_access_and_update_state(
     permission_check: &impl PermissionCheck,
-    source_sid: SecurityId,
-    target_sid: SecurityId,
+    tracer_sid: SecurityId,
+    tracee_selinux_state: &mut SeLinuxThreadGroupState,
 ) -> Result<(), Errno> {
-    check_permission(permission_check, source_sid, target_sid, ProcessPermission::Ptrace)
+    check_permission(
+        permission_check,
+        tracer_sid,
+        tracee_selinux_state.current_sid,
+        ProcessPermission::Ptrace,
+    )
+    .and_then(|_| {
+        // If tracing is allowed, set the `ptracer_sid` of the tracee with the tracer's SID.
+        tracee_selinux_state.ptracer_sid = Some(tracer_sid);
+        Ok(())
+    })
 }
 
 /// Checks if `permission` is allowed from the task with `source_sid` to the task with `target_sid`.
@@ -206,6 +222,9 @@ pub struct SeLinuxThreadGroupState {
 
     /// SID for sockets created by the task.
     pub sockcreate_sid: Option<SecurityId>,
+
+    /// SID of the tracer, if the thread group is traced.
+    pub ptracer_sid: Option<SecurityId>,
 }
 
 impl SeLinuxThreadGroupState {
@@ -218,6 +237,7 @@ impl SeLinuxThreadGroupState {
             fscreate_sid: None,
             keycreate_sid: None,
             sockcreate_sid: None,
+            ptracer_sid: None,
         }
     }
 
@@ -230,6 +250,7 @@ impl SeLinuxThreadGroupState {
             fscreate_sid: None,
             keycreate_sid: None,
             sockcreate_sid: None,
+            ptracer_sid: None,
         }
     }
 }
@@ -301,6 +322,7 @@ mod tests {
             keycreate_sid: None,
             previous_sid: current_sid,
             sockcreate_sid: None,
+            ptracer_sid: None,
         };
 
         assert_eq!(
@@ -328,6 +350,7 @@ mod tests {
             keycreate_sid: None,
             previous_sid: current_sid,
             sockcreate_sid: None,
+            ptracer_sid: None,
         };
 
         assert_eq!(
@@ -357,6 +380,7 @@ mod tests {
             keycreate_sid: None,
             previous_sid: current_sid,
             sockcreate_sid: None,
+            ptracer_sid: None,
         };
 
         assert_eq!(
@@ -382,6 +406,7 @@ mod tests {
             keycreate_sid: None,
             previous_sid: current_sid,
             sockcreate_sid: None,
+            ptracer_sid: None,
         };
 
         assert_eq!(
@@ -408,6 +433,7 @@ mod tests {
             keycreate_sid: None,
             previous_sid: current_sid,
             sockcreate_sid: None,
+            ptracer_sid: None,
         };
 
         // There is no `execute_no_trans` allow statement from `current_sid` to `executable_sid`,
@@ -447,6 +473,7 @@ mod tests {
                 keycreate_sid: initial_state.keycreate_sid,
                 previous_sid: initial_state.previous_sid,
                 sockcreate_sid: initial_state.sockcreate_sid,
+                ptracer_sid: initial_state.ptracer_sid,
             }
         );
     }
@@ -657,35 +684,76 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn ptrace_access_allowed_for_allowed_type() {
+    fn ptrace_access_allowed_for_allowed_type_and_state_is_updated() {
         let security_server = security_server_with_policy();
-        let source_sid = security_server
+        let tracer_sid = security_server
             .security_context_to_sid(b"u:object_r:test_ptrace_tracer_yes_t:s0")
             .expect("invalid security context");
-        let target_sid = security_server
+        let tracee_sid = security_server
             .security_context_to_sid(b"u:object_r:test_ptrace_traced_t:s0")
             .expect("invalid security context");
+        let initial_state = SeLinuxThreadGroupState {
+            current_sid: tracee_sid.clone(),
+            exec_sid: None,
+            fscreate_sid: None,
+            keycreate_sid: None,
+            previous_sid: tracee_sid,
+            sockcreate_sid: None,
+            ptracer_sid: None,
+        };
+        let mut tracee_state = initial_state.clone();
 
         assert_eq!(
-            check_ptrace_access(&security_server.as_permission_check(), source_sid, target_sid),
+            check_ptrace_access_and_update_state(
+                &security_server.as_permission_check(),
+                tracer_sid.clone(),
+                &mut tracee_state
+            ),
             Ok(())
+        );
+        assert_eq!(
+            tracee_state,
+            SeLinuxThreadGroupState {
+                current_sid: initial_state.current_sid,
+                exec_sid: initial_state.exec_sid,
+                fscreate_sid: initial_state.fscreate_sid,
+                keycreate_sid: initial_state.keycreate_sid,
+                previous_sid: initial_state.previous_sid,
+                sockcreate_sid: initial_state.sockcreate_sid,
+                ptracer_sid: Some(tracer_sid),
+            }
         );
     }
 
     #[fuchsia::test]
-    fn ptrace_access_denied_for_denied_type() {
+    fn ptrace_access_denied_for_denied_type_and_state_is_not_updated() {
         let security_server = security_server_with_policy();
-        let source_sid = security_server
+        let tracer_sid = security_server
             .security_context_to_sid(b"u:object_r:test_ptrace_tracer_no_t:s0")
             .expect("invalid security context");
-        let target_sid = security_server
+        let tracee_sid = security_server
             .security_context_to_sid(b"u:object_r:test_ptrace_traced_t:s0")
             .expect("invalid security context");
+        let initial_state = SeLinuxThreadGroupState {
+            current_sid: tracee_sid.clone(),
+            exec_sid: None,
+            fscreate_sid: None,
+            keycreate_sid: None,
+            previous_sid: tracee_sid,
+            sockcreate_sid: None,
+            ptracer_sid: None,
+        };
+        let mut tracee_state = initial_state.clone();
 
         assert_eq!(
-            check_ptrace_access(&security_server.as_permission_check(), source_sid, target_sid),
+            check_ptrace_access_and_update_state(
+                &security_server.as_permission_check(),
+                tracer_sid,
+                &mut tracee_state
+            ),
             error!(EACCES)
         );
+        assert_eq!(initial_state, tracee_state);
     }
 
     #[fuchsia::test]
@@ -709,6 +777,7 @@ mod tests {
                 fscreate_sid: None,
                 keycreate_sid: None,
                 sockcreate_sid: None,
+                ptracer_sid: None,
             }
         );
     }

@@ -27,12 +27,12 @@ pub const SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE: usize = 4096;
 ///
 /// If SELinux is "permissive" (non-enforcing) then error results are logged and the default
 /// success result is returned.
-fn check_if_selinux<F, R>(current_task: &CurrentTask, hook: F) -> Result<R, Errno>
+fn check_if_selinux<F, R>(task: &Task, hook: F) -> Result<R, Errno>
 where
     F: FnOnce(&Arc<SecurityServer>) -> Result<R, Errno>,
     R: Default,
 {
-    if let Some(security_server) = &current_task.kernel().security_server {
+    if let Some(security_server) = &task.kernel().security_server {
         if !security_server.has_policy() {
             return Ok(R::default());
         }
@@ -51,20 +51,20 @@ where
 ///
 /// This is used for non-enforcing hooks, such as those responsible for generating security labels
 /// for new tasks.
-fn run_if_selinux<F, R>(current_task: &CurrentTask, hook: F) -> R
+fn run_if_selinux<F, R>(task: &Task, hook: F) -> R
 where
     F: FnOnce(&Arc<SecurityServer>) -> R,
     R: Default,
 {
-    run_if_selinux_else(current_task, hook, R::default)
+    run_if_selinux_else(task, hook, R::default)
 }
 
-fn run_if_selinux_else<F, R, D>(current_task: &CurrentTask, hook: F, default: D) -> R
+fn run_if_selinux_else<F, R, D>(task: &Task, hook: F, default: D) -> R
 where
     F: FnOnce(&Arc<SecurityServer>) -> R,
     D: Fn() -> R,
 {
-    current_task.kernel().security_server.as_ref().map_or_else(&default, |ss| {
+    task.kernel().security_server.as_ref().map_or_else(&default, |ss| {
         if ss.has_policy() {
             hook(ss)
         } else {
@@ -183,36 +183,46 @@ pub fn check_signal_access(
     })
 }
 
-/// Checks if tracing the current task is allowed.
-pub fn check_ptrace_traceme_access(
+/// Checks if tracing the current task is allowed, and update the thread group SELinux state to
+/// store the tracer SID.
+pub fn check_ptrace_traceme_access_and_update_state(
     parent: &Arc<ThreadGroup>,
     current_task: &CurrentTask,
 ) -> Result<(), Errno> {
     check_if_selinux(current_task, |security_server| {
-        let source_sid = parent.get_current_sid();
-        let target_sid = current_task.get_current_sid();
-        thread_group_hooks::check_ptrace_access(
+        let tracer_sid = parent.get_current_sid();
+        let mut thread_group_state = current_task.thread_group.write();
+        thread_group_hooks::check_ptrace_access_and_update_state(
             &security_server.as_permission_check(),
-            source_sid,
-            target_sid,
+            tracer_sid,
+            &mut thread_group_state.selinux_state,
         )
     })
 }
 
-/// Checks if `current_task` is allowed to trace `tracee_task`.
-pub fn check_ptrace_attach_access(
+/// Checks if `current_task` is allowed to trace `tracee_task`, and update the thread group SELinux
+/// state to store the tracer SID.
+pub fn check_ptrace_attach_access_and_update_state(
     current_task: &CurrentTask,
     tracee_task: &Task,
 ) -> Result<(), Errno> {
     check_if_selinux(current_task, |security_server| {
-        let source_sid = current_task.get_current_sid();
-        let target_sid = tracee_task.get_current_sid();
-        thread_group_hooks::check_ptrace_access(
+        let tracer_sid = current_task.get_current_sid();
+        let mut thread_group_state = tracee_task.thread_group.write();
+        thread_group_hooks::check_ptrace_access_and_update_state(
             &security_server.as_permission_check(),
-            source_sid,
-            target_sid,
+            tracer_sid,
+            &mut thread_group_state.selinux_state,
         )
     })
+}
+
+/// Clears the `ptrace_sid` for `tracee_task`.
+pub fn clear_ptracer_sid(tracee_task: &Task) {
+    run_if_selinux(tracee_task, |_| {
+        let mut thread_group_state = tracee_task.thread_group.write();
+        thread_group_state.selinux_state.ptracer_sid = None;
+    });
 }
 
 /// Attempts to update the security ID (SID) associated with `fs_node` when
@@ -654,37 +664,58 @@ mod tests {
     #[fuchsia::test]
     async fn ptrace_traceme_access_allowed_for_selinux_disabled() {
         let (tracee_task, tracer_task) = create_task_pair_with_selinux_disabled();
-        assert_eq!(check_ptrace_traceme_access(&tracer_task.thread_group, &tracee_task), Ok(()));
+        assert_eq!(
+            check_ptrace_traceme_access_and_update_state(&tracer_task.thread_group, &tracee_task),
+            Ok(())
+        );
     }
 
     #[fuchsia::test]
     async fn ptrace_traceme_access_allowed_for_fake_mode() {
         let (tracee_task, tracer_task) = create_task_pair_with_fake_selinux();
-        assert_eq!(check_ptrace_traceme_access(&tracer_task.thread_group, &tracee_task), Ok(()));
+        assert_eq!(
+            check_ptrace_traceme_access_and_update_state(&tracer_task.thread_group, &tracee_task),
+            Ok(())
+        );
     }
 
     #[fuchsia::test]
     async fn ptrace_traceme_access_allowed_for_permissive_mode() {
         let (tracee_task, tracer_task) = create_task_pair_with_permissive_selinux();
-        assert_eq!(check_ptrace_traceme_access(&tracer_task.thread_group, &tracee_task), Ok(()));
+        assert_eq!(
+            check_ptrace_traceme_access_and_update_state(&tracer_task.thread_group, &tracee_task),
+            Ok(())
+        );
     }
 
     #[fuchsia::test]
     async fn ptrace_attach_access_allowed_for_selinux_disabled() {
         let (tracer_task, tracee_task) = create_task_pair_with_selinux_disabled();
-        assert_eq!(check_ptrace_attach_access(&tracer_task, &tracee_task), Ok(()));
+        assert_eq!(check_ptrace_attach_access_and_update_state(&tracer_task, &tracee_task), Ok(()));
     }
 
     #[fuchsia::test]
     async fn ptrace_attach_access_allowed_for_fake_mode() {
         let (tracer_task, tracee_task) = create_task_pair_with_fake_selinux();
-        assert_eq!(check_ptrace_attach_access(&tracer_task, &tracee_task), Ok(()));
+        assert_eq!(check_ptrace_attach_access_and_update_state(&tracer_task, &tracee_task), Ok(()));
     }
 
     #[fuchsia::test]
     async fn ptrace_attach_access_allowed_for_permissive_mode() {
         let (tracer_task, tracee_task) = create_task_pair_with_permissive_selinux();
-        assert_eq!(check_ptrace_attach_access(&tracer_task, &tracee_task), Ok(()));
+        assert_eq!(check_ptrace_attach_access_and_update_state(&tracer_task, &tracee_task), Ok(()));
+    }
+
+    #[fuchsia::test]
+    async fn ptracer_sid_is_cleared() {
+        let security_server = security_server_with_policy(Mode::Enable);
+        security_server.set_enforcing(true);
+        let (_kernel, tracee_task) = create_kernel_and_task_with_selinux(security_server);
+        tracee_task.thread_group.write().selinux_state.ptracer_sid =
+            Some(SecurityId::initial(InitialSid::Unlabeled));
+
+        clear_ptracer_sid(tracee_task.as_ref());
+        assert!(tracee_task.thread_group.read().selinux_state.ptracer_sid.is_none());
     }
 
     #[fuchsia::test]

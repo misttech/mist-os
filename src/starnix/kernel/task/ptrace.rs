@@ -703,6 +703,7 @@ pub fn ptrace_detach(
     if let Err(x) = ptrace_cont(&tracee, &data, true) {
         return Err(x);
     }
+    selinux_hooks::clear_ptracer_sid(tracee);
     let tid = tracee.get_tid();
     thread_group.ptracees.lock().remove(&tid);
     thread_group.write().zombie_ptracees.retain(&mut |zombie: &ZombieProcess| zombie.pid != tid);
@@ -1037,7 +1038,7 @@ pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<SyscallResult, E
 
     let parent = current_task.thread_group.read().parent.clone();
     if let Some(parent) = parent {
-        selinux_hooks::check_ptrace_traceme_access(&parent, current_task)?;
+        selinux_hooks::check_ptrace_traceme_access_and_update_state(&parent, current_task)?;
         let task_ref = OwnedRef::temp(&current_task.task);
         do_attach(&parent, (&task_ref).into(), PtraceAttachType::Attach, PtraceOptions::empty())?;
         Ok(starnix_syscalls::SUCCESS)
@@ -1061,7 +1062,7 @@ where
 
     let weak_task = current_task.kernel().pids.read().get_task(pid);
     let tracee = weak_task.upgrade().ok_or_else(|| errno!(ESRCH))?;
-    selinux_hooks::check_ptrace_attach_access(&current_task, &tracee)?;
+    selinux_hooks::check_ptrace_attach_access_and_update_state(&current_task, &tracee)?;
 
     if tracee.thread_group == current_task.thread_group {
         return error!(EPERM);
