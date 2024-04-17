@@ -38,6 +38,7 @@ group("tools") {
     "//third_party/openssh-portable:scp-shell-pkg",
     "//third_party/openssh-portable:ssh-keygen-shell-pkg",
     "//third_party/openssh-portable:ssh-shell-pkg",
+    "//third_party/sbase:sbase-pkgs",
     "//tools",
 
     # Tools that are included via the host_toolchain are in a separate group for

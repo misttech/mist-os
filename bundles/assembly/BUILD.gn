@@ -1001,6 +1001,13 @@ assembly_input_bundle("core_realm_eng") {
     # The fs_realm component should be available in every engineering-mode product.
     "//src/storage/fs_realm",
     "//src/storage/bin:fs_realm_tools",
+
+    # Always include 'ls'
+    "//third_party/sbase:ls_pkg",
+
+    # This is used by Chromium test infrastructure, and needs to always be
+    # available.
+    "//third_party/sbase:sha1sum_pkg",
   ]
   shell_commands = [
     {
@@ -3701,7 +3708,19 @@ assembly_input_bundle("emulator_support") {
 # Enabling a soft-transition, remove when complete
 # TODO(122864) Remove transitional labels
 group("third_party_sbase_for_transition") {
-  public_deps = [ "//third_party/sbase:sbase-pkgs" ]
+  public_deps = []
+
+  # Don't add these binaries via the legacy AIB, because they are added by
+  # platform AIBs.
+  _assembly_added_binaries = [
+    "ls",
+    "sha1sum",
+  ]
+  foreach(
+      bin,
+      sbase_binaries + _assembly_added_binaries - _assembly_added_binaries) {
+    public_deps += [ "//third_party/sbase:${bin}_pkg" ]
+  }
 }
 
 # Assembly may select at most one bundle with `intl_services` name prefix.
