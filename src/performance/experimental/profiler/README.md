@@ -52,13 +52,7 @@ The easiest way to interact with the profiler is through the ffx plugin:
 ffx profiler start --pid <target pid> --duration 5
 ```
 
-This will place a `profile.out` file in your current directory. You'll need to export it to pprof format.
-
-```
-fx samples_to_pprof profile.out
-```
-
-This will output the file `profile.out.pb` which can be handed to pprof.
+This will place a `profile.pb` file in your current directory which can be handed to pprof.
 
 ```
 $ pprof -top profile.out.pb

@@ -100,6 +100,22 @@ pub async fn symbolize(from: &PathBuf, to: &PathBuf) -> Result<()> {
     }
 }
 
+pub fn pprof_conversion(from: &PathBuf, to: PathBuf) -> Result<()> {
+    let from_str = from
+        .clone()
+        .into_os_string()
+        .into_string()
+        .map_err(|err| ffx_error!("Invalid path name: {err:?}"))?;
+    let to_str = to
+        .into_os_string()
+        .into_string()
+        .map_err(|err| ffx_error!("Invalid path name: {err:?}"))?;
+    if !samples_to_pprof::convert(from_str, to_str) {
+        ffx_bail!("Failed to convert to pprof");
+    }
+    Ok(())
+}
+
 pub async fn profiler(
     controller: fho::Deferred<profiler::SessionProxy>,
     mut writer: Writer,
@@ -134,7 +150,7 @@ pub async fn profiler(
                 std::path::PathBuf::from(&opts.output)
             };
 
-            let mut output = File::create(&unsymbolized_path).await.unwrap();
+            let mut output = File::create(&unsymbolized_path).await?;
             let copy_task =
                 fuchsia_async::Task::local(
                     async move { futures::io::copy(client, &mut output).await },
@@ -183,8 +199,17 @@ pub async fn profiler(
             if !opts.symbolize {
                 return Ok(());
             }
-            let symbolized_path = std::path::PathBuf::from(&opts.output);
-            symbolize(&unsymbolized_path, &symbolized_path).await
+            let symbolized_path = if opts.pprof_conversion {
+                tmp_dir.path().join("symbolized.txt")
+            } else {
+                std::path::PathBuf::from(&opts.output)
+            };
+            symbolize(&unsymbolized_path, &symbolized_path).await?;
+
+            if !opts.pprof_conversion {
+                return Ok(());
+            }
+            pprof_conversion(&symbolized_path, PathBuf::from(&opts.output))
         }
     }
 }
@@ -202,8 +227,7 @@ mod tests {
             moniker: None,
             duration: None,
             output: String::from("output_file"),
-            print_stats: false,
-            symbolize: false,
+            ..Default::default()
         };
         let target = gather_targets(&args);
         match target {
@@ -219,8 +243,7 @@ mod tests {
             url: None,
             duration: None,
             output: String::from("output_file"),
-            print_stats: false,
-            symbolize: false,
+            ..Default::default()
         };
 
         let empty_targets = gather_targets(&empty_args);
@@ -234,8 +257,7 @@ mod tests {
             url: None,
             duration: None,
             output: String::from("output_file"),
-            print_stats: false,
-            symbolize: false,
+            ..Default::default()
         };
         let invalid_args2 = args::Start {
             pids: vec![],
@@ -245,8 +267,7 @@ mod tests {
             url: None,
             duration: None,
             output: String::from("output_file"),
-            print_stats: false,
-            symbolize: false,
+            ..Default::default()
         };
         let invalid_args3 = args::Start {
             pids: vec![],
@@ -256,8 +277,7 @@ mod tests {
             url: None,
             duration: None,
             output: String::from("output_file"),
-            print_stats: false,
-            symbolize: false,
+            ..Default::default()
         };
 
         let invalid_targets1 = gather_targets(&invalid_args1);

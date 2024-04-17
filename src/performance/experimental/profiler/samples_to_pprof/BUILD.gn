@@ -3,16 +3,17 @@
 # found in the LICENSE file.
 
 import("//build/host.gni")
+import("//build/rust/rustc_library.gni")
 import("//build/test.gni")
 import("//third_party/protobuf/proto_library.gni")
 
 source_set("samples_to_pprof_src") {
   sources = [ "samples_to_pprof.cc" ]
-  deps = [
+  public_deps = [
     # TODO(https://fxbug.dev/42066681): Replace with pprof.
     # "//third_party/github.com/google/pprof:profile_proto",
     ":profile_proto",
-    "//src/lib/fxl",
+    "//sdk/lib/fit",
     "//third_party/protobuf:protobuf_full",
   ]
 }
@@ -24,8 +25,29 @@ if (is_host) {
     deps = [
       ":profile_proto",
       ":samples_to_pprof_src",
-      "//src/lib/fxl",
+      "//sdk/lib/fit",
     ]
+  }
+
+  static_library("rust_samples_to_pprof") {
+    visibility = [ ":*" ]
+    deps = [
+      ":profile_proto",
+      ":samples_to_pprof_src",
+      "//sdk/lib/fit",
+      "//src/zircon/lib/zircon:headers",
+      "//third_party/protobuf:protobuf_full",
+    ]
+    sources = [ "samples_to_pprof_rust.cc" ]
+  }
+
+  rustc_library("samples_to_pprof_rust") {
+    name = "samples_to_pprof"
+    edition = "2021"
+    source_root = "rust/src/lib.rs"
+    deps = [ ":rust_samples_to_pprof" ]
+
+    sources = [ "rust/src/lib.rs" ]
   }
 }
 

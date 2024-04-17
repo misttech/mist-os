@@ -21,6 +21,7 @@ pub enum ProfilerSubCommand {
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 /// Record a profile.
 #[argh(subcommand, name = "start")]
+#[derive(Default)]
 pub struct Start {
     /// url of a component to launch and profile
     #[argh(option)]
@@ -47,8 +48,8 @@ pub struct Start {
     #[argh(option)]
     pub duration: Option<f64>,
 
-    /// name of output trace file.  Defaults to profile.out.
-    #[argh(option, default = "String::from(\"profile.out\")")]
+    /// name of output trace file. Defaults to profile.pb.
+    #[argh(option, default = "String::from(\"profile.pb\")")]
     pub output: String,
 
     /// print stats about how the profiling session went
@@ -58,4 +59,9 @@ pub struct Start {
     /// if false, output the raw sample file instead of attempting to symbolize it
     #[argh(option, default = "true")]
     pub symbolize: bool,
+
+    /// if false, output the raw symbolized sample file instead of attempting to convert to the
+    /// pprof format. Ignored if --symbolize is false.
+    #[argh(option, default = "true")]
+    pub pprof_conversion: bool,
 }
