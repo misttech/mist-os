@@ -929,49 +929,24 @@ ssize_t ArmArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t
   return unmap_size;
 }
 
-ssize_t ArmArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, paddr_t paddr_in,
-                                      size_t size_in, pte_t attrs, const uint index_shift,
-                                      volatile pte_t* page_table, ConsistencyManager& cm) {
-  vaddr_t vaddr = vaddr_in;
-  vaddr_t vaddr_rel = vaddr_rel_in;
-  paddr_t paddr = paddr_in;
-  size_t size = size_in;
-
+zx_status_t ArmArchVmAspace::MapPageTable(pte_t attrs, uint index_shift, volatile pte_t* page_table,
+                                          ExistingEntryAction existing_action,
+                                          MappingCursor& cursor, ConsistencyManager& cm) {
   const vaddr_t block_size = 1UL << index_shift;
-  const vaddr_t block_mask = block_size - 1;
-  LTRACEF("vaddr %#" PRIxPTR ", vaddr_rel %#" PRIxPTR ", paddr %#" PRIxPTR
-          ", size %#zx, attrs %#" PRIx64 ", index shift %u, page_size_shift %u, page_table %p\n",
-          vaddr, vaddr_rel, paddr, size, attrs, index_shift, page_size_shift_, page_table);
+  const uint num_entries = (1u << (page_size_shift_ - 3));
+  const uint64_t index_mask = num_entries - 1;
+  uint index = static_cast<uint>((cursor.vaddr_rel() >> index_shift) & index_mask);
 
-  if ((vaddr_rel | paddr | size) & ((1UL << page_size_shift_) - 1)) {
-    TRACEF("not page aligned: vaddr %#" PRIxPTR ", vaddr_rel %#" PRIxPTR ",paddr %#" PRIxPTR
-           ", size %#zx\n",
-           vaddr, vaddr_rel, paddr, size);
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  auto cleanup = fit::defer([&]() {
-    AssertHeld(lock_);
-    // Unmapping what we have just mapped in should never fail, and we should not have to enlarge
-    // the unmap for it to succeed.
-    ssize_t result = UnmapPageTable(vaddr_in, vaddr_rel_in, size_in - size, EnlargeOperation::No,
-                                    index_shift, page_table, cm);
-    ASSERT(result >= 0);
-  });
-
-  size_t mapped_size = 0;
-  while (size) {
-    const vaddr_t vaddr_rem = vaddr_rel & block_mask;
-    const size_t chunk_size = ktl::min(size, block_size - vaddr_rem);
-    const vaddr_t index = vaddr_rel >> index_shift;
+  for (; index != num_entries && cursor.size() != 0; ++index) {
     pte_t pte = page_table[index];
 
     // if we're at an unaligned address, not trying to map a block, and not at the terminal level,
     // recurse one more level of the page table tree
-    if (((vaddr_rel | paddr) & block_mask) || (chunk_size != block_size) ||
+    const bool level_valigned = IS_ALIGNED(cursor.vaddr_rel(), block_size);
+    const bool level_paligned = IS_ALIGNED(cursor.paddr(), block_size);
+    if (!level_valigned || !level_paligned || cursor.PageRemaining() < block_size ||
         (index_shift > MMU_PTE_DESCRIPTOR_BLOCK_MAX_SHIFT)) {
       // Lookup the next level page table, allocating if required.
-      bool allocated_page_table = false;
       paddr_t page_table_paddr = 0;
       volatile pte_t* next_page_table = nullptr;
 
@@ -980,9 +955,15 @@ ssize_t ArmArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, pa
           zx_status_t ret = AllocPageTable(&page_table_paddr);
           if (ret) {
             TRACEF("failed to allocate page table\n");
-            return ret;
+            // The mapping wasn't fully updated, but there is work here
+            // that might need to be undone.
+            size_t partial_update = ktl::min(block_size, cursor.size());
+            // Cancel paddr tracking so we account for the virtual range we need to
+            // unmap without needing to increment in page appropriate amounts.
+            cursor.DropPAddrs();
+            cursor.ConsumeVAddr(partial_update);
+            return ZX_ERR_NO_MEMORY;
           }
-          allocated_page_table = true;
           void* pt_vaddr = paddr_to_physmap(page_table_paddr);
 
           LTRACEF("allocated page table, vaddr %p, paddr 0x%lx\n", pt_vaddr, page_table_paddr);
@@ -1000,9 +981,9 @@ ssize_t ArmArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, pa
           update_pte(&page_table[index], pte);
 
           // Tell the consistency manager that we've mapped an inner node.
-          cm.MapEntry(vaddr, false);
+          cm.MapEntry(cursor.vaddr(), false);
 
-          LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 "\n", page_table, index, pte);
+          LTRACEF("pte %p[%u] = %#" PRIx64 "\n", page_table, index, pte);
           next_page_table = static_cast<volatile pte_t*>(pt_vaddr);
           break;
         }
@@ -1024,54 +1005,35 @@ ssize_t ArmArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, pa
       }
       DEBUG_ASSERT(next_page_table);
 
-      ssize_t ret = MapPageTable(vaddr, vaddr_rem, paddr, chunk_size, attrs,
-                                 index_shift - (page_size_shift_ - 3), next_page_table, cm);
-      if (ret < 0) {
-        if (allocated_page_table) {
-          // We just allocated this page table. The unmap in err will not clean it up as the size
-          // we pass in will not cause us to look at this page table. This is reasonable as if we
-          // didn't allocate the page table then we shouldn't look into and potentially unmap
-          // anything from that page table.
-          // Since we just allocated it there should be nothing in it, otherwise the MapPageTable
-          // call would not have failed.
-          DEBUG_ASSERT(page_table_is_clear(next_page_table, page_size_shift_));
-          update_pte(&page_table[index], MMU_PTE_DESCRIPTOR_INVALID);
-
-          // We can safely defer TLB flushing as the consistency manager will not return the backing
-          // page to the PMM until after the tlb is flushed.
-          cm.FlushEntry(vaddr, false);
-          FreePageTable(const_cast<pte_t*>(next_page_table), page_table_paddr, cm);
-        }
+      zx_status_t ret = MapPageTable(attrs, index_shift - (page_size_shift_ - 3), next_page_table,
+                                     existing_action, cursor, cm);
+      if (ret != ZX_OK) {
         return ret;
       }
-      DEBUG_ASSERT(static_cast<size_t>(ret) == chunk_size);
     } else {
       if (is_pte_valid(pte)) {
-        LTRACEF("page table entry already in use, index %#" PRIxPTR ", %#" PRIx64 "\n", index, pte);
-        return ZX_ERR_ALREADY_EXISTS;
-      }
-
-      pte = paddr | attrs;
-      if (index_shift > page_size_shift_) {
-        pte |= MMU_PTE_L012_DESCRIPTOR_BLOCK;
+        if (existing_action == ExistingEntryAction::Error) {
+          LTRACEF("page table entry already in use, index %u %#" PRIx64 "\n", index, pte);
+          return ZX_ERR_ALREADY_EXISTS;
+        }
       } else {
-        pte |= MMU_PTE_L3_DESCRIPTOR_PAGE;
-      }
-      LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 " (paddr %#lx)\n", page_table, index, pte, paddr);
-      update_pte(&page_table[index], pte);
+        pte = cursor.paddr() | attrs;
+        if (index_shift > page_size_shift_) {
+          pte |= MMU_PTE_L012_DESCRIPTOR_BLOCK;
+        } else {
+          pte |= MMU_PTE_L3_DESCRIPTOR_PAGE;
+        }
+        LTRACEF("pte %p[%u] = %#" PRIx64 " (paddr %#lx)\n", page_table, index, pte, cursor.paddr());
+        update_pte(&page_table[index], pte);
 
-      // Tell the consistency manager we've mapped a new page.
-      cm.MapEntry(vaddr, true);
+        // Tell the consistency manager we've mapped a new page.
+        cm.MapEntry(cursor.vaddr(), true);
+      }
+      cursor.ConsumePAddr(block_size);
     }
-    vaddr += chunk_size;
-    vaddr_rel += chunk_size;
-    paddr += chunk_size;
-    size -= chunk_size;
-    mapped_size += chunk_size;
   }
 
-  cleanup.cancel();
-  return mapped_size;
+  return ZX_OK;
 }
 
 zx_status_t ArmArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in,
@@ -1318,27 +1280,6 @@ void ArmArchVmAspace::MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel_in,
   }
 }
 
-ssize_t ArmArchVmAspace::MapPages(vaddr_t vaddr, paddr_t paddr, size_t size, pte_t attrs,
-                                  vaddr_t vaddr_base, ConsistencyManager& cm) {
-  vaddr_t vaddr_rel = vaddr - vaddr_base;
-  vaddr_t vaddr_rel_max = 1UL << top_size_shift_;
-
-  LTRACEF("vaddr %#" PRIxPTR ", paddr %#" PRIxPTR ", size %#" PRIxPTR ", attrs %#" PRIx64
-          ", asid %#x\n",
-          vaddr, paddr, size, attrs, asid_);
-
-  if (vaddr_rel > vaddr_rel_max - size || size > vaddr_rel_max) {
-    TRACEF("vaddr %#" PRIxPTR ", size %#" PRIxPTR " out of range vaddr %#" PRIxPTR
-           ", size %#" PRIxPTR "\n",
-           vaddr, size, vaddr_base, vaddr_rel_max);
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  LOCAL_KTRACE("mmu map", ("vaddr", vaddr), ("size", size));
-  ssize_t ret = MapPageTable(vaddr, vaddr_rel, paddr, size, attrs, top_index_shift_, tt_virt_, cm);
-  return ret;
-}
-
 ssize_t ArmArchVmAspace::UnmapPages(vaddr_t vaddr, size_t size, EnlargeOperation enlarge,
                                     vaddr_t vaddr_base, ConsistencyManager& cm) {
   vaddr_t vaddr_rel = vaddr - vaddr_base;
@@ -1430,7 +1371,6 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
     return ZX_OK;
   }
 
-  ssize_t ret;
   {
     Guard<CriticalMutex> a{&lock_};
     ASSERT(updates_enabled_);
@@ -1449,22 +1389,34 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
     pte_t attrs = MmuParamsFromFlags(mmu_flags);
 
     ConsistencyManager cm(*this);
-    ret = MapPages(vaddr, paddr, count * PAGE_SIZE, attrs, vaddr_base_, cm);
+    MappingCursor cursor(/*paddrs=*/&paddr, /*paddr_count=*/1, /*page_size=*/count * PAGE_SIZE,
+                         /*vaddr=*/vaddr);
+    if (!cursor.SetVaddrRelativeOffset(vaddr_base_, 1ull << top_size_shift_)) {
+      return ZX_ERR_OUT_OF_RANGE;
+    }
+    zx_status_t status =
+        MapPageTable(attrs, top_index_shift_, tt_virt_, ExistingEntryAction::Error, cursor, cm);
     MarkAspaceModified();
+    if (status != ZX_OK) {
+      if (cursor.vaddr() > vaddr) {
+        UnmapPages(vaddr, cursor.vaddr() - vaddr, EnlargeOperation::No, vaddr_base_, cm);
+      }
+      return status;
+    }
+    DEBUG_ASSERT(cursor.size() == 0);
   }
 
   if (mapped) {
-    *mapped = (ret > 0) ? (ret / PAGE_SIZE) : 0u;
-    DEBUG_ASSERT(*mapped <= count);
+    *mapped = count;
   }
 
 #if __has_feature(address_sanitizer)
-  if (ret >= 0 && type_ == ArmAspaceType::kKernel) {
-    asan_map_shadow_for(vaddr, ret);
+  if (type_ == ArmAspaceType::kKernel) {
+    asan_map_shadow_for(vaddr, count * PAGE_SIZE);
   }
 #endif  // __has_feature(address_sanitizer)
 
-  return (ret < 0) ? (zx_status_t)ret : ZX_OK;
+  return ZX_OK;
 }
 
 zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
@@ -1500,7 +1452,6 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
     return ZX_OK;
   }
 
-  size_t total_mapped = 0;
   {
     Guard<CriticalMutex> a{&lock_};
     ASSERT(updates_enabled_);
@@ -1516,37 +1467,23 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
     }
     pte_t attrs = MmuParamsFromFlags(mmu_flags);
 
-    ssize_t ret;
-    size_t idx = 0;
     ConsistencyManager cm(*this);
-    auto undo = fit::defer([&]() TA_NO_THREAD_SAFETY_ANALYSIS {
-      if (idx > 0) {
-        UnmapPages(vaddr, idx * PAGE_SIZE, EnlargeOperation::No, vaddr_base_, cm);
-      }
-    });
-
-    vaddr_t v = vaddr;
-    for (; idx < count; ++idx) {
-      paddr_t paddr = phys[idx];
-      DEBUG_ASSERT(IS_PAGE_ALIGNED(paddr));
-      ret = MapPages(v, paddr, PAGE_SIZE, attrs, vaddr_base_, cm);
-      MarkAspaceModified();
-      if (ret < 0) {
-        zx_status_t status = static_cast<zx_status_t>(ret);
-        if (status != ZX_ERR_ALREADY_EXISTS || existing_action == ExistingEntryAction::Error) {
-          return status;
-        }
-      }
-
-      v += PAGE_SIZE;
-      if (ret > 0) {
-        total_mapped += ret / PAGE_SIZE;
-      }
+    MappingCursor cursor(/*paddrs=*/phys, /*paddr_count=*/count, /*page_size=*/PAGE_SIZE,
+                         /*vaddr=*/vaddr);
+    if (!cursor.SetVaddrRelativeOffset(vaddr_base_, 1ull << top_size_shift_)) {
+      return ZX_ERR_OUT_OF_RANGE;
     }
-    undo.cancel();
+    zx_status_t status =
+        MapPageTable(attrs, top_index_shift_, tt_virt_, existing_action, cursor, cm);
+    MarkAspaceModified();
+    if (status != ZX_OK) {
+      if (cursor.vaddr() > vaddr) {
+        UnmapPages(vaddr, cursor.vaddr() - vaddr, EnlargeOperation::No, vaddr_base_, cm);
+      }
+      return status;
+    }
+    DEBUG_ASSERT(cursor.size() == 0);
   }
-  DEBUG_ASSERT(total_mapped <= count);
-  DEBUG_ASSERT(existing_action != ExistingEntryAction::Error || total_mapped == count);
 
   if (mapped) {
     // For ExistingEntryAction::Error, we should have mapped all the addresses we were asked to.
@@ -1557,7 +1494,7 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
 
 #if __has_feature(address_sanitizer)
   if (type_ == ArmAspaceType::kKernel) {
-    asan_map_shadow_for(vaddr, total_mapped * PAGE_SIZE);
+    asan_map_shadow_for(vaddr, count * PAGE_SIZE);
   }
 #endif  // __has_feature(address_sanitizer)
 

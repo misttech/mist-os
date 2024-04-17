@@ -16,6 +16,7 @@
 #include <fbl/canary.h>
 #include <kernel/mutex.h>
 #include <vm/arch_vm_aspace.h>
+#include <vm/mapping_cursor.h>
 
 enum class ArmAspaceType {
   kUser,        // Userspace address space.
@@ -107,9 +108,9 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   void FreePageTable(void* vaddr, paddr_t paddr, ConsistencyManager& cm,
                      Reclaim reclaim = Reclaim::No) TA_REQ(lock_);
 
-  ssize_t MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, paddr_t paddr_in, size_t size_in,
-                       pte_t attrs, uint index_shift, volatile pte_t* page_table,
-                       ConsistencyManager& cm) TA_REQ(lock_);
+  zx_status_t MapPageTable(pte_t attrs, uint index_shift, volatile pte_t* page_table,
+                           ExistingEntryAction existing_action, MappingCursor& cursor,
+                           ConsistencyManager& cm) TA_REQ(lock_);
 
   ssize_t UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t size, EnlargeOperation enlarge,
                          uint index_shift, volatile pte_t* page_table, ConsistencyManager& cm,
@@ -138,8 +139,6 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
                              volatile pte_t* page_table, ConsistencyManager& cm) TA_REQ(lock_);
 
   pte_t MmuParamsFromFlags(uint mmu_flags);
-  ssize_t MapPages(vaddr_t vaddr, paddr_t paddr, size_t size, pte_t attrs, vaddr_t vaddr_base,
-                   ConsistencyManager& cm) TA_REQ(lock_);
 
   ssize_t UnmapPages(vaddr_t vaddr, size_t size, EnlargeOperation enlarge, vaddr_t vaddr_base,
                      ConsistencyManager& cm) TA_REQ(lock_);

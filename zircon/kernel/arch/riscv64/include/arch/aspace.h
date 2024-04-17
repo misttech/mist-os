@@ -14,6 +14,7 @@
 
 #include <arch/riscv64/mmu.h>
 #include <vm/arch_vm_aspace.h>
+#include <vm/mapping_cursor.h>
 
 enum class Riscv64AspaceType {
   kUser,    // Userspace address space.
@@ -114,9 +115,9 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
 
   void FreePageTable(void* vaddr, paddr_t paddr, ConsistencyManager& cm) TA_REQ(lock_);
 
-  zx::result<size_t> MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel, paddr_t paddr_in,
-                                  size_t size_in, pte_t attrs, uint level,
-                                  volatile pte_t* page_table, ConsistencyManager& cm) TA_REQ(lock_);
+  zx_status_t MapPageTable(pte_t attrs, uint level, volatile pte_t* page_table,
+                           ExistingEntryAction existing_action, MappingCursor& cursor,
+                           ConsistencyManager& cm) TA_REQ(lock_);
 
   zx::result<size_t> UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t size,
                                     EnlargeOperation enlarge, uint level,
@@ -144,9 +145,6 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
   // into that table.
   zx_status_t SplitLargePage(vaddr_t vaddr, uint level, vaddr_t pt_index,
                              volatile pte_t* page_table, ConsistencyManager& cm) TA_REQ(lock_);
-
-  zx::result<size_t> MapPages(vaddr_t vaddr, paddr_t paddr, size_t size, pte_t attrs,
-                              ConsistencyManager& cm) TA_REQ(lock_);
 
   zx::result<size_t> UnmapPages(vaddr_t vaddr, size_t size, EnlargeOperation enlarge,
                                 ConsistencyManager& cm) TA_REQ(lock_);

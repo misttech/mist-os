@@ -745,45 +745,20 @@ zx::result<size_t> Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t va
   return zx::ok(unmap_size);
 }
 
-zx::result<size_t> Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in,
-                                                     paddr_t paddr_in, size_t size_in, pte_t attrs,
-                                                     uint level, volatile pte_t* page_table,
-                                                     ConsistencyManager& cm) {
-  vaddr_t vaddr = vaddr_in;
-  vaddr_t vaddr_rel = vaddr_rel_in;
-  paddr_t paddr = paddr_in;
-  size_t size = size_in;
-
+zx_status_t Riscv64ArchVmAspace::MapPageTable(pte_t attrs, uint level, volatile pte_t* page_table,
+                                              ExistingEntryAction existing_action,
+                                              MappingCursor& cursor, ConsistencyManager& cm) {
   const vaddr_t block_size = page_size_per_level(level);
-  const vaddr_t block_mask = block_size - 1;
+  uint index = vaddr_to_index(cursor.vaddr(), level);
 
-  LTRACEF("vaddr %#" PRIxPTR ", vaddr_rel %#" PRIxPTR ", paddr %#" PRIxPTR
-          ", size %#zx, attrs %#" PRIx64 ", level %u, page_table %p\n",
-          vaddr, vaddr_rel, paddr, size, attrs, level, page_table);
-
-  if ((vaddr_rel | paddr | size) & (PAGE_MASK)) {
-    TRACEF("not page aligned\n");
-    return zx::error_result(ZX_ERR_INVALID_ARGS);
-  }
-
-  auto cleanup = fit::defer([&]() {
-    AssertHeld(lock_);
-    zx::result<size_t> result = UnmapPageTable(vaddr_in, vaddr_rel_in, size_in - size,
-                                               EnlargeOperation::No, level, page_table, cm);
-    DEBUG_ASSERT(result.is_ok());
-  });
-
-  size_t mapped_size = 0;
-  while (size) {
-    const vaddr_t vaddr_rem = vaddr_rel & block_mask;
-    const size_t chunk_size = ktl::min(size, block_size - vaddr_rem);
-    const vaddr_t index = vaddr_to_index(vaddr_rel, level);
+  for (; index != RISCV64_MMU_PT_ENTRIES && cursor.size() != 0; ++index) {
     pte_t pte = page_table[index];
 
     // if we're at an unaligned address, and not trying to map a block larger than 1GB,
     // recurse one more level of the page table tree
-    if (((vaddr_rel | paddr) & block_mask) || (chunk_size != block_size) || (level > 2)) {
-      bool allocated_page_table = false;
+    const bool level_valigned = IS_ALIGNED(cursor.vaddr_rel(), block_size);
+    const bool level_paligned = IS_ALIGNED(cursor.paddr(), block_size);
+    if (!level_valigned || !level_paligned || cursor.PageRemaining() < block_size || (level > 2)) {
       paddr_t page_table_paddr = 0;
       volatile pte_t* next_page_table = nullptr;
 
@@ -791,10 +766,16 @@ zx::result<size_t> Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t v
         zx::result<paddr_t> result = AllocPageTable();
         if (result.is_error()) {
           TRACEF("failed to allocate page table\n");
-          return result.take_error();
+          // The mapping wasn't fully updated, but there is work here
+          // that might need to be undone.
+          size_t partial_update = ktl::min(block_size, cursor.size());
+          // Cancel paddr tracking so we account for the virtual range we need to
+          // unmap without needing to increment in page appropriate amounts.
+          cursor.DropPAddrs();
+          cursor.ConsumeVAddr(partial_update);
+          return result.status_value();
         }
         page_table_paddr = result.value();
-        allocated_page_table = true;
         void* pt_vaddr = paddr_to_physmap(page_table_paddr);
 
         LTRACEF("allocated page table, vaddr %p, paddr 0x%lx\n", pt_vaddr, page_table_paddr);
@@ -815,73 +796,53 @@ zx::result<size_t> Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t v
         }
         // We do not need to sync the walker, despite writing a new entry, as this is a
         // non-terminal entry and so is irrelevant to the walker anyway.
-        LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 " (paddr %#lx)\n", page_table, index, pte,
-                paddr);
+        LTRACEF("pte %p[%u] = %#" PRIx64 " (paddr %#lx)\n", page_table, index, pte,
+                page_table_paddr);
         next_page_table = static_cast<volatile pte_t*>(pt_vaddr);
       } else if (!riscv64_pte_is_leaf(pte)) {
         page_table_paddr = riscv64_pte_pa(pte);
         LTRACEF("found page table %#" PRIxPTR "\n", page_table_paddr);
         next_page_table = static_cast<volatile pte_t*>(paddr_to_physmap(page_table_paddr));
       } else {
-        return zx::error_result(ZX_ERR_ALREADY_EXISTS);
+        return ZX_ERR_ALREADY_EXISTS;
       }
       DEBUG_ASSERT(next_page_table);
 
-      zx::result<size_t> result =
-          MapPageTable(vaddr, vaddr_rem, paddr, chunk_size, attrs, level - 1, next_page_table, cm);
-      if (result.is_error()) {
-        if (allocated_page_table) {
-          // We just allocated this page table. The unmap in err will not clean it up as the size
-          // we pass in will not cause us to look at this page table. This is reasonable as if we
-          // didn't allocate the page table then we shouldn't look into and potentially unmap
-          // anything from that page table.
-          // Since we just allocated it there should be nothing in it, otherwise the MapPageTable
-          // call would not have failed.
-          DEBUG_ASSERT(page_table_is_clear(next_page_table));
-          page_table[index] = 0;
-
-          // We can safely defer TLB flushing as the consistency manager will not return the backing
-          // page to the PMM until after the tlb is flushed.
-          cm.FlushEntry(vaddr, false);
-          FreePageTable(const_cast<pte_t*>(next_page_table), page_table_paddr, cm);
-        }
+      zx_status_t result =
+          MapPageTable(attrs, level - 1, next_page_table, existing_action, cursor, cm);
+      if (result != ZX_OK) {
         return result;
       }
-      DEBUG_ASSERT(result.value() == chunk_size);
     } else {
       if (riscv64_pte_is_valid(pte)) {
-        LTRACEF("page table entry already in use, index %#" PRIxPTR ", %#" PRIx64 "\n", index, pte);
-        return zx::error_result(ZX_ERR_ALREADY_EXISTS);
-      }
+        if (existing_action == ExistingEntryAction::Error) {
+          LTRACEF("page table entry already in use, index %u, %#" PRIx64 "\n", index, pte);
+          return ZX_ERR_ALREADY_EXISTS;
+        }
+      } else {
+        pte = riscv64_pte_pa_to_pte(cursor.paddr()) | attrs;
+        LTRACEF("pte %p[%u] = %#" PRIx64 "\n", page_table, index, pte);
+        page_table[index] = pte;
 
-      pte = riscv64_pte_pa_to_pte(paddr) | attrs;
-      LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 "\n", page_table, index, pte);
-      page_table[index] = pte;
-
-      // Flush the TLB on map as well, unlike most architectures.
-      if (IsKernel()) {
-        // Normally we only need a local fence here and secondary cpus at worse would only
-        // get a spurious page fault. However, since spurious PFs are not tolerated in the
-        // kernel we want to do a full flush via the ConsistencyManager for kernel addresses.
-        cm.FlushEntry(vaddr, true);
-      } else if (IsUser()) {
-        // Perform a local sfence.vma on the single page in the local asid. If another cpu were
-        // to page fault on this user address, it will sfence.vma in its PF handler.
-        riscv64_tlb_flush_address_one_asid(vaddr, asid_);
-        kcounter_add(cm_local_page_invalidate, 1);
-      } else [[unlikely]] {
-        PANIC_UNIMPLEMENTED;
+        // Flush the TLB on map as well, unlike most architectures.
+        if (IsKernel()) {
+          // Normally we only need a local fence here and secondary cpus at worse would only
+          // get a spurious page fault. However, since spurious PFs are not tolerated in the
+          // kernel we want to do a full flush via the ConsistencyManager for kernel addresses.
+          cm.FlushEntry(cursor.vaddr(), true);
+        } else if (IsUser()) {
+          // Perform a local sfence.vma on the single page in the local asid. If another cpu were
+          // to page fault on this user address, it will sfence.vma in its PF handler.
+          riscv64_tlb_flush_address_one_asid(cursor.vaddr(), asid_);
+          kcounter_add(cm_local_page_invalidate, 1);
+        } else [[unlikely]] {
+          PANIC_UNIMPLEMENTED;
+        }
       }
+      cursor.ConsumePAddr(block_size);
     }
-    vaddr += chunk_size;
-    vaddr_rel += chunk_size;
-    paddr += chunk_size;
-    size -= chunk_size;
-    mapped_size += chunk_size;
   }
-
-  cleanup.cancel();
-  return zx::ok(mapped_size);
+  return ZX_OK;
 }
 
 zx_status_t Riscv64ArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in,
@@ -1060,15 +1021,6 @@ void Riscv64ArchVmAspace::MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel
   }
 }
 
-zx::result<size_t> Riscv64ArchVmAspace::MapPages(vaddr_t vaddr, paddr_t paddr, size_t size,
-                                                 pte_t attrs, ConsistencyManager& cm) {
-  LOCAL_KTRACE("mmu map", (vaddr & ~PAGE_MASK) | ((size >> PAGE_SIZE_SHIFT) & PAGE_MASK));
-  uint level = RISCV64_MMU_PT_LEVELS - 1;
-  zx::result<size_t> ret = MapPageTable(vaddr, vaddr, paddr, size, attrs, level, tt_virt_, cm);
-  mb();
-  return ret;
-}
-
 zx::result<size_t> Riscv64ArchVmAspace::UnmapPages(vaddr_t vaddr, size_t size,
                                                    EnlargeOperation enlarge,
                                                    ConsistencyManager& cm) {
@@ -1121,13 +1073,26 @@ zx_status_t Riscv64ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, siz
 
   ConsistencyManager cm(*this);
   const pte_t attrs = mmu_flags_to_pte_attr(mmu_flags, IsKernel());
-  zx::result<size_t> result = MapPages(vaddr, paddr, count * PAGE_SIZE, attrs, cm);
+  MappingCursor cursor(/*paddrs=*/&paddr, /*paddr_count=*/1, /*page_size=*/count * PAGE_SIZE,
+                       /*vaddr=*/vaddr);
+  zx_status_t result = MapPageTable(attrs, RISCV64_MMU_PT_LEVELS - 1, tt_virt_,
+                                    ExistingEntryAction::Error, cursor, cm);
+  mb();
+  if (result != ZX_OK) {
+    if (cursor.vaddr() > vaddr) {
+      zx::result<size_t> unmap_result =
+          UnmapPages(vaddr, cursor.vaddr() - vaddr, EnlargeOperation::No, cm);
+      ASSERT(unmap_result.is_ok());
+    }
+    return result;
+  }
+  DEBUG_ASSERT(cursor.size() == 0);
+
   if (mapped) {
-    *mapped = result.is_ok() ? result.value() / PAGE_SIZE : 0u;
-    DEBUG_ASSERT(*mapped <= count);
+    *mapped = count;
   }
 
-  return result.status_value();
+  return ZX_OK;
 }
 
 zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
@@ -1162,7 +1127,6 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
     return ZX_OK;
   }
 
-  size_t total_mapped = 0;
   {
     Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
     if (mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) {
@@ -1172,35 +1136,22 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
       }
     }
 
-    size_t idx = 0;
     ConsistencyManager cm(*this);
-    auto undo = fit::defer([&]() TA_NO_THREAD_SAFETY_ANALYSIS {
-      if (idx > 0) {
-        zx::result<size_t> result = UnmapPages(vaddr, idx * PAGE_SIZE, EnlargeOperation::No, cm);
-        DEBUG_ASSERT(result.is_ok());
-      }
-    });
-
     const pte_t attrs = mmu_flags_to_pte_attr(mmu_flags, IsKernel());
-    vaddr_t v = vaddr;
-    for (; idx < count; ++idx) {
-      paddr_t paddr = phys[idx];
-      DEBUG_ASSERT(IS_PAGE_ALIGNED(paddr));
-      zx::result<size_t> result = MapPages(v, paddr, PAGE_SIZE, attrs, cm);
-      if (result.is_error()) {
-        if (result.error_value() != ZX_ERR_ALREADY_EXISTS ||
-            existing_action == ExistingEntryAction::Error) {
-          return result.error_value();
-        }
-      } else {
-        total_mapped += result.value() / PAGE_SIZE;
+    MappingCursor cursor(/*paddrs=*/phys, /*paddr_count=*/count, /*page_size=*/PAGE_SIZE,
+                         /*vaddr=*/vaddr);
+    zx_status_t result =
+        MapPageTable(attrs, RISCV64_MMU_PT_LEVELS - 1, tt_virt_, existing_action, cursor, cm);
+    mb();
+    if (result != ZX_OK) {
+      if (cursor.vaddr() > vaddr) {
+        zx::result<size_t> unmap_result =
+            UnmapPages(vaddr, cursor.vaddr() - vaddr, EnlargeOperation::No, cm);
+        ASSERT(unmap_result.is_ok());
       }
-
-      v += PAGE_SIZE;
+      return result;
     }
-    undo.cancel();
   }
-  DEBUG_ASSERT(total_mapped <= count);
 
   if (mapped) {
     // For ExistingEntryAction::Error, we should have mapped all the addresses we were asked to.
