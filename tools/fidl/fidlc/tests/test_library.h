@@ -78,8 +78,10 @@ class SharedInterface {
   void set_warnings_as_errors(bool value) { reporter()->set_warnings_as_errors(value); }
   void PrintReports() { reporter()->PrintReports(/*enable_color=*/false); }
   void SelectVersion(std::string platform, std::string_view version) {
-    version_selection()->Insert(Platform::Parse(std::move(platform)).value(),
-                                Version::Parse(version).value());
+    SelectVersion(std::move(platform), Version::Parse(version).value());
+  }
+  void SelectVersion(std::string platform, Version version) {
+    version_selection()->Insert(Platform::Parse(std::move(platform)).value(), version);
   }
   void EnableFlag(ExperimentalFlag flag) { experimental_flags().Enable(flag); }
 };
@@ -225,6 +227,19 @@ class TestLibrary final : public SharedInterface {
   const Union* LookupUnion(std::string_view name);
   const Overlay* LookupOverlay(std::string_view name);
   const Protocol* LookupProtocol(std::string_view name);
+
+  bool HasBits(std::string_view name) { return LookupBits(name) != nullptr; }
+  bool HasConstant(std::string_view name) { return LookupConstant(name) != nullptr; }
+  bool HasEnum(std::string_view name) { return LookupEnum(name) != nullptr; }
+  bool HasResource(std::string_view name) { return LookupResource(name) != nullptr; }
+  bool HasService(std::string_view name) { return LookupService(name) != nullptr; }
+  bool HasStruct(std::string_view name) { return LookupStruct(name) != nullptr; }
+  bool HasNewType(std::string_view name) { return LookupNewType(name) != nullptr; }
+  bool HasTable(std::string_view name) { return LookupTable(name) != nullptr; }
+  bool HasAlias(std::string_view name) { return LookupAlias(name) != nullptr; }
+  bool HasUnion(std::string_view name) { return LookupUnion(name) != nullptr; }
+  bool HasOverlay(std::string_view name) { return LookupOverlay(name) != nullptr; }
+  bool HasProtocol(std::string_view name) { return LookupProtocol(name) != nullptr; }
 
   const SourceFile& source_file() const {
     ZX_ASSERT_MSG(all_sources_.size() == 1, "convenience method only possible with single source");
