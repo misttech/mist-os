@@ -13,6 +13,7 @@
 #include "definitions.h"
 #include "device_port.h"
 #include "diagnostics_service.h"
+#include "event_hook.h"
 #include "port_watcher.h"
 #include "public/locks.h"
 #include "public/network_device.h"
@@ -337,11 +338,11 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   SharedLock control_lock_ __TA_ACQUIRED_AFTER(tx_lock_, rx_lock_);
 
   // Event hooks used in tests:
-  fit::function<void(const char*)> evt_session_started_;
+  EventHook<fit::function<void(const char*)>> evt_session_started_;
   // NB: This will be called with control_lock_ held.
-  fit::function<void(const char*)> evt_session_died_;
-  fit::function<void(uint64_t)> evt_rx_queue_packet_;
-  fit::function<void()> evt_tx_complete_;
+  EventHook<fit::function<void(const char*)>> evt_session_died_;
+  EventHook<fit::function<void(uint64_t)>> evt_rx_queue_packet_;
+  EventHook<fit::function<void()>> evt_tx_complete_;
 };
 
 }  // namespace network::internal

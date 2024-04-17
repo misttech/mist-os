@@ -238,8 +238,15 @@ class NetworkDeviceTest : public ::testing::Test {
     // RX queue, AFTER NetworkDeviceImpl::Start has replied with its completer.
     impl_.SetOnStart([this] {
       SetEvtRxQueuePacketHandler([this](uint64_t key) {
-        SetEvtRxQueuePacketHandler(nullptr);
-        impl_.events().signal(0, kEventStartCompleted);
+        // It's possible to encounter a kSessionSwitchKey packet here depending on scheduling. That
+        // packet is queued before Start is called but may not be processed until after Start has
+        // come to this point. Ignore the kSessionSwitchKey and only signal completion on the
+        // kTriggerRxKey packet as that is what actually signals that the RX queue is ready. And
+        // that is the packet we need to consume to ensure it doesn't interfere with the tests.
+        if (key == internal::RxQueue::kTriggerRxKey) {
+          SetEvtRxQueuePacketHandler(nullptr);
+          impl_.events().signal(0, kEventStartCompleted);
+        }
       });
     });
 
@@ -294,16 +301,35 @@ class NetworkDeviceTest : public ::testing::Test {
   }
 
   void SetEvtRxQueuePacketHandler(fit::function<void(uint64_t)> h) {
-    static_cast<internal::DeviceInterface*>(device_.get())->evt_rx_queue_packet_ = std::move(h);
+    static_cast<internal::DeviceInterface*>(device_.get())->evt_rx_queue_packet_.Set(std::move(h));
   }
 
   void SetEvtTxCompleteHandler(fit::function<void()> h) {
-    static_cast<internal::DeviceInterface*>(device_.get())->evt_tx_complete_ = std::move(h);
+    static_cast<internal::DeviceInterface*>(device_.get())->evt_tx_complete_.Set(std::move(h));
   }
 
   void SetBacktraceCallback(fit::function<void()> cb) {
     auto* dev = static_cast<internal::DeviceInterface*>(device_.get());
     dev->diagnostics().trigger_stack_trace_ = std::move(cb);
+  }
+
+  // Create an RX queue packet event handler that will signal a completion once the RX queue has
+  // been triggered. The completion is created and owned by the handler and a pointer to the
+  // completion will be placed in the |out_completion| parameter. This ensures that even if the
+  // event handler is called after the test has gone out of scope or as the event handler is being
+  // reset it will not attempt to use a completion stored on the stack of the test.
+  fit::function<void(uint64_t)> CreateTriggerRxHandler(libsync::Completion** out_completion) {
+    std::unique_ptr completion = std::make_unique<libsync::Completion>();
+    *out_completion = completion.get();
+    return [completion = std::move(completion)](uint64_t key) {
+      // Ignore any kFifoWatchKey events as they may occur before the kTriggerRxKey event when
+      // completing RX buffers.
+      if (key == internal::RxQueue::kFifoWatchKey) {
+        return;
+      }
+      EXPECT_EQ(key, internal::RxQueue::kTriggerRxKey);
+      completion->Signal();
+    };
   }
 
  protected:
@@ -575,14 +601,11 @@ TEST_F(NetworkDeviceTest, RxBufferBuild) {
   // Ensure no more rx buffers were actually returned:
   ASSERT_TRUE(buffers.is_empty());
 
-  libsync::Completion completion;
-  SetEvtRxQueuePacketHandler([&completion](uint64_t key) {
-    ASSERT_EQ(key, internal::RxQueue::kTriggerRxKey);
-    completion.Signal();
-  });
+  libsync::Completion* completion = nullptr;
+  SetEvtRxQueuePacketHandler(CreateTriggerRxHandler(&completion));
   //  Commit the returned buffers.
   return_session.Commit();
-  ASSERT_OK(completion.Wait(TEST_DEADLINE));
+  ASSERT_OK(completion->Wait(TEST_DEADLINE));
   SetEvtRxQueuePacketHandler(nullptr);
 
   // Check that all descriptors were returned to the queue:
@@ -881,13 +904,10 @@ TEST_F(NetworkDeviceTest, TwoSessionsRx) {
     ASSERT_OK(buff->WriteData(data, vmo_provider));
     return_session.Enqueue(std::move(buff), kPort13);
   }
-  libsync::Completion completion;
-  SetEvtRxQueuePacketHandler([&completion](uint64_t key) {
-    EXPECT_EQ(key, internal::RxQueue::kTriggerRxKey);
-    completion.Signal();
-  });
+  libsync::Completion* completion = nullptr;
+  SetEvtRxQueuePacketHandler(CreateTriggerRxHandler(&completion));
   return_session.Commit();
-  ASSERT_OK(completion.Wait(TEST_DEADLINE));
+  ASSERT_OK(completion->Wait(TEST_DEADLINE));
   SetEvtRxQueuePacketHandler(nullptr);
 
   auto checker = [kBufferCount, kDataLen](TestSession& session) {
@@ -1201,6 +1221,7 @@ TEST_F(NetworkDeviceTest, TxHeadLength) {
   TestSession session;
   ASSERT_OK(OpenSession(&session));
   ASSERT_OK(AttachSessionPort(session, port13_));
+  ASSERT_OK(WaitStart());
   session.ZeroVmo();
   const netdev::wire::PortId port13_id = GetSaltedPortId(kPort13);
   {
@@ -1824,13 +1845,10 @@ TEST_F(NetworkDeviceTest, RxCrossSessionChaining) {
   {
     RxFidlReturnTransaction transaction(&impl_);
     transaction.Enqueue(std::move(ret));
-    libsync::Completion completion;
-    SetEvtRxQueuePacketHandler([&completion](uint64_t key) {
-      EXPECT_EQ(key, internal::RxQueue::kTriggerRxKey);
-      completion.Signal();
-    });
+    libsync::Completion* completion = nullptr;
+    SetEvtRxQueuePacketHandler(CreateTriggerRxHandler(&completion));
     transaction.Commit();
-    ASSERT_OK(completion.Wait(TEST_DEADLINE));
+    ASSERT_OK(completion->Wait(TEST_DEADLINE));
     SetEvtRxQueuePacketHandler(nullptr);
   }
 
@@ -2708,6 +2726,7 @@ TEST_F(NetworkDeviceTest, SecondarySessionWithRxOffsetAndChaining) {
     }
     ASSERT_OK(AttachSessionPort(s.session, port13_));
   }
+  ASSERT_OK(WaitStart());
 
   ASSERT_OK(WaitRxAvailable());
   RxFidlReturnTransaction txn(&impl_);
@@ -2728,13 +2747,10 @@ TEST_F(NetworkDeviceTest, SecondarySessionWithRxOffsetAndChaining) {
     };
     txn.Enqueue(std::move(rx_space), kPort13);
   }
-  libsync::Completion completion;
-  SetEvtRxQueuePacketHandler([&completion](uint64_t key) {
-    EXPECT_EQ(key, internal::RxQueue::kTriggerRxKey);
-    completion.Signal();
-  });
+  libsync::Completion* completion = nullptr;
+  SetEvtRxQueuePacketHandler(CreateTriggerRxHandler(&completion));
   txn.Commit();
-  ASSERT_OK(completion.Wait(TEST_DEADLINE));
+  ASSERT_OK(completion->Wait(TEST_DEADLINE));
 
   SetEvtRxQueuePacketHandler(nullptr);
 
@@ -2790,6 +2806,7 @@ TEST_F(NetworkDeviceTest, BufferChainingOnListenTx) {
   ASSERT_OK(OpenSession(&listen, netdev::wire::SessionFlags::kListenTx, kDefaultDescriptorCount,
                         kDefaultBufferLength, "listen"));
   ASSERT_OK(AttachSessionPort(listen, port13_));
+  ASSERT_OK(WaitStart());
 
   constexpr uint32_t kRxDescriptorLen = 30;
   constexpr uint16_t kRxDescriptorCount = 3;
@@ -2930,6 +2947,7 @@ TEST_F(NetworkDeviceTest, DeadSessionsDontPreventTeardown) {
   TestSession session;
   ASSERT_OK(OpenSession(&session));
   ASSERT_OK(AttachSessionPort(session, port13_));
+  ASSERT_OK(WaitStart());
   session.ResetDescriptor(kDescriptorIndex0);
   ASSERT_OK(session.SendRx(kDescriptorIndex0));
   ASSERT_OK(WaitRxAvailable());
@@ -3059,6 +3077,7 @@ TEST_F(NetworkDeviceTest, PortGetRxCounters) {
   TestSession session;
   ASSERT_OK(OpenSession(&session));
   ASSERT_OK(AttachSessionPort(session, port13_));
+  ASSERT_OK(WaitStart());
 
   zx::result port = OpenPort(kPort13);
   ASSERT_OK(port.status_value());
@@ -3085,15 +3104,12 @@ TEST_F(NetworkDeviceTest, PortGetRxCounters) {
     return std::make_unique<RxFidlReturn>(std::move(buffer), kPort13);
   };
 
-  libsync::Completion rx_event;
-  SetEvtRxQueuePacketHandler([&rx_event](uint64_t key) {
-    ASSERT_EQ(key, internal::RxQueue::kTriggerRxKey);
-    rx_event.Signal();
-  });
+  libsync::Completion* rx_event = nullptr;
+  SetEvtRxQueuePacketHandler(CreateTriggerRxHandler(&rx_event));
 
-  auto wait_for_rx = [&rx_event] {
-    rx_event.Wait();
-    rx_event.Reset();
+  auto wait_for_rx = [rx_event] {
+    rx_event->Wait();
+    rx_event->Reset();
   };
 
   auto assert_counters = [&port_connection](uint64_t frames, uint64_t bytes,
@@ -3151,6 +3167,7 @@ TEST_F(NetworkDeviceTest, PortGetTxCounters) {
   TestSession session;
   ASSERT_OK(OpenSession(&session));
   ASSERT_OK(AttachSessionPort(session, port13_));
+  ASSERT_OK(WaitStart());
 
   zx::result port = OpenPort(kPort13);
   ASSERT_OK(port.status_value());
@@ -3256,6 +3273,7 @@ TEST_F(NetworkDeviceStressTest, ManyTxFullWaits) {
   TestSession session;
   ASSERT_OK(OpenSession(&session));
   ASSERT_OK(AttachSessionPort(session, port13_));
+  ASSERT_OK(WaitStart());
 
   std::array<TestSession, MAX_VMOS - 1> idle_sessions;
 

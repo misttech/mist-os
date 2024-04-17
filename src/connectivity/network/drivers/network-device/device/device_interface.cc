@@ -115,17 +115,6 @@ void TeardownAndFreeBinder(std::unique_ptr<network::NetworkDeviceImplBinder>&& b
   binder_ptr->Teardown([binder = std::move(binder)]() mutable { binder.reset(); });
 }
 
-// Helper to call event hooks (represented by a fit::function or anything that has the same share
-// behavior) while ensuring that the event is kept alive throughout the invocation of the event
-// handler. This allows event handlers to re-assign the same event handler during invocation.
-// Otherwise the handler would be destroyed during its own invocation which could result in attempts
-// to access invalid state in the event handler, such as captures.
-template <typename Event, typename... Args>
-auto TriggerEvent(Event& event, Args&&... args) {
-  auto shared_event = event.share();
-  return event(std::forward<Args>(args)...);
-}
-
 }  // namespace
 
 namespace network {
@@ -822,9 +811,7 @@ void DeviceInterface::SessionStarted(Session& session) {
     control_lock_.Release();
   }
 
-  if (evt_session_started_) {
-    TriggerEvent(evt_session_started_, session.name());
-  }
+  evt_session_started_.Trigger(session.name());
 }
 
 bool DeviceInterface::SessionStoppedInner(Session& session) {
@@ -1365,9 +1352,7 @@ void DeviceInterface::PruneDeadSessions() __TA_REQUIRES_SHARED(control_lock_) {
           const std::string session_name = session.name();
           control_lock_.Acquire();
           dead_sessions_.erase(session);
-          if (evt_session_died_) {
-            TriggerEvent(evt_session_died_, session_name.c_str());
-          }
+          evt_session_died_.Trigger(session_name.c_str());
           ContinueTeardown(TeardownState::SESSIONS);
         });
       });
@@ -1462,17 +1447,9 @@ zx_status_t DeviceInterface::CanCreatePortWithId(uint8_t port_id) {
   return ZX_OK;
 }
 
-void DeviceInterface::NotifyRxQueuePacket(uint64_t key) {
-  if (evt_rx_queue_packet_) {
-    TriggerEvent(evt_rx_queue_packet_, key);
-  }
-}
+void DeviceInterface::NotifyRxQueuePacket(uint64_t key) { evt_rx_queue_packet_.Trigger(key); }
 
-void DeviceInterface::NotifyTxComplete() {
-  if (evt_tx_complete_) {
-    TriggerEvent(evt_tx_complete_);
-  }
-}
+void DeviceInterface::NotifyTxComplete() { evt_tx_complete_.Trigger(); }
 
 DeviceInterface::DeviceInterface(const DeviceInterfaceDispatchers& dispatchers)
     : dispatchers_(dispatchers),

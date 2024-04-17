@@ -348,10 +348,10 @@ zx::result<std::unique_ptr<NetworkDeviceInterface>> FakeNetworkDeviceImpl::Creat
   }
 
   auto& value = device.value();
-  value->evt_session_started_ = [this](const char* session) {
-    event_.signal(0, kEventSessionStarted);
-  };
-  value->evt_session_died_ = [this](const char* session) { event_.signal(0, kEventSessionDied); };
+  value->evt_session_started_.Set(
+      [this](const char* session) { event_.signal(0, kEventSessionStarted); });
+  value->evt_session_died_.Set(
+      [this](const char* session) { event_.signal(0, kEventSessionDied); });
   return zx::ok(std::move(value));
 }
 
