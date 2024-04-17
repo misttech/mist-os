@@ -9,11 +9,12 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <zircon/compiler.h>
 
 #include "device_id.h"
 #include "inet6.h"
 #include "netifc.h"
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 
 #define MDNS_FLAG_QUERY_RESPONSE 0x8000
 #define MDNS_FLAG_AUTHORITATIVE 0x400
@@ -219,7 +220,7 @@ bool mdns_write_packet(struct mdns_header* hdr, struct mdns_record* records, str
 
 bool mdns_write_fastboot_packet(bool finished, bool tcp, struct mdns_buf* packet_buf) {
   // Clear name segment locations.
-  for (size_t i = 0; i < countof(name_segments); ++i) {
+  for (size_t i = 0; i < ARRAY_SIZE(name_segments); ++i) {
     name_segments[i].loc = 0;
   }
 
