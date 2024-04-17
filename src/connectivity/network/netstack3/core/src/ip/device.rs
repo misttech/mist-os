@@ -172,7 +172,7 @@ pub enum Ipv6DeviceTimerId<D: device::StrongId> {
     Mld(MldDelayedReportTimerId<D>),
     Dad(DadTimerId<D>),
     Rs(RsTimerId<D::Weak>),
-    RouteDiscovery(Ipv6DiscoveredRouteTimerId<D>),
+    RouteDiscovery(Ipv6DiscoveredRouteTimerId<D::Weak>),
     Slaac(SlaacTimerId<D>),
 }
 
@@ -195,7 +195,7 @@ impl<D: device::StrongId> Ipv6DeviceTimerId<D> {
             Self::Mld(id) => Some(id.device_id().clone()),
             Self::Dad(id) => Some(id.device_id().clone()),
             Self::Rs(id) => id.device_id().upgrade(),
-            Self::RouteDiscovery(id) => Some(id.device_id().clone()),
+            Self::RouteDiscovery(id) => id.device_id().upgrade(),
             Self::Slaac(id) => Some(id.device_id().clone()),
         }
     }
@@ -219,8 +219,8 @@ impl<D: device::StrongId> From<RsTimerId<D::Weak>> for Ipv6DeviceTimerId<D> {
     }
 }
 
-impl<D: device::StrongId> From<Ipv6DiscoveredRouteTimerId<D>> for Ipv6DeviceTimerId<D> {
-    fn from(id: Ipv6DiscoveredRouteTimerId<D>) -> Ipv6DeviceTimerId<D> {
+impl<D: device::StrongId> From<Ipv6DiscoveredRouteTimerId<D::Weak>> for Ipv6DeviceTimerId<D> {
+    fn from(id: Ipv6DiscoveredRouteTimerId<D::Weak>) -> Ipv6DeviceTimerId<D> {
         Ipv6DeviceTimerId::RouteDiscovery(id)
     }
 }
@@ -258,13 +258,6 @@ impl_timer_context!(
 impl_timer_context!(
     D: device::StrongId,
     Ipv6DeviceTimerId<D>,
-    Ipv6DiscoveredRouteTimerId::<D>,
-    Ipv6DeviceTimerId::RouteDiscovery(id),
-    id
-);
-impl_timer_context!(
-    D: device::StrongId,
-    Ipv6DeviceTimerId<D>,
     SlaacTimerId::<D>,
     Ipv6DeviceTimerId::Slaac(id),
     id
@@ -274,7 +267,7 @@ impl<
         D: device::StrongId,
         BC,
         CC: TimerHandler<BC, RsTimerId<D::Weak>>
-            + TimerHandler<BC, Ipv6DiscoveredRouteTimerId<D>>
+            + TimerHandler<BC, Ipv6DiscoveredRouteTimerId<D::Weak>>
             + TimerHandler<BC, MldDelayedReportTimerId<D>>
             + TimerHandler<BC, SlaacTimerId<D>>
             + TimerHandler<BC, DadTimerId<D>>,

@@ -579,8 +579,8 @@ impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::Ipv6DeviceL
 impl<BT: IpDeviceStateBindingsTypes> LockFor<crate::lock_ordering::Ipv6DeviceRouteDiscovery>
     for DualStackIpDeviceState<BT>
 {
-    type Data = Ipv6RouteDiscoveryState;
-    type Guard<'l> = crate::sync::LockGuard<'l, Ipv6RouteDiscoveryState>
+    type Data = Ipv6RouteDiscoveryState<BT>;
+    type Guard<'l> = crate::sync::LockGuard<'l, Ipv6RouteDiscoveryState<BT>>
         where
             Self: 'l;
     fn lock(&self) -> Self::Guard<'_> {
@@ -641,7 +641,7 @@ impl Ipv6NetworkLearnedParameters {
 /// The state common to all IPv6 devices.
 pub struct Ipv6DeviceState<BT: IpDeviceStateBindingsTypes> {
     pub(super) learned_params: RwLock<Ipv6NetworkLearnedParameters>,
-    pub(super) route_discovery: Mutex<Ipv6RouteDiscoveryState>,
+    pub(super) route_discovery: Mutex<Ipv6RouteDiscoveryState<BT>>,
     pub(super) router_solicitations: Mutex<RsState<BT>>,
     pub(crate) ip_state: IpDeviceState<Ipv6, BT>,
     pub(crate) config: RwLock<Ipv6DeviceConfiguration>,
@@ -654,7 +654,10 @@ impl<BC: IpDeviceStateBindingsTypes + TimerContext2> Ipv6DeviceState<BC> {
     ) -> Self {
         Ipv6DeviceState {
             learned_params: Default::default(),
-            route_discovery: Default::default(),
+            route_discovery: Mutex::new(Ipv6RouteDiscoveryState::new::<
+                _,
+                NestedIntoCoreTimerCtx<CC, _>,
+            >(bindings_ctx, device_id.clone())),
             router_solicitations: Mutex::new(RsState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(
                 bindings_ctx,
                 device_id,
