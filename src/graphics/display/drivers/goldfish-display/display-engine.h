@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_GOLDFISH_DISPLAY_DISPLAY_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_GOLDFISH_DISPLAY_DISPLAY_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_GOLDFISH_DISPLAY_DISPLAY_ENGINE_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_GOLDFISH_DISPLAY_DISPLAY_ENGINE_H_
 
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
@@ -12,7 +12,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/ddk/device.h>
-#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/result.h>
@@ -20,39 +19,35 @@
 #include <zircon/types.h>
 
 #include <list>
-#include <map>
 #include <memory>
 
-#include <ddktl/device.h>
-#include <fbl/auto_lock.h>
-#include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
 
-#include "src/devices/lib/goldfish/pipe_io/pipe_io.h"
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 
 namespace goldfish {
 
-class Display;
-using DisplayType = ddk::Device<Display>;
-
-class Display : public DisplayType,
-                public ddk::DisplayControllerImplProtocol<Display, ddk::base_protocol> {
+class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
  public:
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
+  // `control`, `pipe`, `sysmem_allocator` must be valid.
+  // `render_control` must not be null.
+  explicit DisplayEngine(fidl::ClientEnd<fuchsia_hardware_goldfish::ControlDevice> control,
+                         fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe,
+                         fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_allocator,
+                         std::unique_ptr<RenderControl> render_control);
 
-  explicit Display(zx_device_t* parent);
+  DisplayEngine(const DisplayEngine&) = delete;
+  DisplayEngine(DisplayEngine&&) = delete;
+  DisplayEngine& operator=(const DisplayEngine&) = delete;
+  DisplayEngine& operator=(DisplayEngine&&) = delete;
 
-  ~Display();
+  ~DisplayEngine();
 
-  zx_status_t Bind();
-
-  // Device protocol implementation.
-  void DdkRelease();
+  // Performs initialization that cannot be done in the constructor.
+  zx::result<> Initialize();
 
   // Display controller protocol implementation.
   void DisplayControllerImplSetDisplayControllerInterface(
@@ -97,12 +92,11 @@ class Display : public DisplayType,
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  void SetSysmemAllocatorForTesting(
-      fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client) {
-    sysmem_allocator_client_ = std::move(sysmem_allocator_client);
-  }
-
   void SetupPrimaryDisplayForTesting(int32_t width_px, int32_t height_px, int32_t refresh_rate_hz);
+
+  const display_controller_impl_protocol_ops_t* display_controller_impl_protocol_ops() const {
+    return &display_controller_impl_protocol_ops_;
+  }
 
  private:
   struct ColorBuffer {
@@ -137,7 +131,9 @@ class Display : public DisplayType,
     display::ConfigStamp config_stamp = display::kInvalidConfigStamp;
   };
 
-  struct DisplayDevice {
+  // TODO(https://fxbug.dev/335324453): Define DisplayState as a class with
+  // proper rep invariants on each config update / config flush.
+  struct DisplayState {
     int32_t width_px = 0;
     int32_t height_px = 0;
     int32_t refresh_rate_hz = 60;
@@ -191,15 +187,13 @@ class Display : public DisplayType,
   zx::bti bti_;
   ddk::IoBuffer cmd_buffer_ TA_GUARDED(lock_);
   ddk::IoBuffer io_buffer_ TA_GUARDED(lock_);
-  DisplayDevice primary_display_device_ = {};
+  DisplayState primary_display_device_ = {};
   fbl::Mutex flush_lock_;
   ddk::DisplayControllerInterfaceProtocolClient dc_intf_ TA_GUARDED(flush_lock_);
 
   async::Loop loop_;
-
-  DISALLOW_COPY_ASSIGN_AND_MOVE(Display);
 };
 
 }  // namespace goldfish
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_GOLDFISH_DISPLAY_DISPLAY_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_GOLDFISH_DISPLAY_DISPLAY_ENGINE_H_

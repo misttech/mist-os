@@ -2,8 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/goldfish-display/display.h"
+#include "src/graphics/display/drivers/goldfish-display/display-engine.h"
 
+#include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
+#include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
+#include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -44,9 +47,9 @@ class FakeAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
 class FakePipe : public fidl::WireServer<fuchsia_hardware_goldfish_pipe::GoldfishPipe> {};
 
-class GoldfishDisplayTest : public testing::Test {
+class GoldfishDisplayEngineTest : public testing::Test {
  public:
-  GoldfishDisplayTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+  GoldfishDisplayEngineTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
 
   void SetUp() override;
   void TearDown() override;
@@ -58,7 +61,7 @@ class GoldfishDisplayTest : public testing::Test {
 
   std::array<client_composition_opcode_t, kMaxLayerCount * kDisplayCount> results_ = {};
 
-  std::unique_ptr<Display> display_ = {};
+  std::unique_ptr<DisplayEngine> display_engine_;
 
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_goldfish_pipe::GoldfishPipe>> binding_;
   std::optional<fidl::ServerBindingRef<fuchsia_sysmem::Allocator>> allocator_binding_;
@@ -67,8 +70,18 @@ class GoldfishDisplayTest : public testing::Test {
   FakeAllocator mock_allocator_;
 };
 
-void GoldfishDisplayTest::SetUp() {
-  display_ = std::make_unique<Display>(nullptr);
+void GoldfishDisplayEngineTest::SetUp() {
+  auto [control_client, control_server] =
+      fidl::Endpoints<fuchsia_hardware_goldfish::ControlDevice>::Create();
+  auto [pipe_client, pipe_server] =
+      fidl::Endpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>::Create();
+  auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
+  allocator_binding_ =
+      fidl::BindServer(loop_.dispatcher(), std::move(sysmem_server), &mock_allocator_);
+
+  display_engine_ =
+      std::make_unique<DisplayEngine>(std::move(control_client), std::move(pipe_client),
+                                      std::move(sysmem_client), std::make_unique<RenderControl>());
 
   for (size_t i = 0; i < kDisplayCount; i++) {
     configs_ptrs_[i] = &configs_[i];
@@ -80,33 +93,29 @@ void GoldfishDisplayTest::SetUp() {
 
   // Call SetupPrimaryDisplayForTesting() so that we can set up the display
   // devices without any dependency on proper driver binding.
-  display_->SetupPrimaryDisplayForTesting(kDisplayWidthPx, kDisplayHeightPx, kDisplayRefreshRateHz);
-
-  auto endpoints = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
-  allocator_binding_ =
-      fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), &mock_allocator_);
-  display_->SetSysmemAllocatorForTesting(fidl::WireSyncClient(std::move(endpoints.client)));
+  display_engine_->SetupPrimaryDisplayForTesting(kDisplayWidthPx, kDisplayHeightPx,
+                                                 kDisplayRefreshRateHz);
 }
 
-void GoldfishDisplayTest::TearDown() { allocator_binding_->Unbind(); }
+void GoldfishDisplayEngineTest::TearDown() { allocator_binding_->Unbind(); }
 
-TEST_F(GoldfishDisplayTest, CheckConfigNoDisplay) {
+TEST_F(GoldfishDisplayEngineTest, CheckConfigNoDisplay) {
   // Test No display
   size_t client_composition_opcodes_actual = 0;
-  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), 0, results_.data(),
       results_.size(), &client_composition_opcodes_actual);
   EXPECT_OK(res);
 }
 
-TEST_F(GoldfishDisplayTest, CheckConfigMultiLayer) {
+TEST_F(GoldfishDisplayEngineTest, CheckConfigMultiLayer) {
   // ensure we fail correctly if layers more than 1
   for (size_t i = 0; i < kDisplayCount; i++) {
     configs_[i].layer_count = kMaxLayerCount;
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
@@ -122,7 +131,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigMultiLayer) {
   }
 }
 
-TEST_F(GoldfishDisplayTest, CheckConfigLayerColor) {
+TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColor) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
   for (size_t i = 0; i < kDisplayCount; i++) {
@@ -130,7 +139,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerColor) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
@@ -141,7 +150,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerColor) {
   }
 }
 
-TEST_F(GoldfishDisplayTest, CheckConfigLayerPrimary) {
+TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerPrimary) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
   frame_t dest_frame = {
@@ -166,7 +175,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerPrimary) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
@@ -176,7 +185,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerPrimary) {
   }
 }
 
-TEST_F(GoldfishDisplayTest, CheckConfigLayerDestFrame) {
+TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerDestFrame) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
   frame_t dest_frame = {
@@ -199,7 +208,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerDestFrame) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
@@ -209,7 +218,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerDestFrame) {
   }
 }
 
-TEST_F(GoldfishDisplayTest, CheckConfigLayerSrcFrame) {
+TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerSrcFrame) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
   frame_t dest_frame = {
@@ -232,7 +241,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerSrcFrame) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
@@ -242,7 +251,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerSrcFrame) {
   }
 }
 
-TEST_F(GoldfishDisplayTest, CheckConfigLayerAlpha) {
+TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerAlpha) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
   frame_t dest_frame = {
@@ -266,7 +275,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerAlpha) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
@@ -276,7 +285,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerAlpha) {
   }
 }
 
-TEST_F(GoldfishDisplayTest, CheckConfigLayerTransform) {
+TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerTransform) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
   frame_t dest_frame = {
@@ -300,7 +309,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerTransform) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
@@ -310,7 +319,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerTransform) {
   }
 }
 
-TEST_F(GoldfishDisplayTest, CheckConfigLayerColorCoversion) {
+TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColorCoversion) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
   frame_t dest_frame = {
@@ -334,7 +343,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerColorCoversion) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
@@ -346,7 +355,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerColorCoversion) {
   }
 }
 
-TEST_F(GoldfishDisplayTest, CheckConfigAllFeatures) {
+TEST_F(GoldfishDisplayEngineTest, CheckConfigAllFeatures) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
   frame_t dest_frame = {
@@ -372,7 +381,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigAllFeatures) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kDisplayCount, results_.data(),
       results_.size(), &actual_result_size);
   EXPECT_OK(res);
@@ -387,7 +396,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigAllFeatures) {
   }
 }
 
-TEST_F(GoldfishDisplayTest, ImportBufferCollection) {
+TEST_F(GoldfishDisplayEngineTest, ImportBufferCollection) {
   zx::result token1_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token1_endpoints.is_ok());
   zx::result token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -397,11 +406,11 @@ TEST_F(GoldfishDisplayTest, ImportBufferCollection) {
   constexpr display::DriverBufferCollectionId kValidCollectionId(1);
   constexpr uint64_t kBanjoValidCollectionId =
       display::ToBanjoDriverBufferCollectionId(kValidCollectionId);
-  EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(
+  EXPECT_OK(display_engine_->DisplayControllerImplImportBufferCollection(
       kBanjoValidCollectionId, token1_endpoints->client.TakeChannel()));
 
   // `collection_id` must be unused.
-  EXPECT_EQ(display_->DisplayControllerImplImportBufferCollection(
+  EXPECT_EQ(display_engine_->DisplayControllerImplImportBufferCollection(
                 kBanjoValidCollectionId, token2_endpoints->client.TakeChannel()),
             ZX_ERR_ALREADY_EXISTS);
 
@@ -409,9 +418,10 @@ TEST_F(GoldfishDisplayTest, ImportBufferCollection) {
   constexpr display::DriverBufferCollectionId kInvalidCollectionId(2);
   constexpr uint64_t kBanjoInvalidCollectionId =
       display::ToBanjoDriverBufferCollectionId(kInvalidCollectionId);
-  EXPECT_EQ(display_->DisplayControllerImplReleaseBufferCollection(kBanjoInvalidCollectionId),
-            ZX_ERR_NOT_FOUND);
-  EXPECT_OK(display_->DisplayControllerImplReleaseBufferCollection(kBanjoValidCollectionId));
+  EXPECT_EQ(
+      display_engine_->DisplayControllerImplReleaseBufferCollection(kBanjoInvalidCollectionId),
+      ZX_ERR_NOT_FOUND);
+  EXPECT_OK(display_engine_->DisplayControllerImplReleaseBufferCollection(kBanjoValidCollectionId));
 
   loop_.Shutdown();
 }

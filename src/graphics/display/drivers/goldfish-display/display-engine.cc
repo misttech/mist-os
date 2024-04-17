@@ -2,50 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/goldfish-display/display.h"
+#include "src/graphics/display/drivers/goldfish-display/display-engine.h"
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/time.h>
 #include <lib/async/cpp/wait.h>
-#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/driver.h>
-#include <lib/ddk/trace/event.h>
-#include <lib/fidl/cpp/channel.h>
-#include <lib/fidl/cpp/wire/channel.h>
-#include <lib/fidl/cpp/wire/connect_service.h>
-#include <lib/fit/defer.h>
 #include <lib/image-format/image_format.h>
-#include <lib/zircon-internal/align.h>
+#include <lib/trace/event.h>
 #include <lib/zx/result.h>
-#include <zircon/process.h>
 #include <zircon/status.h>
-#include <zircon/threads.h>
 
 #include <algorithm>
-#include <limits>
 #include <memory>
 #include <numeric>
-#include <optional>
-#include <sstream>
 #include <vector>
 
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 
-#include "src/devices/lib/goldfish/pipe_headers/include/base.h"
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
-#include "src/lib/fxl/strings/string_printf.h"
 
 namespace goldfish {
 namespace {
@@ -68,107 +53,64 @@ constexpr uint32_t FB_FPS = 5;
 constexpr uint32_t GL_RGBA = 0x1908;
 constexpr uint32_t GL_BGRA_EXT = 0x80E1;
 
-zx_koid_t GetKoid(zx_handle_t handle) {
-  zx_info_handle_basic_t info;
-  zx_status_t status =
-      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
-}
-
 }  // namespace
 
-// static
-zx_status_t Display::Create(void* ctx, zx_device_t* device) {
-  auto display = std::make_unique<Display>(device);
-
-  zx_status_t status = display->Bind();
-  if (status == ZX_OK) {
-    // devmgr now owns device.
-    [[maybe_unused]] auto* dev = display.release();
-  }
-  return status;
+DisplayEngine::DisplayEngine(fidl::ClientEnd<fuchsia_hardware_goldfish::ControlDevice> control,
+                             fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe,
+                             fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_allocator,
+                             std::unique_ptr<RenderControl> render_control)
+    : control_(std::move(control)),
+      pipe_(std::move(pipe)),
+      sysmem_allocator_client_(std::move(sysmem_allocator)),
+      rc_(std::move(render_control)),
+      loop_(&kAsyncLoopConfigNeverAttachToThread) {
+  ZX_DEBUG_ASSERT(control_.is_valid());
+  ZX_DEBUG_ASSERT(pipe_.is_valid());
+  ZX_DEBUG_ASSERT(sysmem_allocator_client_.is_valid());
+  ZX_DEBUG_ASSERT(rc_ != nullptr);
 }
 
-Display::Display(zx_device_t* parent)
-    : DisplayType(parent), loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+DisplayEngine::~DisplayEngine() { loop_.Shutdown(); }
 
-Display::~Display() { loop_.Shutdown(); }
-
-zx_status_t Display::Bind() {
+zx::result<> DisplayEngine::Initialize() {
   fbl::AutoLock lock(&lock_);
-
-  zx::result<fidl::ClientEnd<fuchsia_hardware_goldfish::ControlDevice>>
-      connect_control_service_result =
-          DdkConnectFidlProtocol<fuchsia_hardware_goldfish::ControlService::Device>();
-  if (connect_control_service_result.is_error()) {
-    zxlogf(ERROR, "Failed to connect to the goldfish Control FIDL service: %s",
-           connect_control_service_result.status_string());
-    return connect_control_service_result.status_value();
-  }
-  control_ = fidl::WireSyncClient(std::move(connect_control_service_result).value());
-
-  zx::result<fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe>>
-      connect_pipe_service_result =
-          DdkConnectFidlProtocol<fuchsia_hardware_goldfish_pipe::Service::Device>();
-  if (connect_pipe_service_result.is_error()) {
-    zxlogf(ERROR, "Failed to connect to the goldfish pipe FIDL service: %s",
-           connect_pipe_service_result.status_string());
-    return connect_pipe_service_result.status_value();
-  }
-  pipe_ = fidl::WireSyncClient(std::move(connect_pipe_service_result).value());
-
-  zx_status_t status = InitSysmemAllocatorClient();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: cannot initialize sysmem allocator: %s", kTag, zx_status_get_string(status));
-    return status;
-  }
-
-  zx::result<fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe>>
-      render_control_connect_pipe_service_result =
-          DdkConnectFidlProtocol<fuchsia_hardware_goldfish_pipe::Service::Device>();
-  if (render_control_connect_pipe_service_result.is_error()) {
-    zxlogf(ERROR, "Failed to connect to the goldfish pipe FIDL service: %s",
-           render_control_connect_pipe_service_result.status_string());
-    return render_control_connect_pipe_service_result.status_value();
-  }
-  fidl::WireSyncClient<fuchsia_hardware_goldfish_pipe::GoldfishPipe> render_control_pipe_client(
-      std::move(render_control_connect_pipe_service_result).value());
-
-  rc_ = std::make_unique<RenderControl>();
-  status = rc_->InitRcPipe(std::move(render_control_pipe_client));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: RenderControl failed to initialize: %d", kTag, status);
-    return ZX_ERR_NOT_SUPPORTED;
-  }
 
   // Create primary display device.
   static constexpr int32_t kFallbackWidthPx = 1024;
   static constexpr int32_t kFallbackHeightPx = 768;
   static constexpr int32_t kFallbackRefreshRateHz = 60;
-  primary_display_device_ = DisplayDevice{
+  primary_display_device_ = DisplayState{
       .width_px = rc_->GetFbParam(FB_WIDTH, kFallbackWidthPx),
       .height_px = rc_->GetFbParam(FB_HEIGHT, kFallbackHeightPx),
       .refresh_rate_hz = rc_->GetFbParam(FB_FPS, kFallbackRefreshRateHz),
   };
 
   // Set up display and set up flush task for each device.
-  status = SetupPrimaryDisplay();
+  zx_status_t status = SetupPrimaryDisplay();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to set up the primary display: %s", zx_status_get_string(status));
-    return status;
+    return zx::error(status);
   }
 
-  async::PostTask(loop_.dispatcher(), [this] { FlushPrimaryDisplay(loop_.dispatcher()); });
+  status = async::PostTask(loop_.dispatcher(), [this] { FlushPrimaryDisplay(loop_.dispatcher()); });
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to post display flush task on the display event loop: %s",
+           zx_status_get_string(status));
+    return zx::error(status);
+  }
 
   // Start async event thread.
-  loop_.StartThread("goldfish_display_event_thread");
+  status = loop_.StartThread("goldfish_display_event_thread");
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to start thread for the display event loop: %s",
+           zx_status_get_string(status));
+    return zx::error(status);
+  }
 
-  return DdkAdd("goldfish-display");
+  return zx::ok();
 }
 
-void Display::DdkRelease() { delete this; }
-
-void Display::DisplayControllerImplSetDisplayControllerInterface(
+void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* interface) {
   std::vector<added_display_args_t> args;
 
@@ -216,31 +158,9 @@ void Display::DisplayControllerImplSetDisplayControllerInterface(
   }
 }
 
-void Display::DisplayControllerImplResetDisplayControllerInterface() {
+void DisplayEngine::DisplayControllerImplResetDisplayControllerInterface() {
   fbl::AutoLock lock(&flush_lock_);
   dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient();
-}
-
-zx_status_t Display::InitSysmemAllocatorClient() {
-  zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> connect_sysmem_service_result =
-      DdkConnectFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1>();
-  if (connect_sysmem_service_result.is_error()) {
-    zxlogf(ERROR, "Failed to connect to the sysmem Allocator FIDL protocol: %s",
-           connect_sysmem_service_result.status_string());
-    return connect_sysmem_service_result.status_value();
-  }
-  sysmem_allocator_client_ = fidl::WireSyncClient(std::move(connect_sysmem_service_result).value());
-
-  auto pid = GetKoid(zx_process_self());
-  std::string debug_name = fxl::StringPrintf("goldfish-display");
-  auto set_debug_status =
-      sysmem_allocator_client_->SetDebugClientInfo(fidl::StringView::FromExternal(debug_name), pid);
-  if (!set_debug_status.ok()) {
-    zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
-    return set_debug_status.status();
-  }
-
-  return ZX_OK;
 }
 
 namespace {
@@ -261,7 +181,7 @@ uint32_t GetColorBufferFormatFromSysmemPixelFormat(
 
 }  // namespace
 
-zx::result<display::DriverImageId> Display::ImportVmoImage(
+zx::result<display::DriverImageId> DisplayEngine::ImportVmoImage(
     const image_metadata_t& image_metadata, const fuchsia_sysmem::PixelFormat& pixel_format,
     zx::vmo vmo, size_t offset) {
   auto color_buffer = std::make_unique<ColorBuffer>();
@@ -295,7 +215,7 @@ zx::result<display::DriverImageId> Display::ImportVmoImage(
   return zx::ok(image_id);
 }
 
-zx_status_t Display::DisplayControllerImplImportBufferCollection(
+zx_status_t DisplayEngine::DisplayControllerImplImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -323,7 +243,7 @@ zx_status_t Display::DisplayControllerImplImportBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t Display::DisplayControllerImplReleaseBufferCollection(
+zx_status_t DisplayEngine::DisplayControllerImplReleaseBufferCollection(
     uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -336,9 +256,9 @@ zx_status_t Display::DisplayControllerImplReleaseBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t Display::DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
-                                                      uint64_t banjo_driver_buffer_collection_id,
-                                                      uint32_t index, uint64_t* out_image_handle) {
+zx_status_t DisplayEngine::DisplayControllerImplImportImage(
+    const image_metadata_t* image_metadata, uint64_t banjo_driver_buffer_collection_id,
+    uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -419,7 +339,7 @@ zx_status_t Display::DisplayControllerImplImportImage(const image_metadata_t* im
   return ZX_OK;
 }
 
-void Display::DisplayControllerImplReleaseImage(uint64_t image_handle) {
+void DisplayEngine::DisplayControllerImplReleaseImage(uint64_t image_handle) {
   auto color_buffer = reinterpret_cast<ColorBuffer*>(image_handle);
 
   // Color buffer is owned by image in the linear case.
@@ -436,7 +356,7 @@ void Display::DisplayControllerImplReleaseImage(uint64_t image_handle) {
   });
 }
 
-config_check_result_t Display::DisplayControllerImplCheckConfiguration(
+config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
     const display_config_t** display_configs, size_t display_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
@@ -529,7 +449,7 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
   return CONFIG_CHECK_RESULT_OK;
 }
 
-zx_status_t Display::PresentPrimaryDisplayConfig(const DisplayConfig& display_config) {
+zx_status_t DisplayEngine::PresentPrimaryDisplayConfig(const DisplayConfig& display_config) {
   ColorBuffer* color_buffer = display_config.color_buffer;
   if (!color_buffer) {
     return ZX_OK;
@@ -553,7 +473,7 @@ zx_status_t Display::PresentPrimaryDisplayConfig(const DisplayConfig& display_co
                                   pending_config_stamp = display_config.config_stamp](
                                      async_dispatcher_t* dispatcher, async::WaitOnce* current_wait,
                                      zx_status_t status, const zx_packet_signal_t*) {
-    TRACE_DURATION("gfx", "Display::SyncEventHandler", "config_stamp",
+    TRACE_DURATION("gfx", "DisplayEngine::SyncEventHandler", "config_stamp",
                    pending_config_stamp.value());
     if (status == ZX_ERR_CANCELED) {
       zxlogf(INFO, "Wait for config stamp %lu cancelled.", pending_config_stamp.value());
@@ -624,9 +544,9 @@ zx_status_t Display::PresentPrimaryDisplayConfig(const DisplayConfig& display_co
   return ZX_OK;
 }
 
-void Display::DisplayControllerImplApplyConfiguration(const display_config_t** display_configs,
-                                                      size_t display_count,
-                                                      const config_stamp_t* banjo_config_stamp) {
+void DisplayEngine::DisplayControllerImplApplyConfiguration(
+    const display_config_t** display_configs, size_t display_count,
+    const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
   display::DriverImageId driver_image_id = display::kInvalidDriverImageId;
@@ -719,7 +639,7 @@ void Display::DisplayControllerImplApplyConfiguration(const display_config_t** d
   });
 }
 
-zx_status_t Display::DisplayControllerImplSetBufferCollectionConstraints(
+zx_status_t DisplayEngine::DisplayControllerImplSetBufferCollectionConstraints(
     const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -781,7 +701,7 @@ zx_status_t Display::DisplayControllerImplSetBufferCollectionConstraints(
   return ZX_OK;
 }
 
-zx_status_t Display::SetupPrimaryDisplay() {
+zx_status_t DisplayEngine::SetupPrimaryDisplay() {
   // On the host render control protocol, the "invalid" host display ID is used
   // to configure the primary display device.
   const HostDisplayId kPrimaryHostDisplayId = kInvalidHostDisplayId;
@@ -802,7 +722,7 @@ zx_status_t Display::SetupPrimaryDisplay() {
   return ZX_OK;
 }
 
-void Display::FlushPrimaryDisplay(async_dispatcher_t* dispatcher) {
+void DisplayEngine::FlushPrimaryDisplay(async_dispatcher_t* dispatcher) {
   zx::duration period = zx::sec(1) / primary_display_device_.refresh_rate_hz;
   zx::time expected_next_flush = primary_display_device_.expected_next_flush + period;
 
@@ -836,8 +756,8 @@ void Display::FlushPrimaryDisplay(async_dispatcher_t* dispatcher) {
       dispatcher, [this, dispatcher] { FlushPrimaryDisplay(dispatcher); }, expected_next_flush);
 }
 
-void Display::SetupPrimaryDisplayForTesting(int32_t width_px, int32_t height_px,
-                                            int32_t refresh_rate_hz) {
+void DisplayEngine::SetupPrimaryDisplayForTesting(int32_t width_px, int32_t height_px,
+                                                  int32_t refresh_rate_hz) {
   primary_display_device_ = {
       .width_px = width_px,
       .height_px = height_px,
@@ -846,12 +766,3 @@ void Display::SetupPrimaryDisplayForTesting(int32_t width_px, int32_t height_px,
 }
 
 }  // namespace goldfish
-
-static constexpr zx_driver_ops_t goldfish_display_driver_ops = []() -> zx_driver_ops_t {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = goldfish::Display::Create;
-  return ops;
-}();
-
-ZIRCON_DRIVER(goldfish_display, goldfish_display_driver_ops, "zircon", "0.1");
