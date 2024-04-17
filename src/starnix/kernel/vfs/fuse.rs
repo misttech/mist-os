@@ -18,11 +18,12 @@ use crate::{
     },
 };
 use bstr::B;
+use fuchsia_zircon as zx;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::{
-    DeviceOpen, FileOpsCore, FsNodeAllocate, Locked, Mutex, MutexGuard, RwLock, RwLockReadGuard,
-    RwLockWriteGuard, Unlocked, WriteOps,
+    AtomicTime, DeviceOpen, FileOpsCore, FsNodeAllocate, Locked, Mutex, MutexGuard, RwLock,
+    RwLockReadGuard, RwLockWriteGuard, Unlocked, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
@@ -34,7 +35,7 @@ use starnix_uapi::{
     mode, off_t,
     open_flags::OpenFlags,
     statfs,
-    time::time_from_timespec,
+    time::{duration_from_timespec, time_from_timespec},
     uapi,
     vfs::{default_statfs, FdEvents},
     FUSE_SUPER_MAGIC,
@@ -65,6 +66,13 @@ pub fn open_fuse_device(
     let fusectl_fs = fusectl_fs(current_task);
     let connection = fusectl_fs.new_connection(current_task);
     Ok(Box::new(DevFuse { connection }))
+}
+
+fn attr_valid_to_duration(attr_valid: u64, attr_valid_nsec: u32) -> Result<zx::Duration, Errno> {
+    duration_from_timespec(uapi::timespec {
+        tv_sec: i64::try_from(attr_valid).unwrap_or(i64::MAX),
+        tv_nsec: attr_valid_nsec.into(),
+    })
 }
 
 impl FileOps for DevFuse {
@@ -141,11 +149,7 @@ pub fn new_fuse_fs(
         FuseFs { connection: connection.clone(), default_permissions },
         options,
     );
-    let fuse_node = Arc::new(FuseNode {
-        connection: connection.clone(),
-        nodeid: uapi::FUSE_ROOT_ID as u64,
-        state: Default::default(),
-    });
+    let fuse_node = FuseNode::new(connection.clone(), uapi::FUSE_ROOT_ID as u64);
     fuse_node.state.lock().nlookup += 1;
 
     let mut root_node = FsNode::new_root(fuse_node.clone());
@@ -449,15 +453,86 @@ struct FuseNodeMutableState {
 struct FuseNode {
     connection: Arc<FuseConnection>,
     nodeid: u64,
+    attributes_valid_until: AtomicTime,
     state: Mutex<FuseNodeMutableState>,
 }
 
 impl FuseNode {
+    fn new(connection: Arc<FuseConnection>, nodeid: u64) -> Arc<Self> {
+        Arc::new(Self {
+            connection,
+            nodeid,
+            attributes_valid_until: zx::Time::INFINITE_PAST.into(),
+            state: Default::default(),
+        })
+    }
+
     fn from_node(node: &FsNode) -> Result<&Arc<FuseNode>, Errno> {
         node.downcast_ops::<Arc<FuseNode>>().ok_or_else(|| errno!(ENOENT))
     }
 
-    fn refresh_node_info(info: &mut FsNodeInfo, attributes: uapi::fuse_attr) -> Result<(), Errno> {
+    fn refresh_expired_node_attributes<'a>(
+        &self,
+        current_task: &CurrentTask,
+        info: &'a RwLock<FsNodeInfo>,
+    ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
+        // Relaxed because the attributes valid until atomic is not used to synchronize
+        // anything. Its final access is protected by the info lock anyways.
+        const VALID_UNTIL_LOAD_ORDERING: Ordering = Ordering::Relaxed;
+
+        let now = zx::Time::get_monotonic();
+        if self.attributes_valid_until.load(VALID_UNTIL_LOAD_ORDERING) >= now {
+            let info = info.read();
+
+            // Check the valid_until again after taking the info lock to make sure
+            // that the attributes are still valid. We do this because after we
+            // checked the first time and now, the node's attributes could have been
+            // invalidated or expired.
+            //
+            // But why not only check if the attributes are valid after taking the
+            // lock? Because when we will impact FUSE implementations that don't
+            // support caching, or caching with small valid durations, by always
+            // taking a read lock which we then drop to acquire a write lock. We
+            // slightly pessimize the "happy" path with an extra atomic load so
+            // that we don't overly pessimize the uncached/"slower" path.
+            if self.attributes_valid_until.load(VALID_UNTIL_LOAD_ORDERING) >= now {
+                return Ok(info);
+            }
+        }
+
+        // Force a refresh of our cached attributes.
+        self.refresh_info_impl(current_task, info)
+    }
+
+    fn refresh_info_impl<'a>(
+        &self,
+        current_task: &CurrentTask,
+        info: &'a RwLock<FsNodeInfo>,
+    ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
+        let response =
+            self.connection.lock().execute_operation(current_task, self, FuseOperation::GetAttr)?;
+        let uapi::fuse_attr_out { attr_valid, attr_valid_nsec, attr, .. } =
+            if let FuseResponse::Attr(attr) = response {
+                attr
+            } else {
+                return error!(EINVAL);
+            };
+        let mut info = info.write();
+        FuseNode::refresh_node_info(
+            &mut info,
+            attr,
+            attr_valid_to_duration(attr_valid, attr_valid_nsec)?,
+            &self.attributes_valid_until,
+        )?;
+        Ok(RwLockWriteGuard::downgrade(info))
+    }
+
+    fn refresh_node_info(
+        info: &mut FsNodeInfo,
+        attributes: uapi::fuse_attr,
+        attr_valid_duration: zx::Duration,
+        node_attributes_valid_until: &AtomicTime,
+    ) -> Result<(), Errno> {
         info.ino = attributes.ino as uapi::ino_t;
         info.mode = FileMode::from_bits(attributes.mode);
         info.size = attributes.size.try_into().map_err(|_| errno!(EINVAL))?;
@@ -479,6 +554,8 @@ impl FuseNode {
             tv_nsec: attributes.mtimensec as i64,
         })?;
         info.rdev = DeviceType::from_bits(attributes.rdev as u64);
+
+        node_attributes_valid_until.store(zx::Time::after(attr_valid_duration), Ordering::Relaxed);
         Ok(())
     }
 
@@ -499,13 +576,14 @@ impl FuseNode {
             return error!(ENOENT);
         }
         let node = node.fs().get_or_create_node(current_task, Some(entry.nodeid), |id| {
-            let fuse_node = Arc::new(FuseNode {
-                connection: self.connection.clone(),
-                nodeid: entry.nodeid,
-                state: Default::default(),
-            });
+            let fuse_node = FuseNode::new(self.connection.clone(), entry.nodeid);
             let mut info = FsNodeInfo::default();
-            FuseNode::refresh_node_info(&mut info, entry.attr)?;
+            FuseNode::refresh_node_info(
+                &mut info,
+                entry.attr,
+                attr_valid_to_duration(entry.attr_valid, entry.attr_valid_nsec)?,
+                &fuse_node.attributes_valid_until,
+            )?;
             Ok(FsNode::new_uncached(current_task, fuse_node, &node.fs(), id, info))
         })?;
         // . and .. do not get their lookup count increased.
@@ -835,7 +913,8 @@ impl FsNodeOps for Arc<FuseNode> {
             .default_permissions
             .load(DEFAULT_PERMISSIONS_ATOMIC_ORDERING)
         {
-            return node.default_check_access_impl(current_task, access, info.read());
+            let info = self.refresh_expired_node_attributes(current_task, info)?;
+            return node.default_check_access_impl(current_task, access, info);
         }
 
         let response = self.connection.lock().execute_operation(
@@ -1023,12 +1102,18 @@ impl FsNodeOps for Arc<FuseNode> {
                 self,
                 FuseOperation::SetAttr(attributes),
             )?;
-            let attr = if let FuseResponse::Attr(attr) = response {
-                attr
-            } else {
-                return error!(EINVAL);
-            };
-            FuseNode::refresh_node_info(info, attr.attr)?;
+            let uapi::fuse_attr_out { attr_valid, attr_valid_nsec, attr, .. } =
+                if let FuseResponse::Attr(attr) = response {
+                    attr
+                } else {
+                    return error!(EINVAL);
+                };
+            FuseNode::refresh_node_info(
+                info,
+                attr,
+                attr_valid_to_duration(attr_valid, attr_valid_nsec)?,
+                &self.attributes_valid_until,
+            )?;
             Ok(())
         })
     }
@@ -1052,16 +1137,7 @@ impl FsNodeOps for Arc<FuseNode> {
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        let response =
-            self.connection.lock().execute_operation(current_task, self, FuseOperation::GetAttr)?;
-        let attr = if let FuseResponse::Attr(attr) = response {
-            attr
-        } else {
-            return error!(EINVAL);
-        };
-        let mut info = info.write();
-        FuseNode::refresh_node_info(&mut info, attr.attr)?;
-        Ok(RwLockWriteGuard::downgrade(info))
+        self.refresh_info_impl(current_task, info)
     }
 
     fn get_xattr(

@@ -13,6 +13,7 @@
 #include <sys/xattr.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
@@ -134,6 +135,9 @@ class FuseTest : public ::testing::Test {
 
 class FuseServer {
  public:
+  FuseServer() : FuseServer(0) {}
+  FuseServer(uint32_t want_init_flags) : want_init_flags_(want_init_flags) {}
+
   virtual ~FuseServer() {}
 
   const test_helper::ScopedFD& fuse_fd() { return fuse_fd_; }
@@ -241,13 +245,14 @@ class FuseServer {
   virtual testing::AssertionResult HandleInit(const struct fuse_in_header* in_header,
                                               const struct fuse_init_in* init_in,
                                               const std::vector<std::byte>& message) {
-    struct fuse_init_out init_out = {};
-    init_out.major = FUSE_KERNEL_VERSION;
-    init_out.minor = FUSE_KERNEL_MINOR_VERSION;
+    EXPECT_EQ(init_in->flags & want_init_flags_, want_init_flags_);
+    fuse_init_out init_out = {
+        .major = FUSE_KERNEL_VERSION,
+        .minor = FUSE_KERNEL_MINOR_VERSION,
+        .flags = want_init_flags_,
+    };
     OK_OR_RETURN(WriteStructResponse(in_header, init_out));
-
     NotifyInitWaiters();
-
     return testing::AssertionSuccess();
   }
 
@@ -267,11 +272,8 @@ class FuseServer {
 
   virtual testing::AssertionResult HandleLookup(const struct fuse_in_header* in_header,
                                                 const std::vector<std::byte>& message) {
-    fuse_entry_out entry_out = {
-        .nodeid = next_nodeid_++,
-        .generation = 1,
-    };
-    PopulateDefaultAttr(entry_out.nodeid, entry_out.attr);
+    fuse_entry_out entry_out;
+    PopulateDefaultEntry(entry_out);
     return WriteStructResponse(in_header, entry_out);
   }
 
@@ -337,6 +339,26 @@ class FuseServer {
 
   uint64_t GetNextFileHandle() { return next_fh_++; }
 
+  void PopulateDefaultEntry(fuse_entry_out& entry_out) {
+    entry_out = {
+        .nodeid = next_nodeid_++,
+        .generation = 1,
+    };
+    PopulateDefaultAttr(entry_out.nodeid, entry_out.attr);
+  }
+
+  static void PopulateDefaultAttr(uint64_t ino, fuse_attr& attr) {
+    attr = {
+        .ino = ino,
+        // Consider the root node as a directory and everything else as a
+        // regular file. The node will also have read/write/exec permissions
+        // for the owning user, group and world. For current testing needs,
+        // this is sufficient.
+        .mode = static_cast<uint32_t>(ino == FUSE_ROOT_ID ? S_IFDIR : S_IFREG) | S_IRWXU | S_IRWXG |
+                S_IRWXO,
+    };
+  }
+
  private:
   testing::AssertionResult ReadRequest(std::vector<std::byte>* request, bool* unmounted) {
     // There doesn't seem to be a good value to use for the max request size. We just pick
@@ -366,18 +388,6 @@ class FuseServer {
     return testing::AssertionSuccess();
   }
 
-  static void PopulateDefaultAttr(uint64_t ino, fuse_attr& attr) {
-    attr = {
-        .ino = ino,
-        // Consider the root node as a directory and everything else as a
-        // regular file. The node will also have read/write/exec permissions
-        // for the owning user, group and world. For current testing needs,
-        // this is sufficient.
-        .mode = static_cast<uint32_t>(ino == FUSE_ROOT_ID ? S_IFDIR : S_IFREG) | S_IRWXU | S_IRWXG |
-                S_IRWXO,
-    };
-  }
-
   test_helper::ScopedFD fuse_fd_;
   uint64_t next_fh_ = 1;
   uint64_t next_nodeid_ = 2;  // 1 is reserved for the root.
@@ -385,6 +395,8 @@ class FuseServer {
   std::mutex init_mtx_;
   std::condition_variable init_cv_;
   bool init_done_ = false;
+
+  uint32_t want_init_flags_;
 };
 
 class FuseServerTest : public ::testing::Test {
@@ -755,6 +767,18 @@ TEST_F(FuseServerTest, OverlongHeaderLength) {
   fd.reset();
 }
 
+// Run the checks in a separate thread where we drop the |CAP_DAC_OVERRIDE|
+// capability which bypasses file permission checks. See capabilities(7).
+template <typename F>
+void InThreadWithoutCapDacOverride(F f) {
+  std::thread thrd([&]() {
+    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
+
+    f();
+  });
+  thrd.join();
+}
+
 struct BypassAccessTestCase {
   uint32_t want_init_flags;
   int access_reply;
@@ -770,26 +794,11 @@ TEST_P(FuseServerBypassAccessTest, BypassAccess) {
   class BypassAccessServer : public FuseServer {
    public:
     BypassAccessServer(uint32_t want_init_flags, int access_reply)
-        : want_init_flags_(want_init_flags), access_reply_(access_reply) {}
+        : FuseServer(want_init_flags), access_reply_(access_reply) {}
 
     uint64_t AccessCount() { return calls_to_access_.load(std::memory_order_relaxed); }
 
    protected:
-    testing::AssertionResult HandleInit(const struct fuse_in_header* in_header,
-                                        const struct fuse_init_in* init_in,
-                                        const std::vector<std::byte>& message) override {
-      EXPECT_EQ(init_in->flags & want_init_flags_, want_init_flags_);
-
-      fuse_init_out init_out = {
-          .major = FUSE_KERNEL_VERSION,
-          .minor = FUSE_KERNEL_MINOR_VERSION,
-          .flags = want_init_flags_,
-      };
-      OK_OR_RETURN(WriteStructResponse(in_header, init_out));
-      NotifyInitWaiters();
-      return testing::AssertionSuccess();
-    }
-
     testing::AssertionResult HandleAccess(const struct fuse_in_header* in_header,
                                           const struct fuse_access_in* access_in,
                                           const std::vector<std::byte>& message) override {
@@ -798,7 +807,6 @@ TEST_P(FuseServerBypassAccessTest, BypassAccess) {
     }
 
    private:
-    uint32_t want_init_flags_;
     int access_reply_;
     std::atomic_uint64_t calls_to_access_ = 0;
   };
@@ -809,11 +817,7 @@ TEST_P(FuseServerBypassAccessTest, BypassAccess) {
   server->WaitForInit();
   EXPECT_EQ(server->AccessCount(), 0u);
 
-  // Run the checks in a separate thread where we drop the |CAP_DAC_OVERRIDE|
-  // capability which bypasses file permission checks. See capabilities(7).
-  std::thread thrd([&]() {
-    test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
-
+  InThreadWithoutCapDacOverride([&]() {
     auto check_access = [&, max_access_count = test_case.max_access_count](const char* file) {
       const std::string filename = GetMountDir() + "/" + file;
       ASSERT_EQ(access(filename.c_str(), R_OK), 0) << strerror(errno);
@@ -831,7 +835,6 @@ TEST_P(FuseServerBypassAccessTest, BypassAccess) {
     // part of the same connection.
     ASSERT_NO_FATAL_FAILURE(check_access("somefile2"));
   });
-  thrd.join();
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -844,3 +847,131 @@ INSTANTIATE_TEST_SUITE_P(
         // |FUSE_POSIX_ACL| init flag.
         BypassAccessTestCase{
             .want_init_flags = FUSE_POSIX_ACL, .access_reply = 0, .max_access_count = 0}));
+
+enum class ExpectedGetAttrBehaviour {
+  kNone,
+  kOncePerFile,
+  kOncePerAccess,
+};
+
+uint64_t ExpectedGetAttrsValue(ExpectedGetAttrBehaviour behaviour, uint64_t access_count) {
+  switch (behaviour) {
+    case ExpectedGetAttrBehaviour::kNone:
+      return 0;
+    case ExpectedGetAttrBehaviour::kOncePerFile:
+      return std::min(access_count, 1ul);
+    case ExpectedGetAttrBehaviour::kOncePerAccess:
+      return access_count;
+  }
+}
+
+struct CacheAttributesTestCase {
+  uint64_t lookup_attr_timeout;
+  uint64_t getattr_attr_timeout;
+  ExpectedGetAttrBehaviour expected_getattr_behaviour;
+};
+
+class FuseServerCacheAttributesTest
+    : public FuseServerTest,
+      public ::testing::WithParamInterface<CacheAttributesTestCase> {};
+
+TEST_P(FuseServerCacheAttributesTest, CacheAttributes) {
+  const CacheAttributesTestCase& test_case = GetParam();
+
+  class CacheAttributesServer : public FuseServer {
+   public:
+    CacheAttributesServer(uint64_t lookup_attr_valid, uint64_t getattr_attr_valid)
+        : FuseServer(FUSE_POSIX_ACL),
+          lookup_attr_valid_(lookup_attr_valid),
+          getattr_attr_valid_(getattr_attr_valid) {}
+
+    uint64_t NonRootGetAttrCount() {
+      return calls_to_non_root_getattr_.load(std::memory_order_relaxed);
+    }
+
+   protected:
+    testing::AssertionResult HandleLookup(const struct fuse_in_header* in_header,
+                                          const std::vector<std::byte>& message) override {
+      fuse_entry_out entry_out;
+      PopulateDefaultEntry(entry_out);
+      // Instruct the kernel to not immediately evict the |dcache| entry (|dentry|)
+      // for this node by setting a really high entry value. This value is used to
+      // determine when a FUSE-based |dentry| has gone stale. This test isn't focused
+      // on the |dcache| or |dentry| so this is ok. For more details, see:
+      //  - https://www.halolinux.us/kernel-reference/the-dentry-cache.html
+      //  - https://www.kernel.org/doc/html/latest/filesystems/path-lookup.html
+      //  - https://lwn.net/Articles/649115/
+      //  -
+      //  https://www.infradead.org/~mchehab/kernel_docs/filesystems/path-walking.html#dcache-name-lookup
+      entry_out.entry_valid = std::numeric_limits<uint64_t>::max();
+      entry_out.attr_valid = lookup_attr_valid_;
+      return WriteStructResponse(in_header, entry_out);
+    }
+
+    testing::AssertionResult HandleGetAttr(const struct fuse_in_header* in_header,
+                                           const struct fuse_getattr_in* getattr_in,
+                                           const std::vector<std::byte>& message) override {
+      if (in_header->nodeid != FUSE_ROOT_ID) {
+        calls_to_non_root_getattr_.fetch_add(1, std::memory_order_relaxed);
+      }
+      fuse_attr_out attr_out = {
+          .attr_valid = getattr_attr_valid_,
+      };
+      PopulateDefaultAttr(in_header->nodeid, attr_out.attr);
+      return WriteStructResponse(in_header, attr_out);
+    }
+
+   private:
+    uint64_t lookup_attr_valid_;
+    uint64_t getattr_attr_valid_;
+    std::atomic_uint64_t calls_to_non_root_getattr_ = 0;
+  };
+
+  std::shared_ptr<CacheAttributesServer> server(
+      new CacheAttributesServer(test_case.lookup_attr_timeout, test_case.getattr_attr_timeout));
+  ASSERT_TRUE(Mount(server));
+  server->WaitForInit();
+  EXPECT_EQ(server->NonRootGetAttrCount(), 0u);
+
+  InThreadWithoutCapDacOverride([&]() {
+    auto check_getattr = [&](const char* file, uint64_t expected_getattrs) {
+      const std::string filename = GetMountDir() + "/" + file;
+      ASSERT_EQ(access(filename.c_str(), R_OK), 0) << strerror(errno);
+      EXPECT_EQ(server->NonRootGetAttrCount(), expected_getattrs);
+    };
+
+    uint64_t count_after_file1;
+    for (uint64_t i = 1; i <= 3; ++i) {
+      count_after_file1 = ExpectedGetAttrsValue(test_case.expected_getattr_behaviour, i);
+      ASSERT_NO_FATAL_FAILURE(check_getattr("somefile1", count_after_file1));
+    }
+
+    for (uint64_t i = 1; i <= 5; ++i) {
+      ASSERT_NO_FATAL_FAILURE(check_getattr(
+          "somefile2",
+          count_after_file1 + ExpectedGetAttrsValue(test_case.expected_getattr_behaviour, i)));
+    }
+  });
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    FuseServerCacheAttributesTest, FuseServerCacheAttributesTest,
+    testing::Values(
+        // When we don't cache the attributes, expect the kernel to refresh the
+        // attributes each call.
+        CacheAttributesTestCase{
+            .lookup_attr_timeout = 0,
+            .getattr_attr_timeout = 0,
+            .expected_getattr_behaviour = ExpectedGetAttrBehaviour::kOncePerAccess},
+
+        // When we respond to the lookup request with a cache timeout, it should
+        // be respected.
+        CacheAttributesTestCase{.lookup_attr_timeout = std::numeric_limits<uint64_t>::max(),
+                                .getattr_attr_timeout = 0,
+                                .expected_getattr_behaviour = ExpectedGetAttrBehaviour::kNone},
+        // When don't provide a cache timeout with lookup, but do for getattr,
+        // respect the cached attributes after the getattr request.
+        CacheAttributesTestCase{
+            .lookup_attr_timeout = 0,
+            .getattr_attr_timeout = std::numeric_limits<uint64_t>::max(),
+            .expected_getattr_behaviour = ExpectedGetAttrBehaviour::kOncePerFile}));
