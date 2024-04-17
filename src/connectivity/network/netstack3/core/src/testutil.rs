@@ -1917,7 +1917,7 @@ mod tests {
                 None, // local_ip
                 SocketIpAddr::try_from(FAKE_CONFIG_V4.remote_ip).unwrap(),
                 Ipv4Proto::Icmp,
-                DefaultSendOptions,
+                &DefaultSendOptions,
                 |_| {
                     let req = IcmpEchoRequest::new(0, 0);
                     let req_body = &[1, 2, 3, 4];

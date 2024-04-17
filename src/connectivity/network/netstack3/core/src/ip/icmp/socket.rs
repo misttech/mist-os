@@ -9,7 +9,6 @@ use core::{
     borrow::Borrow,
     convert::Infallible as Never,
     fmt::Debug,
-    hash::Hash,
     marker::PhantomData,
     num::{NonZeroU16, NonZeroU8},
 };
@@ -299,7 +298,7 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
 
     type SocketId<I: datagram::IpExt, D: device::WeakId> = IcmpSocketId<I, D, BT>;
 
-    type OtherStackIpOptions<I: datagram::IpExt> = ();
+    type OtherStackIpOptions<I: datagram::IpExt, D: device::WeakId> = ();
 
     type SharingState = ();
 
@@ -376,14 +375,13 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
         <Self::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     >;
 
-    type ConnState<I: datagram::IpExt, D: Debug + Eq + Hash + Send + Sync> =
-        datagram::ConnState<I, I, D, Self>;
+    type ConnState<I: datagram::IpExt, D: device::WeakId> = datagram::ConnState<I, I, D, Self>;
     // Store the remote port/id set by `connect`. This does not participate in
     // demuxing, so not part of the socketmap, but we need to store it so that
     // it can be reported later.
     type ConnStateExtra = u16;
 
-    fn conn_info_from_state<I: IpExt, D: Clone + Debug + Eq + Hash + Send + Sync>(
+    fn conn_info_from_state<I: IpExt, D: device::WeakId>(
         datagram::ConnState { addr: ConnAddr { ip, device }, extra, .. }: &Self::ConnState<I, D>,
     ) -> datagram::ConnInfo<I::Addr, D> {
         let ConnInfoAddr { local: (local_ip, local_identifier), remote: (remote_ip, ()) } =

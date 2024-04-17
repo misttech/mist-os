@@ -4990,7 +4990,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
                 Some(local_ip),
                 remote_ip,
                 IpProto::Tcp.into(),
-                DefaultSendOptions,
+                &DefaultSendOptions,
                 |_addr| tcp_serialize_segment(segment, conn_addr),
                 None,
             )
@@ -5480,7 +5480,7 @@ mod tests {
         where
             S: TransportPacketSerializer,
             S::Buffer: BufferMut,
-            O: SendOptions<I>,
+            O: SendOptions<I, Self::WeakDeviceId>,
         {
             self.inner.send_ip_packet(bindings_ctx, socket, body, mtu, options)
         }

@@ -1957,7 +1957,7 @@ fn send_icmp_reply<I, BC, CC, S, F>(
             Some(original_dst_ip),
             original_src_ip,
             I::ICMP_IP_PROTO,
-            DefaultSendOptions,
+            &DefaultSendOptions,
             |src_ip| get_body_from_src_ip(src_ip.into()),
             None,
         )
@@ -2770,7 +2770,7 @@ fn send_icmpv4_error_message<
             None,
             original_src_ip,
             Ipv4Proto::Icmp,
-            DefaultSendOptions,
+            &DefaultSendOptions,
             |local_ip| {
                 original_packet.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                     local_ip.addr(),
@@ -2824,7 +2824,7 @@ fn send_icmpv6_error_message<
             None,
             original_src_ip,
             Ipv6Proto::Icmpv6,
-            DefaultSendOptions,
+            &DefaultSendOptions,
             |local_ip| {
                 let icmp_builder = IcmpPacketBuilder::<Ipv6, _>::new(
                     local_ip.addr(),
@@ -4008,7 +4008,7 @@ mod tests {
         where
             S: TransportPacketSerializer,
             S::Buffer: BufferMut,
-            O: SendOptions<I>,
+            O: SendOptions<I, Self::WeakDeviceId>,
         {
             self.inner.send_ip_packet(bindings_ctx, socket, body, mtu, options)
         }

@@ -108,7 +108,7 @@ impl<I: crate::ip::IpExt + DualStackIpExt + crate::ip::icmp::IcmpIpExt> IpExt fo
 
 #[derive(Derivative, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-#[derivative(Debug(bound = "D: Debug"))]
+#[derivative(Debug(bound = ""))]
 pub enum SocketState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
     Unbound(UnboundSocketState<I, D, S>),
     Bound(BoundSocketState<I, D, S>),
@@ -306,14 +306,16 @@ pub(crate) enum AddrEntry<'a, I: Ip, D, A: SocketMapAddrSpec, S: SocketMapStateS
 }
 
 #[derive(Derivative)]
-#[derivative(Debug(bound = "D: Debug"), Default(bound = ""))]
-pub struct UnboundSocketState<I: IpExt, D, S: DatagramSocketSpec> {
+#[derivative(Debug(bound = ""), Default(bound = ""))]
+pub struct UnboundSocketState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
     device: Option<D>,
     sharing: S::SharingState,
     ip_options: IpOptions<I, D, S>,
 }
 
-impl<I: IpExt, D, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>> for UnboundSocketState<I, D, S> {
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>>
+    for UnboundSocketState<I, D, S>
+{
     fn as_ref(&self) -> &IpOptions<I, D, S> {
         &self.ip_options
     }
@@ -321,12 +323,12 @@ impl<I: IpExt, D, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>> for UnboundSo
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
-pub(crate) struct ListenerState<I: IpExt, D: Hash + Eq + Debug, S: DatagramSocketSpec + ?Sized> {
+pub(crate) struct ListenerState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec + ?Sized> {
     pub(crate) ip_options: IpOptions<I, D, S>,
     pub(crate) addr: ListenerAddr<S::ListenerIpAddr<I>, D>,
 }
 
-impl<I: IpExt, D: Debug + Hash + Eq, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>>
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>>
     for ListenerState<I, D, S>
 {
     fn as_ref(&self) -> &IpOptions<I, D, S> {
@@ -336,7 +338,12 @@ impl<I: IpExt, D: Debug + Hash + Eq, S: DatagramSocketSpec> AsRef<IpOptions<I, D
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub struct ConnState<WireI: IpExt, SocketI: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Sized> {
+pub struct ConnState<
+    WireI: IpExt,
+    SocketI: IpExt,
+    D: device::WeakId,
+    S: DatagramSocketSpec + ?Sized,
+> {
     pub(crate) socket: IpSock<WireI, D>,
     pub(crate) ip_options: IpOptions<SocketI, D, S>,
     pub(crate) shutdown: Shutdown,
@@ -371,7 +378,7 @@ pub struct ConnState<WireI: IpExt, SocketI: IpExt, D: Eq + Hash, S: DatagramSock
     pub(crate) extra: S::ConnStateExtra,
 }
 
-impl<WireI: IpExt, SocketI: IpExt, D: Hash + Eq, S: DatagramSocketSpec>
+impl<WireI: IpExt, SocketI: IpExt, D: device::WeakId, S: DatagramSocketSpec>
     AsRef<IpOptions<SocketI, D, S>> for ConnState<WireI, SocketI, D, S>
 {
     fn as_ref(&self) -> &IpOptions<SocketI, D, S> {
@@ -379,7 +386,7 @@ impl<WireI: IpExt, SocketI: IpExt, D: Hash + Eq, S: DatagramSocketSpec>
     }
 }
 
-impl<WireI: IpExt, SocketI: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsRef<Shutdown>
+impl<WireI: IpExt, SocketI: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsRef<Shutdown>
     for ConnState<WireI, SocketI, D, S>
 {
     fn as_ref(&self) -> &Shutdown {
@@ -387,7 +394,7 @@ impl<WireI: IpExt, SocketI: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsRef<Sh
     }
 }
 
-impl<WireI: IpExt, SocketI: IpExt, D: Hash + Eq, S: DatagramSocketSpec>
+impl<WireI: IpExt, SocketI: IpExt, D: device::WeakId, S: DatagramSocketSpec>
     AsMut<IpOptions<SocketI, D, S>> for ConnState<WireI, SocketI, D, S>
 {
     fn as_mut(&mut self) -> &mut IpOptions<SocketI, D, S> {
@@ -395,7 +402,7 @@ impl<WireI: IpExt, SocketI: IpExt, D: Hash + Eq, S: DatagramSocketSpec>
     }
 }
 
-impl<WireI: IpExt, SocketI: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsMut<Shutdown>
+impl<WireI: IpExt, SocketI: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsMut<Shutdown>
     for ConnState<WireI, SocketI, D, S>
 {
     fn as_mut(&mut self) -> &mut Shutdown {
@@ -403,7 +410,7 @@ impl<WireI: IpExt, SocketI: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsMut<Sh
     }
 }
 
-impl<WireI: IpExt, SocketI: IpExt, D: Eq + Hash, S: DatagramSocketSpec>
+impl<WireI: IpExt, SocketI: IpExt, D: device::WeakId, S: DatagramSocketSpec>
     ConnState<WireI, SocketI, D, S>
 {
     pub(crate) fn should_receive(&self) -> bool {
@@ -422,16 +429,19 @@ impl<WireI: IpExt, SocketI: IpExt, D: Eq + Hash, S: DatagramSocketSpec>
 
 /// Connection state belong to either this-stack or the other-stack.
 #[derive(Derivative)]
-#[derivative(Debug(bound = "D: Debug"))]
-pub enum DualStackConnState<I: IpExt + DualStackIpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Sized>
-{
+#[derivative(Debug(bound = ""))]
+pub enum DualStackConnState<
+    I: IpExt + DualStackIpExt,
+    D: device::WeakId,
+    S: DatagramSocketSpec + ?Sized,
+> {
     /// The [`ConnState`] for a socked connected with [`I::Version`].
     ThisStack(ConnState<I, I, D, S>),
     /// The [`ConnState`] for a socked connected with [`I::OtherVersion`].
     OtherStack(ConnState<I::OtherVersion, I, D, S>),
 }
 
-impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>>
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>>
     for DualStackConnState<I, D, S>
 {
     fn as_ref(&self) -> &IpOptions<I, D, S> {
@@ -442,7 +452,7 @@ impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>>
     }
 }
 
-impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsMut<IpOptions<I, D, S>>
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsMut<IpOptions<I, D, S>>
     for DualStackConnState<I, D, S>
 {
     fn as_mut(&mut self) -> &mut IpOptions<I, D, S> {
@@ -453,7 +463,7 @@ impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsMut<IpOptions<I, D, S>>
     }
 }
 
-impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsRef<Shutdown>
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsRef<Shutdown>
     for DualStackConnState<I, D, S>
 {
     fn as_ref(&self) -> &Shutdown {
@@ -464,7 +474,7 @@ impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsRef<Shutdown>
     }
 }
 
-impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsMut<Shutdown>
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsMut<Shutdown>
     for DualStackConnState<I, D, S>
 {
     fn as_mut(&mut self) -> &mut Shutdown {
@@ -477,23 +487,39 @@ impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsMut<Shutdown>
 
 #[derive(Derivative, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-#[derivative(Clone(bound = "D: Clone"), Debug(bound = "D: Debug"), Default(bound = ""))]
-pub struct IpOptions<I: IpExt, D, S: DatagramSocketSpec + ?Sized> {
+#[derivative(Clone(bound = ""), Debug, Default(bound = ""))]
+pub struct IpOptions<I: IpExt, D: device::WeakId, S: DatagramSocketSpec + ?Sized> {
     multicast_memberships: MulticastMemberships<I::Addr, D>,
+    multicast_interface: Option<D>,
     hop_limits: SocketHopLimits<I>,
-    other_stack: S::OtherStackIpOptions<I>,
+    other_stack: S::OtherStackIpOptions<I, D>,
     transparent: bool,
 }
 
-impl<I: IpExt, D, S: DatagramSocketSpec> AsRef<Self> for IpOptions<I, D, S> {
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsRef<Self> for IpOptions<I, D, S> {
     fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl<I: IpExt, D, S: DatagramSocketSpec> IpOptions<I, D, S> {
-    pub(crate) fn other_stack(&self) -> &S::OtherStackIpOptions<I> {
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> IpOptions<I, D, S> {
+    pub(crate) fn other_stack(&self) -> &S::OtherStackIpOptions<I, D> {
         &self.other_stack
+    }
+}
+
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> SendOptions<I, D> for IpOptions<I, D, S> {
+    fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
+        let Self { hop_limits: SocketHopLimits { unicast, multicast, version: _ }, .. } = self;
+        if destination.is_multicast() {
+            *multicast
+        } else {
+            *unicast
+        }
+    }
+
+    fn multicast_interface(&self) -> Option<&D> {
+        self.multicast_interface.as_ref()
     }
 }
 
@@ -527,17 +553,6 @@ impl<I: Ip> SocketHopLimits<I> {
     }
 }
 
-impl<I: Ip> SendOptions<I> for SocketHopLimits<I> {
-    fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
-        let SocketHopLimits { unicast, multicast, version: _ } = self;
-        if destination.is_multicast() {
-            *multicast
-        } else {
-            *unicast
-        }
-    }
-}
-
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default(bound = ""))]
 pub(crate) struct MulticastMemberships<A, D>(HashSet<(MulticastAddr<A>, D)>);
@@ -548,7 +563,7 @@ pub(crate) enum MulticastMembershipChange {
     Leave,
 }
 
-impl<A: Eq + Hash, D: Eq + Hash + Clone> MulticastMemberships<A, D> {
+impl<A: Eq + Hash, D: device::WeakId> MulticastMemberships<A, D> {
     pub(crate) fn apply_membership_change(
         &mut self,
         address: MulticastAddr<A>,
@@ -794,11 +809,14 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSoc
     /// Returns if the socket state indicates dual-stack operation is enabled.
     fn dual_stack_enabled(&self, state: &impl AsRef<IpOptions<I, Self::WeakDeviceId, S>>) -> bool;
 
+    /// Type for [`SendOptions`] for the other stack.
+    type OtherSendOptions: SendOptions<I::OtherVersion, Self::WeakDeviceId>;
+
     /// Returns the [`SendOptions`] to use for packets in the other stack.
     fn to_other_send_options<'a>(
         &self,
         state: &'a IpOptions<I, Self::WeakDeviceId, S>,
-    ) -> &'a SocketHopLimits<I::OtherVersion>;
+    ) -> &'a Self::OtherSendOptions;
 
     /// Asserts that the socket state indicates dual-stack operation is enabled.
     ///
@@ -1006,7 +1024,7 @@ pub trait DualStackIpExt: super::DualStackIpExt {
         + Into<ConnInfoAddr<Self::Addr, <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier>>;
 
     /// Connection state for a dual-stack socket.
-    type DualStackConnState<D: Eq + Hash + Debug + Send + Sync, S: DatagramSocketSpec>: Debug
+    type DualStackConnState<D: device::WeakId, S: DatagramSocketSpec>: Debug
         + AsRef<IpOptions<Self, D, S>>
         + AsMut<IpOptions<Self, D, S>>
         + Send
@@ -1024,7 +1042,7 @@ pub trait DualStackIpExt: super::DualStackIpExt {
         Self: IpExt;
 
     /// Retrieves the associated connection address from the connection state.
-    fn conn_addr_from_state<D: Eq + Hash + Debug + Clone + Send + Sync, S: DatagramSocketSpec>(
+    fn conn_addr_from_state<D: device::WeakId, S: DatagramSocketSpec>(
         state: &Self::DualStackConnState<D, S>,
     ) -> ConnAddr<Self::DualStackConnIpAddr<S>, D>;
 }
@@ -1056,8 +1074,7 @@ impl DualStackIpExt for Ipv4 {
         <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     >;
     /// IPv4 sockets cannot connect on dual-stack addresses.
-    type DualStackConnState<D: Eq + Hash + Debug + Send + Sync, S: DatagramSocketSpec> =
-        ConnState<Self, Self, D, S>;
+    type DualStackConnState<D: device::WeakId, S: DatagramSocketSpec> = ConnState<Self, Self, D, S>;
 
     fn into_dual_stack_bound_socket_id<D: device::WeakId, S: DatagramSocketSpec>(
         id: S::SocketId<Self, D>,
@@ -1065,7 +1082,7 @@ impl DualStackIpExt for Ipv4 {
         EitherIpSocket::V4(id)
     }
 
-    fn conn_addr_from_state<D: Clone + Debug + Eq + Hash + Send + Sync, S: DatagramSocketSpec>(
+    fn conn_addr_from_state<D: device::WeakId, S: DatagramSocketSpec>(
         state: &Self::DualStackConnState<D, S>,
     ) -> ConnAddr<Self::DualStackConnIpAddr<S>, D> {
         let ConnState {
@@ -1097,7 +1114,7 @@ impl DualStackIpExt for Ipv6 {
     >;
     /// IPv6 sockets can connect on dual-stack addresses (if the protocol and
     /// socket are dual-stack-enabled).
-    type DualStackConnState<D: Eq + Hash + Debug + Send + Sync, S: DatagramSocketSpec> =
+    type DualStackConnState<D: device::WeakId, S: DatagramSocketSpec> =
         DualStackConnState<Self, D, S>;
 
     fn into_dual_stack_bound_socket_id<D: device::WeakId, S: DatagramSocketSpec>(
@@ -1106,7 +1123,7 @@ impl DualStackIpExt for Ipv6 {
         id
     }
 
-    fn conn_addr_from_state<D: Clone + Debug + Eq + Hash + Send + Sync, S: DatagramSocketSpec>(
+    fn conn_addr_from_state<D: device::WeakId, S: DatagramSocketSpec>(
         state: &Self::DualStackConnState<D, S>,
     ) -> ConnAddr<Self::DualStackConnIpAddr<S>, D> {
         match state {
@@ -1175,7 +1192,7 @@ pub trait DatagramSocketSpec: Sized {
         + From<StrongRc<I, D, Self>>;
 
     /// IP-level options for sending `I::OtherVersion` IP packets.
-    type OtherStackIpOptions<I: IpExt>: Clone + Debug + Default + Send + Sync;
+    type OtherStackIpOptions<I: IpExt, D: device::WeakId>: Clone + Debug + Default + Send + Sync;
 
     /// The type of a listener IP address.
     ///
@@ -1213,7 +1230,7 @@ pub trait DatagramSocketSpec: Sized {
     /// [`DualStackIpExt::ConnState`], which will be one of [`ConnState`] or
     /// [`DualStackConnState`]. Non-dual-stack-capable protocols (like ICMP and
     /// raw IP sockets) should just use [`ConnState`].
-    type ConnState<I: IpExt, D: Debug + Eq + Hash + Send + Sync>: Debug
+    type ConnState<I: IpExt, D: device::WeakId>: Debug
         + AsRef<IpOptions<I, D, Self>>
         + AsMut<IpOptions<I, D, Self>>
         + Send
@@ -1286,7 +1303,7 @@ pub trait DatagramSocketSpec: Sized {
     ) -> Option<<Self::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>;
 
     /// Retrieves the associated connection info from the connection state.
-    fn conn_info_from_state<I: IpExt, D: Clone + Debug + Eq + Hash + Send + Sync>(
+    fn conn_info_from_state<I: IpExt, D: device::WeakId>(
         state: &Self::ConnState<I, D>,
     ) -> ConnInfo<I::Addr, D>;
 
@@ -3506,7 +3523,13 @@ pub(crate) fn send_conn<
             }
         };
 
-        struct SendParams<'a, I: IpExt, S: DatagramSocketSpec, D: device::WeakId, O: SendOptions<I>> {
+        struct SendParams<
+            'a,
+            I: IpExt,
+            S: DatagramSocketSpec,
+            D: device::WeakId,
+            O: SendOptions<I, D>,
+        > {
             socket: &'a IpSock<I, D>,
             ip: &'a ConnIpAddr<
                 I::Addr,
@@ -3524,8 +3547,8 @@ pub(crate) fn send_conn<
             BC: DatagramStateBindingsContext<I, S>,
             DualStackSC: DualStackDatagramBoundStateContext<I, BC, S>,
             CC: DatagramBoundStateContext<I, BC, S>,
-            O: SendOptions<I>,
-            OtherO: SendOptions<I::OtherVersion>,
+            O: SendOptions<I, D>,
+            OtherO: SendOptions<I::OtherVersion, D>,
         > {
             SendToThisStack((SendParams<'a, I, S, D, O>, &'a mut CC)),
             SendToOtherStack((SendParams<'a, I::OtherVersion, S, D, OtherO>, &'a mut DualStackSC)),
@@ -3546,7 +3569,7 @@ pub(crate) fn send_conn<
                 }) => (
                     shutdown,
                     Operation::SendToThisStack((
-                        SendParams { socket, ip, options: &ip_options.hop_limits },
+                        SendParams { socket, ip, options: ip_options },
                         core_ctx,
                     )),
                 ),
@@ -3581,7 +3604,7 @@ pub(crate) fn send_conn<
                 (
                     shutdown,
                     Operation::SendToThisStack((
-                        SendParams { socket, ip, options: &ip_options.hop_limits },
+                        SendParams { socket, ip, options: ip_options },
                         core_ctx,
                     )),
                 )
@@ -3671,8 +3694,8 @@ pub(crate) fn send_to<
             BC: DatagramStateBindingsContext<I, S>,
             DualStackSC: DualStackDatagramBoundStateContext<I, BC, S>,
             CC: DatagramBoundStateContext<I, BC, S>,
-            O: SendOptions<I>,
-            OtherO: SendOptions<I::OtherVersion>,
+            O: SendOptions<I, D>,
+            OtherO: SendOptions<I::OtherVersion, D>,
         > {
             SendToThisStack((SendOneshotParameters<'a, I, S, D, O>, &'a mut CC)),
 
@@ -3707,7 +3730,7 @@ pub(crate) fn send_to<
                                     remote_ip,
                                     remote_id: remote_identifier,
                                     device,
-                                    send_options: &ip_options.hop_limits,
+                                    send_options: ip_options,
                                 },
                                 core_ctx,
                             )),
@@ -3735,7 +3758,7 @@ pub(crate) fn send_to<
                                     remote_ip,
                                     remote_id: remote_identifier,
                                     device,
-                                    send_options: &ip_options.hop_limits,
+                                    send_options: ip_options,
                                 },
                                 core_ctx,
                             )),
@@ -3766,7 +3789,7 @@ pub(crate) fn send_to<
                                 remote_ip,
                                 remote_id: remote_identifier,
                                 device,
-                                send_options: &ip_options.hop_limits,
+                                send_options: ip_options,
                             },
                             core_ctx,
                         )),
@@ -3783,7 +3806,7 @@ pub(crate) fn send_to<
                                 remote_ip,
                                 remote_id: remote_identifier,
                                 device,
-                                send_options: &ip_options.hop_limits,
+                                send_options: ip_options,
                             },
                             core_ctx,
                         )),
@@ -3854,7 +3877,7 @@ pub(crate) fn send_to<
                                     remote_ip,
                                     remote_id: remote_identifier,
                                     device,
-                                    send_options: &ip_options.hop_limits,
+                                    send_options: ip_options,
                                 },
                                 core_ctx,
                             )),
@@ -3924,7 +3947,7 @@ struct SendOneshotParameters<
     I: IpExt,
     S: DatagramSocketSpec,
     D: device::WeakId,
-    O: SendOptions<I>,
+    O: SendOptions<I, D>,
 > {
     local_ip: Option<SocketIpAddr<I::Addr>>,
     local_id: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
@@ -3940,7 +3963,7 @@ fn send_oneshot<
     CC: IpSocketHandler<I, BC>,
     BC,
     B: BufferMut,
-    O: SendOptions<I>,
+    O: SendOptions<I, CC::WeakDeviceId>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -4551,7 +4574,7 @@ pub(crate) fn set_multicast_membership<
 fn get_options_device_from_conn_state<
     WireI: IpExt,
     SocketI: IpExt,
-    D: Eq + Hash,
+    D: device::WeakId,
     S: DatagramSocketSpec,
 >(
     ConnState {
@@ -4693,7 +4716,7 @@ pub(crate) fn get_ip_hop_limits<
     })
 }
 
-/// Calls the callback with mutable access to [`S::OtherStackIpOptions<I>`].
+/// Calls the callback with mutable access to [`S::OtherStackIpOptions<I, D>`].
 ///
 /// If the socket is bound, the callback is not called, and instead an
 /// `ExpectedUnboundError` is returned.
@@ -4707,7 +4730,7 @@ pub(crate) fn with_other_stack_ip_options_mut_if_unbound<
     core_ctx: &mut CC,
     _bindings_ctx: &mut BC,
     id: &S::SocketId<I, CC::WeakDeviceId>,
-    cb: impl FnOnce(&mut S::OtherStackIpOptions<I>) -> R,
+    cb: impl FnOnce(&mut S::OtherStackIpOptions<I, CC::WeakDeviceId>) -> R,
 ) -> Result<R, ExpectedUnboundError> {
     core_ctx.with_socket_state_mut(id, |core_ctx, state| {
         let is_unbound = match state {
@@ -4723,7 +4746,7 @@ pub(crate) fn with_other_stack_ip_options_mut_if_unbound<
     })
 }
 
-/// Calls the callback with mutable access to [`S::OtherStackIpOptions<I>`].
+/// Calls the callback with mutable access to [`S::OtherStackIpOptions<I, D>`].
 pub(crate) fn with_other_stack_ip_options_mut<
     I: IpExt,
     CC: DatagramStateContext<I, BC, S>,
@@ -4734,7 +4757,7 @@ pub(crate) fn with_other_stack_ip_options_mut<
     core_ctx: &mut CC,
     _bindings_ctx: &mut BC,
     id: &S::SocketId<I, CC::WeakDeviceId>,
-    cb: impl FnOnce(&mut S::OtherStackIpOptions<I>) -> R,
+    cb: impl FnOnce(&mut S::OtherStackIpOptions<I, CC::WeakDeviceId>) -> R,
 ) -> R {
     core_ctx.with_socket_state_mut(id, |core_ctx, state| {
         let options = get_options_mut(core_ctx, state);
@@ -4742,7 +4765,7 @@ pub(crate) fn with_other_stack_ip_options_mut<
     })
 }
 
-/// Calls the callback with access to [`S::OtherStackIpOptions<I>`].
+/// Calls the callback with access to [`S::OtherStackIpOptions<I, D>`].
 pub(crate) fn with_other_stack_ip_options<
     I: IpExt,
     CC: DatagramStateContext<I, BC, S>,
@@ -4753,7 +4776,7 @@ pub(crate) fn with_other_stack_ip_options<
     core_ctx: &mut CC,
     _bindings_ctx: &BC,
     id: &S::SocketId<I, CC::WeakDeviceId>,
-    cb: impl FnOnce(&S::OtherStackIpOptions<I>) -> R,
+    cb: impl FnOnce(&S::OtherStackIpOptions<I, CC::WeakDeviceId>) -> R,
 ) -> R {
     core_ctx.with_socket_state(id, |core_ctx, state| {
         let (options, _device) = get_options_device(core_ctx, state);
@@ -4762,7 +4785,7 @@ pub(crate) fn with_other_stack_ip_options<
     })
 }
 
-/// Calls the callback with access to [`S::OtherStackIpOptions<I>`], and the
+/// Calls the callback with access to [`S::OtherStackIpOptions<I, D>`], and the
 /// default [`HopLimits`] for `I::OtherVersion`.
 ///
 /// If dualstack operations are not supported, the callback is not called, and
@@ -4777,7 +4800,7 @@ pub(crate) fn with_other_stack_ip_options_and_default_hop_limits<
     core_ctx: &mut CC,
     _bindings_ctx: &BC,
     id: &S::SocketId<I, CC::WeakDeviceId>,
-    cb: impl FnOnce(&S::OtherStackIpOptions<I>, HopLimits) -> R,
+    cb: impl FnOnce(&S::OtherStackIpOptions<I, CC::WeakDeviceId>, HopLimits) -> R,
 ) -> Result<R, NotDualStackCapableError> {
     core_ctx.with_socket_state(id, |core_ctx, state| {
         let (options, device) = get_options_device(core_ctx, state);
@@ -5080,19 +5103,39 @@ mod test {
     const FAKE_DATAGRAM_IPV4_PROTOCOL: Ipv4Proto = Ipv4Proto::Other(253);
     const FAKE_DATAGRAM_IPV6_PROTOCOL: Ipv6Proto = Ipv6Proto::Other(254);
 
+    #[derive(Clone, Default, Debug)]
+    struct OtherStackSocketState<I: IpExt> {
+        hop_limits: SocketHopLimits<I>,
+    }
+
+    impl<I: IpExt, D> SendOptions<I, D> for OtherStackSocketState<I> {
+        fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
+            let Self { hop_limits, .. } = self;
+            if destination.is_multicast() {
+                hop_limits.multicast
+            } else {
+                hop_limits.unicast
+            }
+        }
+
+        fn multicast_interface(&self) -> Option<&D> {
+            None
+        }
+    }
+
     impl DatagramSocketSpec for FakeStateSpec {
         const NAME: &'static str = "FAKE";
         type AddrSpec = FakeAddrSpec;
         type SocketId<I: IpExt, D: device::WeakId> = Id<I, D>;
-        type OtherStackIpOptions<I: IpExt> = SocketHopLimits<I::OtherVersion>;
+        type OtherStackIpOptions<I: IpExt, D: device::WeakId> =
+            OtherStackSocketState<I::OtherVersion>;
         type SocketMapSpec<I: IpExt, D: device::WeakId> = (Self, I, D);
         type SharingState = Sharing;
         type ListenerIpAddr<I: IpExt> =
             I::DualStackListenerIpAddr<<FakeAddrSpec as SocketMapAddrSpec>::LocalIdentifier>;
         type ConnIpAddr<I: IpExt> = I::DualStackConnIpAddr<Self>;
         type ConnStateExtra = ();
-        type ConnState<I: IpExt, D: Debug + Eq + Hash + Send + Sync> =
-            I::DualStackConnState<D, Self>;
+        type ConnState<I: IpExt, D: device::WeakId> = I::DualStackConnState<D, Self>;
         type ExternalData<I: Ip> = ();
 
         fn ip_proto<I: IpProtoExt>() -> I::Proto {
@@ -5127,7 +5170,7 @@ mod test {
             (1..=u16::MAX).map(|i| NonZeroU16::new(i).unwrap()).find(|i| is_available(*i).is_ok())
         }
 
-        fn conn_info_from_state<I: IpExt, D: Clone + Debug + Eq + Hash + Send + Sync>(
+        fn conn_info_from_state<I: IpExt, D: device::WeakId>(
             state: &Self::ConnState<I, D>,
         ) -> ConnInfo<I::Addr, D> {
             let ConnAddr { ip, device } = I::conn_addr_from_state(state);
@@ -5581,12 +5624,13 @@ mod test {
             true
         }
 
+        type OtherSendOptions = OtherStackSocketState<Ipv4>;
+
         fn to_other_send_options<'a>(
             &self,
             state: &'a IpOptions<Ipv6, Self::WeakDeviceId, FakeStateSpec>,
-        ) -> &'a SocketHopLimits<Ipv4> {
-            let IpOptions { multicast_memberships: _, hop_limits: _, other_stack, transparent: _ } =
-                state;
+        ) -> &'a Self::OtherSendOptions {
+            let IpOptions { other_stack, .. } = state;
             other_stack
         }
 
