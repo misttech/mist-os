@@ -124,13 +124,13 @@ impl FileOps for RemoteBinderFileOps {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        self.0.ioctl(current_task, request, arg)
+        self.0.ioctl(locked, current_task, request, arg)
     }
 
     fn get_vmo(
@@ -477,6 +477,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
 
     fn ioctl(
         self: &Arc<Self>,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
@@ -484,7 +485,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         let user_addr = UserAddress::from(arg);
         match request {
             uapi::REMOTE_BINDER_START => self.start(current_task, user_addr.into())?,
-            uapi::REMOTE_BINDER_WAIT => self.wait(current_task, user_addr.into())?,
+            uapi::REMOTE_BINDER_WAIT => self.wait(locked, current_task, user_addr.into())?,
             _ => return error!(ENOTSUP),
         }
         Ok(SUCCESS)
@@ -964,6 +965,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     /// Implementation of the REMOTE_BINDER_WAIT ioctl.
     fn wait(
         &self,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         wait_command_ref: UserRef<uapi::remote_binder_wait_command>,
     ) -> Result<(), Errno> {
@@ -1000,8 +1002,12 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 } => {
                     trace_duration!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL_WORKER_PROCESS);
                     trace_flow_step!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL, koid.into());
-                    let result =
-                        remote_binder_connection.ioctl(current_task, request, parameter.into());
+                    let result = remote_binder_connection.ioctl(
+                        locked,
+                        current_task,
+                        request,
+                        parameter.into(),
+                    );
                     // Once the potentially blocking calls is made, the task is ready to handle the
                     // next request.
                     self.lock()
@@ -1147,6 +1153,7 @@ mod tests {
                 );
 
                 let start_result = remote_binder_handle.ioctl(
+                    locked,
                     &task,
                     uapi::REMOTE_BINDER_START,
                     start_command_address.into(),
@@ -1156,6 +1163,7 @@ mod tests {
                 }
                 loop {
                     let result = remote_binder_handle.ioctl(
+                        locked,
                         &task,
                         uapi::REMOTE_BINDER_WAIT,
                         wait_command_address.into(),
