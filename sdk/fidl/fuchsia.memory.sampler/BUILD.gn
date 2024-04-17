@@ -7,5 +7,6 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.memory.sampler") {
   sdk_category = "internal"
   sources = [ "sampler.fidl" ]
+  sdk_area = "Diagnostics"
   public_deps = [ "//zircon/vdso/zx" ]
 }

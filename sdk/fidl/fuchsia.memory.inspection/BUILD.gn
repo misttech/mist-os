@@ -6,7 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.memory.inspection") {
   sdk_category = "partner_internal"
-  sdk_area = "Unknown"
+  sdk_area = "Diagnostics"
   sources = [ "inspection.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
   enable_hlcpp = true
