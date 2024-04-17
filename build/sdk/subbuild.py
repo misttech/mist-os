@@ -67,7 +67,7 @@ def error(msg: str) -> int:
     return 1
 
 
-def write_file_if_unchanged(path: Path, content: str) -> bool:
+def write_file_if_changed(path: Path, content: str) -> bool:
     """Write |content| into |path| if needed. Return True on write."""
     if path.exists() and path.read_text() == content:
         # Nothing to do
@@ -157,9 +157,9 @@ def main():
     )
     parser.add_argument(
         "--api-level",
-        type=int,
+        type=str,
         required=True,
-        help="API level at which to build the sdk_collection, or 0 to use the default.",
+        help="API level at which to build the sdk_collection.",
     )
     parser.add_argument("--stamp-file", help="Optional output stamp file.")
     parser.add_argument(
@@ -285,19 +285,23 @@ def main():
 
     args_gn_content += "sdk_inside_sub_build = true\n"
 
-    if api_level == 0:
-        # The host architecture is built at the default level as part of the
+    # PLATFORM should be passed to GN as a string, numeric API levels are passed
+    # as ints.
+    if api_level == "PLATFORM":
+        gn_api_level = '"PLATFORM"'
+
+        # The host architecture is built at the PLATFORM level as part of the
         # main build, so only sub-builds for other target CPU architectures
         # should reach here.
         assert f"{target_cpu}" != f"{get_host_arch()}"
     else:
-        # A non-default API level was specified.
-        args_gn_content += "sdk_inside_supported_api_sub_build = true\n"
-        args_gn_content += f"override_target_api_level = {api_level}\n"
+        gn_api_level = int(api_level)
+
+    args_gn_content += f"override_target_api_level = {gn_api_level}\n"
 
     log(f"{build_dir}: args.gn content:\n{args_gn_content}")
     if (
-        write_file_if_unchanged(build_dir / "args.gn", args_gn_content)
+        write_file_if_changed(build_dir / "args.gn", args_gn_content)
         or not (build_dir / "build.ninja").exists()
     ):
         if run_checked_command(
@@ -320,10 +324,7 @@ def main():
     # the top-level ones.
     ninja_status = os.environ.get("NINJA_STATUS", "[%f/%t](%r) ")
 
-    if api_level == 0:
-        status_prefix = f"IDK_SUBBUILD_{target_cpu} "
-    else:
-        status_prefix = f"IDK_SUBBUILD_api{api_level}-{target_cpu} "
+    status_prefix = f"IDK_SUBBUILD_api_{api_level}_{target_cpu} "
     ninja_status = status_prefix + ninja_status
     ninja_env = {"NINJA_STATUS": ninja_status}
 

@@ -21,11 +21,8 @@ import("config.gni")
 
 visibility = [ ":*" ]
 
-assert(sdk_inside_supported_api_sub_build ==
-       (sdk_inside_sub_build && override_target_api_level != -1))
-
 # Verify that `override_target_api_level` is actually supported.
-if (override_target_api_level != -1) {
+if (override_target_api_level != "PLATFORM") {
   _override_is_supported = false
   foreach(supported_level, platform_version.build_time_supported_api_levels) {
     if (supported_level == override_target_api_level) {
@@ -195,11 +192,9 @@ sdk_collection("core") {
 sdk_molecule("fuchsia_idk_atoms") {
   visibility += [ "//vendor/*" ]
 
-  deps = [ ":fuchsia_idk_atoms_for_each_api_level_and_legacy" ]
+  deps = [ ":fuchsia_idk_atoms_for_each_api_level_and_platform" ]
 
-  if (sdk_inside_supported_api_sub_build) {
-    deps += [ ":fuchsia_idk_atoms_for_each_api_level" ]
-  } else {
+  if (override_target_api_level == "PLATFORM") {
     deps += [
       # Do not add to this list. Instead, add new items to
       # fuchsia_idk_atoms_independent_of_api_level, which verifies there are no
@@ -207,9 +202,11 @@ sdk_molecule("fuchsia_idk_atoms") {
       ":fuchsia_idk_atoms_independent_of_api_level",
 
       # There are very limited exceptions that do depend on API level but are
-      # only built in an API-level agnostic build.
-      ":fuchsia_idk_atoms_for_legacy_only",
+      # only built at "PLATFORM".
+      ":fuchsia_idk_atoms_for_platform_only",
     ]
+  } else {
+    deps += [ ":fuchsia_idk_atoms_for_each_api_level" ]
   }
 
   host_tools_deps = [
@@ -224,7 +221,7 @@ sdk_molecule("fuchsia_idk_atoms") {
 }
 
 # Prebuilt libraries (including the sysroot) must be built and included for all
-# API levels they support. They are also built at `LEGACY` (a.k.a., the
+# API levels they support. They are also built at `PLATFORM` (a.k.a., the
 # API-level-agnostic build, a.k.a., the default platform build), for backwards
 # compatibility with IDK users that don't yet know about per-API-level
 # prebuilts.
@@ -232,26 +229,26 @@ sdk_molecule("fuchsia_idk_atoms") {
 # TODO(https://fxbug.dev/310006516): Move all these into
 # `fuchsia_idk_atoms_for_each_api_level` once all IDK users are using the
 # per-API-level artifacts.
-sdk_molecule("fuchsia_idk_atoms_for_each_api_level_and_legacy") {
+sdk_molecule("fuchsia_idk_atoms_for_each_api_level_and_platform") {
   deps = [
     ":core_cc_prebuilt_libraries",
-    ":core_packages_for_each_api_level_and_legacy",
+    ":core_packages_for_each_api_level_and_platform",
     ":core_sysroot",
   ]
 }
 
 # Prebuilt libraries and packages that are built exclusively for the API levels
-# SDK users can target (not `LEGACY`).
+# SDK users can target (not `PLATFORM`).
 sdk_molecule("fuchsia_idk_atoms_for_each_api_level") {
   deps = [ ":core_packages" ]
 }
 
-if (!sdk_inside_supported_api_sub_build) {
+if (override_target_api_level == "PLATFORM") {
   # Do not add dependencies to this target without a really good reason.
   # Most dependencies should be built at every API level (add to
   # :fuchsia_idk_atoms_for_each_api_level) or be verifiably independent of the
   # API level (add to :fuchsia_idk_atoms_independent_of_api_level).
-  sdk_molecule("fuchsia_idk_atoms_for_legacy_only") {
+  sdk_molecule("fuchsia_idk_atoms_for_platform_only") {
     deps = [
       # The C++ source libraries must be buildable at each supported API level
       # but are only built once.
@@ -266,7 +263,7 @@ if (!sdk_inside_supported_api_sub_build) {
       # of the subbuilds currently puts the build files at the same path, so all
       # but one of them gets clobbered. Give `loadable_modules` the proper
       # per-API-level treatment and move this to
-      # :fuchsia_idk_atoms_for_each_api_level_and_legacy.
+      # :fuchsia_idk_atoms_for_each_api_level_and_platform.
       ":core_loadable_modules",
     ]
   }
@@ -553,7 +550,7 @@ sdk_molecule("core_packages") {
 # TODO(https://fxbug.dev/310006516): Move the contents of this target to
 # ":core_packages" once downstream customers no longer need them in "API level
 # agnostic" form.
-sdk_molecule("core_packages_for_each_api_level_and_legacy") {
+sdk_molecule("core_packages_for_each_api_level_and_platform") {
   deps = [
     "//src/graphics/magma/tests/integration:magma_conformance_tests_sdk",
     "//src/graphics/tests/vkreadback:vkreadback_test_sdk",

@@ -180,7 +180,7 @@ template("idk") {
       _subbuild(_subbuild_name) {
         sdk_collection = invoker.sdk_collection_label
         target_cpu = target_cpu
-        api_level = "0"  # Sentinel for "default"
+        api_level = "PLATFORM"
         extra_deps = []
 
         forward_variables_from(invoker,

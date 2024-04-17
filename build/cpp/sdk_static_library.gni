@@ -351,7 +351,7 @@ template("sdk_static_library") {
     ]
     args += [ "--deps" ] + rebase_path(sdk_metas, root_build_dir)
     args += [ "--headers" ] + sdk_metadata_headers
-    if (override_target_api_level != -1) {
+    if (override_target_api_level != "PLATFORM") {
       args += [
         "--api-level",
         "${override_target_api_level}",

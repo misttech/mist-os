@@ -4,19 +4,18 @@
 
 declare_args() {
   # Specify a specific target API level for the platform build.
-  # When set to -1, the platform is built targeting HEAD with runtime support
-  # for all supported and sunset API levels.
-  # Must be -1 or a positive integer corresponding to currently supported
-  # (not sunset) API level. This is primarily used by the SDK.
-  # Not all targets support the non-default value. In particular, `:default`
-  # currently fails.
-  override_target_api_level = -1
+  #
+  # For the normal platform build, the API level is "PLATFORM", which is greater
+  # than (that is to say: "newer than") all other API levels.
+  #
+  # If this is _not_ set to "PLATFORM", then it must be set to a positive
+  # integer corresponding to a currently supported (not sunset) API level. In
+  # that case, the build will target the given API level.
+  #
+  # This is primarily used by the IDK. Not all targets support the non-default
+  # value. In particular, `:default` currently fails.
+  override_target_api_level = "PLATFORM"
 }
-
-assert(override_target_api_level == -1 || 0 < override_target_api_level,
-       "Override must be positive integers.")
-assert(override_target_api_level < 1000,
-       "Override must be a numbered API level.")
 
 # TODO(https://fxbug.dev/325448727): Move this value back into the if
 # statement below and prefix it with `_` once the bug is fixed.
@@ -28,17 +27,19 @@ CLANG_FUCHSIA_HEAD_VALUE = 4294967295
 
 # LINT.ThenChange(//zircon/system/public/zircon/availability.h:fuchsia_head_c_value)
 
-if (override_target_api_level == -1) {
-  # The platform is built for "HEAD" by default. "HEAD" is an artificial API
-  # level that represents the bleeding edge of the Fuchsia API surface. It is
-  # not really meant to be used by SDK users unless they want to try some
-  # unreleased APIs.
+if (override_target_api_level == "PLATFORM") {
+  # This should really be a constant that indicates that we're building at
+  # `PLATFORM`, rather than `HEAD` (which we actually don't support yet).
+  #
+  # TODO(https://fxbug.dev/330426357): Switch this to a constant for `PLATFORM`,
+  # once one exists.
   clang_fuchsia_api_level = CLANG_FUCHSIA_HEAD_VALUE
 
-  # By default the FIDL APIs are compiled at the "LEGACY" level. This level is
-  # only meant to be used in the platform itself, SDK users aren't expected to
-  # target it. It's a higher level than the "HEAD" API level, in other words,
-  # "HEAD" is a subset of "LEGACY".
+  # By default the FIDL APIs are compiled at the "LEGACY" level, which is an
+  # older name for the "PLATFORM" API level. This level is only meant to be used
+  # in the platform itself, SDK users aren't expected to target it. It's a
+  # higher level than the "HEAD" API level, in other words, "HEAD" is a subset
+  # of "LEGACY".
   fidl_fuchsia_api_level = "LEGACY"
 
   # Directory name to use for target API level.
@@ -48,11 +49,17 @@ if (override_target_api_level == -1) {
   sdk_prebuilt_base_for_target_api_level =
       "arch/${target_cpu_dir_name_for_target_api_level}"
 } else {
+  # Ensure that `override_target_api_level` is an integer corresponding to a
+  # normal API level.
+  assert(
+      0 < override_target_api_level,
+      "Override must be 'PLATFORM' or a positive integer, not: ${override_target_api_level}")
+  assert(override_target_api_level < 2147483648,
+         "Special API levels should be given by name, not number.")
+
   clang_fuchsia_api_level = override_target_api_level
   fidl_fuchsia_api_level = "$override_target_api_level"
 
-  # If support for named API levels is added and `override_target_api_level` becomes a string,
-  # we will need to ensure the strings are normalized.
   target_cpu_dir_name_for_target_api_level =
       "${target_cpu}-api-${override_target_api_level}"
   sdk_prebuilt_base_for_target_api_level =

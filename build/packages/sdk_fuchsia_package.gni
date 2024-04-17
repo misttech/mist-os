@@ -87,21 +87,27 @@ template("sdk_fuchsia_package") {
   assert(defined(invoker.api_level_added),
          "Must specify the API level at which the package was added")
 
-  # Build the package for supported API levels.
-  package_in_target_api_level =
-      invoker.api_level_added <= override_target_api_level
-
-  if (defined(invoker.api_level_removed)) {
-    package_in_target_api_level =
-        package_in_target_api_level &&
-        override_target_api_level < invoker.api_level_removed
-  }
-
-  # Also build it in non-per-API-level contexts, for now.
+  # Build packages at `PLATFORM`, for now. See the references to
+  # fxbug.dev/310006516 further down in this file for more context.
   #
   # TODO(https://fxbug.dev/310006516): Delete API-level-agnostic packages from the IDK.
-  if (override_target_api_level == -1) {
+  if (override_target_api_level == "PLATFORM") {
     package_in_target_api_level = true
+    not_needed(invoker,
+               [
+                 "api_level_added",
+                 "api_level_removed",
+               ])
+  } else {
+    # Build the package for supported API levels.
+    package_in_target_api_level =
+        invoker.api_level_added <= override_target_api_level
+
+    if (defined(invoker.api_level_removed)) {
+      package_in_target_api_level =
+          package_in_target_api_level &&
+          override_target_api_level < invoker.api_level_removed
+    }
   }
 
   if (package_in_target_api_level && current_toolchain == target_toolchain) {
@@ -254,6 +260,17 @@ template("sdk_fuchsia_package") {
       ]
       depfile = _sdk_package_depfile
 
+      # Change "PLATFORM" to -1, which is what it used to be. This is necessary
+      # for backwards compatibility until we actually remove API-level-agnostic
+      # packages from the IDK.
+      #
+      # TODO(https://fxbug.dev/310006516): Delete this once API-level-agnostic
+      # packages are no longer in the IDK.
+      _api_level_arg = override_target_api_level
+      if (override_target_api_level == "PLATFORM") {
+        _api_level_arg = -1
+      }
+
       args = [
         "--manifest",
         rebase_path(package_manifest_file, root_build_dir),
@@ -263,8 +280,8 @@ template("sdk_fuchsia_package") {
         rebase_path(_sdk_package_dir, root_build_dir),
 
         # In the API-level-agnostic builds, the value of this flag is a bit
-        # strange, and means we say in `meta.json` that the API level is -1.
-        # This is... neither correct nor incorrect.
+        # strange, and means we say in `meta.json` that the API level is
+        # "PLATFORM". This is... neither correct nor incorrect.
         #
         # It's honestly rather moot, because none of the SDKs actually allow
         # users to use these packages, yet. Hopefully we'll be able to add
@@ -281,7 +298,7 @@ template("sdk_fuchsia_package") {
         # TODO(https://fxbug.dev/310006516): Delete this comment once API-level-agnostic
         # packages are no longer in the IDK.
         "--api-level",
-        "${override_target_api_level}",
+        "${_api_level_arg}",
         "--target-cpu",
         "${target_cpu}",
         "--depfile",
