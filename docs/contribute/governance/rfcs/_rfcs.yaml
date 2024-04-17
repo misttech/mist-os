@@ -3141,6 +3141,19 @@
   submitted: '2024-02-06'
   reviewed: '2024-03-11'
 
+- name: 'RFC-0241'
+  title: 'Explicit Platform / External Split in SDK Interfaces'
+  short_description: 'Expressing more precisely which parts of the Fuchsia interface can be implemented outside of the Fuchsia platform.'
+  authors: ['ianloic@google.com']
+  file: '0241_explicit_platform_external.md'
+  area: ['FIDL']
+  issue: ['335446415']
+  gerrit_change_id: ['982353']
+  status: 'Accepted'
+  reviewers: ['abarth@google.com', 'chaselatta@google.com', 'hjfreyer@google.com', 'mkember@google.com']
+  submitted: '2024-01-29'
+  reviewed: '2024-04-09'
+
 - name: 'RFC-0242'
   title: 'Configuration Capabilities'
   short_description: "Adding Configuration Capabilities to the Component Framework"
