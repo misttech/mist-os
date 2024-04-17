@@ -11,7 +11,7 @@ use {
                 resolve::sandbox_construction::{
                     self, build_component_sandbox, extend_dict_with_offers,
                 },
-                shutdown, ActionKey, DiscoverAction, StopAction,
+                shutdown, ActionKey, ActionSet, DiscoverAction, StopAction,
             },
             component::{
                 Component, ComponentInstance, Package, StartReason, WeakComponentInstance,
@@ -1017,12 +1017,9 @@ impl ResolvedInstanceState {
         for (child_name, child_instance) in &self.children {
             let child_name = Name::new(child_name.name()).unwrap();
             let child_input = child_inputs.remove(&child_name).expect("missing child dict");
-            let _discover_fut = child_instance
-                .clone()
-                .lock_actions()
+            ActionSet::register(child_instance.clone(), DiscoverAction::new(child_input))
                 .await
-                .register_no_wait(&child_instance, DiscoverAction::new(child_input))
-                .await;
+                .expect("failed to discover child");
         }
     }
 }
