@@ -976,14 +976,14 @@ class X86PageTableImpl : public X86PageTableBase {
           //   2. it is already writable - we shouldn't downgrade permissions.
           if (!remapping_same_address || !mmu_flags_ro) {
             UpdateEntry(cm, PageTableLevel::PT_L, cursor.vaddr(), existing_entry, cursor.paddr(),
-                        term_flags, /*was_terminal=*/false);
+                        term_flags, /*was_terminal=*/true);
           }
         } else if (existing_action == ExistingEntryAction::Error) {
           return ZX_ERR_ALREADY_EXISTS;
         }
       } else {
         UpdateEntry(cm, PageTableLevel::PT_L, cursor.vaddr(), existing_entry, cursor.paddr(),
-                    term_flags, /*was_terminal=*/false);
+                    term_flags, /*was_terminal=*/true);
       }
       cursor.ConsumePAddr(PAGE_SIZE);
     }
