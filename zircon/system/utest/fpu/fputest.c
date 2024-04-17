@@ -16,6 +16,8 @@
 #define THREAD_COUNT 8
 #define ITER 1000000
 
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
+
 /* expected double bit pattern for each thread */
 static const uint64_t expected[THREAD_COUNT] = {
     0x4284755ed4188b3e, 0x4284755ed6cb84c0, 0x4284755ed97e7dd3, 0x4284755edc317770,
@@ -34,18 +36,18 @@ static int float_thread(void* arg) {
 
   /* do a bunch of work with floating point to test context switching */
   a[0] = *val;
-  for (i = 1; i < countof(a); i++) {
+  for (i = 1; i < ARRAY_SIZE(a); i++) {
     a[i] = a[i - 1] * 1.01;
   }
 
   for (i = 0; i < ITER; i++) {
     a[0] += i;
-    for (j = 1; j < countof(a); j++) {
+    for (j = 1; j < ARRAY_SIZE(a); j++) {
       a[j] += a[j - 1] * 0.00001;
     }
   }
 
-  *val = a[countof(a) - 1];
+  *val = a[ARRAY_SIZE(a) - 1];
   return 0;
 }
 
@@ -54,17 +56,17 @@ TEST(FpuTests, fpu_test) {
 
   /* test lazy fpu load on separate thread */
   thrd_t t[THREAD_COUNT];
-  double val[countof(t)];
+  double val[ARRAY_SIZE(t)];
   char name[ZX_MAX_NAME_LEN];
 
-  printf("creating %zu floating point threads\n", countof(t));
-  for (unsigned int i = 0; i < countof(t); i++) {
+  printf("creating %zu floating point threads\n", ARRAY_SIZE(t));
+  for (unsigned int i = 0; i < ARRAY_SIZE(t); i++) {
     val[i] = i;
     snprintf(name, sizeof(name), "fpu thread %u", i);
     thrd_create_with_name(&t[i], float_thread, &val[i], name);
   }
 
-  for (unsigned int i = 0; i < countof(t); i++) {
+  for (unsigned int i = 0; i < ARRAY_SIZE(t); i++) {
     thrd_join(t[i], NULL);
     void* v = &val[i];
     uint64_t int64_val = *(uint64_t*)v;

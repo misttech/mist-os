@@ -19,6 +19,8 @@
 
 #include "util.h"
 
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
+
 TEST(StdioTests, stdio_pipe_test) {
   int fds[2];
   ASSERT_EQ(pipe(fds), 0, "pipe creation failed");
@@ -77,7 +79,7 @@ TEST(StdioTests, stdio_advanced_pipe_test) {
 
   // Start the process
   zx_handle_t p = tu_launch_process(job_copy, "pipe_stdio_test", 1, &file, 0, NULL,
-                                    countof(handles), handles, handle_ids);
+                                    ARRAY_SIZE(handles), handles, handle_ids);
   ASSERT_NE(p, ZX_HANDLE_INVALID, "process handle != 0");
 
   // Read the stdio
@@ -137,9 +139,9 @@ TEST(StdioTests, stdio_race_on_file_access) {
     ASSERT_NOT_NULL(f, "tmpfile failed");
 
     pthread_t threads[100];
-    ThreadData thread_data[countof(threads)];
+    ThreadData thread_data[ARRAY_SIZE(threads)];
 
-    for (size_t i = 0; i < countof(threads); ++i) {
+    for (size_t i = 0; i < ARRAY_SIZE(threads); ++i) {
       ThreadData* data = &thread_data[i];
       data->f = f;
       data->index = i;
@@ -148,7 +150,7 @@ TEST(StdioTests, stdio_race_on_file_access) {
       ASSERT_EQ(err, 0, "pthread_create");
     }
 
-    for (size_t i = 0; i < countof(threads); ++i) {
+    for (size_t i = 0; i < ARRAY_SIZE(threads); ++i) {
       int err = pthread_join(threads[i], NULL);
       ASSERT_EQ(err, 0, "pthread_join");
     }

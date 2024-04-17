@@ -8,6 +8,8 @@
 #include <pretty/sizes.h>
 #include <zxtest/zxtest.h>
 
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
+
 typedef struct {
   const size_t input;
   const char unit;
@@ -113,7 +115,7 @@ static const format_size_test_case_t format_size_test_cases[] = {
 TEST(PrettyTests, format_size_fixed_test) {
   char str[MAX_FORMAT_SIZE_LEN];
   char msg[128];
-  for (unsigned int i = 0; i < countof(format_size_test_cases); i++) {
+  for (unsigned int i = 0; i < ARRAY_SIZE(format_size_test_cases); i++) {
     const format_size_test_case_t* tc = format_size_test_cases + i;
     memset(str, 0, sizeof(str));
     char* ret = format_size_fixed(str, sizeof(str), tc->input, tc->unit);
