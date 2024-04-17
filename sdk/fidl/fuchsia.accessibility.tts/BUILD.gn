@@ -9,7 +9,7 @@ fidl("fuchsia.accessibility.tts") {
   excluded_checks = [ "string-bounds-not-specified" ]
 
   sdk_category = "partner"
-  sdk_area = "Unknown"
+  sdk_area = "HCI"
 
   sources = [
     "tts.fidl",

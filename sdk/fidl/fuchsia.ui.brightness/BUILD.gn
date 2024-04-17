@@ -6,7 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.ui.brightness") {
   sdk_category = "partner"
-  sdk_area = "Unknown"
+  sdk_area = "HCI"
   sources = [
     "brightness.fidl",
     "color_adjustment.fidl",

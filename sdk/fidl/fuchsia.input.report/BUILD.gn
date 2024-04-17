@@ -6,7 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.input.report") {
   sdk_category = "partner"
-  sdk_area = "Unknown"
+  sdk_area = "HCI"
 
   sources = [
     "consumer_control.fidl",

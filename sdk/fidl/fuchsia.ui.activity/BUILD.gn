@@ -9,7 +9,7 @@ fidl("fuchsia.ui.activity") {
   excluded_checks = [ "string-bounds-not-specified" ]
 
   sdk_category = "partner"
-  sdk_area = "Unknown"
+  sdk_area = "HCI"
 
   sources = [
     "activity.fidl",
