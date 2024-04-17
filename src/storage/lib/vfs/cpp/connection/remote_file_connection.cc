@@ -31,7 +31,7 @@ RemoteFileConnection::RemoteFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::
     : FileConnection(vfs, std::move(vnode), rights, append, koid) {}
 
 zx_status_t RemoteFileConnection::ReadInternal(void* data, size_t len, size_t* out_actual) {
-  FS_PRETTY_TRACE_DEBUG("[FileRead] options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[FileRead] rights: ", rights());
   if (!(rights() & fuchsia_io::Rights::kReadBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -59,7 +59,7 @@ void RemoteFileConnection::Read(ReadRequestView request, ReadCompleter::Sync& co
 
 zx_status_t RemoteFileConnection::ReadAtInternal(void* data, size_t len, size_t offset,
                                                  size_t* out_actual) {
-  FS_PRETTY_TRACE_DEBUG("[FileReadAt] options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[FileReadAt] rights: ", rights());
   if (!(rights() & fuchsia_io::Rights::kReadBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -85,7 +85,7 @@ void RemoteFileConnection::ReadAt(ReadAtRequestView request, ReadAtCompleter::Sy
 }
 
 zx_status_t RemoteFileConnection::WriteInternal(const void* data, size_t len, size_t* out_actual) {
-  FS_PRETTY_TRACE_DEBUG("[FileWrite] options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[FileWrite] rights: ", rights());
   if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -120,7 +120,7 @@ void RemoteFileConnection::Write(WriteRequestView request, WriteCompleter::Sync&
 
 zx_status_t RemoteFileConnection::WriteAtInternal(const void* data, size_t len, size_t offset,
                                                   size_t* out_actual) {
-  FS_PRETTY_TRACE_DEBUG("[FileWriteAt] options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[FileWriteAt] rights: ", rights());
   if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -144,7 +144,7 @@ void RemoteFileConnection::WriteAt(WriteAtRequestView request, WriteAtCompleter:
 
 zx_status_t RemoteFileConnection::SeekInternal(fuchsia_io::wire::SeekOrigin origin,
                                                int64_t requested_offset) {
-  FS_PRETTY_TRACE_DEBUG("[FileSeek] options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[FileSeek] rights: ", rights());
   fs::VnodeAttributes attr;
   if (zx_status_t status = vnode()->GetAttributes(&attr); status != ZX_OK) {
     return ZX_ERR_STOP;

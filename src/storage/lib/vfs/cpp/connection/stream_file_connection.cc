@@ -36,7 +36,7 @@ StreamFileConnection::StreamFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::
     : FileConnection(vfs, std::move(vnode), rights, append, koid), stream_(std::move(stream)) {}
 
 zx_status_t StreamFileConnection::ReadInternal(void* data, size_t len, size_t* out_actual) {
-  FS_PRETTY_TRACE_DEBUG("[FileRead] options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[FileRead] rights: ", rights());
   if (!(rights() & fuchsia_io::Rights::kReadBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -67,7 +67,7 @@ void StreamFileConnection::Read(ReadRequestView request, ReadCompleter::Sync& co
 
 zx_status_t StreamFileConnection::ReadAtInternal(void* data, size_t len, size_t offset,
                                                  size_t* out_actual) {
-  FS_PRETTY_TRACE_DEBUG("[FileReadAt] options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[FileReadAt] rights: ", rights());
   if (!(rights() & fuchsia_io::Rights::kReadBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -97,7 +97,7 @@ void StreamFileConnection::ReadAt(ReadAtRequestView request, ReadAtCompleter::Sy
 }
 
 zx_status_t StreamFileConnection::WriteInternal(const void* data, size_t len, size_t* out_actual) {
-  FS_PRETTY_TRACE_DEBUG("[FileWrite] options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[FileWrite] rights: ", rights());
   if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -125,7 +125,7 @@ void StreamFileConnection::Write(WriteRequestView request, WriteCompleter::Sync&
 
 zx_status_t StreamFileConnection::WriteAtInternal(const void* data, size_t len, size_t offset,
                                                   size_t* out_actual) {
-  FS_PRETTY_TRACE_DEBUG("[FileWriteAt] options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[FileWriteAt] rights: ", rights());
   if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -153,7 +153,7 @@ void StreamFileConnection::WriteAt(WriteAtRequestView request, WriteAtCompleter:
 }
 
 void StreamFileConnection::Seek(SeekRequestView request, SeekCompleter::Sync& completer) {
-  FS_PRETTY_TRACE_DEBUG("[FileSeek] options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[FileSeek] rights: ", rights());
   zx_off_t seek = 0u;
   zx_status_t status =
       stream_.seek(static_cast<zx_stream_seek_origin_t>(request->origin), request->offset, &seek);

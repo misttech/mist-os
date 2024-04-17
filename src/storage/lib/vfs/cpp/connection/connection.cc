@@ -86,8 +86,7 @@ void Connection::NodeClone(fio::OpenFlags flags, fidl::ServerEnd<fio::Node> serv
     return;
   }
   auto clone_options = VnodeConnectionOptions::FromIoV1Flags(flags);
-  FS_PRETTY_TRACE_DEBUG("[NodeClone] our options: ", options(),
-                        ", incoming options: ", clone_options);
+  FS_PRETTY_TRACE_DEBUG("[NodeClone] our rights: ", rights(), ", clone options: ", clone_options);
 
   // If CLONE_SAME_RIGHTS is requested, cloned connection will inherit the same rights as those from
   // the originating connection.
@@ -117,7 +116,7 @@ void Connection::NodeClone(fio::OpenFlags flags, fidl::ServerEnd<fio::Node> serv
 }
 
 zx::result<VnodeAttributes> Connection::NodeGetAttr() const {
-  FS_PRETTY_TRACE_DEBUG("[NodeGetAttr] options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[NodeGetAttr] rights: ", rights());
   // TODO(https://fxbug.dev/324080764): This io1 operation should require the GET_ATTRIBUTES right.
   fs::VnodeAttributes attr;
   if (zx_status_t status = vnode_->GetAttributes(&attr); status != ZX_OK) {
@@ -128,7 +127,7 @@ zx::result<VnodeAttributes> Connection::NodeGetAttr() const {
 
 zx::result<> Connection::NodeSetAttr(fio::NodeAttributeFlags flags,
                                      const fio::wire::NodeAttributes& attributes) {
-  FS_PRETTY_TRACE_DEBUG("[NodeSetAttr] our options: ", options(), ", incoming flags: ", flags);
+  FS_PRETTY_TRACE_DEBUG("[NodeSetAttr] our rights: ", rights(), ", incoming flags: ", flags);
   if (!(rights_ & fio::Rights::kUpdateAttributes)) {
     return zx::error(ZX_ERR_BAD_HANDLE);
   }

@@ -198,7 +198,7 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
     return write_error(std::move(request->object), ZX_ERR_INVALID_ARGS);
   }
 
-  FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] our options: ", options(),
+  FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] our rights ", rights(),
                         ", incoming options: ", open_options, ", path: ", request->path);
 
   if (open_options.flags & fuchsia_io::OpenFlags::kCloneSameRights) {
@@ -226,7 +226,7 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
 }
 
 void DirectoryConnection::Unlink(UnlinkRequestView request, UnlinkCompleter::Sync& completer) {
-  FS_PRETTY_TRACE_DEBUG("[DirectoryUnlink] our options: ", options(), ", name: ", request->name);
+  FS_PRETTY_TRACE_DEBUG("[DirectoryUnlink] our rights: ", rights(), ", name: ", request->name);
   // TODO(https://fxbug.dev/324080764): This operation should require ENUMERATE and MODIFY_DIRECTORY
   // rights, instead of WRITE_BYTES.
   if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
@@ -252,7 +252,7 @@ void DirectoryConnection::Unlink(UnlinkRequestView request, UnlinkCompleter::Syn
 
 void DirectoryConnection::ReadDirents(ReadDirentsRequestView request,
                                       ReadDirentsCompleter::Sync& completer) {
-  FS_PRETTY_TRACE_DEBUG("[DirectoryReadDirents] our options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[DirectoryReadDirents] our rights: ", rights());
   // TODO(https://fxbug.dev/324080764): This io1 operation should require the ENUMERATE right.
   if (request->max_bytes > fio::wire::kMaxBuf) {
     completer.Reply(ZX_ERR_BAD_HANDLE, fidl::VectorView<uint8_t>());
@@ -266,14 +266,14 @@ void DirectoryConnection::ReadDirents(ReadDirentsRequestView request,
 }
 
 void DirectoryConnection::Rewind(RewindCompleter::Sync& completer) {
-  FS_PRETTY_TRACE_DEBUG("[DirectoryRewind] our options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[DirectoryRewind] our rights: ", rights());
   // TODO(https://fxbug.dev/324080764): This io1 operation should require the ENUMERATE right.
   dircookie_ = VdirCookie();
   completer.Reply(ZX_OK);
 }
 
 void DirectoryConnection::GetToken(GetTokenCompleter::Sync& completer) {
-  FS_PRETTY_TRACE_DEBUG("[DirectoryGetToken] our options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[DirectoryGetToken] our rights: ", rights());
   // TODO(https://fxbug.dev/324080764): This io1 operation should need ENUMERATE or another right.
   if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     completer.Reply(ZX_ERR_BAD_HANDLE, zx::handle());
@@ -285,7 +285,7 @@ void DirectoryConnection::GetToken(GetTokenCompleter::Sync& completer) {
 }
 
 void DirectoryConnection::Rename(RenameRequestView request, RenameCompleter::Sync& completer) {
-  FS_PRETTY_TRACE_DEBUG("[DirectoryRename] our options: ", options(), ", src: ", request->src,
+  FS_PRETTY_TRACE_DEBUG("[DirectoryRename] our rights: ", rights(), ", src: ", request->src,
                         ", dst: ", request->dst);
   if (request->src.empty() || request->dst.empty()) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
@@ -308,7 +308,7 @@ void DirectoryConnection::Rename(RenameRequestView request, RenameCompleter::Syn
 }
 
 void DirectoryConnection::Link(LinkRequestView request, LinkCompleter::Sync& completer) {
-  FS_PRETTY_TRACE_DEBUG("[DirectoryLink] our options: ", options(), ", src: ", request->src,
+  FS_PRETTY_TRACE_DEBUG("[DirectoryLink] our rights: ", rights(), ", src: ", request->src,
                         ", dst: ", request->dst);
   // |fuchsia.io/Directory.Rename| only specified the token to be a generic handle; casting it here.
   zx::event token(request->dst_parent_token.release());
@@ -329,7 +329,7 @@ void DirectoryConnection::Link(LinkRequestView request, LinkCompleter::Sync& com
 }
 
 void DirectoryConnection::Watch(WatchRequestView request, WatchCompleter::Sync& completer) {
-  FS_PRETTY_TRACE_DEBUG("[DirectoryWatch] our options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[DirectoryWatch] our rights: ", rights());
   // TODO(https://fxbug.dev/324080764): This io1 operation should require the ENUMERATE right.
   zx_status_t status =
       vnode()->WatchDir(vfs(), request->mask, request->options, std::move(request->watcher));
@@ -337,7 +337,7 @@ void DirectoryConnection::Watch(WatchRequestView request, WatchCompleter::Sync& 
 }
 
 void DirectoryConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) {
-  FS_PRETTY_TRACE_DEBUG("[DirectoryQueryFilesystem] our options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[DirectoryQueryFilesystem] our rights: ", rights());
 
   zx::result result = Connection::NodeQueryFilesystem();
   completer.Reply(result.status_value(),
