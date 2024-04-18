@@ -54,7 +54,7 @@ use netstack_testing_common::{
     nud::apply_nud_flake_workaround,
     realms::{
         KnownServiceProvider, ManagementAgent, Manager, ManagerConfig, NetCfgBasic, NetCfgVersion,
-        Netstack, Netstack3, NetstackVersion, TestRealmExt as _, TestSandboxExt,
+        Netstack, Netstack3, TestRealmExt as _, TestSandboxExt,
     },
     try_all, try_any, wait_for_component_stopped, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
@@ -349,23 +349,12 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
         Some(())
     };
 
-    // TODO(https://fxbug.dev/42182576): Remove special case for NS3 once we
-    // stop serving filter.deprecated. Without this, there are spurious
-    // failures where the message is not received within the negative
-    // timeout window, causing the test to pass when it is expected to fail.
-    let timeout = match N::VERSION {
-        // Choose a timeout dependent on whether we are looking for a positive
-        // check (message was received) or negative check (message was dropped).
-        NetstackVersion::Netstack2 { .. } | NetstackVersion::ProdNetstack2 => {
-            if message_expected {
-                ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT
-            } else {
-                ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT
-            }
-        }
-        NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => {
-            ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT
-        }
+    // Choose a timeout dependent on whether we are looking for a positive
+    // check (message was received) or negative check (message was dropped).
+    let timeout = if message_expected {
+        ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT
+    } else {
+        ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT
     };
 
     let ((), message_received) = futures::future::join(sender_fut, receiver_fut)

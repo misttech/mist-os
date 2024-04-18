@@ -69,7 +69,6 @@ pub fn main() {
         .add_fidl_service(Service::InterfacesAdmin)
         .add_fidl_service(Service::FilterState)
         .add_fidl_service(Service::FilterControl)
-        .add_fidl_service(Service::FilterDeprecated)
         .add_fidl_service(Service::Neighbor)
         .add_fidl_service(Service::NeighborController)
         .add_fidl_service(Service::Verifier);

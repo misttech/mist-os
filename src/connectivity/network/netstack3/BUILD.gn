@@ -12,7 +12,6 @@ common_deps = [
   "//sdk/fidl/fuchsia.net.debug:fuchsia.net.debug_rust",
   "//sdk/fidl/fuchsia.net.dhcp:fuchsia.net.dhcp_rust",
   "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
-  "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated_rust",
   "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
   "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
   "//sdk/fidl/fuchsia.net.name:fuchsia.net.name_rust",

@@ -17,10 +17,7 @@
                 // TODO(https://fxbug.dev/333528428): Remove filtering
                 // tests once `use_out_of_stack_dhcp_client` is aligned
                 // with NS2/NS3.
-                "test_filtering_udp_netcfg_advanced_ns3::both_no_filter",
-                "test_filtering_udp_netcfg_basic_ns3::both_no_filter",
-                "test_filtering_udp_netcfg_advanced_ns3::both_wlan_enabled",
-                "test_filtering_udp_netcfg_basic_ns3::both_wlan_enabled",
+                "test_filtering_udp_netcfg_*_ns3::*",
                 "test_oir_interface_name_conflict_uninstall_existing_netcfg_advanced_ns3",
                 "test_oir_interface_name_conflict_uninstall_existing_netcfg_basic_ns3",
                 "test_oir_interface_name_conflict_reject_netcfg_basic_ns2::*",
@@ -48,15 +45,6 @@
         {
             type: "expect_failure_with_err_logs",
             matchers: [
-                // TODO(https://fxbug.dev/42182576): Remove once NS3 stops
-                // serving a stub of filter.deprecated.
-                "test_filtering_udp_netcfg_advanced_ns3::receiver_eth_enabled",
-                "test_filtering_udp_netcfg_basic_ns3::receiver_eth_enabled",
-                "test_filtering_udp_netcfg_advanced_ns3::sender_eth_enabled",
-                "test_filtering_udp_netcfg_basic_ns3::sender_eth_enabled",
-                "test_filtering_udp_netcfg_advanced_ns3::both_eth_enabled",
-                "test_filtering_udp_netcfg_basic_ns3::both_eth_enabled",
-
                 // TODO(https://fxbug.dev/323052525): Remove once multicast
                 // forwarding is supported in interface configurations.
                 "test_forwarding_netcfg_advanced_ns3",
