@@ -23,7 +23,9 @@ fidl("linux") {
     "//zircon/tools/zither:tests",
   ]
 
-  sources = []
+  # Order matters! It needs to match linux syscall numbers.
+  # NOSORT
+  sources = [ "fs.fidl" ]
 
   if (!exclude_testonly_syscalls) {
     sources += [ "syscall.test.fidl" ]

@@ -2,6 +2,9 @@
 IfsVersion:      3.0
 SoName:          liblinux.so
 Symbols:
+  - { Name: _zx_close, Type: Func }
+  - { Name: _zx_open, Type: Func }
+  - { Name: _zx_read, Type: Func }
   - { Name: _zx_syscall_test_0, Type: Func }
   - { Name: _zx_syscall_test_1, Type: Func }
   - { Name: _zx_syscall_test_2, Type: Func }
@@ -9,6 +12,10 @@ Symbols:
   - { Name: _zx_syscall_test_4, Type: Func }
   - { Name: _zx_syscall_test_5, Type: Func }
   - { Name: _zx_syscall_test_6, Type: Func }
+  - { Name: _zx_write, Type: Func }
+  - { Name: zx_close, Type: Func, Weak: true }
+  - { Name: zx_open, Type: Func, Weak: true }
+  - { Name: zx_read, Type: Func, Weak: true }
   - { Name: zx_syscall_test_0, Type: Func, Weak: true }
   - { Name: zx_syscall_test_1, Type: Func, Weak: true }
   - { Name: zx_syscall_test_2, Type: Func, Weak: true }
@@ -16,4 +23,5 @@ Symbols:
   - { Name: zx_syscall_test_4, Type: Func, Weak: true }
   - { Name: zx_syscall_test_5, Type: Func, Weak: true }
   - { Name: zx_syscall_test_6, Type: Func, Weak: true }
+  - { Name: zx_write, Type: Func, Weak: true }
 ...

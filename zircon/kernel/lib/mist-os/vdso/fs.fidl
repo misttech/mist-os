@@ -1,0 +1,37 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library linux;
+
+@no_protocol_prefix
+@transport("Syscall")
+closed protocol Fs {
+    /// SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
+    strict Read(resource struct {
+        fd uint32;
+        @out
+        buf experimental_pointer<uchar>;
+        count uint64;
+    }) -> () error int64;
+
+    /// SYSCALL_DEFINE3(write, unsigned int, fd, const char __user *, buf, size_t, count)
+    strict Write(resource struct {
+        fd uint32;
+        @in
+        buf experimental_pointer<uchar>;
+        count uint64;
+    }) -> () error int64;
+
+    /// SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, umode_t, mode)
+    strict Open(resource struct {
+        @in
+        filename experimental_pointer<uchar>;
+        flags int32;
+        mode uint16;
+    }) -> () error int64;
+
+    /// SYSCALL_DEFINE1(close, unsigned int, fd)
+    strict Close(resource struct {
+        fd uint32;
+    }) -> () error int64;
+};

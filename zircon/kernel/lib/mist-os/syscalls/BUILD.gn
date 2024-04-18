@@ -28,10 +28,14 @@ zx_library("syscalls") {
 
 source_set("impl") {
   visibility = [ ":*" ]
-  sources = [ "test.cc" ]
+  sources = [
+    "fs.cc",
+    "test.cc",
+  ]
   deps = [
     "//zircon/kernel/lib/syscalls:headers",
     "//zircon/kernel/lib/user_copy",
     "//zircon/kernel/object",
+    "//zircon/kernel/lib/mist-os/linux_uapi",
   ]
 }
