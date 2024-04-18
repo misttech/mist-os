@@ -115,6 +115,15 @@ impl SimulatedBatteryInfoSource {
         Ok(())
     }
 
+    async fn set_battery_spec(&self, spec: fpower::BatterySpec) -> Result<(), Error> {
+        let mut battery_info = self.battery_info.lock().await;
+        battery_info.battery_spec = Some(spec);
+        battery_info.timestamp = get_current_time();
+        drop(battery_info);
+        self.notify_battery_info_changed().await?;
+        Ok(())
+    }
+
     // Updates the simulated_battery_info in BatteryManager
     async fn notify_battery_info_changed(&self) -> Result<(), Error> {
         let observer = self.observer.upgrade().ok_or(format_err!("Observer not found"))?;
@@ -181,6 +190,9 @@ impl SimulatedBatteryInfoSource {
                 }
                 spower::BatterySimulatorRequest::IsSimulating { responder: _, .. } => {
                     Err(format_err!("Unexpected Simulating requested called"))?
+                }
+                spower::BatterySimulatorRequest::SetBatterySpec { spec, .. } => {
+                    self.set_battery_spec(spec).await?;
                 }
             }
             Ok::<(), Error>(())

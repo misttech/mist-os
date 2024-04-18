@@ -48,6 +48,11 @@ class PowerSourceState {
       .present_rate = 2,
       .remaining_capacity = 2900,
       .present_voltage = 2910,
+      .battery_spec = fuchsia_hardware_powersource::BatterySpec{{
+          .max_charging_current_ua = 1000000,
+          .max_charnging_voltage_uv = 5000000,
+          .design_capacity_uah = 300000,
+      }},
   }};
   fuchsia_hardware_powersource::SourceInfo source_info_;
   std::unordered_set<Observer*> observers_;

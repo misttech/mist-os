@@ -75,6 +75,11 @@ closed protocol BatterySimulatorController {
     strict SetRemainingCapacityUah(struct {
         capacity uint32;
     });
+
+    /// Sets the BatterySpec
+    strict SetBatterySpec(struct {
+        spec fuchsia.power.battery.BatterySpec;
+    });
 };
 
 /// Simulator interface for battery simulation
