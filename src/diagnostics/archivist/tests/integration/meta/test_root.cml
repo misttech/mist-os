@@ -35,10 +35,7 @@
         {
             protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "parent",
-            to: [
-                "#realm_factory",
-                "#test_cases",
-            ],
+            to: [ "#realm_factory" ],
             availability: "optional",
         },
         {
@@ -49,10 +46,7 @@
         {
             event_stream: [ "capability_requested" ],
             from: "parent",
-            to: [
-                "#realm_factory",
-                "#test_cases",
-            ],
+            to: [ "#realm_factory" ],
         },
     ],
     expose: [
