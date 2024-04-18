@@ -7,6 +7,13 @@
 
 #include <netinet/in.h>
 
+#include "packet.h"
+#if PACKET_SOCKETS
+#include <netpacket/packet.h>
+
+#include "api_abstraction.h"
+#endif  // PACKET_SOCKETS
+
 #include <optional>
 #include <string>
 
@@ -27,5 +34,12 @@ std::pair<std::optional<in_addr>, std::optional<int>> ParseIpv4WithScope(
 
 /// Returns the length of the provided address based on its family.
 socklen_t AddrLen(const sockaddr_storage& addr);
+
+#if PACKET_SOCKETS
+/// Parses the `argstr` into a packet socket address (`sockaddr_ll`).
+///
+/// The expected format for `argstr` is "<protocol>:<ifname>".
+std::optional<sockaddr_ll> ParseSockAddrLlFromArg(const std::string& argstr, ApiAbstraction* api);
+#endif  // PACKET_SOCKETS
 
 #endif  // SRC_CONNECTIVITY_NETWORK_TOOLS_SOCKSCRIPTER_ADDR_H_

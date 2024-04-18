@@ -18,6 +18,8 @@
 
 #if PACKET_SOCKETS
 #include <netpacket/packet.h>
+
+#include "api_abstraction.h"
 #endif
 
 struct PrintInterface {
@@ -231,3 +233,40 @@ socklen_t AddrLen(const sockaddr_storage& addr) {
     }
   }
 }
+
+#if PACKET_SOCKETS
+std::optional<sockaddr_ll> ParseSockAddrLlFromArg(const std::string& argstr, ApiAbstraction* api) {
+  size_t col_pos = argstr.find_first_of(':');
+  if (col_pos == std::string::npos) {
+    LOG(ERROR) << "Error-Cannot parse packet socket addr='" << argstr
+               << "' for <protocol>:<ifname> - missing separating colon ':'!";
+    return std::nullopt;
+  }
+
+  std::string protocol_str = argstr.substr(0, col_pos);
+  std::string ifname_str = argstr.substr(col_pos + 1);
+
+  int protocol;
+  if (!str2int(protocol_str, &protocol)) {
+    LOG(ERROR) << "Error-Cannot parse protocol number='" << protocol_str << "'!";
+    return std::nullopt;
+  }
+
+  unsigned int if_index = 0;
+  if (!ifname_str.empty()) {
+    if_index = api->if_nametoindex(ifname_str.c_str());
+    if (!if_index) {
+      LOG(ERROR) << "Error-if_nametoindex(" << ifname_str << ") failed -" << "[" << errno << "]"
+                 << strerror(errno);
+      return std::nullopt;
+    }
+  }
+
+  const struct sockaddr_ll sll = {
+      .sll_family = AF_PACKET,
+      .sll_protocol = htons(static_cast<uint16_t>(protocol)),
+      .sll_ifindex = static_cast<int>(if_index),
+  };
+  return std::make_optional(sll);
+}
+#endif  // PACKET_SOCKETS

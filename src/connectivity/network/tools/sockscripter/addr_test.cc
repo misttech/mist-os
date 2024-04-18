@@ -8,6 +8,13 @@
 
 #include <gtest/gtest.h>
 
+#if PACKET_SOCKETS
+#include <netpacket/packet.h>
+
+#include "api_abstraction.h"
+#include "testutil.h"
+#endif  // PACKET_SOCKETS
+
 #define EXPECT_NO_VALUE(expr)                     \
   do {                                            \
     const std::optional val = expr;               \
@@ -128,3 +135,26 @@ TEST(AddrTest, TestAddrlen) {
   ASSERT_EQ(addr_v6.value().ss_family, AF_INET6);
   EXPECT_EQ(AddrLen(addr_v6.value()), sizeof(sockaddr_in6));
 }
+
+#if PACKET_SOCKETS
+TEST(AddrTest, TestParseSockAddrLl) {
+  constexpr unsigned int kIfIndex = 5;
+  constexpr uint16_t kIpv4Protocol = 2048;
+  TestApi api;
+  EXPECT_CALL(api, if_nametoindex(testing::_)).WillOnce([](const char* ifname) {
+    EXPECT_EQ(std::string(ifname), "myinterfacename");
+    return kIfIndex;
+  });
+
+  std::optional actual_addr = ParseSockAddrLlFromArg("2048:myinterfacename", &api);
+  const struct sockaddr_ll expected_addr = {
+      .sll_family = AF_PACKET,
+      .sll_protocol = htons(kIpv4Protocol),
+      .sll_ifindex = kIfIndex,
+  };
+  ASSERT_TRUE(actual_addr.has_value());
+  EXPECT_EQ(actual_addr->sll_family, expected_addr.sll_family);
+  EXPECT_EQ(actual_addr->sll_protocol, expected_addr.sll_protocol);
+  EXPECT_EQ(actual_addr->sll_ifindex, expected_addr.sll_ifindex);
+}
+#endif  // PACKET_SOCKETS

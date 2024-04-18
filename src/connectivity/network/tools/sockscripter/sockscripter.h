@@ -104,6 +104,7 @@ class SockScripter {
 
 #if PACKET_SOCKETS
   bool PacketBind(char* arg);
+  bool PacketSendTo(char* arg);
 #endif
 
  private:

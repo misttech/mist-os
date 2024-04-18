@@ -34,6 +34,7 @@ test("sockscripter_test") {
   sources = [
     "addr_test.cc",
     "sockscripter_test.cc",
+    "testutil.h",
   ]
   deps = [
     ":src",
