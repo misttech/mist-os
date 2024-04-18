@@ -1001,6 +1001,13 @@ assembly_input_bundle("core_realm_eng") {
     # The fs_realm component should be available in every engineering-mode product.
     "//src/storage/fs_realm",
     "//src/storage/bin:fs_realm_tools",
+
+    # Always include 'ls'
+    "//third_party/sbase:ls_pkg",
+
+    # This is used by Chromium test infrastructure, and needs to always be
+    # available.
+    "//third_party/sbase:sha1sum_pkg",
   ]
   shell_commands = [
     {
@@ -1011,15 +1018,6 @@ assembly_input_bundle("core_realm_eng") {
         "mount",
         "umount",
       ]
-    },
-  ]
-
-  # wlancfg's donut tool.
-  on_demand = [ "//src/connectivity/wlan/wlancfg/tool:donut" ]
-  shell_commands += [
-    {
-      package = "donut"
-      components = [ "donut" ]
     },
   ]
 
@@ -1089,7 +1087,10 @@ assembly_input_bundle("core_realm_eng") {
       package = "net-cli"
       components = [ "net" ]
     },
-
+    {
+      package = "donut"
+      components = [ "donut" ]
+    },
     {
       package = "dai-info"
       components = [ "dai-info" ]
@@ -1208,34 +1209,18 @@ assembly_input_bundle("core_realm_eng") {
     },
   ]
 
-  # Add the sbase binaries, some of which are in base, but most are in the
-  # on_demand package set.
-  _sbase_bins_in_base = [
-    # Always include 'ls'
-    "ls",
-
-    # This is used by Chromium test infrastructure, and needs to always be
-    # available.
-    "sha1sum",
-  ]
+  # Document the sbase shell commands in the on-demand package set (these are
+  # not added to the product image).
   on_demand = []
   foreach(bin, sbase_binaries) {
-    # Always create the shell_commands entry.
+    # To be enabled soon, but will cause errors in assembly.
+    # on_demand += [ "//third_party/sbase:${bin}_pkg" ]
     shell_commands += [
       {
         package = bin
         components = [ bin ]
       },
     ]
-
-    # Add to the base package set if it's in the _sbase_bins_in_base list,
-    # otherwise add it to on_demand
-    _sbase_target = "//third_party/sbase:${bin}_pkg"
-    if (_sbase_bins_in_base != _sbase_bins_in_base + [ bin ] - [ bin ]) {
-      base_packages += [ _sbase_target ]
-    } else {
-      on_demand += [ _sbase_target ]
-    }
   }
 
   compiled_packages = [
@@ -3718,6 +3703,24 @@ assembly_input_bundle("example_assembly_bundle") {
 assembly_input_bundle("emulator_support") {
   qemu_kernel = qemu_boot_shim.path
   deps = qemu_boot_shim.deps
+}
+
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("third_party_sbase_for_transition") {
+  public_deps = []
+
+  # Don't add these binaries via the legacy AIB, because they are added by
+  # platform AIBs.
+  _assembly_added_binaries = [
+    "ls",
+    "sha1sum",
+  ]
+  foreach(
+      bin,
+      sbase_binaries + _assembly_added_binaries - _assembly_added_binaries) {
+    public_deps += [ "//third_party/sbase:${bin}_pkg" ]
+  }
 }
 
 # Assembly may select at most one bundle with `intl_services` name prefix.

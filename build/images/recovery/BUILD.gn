@@ -92,6 +92,12 @@ if (is_fuchsia) {
     # Enable ffx support.
     "//src/connectivity/network/mdns/bundles:services",  # group for transition
 
+    # Basic command-line tools:
+    "//bundles/assembly:third_party_sbase_for_transition",
+
+    # Command-line interface to wlan stack:
+    "//src/connectivity/wlan/wlancfg/tool:for_transition",
+
     # Device side of zxdb & fidlcat:
     "//src/developer/debug/debug_agent",
   ]

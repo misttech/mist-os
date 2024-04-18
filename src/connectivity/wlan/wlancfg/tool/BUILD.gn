@@ -10,6 +10,12 @@ group("donut-tests") {
   deps = [ "policy:donut-lib-tests" ]
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("for_transition") {
+  public_deps = [ ":donut" ]
+}
+
 fuchsia_package("donut") {
   deps = [ "cli:bin" ]
 }
