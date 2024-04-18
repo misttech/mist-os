@@ -37,7 +37,7 @@ pub use self::fuchsia::{
 };
 
 use futures::prelude::*;
-use pin_utils::{unsafe_pinned, unsafe_unpinned};
+use pin_project_lite::pin_project;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -108,25 +108,17 @@ pub trait TimeoutExt: Future + Sized {
 
 impl<F: Future + Sized> TimeoutExt for F {}
 
-/// A wrapper for a future which will complete with a provided closure when a timeout occurs.
-#[derive(Debug)]
-#[must_use = "futures do nothing unless polled"]
-pub struct OnTimeout<F, OT> {
-    timer: Timer,
-    future: F,
-    on_timeout: Option<OT>,
+pin_project! {
+    /// A wrapper for a future which will complete with a provided closure when a timeout occurs.
+    #[derive(Debug)]
+    #[must_use = "futures do nothing unless polled"]
+    pub struct OnTimeout<F, OT> {
+        timer: Timer,
+        #[pin]
+        future: F,
+        on_timeout: Option<OT>,
+    }
 }
-
-impl<F, OT> OnTimeout<F, OT> {
-    // Safety: this is safe because `OnTimeout` is only `Unpin` if
-    // the future is `Unpin`, and aside from `future`, all other fields are
-    // treated as movable.
-    unsafe_unpinned!(timer: Timer);
-    unsafe_pinned!(future: F);
-    unsafe_unpinned!(on_timeout: Option<OT>);
-}
-
-impl<F: Unpin, OT> Unpin for OnTimeout<F, OT> {}
 
 impl<F: Future, OT> Future for OnTimeout<F, OT>
 where
@@ -134,14 +126,13 @@ where
 {
     type Output = F::Output;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if let Poll::Ready(item) = self.as_mut().future().poll(cx) {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        if let Poll::Ready(item) = this.future.poll(cx) {
             return Poll::Ready(item);
         }
-        if let Poll::Ready(()) = self.as_mut().timer().poll_unpin(cx) {
-            let ot = OnTimeout::on_timeout(self.as_mut())
-                .take()
-                .expect("polled withtimeout after completion");
+        if let Poll::Ready(()) = this.timer.poll_unpin(cx) {
+            let ot = this.on_timeout.take().expect("polled withtimeout after completion");
             let item = (ot)();
             return Poll::Ready(item);
         }
@@ -149,28 +140,19 @@ where
     }
 }
 
-/// A wrapper for a future who's steady progress is monitored and will complete with the provided
-/// closure if no progress is made before the timeout.
-#[derive(Debug)]
-#[must_use = "futures do nothing unless polled"]
-pub struct OnStalled<F, OS> {
-    timer: Timer,
-    future: F,
-    timeout: std::time::Duration,
-    on_stalled: Option<OS>,
+pin_project! {
+    /// A wrapper for a future who's steady progress is monitored and will complete with the
+    /// provided closure if no progress is made before the timeout.
+    #[derive(Debug)]
+    #[must_use = "futures do nothing unless polled"]
+    pub struct OnStalled<F, OS> {
+        timer: Timer,
+        #[pin]
+        future: F,
+        timeout: std::time::Duration,
+        on_stalled: Option<OS>,
+    }
 }
-
-impl<F, OS> OnStalled<F, OS> {
-    // Safety: this is safe because `OnTimeout` is only `Unpin` if
-    // the future is `Unpin`, and aside from `future`, all other fields are
-    // treated as movable.
-    unsafe_unpinned!(timer: Timer);
-    unsafe_pinned!(future: F);
-    unsafe_unpinned!(timeout: std::time::Duration);
-    unsafe_unpinned!(on_stalled: Option<OS>);
-}
-
-impl<F: Unpin, OT> Unpin for OnStalled<F, OT> {}
 
 impl<F: Future, OS> Future for OnStalled<F, OS>
 where
@@ -178,19 +160,17 @@ where
 {
     type Output = F::Output;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if let Poll::Ready(item) = self.as_mut().future().poll(cx) {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        if let Poll::Ready(item) = this.future.poll(cx) {
             return Poll::Ready(item);
         }
-        match self.as_mut().timer().poll_unpin(cx) {
+        match this.timer.poll_unpin(cx) {
             Poll::Ready(()) => {
-                let os =
-                    OnStalled::on_stalled(self.as_mut()).take().expect("polled after completion");
-                Poll::Ready((os)())
+                Poll::Ready((this.on_stalled.take().expect("polled after completion"))())
             }
             Poll::Pending => {
-                let new_timer = Timer::new(*self.as_mut().timeout());
-                *self.as_mut().timer() = new_timer;
+                *this.timer = Timer::new(*this.timeout);
                 Poll::Pending
             }
         }

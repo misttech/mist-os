@@ -158,9 +158,13 @@ pub fn create_persistence_req_sender(
 #[cfg(test)]
 mod tests {
     use {
-        super::*, fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_diagnostics_persist::DataPersistenceRequest, fuchsia_async as fasync,
-        fuchsia_inspect::Inspector, futures::task::Poll, pin_utils::pin_mut, std::cell::RefCell,
+        super::*,
+        fidl::endpoints::create_proxy_and_stream,
+        fidl_fuchsia_diagnostics_persist::DataPersistenceRequest,
+        fuchsia_async as fasync,
+        fuchsia_inspect::Inspector,
+        futures::task::Poll,
+        std::{cell::RefCell, pin::pin},
     };
 
     #[fuchsia::test]
@@ -191,7 +195,7 @@ mod tests {
                 .expect("creating persistence proxy and stream should succeed");
         let (mut req_sender, req_forwarder_fut) = create_persistence_req_sender(persistence_proxy);
 
-        pin_mut!(req_forwarder_fut);
+        let mut req_forwarder_fut = pin!(req_forwarder_fut);
 
         // Nothing has happened yet, so these futures should be Pending
         match exec.run_until_stalled(&mut req_forwarder_fut) {

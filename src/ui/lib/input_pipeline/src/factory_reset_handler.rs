@@ -470,9 +470,8 @@ mod tests {
         fidl_fuchsia_recovery_policy::{DeviceMarker, DeviceProxy},
         fidl_fuchsia_recovery_ui::{FactoryResetCountdownMarker, FactoryResetCountdownProxy},
         fuchsia_async::TestExecutor,
-        pin_utils::pin_mut,
         pretty_assertions::assert_eq,
-        std::task::Poll,
+        std::{pin::pin, task::Poll},
     };
 
     fn create_factory_reset_countdown_proxy(
@@ -622,9 +621,8 @@ mod tests {
 
         // Send a reset event
         let reset_event = create_reset_input_event();
-        let handle_input_event_fut =
-            reset_handler.clone().handle_unhandled_input_event(reset_event);
-        pin_mut!(handle_input_event_fut);
+        let mut handle_input_event_fut =
+            pin!(reset_handler.clone().handle_unhandled_input_event(reset_event));
         assert_matches!(executor.run_until_stalled(&mut handle_input_event_fut), Poll::Ready(events) => {
             assert_matches!(events.as_slice(), [input_device::InputEvent { .. }]);
         });

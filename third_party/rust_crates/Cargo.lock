@@ -1399,7 +1399,7 @@ dependencies = [
  "pest_derive",
  "petgraph",
  "pin-project",
- "pin-utils",
+ "pin-project-lite",
  "pkcs8",
  "png",
  "pretty",

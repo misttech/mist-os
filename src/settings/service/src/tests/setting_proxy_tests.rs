@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use std::collections::HashMap;
+use std::pin::pin;
 use std::sync::Arc;
 use std::task::Poll;
 
@@ -1030,7 +1031,7 @@ async fn test_early_exit() {
 fn test_timeout() {
     let mut executor = fuchsia_async::TestExecutor::new_with_fake_time();
 
-    let fut = async move {
+    let mut fut = pin!(async move {
         let setting_type = SettingType::Unknown;
         let environment = TestEnvironmentBuilder::new(setting_type)
             .set_timeout(SETTING_PROXY_TIMEOUT_MS.millis(), true)
@@ -1111,9 +1112,8 @@ fn test_timeout() {
                 request.clone(),
             ),
         );
-    };
+    });
 
-    pin_utils::pin_mut!(fut);
     loop {
         let new_time = fuchsia_async::Time::from_nanos(
             executor.now().into_nanos()
@@ -1131,7 +1131,7 @@ fn test_timeout() {
 fn test_timeout_no_retry() {
     let mut executor = fuchsia_async::TestExecutor::new_with_fake_time();
 
-    let fut = async move {
+    let mut fut = pin!(async move {
         let setting_type = SettingType::Unknown;
         let environment = TestEnvironmentBuilder::new(setting_type)
             .set_timeout(SETTING_PROXY_TIMEOUT_MS.millis(), false)
@@ -1180,9 +1180,8 @@ fn test_timeout_no_retry() {
                 .0,
             event::handler::Event::Request(event::handler::Action::Timeout, request),
         );
-    };
+    });
 
-    pin_utils::pin_mut!(fut);
     loop {
         let new_time = fuchsia_async::Time::from_nanos(
             executor.now().into_nanos()

@@ -477,9 +477,8 @@ mod tests {
     use fuchsia_async::TestExecutor;
     use fuchsia_zircon as zx;
     use futures::Future;
-    use pin_utils::pin_mut;
     use pretty_assertions::assert_eq;
-    use std::task::Poll;
+    use std::{pin::pin, task::Poll};
 
     // Default autorepeat settings used for test.  If these settings are changed,
     // any tests may fail, since the tests are tuned to the precise timing that
@@ -723,10 +722,9 @@ mod tests {
         // Drive both the test fixture task and the handler task in parallel,
         // and both in fake time.  `run_in_fake_time` advances the fake time from
         // zero in increments of about 10ms until all futures complete.
-        let joined_fut = Task::local(async move {
+        let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        pin_mut!(joined_fut);
         run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
     }
 
@@ -783,10 +781,9 @@ mod tests {
             )
             .await;
         };
-        let joined_fut = Task::local(async move {
+        let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        pin_mut!(joined_fut);
         run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
     }
 
@@ -847,10 +844,9 @@ mod tests {
             .await;
         };
 
-        let joined_fut = Task::local(async move {
+        let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        pin_mut!(joined_fut);
         run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
     }
 
@@ -929,10 +925,9 @@ mod tests {
             )
             .await;
         };
-        let joined_fut = Task::local(async move {
+        let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        pin_mut!(joined_fut);
         run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
     }
 
@@ -1013,10 +1008,9 @@ mod tests {
             )
             .await;
         };
-        let joined_fut = Task::local(async move {
+        let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        pin_mut!(joined_fut);
         run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
     }
 
@@ -1146,10 +1140,9 @@ mod tests {
             )
             .await;
         };
-        let joined_fut = Task::local(async move {
+        let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        pin_mut!(joined_fut);
         run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
     }
 
@@ -1277,10 +1270,9 @@ mod tests {
             )
             .await;
         };
-        let joined_fut = Task::local(async move {
+        let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        pin_mut!(joined_fut);
         run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
     }
 
@@ -1343,10 +1335,9 @@ mod tests {
             )
             .await;
         };
-        let joined_fut = Task::local(async move {
+        let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        pin_mut!(joined_fut);
         run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
     }
 
@@ -1455,10 +1446,9 @@ mod tests {
             )
             .await;
         };
-        let joined_fut = Task::local(async move {
+        let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        pin_mut!(joined_fut);
         run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
     }
 
@@ -1584,10 +1574,9 @@ mod tests {
             )
             .await;
         };
-        let joined_fut = async move {
+        let mut joined_fut = pin!(async move {
             let _r = futures::join!(main_fut, handler_task);
-        };
-        pin_mut!(joined_fut);
+        });
         run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
     }
 
@@ -1705,10 +1694,9 @@ mod tests {
                 }
             });
         };
-        let joined_fut = Task::local(async move {
+        let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        pin_mut!(joined_fut);
         run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
     }
 }

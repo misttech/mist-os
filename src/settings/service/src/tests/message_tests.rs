@@ -10,6 +10,7 @@ use fuchsia_zircon::DurationNum;
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::StreamExt;
+use std::pin::pin;
 use std::sync::Arc;
 use std::task::Poll;
 
@@ -260,7 +261,7 @@ fn test_timeout() {
     let mut executor = fuchsia_async::TestExecutor::new_with_fake_time();
     let timeout_ms = 1000;
 
-    let fut = async move {
+    let mut fut = pin!(async move {
         let delegate = test::MessageHub::create();
         let (messenger_client_1, _) =
             delegate.create(MessengerType::Addressable(crate::Address::Test(1))).await.unwrap();
@@ -285,9 +286,8 @@ fn test_timeout() {
         .await;
 
         verify_result(Status::Timeout, &mut reply_receptor).await;
-    };
+    });
 
-    pin_utils::pin_mut!(fut);
     loop {
         let new_time = fuchsia_async::Time::from_nanos(
             executor.now().into_nanos()

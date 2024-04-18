@@ -27,7 +27,6 @@ rustc_library("wlan-service-util") {
 
   test_deps = [
     "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:pin-utils",
     "//third_party/rust_crates:rand",
   ]
 
