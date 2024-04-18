@@ -19,10 +19,13 @@ import("//build/assembly/product_assembly_config_file_impl.gni")
 #       all platform-defined universe packages (such as shell commands) are as
 #       well.
 #
+#   platform
+#     [scope] This is a set of values to override / overlay onto the platform
+#     configuration.
 #
 #   kernel
-#    [scope] This is a set of flags and settings specifically for the kernel.
-#    It's a scope with the following fields (all optional):
+#     [scope] This is a set of flags and settings specifically for the kernel.
+#     It's a scope with the following fields (all optional):
 #
 #    command_line_args (optional; defauilt = [])
 #      [list, strings] A list of kernel command-line arguments to add to the
@@ -51,6 +54,7 @@ template("assembly_developer_overrides") {
     forward_variables_from(invoker,
                            [
                              "developer_only_options",
+                             "platform",
                              "kernel",
                            ])
   }

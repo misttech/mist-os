@@ -9,7 +9,7 @@ use assembly_config_schema::{
     assembly_config::{AssemblyInputBundle, CompiledPackageDefinition, ShellCommands},
     board_config::{BoardInputBundle, HardwareInfo},
     common::PackagedDriverDetails,
-    developer_overrides::{DeveloperOnlyOptions, DeveloperOverrides},
+    developer_overrides::{DeveloperOnlyOptions, KernelOptions},
     image_assembly_config::{BoardDriverArguments, KernelConfig},
     platform_config::BuildType,
     product_config::{ProductConfigData, ProductPackageDetails, ProductPackagesConfig},
@@ -111,16 +111,14 @@ impl ImageAssemblyConfigBuilder {
     /// Add developer overrides to the builder
     pub fn add_developer_overrides(
         &mut self,
-        developer_overrides: DeveloperOverrides,
+        developer_only_options: DeveloperOnlyOptions,
+        kernel_options: KernelOptions,
     ) -> Result<()> {
-        let DeveloperOverrides { developer_only_options, kernel, target_name: _ } =
-            developer_overrides;
-
         // Set the developer-only options for the buidler to use.
         self.developer_only_options = Some(developer_only_options);
 
         // Add the kernel command line args from the developer
-        self.kernel_args.extend(kernel.command_line_args.into_iter());
+        self.kernel_args.extend(kernel_options.command_line_args.into_iter());
 
         Ok(())
     }

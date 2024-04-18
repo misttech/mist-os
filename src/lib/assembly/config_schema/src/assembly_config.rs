@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::image_assembly_config::PartialKernelConfig;
+use crate::platform_config::PlatformConfig;
 use crate::PackageDetails;
 use assembly_package_utils::PackageInternalPathBuf;
 use assembly_util::{CompiledPackageDestination, FileEntry};
@@ -11,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::common::{DriverDetails, PackageName};
-use crate::platform_config::PlatformConfig;
 use crate::product_config::ProductConfig;
 
 /// Configuration for a Product Assembly operation.  This is a high-level operation
@@ -22,6 +22,20 @@ use crate::product_config::ProductConfig;
 #[serde(deny_unknown_fields)]
 pub struct AssemblyConfig {
     pub platform: PlatformConfig,
+    pub product: ProductConfig,
+}
+
+/// Configuration for Product Assembly, when developer overrides are in use.
+///
+/// This deserializes to intermediate types that can be manipulated in order to
+/// apply developer overrides, before being parsed into the PlatformConfig
+/// and ProductConfig types.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct AssemblyConfigWrapperForOverrides {
+    // The platform config is deserialized as a Value before it is parsed into
+    // a 'PlatformConfig``
+    pub platform: serde_json::Value,
     pub product: ProductConfig,
 }
 
@@ -150,6 +164,7 @@ impl CompiledPackageDefinition {
 mod tests {
     use super::*;
     use crate::common::{FeatureControl, PackageSet};
+    use crate::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
     use crate::platform_config::{BuildType, FeatureSupportLevel};
     use crate::product_config::ProductPackageDetails;
     use assembly_file_relative_path::FileRelativePathBuf;
@@ -168,8 +183,9 @@ mod tests {
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(config.platform.build_type, BuildType::Eng);
-        assert_eq!(config.platform.feature_set_level, FeatureSupportLevel::Standard);
+        let platform = config.platform;
+        assert_eq!(platform.build_type, BuildType::Eng);
+        assert_eq!(platform.feature_set_level, FeatureSupportLevel::Standard);
     }
 
     #[test]
@@ -186,8 +202,9 @@ mod tests {
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(config.platform.build_type, BuildType::Eng);
-        assert_eq!(config.platform.feature_set_level, FeatureSupportLevel::Bootstrap);
+        let platform = config.platform;
+        assert_eq!(platform.build_type, BuildType::Eng);
+        assert_eq!(platform.feature_set_level, FeatureSupportLevel::Bootstrap);
     }
 
     #[test]
@@ -203,8 +220,9 @@ mod tests {
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(config.platform.build_type, BuildType::Eng);
-        assert_eq!(config.platform.feature_set_level, FeatureSupportLevel::Standard);
+        let platform = config.platform;
+        assert_eq!(platform.build_type, BuildType::Eng);
+        assert_eq!(platform.feature_set_level, FeatureSupportLevel::Standard);
     }
 
     #[test]
@@ -221,8 +239,9 @@ mod tests {
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(config.platform.build_type, BuildType::Eng);
-        assert_eq!(config.platform.feature_set_level, FeatureSupportLevel::Empty);
+        let platform = config.platform;
+        assert_eq!(platform.build_type, BuildType::Eng);
+        assert_eq!(platform.feature_set_level, FeatureSupportLevel::Empty);
     }
 
     #[test]
@@ -238,7 +257,8 @@ mod tests {
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(config.platform.build_type, BuildType::UserDebug);
+        let platform = config.platform;
+        assert_eq!(platform.build_type, BuildType::UserDebug);
     }
 
     #[test]
@@ -254,7 +274,8 @@ mod tests {
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(config.platform.build_type, BuildType::User);
+        let platform = config.platform;
+        assert_eq!(platform.build_type, BuildType::User);
     }
 
     #[test]
@@ -288,7 +309,8 @@ mod tests {
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(config.platform.build_type, BuildType::Eng);
+        let platform = config.platform;
+        assert_eq!(platform.build_type, BuildType::Eng);
         assert_eq!(
             config.product.packages.base,
             vec![ProductPackageDetails {
@@ -303,7 +325,7 @@ mod tests {
                 config_data: Vec::default()
             }]
         );
-        assert_eq!(config.platform.identity.password_pinweaver, FeatureControl::Allowed);
+        assert_eq!(platform.identity.password_pinweaver, FeatureControl::Allowed);
         assert_eq!(
             config.product.base_drivers,
             vec![DriverDetails {
@@ -435,6 +457,55 @@ mod tests {
                 PackageInternalPathBuf::from("path/to/binary1"),
                 PackageInternalPathBuf::from("path/to/binary2"),
             ])
+        );
+    }
+
+    #[test]
+    fn test_assembly_config_wrapper_for_overrides() {
+        let json5 = r#"
+        {
+          platform: {
+            build_type: "eng",
+          },
+          product: {},
+        }
+        "#;
+
+        let overrides = serde_json::json!({
+            "media": {
+                "audio": {
+                    "partial_stack": {}
+                }
+            }
+        });
+
+        let mut cursor = std::io::Cursor::new(json5);
+        let AssemblyConfigWrapperForOverrides { platform, product: _ } =
+            util::from_reader(&mut cursor).unwrap();
+
+        // serde_json and serde_json5 have an incompatible handling of how they
+        // serialize / deserialize enums.  So this test validates both the
+        // value merging method but also that the problematic enum syntax is
+        // correctly parsed when bounced through a string as it's done in the
+        // product assembly binary itself.
+
+        // 1. Merge to a 'value', not to the final type, as we need serde_json5
+        //    to do the parsing, not serde_json.
+        let merged_platform_value: serde_json::Value =
+            crate::try_merge_into(platform, overrides).unwrap();
+
+        // 2. Write the value out to a string, using pretty-printing so that
+        // line numbers and such are all sensical.
+        let merged_platform_string = serde_json::to_string_pretty(&merged_platform_value).unwrap();
+
+        // 3. Parse the string using serde_json5, so that enums are handled
+        //    consistently.
+        let merged_platform: PlatformConfig =
+            serde_json5::from_str(&merged_platform_string).unwrap();
+
+        assert_eq!(
+            merged_platform.media,
+            PlatformMediaConfig { audio: Some(AudioConfig::PartialStack), ..Default::default() },
         );
     }
 }

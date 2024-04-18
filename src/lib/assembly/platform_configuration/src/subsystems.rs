@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Context};
-use assembly_config_schema::{AssemblyConfig, BoardInformation, BuildType, ExampleConfig};
+use assembly_config_schema::platform_config::PlatformConfig;
+use assembly_config_schema::product_config::ProductConfig;
+use assembly_config_schema::{BoardInformation, BuildType, ExampleConfig};
 use camino::Utf8Path;
 
 use crate::common::{CompletedConfiguration, ConfigurationBuilderImpl};
@@ -67,24 +69,24 @@ const EXAMPLE_ENABLED_FLAG: &str = "assembly_example_enabled";
 ///
 /// Returns a map from package names to configuration updates.
 pub fn define_configuration(
-    config: &AssemblyConfig,
+    platform: &PlatformConfig,
+    product: &ProductConfig,
     board_info: &BoardInformation,
     ramdisk_image: bool,
     gendir: impl AsRef<Utf8Path>,
     resource_dir: impl AsRef<Utf8Path>,
 ) -> anyhow::Result<CompletedConfiguration> {
-    let icu_config = &config.platform.icu;
+    let icu_config = &platform.icu;
     let mut builder = ConfigurationBuilderImpl::new(icu_config.clone());
 
     // The emulator support bundle is always added, even to an empty build.
     builder.platform_bundle("emulator_support");
 
-    let feature_set_level =
-        FeatureSupportLevel::from_deserialized(&config.platform.feature_set_level);
+    let feature_set_level = FeatureSupportLevel::from_deserialized(&platform.feature_set_level);
 
     // Only perform configuration if the feature_set_level is not None (ie, Empty).
     if let Some(feature_set_level) = &feature_set_level {
-        let build_type = &config.platform.build_type;
+        let build_type = &platform.build_type;
         let gendir = gendir.as_ref().to_path_buf();
         let resource_dir = resource_dir.as_ref().to_path_buf();
 
@@ -100,7 +102,7 @@ pub fn define_configuration(
         };
 
         // Call the configuration functions for each subsystem.
-        configure_subsystems(&context, config, &mut builder)?;
+        configure_subsystems(&context, platform, product, &mut builder)?;
     }
 
     Ok(builder.build())
@@ -185,7 +187,8 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
 
 fn configure_subsystems(
     context: &ConfigurationContext<'_>,
-    config: &AssemblyConfig,
+    platform: &PlatformConfig,
+    product: &ProductConfig,
     builder: &mut dyn ConfigurationBuilder,
 ) -> anyhow::Result<()> {
     // Define the common platform bundles for this platform configuration.
@@ -196,108 +199,92 @@ fn configure_subsystems(
     if should_configure_example() {
         example::ExampleSubsystemConfig::define_configuration(
             context,
-            &config.platform.example_config,
+            &platform.example_config,
             builder,
         )?;
-    } else if config.platform.example_config != ExampleConfig::default() {
+    } else if platform.example_config != ExampleConfig::default() {
         bail!("Config options were set for the example subsystem, but the example is not enabled to be configured.");
     }
 
     // The real platform subsystems
 
-    battery::BatterySubsystemConfig::define_configuration(
-        context,
-        &config.platform.battery,
-        builder,
-    )
-    .context("Configuring the 'battery' subsystem")?;
+    battery::BatterySubsystemConfig::define_configuration(context, &platform.battery, builder)
+        .context("Configuring the 'battery' subsystem")?;
 
     bluetooth::BluetoothSubsystemConfig::define_configuration(
         context,
-        &config.platform.bluetooth,
+        &platform.bluetooth,
         builder,
     )
     .context("Configuring the `bluetooth` subsystem")?;
 
-    build_info::BuildInfoSubsystem::define_configuration(
-        context,
-        &config.product.build_info,
-        builder,
-    )
-    .context("Configuring the 'build_info' subsystem")?;
+    build_info::BuildInfoSubsystem::define_configuration(context, &product.build_info, builder)
+        .context("Configuring the 'build_info' subsystem")?;
 
     let component_config = component::ComponentConfig {
-        policy: &config.product.component_policy,
-        development_support: &config.platform.development_support,
-        starnix: &config.platform.starnix,
+        policy: &product.component_policy,
+        development_support: &platform.development_support,
+        starnix: &platform.starnix,
     };
     component::ComponentSubsystem::define_configuration(context, &component_config, builder)
         .context("Configuring the 'component' subsystem")?;
 
     connectivity::ConnectivitySubsystemConfig::define_configuration(
         context,
-        &config.platform.connectivity,
+        &platform.connectivity,
         builder,
     )
     .context("Configuring the 'connectivity' subsystem")?;
 
     development::DevelopmentConfig::define_configuration(
         context,
-        &config.platform.development_support,
+        &platform.development_support,
         builder,
     )
     .context("Configuring the 'development' subsystem")?;
 
     diagnostics::DiagnosticsSubsystem::define_configuration(
         context,
-        &config.platform.diagnostics,
+        &platform.diagnostics,
         builder,
     )
     .context("Configuring the 'diagnostics' subsystem")?;
 
     driver_framework::DriverFrameworkSubsystemConfig::define_configuration(
         context,
-        &config.platform.driver_framework,
+        &platform.driver_framework,
         builder,
     )
     .context("Configuring the 'driver_framework' subsystem")?;
 
-    graphics::GraphicsSubsystemConfig::define_configuration(
-        context,
-        &config.platform.graphics,
-        builder,
-    )
-    .context("Configuring the 'graphics' subsystem")?;
+    graphics::GraphicsSubsystemConfig::define_configuration(context, &platform.graphics, builder)
+        .context("Configuring the 'graphics' subsystem")?;
 
-    hwinfo::HwinfoSubsystem::define_configuration(context, &config.product.info, builder)
+    hwinfo::HwinfoSubsystem::define_configuration(context, &product.info, builder)
         .context("Configuring the 'hwinfo' subsystem")?;
 
-    icu::IcuSubsystem::define_configuration(context, &config.platform.icu, builder)
+    icu::IcuSubsystem::define_configuration(context, &platform.icu, builder)
         .context("Configuring the 'icu' subsystem")?;
 
-    identity::IdentitySubsystemConfig::define_configuration(
-        context,
-        &config.platform.identity,
-        builder,
-    )
-    .context("Configuring the 'identity' subsystem")?;
+    identity::IdentitySubsystemConfig::define_configuration(context, &platform.identity, builder)
+        .context("Configuring the 'identity' subsystem")?;
 
     input_groups::InputGroupsSubsystem::define_configuration(
         context,
-        &config.platform.input_groups,
+        &platform.input_groups,
         builder,
     )
     .context("Configuring the 'input_groups' subsystem")?;
 
-    media::MediaSubsystem::define_configuration(context, &config.platform.media, builder)
+    media::MediaSubsystem::define_configuration(context, &platform.media, builder)
         .context("Configuring the 'media' subsystem")?;
 
-    power::PowerManagementSubsystem::define_configuration(context, &config.platform.power, builder)
+    power::PowerManagementSubsystem::define_configuration(context, &platform.power, builder)
         .context("Configuring the 'power' subsystem")?;
 
     paravirtualization::ParavirtualizationSubsystem::define_configuration(
         context,
-        &config.platform.paravirtualization,
+        &platform.paravirtualization,
         builder,
     )
     .context("Configuring the 'paravirtualization' subsystem")?;
@@ -305,83 +292,63 @@ fn configure_subsystems(
     radar::RadarSubsystemConfig::define_configuration(context, &(), builder)
         .context("Configuring the 'radar' subsystem")?;
 
-    recovery::RecoverySubsystem::define_configuration(context, &config.platform.recovery, builder)
+    recovery::RecoverySubsystem::define_configuration(context, &platform.recovery, builder)
         .context("Configuring the 'recovery' subsystem")?;
 
     rcs::RcsSubsystemConfig::define_configuration(context, &(), builder)
         .context("Configuring the 'rcs' subsystem")?;
 
-    sensors::SensorsSubsystemConfig::define_configuration(
-        context,
-        &config.platform.starnix,
-        builder,
-    )
-    .context("Configuring the 'sensors' subsystem")?;
+    sensors::SensorsSubsystemConfig::define_configuration(context, &platform.starnix, builder)
+        .context("Configuring the 'sensors' subsystem")?;
 
     session::SessionConfig::define_configuration(
         context,
-        &(&config.platform.session, &config.product.session_url),
+        &(&platform.session, &product.session_url),
         builder,
     )
     .context("Configuring the 'session' subsystem")?;
 
-    starnix::StarnixSubsystem::define_configuration(context, &config.platform.starnix, builder)
+    starnix::StarnixSubsystem::define_configuration(context, &platform.starnix, builder)
         .context("Configuring the starnix subsystem")?;
 
-    storage::StorageSubsystemConfig::define_configuration(
-        context,
-        &config.platform.storage,
-        builder,
-    )
-    .context("Configuring the 'storage' subsystem")?;
+    storage::StorageSubsystemConfig::define_configuration(context, &platform.storage, builder)
+        .context("Configuring the 'storage' subsystem")?;
 
-    swd::SwdSubsystemConfig::define_configuration(
-        context,
-        &config.platform.software_delivery,
-        builder,
-    )
-    .context("Configuring the 'software_delivery' subsystem")?;
+    swd::SwdSubsystemConfig::define_configuration(context, &platform.software_delivery, builder)
+        .context("Configuring the 'software_delivery' subsystem")?;
 
     thermal::ThermalSubsystem::define_configuration(context, &(), builder)
         .context("Configuring the 'thermal' subsystem")?;
 
-    ui::UiSubsystem::define_configuration(context, &config.platform.ui, builder)
+    ui::UiSubsystem::define_configuration(context, &platform.ui, builder)
         .context("Configuring the 'ui' subsystem")?;
 
     virtualization::VirtualizationSubsystem::define_configuration(
         context,
-        &config.platform.virtualization,
+        &platform.virtualization,
         builder,
     )
     .context("Configuring the 'virtualization' subsystem")?;
 
-    fonts::FontsSubsystem::define_configuration(context, &config.platform.fonts, builder)
+    fonts::FontsSubsystem::define_configuration(context, &platform.fonts, builder)
         .context("Configuring the 'fonts' subsystem")?;
 
-    intl::IntlSubsystem::define_configuration(context, &config.platform.intl, builder)
+    intl::IntlSubsystem::define_configuration(context, &platform.intl, builder)
         .context("Confguring the 'intl' subsystem")?;
 
-    setui::SetUiSubsystem::define_configuration(context, &config.platform.setui, builder)
+    setui::SetUiSubsystem::define_configuration(context, &platform.setui, builder)
         .context("Confguring the 'SetUI' subsystem")?;
 
-    kernel::KernelSubsystem::define_configuration(context, &config.platform.kernel, builder)
+    kernel::KernelSubsystem::define_configuration(context, &platform.kernel, builder)
         .context("Configuring the 'kernel' subsystem")?;
 
-    forensics::ForensicsSubsystem::define_configuration(
-        context,
-        &config.platform.forensics,
-        builder,
-    )
-    .context("Configuring the 'Forensics' subsystem")?;
+    forensics::ForensicsSubsystem::define_configuration(context, &platform.forensics, builder)
+        .context("Configuring the 'Forensics' subsystem")?;
 
-    timekeeper::TimekeeperSubsystem::define_configuration(
-        context,
-        &config.platform.timekeeper,
-        builder,
-    )
-    .context("Configuring the 'timekeeper' subsystem")?;
+    timekeeper::TimekeeperSubsystem::define_configuration(context, &platform.timekeeper, builder)
+        .context("Configuring the 'timekeeper' subsystem")?;
 
-    usb::UsbSubsystemConfig::define_configuration(context, &config.platform.usb, builder)
+    usb::UsbSubsystemConfig::define_configuration(context, &platform.usb, builder)
         .context("Configuring the 'usb' subsystem")?;
 
     Ok(())
@@ -396,6 +363,7 @@ fn should_configure_example() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assembly_config_schema::AssemblyConfig;
     use assembly_util as util;
 
     #[test]
@@ -413,8 +381,9 @@ mod tests {
         "#;
 
         let mut cursor = std::io::Cursor::new(json5);
-        let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
-        let result = define_configuration(&config, &BoardInformation::default(), false, "", "");
+        let AssemblyConfig { platform, product } = util::from_reader(&mut cursor).unwrap();
+        let result =
+            define_configuration(&platform, &product, &BoardInformation::default(), false, "", "");
 
         assert!(result.is_err());
     }
