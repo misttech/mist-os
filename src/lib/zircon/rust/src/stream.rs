@@ -279,6 +279,49 @@ unsafe_handle_properties!(object: Stream,
     ]
 );
 
+impl std::io::Read for Stream {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let mut iovec = [sys::zx_iovec_t { buffer: buf.as_mut_ptr(), capacity: buf.len() }];
+        // SAFETY: The buffer in `iovec` comes from a mutable slice so we know it's safe to pass it
+        // to `readv`.
+        Ok(unsafe { self.readv(StreamReadOptions::empty(), &mut iovec) }?)
+    }
+
+    fn read_vectored(&mut self, bufs: &mut [std::io::IoSliceMut<'_>]) -> std::io::Result<usize> {
+        // SAFETY: `zx_iovec_t` and `IoSliceMut` have the same layout.
+        let mut iovecs = unsafe {
+            std::slice::from_raw_parts_mut(bufs.as_mut_ptr() as *mut sys::zx_iovec_t, bufs.len())
+        };
+        // SAFETY: `IoSliceMut` can only be constructed from a mutable slice so we know it's safe to
+        // pass to `readv`.
+        Ok(unsafe { self.readv(StreamReadOptions::empty(), &mut iovecs) }?)
+    }
+}
+
+impl std::io::Seek for Stream {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        Ok(Self::seek(&self, pos)? as u64)
+    }
+}
+
+impl std::io::Write for Stream {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        Ok(Self::write(&self, StreamWriteOptions::empty(), buf)?)
+    }
+
+    fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> std::io::Result<usize> {
+        // SAFETY: `zx_iovec_t` and `IoSliceMut` have the same layout.
+        let iovecs = unsafe {
+            std::slice::from_raw_parts(bufs.as_ptr() as *const sys::zx_iovec_t, bufs.len())
+        };
+        Ok(self.writev(StreamWriteOptions::empty(), &iovecs)?)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -460,5 +503,58 @@ mod tests {
 
         let data = stream.read_at_to_vec(StreamReadOptions::empty(), 0, DATA.len()).unwrap();
         assert_eq!(data, DATA);
+    }
+
+    #[test]
+    fn std_io_read_write_seek() {
+        const DATA: &'static str = "stream-contents";
+        let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).unwrap();
+        let mut stream =
+            Stream::create(StreamOptions::MODE_READ | StreamOptions::MODE_WRITE, &vmo, 0).unwrap();
+
+        std::io::Write::write_all(&mut stream, DATA.as_bytes()).unwrap();
+        assert_eq!(std::io::Seek::stream_position(&mut stream).unwrap(), DATA.len() as u64);
+        std::io::Seek::rewind(&mut stream).unwrap();
+        assert_eq!(std::io::read_to_string(&mut stream).unwrap(), DATA);
+        assert_eq!(std::io::Seek::stream_position(&mut stream).unwrap(), DATA.len() as u64);
+    }
+
+    #[test]
+    fn std_io_read_vectored() {
+        const DATA: &'static [u8] = b"stream-contents";
+        let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).unwrap();
+        let mut stream =
+            Stream::create(StreamOptions::MODE_READ | StreamOptions::MODE_WRITE, &vmo, 0).unwrap();
+        assert_eq!(stream.write(StreamWriteOptions::empty(), DATA).unwrap(), DATA.len());
+        std::io::Seek::rewind(&mut stream).unwrap();
+
+        let mut buf1 = [0; 6];
+        let mut buf2 = [0; 1];
+        let mut buf3 = [0; 8];
+        let mut bufs = [
+            std::io::IoSliceMut::new(&mut buf1),
+            std::io::IoSliceMut::new(&mut buf2),
+            std::io::IoSliceMut::new(&mut buf3),
+        ];
+        assert_eq!(std::io::Read::read_vectored(&mut stream, &mut bufs).unwrap(), DATA.len());
+        assert_eq!(buf1, DATA[0..6]);
+        assert_eq!(buf2, DATA[6..7]);
+        assert_eq!(buf3, DATA[7..]);
+    }
+
+    #[test]
+    fn std_io_write_vectored() {
+        let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).unwrap();
+        let mut stream =
+            Stream::create(StreamOptions::MODE_READ | StreamOptions::MODE_WRITE, &vmo, 0).unwrap();
+
+        let bufs = [
+            std::io::IoSlice::new(b"stream"),
+            std::io::IoSlice::new(b"-"),
+            std::io::IoSlice::new(b"contents"),
+        ];
+        assert_eq!(std::io::Write::write_vectored(&mut stream, &bufs).unwrap(), 15);
+        std::io::Seek::rewind(&mut stream).unwrap();
+        assert_eq!(stream.read_to_vec(StreamReadOptions::empty(), 15).unwrap(), b"stream-contents");
     }
 }
