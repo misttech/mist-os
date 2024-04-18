@@ -24,7 +24,6 @@
 #include <ddktl/device-internal.h>
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
-#include <ddktl/metadata/audio.h>
 #include <soc/aml-common/aml-tdm-audio.h>
 
 #include "aml-tdm-config-device.h"

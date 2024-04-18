@@ -13,8 +13,6 @@
 
 #include <unordered_map>
 
-#include <ddktl/metadata/audio.h>
-
 #include "src/media/audio/drivers/aml-g12-tdm/aml-tdm-config-device.h"
 
 namespace audio::aml_g12 {

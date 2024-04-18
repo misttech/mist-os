@@ -12,8 +12,5 @@ This folder contains drivers for the AMLogic g12 audio subsystem. There are driv
 See [Audio Codec Interface](https://fuchsia.dev/fuchsia-src/development/audio/drivers/codec.md) for a
 description of codec terms used in this driver.
 
-See [audio.h](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/ddktl/include/ddktl/metadata/audio.h)
-for descriptions of audio metadata used in DFv1 drivers.
-
 See [aml-audio.h](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/devices/lib/amlogic/include/soc/aml-common/aml-audio.h)
 for descriptions of AMLogic specific metadata used in DFv1 drivers.

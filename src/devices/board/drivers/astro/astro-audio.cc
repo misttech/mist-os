@@ -21,7 +21,6 @@
 #include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/ti/platform/cpp/bind.h>
-#include <ddktl/metadata/audio.h>
 #include <soc/aml-common/aml-audio.h>
 #include <soc/aml-meson/g12a-clk.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>

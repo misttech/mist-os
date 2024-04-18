@@ -23,7 +23,6 @@
 #include <audio-proto/audio-proto.h>
 #include <ddktl/device-internal.h>
 #include <ddktl/device.h>
-#include <ddktl/metadata/audio.h>
 #include <fbl/mutex.h>
 #include <soc/aml-common/aml-tdm-audio.h>
 
@@ -91,13 +90,11 @@ class AmlG12TdmDspStream : public SimpleAudioStream {
   int64_t codecs_turn_off_delay_nsec_ = 0;
   bool hardware_configured_ = false;
 
-  async::TaskClosureMethod<AmlG12TdmDspStream,
-                           &AmlG12TdmDspStream::ProcessRingNotification> notify_timer_
-      __TA_GUARDED(domain_token()){this};
+  async::TaskClosureMethod<AmlG12TdmDspStream, &AmlG12TdmDspStream::ProcessRingNotification>
+      notify_timer_ __TA_GUARDED(domain_token()){this};
   // Inform DSP FW of ring buffer location information regularly
-  async::TaskClosureMethod<AmlG12TdmDspStream,
-                           &AmlG12TdmDspStream::RingNotificationReport> position_timer_
-      __TA_GUARDED(domain_token()){this};
+  async::TaskClosureMethod<AmlG12TdmDspStream, &AmlG12TdmDspStream::RingNotificationReport>
+      position_timer_ __TA_GUARDED(domain_token()){this};
 
   ddk::PDevFidl pdev_;
 
