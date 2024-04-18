@@ -9,6 +9,7 @@ use crate::{
         FileObject, FileOps, FsString, SeekTarget,
     },
 };
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::{errors::Errno, ino_t, off_t};
 
 /// A directory entry used for [`VecDirectory`].
@@ -48,6 +49,7 @@ impl FileOps for VecDirectory {
 
     fn readdir(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,

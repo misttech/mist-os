@@ -472,6 +472,7 @@ impl FileOps for SeLinuxBooleansDirectory {
 
     fn readdir(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,

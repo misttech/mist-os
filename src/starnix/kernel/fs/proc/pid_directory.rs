@@ -139,11 +139,12 @@ impl FileOps for TaskDirectory {
 
     fn readdir(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
-        self.file_ops.readdir(file, current_task, sink)
+        self.file_ops.readdir(locked, file, current_task, sink)
     }
 
     fn as_pid(&self, _file: &FileObject) -> Result<pid_t, Errno> {

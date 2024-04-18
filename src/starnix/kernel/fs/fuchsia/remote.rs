@@ -1317,6 +1317,7 @@ impl FileOps for RemoteDirectoryObject {
 
     fn readdir(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -2054,7 +2055,7 @@ mod test {
                         }
                     }
                     let mut sink = Sink::default();
-                    dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
+                    dir_handle.readdir(locked, &current_task, &mut sink).expect("readdir failed");
 
                     // inode_num for .. for the root should be the same as root.
                     assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.node_id);
@@ -2064,7 +2065,7 @@ mod test {
                         .open_anonymous(locked, &current_task, OpenFlags::RDONLY)
                         .expect("open failed");
                     let mut sink = Sink::default();
-                    dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
+                    dir_handle.readdir(locked, &current_task, &mut sink).expect("readdir failed");
 
                     // inode_num for .. for the first sub directory should be the same as root.
                     assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.node_id);
@@ -2074,7 +2075,7 @@ mod test {
                         .open_anonymous(locked, &current_task, OpenFlags::RDONLY)
                         .expect("open failed");
                     let mut sink = Sink::default();
-                    dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
+                    dir_handle.readdir(locked, &current_task, &mut sink).expect("readdir failed");
 
                     // inode_num for .. for the second sub directory should be the first sub directory.
                     assert_eq!(sink.dot_dot_inode_num, sub_dir1.entry.node.node_id);

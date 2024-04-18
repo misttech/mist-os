@@ -755,7 +755,7 @@ pub fn sys_faccessat2(
 }
 
 pub fn sys_getdents64(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_buffer: UserAddress,
@@ -764,7 +764,7 @@ pub fn sys_getdents64(
     let file = current_task.files.get(fd)?;
     let mut offset = file.offset.lock();
     let mut sink = DirentSink64::new(current_task, &mut offset, user_buffer, user_capacity);
-    let result = file.readdir(current_task, &mut sink);
+    let result = file.readdir(locked, current_task, &mut sink);
     sink.map_result_with_actual(result)
 }
 

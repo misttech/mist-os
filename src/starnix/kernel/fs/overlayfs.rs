@@ -202,9 +202,11 @@ impl ActiveEntry {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut sink = DirentSinkAdapter::default();
-        self.entry()
-            .open_anonymous(locked, current_task, OpenFlags::DIRECTORY)?
-            .readdir(current_task, &mut sink)?;
+        self.entry().open_anonymous(locked, current_task, OpenFlags::DIRECTORY)?.readdir(
+            locked,
+            current_task,
+            &mut sink,
+        )?;
         Ok(sink.items)
     }
 }
@@ -758,7 +760,7 @@ impl OverlayDirectory {
         current_task: &CurrentTask,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut entries = DirEntries::new();
 
@@ -813,13 +815,13 @@ impl FileOps for OverlayDirectory {
 
     fn readdir(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): FileOpsReaddir before FileOpsCore
         if sink.offset() == 0 {
-            self.refresh_dir_entries(&mut locked, current_task)?;
+            self.refresh_dir_entries(locked, current_task)?;
         }
 
         emit_dotdot(file, sink)?;
