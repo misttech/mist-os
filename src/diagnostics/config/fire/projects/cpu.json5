@@ -4,7 +4,7 @@
             metric_id: 1,
             metric_type: "IntHistogram",
             selector: [
-                "<component_manager>:root/stats/histograms:\\/{MONIKER}",
+                "<component_manager>:root/stats/histograms:{MONIKER}",
             ],
         },
     ],
