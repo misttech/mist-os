@@ -172,9 +172,23 @@ class FuseServer {
     return true;
   }
 
-  void WaitForInit() {
+  template <typename R = void>
+  R WaitForInit(std::function<R()> f = std::function<R()>()) {
     std::unique_lock guard(init_mtx_);
     init_cv_.wait(guard, [&]() { return init_done_; });
+    if (f) {
+      return f();
+    }
+    return R();
+  }
+
+  testing::AssertionResult SendInitResponse(const fuse_in_header* in_header, uint32_t flags) {
+    fuse_init_out init_out = {
+        .major = FUSE_KERNEL_VERSION,
+        .minor = FUSE_KERNEL_MINOR_VERSION,
+        .flags = flags,
+    };
+    return WriteStructResponse(in_header, init_out);
   }
 
  protected:
@@ -240,9 +254,12 @@ class FuseServer {
     return testing::AssertionSuccess();
   }
 
-  void NotifyInitWaiters() {
+  void NotifyInitWaiters(std::function<void()> f = std::function<void()>()) {
     std::unique_lock guard(init_mtx_);
     init_done_ = true;
+    if (f) {
+      f();
+    }
     init_cv_.notify_all();
   }
 
@@ -250,12 +267,7 @@ class FuseServer {
                                               const struct fuse_init_in* init_in,
                                               const std::vector<std::byte>& message) {
     EXPECT_EQ(init_in->flags & want_init_flags_, want_init_flags_);
-    fuse_init_out init_out = {
-        .major = FUSE_KERNEL_VERSION,
-        .minor = FUSE_KERNEL_MINOR_VERSION,
-        .flags = want_init_flags_,
-    };
-    OK_OR_RETURN(WriteStructResponse(in_header, init_out));
+    OK_OR_RETURN(SendInitResponse(in_header, want_init_flags_));
     NotifyInitWaiters();
     return testing::AssertionSuccess();
   }
@@ -707,6 +719,49 @@ TEST_F(FuseTest, XAttr) {
   ASSERT_EQ(fremovexattr(fd.get(), attribute_name), 0);
   ASSERT_EQ(fgetxattr(fd.get(), attribute_name, nullptr, 0), -1);
   ASSERT_EQ(errno, ENODATA);
+}
+
+TEST_F(FuseServerTest, NoReqsUntilInitResponse) {
+  class NoReqsUntilInitResponseServer : public FuseServer {
+   public:
+    fuse_in_header WaitForInitAndReturnRequestHeader() {
+      return WaitForInit(std::function<fuse_in_header()>([&]() { return init_hdr_; }));
+    }
+
+   protected:
+    testing::AssertionResult HandleInit(const struct fuse_in_header* in_header,
+                                        const struct fuse_init_in* init_in,
+                                        const std::vector<std::byte>& message) {
+      // Don't actually complete the request, just store the init request's header so
+      // that we can respond to it later.
+      NotifyInitWaiters([&]() { init_hdr_ = *in_header; });
+      return testing::AssertionSuccess();
+    }
+
+   private:
+    fuse_in_header init_hdr_;
+  };
+
+  std::shared_ptr<NoReqsUntilInitResponseServer> server(new NoReqsUntilInitResponseServer());
+  ASSERT_TRUE(Mount(server));
+  const fuse_in_header init_hdr = server->WaitForInitAndReturnRequestHeader();
+
+  // Create a new thread to perform a request against the FUSE server.
+  std::atomic_bool access_done = false;
+  std::thread thrd([&]() {
+    std::string filename = GetMountDir() + "/file";
+    EXPECT_EQ(access(filename.c_str(), R_OK), 0) << strerror(errno);
+    access_done = true;
+  });
+  // Make sure that the request is not completed.
+  sleep(1);
+  EXPECT_FALSE(access_done);
+
+  // Send our (delayed) response to the FUSE_INIT request and make sure that the
+  // access request is now completed.
+  server->SendInitResponse(&init_hdr, 0);
+  thrd.join();
+  EXPECT_TRUE(access_done);
 }
 
 TEST_F(FuseServerTest, OpenAndClose) {

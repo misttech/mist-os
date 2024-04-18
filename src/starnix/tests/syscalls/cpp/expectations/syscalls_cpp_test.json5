@@ -24,6 +24,8 @@
         {
             type: "expect_failure",
             matchers: [
+                "FuseServerTest.NoReqsUntilInitResponse",
+
                 // TODO(https://fxbug.dev/42072786)
                 "MMapProcTest.AdjacentFileMappings",
 
