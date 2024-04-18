@@ -14,6 +14,7 @@ class AttachRequestZxdb : public AttachRequest {
  public:
   dap::string process;
   optional<dap::string> command;
+  optional<dap::boolean> recursive;
   // Current working directory for running the shell command.
   optional<string> cwd;
 };

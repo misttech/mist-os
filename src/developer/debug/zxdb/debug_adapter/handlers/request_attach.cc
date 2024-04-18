@@ -13,7 +13,7 @@ namespace dap {
 
 DAP_IMPLEMENT_STRUCT_TYPEINFO_EXT(AttachRequestZxdb, AttachRequest, "attach",
                                   DAP_FIELD(process, "process"), DAP_FIELD(command, "command"),
-                                  DAP_FIELD(cwd, "cwd"))
+                                  DAP_FIELD(recursive, "recursive"), DAP_FIELD(cwd, "cwd"))
 
 }  // namespace dap
 
@@ -22,7 +22,8 @@ namespace zxdb {
 dap::ResponseOrError<dap::AttachResponse> OnRequestAttach(DebugAdapterContext* context,
                                                           const dap::AttachRequestZxdb& req) {
   dap::AttachResponse response;
-  context->console()->ProcessInputLine("attach " + req.process);
+  std::string attach = req.recursive && *req.recursive ? "attach --recursive " : "attach ";
+  context->console()->ProcessInputLine(attach + req.process);
 
   // If specified run the provided command (an event) every time we start debugging
   // or after clicking the restart button.
