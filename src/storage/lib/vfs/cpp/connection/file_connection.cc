@@ -59,7 +59,8 @@ void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& compl
   if (append()) {
     inherited_flags |= fio::OpenFlags::kAppend;
   }
-  Connection::NodeClone(request->flags | inherited_flags, std::move(request->object));
+  Connection::NodeClone(request->flags | inherited_flags, VnodeProtocol::kFile,
+                        std::move(request->object));
 }
 
 void FileConnection::Close(CloseCompleter::Sync& completer) { completer.Reply(Unbind()); }

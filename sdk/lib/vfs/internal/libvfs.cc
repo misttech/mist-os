@@ -190,7 +190,7 @@ __EXPORT zx_status_t vfs_internal_node_serve(vfs_internal_node_t* vnode,
     return ZX_ERR_INVALID_ARGS;
   }
   return vnode->vfs->Serve(vnode->AsNode(), std::move(chan),
-                           intree_vfs::VnodeConnectionOptions::FromIoV1Flags(*fidl_rights));
+                           intree_vfs::VnodeConnectionOptions::FromOpen1Flags(*fidl_rights));
 }
 
 __EXPORT zx_status_t vfs_internal_node_shutdown(vfs_internal_node_t* vnode) {

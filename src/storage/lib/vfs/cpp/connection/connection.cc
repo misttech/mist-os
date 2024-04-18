@@ -34,26 +34,6 @@ static_assert(NAME_MAX == fio::wire::kMaxFilename,
 
 namespace fs::internal {
 
-bool PrevalidateFlags(fio::OpenFlags flags) {
-  if (flags & fio::OpenFlags::kNodeReference) {
-    // Explicitly reject VNODE_REF_ONLY together with any invalid flags.
-    if (flags - fio::kOpenFlagsAllowedWithNodeReference) {
-      return false;
-    }
-  }
-
-  if ((flags & fio::OpenFlags::kNotDirectory) && (flags & fio::OpenFlags::kDirectory)) {
-    return false;
-  }
-
-  // If CLONE_SAME_RIGHTS is specified, the client cannot request any specific rights.
-  if ((flags & fio::OpenFlags::kCloneSameRights) && (flags & kAllIo1Rights)) {
-    return false;
-  }
-
-  return true;
-}
-
 Connection::Connection(FuchsiaVfs* vfs, fbl::RefPtr<Vnode> vnode, fuchsia_io::Rights rights)
     : vfs_(vfs), vnode_(std::move(vnode)), rights_(rights) {
   ZX_DEBUG_ASSERT(vfs);
@@ -68,51 +48,67 @@ Connection::~Connection() {
   }
 }
 
-void Connection::NodeClone(fio::OpenFlags flags, fidl::ServerEnd<fio::Node> server_end) {
-  auto write_error = [describe = flags & fio::OpenFlags::kDescribe](
-                         fidl::ServerEnd<fio::Node> channel, zx_status_t error) {
-    FS_PRETTY_TRACE_DEBUG("[NodeClone] error: ", zx_status_get_string(error));
-    if (describe) {
+void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
+                           fidl::ServerEnd<fio::Node> server_end) {
+  auto clone_result = [=]() -> zx::result<std::tuple<fbl::RefPtr<Vnode>, VnodeConnectionOptions>> {
+    if (!ValidateCloneFlags(flags)) {
+      FS_PRETTY_TRACE_DEBUG("[NodeClone] invalid flags: ", flags);
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    auto clone_options = VnodeConnectionOptions::FromCloneFlags(flags);
+    FS_PRETTY_TRACE_DEBUG("[NodeClone] our rights: ", rights(), ", clone options: ", clone_options);
+
+    // If CLONE_SAME_RIGHTS is requested, cloned connection will inherit the same rights as those
+    // from the originating connection.
+    if (clone_options.flags & fio::OpenFlags::kCloneSameRights) {
+      clone_options.rights = rights_;
+    } else if (clone_options.rights - rights_) {
+      // Return ACCESS_DENIED if the client asked for a right the parent connection doesn't have.
+      return zx::error(ZX_ERR_ACCESS_DENIED);
+    }
+
+    // Ensure we map the request to the correct flags based on the connection's protocol.
+    switch (protocol) {
+      case fs::VnodeProtocol::kNode: {
+        clone_options.flags |= fio::OpenFlags::kNodeReference;
+        break;
+      }
+      case fs::VnodeProtocol::kDirectory: {
+        clone_options.flags |= fio::OpenFlags::kDirectory;
+        break;
+      }
+      default: {
+        clone_options.flags |= fio::OpenFlags::kNotDirectory;
+        break;
+      }
+    }
+
+    if (zx::result validated = vnode()->ValidateOptions(clone_options); validated.is_error()) {
+      return validated.take_error();
+    }
+    fbl::RefPtr vn = vnode();
+    if (protocol != VnodeProtocol::kNode) {
+      // We only need to open the underlying Vnode again if this isn't a node reference connection.
+      if (zx_status_t open_status = OpenVnode(&vn); open_status != ZX_OK) {
+        return zx::error(open_status);
+      }
+    }
+
+    return zx::ok(std::make_tuple(std::move(vn), clone_options));
+  }();
+
+  if (clone_result.is_ok()) {
+    auto [vnode, options] = *std::move(clone_result);
+    vfs_->Serve(vnode, server_end.TakeChannel(), options);
+  } else {
+    FS_PRETTY_TRACE_DEBUG("[NodeClone] error: ", clone_result.status_string());
+    if (flags & fio::OpenFlags::kDescribe) {
       // Ignore errors since there is nothing we can do if this fails.
       [[maybe_unused]] auto result =
-          fidl::WireSendEvent(channel)->OnOpen(error, fio::wire::NodeInfoDeprecated());
-      channel.reset();
-    }
-  };
-
-  if (!PrevalidateFlags(flags)) {
-    FS_PRETTY_TRACE_DEBUG("[NodeClone] prevalidate failed", ", incoming flags: ", flags);
-    write_error(std::move(server_end), ZX_ERR_INVALID_ARGS);
-    return;
-  }
-  auto clone_options = VnodeConnectionOptions::FromIoV1Flags(flags);
-  FS_PRETTY_TRACE_DEBUG("[NodeClone] our rights: ", rights(), ", clone options: ", clone_options);
-
-  // If CLONE_SAME_RIGHTS is requested, cloned connection will inherit the same rights as those from
-  // the originating connection.
-  if (clone_options.flags & fio::OpenFlags::kCloneSameRights) {
-    clone_options.rights = rights_;
-  } else {
-    // Return ACCESS_DENIED if the client asked for a right the parent connection doesn't have.
-    if (clone_options.rights - rights_) {
-      write_error(std::move(server_end), ZX_ERR_ACCESS_DENIED);
-      return;
+          fidl::WireSendEvent(server_end)
+              ->OnOpen(clone_result.error_value(), fio::wire::NodeInfoDeprecated());
     }
   }
-
-  fbl::RefPtr<Vnode> vn(vnode_);
-  if (zx::result validated = vn->ValidateOptions(clone_options); validated.is_error()) {
-    write_error(std::move(server_end), validated.error_value());
-    return;
-  }
-  if (!(clone_options.flags & fio::OpenFlags::kNodeReference)) {
-    if (zx_status_t open_status = OpenVnode(&vn); open_status != ZX_OK) {
-      write_error(std::move(server_end), open_status);
-      return;
-    }
-  }
-
-  vfs_->Serve(vn, server_end.TakeChannel(), clone_options);
 }
 
 zx::result<VnodeAttributes> Connection::NodeGetAttr() const {

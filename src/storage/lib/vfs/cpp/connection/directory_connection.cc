@@ -107,8 +107,7 @@ zx::result<> DirectoryConnection::Unbind() {
 }
 
 void DirectoryConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
-  // TODO(https://fxbug.dev/42062619): test this.
-  Connection::NodeClone(request->flags | fio::OpenFlags::kDirectory, std::move(request->object));
+  Connection::NodeClone(request->flags, VnodeProtocol::kDirectory, std::move(request->object));
 }
 
 void DirectoryConnection::Close(CloseCompleter::Sync& completer) { completer.Reply(Unbind()); }
@@ -190,20 +189,16 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
     flags |= fio::wire::OpenFlags::kDirectory;
   }
 
-  auto open_options = VnodeConnectionOptions::FromIoV1Flags(flags);
+  auto open_options = VnodeConnectionOptions::FromOpen1Flags(flags);
 
-  if (!PrevalidateFlags(flags)) {
-    FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] prevalidate failed",
-                          ", incoming flags: ", request->flags, ", path: ", request->path);
+  if (!ValidateOpenFlags(flags)) {
+    FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] Invalid open flags: ", request->flags,
+                          ", path: ", request->path);
     return write_error(std::move(request->object), ZX_ERR_INVALID_ARGS);
   }
 
   FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] our rights ", rights(),
                         ", incoming options: ", open_options, ", path: ", request->path);
-
-  if (open_options.flags & fuchsia_io::OpenFlags::kCloneSameRights) {
-    return write_error(std::move(request->object), ZX_ERR_INVALID_ARGS);
-  }
 
   // The POSIX compatibility flags allow the child directory connection to inherit the writable
   // and executable rights.  If there exists a directory without the corresponding right along

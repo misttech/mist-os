@@ -164,9 +164,13 @@ struct VnodeConnectionOptions {
   }
 
 #ifdef __Fuchsia__
-  // Converts from io1 OpenFlags flags to |VnodeConnectionOptions|. Note that in io1, certain
-  // operations were unprivileged, so they may be implicitly added to the resulting `rights`.
-  static VnodeConnectionOptions FromIoV1Flags(fuchsia_io::OpenFlags fidl_flags);
+  // Converts from fuchsia.io/Directory.Open1 flags to |VnodeConnectionOptions|. Note that in io1,
+  // certain operations were unprivileged so they may be implicitly added to the resulting `rights`.
+  static VnodeConnectionOptions FromOpen1Flags(fuchsia_io::OpenFlags open1_flags);
+
+  // Converts from fuchsia.io/Directory.Clone flags to |VnodeConnectionOptions|. Note that in io1,
+  // certain operations were unprivileged so they may be implicitly added to the resulting `rights`.
+  static VnodeConnectionOptions FromCloneFlags(fuchsia_io::OpenFlags clone_flags);
 
   // Converts from |VnodeConnectionOptions| to fuchsia.io flags.
   fuchsia_io::OpenFlags ToIoV1Flags() const;
@@ -238,6 +242,13 @@ class VnodeAttributesUpdate {
   std::optional<uint64_t> creation_time_ = {};
   std::optional<uint64_t> modification_time_ = {};
 };
+
+namespace internal {
+
+bool ValidateCloneFlags(fuchsia_io::OpenFlags flags);
+bool ValidateOpenFlags(fuchsia_io::OpenFlags flags);
+
+}  // namespace internal
 
 }  // namespace fs
 

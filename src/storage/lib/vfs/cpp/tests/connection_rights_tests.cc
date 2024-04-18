@@ -100,7 +100,7 @@ TEST(ConnectionRightsTest, RightsBehaveAsExpected) {
       auto file = fidl::Endpoints<fio::File>::Create();
       fio::wire::OpenFlags flags = row.connection_flags;
       vfs->Serve(vnode, file.server.TakeChannel(),
-                 fs::VnodeConnectionOptions::FromIoV1Flags(flags));
+                 fs::VnodeConnectionOptions::FromOpen1Flags(flags));
 
       // Call FileGetBuffer on the channel with the testcase's request flags. Check that we get the
       // expected result.
