@@ -718,6 +718,16 @@ eviction happens a sub-optimal page is chosen.
 
 This value should be greater than or equal to `kernel.page-scanner.min-aging-interval`.
 
+### kernel.page-scanner.accessed-scan-interval=\<uint32_t>
+
+**Default:** `0x3`
+
+Sets the time, in seconds, between harvesting page access information. Lower values provide greater
+age fidelity and will improve accuracy of page reclamation choices at the expense of increased CPU
+time spent harvesting.
+
+There is no benefit to setting this to be lower than the `kernel.page-scanner.min-aging-interval`.
+
 ### kernel.page-scanner.active-ratio-multiplier=\<uint32_t>
 
 **Default:** `0x2`
