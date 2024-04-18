@@ -440,7 +440,7 @@ mod tests {
                         SecureStoreRequest::Identify { .. } => {}
                         SecureStoreRequest::CreateAccessor { accessor_request, .. } => {
                             let read_from_stash = read_from_stash.clone();
-                            fuchsia_async::EHandle::local().spawn_detached(async move {
+                            fuchsia_async::Task::spawn(async move {
                                 let mut request_stream = accessor_request.into_stream().unwrap();
                                 while let Some(request) = request_stream.next().await {
                                     match request.unwrap() {
@@ -452,7 +452,8 @@ mod tests {
                                         _ => unreachable!(),
                                     }
                                 }
-                            });
+                            })
+                            .detach();
                         }
                     }
                 }

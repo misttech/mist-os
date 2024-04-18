@@ -6,9 +6,9 @@ use crate::TimeoutExt;
 use futures::{lock::Mutex, prelude::*};
 use std::pin::Pin;
 use std::sync::Arc;
-#[cfg(target_os = "fuchsia")]
-use std::task::Poll;
 use std::time::Duration;
+#[cfg(target_os = "fuchsia")]
+use std::{pin::pin, task::Poll};
 
 // Apply the timeout from config to test
 // Ideally this would be a function like Config::with_timeout, but we need to handle Send and !Send
@@ -132,8 +132,7 @@ impl TestResult for () {
     ) -> Poll<Self> {
         // TODO(ctiller): figure out why this is necessary and unify the loops
         if cfg.repeat_count == 1 {
-            let test = test(1);
-            crate::pin_mut!(test);
+            let mut test = pin!(test(1));
             executor.run_until_stalled(&mut test)
         } else {
             executor.run_until_stalled(

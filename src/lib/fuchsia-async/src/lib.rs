@@ -64,9 +64,6 @@ pub mod emulated_handle {
 /// A future which can be used by multiple threads at once.
 pub mod atomic_future;
 
-// Re-export pin_mut as its used by the async proc macros
-pub use pin_utils::pin_mut;
-
 pub use fuchsia_async_macro::{run, run_singlethreaded, run_until_stalled};
 
 /// Testing support for repeated runs

@@ -201,7 +201,6 @@ mod tests {
     use crate::TestExecutor;
     use fuchsia_zircon::{self as zx};
     use futures::task::{waker, ArcWake};
-    use pin_utils::pin_mut;
     use std::{future::poll_fn, mem, pin::pin, sync::Arc};
 
     #[test]
@@ -212,12 +211,11 @@ mod tests {
         let (tx, rx) = zx::Channel::create();
         let f_rx = Channel::from_channel(rx);
 
-        let receiver = async move {
+        let mut receiver = pin!(async move {
             let mut buffer = MessageBuf::new();
             f_rx.recv_msg(&mut buffer).await.expect("failed to receive message");
             assert_eq!(bytes, buffer.bytes());
-        };
-        pin_mut!(receiver);
+        });
 
         assert!(exec.run_until_stalled(&mut receiver).is_pending());
 
@@ -235,12 +233,11 @@ mod tests {
         let (tx, rx) = zx::Channel::create();
         let f_rx = Channel::from_channel(rx);
 
-        let receiver = async move {
+        let mut receiver = pin!(async move {
             let mut buffer = MessageBufEtc::new();
             f_rx.recv_etc_msg(&mut buffer).await.expect("failed to receive message");
             assert_eq!(bytes, buffer.bytes());
-        };
-        pin_mut!(receiver);
+        });
 
         assert!(exec.run_until_stalled(&mut receiver).is_pending());
 
@@ -260,11 +257,10 @@ mod tests {
         mem::drop(f_rx0);
         let f_rx1 = Channel::from_channel(rx1);
         // f_rx0 and f_rx1 use the same key.
-        let receiver = async move {
+        let mut receiver = pin!(async move {
             let mut buffer = MessageBuf::new();
             f_rx1.recv_msg(&mut buffer).await.expect("failed to receive message");
-        };
-        pin_mut!(receiver);
+        });
 
         assert!(exec.run_until_stalled(&mut receiver).is_pending());
     }
@@ -279,11 +275,10 @@ mod tests {
         mem::drop(f_rx0);
         let f_rx1 = Channel::from_channel(rx1);
         // f_rx0 and f_rx1 use the same key.
-        let receiver = async move {
+        let mut receiver = pin!(async move {
             let mut buffer = MessageBufEtc::new();
             f_rx1.recv_etc_msg(&mut buffer).await.expect("failed to receive message");
-        };
-        pin_mut!(receiver);
+        });
 
         assert!(exec.run_until_stalled(&mut receiver).is_pending());
     }

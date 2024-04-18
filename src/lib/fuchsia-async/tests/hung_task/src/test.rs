@@ -8,7 +8,7 @@ use fidl_fuchsia_diagnostics::Severity;
 use fuchsia_async::{Task, Timer};
 use fuchsia_zircon::AsHandleRef as _;
 use futures::prelude::*;
-use std::time::Duration;
+use std::{pin::pin, time::Duration};
 use test_case::test_case;
 use tracing::trace;
 
@@ -81,8 +81,7 @@ async fn initialize_logging_and_find_hung_tasks(make_task: MakeTaskFn, make_task
         // the logging pipeline. using a delay here means that legitimate failures will appear as
         // flakes, but given the lack of a "flush everything and wait" api from archivist i think
         // it's the best we can do for now
-        let pending_until_channel_send = events.next();
-        pin_utils::pin_mut!(pending_until_channel_send);
+        let mut pending_until_channel_send = pin!(events.next());
         Timer::new(Duration::from_secs(1)).await;
         assert!(futures::poll!(&mut pending_until_channel_send).is_pending());
 

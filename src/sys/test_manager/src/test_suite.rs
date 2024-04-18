@@ -734,7 +734,7 @@ mod tests {
         // sending a get event first should not prevent killing the controller.
         let get_events_task = fasync::Task::spawn(proxy.get_events());
         drop(proxy);
-        drop(get_events_task.cancel().await);
+        drop(get_events_task);
         // After controller is dropped, both the controller future and the task it was
         // controlling should terminate.
         pending_task.await;
@@ -782,7 +782,7 @@ mod tests {
         // sending a get event first should not prevent killing the controller.
         let get_events_task = fasync::Task::spawn(proxy.get_events());
         drop(proxy);
-        drop(get_events_task.cancel().await);
+        drop(get_events_task);
         // After controller is dropped, both the controller future and the task it was
         // controlling should terminate.
         pending_task.await;

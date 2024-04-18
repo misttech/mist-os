@@ -269,7 +269,7 @@ async fn connect<'a>(
     if let Some((pairing_task, mut recv)) = pairing {
         if let Some((paired_id, paired)) = recv.next().await {
             // If pairing was completed, exit.
-            let _ = pairing_task.cancel().await;
+            let _ = pairing_task.cancel();
             println!(
                 "Completed {} pairing for {}.",
                 if paired { "successful" } else { "unsuccessful" },
@@ -427,7 +427,7 @@ async fn allow_pairing(args: &[&str], access_svc: &PairingProxy) -> Result<Strin
 
     if let Some((paired_id, paired)) = receiver.next().await {
         // If pairing was completed, exit.
-        let _ = delegate_task.cancel().await;
+        let _ = delegate_task.cancel();
         return Ok(format!(
             "Completed {} pairing with {}.",
             if paired { "successful" } else { "unsuccessful" },

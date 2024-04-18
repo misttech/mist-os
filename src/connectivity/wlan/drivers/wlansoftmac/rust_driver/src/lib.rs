@@ -345,7 +345,7 @@ where
                     Err(e) => {
                         error!("mlme_init_receiver interrupted: {}", e);
                         let status = zx::Status::INTERNAL;
-                    bridge.cancel().await;
+                        std::mem::drop(bridge);
                         init_completer.complete(Err(status));
                         return Err(status);
                     }
@@ -355,7 +355,7 @@ where
                         init_completer.complete(Ok(())),
                     Err(status) => {
                         error!("Failed to initialize MLME: {}", status);
-                    bridge.cancel().await;
+                        std::mem::drop(bridge);
                         init_completer.complete(Err(status));
                         return Err(status);
                     }
@@ -364,7 +364,7 @@ where
             mlme_result = mlme => {
                 error!("MLME future completed before signaling init_sender: {:?}", mlme_result);
                 let status = zx::Status::INTERNAL;
-                bridge.cancel().await;
+                std::mem::drop(bridge);
                 init_completer.complete(Err(status));
                 return Err(status);
             }
@@ -403,10 +403,7 @@ where
 
     // At this point, the `bridge` Task should not report a result because the WlanSoftmacIfcBridge
     // server is still running. This cancellation should cause `bridge_exit_receiver` to be dropped.
-    bridge
-        .cancel()
-        .await
-        .map(|()| warn!("SoftmacIfcBridge server task completed before cancelation."));
+    bridge.cancel().map(|()| warn!("SoftmacIfcBridge server task completed before cancelation."));
     let bridge_result: Result<(), ()> = match bridge_exit_receiver.await {
         Err(Canceled) => {
             // This is the expected case because when MLME shuts down, the SoftmacIfcBridge server

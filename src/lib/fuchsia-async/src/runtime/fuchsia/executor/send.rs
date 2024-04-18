@@ -4,11 +4,9 @@
 
 use super::super::timer::TimerHeap;
 use super::common::{with_local_timer_heap, ExecutorTime, Inner};
+use crate::atomic_future::AtomicFuture;
 use fuchsia_sync::{Condvar, Mutex};
-use futures::{
-    future::{self, FutureObj},
-    FutureExt,
-};
+use futures::FutureExt;
 use std::{
     fmt,
     future::Future,
@@ -74,13 +72,15 @@ impl SendExecutor {
         // Spawn a future which will set the result upon completion.
         Inner::spawn_main(
             &self.inner,
-            FutureObj::new(Box::new(future.then(move |fut_result| {
-                let (lock, cvar) = &*pair2;
-                let mut result = lock.lock();
-                *result = Some(fut_result);
-                cvar.notify_one();
-                future::ready(())
-            }))),
+            AtomicFuture::new(
+                future.map(move |fut_result| {
+                    let (lock, cvar) = &*pair2;
+                    let mut result = lock.lock();
+                    *result = Some(fut_result);
+                    cvar.notify_one();
+                }),
+                true,
+            ),
         );
 
         // Start worker threads, handing off timers from the current thread.

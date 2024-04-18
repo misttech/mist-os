@@ -278,12 +278,11 @@ mod task_tests {
         run(async move {
             let (_tx_start, rx_start) = oneshot::channel::<()>();
             let (tx_done, rx_done) = oneshot::channel();
-            let t = Task::spawn(async move {
+            // Start and immediately cancel the task (by dropping it).
+            let _ = Task::spawn(async move {
                 rx_start.await.unwrap();
                 tx_done.send(()).unwrap();
             });
-            // cancel the task without sending the start signal
-            t.cancel().await;
             // we should see an error on receive
             rx_done.await.expect_err("done should not be sent");
         })

@@ -20,9 +20,11 @@ Task(id = 0)
       └─ async_rust::main::func::λ • async_rust.rs:??
          └─ fuchsia_async::runtime::fuchsia::task::Task
 Task(id = 1)
+└─ Finished
+Task(id = 2)
 └─ async_rust::baz • async_rust.rs:??
    └─ fuchsia_async::runtime::fuchsia::timer::Timer
-Task(id = 2)
+Task(id = 3)
 └─ async_rust::baz (Unresumed) • async_rust.rs:??
 
 [zxdb] kill

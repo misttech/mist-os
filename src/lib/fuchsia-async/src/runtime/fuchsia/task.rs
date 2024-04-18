@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::EHandle;
-use futures::future::RemoteHandle;
 use futures::prelude::*;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -21,8 +21,12 @@ use std::task::{Context, Poll};
 #[must_use]
 #[derive(Debug)]
 pub struct Task<T> {
-    remote_handle: RemoteHandle<T>,
+    executor: EHandle,
+    task_id: usize,
+    phantom: PhantomData<T>,
 }
+
+impl<T> Unpin for Task<T> {}
 
 impl Task<()> {
     /// Detach this task so that it can run independently in the background.
@@ -49,12 +53,13 @@ impl Task<()> {
     /// * [`futures::stream::TryStreamExt::try_for_each_concurrent`]
     ///
     /// can meet your needs.
-    pub fn detach(self) {
-        self.remote_handle.forget();
+    pub fn detach(mut self) {
+        self.executor.detach(self.task_id);
+        self.task_id = 0;
     }
 }
 
-impl<T: Send> Task<T> {
+impl<T: Send + 'static> Task<T> {
     /// Spawn a new task on the current executor.
     ///
     /// The task may be executed on any thread(s) owned by the current executor.
@@ -70,20 +75,13 @@ impl<T: Send> Task<T> {
     /// within a call to `run` or `run_singlethreaded`).
     #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn(future: impl Future<Output = T> + Send + 'static) -> Task<T> {
-        // Fuse is a combinator that will drop the underlying future as soon as it has been
-        // completed to ensure resources are reclaimed as soon as possible. That gives callers that
-        // await on the Task the guarantee that the future has been dropped.
-        //
-        // Note that it is safe to pass in a future that has already been fused. Double fusing
-        // a future does not change the expected behavior.
-        let future = future.fuse();
-        let (future, remote_handle) = future.remote_handle();
-        EHandle::local().spawn_detached(future);
-        Task { remote_handle }
+        let executor = EHandle::local();
+        let task_id = executor.spawn(future);
+        Task { executor, task_id, phantom: PhantomData }
     }
 }
 
-impl<T> Task<T> {
+impl<T: 'static> Task<T> {
     /// Spawn a new task on the thread local executor.
     ///
     /// The passed future will live until either (a) the future completes,
@@ -99,16 +97,9 @@ impl<T> Task<T> {
     /// within a call to `run` or `run_singlethreaded`).
     #[cfg_attr(trace_level_logging, track_caller)]
     pub fn local(future: impl Future<Output = T> + 'static) -> Task<T> {
-        // Fuse is a combinator that will drop the underlying future as soon as it has been
-        // completed to ensure resources are reclaimed as soon as possible. That gives callers that
-        // await on the Task the guarantee that the future has been dropped.
-        //
-        // Note that it is safe to pass in a future that has already been fused. Double fusing
-        // a future does not change the expected behavior.
-        let future = future.fuse();
-        let (future, remote_handle) = future.remote_handle();
-        EHandle::local().spawn_local_detached(future);
-        Task { remote_handle }
+        let executor = EHandle::local();
+        let task_id = executor.spawn_local(future);
+        Task { executor, task_id, phantom: PhantomData }
     }
 }
 
@@ -121,15 +112,32 @@ impl<T: 'static> Task<T> {
     /// short period before getting dropped. If so, do not assume any resources held
     /// by the task's future are released. If `Some(..)` is returned, such resources
     /// are guaranteed to be released.
-    pub async fn cancel(self) -> Option<T> {
-        self.remote_handle.now_or_never()
+    pub fn cancel(mut self) -> Option<T> {
+        // SAFETY: We spawned the task so the return type should be correct.
+        let result = unsafe { self.executor.cancel(self.task_id) };
+        self.task_id = 0;
+        result
+    }
+}
+
+impl<T> Drop for Task<T> {
+    fn drop(&mut self) {
+        if self.task_id != 0 {
+            // SAFETY: We spawned the task so the return type should be correct.
+            unsafe { self.executor.cancel::<T>(self.task_id) };
+        }
     }
 }
 
 impl<T: 'static> Future for Task<T> {
     type Output = T;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        self.remote_handle.poll_unpin(cx)
+        // SAFETY: We spawned the task so the return type should be correct.
+        let result = unsafe { self.executor.poll_join_result(self.task_id, cx) };
+        if result.is_ready() {
+            self.task_id = 0;
+        }
+        result
     }
 }
 

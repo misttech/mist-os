@@ -305,9 +305,7 @@ impl Archivist {
             Some(stop_recv) => async move {
                 stop_recv.into_future().await.ok();
                 terminate_handle.terminate().await;
-                for task in incoming_external_event_producers {
-                    task.cancel().await;
-                }
+                std::mem::drop(incoming_external_event_producers);
                 inspect_sink_server.stop();
                 log_server.stop();
                 accessor_server.stop();
