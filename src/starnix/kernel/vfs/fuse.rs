@@ -1342,12 +1342,13 @@ struct FuseMutableState {
 }
 
 impl<'a> FuseMutableStateGuard<'a> {
-    fn get_configuration(
+    fn wait_for_configuration<T>(
         &mut self,
         current_task: &CurrentTask,
-    ) -> Result<FuseConfiguration, Errno> {
+        f: impl Fn(&FuseConfiguration) -> T,
+    ) -> Result<T, Errno> {
         if let Some(configuration) = self.configuration.as_ref() {
-            return Ok(configuration.clone());
+            return Ok(f(configuration));
         }
         loop {
             if !self.is_connected() {
@@ -1356,10 +1357,21 @@ impl<'a> FuseMutableStateGuard<'a> {
             let waiter = Waiter::new();
             self.waiters.wait_async_value(&waiter, CONFIGURATION_AVAILABLE_EVENT);
             if let Some(configuration) = self.configuration.as_ref() {
-                return Ok(configuration.clone());
+                return Ok(f(configuration));
             }
             Self::unlocked(self, || waiter.wait(current_task))?;
         }
+    }
+
+    fn get_configuration(
+        &mut self,
+        current_task: &CurrentTask,
+    ) -> Result<FuseConfiguration, Errno> {
+        self.wait_for_configuration(current_task, Clone::clone)
+    }
+
+    fn wait_for_configuration_ready(&mut self, current_task: &CurrentTask) -> Result<(), Errno> {
+        self.wait_for_configuration(current_task, |_| ())
     }
 
     /// Execute the given operation on the `node`. If the operation is not asynchronous, this
@@ -1373,6 +1385,14 @@ impl<'a> FuseMutableStateGuard<'a> {
         node: &FuseNode,
         operation: FuseOperation,
     ) -> Result<FuseResponse, Errno> {
+        // Block until we have a valid configuration to make sure that the FUSE
+        // implementation has initialized, indicated by its response to the
+        // `FUSE_INIT` request. Obviously, we skip this check for the `FUSE_INIT`
+        // request itself.
+        if !matches!(operation, FuseOperation::Init { .. }) {
+            self.wait_for_configuration_ready(current_task)?;
+        }
+
         if let Some(result) = self.operations_state.get(&operation.opcode()) {
             return result.clone();
         }
