@@ -11,23 +11,16 @@
 
 namespace vreg {
 
-using fuchsia_hardware_vreg::wire::PwmVregMetadataEntry;
-PwmVregMetadataEntry BuildMetadata(fidl::AnyArena& allocator, uint32_t pwm_index,
-                                   uint32_t period_ns, uint32_t min_voltage_uv,
-                                   uint32_t voltage_step_uv, uint32_t num_steps) {
-  PwmVregMetadataEntry entry(allocator);
-  entry.set_pwm_index(pwm_index);
-  entry.set_period_ns(period_ns);
-  entry.set_min_voltage_uv(min_voltage_uv);
-  entry.set_voltage_step_uv(voltage_step_uv);
-  entry.set_num_steps(num_steps);
-  return entry;
-}
-
-using fuchsia_hardware_vreg::wire::Metadata;
-Metadata BuildMetadata(fidl::AnyArena& allocator, fidl::VectorView<PwmVregMetadataEntry> pwm_vreg) {
-  Metadata metadata(allocator);
-  metadata.set_pwm_vreg(allocator, std::move(pwm_vreg));
+using fuchsia_hardware_vreg::wire::PwmVregMetadata;
+PwmVregMetadata BuildMetadata(fidl::AnyArena& allocator, uint32_t pwm_index, uint32_t period_ns,
+                              uint32_t min_voltage_uv, uint32_t voltage_step_uv,
+                              uint32_t num_steps) {
+  PwmVregMetadata metadata(allocator);
+  metadata.set_pwm_index(pwm_index);
+  metadata.set_period_ns(period_ns);
+  metadata.set_min_voltage_uv(min_voltage_uv);
+  metadata.set_voltage_step_uv(voltage_step_uv);
+  metadata.set_num_steps(num_steps);
   return metadata;
 }
 
