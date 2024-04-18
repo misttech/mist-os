@@ -7,18 +7,12 @@
 ### start the update server and attach to a running fuchsia device
 ## usage: fx serve [-v] [-l host[:port]] [-c version] [--no-auto-config] [--name NAME]
 ##
-##   -l host:port       host and port that "pm serve" will listen on
-##   -c version         configuration format version for the served config.json
-##                      that "pm" will serve. Valid choices: 1 or 2.
-##                      Choosing `1` will serve a file which can be processed by
-##                      `pkgctl repo add ... -f 1`.
-##                      Choosing `2` will serve a file which can be processed by
-##                      `pkgctl repo ...` without the `-f 1` switch.
+##   -l host:port       host and port that "fx serve" will listen on
 ##   --no-auto-config   do not configure this host as a package server on the device
 ##   --name NAME        Name the generated update source config NAME.
 ##   --[no-]persist     enable or disable persistence of repository metadata. Disabled
 ##                      by default.
-##   -v                 verbose mode, shows info and debug messages from "pm" and "ffx repository serve"
+##   -v                 verbose mode, shows info and debug messages from "ffx repository serve"
 ##   -C|--clean         clean the package repository first. This flag is only
 ##                      valid if the incremental package publishing is enabled.
 ##
@@ -48,7 +42,6 @@ pm_serve_flags=()
 verbose=false
 auto_config=true
 clean_first=false
-config_format="2"
 source_name=""
 persist="--no-persist"
 while (($#)); do
@@ -57,10 +50,6 @@ while (($#)); do
       shift
       port="${1##*:}"
       pm_serve_flags+=(-l "$1")
-      ;;
-    -c)
-      config_format=("$2")
-      shift
       ;;
     --name)
       source_name="$2"
@@ -88,7 +77,6 @@ while (($#)); do
   esac
   shift
 done
-pm_serve_flags+=("-c" "${config_format}")
 
 if fx-is-bringup; then
   fx-error "$0 is not supported in the bringup build configuration, as there are no package features in bringup."
@@ -183,36 +171,40 @@ with-pinned-target() {
   )
 }
 
-background_server_resolutions() {
-  fx-error "To resolve your issue, please pick between the following two options:"
+pm_bg_resolutions() {
+  fx-error "Please consider switching to foreground serving via ffx, and report"
+  fx-error "any blocking issues at your earliest convenience."
+  fx-error "To serve repositories, please pick between the following two options:"
   fx-error ""
-  fx-error "1. Disable the background server and restart ffx:"
+  fx-error "1. Disable pm and switch to ffx foreground server (aka supported):"
   fx-error ""
   fx-error "   Ensure your shell does *not* export the environment variable"
   fx-error "   FUCHSIA_DISABLED_foreground_repo_server"
   fx-error ""
+  fx-error "   $ ffx config remove repository.server.mode"
   fx-error "   $ ffx config remove repository.server.enabled"
   fx-error "   $ ffx doctor --restart-daemon"
   fx-error ""
   fx-error "   Then restart \"fx serve\""
   fx-error ""
-  fx-error "2. (strongly discouraged, background serving is going away at the end of 2024Q2):"
-  fx-error "   Ensure your shell *does* export the following environment variable wherever"
-  fx-error "   you use fx and ffx."
+  fx-error "2. Strongly discouraged, this option is going away at the end"
+  fx-error "   of 2024Q2: Ensure your shell *does* export the following"
+  fx-error "   environment variable wherever you use fx and ffx."
   fx-error ""
   fx-error "   $ export FUCHSIA_DISABLED_foreground_repo_server=1"
   fx-error ""
-  fx-error "   Enable the background server:"
+  fx-error "   Enable the ffx background server:"
   fx-error ""
+  fx-error "   $ ffx config remove repository.server.mode"
   fx-error "   $ ffx config set repository.server.enabled true"
   fx-error "   $ ffx doctor --restart-daemon"
   fx-error ""
-  fx-error "   Please note that an already running foreground server may not always"
-  fx-error "   be detected correctly. Consider running the following commands in case"
-  fx-error "   of problems:"
+  fx-error "In both cases, please note that an already running foreground server is"
+  fx-error "not always detected correctly. Consider running the following commands"
+  fx-error "in case of problems:"
   fx-error ""
-  fx-error "   $ ffx config remove repository.server.listen"
-  fx-error "   $ ffx doctor --restart-daemon"
+  fx-error "$ ffx config remove repository.server.listen"
+  fx-error "$ ffx doctor --restart-daemon"
   fx-error ""
   exit 1
 }
@@ -272,30 +264,9 @@ fi
 
 # Heads-up for the upcoming removal of pm
 if [[ "${server_mode}" = "pm" ]] ; then
-  fx-warn "Serving repositories with pm is going away, targeted for 2024 Q2."
-  fx-warn "Please consider switching to serving via ffx, and report any issues."
-  fx-warn "To help make the transition as smooth as possible, you can use the"
-  fx-warn "following command to delete your settings overrides and use the"
-  fx-warn "default server mode:"
-  fx-warn ""
-  fx-warn "$ ffx config remove repository.server.mode"
-  fx-warn ""
-fi
-
-# pm and foreground repo server are mutually incompatible
-if [[ "${server_mode}" = "pm" ]] && is_feature_enabled "foreground_repo_server"; then
-  fx-error "The ffx foreground repo server and pm are mutually incompatible."
-  fx-error "If you want to serve via pm (please note that is is going away soon,"
-  fx-error "see above), you can export the following shell variable to disable"
-  fx-error "foreground serving:"
-  fx-error ""
-  fx-error "$ export FUCHSIA_DISABLED_foreground_repo_server=1"
-  fx-error ""
-  fx-error "But please consider using the foreground server instead of pm as"
-  fx-error "described above, and report any issues to help make the transition"
-  fx-error "away from pm as smooth as possible. Thank you."
-  fx-error ""
-  exit 1
+  fx-error "Invoking pm via fx serve is no longer supported. Additionally,"
+  fx-error "the pm is slated for removal, targeted for 2024 Q2."
+  pm_bg_resolutions
 fi
 
 # Default the port to 8083 if it is unset.
@@ -306,7 +277,7 @@ if [[ "${server_mode}" = "pm" ]] || is_feature_enabled "foreground_repo_server";
 fi
 
 if [[ "${server_mode}" = "pm" ]]; then
-  pm_serve_args=( serve -vt -repo "${repo_dir}" "${pm_serve_flags[@]}" )
+  pm_serve_args=( serve -vt -c 2 -repo "${repo_dir}" "${pm_serve_flags[@]}" )
 
   # the manifest list file has relative paths and "pm serve" looks for them
   # from PWD, so pm command needs to be executed in "$FUCHSIA_BUILD_DIR"
@@ -320,7 +291,7 @@ fi
 
 if is_feature_enabled "foreground_repo_server" && [[ "$(ffx-repository-server-enabled)" == "true" ]]; then
   fx-error "Both the foreground and background server are enabled. This is mutually incompatible."
-  background_server_resolutions
+  pm_bg_resolutions
 elif is_feature_enabled "foreground_repo_server"; then
   fx-info "The 'foreground_repo_server' feature is now enabled by default."
   fx-info "Background serving with both ffx and pm is going away soon."
@@ -349,7 +320,7 @@ elif is_feature_enabled "foreground_repo_server"; then
 else
   fx-error "Starting a background server from \"fx serve\" is no longer supported,"
   fx-error "preceding the upcoming deprecation of background serving at the end of 2024Q2."
-  background_server_resolutions
+  pm_bg_resolutions
 fi
 
 # Error out if we can't start a package server.
