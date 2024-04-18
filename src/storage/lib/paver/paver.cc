@@ -891,6 +891,7 @@ void Paver::LifecycleStopCallback(fit::callback<void(zx_status_t status)> cb) {
                                                             GetCurrentArch(), context_);
   if (partitioner.is_error()) {
     ERROR("Unable to initialize a partitioner: %s.\n", partitioner.status_string());
+    cb(partitioner.status_value());
     return;
   }
   zx::result res = partitioner->OnStop();
