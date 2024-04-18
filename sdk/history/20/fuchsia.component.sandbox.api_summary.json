@@ -1,0 +1,32 @@
+[
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.component.sandbox/Dictionary.Clone2",
+        "strictness": "strict",
+        "ordinal": "2366825959783828089",
+        "direction": "one_way",
+        "request": "fuchsia.unknown/CloneableClone2Request"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.component.sandbox/Dictionary",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.component.sandbox/MAX_DATA_LENGTH",
+        "type": "uint32",
+        "value": "8192"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.component.sandbox/MAX_DICTIONARY_ITEMS_CHUNK",
+        "type": "uint32",
+        "value": "128"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.component.sandbox"
+    }
+]

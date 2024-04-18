@@ -4,14 +4,14 @@
 library fuchsia.component;
 using fuchsia.component.sandbox;
 
-@available(added=HEAD)
+@available(added=20)
 type NamespaceInputEntry = resource struct {
     path string:MAX_PATH_LENGTH;
     dictionary client_end:fuchsia.component.sandbox.Dictionary;
 };
 
 /// Error returned from methods in [`Namespace`].
-@available(added=HEAD)
+@available(added=20)
 type NamespaceError = flexible enum {
     /// The parent of a parent shares a prefix with another namespace entry
     SHADOW = 1;
@@ -30,7 +30,7 @@ type NamespaceError = flexible enum {
 };
 
 /// Protocol for performing namespace operations.
-@available(added=HEAD)
+@available(added=20)
 @discoverable
 open protocol Namespace {
     flexible Create(resource struct {

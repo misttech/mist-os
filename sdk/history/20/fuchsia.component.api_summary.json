@@ -516,6 +516,33 @@
         "value": "255"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.component/Namespace.Create",
+        "strictness": "flexible",
+        "ordinal": "4839678630846501113",
+        "direction": "two_way",
+        "request": "fuchsia.component/NamespaceCreateRequest",
+        "response": "fuchsia.component/Namespace_Create_Response",
+        "error": "fuchsia.component/NamespaceError"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.component/Namespace",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.component/NamespaceCreateRequest.entries",
+        "ordinal": "1",
+        "type": "vector<fuchsia.component/NamespaceInputEntry>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.component/NamespaceCreateRequest",
+        "resourceness": "resource"
+    },
+    {
         "kind": "table/member",
         "name": "fuchsia.component/NamespaceEntry.directory",
         "ordinal": "2",
@@ -530,6 +557,65 @@
     {
         "kind": "table",
         "name": "fuchsia.component/NamespaceEntry",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.component/NamespaceError.BAD_ENTRY",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.component/NamespaceError.CONVERSION",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.component/NamespaceError.DICTIONARY_READ",
+        "value": "5"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.component/NamespaceError.DUPLICATE",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.component/NamespaceError.SHADOW",
+        "value": "1"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.component/NamespaceError",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.component/NamespaceInputEntry.dictionary",
+        "ordinal": "2",
+        "type": "fuchsia.component.sandbox/Dictionary"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.component/NamespaceInputEntry.path",
+        "ordinal": "1",
+        "type": "string:4095"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.component/NamespaceInputEntry",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.component/Namespace_Create_Response.entries",
+        "ordinal": "1",
+        "type": "vector<fuchsia.component/NamespaceEntry>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.component/Namespace_Create_Response",
         "resourceness": "resource"
     },
     {
