@@ -666,7 +666,7 @@ mod tests {
             )]),
         )
         .unwrap();
-        let hash = fuchsia_merkle::MerkleTree::from_reader(&*meta_far).unwrap().root();
+        let hash = fuchsia_merkle::from_slice(&meta_far).root();
         let () = blobfs_fake.add_blob(hash, meta_far);
 
         assert_matches!(

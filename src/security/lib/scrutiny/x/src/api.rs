@@ -135,8 +135,6 @@ clone_trait_object!(Zbi);
 
 #[derive(Debug, Error)]
 pub enum ZbiError {
-    #[error("failed to hash blobfs blob at bootfs path {bootfs_path:?}: {error}")]
-    Hash { bootfs_path: Box<dyn Path>, error: std::io::Error },
     #[error("expected to find exactly 1 bootfs section in zbi, but found {num_sections}")]
     BootfsSections { num_sections: usize },
     #[error("failed to parse bootfs image in zbi at path {path:?}: {error}")]

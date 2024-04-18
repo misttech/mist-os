@@ -17,7 +17,6 @@ use cm_rust::FidlIntoNative as _;
 use fidl_fuchsia_component_decl as fdecl;
 use fuchsia_archive::Error as FarError;
 use fuchsia_archive::Utf8Reader as FarReader;
-use fuchsia_merkle::MerkleTree as FuchsiaMerkleTree;
 use fuchsia_pkg::MetaContents as FuchsiaMetaContents;
 use fuchsia_pkg::MetaContentsError as FuchsiaMetaContentsError;
 use fuchsia_pkg::MetaPackage as FuchsiaMetaPackage;
@@ -146,10 +145,7 @@ impl Package {
             .into_iter()
             .map(|path_string| {
                 let contents = far_reader.read_file(&path_string)?;
-                let hash: Hash = FuchsiaMerkleTree::from_reader(contents.as_slice())
-                    .map_err(Error::from)?
-                    .root()
-                    .into();
+                let hash: Hash = fuchsia_merkle::from_slice(&contents).root().into();
                 Ok(BlobData {
                     data_sources: vec![Box::new(package_data_source.clone())],
                     path: Box::new(path_string),
@@ -388,7 +384,6 @@ pub(crate) mod test {
     use cm_rust as cm;
     use cm_rust::NativeIntoFidl as _;
     use cm_rust_testing as cmt;
-    use fuchsia_merkle::MerkleTree as FuchsiaMerkleTree;
     use fuchsia_pkg::MetaContents as FuchsiaMetaContents;
     use fuchsia_pkg::MetaPackage as FuchsiaMetaPackage;
     use fuchsia_pkg::PackageName;
@@ -503,7 +498,7 @@ pub(crate) mod test {
         let mut far_bytes = vec![];
         fuchsia_archive::write(&mut far_bytes, far_map).unwrap();
 
-        let far_fuchsia_hash = FuchsiaMerkleTree::from_reader(far_bytes.as_slice()).unwrap().root();
+        let far_fuchsia_hash = fuchsia_merkle::from_slice(&far_bytes).root();
         let meta_far_hash: Box<dyn api::Hash> = Box::new(Hash::from(far_fuchsia_hash));
 
         (meta_far_hash, far_bytes)
@@ -556,7 +551,6 @@ mod tests {
     use super::MetaContents;
     use super::MetaPackage;
     use super::Package;
-    use fuchsia_merkle::MerkleTree as FuchsiaMerkleTree;
     use fuchsia_pkg::MetaContents as FuchsiaMetaContents;
     use fuchsia_pkg::MetaPackage as FuchsiaMetaPackage;
     use fuchsia_pkg::PackageName;
@@ -577,7 +571,7 @@ mod tests {
         let content_blob_content_str = "Hello, World!";
         let content_blob_path_str = "data";
         let content_blob_fuchsia_hash =
-            FuchsiaMerkleTree::from_reader(content_blob_content_str.as_bytes()).unwrap().root();
+            fuchsia_merkle::from_slice(content_blob_content_str.as_bytes()).root();
 
         // Define meta/package.
         let meta_package = FuchsiaMetaPackage::from_name_and_variant_zero(
@@ -602,7 +596,7 @@ mod tests {
         };
         let mut far_bytes = vec![];
         fuchsia_archive::write(&mut far_bytes, far_map).unwrap();
-        let far_fuchsia_hash = FuchsiaMerkleTree::from_reader(far_bytes.as_slice()).unwrap().root();
+        let far_fuchsia_hash = fuchsia_merkle::from_slice(&far_bytes).root();
         let far_fuchsia_hash_string = format!("{}", far_fuchsia_hash);
 
         // Construct blob set with content blob and package meta.far.
@@ -652,9 +646,8 @@ mod tests {
             blob.reader_seeker().unwrap().read_to_end(&mut actual_bytes).unwrap();
             assert_eq!(expected_bytes, actual_bytes.as_slice());
 
-            let expected_hash: Box<dyn api::Hash> = Box::new(Hash::from(
-                FuchsiaMerkleTree::from_reader(expected_bytes).unwrap().root(),
-            ));
+            let expected_hash: Box<dyn api::Hash> =
+                Box::new(Hash::from(fuchsia_merkle::from_slice(expected_bytes).root()));
             let actual_hash = blob.hash();
             assert_eq!(expected_hash.as_ref(), actual_hash.as_ref());
 
@@ -691,9 +684,8 @@ mod tests {
             blob.reader_seeker().unwrap().read_to_end(&mut actual_bytes).unwrap();
             assert_eq!(expected_bytes, actual_bytes.as_slice());
 
-            let expected_hash: Box<dyn api::Hash> = Box::new(Hash::from(
-                FuchsiaMerkleTree::from_reader(expected_bytes).unwrap().root(),
-            ));
+            let expected_hash: Box<dyn api::Hash> =
+                Box::new(Hash::from(fuchsia_merkle::from_slice(expected_bytes).root()));
             let actual_hash = blob.hash();
             assert_eq!(expected_hash.as_ref(), actual_hash.as_ref());
 
@@ -729,8 +721,7 @@ mod tests {
     #[fuchsia::test]
     fn bad_far() {
         let bad_far_contents = vec![];
-        let bad_far_blob =
-            VerifiedMemoryBlob::new([], bad_far_contents.clone()).expect("bad far blob");
+        let bad_far_blob = VerifiedMemoryBlob::new([], bad_far_contents.clone());
         match Package::new(
             None,
             placeholder_package_url(),
@@ -761,7 +752,7 @@ mod tests {
         };
         let mut far_bytes = vec![];
         fuchsia_archive::write(&mut far_bytes, far_map).unwrap();
-        let far_blob = VerifiedMemoryBlob::new([], far_bytes.clone()).expect("far blob");
+        let far_blob = VerifiedMemoryBlob::new([], far_bytes.clone());
 
         // Use empty blob set.
         let blob_set = VerifiedMemoryBlobSet::new([], iter::empty::<&[u8]>());
@@ -795,7 +786,7 @@ mod tests {
         };
         let mut far_bytes = vec![];
         fuchsia_archive::write(&mut far_bytes, far_map).unwrap();
-        let far_blob = VerifiedMemoryBlob::new([], far_bytes.clone()).expect("far blob");
+        let far_blob = VerifiedMemoryBlob::new([], far_bytes.clone());
 
         // Use empty blob set.
         let blob_set = VerifiedMemoryBlobSet::new([], iter::empty::<&[u8]>());
@@ -823,7 +814,7 @@ mod tests {
         let content_blob_content_str = "Hello, World!";
         let content_blob_path_str = "data";
         let content_blob_fuchsia_hash =
-            FuchsiaMerkleTree::from_reader(content_blob_content_str.as_bytes()).unwrap().root();
+            fuchsia_merkle::from_slice(content_blob_content_str.as_bytes()).root();
         let content_blob_hash: Box<dyn api::Hash> =
             Box::new(Hash::from(content_blob_fuchsia_hash.clone()));
 
@@ -854,7 +845,7 @@ mod tests {
         // Use empty blob set: Lookup of content blob will fail.
         let blob_set = VerifiedMemoryBlobSet::new([], iter::empty::<&[u8]>());
 
-        let far_blob = VerifiedMemoryBlob::new([], far_bytes.clone()).expect("far blob");
+        let far_blob = VerifiedMemoryBlob::new([], far_bytes.clone());
 
         // Attempt to construct package. This will construct content blobs that store their metadata
         // such as their data source. Locating the content blob that is missing from `blob_set`

@@ -288,7 +288,7 @@ mod tests {
         },
         anyhow::{anyhow, Context, Result},
         fuchsia_archive::write as far_write,
-        fuchsia_merkle::{Hash, MerkleTree, HASH_SIZE},
+        fuchsia_merkle::{Hash, HASH_SIZE},
         fuchsia_url::{PackageName, PackageVariant},
         maplit::{btreemap, hashmap, hashset},
         scrutiny::model::collector::DataCollector,
@@ -533,8 +533,7 @@ mod tests {
         // `mock_artifact_reader`, but is not the correct hash for the file.
         let designated_system_image_hash = Hash::from([0; HASH_SIZE]);
         let system_image_contents = create_system_image_far(None);
-        let system_image_hash =
-            MerkleTree::from_reader(system_image_contents.as_slice()).unwrap().root();
+        let system_image_hash = fuchsia_merkle::from_slice(&system_image_contents).root();
         assert!(designated_system_image_hash != system_image_hash);
 
         // Incorrectly map `designated_system_image_hash` to `system_image_contents` (that's not its
@@ -565,8 +564,7 @@ mod tests {
 
         // `None` below implies no static packages entry in system image package.
         let system_image_contents = create_system_image_far(None);
-        let system_image_hash =
-            MerkleTree::from_reader(system_image_contents.as_slice()).unwrap().root();
+        let system_image_hash = fuchsia_merkle::from_slice(&system_image_contents).root();
 
         mock_artifact_reader
             .append_artifact(&PathBuf::from(system_image_hash.to_string()), system_image_contents);
@@ -592,12 +590,10 @@ mod tests {
 
         let static_pkgs = hashmap! {};
         let static_pkgs_contents = create_static_pkgs_listing(static_pkgs.clone());
-        let static_pkgs_hash =
-            MerkleTree::from_reader(static_pkgs_contents.as_slice()).unwrap().root();
+        let static_pkgs_hash = fuchsia_merkle::from_slice(&static_pkgs_contents).root();
 
         let system_image_contents = create_system_image_far(Some(static_pkgs_hash.clone()));
-        let system_image_hash =
-            MerkleTree::from_reader(system_image_contents.as_slice()).unwrap().root();
+        let system_image_hash = fuchsia_merkle::from_slice(&system_image_contents).root();
 
         // Note: `mock_artifact_reader does not have static packages manifest added, so it will
         // yield an error when code under test attempts to said manifest.
@@ -628,8 +624,7 @@ mod tests {
 
         let static_pkgs = hashmap! {};
         let static_pkgs_contents = create_static_pkgs_listing(static_pkgs.clone());
-        let static_pkgs_hash =
-            MerkleTree::from_reader(static_pkgs_contents.as_slice()).unwrap().root();
+        let static_pkgs_hash = fuchsia_merkle::from_slice(&static_pkgs_contents).root();
 
         // System image designates `designated_static_pkgs_hash` as "where to find static pkgs
         // listing". This value is mapped to the static pkgs file according to
@@ -637,8 +632,7 @@ mod tests {
         let designated_static_pkgs_hash = Hash::from([0; HASH_SIZE]);
         let system_image_contents =
             create_system_image_far(Some(designated_static_pkgs_hash.clone()));
-        let system_image_hash =
-            MerkleTree::from_reader(system_image_contents.as_slice()).unwrap().root();
+        let system_image_hash = fuchsia_merkle::from_slice(&system_image_contents).root();
         assert!(designated_static_pkgs_hash != static_pkgs_hash);
 
         // Incorrectly map `designated_static_pkgs_hash` to `static_pkgs_contents` (that's not its
@@ -672,12 +666,10 @@ mod tests {
 
         let static_pkgs = hashmap! {};
         let static_pkgs_contents = create_static_pkgs_listing(static_pkgs.clone());
-        let static_pkgs_hash =
-            MerkleTree::from_reader(static_pkgs_contents.as_slice()).unwrap().root();
+        let static_pkgs_hash = fuchsia_merkle::from_slice(&static_pkgs_contents).root();
 
         let system_image_contents = create_system_image_far(Some(static_pkgs_hash.clone()));
-        let system_image_hash =
-            MerkleTree::from_reader(system_image_contents.as_slice()).unwrap().root();
+        let system_image_hash = fuchsia_merkle::from_slice(&system_image_contents).root();
 
         mock_artifact_reader
             .append_artifact(&PathBuf::from(static_pkgs_hash.to_string()), static_pkgs_contents);
@@ -709,12 +701,10 @@ mod tests {
             (PackageName::from_str("beta").unwrap(), Some(PackageVariant::zero())) => beta_hash.clone(),
         };
         let static_pkgs_contents = create_static_pkgs_listing(static_pkgs.clone());
-        let static_pkgs_hash =
-            MerkleTree::from_reader(static_pkgs_contents.as_slice()).unwrap().root();
+        let static_pkgs_hash = fuchsia_merkle::from_slice(&static_pkgs_contents).root();
 
         let system_image_contents = create_system_image_far(Some(static_pkgs_hash.clone()));
-        let system_image_hash =
-            MerkleTree::from_reader(system_image_contents.as_slice()).unwrap().root();
+        let system_image_hash = fuchsia_merkle::from_slice(&system_image_contents).root();
 
         mock_artifact_reader
             .append_artifact(&PathBuf::from(static_pkgs_hash.to_string()), static_pkgs_contents);

@@ -565,9 +565,7 @@ mod tests {
         let data = [0xab; 2];
         let hash;
         {
-            let mut builder = MerkleTreeBuilder::new();
-            builder.write(&data);
-            hash = builder.finish().root();
+            hash = fuchsia_merkle::from_slice(&data).root();
             let compressed_data: Vec<u8> = Type1Blob::generate(&data, CompressionMode::Always);
 
             let (blob_volume_outgoing_dir, server_end) =
@@ -634,9 +632,7 @@ mod tests {
         let mut hashes = vec![];
         let mut filenames = vec![];
         for datum in data {
-            let mut builder = MerkleTreeBuilder::new();
-            builder.write(&datum);
-            let hash = builder.finish().root();
+            let hash = fuchsia_merkle::from_slice(&datum).root();
             let filename = PathBuf::from(format!("{}", hash));
             hashes.push(hash.clone());
             filenames.push(filename.clone());

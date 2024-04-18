@@ -176,7 +176,6 @@ mod tests {
     use super::*;
     use dyn_clone::DynClone;
     use fuchsia_merkle::Hash;
-    use fuchsia_merkle::MerkleTree;
     use std::collections::HashMap;
     use std::fs;
     use std::path::Path;
@@ -187,7 +186,7 @@ mod tests {
     }
 
     fn write_blob<Dir: AsRef<Path>>(directory: Dir, contents: &[u8]) -> Hash {
-        let hash = MerkleTree::from_reader(contents).expect("compute fuchsia merkle tree").root();
+        let hash = fuchsia_merkle::from_slice(contents).root();
         let filename = format!("{}", hash);
         fs::write(directory.as_ref().join(filename), contents).expect("write blob to file");
         hash

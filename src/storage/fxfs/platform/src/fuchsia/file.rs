@@ -586,7 +586,7 @@ mod tests {
         },
         anyhow::format_err,
         fidl_fuchsia_io as fio,
-        fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder},
+        fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions},
         fuchsia_async as fasync,
         fuchsia_fs::file,
         fuchsia_zircon::Status,
@@ -1712,11 +1712,10 @@ mod tests {
                 .expect("write failed");
         }
 
-        let mut builder = MerkleTreeBuilder::new(FsVerityHasher::Sha256(
-            FsVerityHasherOptions::new(vec![0xFF; 8], 4096),
-        ));
-        builder.write(data.as_slice());
-        let tree = builder.finish();
+        let tree = fsverity_merkle::from_slice(
+            &data,
+            FsVerityHasher::Sha256(FsVerityHasherOptions::new(vec![0xFF; 8], 4096)),
+        );
         let mut expected_root = tree.root().to_vec();
         expected_root.extend_from_slice(&[0; 32]);
 

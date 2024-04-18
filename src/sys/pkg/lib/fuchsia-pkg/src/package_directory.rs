@@ -250,8 +250,7 @@ mod tests {
         assert!(!blobs.is_empty());
 
         // the test duplicate blob appears twice
-        let duplicate_blob_merkle =
-            fuchsia_merkle::MerkleTree::from_reader("Hello World!".as_bytes()).unwrap().root();
+        let duplicate_blob_merkle = fuchsia_merkle::from_slice("Hello World!".as_bytes()).root();
         assert_eq!(blobs.iter().filter(|hash| *hash == &duplicate_blob_merkle).count(), 2);
     }
 

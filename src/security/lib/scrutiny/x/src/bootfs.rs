@@ -340,13 +340,11 @@ mod tests {
         let blob_1 = VerifiedMemoryBlob::new(
             [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
             "blob_1".as_bytes().into(),
-        )
-        .expect("blob");
+        );
         let blob_2 = VerifiedMemoryBlob::new(
             [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
             "blob_2".as_bytes().into(),
-        )
-        .expect("blob");
+        );
         let blobs = [(path_1.clone(), blob_1.clone()), (path_2.clone(), blob_2.clone())];
         let bootfs = Bootfs::new(data_source, blobs.clone());
         let mut expected = blobs
@@ -389,13 +387,11 @@ mod tests {
         let blob_1 = VerifiedMemoryBlob::new(
             [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
             "blob_1".as_bytes().into(),
-        )
-        .expect("blob");
+        );
         let blob_2 = VerifiedMemoryBlob::new(
             [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
             "blob_2".as_bytes().into(),
-        )
-        .expect("blob");
+        );
         let blobs = [(path_1.clone(), blob_1.clone()), (path_2.clone(), blob_2.clone())];
         let bootfs = Bootfs::new(data_source, blobs.clone());
         let mut expected = blobs
@@ -439,13 +435,11 @@ mod tests {
         let blob_1 = VerifiedMemoryBlob::new(
             [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
             "blob_1".as_bytes().into(),
-        )
-        .expect("blob");
+        );
         let blob_2 = VerifiedMemoryBlob::new(
             [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
             "blob_2".as_bytes().into(),
-        )
-        .expect("blob");
+        );
         let blobs = [
             (blob_1_path_1.clone(), blob_1.clone()),
             (blob_1_path_2.clone(), blob_1.clone()),
@@ -536,8 +530,7 @@ mod tests {
             VerifiedMemoryBlob::new(
                 [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
                 additional_boot_config_str.as_bytes().into(),
-            )
-            .expect("blob"),
+            ),
         )];
         let bootfs = Bootfs::new(data_source, blobs.clone());
         let additional_boot_config =
@@ -566,8 +559,7 @@ mod tests {
             VerifiedMemoryBlob::new(
                 [Box::new(data_source.clone()) as Box<dyn api::DataSource>].into_iter(),
                 additional_boot_config_str.as_bytes().into(),
-            )
-            .expect("blob"),
+            ),
         )];
         let bootfs = Bootfs::new(data_source, blobs.clone().into_iter());
         match bootfs.additional_boot_configuration() {
@@ -591,8 +583,7 @@ mod tests {
             VerifiedMemoryBlob::new(
                 [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
                 additional_boot_config_str.as_bytes().into(),
-            )
-            .expect("blob"),
+            ),
         )];
         let bootfs = Bootfs::new(data_source, blobs.clone());
         match bootfs.additional_boot_configuration() {
@@ -619,8 +610,7 @@ mod tests {
             VerifiedMemoryBlob::new(
                 [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
                 component_manager_config_bytes.into(),
-            )
-            .expect("blob"),
+            ),
         )];
         let bootfs = Bootfs::new(data_source, blobs.clone());
         let component_manager_config =
@@ -645,8 +635,7 @@ mod tests {
             VerifiedMemoryBlob::new(
                 [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
                 component_manager_config_bytes.into(),
-            )
-            .expect("blob"),
+            ),
         )];
         let bootfs = Bootfs::new(data_source, blobs.clone());
         match bootfs.component_manager_configuration() {
@@ -674,16 +663,14 @@ mod tests {
                 VerifiedMemoryBlob::new(
                     [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
                     pkg_index_str.into_bytes(),
-                )
-                .expect("package index blob"),
+                ),
             ),
             (
                 pkg_path,
                 VerifiedMemoryBlob::new(
                     [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
                     far_bytes,
-                )
-                .expect("package blob"),
+                ),
             ),
         ];
         let bootfs = Bootfs::new(data_source, blobs.clone());
@@ -713,24 +700,21 @@ mod tests {
                 VerifiedMemoryBlob::new(
                     [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
                     pkg_index_str.into_bytes(),
-                )
-                .expect("package index blob"),
+                ),
             ),
             (
                 pkg_path.clone(),
                 VerifiedMemoryBlob::new(
                     [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
                     far_bytes.clone(),
-                )
-                .expect("package blob 1"),
+                ),
             ),
             (
                 pkg_path,
                 VerifiedMemoryBlob::new(
                     [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
                     far_bytes,
-                )
-                .expect("package blob 2"),
+                ),
             ),
         ];
         let bootfs = Bootfs::new(data_source, blobs.clone());
@@ -760,16 +744,14 @@ mod tests {
                 VerifiedMemoryBlob::new(
                     [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
                     pkg_index_str.into_bytes(),
-                )
-                .expect("package index blob"),
+                ),
             ),
             (
                 pkg_path,
                 VerifiedMemoryBlob::new(
                     [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
                     far_bytes,
-                )
-                .expect("package blob"),
+                ),
             ),
         ];
         let bootfs = Bootfs::new(data_source, blobs.clone());

@@ -199,7 +199,6 @@ mod tests {
         super::{PackageReader, PackagesFromUpdateReader},
         crate::core::util::types::ComponentManifest,
         fuchsia_archive::write,
-        fuchsia_merkle::MerkleTree,
         fuchsia_url::{PackageName, PackageVariant, PinnedAbsolutePackageUrl},
         scrutiny_testing::{artifact::MockArtifactReader, TEST_REPO_URL},
         scrutiny_utils::package::META_CONTENTS_PATH,
@@ -219,8 +218,7 @@ mod tests {
         pkg_urls: &[PinnedAbsolutePackageUrl],
     ) -> MockArtifactReader {
         let packages_json_contents = serialize_packages_json(pkg_urls).unwrap();
-        let packages_json_merkle =
-            MerkleTree::from_reader(packages_json_contents.as_slice()).unwrap().root();
+        let packages_json_merkle = fuchsia_merkle::from_slice(&packages_json_contents).root();
         let meta_contents_string = format!("packages.json={}\n", packages_json_merkle);
         let meta_contents_str = &meta_contents_string;
         let meta_contents_bytes = meta_contents_str.as_bytes();
@@ -256,9 +254,9 @@ mod tests {
         let a_path = PathBuf::from(a_str);
         let c_path = PathBuf::from(c_str);
         let one_path = PathBuf::from(one_str);
-        let a_hash = MerkleTree::from_reader(a_str.as_bytes()).unwrap().root();
-        let c_hash = MerkleTree::from_reader(c_str.as_bytes()).unwrap().root();
-        let one_hash = MerkleTree::from_reader(one_str.as_bytes()).unwrap().root();
+        let a_hash = fuchsia_merkle::from_slice(a_str.as_bytes()).root();
+        let c_hash = fuchsia_merkle::from_slice(c_str.as_bytes()).root();
+        let one_hash = fuchsia_merkle::from_slice(one_str.as_bytes()).root();
         let meta_contents_string =
             format!("{}={}\n{}={}\n{}={}\n", a_str, a_hash, c_str, c_hash, one_str, one_hash);
         let meta_contents_str = &meta_contents_string;
@@ -286,7 +284,7 @@ mod tests {
         let mut target = Cursor::new(Vec::new());
         write(&mut target, path_content_map).unwrap();
         let pkg_contents = target.get_ref();
-        let pkg_merkle = MerkleTree::from_reader(pkg_contents.as_slice()).unwrap().root();
+        let pkg_merkle = fuchsia_merkle::from_slice(&pkg_contents).root();
         let pkg_url = PinnedAbsolutePackageUrl::new(
             TEST_REPO_URL.clone(),
             PackageName::from_str("foo").unwrap(),

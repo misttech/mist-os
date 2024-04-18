@@ -561,8 +561,8 @@ impl Client {
 mod tests {
     use {
         super::*, assert_matches::assert_matches, blobfs_ramdisk::BlobfsRamdisk,
-        fuchsia_async as fasync, fuchsia_merkle::MerkleTree, futures::stream::TryStreamExt,
-        maplit::hashset, std::io::Write as _, std::sync::Arc,
+        fuchsia_async as fasync, futures::stream::TryStreamExt, maplit::hashset,
+        std::io::Write as _, std::sync::Arc,
     };
 
     #[fasync::run_singlethreaded(test)]
@@ -599,10 +599,10 @@ mod tests {
             .unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
-        let merkle = MerkleTree::from_reader(&b"blob 1"[..]).unwrap().root();
+        let merkle = fuchsia_merkle::from_slice(&b"blob 1"[..]).root();
         assert_matches!(client.delete_blob(&merkle).await, Ok(()));
 
-        let expected = hashset! {MerkleTree::from_reader(&b"blob 2"[..]).unwrap().root()};
+        let expected = hashset! {fuchsia_merkle::from_slice(&b"blob 2"[..]).root()};
         assert_eq!(client.list_known_blobs().await.unwrap(), expected);
         blobfs.stop().await.unwrap();
     }
@@ -643,10 +643,7 @@ mod tests {
         let blobfs = BlobfsRamdisk::builder().with_blob(&b"blob 1"[..]).start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
-        assert_eq!(
-            client.has_blob(&MerkleTree::from_reader(&b"blob 1"[..]).unwrap().root()).await,
-            true
-        );
+        assert_eq!(client.has_blob(&fuchsia_merkle::from_slice(&b"blob 1"[..]).root()).await, true);
         assert_eq!(client.has_blob(&Hash::from([1; 32])).await, false);
 
         blobfs.stop().await.unwrap();
@@ -658,7 +655,7 @@ mod tests {
             BlobfsRamdisk::builder().fxblob().with_blob(&b"blob 1"[..]).start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
-        assert!(client.has_blob(&MerkleTree::from_reader(&b"blob 1"[..]).unwrap().root()).await);
+        assert!(client.has_blob(&fuchsia_merkle::from_slice(&b"blob 1"[..]).root()).await);
         assert!(!client.has_blob(&Hash::from([1; 32])).await);
 
         blobfs.stop().await.unwrap();
@@ -670,7 +667,7 @@ mod tests {
         let client = Client::for_ramdisk(&blobfs);
 
         let blob = [3; 1024];
-        let hash = MerkleTree::from_reader(&blob[..]).unwrap().root();
+        let hash = fuchsia_merkle::from_slice(&blob).root();
 
         let mut file = blobfs.root_dir().unwrap().write_file(hash.to_string(), 0o777).unwrap();
         assert_eq!(client.has_blob(&hash).await, false);
@@ -701,7 +698,7 @@ mod tests {
         let client = Client::for_ramdisk(&blobfs);
 
         let content = [3; 1024];
-        let hash = MerkleTree::from_reader(&content[..]).unwrap().root();
+        let hash = fuchsia_merkle::from_slice(&content).root();
         let delivery_content =
             delivery_blob::Type1Blob::generate(&content, delivery_blob::CompressionMode::Always);
 
@@ -724,20 +721,20 @@ mod tests {
     }
 
     async fn open_blob_only(client: &Client, content: &[u8]) -> TestBlob {
-        let hash = MerkleTree::from_reader(content).unwrap().root();
+        let hash = fuchsia_merkle::from_slice(content).root();
         let _blob = client.open_blob_proxy_from_dir_for_write(&hash).await.unwrap();
         TestBlob { _blob, hash }
     }
 
     async fn open_and_truncate_blob(client: &Client, content: &[u8]) -> TestBlob {
-        let hash = MerkleTree::from_reader(content).unwrap().root();
+        let hash = fuchsia_merkle::from_slice(content).root();
         let _blob = client.open_blob_proxy_from_dir_for_write(&hash).await.unwrap();
         let () = resize(&_blob, content.len()).await;
         TestBlob { _blob, hash }
     }
 
     async fn partially_write_blob(client: &Client, content: &[u8]) -> TestBlob {
-        let hash = MerkleTree::from_reader(content).unwrap().root();
+        let hash = fuchsia_merkle::from_slice(content).root();
         let _blob = client.open_blob_proxy_from_dir_for_write(&hash).await.unwrap();
         let content = delivery_blob::generate(delivery_blob::DeliveryBlobType::Type1, content);
         let () = resize(&_blob, content.len()).await;
@@ -746,7 +743,7 @@ mod tests {
     }
 
     async fn fully_write_blob(client: &Client, content: &[u8]) -> TestBlob {
-        let hash = MerkleTree::from_reader(content).unwrap().root();
+        let hash = fuchsia_merkle::from_slice(content).root();
         let _blob = client.open_blob_proxy_from_dir_for_write(&hash).await.unwrap();
         let content = delivery_blob::generate(delivery_blob::DeliveryBlobType::Type1, content);
         let () = resize(&_blob, content.len()).await;

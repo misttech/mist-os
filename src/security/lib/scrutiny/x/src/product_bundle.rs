@@ -397,12 +397,7 @@ mod tests {
     }
 
     fn blob_path(blob: &[u8]) -> String {
-        format!(
-            "{}",
-            fuchsia_merkle::MerkleTree::from_reader(blob)
-                .expect("merkle tree from string bytes")
-                .root()
-        )
+        format!("{}", fuchsia_merkle::from_slice(blob).root())
     }
 
     fn blob_hash(blob: &[u8]) -> Box<dyn api::Hash> {

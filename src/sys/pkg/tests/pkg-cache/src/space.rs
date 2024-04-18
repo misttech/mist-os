@@ -119,7 +119,7 @@ async fn gc_cache_packages_protected() {
 async fn gc_unowned_blob() {
     let env = TestEnv::builder().build().await;
     let unowned_content = &b"blob not referenced by any protected packages"[..];
-    let unowned_hash = fuchsia_merkle::MerkleTree::from_reader(unowned_content).unwrap().root();
+    let unowned_hash = fuchsia_merkle::from_slice(unowned_content).root();
     let () = env.write_to_blobfs(&unowned_hash, unowned_content).await;
     assert!(env.blobfs.list_blobs().unwrap().contains(&unowned_hash));
 
@@ -143,7 +143,7 @@ async fn gc_frees_space_so_write_can_succeed(blob_implementation: blobfs_ramdisk
     // Write an orphaned incompressible 4 MB blob.
     let mut orphan_data = vec![0; 4 * 1024 * 1024];
     StdRng::from_seed([0u8; 32]).fill(&mut orphan_data[..]);
-    let orphan_hash = fuchsia_merkle::MerkleTree::from_reader(&orphan_data[..]).unwrap().root();
+    let orphan_hash = fuchsia_merkle::from_slice(&orphan_data).root();
     let () = small_blobfs.add_blob_from(orphan_hash, &orphan_data[..]).await.unwrap();
     assert!(small_blobfs.list_blobs().unwrap().contains(&orphan_hash));
 

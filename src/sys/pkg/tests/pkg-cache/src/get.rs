@@ -11,7 +11,6 @@ use {
     fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg::{self as fpkg, BlobInfo, NeededBlobsMarker},
     fidl_fuchsia_pkg_ext::{self as fpkg_ext, BlobId},
-    fuchsia_merkle::MerkleTree,
     fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder},
     fuchsia_zircon::Status,
     futures::prelude::*,
@@ -227,14 +226,14 @@ async fn handles_partially_written_pkg() {
     let () = env.write_to_blobfs(&meta_far_hash, &meta_far_data).await;
     {
         let data = &b"some contents"[..];
-        let hash = MerkleTree::from_reader(data).unwrap().root();
+        let hash = fuchsia_merkle::from_slice(data).root();
         let () = env.write_to_blobfs(&hash, data).await;
     }
 
     // Perform a Get(), expecting to only write the 1 remaining content blob.
     let dir = {
         let data = &b"different contents"[..];
-        let hash = MerkleTree::from_reader(data).unwrap().root();
+        let hash = fuchsia_merkle::from_slice(data).root();
         let compressed =
             delivery_blob::Type1Blob::generate(data, delivery_blob::CompressionMode::Always);
 
@@ -654,7 +653,7 @@ async fn get_with_retained_protection_refetches_blobs() {
     let () = env.block_until_started().await;
 
     // Delete the content blob.
-    let blob_hash = MerkleTree::from_reader(blob_content).unwrap().root();
+    let blob_hash = fuchsia_merkle::from_slice(blob_content).root();
     let blobfs = env.blobfs.client();
     let () = blobfs.delete_blob(&blob_hash).await.unwrap();
     assert!(!blobfs.has_blob(&blob_hash).await);
@@ -749,7 +748,7 @@ async fn get_uses_open_packages_to_short_circuit() {
     let dir = crate::get_and_verify_package(&env.proxies.package_cache, &pkg).await;
 
     // Delete its content blob.
-    let content_hash = MerkleTree::from_reader(blob_content).unwrap().root();
+    let content_hash = fuchsia_merkle::from_slice(blob_content).root();
     let () = env.blobfs.client().delete_blob(&content_hash).await.unwrap();
 
     {

@@ -240,7 +240,7 @@ mod tests {
         let blobfs = blobfs_ramdisk::BlobfsRamdisk::builder().fxblob().start().await.unwrap();
         assert_eq!(blobfs.list_blobs().unwrap(), std::collections::BTreeSet::new());
         let contents = [0u8; 7];
-        let hash = fuchsia_merkle::MerkleTree::from_reader(&contents[..]).unwrap().root();
+        let hash = fuchsia_merkle::from_slice(&contents).root();
         let compressed = delivery_blob::Type1Blob::generate(
             &contents[..],
             delivery_blob::CompressionMode::Attempt,

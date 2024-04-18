@@ -7,7 +7,6 @@ use {
     assert_matches::assert_matches,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
-    fuchsia_merkle::MerkleTree,
     fuchsia_zircon::Status,
     std::{io::Write as _, time::Duration},
 };
@@ -387,7 +386,7 @@ async fn open_resize_wait_for_signal() -> Result<(), Error> {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn empty_blob_readable_after_resize() {
-    let empty_hash = MerkleTree::from_reader(&[][..]).unwrap().root().to_string();
+    let empty_hash = fuchsia_merkle::from_slice(&[][..]).root().to_string();
 
     let blobfs_server = BlobfsRamdisk::start().await.unwrap();
     let root_dir = blobfs_server.root_dir_proxy().unwrap();
@@ -428,7 +427,7 @@ struct TestBlob {
 
 impl TestBlob {
     fn new(contents: &'static [u8]) -> Self {
-        Self { merkle: MerkleTree::from_reader(contents).unwrap().root(), contents }
+        Self { merkle: fuchsia_merkle::from_slice(contents).root(), contents }
     }
 }
 
@@ -549,7 +548,7 @@ async fn fxblob_concurrent_creation_succeeds() {
 
     // 8,194 bytes so that the partial write exceeds 8,192 bytes.
     let bytes = vec![0u8; 8194];
-    let hash = fuchsia_merkle::MerkleTree::from_reader(&bytes[..]).unwrap().root();
+    let hash = fuchsia_merkle::from_slice(&bytes).root();
     let compressed = Type1Blob::generate(&bytes, CompressionMode::Never);
     let compressed_len: u64 = compressed.len().try_into().unwrap();
 
@@ -574,7 +573,7 @@ async fn fxblob_create_already_present_returns_already_exists() {
     let creator = blobfs.blob_creator_proxy().unwrap().unwrap();
 
     let bytes = vec![0u8; 1];
-    let hash = fuchsia_merkle::MerkleTree::from_reader(&bytes[..]).unwrap().root();
+    let hash = fuchsia_merkle::from_slice(&bytes).root();
     let compressed = Type1Blob::generate(&bytes, CompressionMode::Never);
     let compressed_len: u64 = compressed.len().try_into().unwrap();
 

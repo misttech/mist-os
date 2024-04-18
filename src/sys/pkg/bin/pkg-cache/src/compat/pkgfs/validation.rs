@@ -493,7 +493,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn make_missing_contents_irrelevant_blobfs_blob() {
         let blob = vec![0u8, 1u8];
-        let hash = fuchsia_merkle::MerkleTree::from_reader(blob.as_slice()).unwrap().root();
+        let hash = fuchsia_merkle::from_slice(&blob).root();
         let (_env, validation) =
             TestEnv::with_base_blobs_and_blobfs_contents(HashSet::new(), [(hash, blob)]).await;
 
@@ -503,7 +503,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn make_missing_contents_present_blob() {
         let blob = vec![0u8, 1u8];
-        let hash = fuchsia_merkle::MerkleTree::from_reader(blob.as_slice()).unwrap().root();
+        let hash = fuchsia_merkle::from_slice(&blob).root();
         let (_env, validation) =
             TestEnv::with_base_blobs_and_blobfs_contents(HashSet::from([hash]), [(hash, blob)])
                 .await;
@@ -514,7 +514,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn make_missing_contents_present_blob_missing_blob() {
         let blob = vec![0u8, 1u8];
-        let hash = fuchsia_merkle::MerkleTree::from_reader(blob.as_slice()).unwrap().root();
+        let hash = fuchsia_merkle::from_slice(&blob).root();
         let mut missing_hash = <[u8; 32]>::from(hash);
         missing_hash[0] = !missing_hash[0];
         let missing_hash = missing_hash.into();

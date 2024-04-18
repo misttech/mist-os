@@ -11,7 +11,7 @@ use {
         filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem},
         FSConfig,
     },
-    fuchsia_merkle::{Hash, MerkleTree},
+    fuchsia_merkle::Hash,
     fuchsia_zircon as zx,
     std::path::Path,
     storage_benchmarks::{block_device::BlockDevice, CacheClearableFilesystem, Filesystem},
@@ -47,7 +47,7 @@ pub struct DeliveryBlob {
 
 impl DeliveryBlob {
     pub fn new(data: Vec<u8>, mode: CompressionMode) -> Self {
-        let name = MerkleTree::from_reader(data.as_slice()).unwrap().root();
+        let name = fuchsia_merkle::from_slice(&data).root();
         Self { data: Type1Blob::generate(&data, mode), name }
     }
 }

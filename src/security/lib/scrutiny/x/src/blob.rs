@@ -230,13 +230,13 @@ impl VerifiedMemoryBlob {
     pub fn new(
         data_sources: impl IntoIterator<Item = Box<dyn api::DataSource>>,
         bytes: Vec<u8>,
-    ) -> Result<Self, io::Error> {
-        let hash: Hash = FuchsiaMerkleTree::from_reader(bytes.as_slice())?.root().into();
-        Ok(Self(Rc::new(MemoryBlobData {
+    ) -> Self {
+        let hash: Hash = fuchsia_merkle::from_slice(&bytes).root().into();
+        Self(Rc::new(MemoryBlobData {
             data_sources: data_sources.into_iter().collect::<Vec<_>>(),
             hash: Box::new(hash),
             bytes,
-        })))
+        }))
     }
 }
 
@@ -511,8 +511,7 @@ pub(crate) mod test {
                 .map(|mut blob| {
                     let mut bytes = vec![];
                     blob.read_to_end(&mut bytes).expect("read blob for memory blob set");
-                    let blob = VerifiedMemoryBlob::new(data_sources.clone(), bytes)
-                        .expect("hash blob for memory blob set");
+                    let blob = VerifiedMemoryBlob::new(data_sources.clone(), bytes);
                     (blob.hash(), blob)
                 })
                 .collect::<HashMap<_, _>>();
@@ -554,7 +553,6 @@ mod tests {
     use super::BlobOpenError;
     use fuchsia_hash::HASH_SIZE as FUCHSIA_HASH_SIZE;
     use fuchsia_merkle::Hash as FuchsiaMerkleHash;
-    use fuchsia_merkle::MerkleTree as FuchsiaMerkleTree;
     use maplit::hashmap;
     use std::fs;
     use std::io::Write as _;
@@ -568,7 +566,7 @@ mod tests {
 
     macro_rules! fuchsia_hash {
         ($bytes:expr) => {
-            FuchsiaMerkleTree::from_reader($bytes).unwrap().root()
+            fuchsia_merkle::from_slice($bytes).root()
         };
     }
 

@@ -337,7 +337,7 @@ mod tests {
         crate::io::ReadSeek,
         anyhow::{anyhow, Result},
         fuchsia_archive::write as far_write,
-        fuchsia_merkle::{Hash, MerkleTree, HASH_SIZE},
+        fuchsia_merkle::{Hash, HASH_SIZE},
         maplit::{btreemap, hashmap},
         std::{
             collections::{BTreeMap, HashMap, HashSet},
@@ -476,7 +476,7 @@ mod tests {
         // a merkle and match it against the given value (the `designated_package_hash`).
         let designated_package_hash = Hash::from([0; HASH_SIZE]);
         let package_contents = create_package_far();
-        let package_hash = MerkleTree::from_reader(package_contents.as_slice()).unwrap().root();
+        let package_hash = fuchsia_merkle::from_slice(&package_contents).root();
         assert!(designated_package_hash != package_hash);
 
         // Incorrectly map designated_package_hash` to `package_contents` (that's not its
