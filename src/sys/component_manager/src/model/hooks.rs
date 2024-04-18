@@ -256,6 +256,7 @@ pub enum EventPayload {
     },
     Stopped {
         status: zx::Status,
+        stop_time: zx::Time,
     },
     DebugStarted {
         runtime_dir: Option<fio::DirectoryProxy>,
@@ -295,7 +296,7 @@ impl fmt::Debug for EventPayload {
             EventPayload::Resolved { component: _, decl, .. } => {
                 formatter.field("decl", decl).finish()
             }
-            EventPayload::Stopped { status } => formatter.field("status", status).finish(),
+            EventPayload::Stopped { status, .. } => formatter.field("status", status).finish(),
             EventPayload::Unresolved
             | EventPayload::Discovered
             | EventPayload::Destroyed
@@ -418,7 +419,7 @@ impl fmt::Display for Event {
             EventPayload::CapabilityRequested { source_moniker, name, .. } => {
                 format!("requested '{}' from '{}'", name.to_string(), source_moniker)
             }
-            EventPayload::Stopped { status } => {
+            EventPayload::Stopped { status, .. } => {
                 format!("with status: {}", status.to_string())
             }
             EventPayload::Discovered { .. }

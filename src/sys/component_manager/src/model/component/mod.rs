@@ -708,8 +708,13 @@ impl ComponentInstance {
                 };
             }
 
-            let event =
-                Event::new(self, EventPayload::Stopped { status: outcome.component_exit_status });
+            let event = Event::new(
+                self,
+                EventPayload::Stopped {
+                    status: outcome.component_exit_status,
+                    stop_time: zx::Time::get_monotonic(),
+                },
+            );
             self.hooks.dispatch(&event).await;
         }
 
