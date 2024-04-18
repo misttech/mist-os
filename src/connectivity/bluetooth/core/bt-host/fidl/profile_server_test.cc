@@ -1576,9 +1576,11 @@ TEST_F(ProfileServerTestFakeAdapter, AudioOffloadExtRequestParametersClosedOnCha
       params;
   params.SetToZeros();
   params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
-  params.view().a2dp_source_offload_capability_mask().BackingStorage().UncheckedWriteUInt(
-      static_cast<uint32_t>(android_hci::A2dpCodecType::AAC));
-  adapter()->mutable_state().android_vendor_capabilities.Initialize(params.view());
+  params.view().version_supported().major_number().Write(0);
+  params.view().version_supported().minor_number().Write(98);
+  params.view().a2dp_source_offload_capability_mask().aac().Write(true);
+  adapter()->mutable_state().android_vendor_capabilities =
+      bt::gap::AndroidVendorCapabilities::New(params.view());
 
   // Set L2CAP channel parameters
   fidlbredr::L2capParameters l2cap_params;
@@ -1643,8 +1645,11 @@ TEST_P(ProfileServerInvalidSamplingFrequencyTest, SbcInvalidSamplingFrequency) {
       pw::bluetooth::vendor::android_hci::LEGetVendorCapabilitiesCommandCompleteEventWriter>
       params;
   params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
+  params.view().version_supported().major_number().Write(0);
+  params.view().version_supported().minor_number().Write(98);
   params.view().a2dp_source_offload_capability_mask().sbc().Write(true);
-  adapter()->mutable_state().android_vendor_capabilities.Initialize(params.view());
+  adapter()->mutable_state().android_vendor_capabilities =
+      bt::gap::AndroidVendorCapabilities::New(params.view());
 
   // set up a fake channel and connection
   FakeChannel::WeakPtr fake_channel;
@@ -1734,9 +1739,12 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtGetSupportedFeatures) {
         params;
     params.SetToZeros();
     params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
+    params.view().version_supported().major_number().Write(0);
+    params.view().version_supported().minor_number().Write(98);
     params.view().a2dp_source_offload_capability_mask().BackingStorage().UncheckedWriteUInt(
         a2dp_offload_capabilities);
-    adapter()->mutable_state().android_vendor_capabilities.Initialize(params.view());
+    adapter()->mutable_state().android_vendor_capabilities =
+        bt::gap::AndroidVendorCapabilities::New(params.view());
   }
 
   const bt::PeerId peer_id(1);
@@ -1805,9 +1813,12 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadSuccess) {
         params;
     params.SetToZeros();
     params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
+    params.view().version_supported().major_number().Write(0);
+    params.view().version_supported().minor_number().Write(98);
     params.view().a2dp_source_offload_capability_mask().BackingStorage().UncheckedWriteUInt(
         a2dp_offload_capabilities);
-    adapter()->mutable_state().android_vendor_capabilities.Initialize(params.view());
+    adapter()->mutable_state().android_vendor_capabilities =
+        bt::gap::AndroidVendorCapabilities::New(params.view());
   }
 
   const bt::PeerId peer_id(1);
@@ -1898,9 +1909,12 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadFail) {
         params;
     params.SetToZeros();
     params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
+    params.view().version_supported().major_number().Write(0);
+    params.view().version_supported().minor_number().Write(98);
     params.view().a2dp_source_offload_capability_mask().BackingStorage().UncheckedWriteUInt(
         a2dp_offload_capabilities);
-    adapter()->mutable_state().android_vendor_capabilities.Initialize(params.view());
+    adapter()->mutable_state().android_vendor_capabilities =
+        bt::gap::AndroidVendorCapabilities::New(params.view());
   }
 
   const bt::PeerId peer_id(1);
@@ -1994,9 +2008,12 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadInProgress)
         params;
     params.SetToZeros();
     params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
+    params.view().version_supported().major_number().Write(0);
+    params.view().version_supported().minor_number().Write(98);
     params.view().a2dp_source_offload_capability_mask().BackingStorage().UncheckedWriteUInt(
         a2dp_offload_capabilities);
-    adapter()->mutable_state().android_vendor_capabilities.Initialize(params.view());
+    adapter()->mutable_state().android_vendor_capabilities =
+        bt::gap::AndroidVendorCapabilities::New(params.view());
   }
 
   const bt::PeerId peer_id(1);
@@ -2090,9 +2107,12 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadControllerE
         params;
     params.SetToZeros();
     params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
+    params.view().version_supported().major_number().Write(0);
+    params.view().version_supported().minor_number().Write(98);
     params.view().a2dp_source_offload_capability_mask().BackingStorage().UncheckedWriteUInt(
         a2dp_offload_capabilities);
-    adapter()->mutable_state().android_vendor_capabilities.Initialize(params.view());
+    adapter()->mutable_state().android_vendor_capabilities =
+        bt::gap::AndroidVendorCapabilities::New(params.view());
   }
 
   const bt::PeerId peer_id(1);
