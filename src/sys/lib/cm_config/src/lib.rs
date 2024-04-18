@@ -932,7 +932,7 @@ mod tests {
                         allowlist: Some(vec![
                         component_internal::CapabilityAllowlistEntry {
                             source_moniker: Some("<component_manager>".to_string()),
-                            source_name: Some("fuchsia.boot.RootResource".to_string()),
+                            source_name: Some("fuchsia.kernel.MmioResource".to_string()),
                             source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
                             capability: Some(component_internal::AllowlistedCapability::Protocol(component_internal::AllowlistedProtocol::default())),
                             target_monikers: Some(vec![
@@ -1034,7 +1034,7 @@ mod tests {
                     capability_policy: HashMap::from_iter(vec![
                         (CapabilityAllowlistKey {
                             source_moniker: ExtendedMoniker::ComponentManager,
-                            source_name: "fuchsia.boot.RootResource".parse().unwrap(),
+                            source_name: "fuchsia.kernel.MmioResource".parse().unwrap(),
                             source: CapabilityAllowlistSource::Self_,
                             capability: CapabilityTypeName::Protocol,
                         },
@@ -1179,7 +1179,7 @@ mod tests {
                         allowlist: Some(vec![
                         component_internal::CapabilityAllowlistEntry {
                             source_moniker: Some("<component_manager>".to_string()),
-                            source_name: Some("fuchsia.boot.RootResource".to_string()),
+                            source_name: Some("fuchsia.kernel.MmioResource".to_string()),
                             source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
                             capability: None,
                             target_monikers: Some(vec!["/core".to_string()]),
