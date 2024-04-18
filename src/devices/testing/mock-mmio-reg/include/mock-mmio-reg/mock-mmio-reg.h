@@ -11,7 +11,13 @@
 #include <memory>
 
 #include <fbl/vector.h>
+
+// SDK-users, don't build with -DMOCK_MMIO_REG_USE_ZXTEST in effect, zxtest isn't available.
+#ifdef MOCK_MMIO_REG_USE_ZXTEST
+#include <zxtest/zxtest.h>
+#else
 #include <gtest/gtest.h>
+#endif
 
 #include "src/devices/lib/mmio/test-helper.h"
 
@@ -163,6 +169,9 @@ class MockMmioRegRegion {
   MockMmioRegRegion(size_t reg_size, size_t reg_count, size_t reg_offset = 0)
       : reg_size_(reg_size), reg_count_(reg_count), reg_offset_(reg_offset) {
     regs_.resize(reg_count_);
+#ifdef MOCK_MMIO_REG_USE_ZXTEST
+    ASSERT_GT(reg_size_, 0);
+#endif
   }
 
   // Accesses the MockMmioReg at the given offset. Note that this is the _offset_, not the

@@ -13,6 +13,42 @@ config("headers.config") {
   include_dirs = [ "include" ]
 }
 
+config("zxtest-backend") {
+  defines = [ "MOCK_MMIO_REG_USE_ZXTEST" ]
+}
+
+# TODO(b/328812587) Move everything over to this target from
+# mock-mmio-reg-zxtest.
+source_set("mock-mmio-reg-zxtest") {
+  public = [ "include/mock-mmio-reg/mock-mmio-reg.h" ]
+  deps = [
+    "//src/devices/lib/mmio:test_helper",
+    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+  ]
+  public_configs = [
+    ":headers.config",
+    ":zxtest-backend",
+  ]
+
+  visibility = [
+    "test:*",
+    "//src/camera/drivers/hw_accel/gdc:*",
+    "//src/camera/drivers/hw_accel/ge2d:*",
+    "//src/devices/ml/drivers/aml-nna:*",
+    "//src/devices/nand/drivers/aml-rawnand/tests:*",
+    "//src/devices/power/drivers/aml-meson-power:*",
+    "//src/devices/pwm/drivers/aml-pwm:*",
+    "//src/devices/registers/drivers/registers:*",
+    "//src/devices/suspend/drivers/aml-suspend/tests:*",
+    "//src/devices/temperature/drivers/aml-trip/tests:*",
+    "//src/devices/thermal/drivers/aml-thermal:*",
+    "//src/devices/thermal/drivers/aml-thermal-s905d2g-legacy:*",
+    "//src/media/audio/drivers/aml-g12-tdm/test:*",
+    "//src/ui/backlight/drivers/ti-lp8556:*",
+    "//vendor/*",
+  ]
+}
+
 sdk_source_set("mock-mmio-reg") {
   category = "internal"
   sdk_name = "mock-mmio-reg"
