@@ -26,9 +26,7 @@ cuckoo_kernel_zbi_test_params = {
   # packages, core realm shards, etc.
   input_groups = [
     "bootstrap",
-    "legacy",
     "network",
-    "debug",
     "test",
   ]
 }

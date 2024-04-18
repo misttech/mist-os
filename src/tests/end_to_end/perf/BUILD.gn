@@ -164,8 +164,6 @@ group("test") {
   deps = _python_benchmarks
 
   deps += [
-    "//third_party/sbase:sbase-pkgs",
-
     # Many tests use sl4f to communicate with the target.
     "//src/testing/sl4f",
 
