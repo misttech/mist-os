@@ -743,6 +743,7 @@ sdk_molecule("platform_libs") {
     "//src/devices/testing/fake-bti:fake-bti_sdk",
     "//src/devices/testing/fake-mmio-reg:fake-mmio-reg_sdk",
     "//src/devices/testing/mock-mmio-reg:mock-mmio-reg_sdk",
+    "//src/lib/memory_barriers:memory_barriers_sdk",
     "//zircon/system/ulib/ddk-platform-defs:ddk-platform-defs_sdk",
     "//zircon/system/ulib/fzl:fzl_sdk",
   ]
