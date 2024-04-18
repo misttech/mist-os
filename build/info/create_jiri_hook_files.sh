@@ -71,7 +71,6 @@ mkdir -p "${OUTPUT_DIR}"
 
 "$PREBUILT_PYTHON" -S \
   "${_SCRIPT_DIR}/gen_latest_commit_date.py" \
-  --force-git \
   --repo "${FUCHSIA_DIR}/integration" \
   --timestamp-file "$OUTPUT_DIR/integration_commit_stamp.txt" \
   --commit-hash-file "${OUTPUT_DIR}/integration_commit_hash.txt"
