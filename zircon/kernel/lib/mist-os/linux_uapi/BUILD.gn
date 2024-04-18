@@ -3,32 +3,33 @@
 # found in the LICENSE file.
 
 import("//build/zircon/migrated_targets.gni")
+import("//build/zircon/zircon_cpu.gni")
 
 zx_library("linux_uapi") {
   sources = []
-  public_deps = []
-  deps = [ ":generate_uapi_headers" ]
-  public_configs = [ ":uapi_defines" ]
+  public_deps = [ ":generate_uapi_headers" ]
+  public_configs = [ ":uapi" ]
 }
 
-config("uapi_defines") {
+config("uapi") {
+  include_dirs = [ "$target_gen_dir/uapi/$zircon_cpu/include" ]
   defines = [
     "_STRUCT_TIMESPEC",
     "_KERNEL_MISTOS_UAPI",
   ]
 }
 
-#action("generate_uapi_headers") {
-#  script = "generate_uapi_headers.sh"
-#  outputs = [ "$target_gen_dir/uapi" ]
-#  no_output_dir_leaks = false
-#  args = [
-#    "--download-kernel",
-#
-#    # Kernel 6.6 LTS version
-#    "--branch",
-#    "v6.6",
-#    "--out-dir",
-#    rebase_path(target_gen_dir, root_build_dir),
-#  ]
-#}
+action("generate_uapi_headers") {
+  script = "generate_uapi_headers.sh"
+  outputs = [ "$target_gen_dir/uapi" ]
+  no_output_dir_leaks = false
+  args = [
+    "--download-kernel",
+
+    # Kernel 6.6 LTS version
+    "--branch",
+    "v6.6",
+    "--out-dir",
+    rebase_path(target_gen_dir, root_build_dir),
+  ]
+}
