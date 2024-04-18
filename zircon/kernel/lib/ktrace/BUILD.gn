@@ -52,6 +52,9 @@ config("suppress-warning.config") {
     "//zircon/third_party/ulib/*",
     "//zircon/vdso/*",
   ]
+  if (is_mistos) {
+    visibility += [ "//third_party/linux-kernel/*" ]
+  }
   if (!is_gcc) {
     # Silence warning in Clang about GNU extension used in string_ref.h.
     cflags_cc = [ "-Wno-gnu-string-literal-operator-template" ]

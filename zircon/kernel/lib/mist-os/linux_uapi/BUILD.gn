@@ -1,0 +1,34 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/zircon/migrated_targets.gni")
+
+zx_library("linux_uapi") {
+  sources = []
+  public_deps = []
+  deps = [ ":generate_uapi_headers" ]
+  public_configs = [ ":uapi_defines" ]
+}
+
+config("uapi_defines") {
+  defines = [
+    "_STRUCT_TIMESPEC",
+    "_KERNEL_MISTOS_UAPI",
+  ]
+}
+
+#action("generate_uapi_headers") {
+#  script = "generate_uapi_headers.sh"
+#  outputs = [ "$target_gen_dir/uapi" ]
+#  no_output_dir_leaks = false
+#  args = [
+#    "--download-kernel",
+#
+#    # Kernel 6.6 LTS version
+#    "--branch",
+#    "v6.6",
+#    "--out-dir",
+#    rebase_path(target_gen_dir, root_build_dir),
+#  ]
+#}
