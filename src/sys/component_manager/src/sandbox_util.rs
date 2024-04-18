@@ -20,7 +20,7 @@ use {
         epitaph::ChannelEpitaphExt,
         AsyncChannel,
     },
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{future::BoxFuture, FutureExt},
     sandbox::{Capability, Dict, Message, Open, Sendable, Sender},
     std::{fmt::Debug, sync::Arc},
@@ -43,7 +43,11 @@ pub trait DictExt {
     fn get_capability(&self, path: &impl IterablePath) -> Option<Capability>;
 
     /// Inserts the capability at the path. Intermediary dictionaries are created as needed.
-    fn insert_capability(&self, path: &impl IterablePath, capability: Capability);
+    fn insert_capability(
+        &self,
+        path: &impl IterablePath,
+        capability: Capability,
+    ) -> Result<(), fsandbox::DictionaryError>;
 
     /// Removes the capability at the path, if it exists.
     fn remove_capability(&self, path: &impl IterablePath);
@@ -69,18 +73,22 @@ impl DictExt for Dict {
                     // Lifetimes are weird here with the MutexGuard, so we do this in two steps
                     let sub_dict = current_dict
                         .lock_entries()
-                        .get(current_name.as_str())
+                        .get(current_name)
                         .and_then(|value| value.clone().to_dictionary())?;
                     current_dict = sub_dict;
 
                     current_name = next_name;
                 }
-                None => return current_dict.lock_entries().get(current_name.as_str()).cloned(),
+                None => return current_dict.lock_entries().get(current_name).cloned(),
             }
         }
     }
 
-    fn insert_capability(&self, path: &impl IterablePath, capability: Capability) {
+    fn insert_capability(
+        &self,
+        path: &impl IterablePath,
+        capability: Capability,
+    ) -> Result<(), fsandbox::DictionaryError> {
         let mut segments = path.iter_segments();
         let mut current_name = segments.next().expect("path must be non-empty");
         let mut current_dict = self.clone();
@@ -88,20 +96,23 @@ impl DictExt for Dict {
             match segments.next() {
                 Some(next_name) => {
                     // Lifetimes are weird here with the MutexGuard, so we do this in two steps
-                    let sub_dict = current_dict
-                        .lock_entries()
-                        .entry(current_name.clone())
-                        .or_insert(Capability::Dictionary(Dict::new()))
-                        .clone()
-                        .to_dictionary()
-                        .unwrap();
+                    let sub_dict = {
+                        let mut entries = current_dict.lock_entries();
+                        match entries.get(current_name) {
+                            Some(cap) => cap.clone().to_dictionary().unwrap(),
+                            None => {
+                                let cap = Capability::Dictionary(Dict::new());
+                                entries.insert(current_name.clone(), cap.clone())?;
+                                cap.to_dictionary().unwrap()
+                            }
+                        }
+                    };
                     current_dict = sub_dict;
 
                     current_name = next_name;
                 }
                 None => {
-                    current_dict.lock_entries().insert(current_name.clone(), capability);
-                    return;
+                    return current_dict.lock_entries().insert(current_name.clone(), capability);
                 }
             }
         }
@@ -116,7 +127,7 @@ impl DictExt for Dict {
                 Some(next_name) => {
                     let sub_dict = current_dict
                         .lock_entries()
-                        .get(current_name.as_str())
+                        .get(current_name)
                         .and_then(|value| value.clone().to_dictionary());
                     if sub_dict.is_none() {
                         // The capability doesn't exist, there's nothing to remove.
@@ -126,7 +137,7 @@ impl DictExt for Dict {
                     current_name = next_name;
                 }
                 None => {
-                    current_dict.lock_entries().remove(current_name.as_str());
+                    current_dict.lock_entries().remove(current_name);
                     return;
                 }
             }
@@ -144,7 +155,7 @@ impl DictExt for Dict {
             let Capability::Dictionary(current_dict) = &current_capability else { return Ok(None) };
 
             // Get the capability.
-            let capability = current_dict.lock_entries().get(next_name.as_str()).cloned();
+            let capability = current_dict.lock_entries().get(next_name).cloned();
 
             // The capability doesn't exist.
             let Some(capability) = capability else { return Ok(None) };
@@ -441,12 +452,21 @@ pub mod tests {
     #[fuchsia::test]
     async fn get_capability() {
         let sub_dict = Dict::new();
-        sub_dict.lock_entries().insert("bar".parse().unwrap(), Capability::Dictionary(Dict::new()));
+        sub_dict
+            .lock_entries()
+            .insert("bar".parse().unwrap(), Capability::Dictionary(Dict::new()))
+            .expect("dict entry already exists");
         let (_, sender) = Receiver::new();
-        sub_dict.lock_entries().insert("baz".parse().unwrap(), sender.into());
+        sub_dict
+            .lock_entries()
+            .insert("baz".parse().unwrap(), sender.into())
+            .expect("dict entry already exists");
 
         let test_dict = Dict::new();
-        test_dict.lock_entries().insert("foo".parse().unwrap(), Capability::Dictionary(sub_dict));
+        test_dict
+            .lock_entries()
+            .insert("foo".parse().unwrap(), Capability::Dictionary(sub_dict))
+            .expect("dict entry already exists");
 
         assert!(test_dict.get_capability(&RelativePath::dot()).is_some());
         assert!(test_dict.get_capability(&RelativePath::new("nonexistent").unwrap()).is_none());
@@ -459,18 +479,24 @@ pub mod tests {
     #[fuchsia::test]
     async fn insert_capability() {
         let test_dict = Dict::new();
-        test_dict.insert_capability(&RelativePath::new("foo/bar").unwrap(), Dict::new().into());
+        assert!(test_dict
+            .insert_capability(&RelativePath::new("foo/bar").unwrap(), Dict::new().into())
+            .is_ok());
         assert!(test_dict.get_capability(&RelativePath::new("foo/bar").unwrap()).is_some());
 
         let (_, sender) = Receiver::new();
-        test_dict.insert_capability(&RelativePath::new("foo/baz").unwrap(), sender.into());
+        assert!(test_dict
+            .insert_capability(&RelativePath::new("foo/baz").unwrap(), sender.into())
+            .is_ok());
         assert!(test_dict.get_capability(&RelativePath::new("foo/baz").unwrap()).is_some());
     }
 
     #[fuchsia::test]
     async fn remove_capability() {
         let test_dict = Dict::new();
-        test_dict.insert_capability(&RelativePath::new("foo/bar").unwrap(), Dict::new().into());
+        assert!(test_dict
+            .insert_capability(&RelativePath::new("foo/bar").unwrap(), Dict::new().into())
+            .is_ok());
         assert!(test_dict.get_capability(&RelativePath::new("foo/bar").unwrap()).is_some());
 
         test_dict.remove_capability(&RelativePath::new("foo/bar").unwrap());
@@ -485,18 +511,22 @@ pub mod tests {
     async fn get_with_request_ok() {
         let bar = Dict::new();
         let data = Data::String("hello".to_owned());
-        bar.insert_capability(&RelativePath::new("data").unwrap(), data.into());
+        assert!(bar.insert_capability(&RelativePath::new("data").unwrap(), data.into()).is_ok());
         // Put bar behind a few layers of Router for good measure.
         let bar_router = Router::new_ok(bar);
         let bar_router = Router::new_ok(bar_router);
         let bar_router = Router::new_ok(bar_router);
 
         let foo = Dict::new();
-        foo.insert_capability(&RelativePath::new("bar").unwrap(), bar_router.into());
+        assert!(foo
+            .insert_capability(&RelativePath::new("bar").unwrap(), bar_router.into())
+            .is_ok());
         let foo_router = Router::new_ok(foo);
 
         let dict = Dict::new();
-        dict.insert_capability(&RelativePath::new("foo").unwrap(), foo_router.into());
+        assert!(dict
+            .insert_capability(&RelativePath::new("foo").unwrap(), foo_router.into())
+            .is_ok());
 
         let cap = dict
             .get_with_request(
@@ -514,7 +544,7 @@ pub mod tests {
     async fn get_with_request_error() {
         let dict = Dict::new();
         let foo = Router::new_error(RoutingError::SourceCapabilityIsVoid);
-        dict.insert_capability(&RelativePath::new("foo").unwrap(), foo.into());
+        assert!(dict.insert_capability(&RelativePath::new("foo").unwrap(), foo.into()).is_ok());
         let cap = dict
             .get_with_request(
                 &RelativePath::new("foo/bar").unwrap(),
@@ -555,7 +585,7 @@ pub mod tests {
 
         let foo = Dict::new();
         let foo = Router::new_ok(foo);
-        dict.insert_capability(&RelativePath::new("foo").unwrap(), foo.into());
+        assert!(dict.insert_capability(&RelativePath::new("foo").unwrap(), foo.into()).is_ok());
 
         let cap = dict
             .get_with_request(
@@ -705,7 +735,10 @@ pub mod tests {
     async fn lazy_get() {
         let source = Capability::Data(Data::String("hello".to_string()));
         let dict1 = Dict::new();
-        dict1.lock_entries().insert("source".parse().unwrap(), source);
+        dict1
+            .lock_entries()
+            .insert("source".parse().unwrap(), source)
+            .expect("dict entry already exists");
 
         let base_router = Router::new_ok(dict1);
         let downscoped_router = base_router.lazy_get(
@@ -731,13 +764,25 @@ pub mod tests {
     async fn lazy_get_deep() {
         let source = Capability::Data(Data::String("hello".to_string()));
         let dict1 = Dict::new();
-        dict1.lock_entries().insert("source".parse().unwrap(), source);
+        dict1
+            .lock_entries()
+            .insert("source".parse().unwrap(), source)
+            .expect("dict entry already exists");
         let dict2 = Dict::new();
-        dict2.lock_entries().insert("dict1".parse().unwrap(), Capability::Dictionary(dict1));
+        dict2
+            .lock_entries()
+            .insert("dict1".parse().unwrap(), Capability::Dictionary(dict1))
+            .expect("dict entry already exists");
         let dict3 = Dict::new();
-        dict3.lock_entries().insert("dict2".parse().unwrap(), Capability::Dictionary(dict2));
+        dict3
+            .lock_entries()
+            .insert("dict2".parse().unwrap(), Capability::Dictionary(dict2))
+            .expect("dict entry already exists");
         let dict4 = Dict::new();
-        dict4.lock_entries().insert("dict3".parse().unwrap(), Capability::Dictionary(dict3));
+        dict4
+            .lock_entries()
+            .insert("dict3".parse().unwrap(), Capability::Dictionary(dict3))
+            .expect("dict entry already exists");
 
         let base_router = Router::new_ok(dict4);
         let downscoped_router = base_router.lazy_get(

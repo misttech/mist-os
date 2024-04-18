@@ -649,7 +649,10 @@ impl ResolvedInstanceState {
                 None => continue,
             };
             let open = Open::new(RouteEntry::new(component.clone(), request, type_name.into()));
-            target_dict.insert_capability(target_name, open.into());
+            match target_dict.insert_capability(target_name, open.into()) {
+                Ok(()) => (),
+                Err(e) => warn!("failed to insert {} in target dict: {e:?}", target_name),
+            };
         }
     }
 

@@ -79,14 +79,9 @@ impl NamespaceBuilder {
         };
 
         // Insert the capability into the Dict.
-        {
-            let mut entries = dict.lock_entries();
-            if entries.contains_key(path.basename().as_str()) {
-                return Err(NamespaceError::Duplicate(path.clone().into()).into());
-            }
-            entries.insert(path.basename().clone(), cap);
-        }
-        Ok(())
+        dict.lock_entries()
+            .insert(path.basename().clone(), cap)
+            .map_err(|_| NamespaceError::Duplicate(path.clone().into()).into())
     }
 
     /// Add a capability `cap` at `path`. As a result, the framework will create a

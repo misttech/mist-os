@@ -48,10 +48,12 @@ pub fn build_component_sandbox(
     let declared_dictionaries = Dict::new();
 
     for environment_decl in &decl.environments {
-        environments.insert(
-            Name::new(&environment_decl.name).unwrap(),
-            build_environment(component, children, component_input, environment_decl),
-        );
+        environments
+            .insert(
+                Name::new(&environment_decl.name).unwrap(),
+                build_environment(component, children, component_input, environment_decl),
+            )
+            .ok();
     }
 
     for child in &decl.children {
@@ -65,7 +67,7 @@ pub fn build_component_sandbox(
             environment = component_input.environment();
         }
         let input = ComponentInput::new(environment);
-        child_inputs.insert(Name::new(&child.name).unwrap(), input);
+        child_inputs.insert(Name::new(&child.name).unwrap(), input).ok();
     }
 
     for collection in &decl.collections {
@@ -79,7 +81,7 @@ pub fn build_component_sandbox(
             environment = component_input.environment();
         }
         let input = ComponentInput::new(environment);
-        collection_inputs.insert(collection.name.clone(), input);
+        collection_inputs.insert(collection.name.clone(), input).ok();
     }
 
     for capability in &decl.capabilities {
@@ -108,7 +110,7 @@ pub fn build_component_sandbox(
                 assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
                 let child_name = Name::new(&child_ref.name).unwrap();
                 if child_inputs.get(&child_name).is_none() {
-                    child_inputs.insert(child_name.clone(), Default::default());
+                    child_inputs.insert(child_name.clone(), Default::default()).ok();
                 }
                 child_inputs
                     .get(&child_name)
@@ -117,16 +119,20 @@ pub fn build_component_sandbox(
             }
             cm_rust::OfferTarget::Collection(name) => {
                 if collection_inputs.get(name).is_none() {
-                    collection_inputs.insert(name.clone(), Default::default());
+                    collection_inputs.insert(name.clone(), Default::default()).ok();
                 }
                 collection_inputs.get(name).expect("collection input was just added").capabilities()
             }
             cm_rust::OfferTarget::Capability(name) => {
                 let mut entries = declared_dictionaries.lock_entries();
-                let dict = entries
-                    .entry(name.clone())
-                    .or_insert_with(|| Capability::Dictionary(Dict::new()))
-                    .clone();
+                let dict = match entries.get(name) {
+                    Some(dict) => dict.clone(),
+                    None => {
+                        let dict = Capability::Dictionary(Dict::new());
+                        entries.insert(name.clone(), dict.clone()).ok();
+                        dict
+                    }
+                };
                 let Capability::Dictionary(dict) = dict else {
                     panic!("wrong type in dict");
                 };
@@ -169,7 +175,12 @@ fn extend_dict_with_capability(
                 },
                 component.policy_checker().clone(),
             );
-            program_output_dict.insert_capability(capability.name(), router.into());
+            match program_output_dict.insert_capability(capability.name(), router.into()) {
+                Ok(()) => (),
+                Err(e) => {
+                    warn!("failed to add {} to program output dict: {e:?}", capability.name())
+                }
+            }
         }
         cm_rust::CapabilityDecl::Dictionary(d) => {
             extend_dict_with_dictionary(
@@ -238,8 +249,14 @@ fn extend_dict_with_dictionary(
     } else {
         Router::new_ok(dict.clone())
     };
-    declared_dictionaries.insert_capability(&decl.name, dict.into());
-    program_output_dict.insert_capability(&decl.name, router.into());
+    match declared_dictionaries.insert_capability(&decl.name, dict.into()) {
+        Ok(()) => (),
+        Err(e) => warn!("failed to add {} to declared dicts: {e:?}", decl.name),
+    };
+    match program_output_dict.insert_capability(&decl.name, router.into()) {
+        Ok(()) => (),
+        Err(e) => warn!("failed to add {} to program output dict: {e:?}", decl.name),
+    }
 }
 
 fn build_environment(
@@ -282,7 +299,13 @@ fn build_environment(
                 )
             }
         };
-        environment.debug().insert_capability(&debug_protocol.target_name, router.into());
+        match environment.debug().insert_capability(&debug_protocol.target_name, router.into()) {
+            Ok(()) => (),
+            Err(e) => warn!(
+                "failed to add {} to debug capabilities dict: {e:?}",
+                debug_protocol.target_name
+            ),
+        }
     }
     environment
 }
@@ -319,13 +342,15 @@ fn make_dict_extending_router(
             {
                 let mut entries = dict.lock_entries();
                 let source_entries = source_dict.lock_entries();
-                for source_key in source_entries.keys() {
-                    if entries.contains_key(source_key.as_str()) {
+                for source_key in source_entries.iter().map(|(k, _v)| k) {
+                    if let Some(_entry) = entries.get(source_key) {
                         return Err(RoutingError::BedrockSourceDictionaryCollision.into());
                     }
                 }
-                for (source_key, source_value) in &*source_entries {
-                    entries.insert(source_key.clone(), source_value.clone());
+                for (source_key, source_value) in source_entries.iter() {
+                    if let Err(_e) = entries.insert(source_key.clone(), source_value.clone()) {
+                        return Err(RoutingError::BedrockSourceDictionaryCollision.into());
+                    }
                 }
             }
             *did_combine.lock().unwrap() = true;
@@ -443,10 +468,15 @@ fn extend_dict_with_use(
         // UseSource::Environment is not used for protocol capabilities
         cm_rust::UseSource::Environment => return,
     };
-    program_input_dict.insert_capability(
+    match program_input_dict.insert_capability(
         &use_protocol.target_path,
         router.with_availability(*use_.availability()).into(),
-    );
+    ) {
+        Ok(()) => (),
+        Err(e) => {
+            warn!("failed to insert {} in program input dict: {e:?}", use_protocol.target_path)
+        }
+    }
 }
 
 /// Builds a router that obtains a capability that the program uses from `parent`.
@@ -596,8 +626,12 @@ fn extend_dict_with_offer(
         // This is only relevant for services, so this arm is never reached.
         cm_rust::OfferSource::Collection(_name) => return,
     };
-    target_dict
-        .insert_capability(target_name, router.with_availability(*offer.availability()).into());
+    match target_dict
+        .insert_capability(target_name, router.with_availability(*offer.availability()).into())
+    {
+        Ok(()) => (),
+        Err(e) => warn!("failed to insert {target_name} into target dict: {e:?}"),
+    }
 }
 
 pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
@@ -679,8 +713,12 @@ fn extend_dict_with_expose(
         // This is only relevant for services, so this arm is never reached.
         cm_rust::ExposeSource::Collection(_name) => return,
     };
-    target_dict
-        .insert_capability(target_name, router.with_availability(*expose.availability()).into());
+    match target_dict
+        .insert_capability(target_name, router.with_availability(*expose.availability()).into())
+    {
+        Ok(()) => (),
+        Err(e) => warn!("failed to insert {target_name} into target_dict: {e:?}"),
+    }
 }
 
 fn new_unit_router() -> Router {

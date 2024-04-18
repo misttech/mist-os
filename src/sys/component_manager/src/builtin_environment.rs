@@ -421,17 +421,20 @@ impl RootComponentInputBuilder {
 
         let launch = LaunchTaskOnReceive::new(
             self.top_instance.task_group().as_weak(),
-            name,
+            name.clone(),
             Some((self.policy_checker.clone(), capability_source)),
             Arc::new(move |server_end, _| {
                 task_to_launch(crate::sandbox_util::take_handle_as_stream::<P>(server_end)).boxed()
             }),
         );
 
-        self.input.insert_capability(
+        match self.input.insert_capability(
             &P::PROTOCOL_NAME.parse::<Name>().unwrap(),
             launch.into_router().into(),
-        );
+        ) {
+            Ok(()) => (),
+            Err(e) => warn!("failed to add {name} to root component input: {e:?}"),
+        }
     }
 
     fn add_namespace_protocol(&mut self, protocol: &cm_rust::ProtocolDecl) {
@@ -463,7 +466,10 @@ impl RootComponentInputBuilder {
                 fut.boxed()
             }),
         );
-        self.input.insert_capability(&protocol.name, launch.into_router().into());
+        match self.input.insert_capability(&protocol.name, launch.into_router().into()) {
+            Ok(()) => (),
+            Err(e) => warn!("failed to add {} to root component input: {e:?}", protocol.name),
+        }
     }
 
     fn build(self) -> ComponentInput {
@@ -1421,7 +1427,7 @@ impl BuiltinEnvironment {
                 task_to_launch(crate::sandbox_util::take_handle_as_stream::<P>(server_end)).boxed()
             }),
         );
-        self.root_component_input.insert_capability(&name, launch.into_router().into());
+        self.root_component_input.insert_capability(&name, launch.into_router().into()).unwrap();
     }
 
     #[cfg(test)]

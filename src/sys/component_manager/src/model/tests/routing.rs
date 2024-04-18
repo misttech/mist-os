@@ -1089,7 +1089,9 @@ async fn create_child_with_dict() {
 
     // CreateChild dictionary entries must be Open capabilities.
     // TODO(https://fxbug.dev/319542502): Insert the external Router type, once it exists
-    dict.lock_entries().insert("hippo".parse().unwrap(), sender.into());
+    dict.lock_entries()
+        .insert("hippo".parse().unwrap(), sender.into())
+        .expect("dict entry already exists");
 
     let dictionary_client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
 

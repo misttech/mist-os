@@ -154,7 +154,7 @@ impl Router {
         let entries = dict.lock_entries();
         let out = Dict::new();
         let mut out_entries = out.lock_entries();
-        for (key, value) in &*entries {
+        for (key, value) in entries.iter() {
             let value = match value {
                 Capability::Dictionary(dict) => {
                     Capability::Dictionary(Self::dict_routers_to_open(weak_component, dict))
@@ -177,7 +177,7 @@ impl Router {
                 }
                 other => other.clone(),
             };
-            out_entries.insert(key.clone(), value);
+            out_entries.insert(key.clone(), value.clone()).ok();
         }
         drop(out_entries);
         out

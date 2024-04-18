@@ -61,7 +61,7 @@ use {
     },
     manager::ComponentManagerInstance,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
-    sandbox::{Capability, Dict, Open},
+    sandbox::{Capability, Dict, DictEntries, Open},
     std::{
         clone::Clone,
         collections::{HashMap, HashSet},
@@ -509,7 +509,7 @@ impl ComponentInstance {
             };
             let dict_entries = {
                 let mut entries = dict.lock_entries();
-                std::mem::replace(&mut *entries, std::collections::BTreeMap::new())
+                std::mem::replace(&mut *entries, DictEntries::new())
             };
             let capabilities = child_input.capabilities();
             let mut child_dict_entries = capabilities.lock_entries();
@@ -527,9 +527,8 @@ impl ComponentInstance {
                     _ => return Err(AddDynamicChildError::InvalidDictionary),
                 };
 
-                if child_dict_entries
-                    .insert(key.clone(), Capability::Router(Box::new(router)))
-                    .is_some()
+                if let Err(_) =
+                    child_dict_entries.insert(key.clone(), Capability::Router(Box::new(router)))
                 {
                     return Err(AddDynamicChildError::StaticRouteConflict { capability_name: key });
                 }
