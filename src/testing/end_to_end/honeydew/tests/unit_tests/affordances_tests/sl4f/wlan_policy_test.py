@@ -65,7 +65,7 @@ class WlanPolicySL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_connect(self, parameterized_dict) -> None:
+    def test_connect(self, parameterized_dict: dict[str, Any]) -> None:
         """Test for WlanPolicy.connect()."""
         self.sl4f_obj.run.return_value = parameterized_dict["return_value"]
 
@@ -157,7 +157,9 @@ class WlanPolicySL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_get_saved_networks(self, parameterized_dict) -> None:
+    def test_get_saved_networks(
+        self, parameterized_dict: dict[str, Any]
+    ) -> None:
         """Test for WlanPolicy.get_saved_networks()."""
         self.sl4f_obj.run.return_value = parameterized_dict["return_value"]
 
@@ -278,7 +280,7 @@ class WlanPolicySL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_get_update(self, parameterized_dict) -> None:
+    def test_get_update(self, parameterized_dict: dict[str, Any]) -> None:
         """Testcase for WlanPolicy.get_update()"""
         self.sl4f_obj.run.return_value = parameterized_dict["return_value"]
 
@@ -349,7 +351,9 @@ class WlanPolicySL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_scan_for_networks(self, parameterized_dict) -> None:
+    def test_scan_for_networks(
+        self, parameterized_dict: dict[str, Any]
+    ) -> None:
         """Test for WlanPolicy.scan_for_networks()."""
         self.sl4f_obj.run.return_value = parameterized_dict["return_value"]
 
