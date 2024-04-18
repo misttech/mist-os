@@ -7,10 +7,10 @@
 import json
 import hashlib
 import dataclasses
-from pathlib import Path
 from file_access import FileAccess
 from gn_label import GnLabel
 from typing import Callable, Dict, List, Any, Tuple, TypeAlias
+import os
 
 AnyDict: TypeAlias = Dict[Any, Any]
 
@@ -64,7 +64,7 @@ class SpdxWriter:
                 "name": self.root_package_name,
                 "documentNamespace": "",
                 "creationInfo": {
-                    "creators": [f"Tool: {Path(__file__).name}"],
+                    "creators": [f"Tool: {os.path.basename(__file__)}"],
                 },
                 "dataLicense": "CC0-1.0",
                 "documentDescribes": self.document_describes,
@@ -153,7 +153,7 @@ class SpdxWriter:
             key=lambda x: x["spdxElementId"] + x["relatedSpdxElement"]
         )
 
-    def save(self, file_path: Path) -> None:
+    def save(self, file_path: str) -> None:
         self._sort_elements()
         with open(file_path, "w") as f:
             json.dump(self.json_document, f, indent=4)
