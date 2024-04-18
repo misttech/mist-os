@@ -18,7 +18,7 @@ use {
         repo_builder::RepoBuilder,
         repo_client::{RepoClient, RepositoryPackage},
         repo_keys::RepoKeys,
-        repository::{Error as RepoError, PmRepository},
+        repository::{Error as RepoError, PmRepository, RepoProvider as _},
     },
     futures::{AsyncReadExt as _, StreamExt as _},
     sdk_metadata::get_repositories,
@@ -184,6 +184,7 @@ pub async fn repo_package_manifest_list(
 
             let package_manifest = PackageManifest::from_blobs_dir(
                 blobs_dir.as_std_path(),
+                Some(src_repo.blob_type()),
                 package.hash,
                 manifests_dir.as_std_path(),
             )
@@ -319,11 +320,8 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
         let file = File::create(blob_manifest_path)
             .with_context(|| format!("creating {}", blob_manifest_path))?;
 
-        serde_json::to_writer(
-            std::io::BufWriter::new(file),
-            &staged_blobs.into_values().collect::<BTreeSet<fuchsia_pkg::BlobInfo>>(),
-        )
-        .with_context(|| format!("writing {}", blob_manifest_path))?;
+        serde_json::to_writer(std::io::BufWriter::new(file), &staged_blobs)
+            .with_context(|| format!("writing {}", blob_manifest_path))?;
     }
 
     Ok(())
