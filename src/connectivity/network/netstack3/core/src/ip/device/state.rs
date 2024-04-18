@@ -321,6 +321,11 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceAddresses<Instant, 
         self.addrs.iter()
     }
 
+    /// Iterates over strong clones of addresses assigned to this device.
+    pub(crate) fn strong_iter(&self) -> AddressIdIter<'_, Instant, I> {
+        AddressIdIter(self.addrs.iter())
+    }
+
     /// Adds an IP address to this interface.
     pub(crate) fn add(
         &mut self,
@@ -347,6 +352,22 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceAddresses<Instant, 
             .find(|(_, entry)| &entry.addr().addr() == addr)
             .ok_or(crate::error::NotFoundError)?;
         Ok(self.addrs.remove(index))
+    }
+}
+
+/// An iterator over address StrongIds. Created from `IpDeviceAddresses`.
+pub struct AddressIdIter<'a, Instant: crate::Instant, I: Ip + IpDeviceStateIpExt>(
+    core::slice::Iter<'a, PrimaryRc<I::AssignedAddress<Instant>>>,
+);
+
+impl<'a, Instant: crate::Instant, I: Ip + IpDeviceStateIpExt> Iterator
+    for AddressIdIter<'a, Instant, I>
+{
+    type Item = StrongRc<I::AssignedAddress<Instant>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self(inner) = self;
+        inner.next().map(PrimaryRc::clone_strong)
     }
 }
 

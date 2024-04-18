@@ -1167,12 +1167,11 @@ where
         device::IpDeviceStateContext::<I, BC>::get_address_id(core_ctx, device_id, addr)
     }
 
+    type AddressIdsIter<'b> =
+        <CoreCtx<'a, BC, L> as device::IpDeviceStateContext<I, BC>>::AddressIdsIter<'b>;
     fn with_address_ids<
         O,
-        F: FnOnce(
-            Box<dyn Iterator<Item = Self::AddressId> + '_>,
-            &mut Self::IpDeviceAddressCtx<'_>,
-        ) -> O,
+        F: FnOnce(Self::AddressIdsIter<'_>, &mut Self::IpDeviceAddressCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,

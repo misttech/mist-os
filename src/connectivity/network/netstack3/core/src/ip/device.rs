@@ -595,15 +595,14 @@ pub trait IpDeviceStateContext<I: IpDeviceIpExt, BT: InstantBindingsTypes>:
         addr: SpecifiedAddr<I::Addr>,
     ) -> Result<Self::AddressId, NotFoundError>;
 
+    /// The iterator given to `with_address_ids`.
+    type AddressIdsIter<'a>: Iterator<Item = Self::AddressId> + 'a;
+
     /// Calls the function with an iterator over all the address IDs associated
     /// with the device.
-    // TODO(https://fxbug.dev/42059236): Avoid dynamic dispatch.
     fn with_address_ids<
         O,
-        F: FnOnce(
-            Box<dyn Iterator<Item = Self::AddressId> + '_>,
-            &mut Self::IpDeviceAddressCtx<'_>,
-        ) -> O,
+        F: FnOnce(Self::AddressIdsIter<'_>, &mut Self::IpDeviceAddressCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
