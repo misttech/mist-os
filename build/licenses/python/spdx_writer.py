@@ -168,7 +168,7 @@ class SpdxWriter:
         md5 = hashlib.md5()
         md5.update(public_package_name.strip().encode("utf-8"))
         for ll in license_labels:
-            md5.update(str(ll.path).encode("utf-8"))
+            md5.update(str(ll.path_str).encode("utf-8"))
         digest = md5.hexdigest()
         return f"SPDXRef-Package-{digest}"
 
@@ -177,6 +177,6 @@ class SpdxWriter:
     ) -> str:
         md5 = hashlib.md5()
         md5.update(public_package_name.strip().encode("utf-8"))
-        md5.update(str(license_label.path).encode("utf-8"))
+        md5.update(str(license_label.path_str).encode("utf-8"))
         digest = md5.hexdigest()
         return f"LicenseRef-{digest}"

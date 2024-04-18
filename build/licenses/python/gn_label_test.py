@@ -14,7 +14,7 @@ class GnLabelTest(unittest.TestCase):
     def test_from_str(self):
         label = GnLabel.from_str("//path/to/foo")
         self.assertEqual(label.gn_str, "//path/to/foo")
-        self.assertEqual(label.path, Path("path/to/foo"))
+        self.assertEqual(label.path_str, "path/to/foo")
         self.assertEqual(label.name, "foo")
         self.assertFalse(label.is_local_name)
         self.assertIsNone(label.toolchain)
@@ -23,14 +23,14 @@ class GnLabelTest(unittest.TestCase):
         toolchain = GnLabel.from_str("//some/toolchain")
         label = GnLabel.from_str("//path/to/foo(//some/toolchain)")
         self.assertEqual(label.gn_str, "//path/to/foo(//some/toolchain)")
-        self.assertEqual(label.path, Path("path/to/foo"))
+        self.assertEqual(label.path_str, "path/to/foo")
         self.assertEqual(label.name, "foo")
         self.assertEqual(label.toolchain, toolchain)
 
     def test_from_str_with_local_name(self):
         label = GnLabel.from_str("//path/to/foo:bar")
         self.assertEqual(label.gn_str, "//path/to/foo:bar")
-        self.assertEqual(label.path, Path("path/to/foo"))
+        self.assertEqual(label.path_str, "path/to/foo")
         self.assertEqual(label.name, "bar")
         self.assertTrue(label.is_local_name)
         self.assertIsNone(label.toolchain)
@@ -38,7 +38,7 @@ class GnLabelTest(unittest.TestCase):
     def test_from_str_with_redundant_local_name(self):
         label = GnLabel.from_str("//path/to/foo:foo")
         self.assertEqual(label.gn_str, "//path/to/foo:foo")
-        self.assertEqual(label.path, Path("path/to/foo"))
+        self.assertEqual(label.path_str, "path/to/foo")
         self.assertEqual(label.name, "foo")
         self.assertTrue(label.is_local_name)
         self.assertIsNone(label.toolchain)
@@ -47,7 +47,7 @@ class GnLabelTest(unittest.TestCase):
         toolchain = GnLabel.from_str("//some/toolchain")
         label = GnLabel.from_str("//path/to/foo:bar(//some/toolchain)")
         self.assertEqual(label.gn_str, "//path/to/foo:bar(//some/toolchain)")
-        self.assertEqual(label.path, Path("path/to/foo"))
+        self.assertEqual(label.path_str, "path/to/foo")
         self.assertEqual(label.name, "bar")
         self.assertEqual(label.toolchain, toolchain)
 
@@ -55,28 +55,28 @@ class GnLabelTest(unittest.TestCase):
         toolchain = GnLabel.from_str("//some/toolchain")
         label = GnLabel.from_str("//path/to/foo/../bar:baz(//some/toolchain)")
         self.assertEqual(label.gn_str, "//path/to/bar:baz(//some/toolchain)")
-        self.assertEqual(label.path, Path("path/to/bar"))
+        self.assertEqual(label.path_str, "path/to/bar")
         self.assertEqual(label.name, "baz")
         self.assertEqual(label.toolchain, toolchain)
 
     def test_from_str_root_path(self):
         label = GnLabel.from_str("//")
         self.assertEqual(label.gn_str, "//")
-        self.assertEqual(label.path, Path("."))
+        self.assertEqual(label.path_str, "")
         self.assertEqual(label.name, "")
         self.assertIsNone(label.toolchain)
 
     def test_from_root_path(self):
         label = GnLabel.from_path(Path(""))
         self.assertEqual(label.gn_str, "//")
-        self.assertEqual(label.path, Path("."))
+        self.assertEqual(label.path_str, "")
         self.assertEqual(label.name, "")
         self.assertIsNone(label.toolchain)
 
     def test_from_path(self):
         label = GnLabel.from_path(Path("path/to/foo"))
         self.assertEqual(label.gn_str, "//path/to/foo")
-        self.assertEqual(label.path, Path("path/to/foo"))
+        self.assertEqual(label.path_str, "path/to/foo")
         self.assertEqual(label.name, "foo")
         self.assertIsNone(label.toolchain)
 

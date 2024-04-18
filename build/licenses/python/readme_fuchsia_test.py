@@ -62,13 +62,13 @@ Some text
 
 @dataclasses.dataclass
 class MockFileAccess(FileAccess):
-    readme_content_by_path: Dict[Path, str] = None
+    readme_content_by_path: Dict[str, str] = None
 
     def read_text(self, label: GnLabel) -> str:
-        return self.readme_content_by_path[label.path]
+        return self.readme_content_by_path[label.path_str]
 
     def file_exists(self, label: GnLabel) -> bool:
-        return label.path in self.readme_content_by_path
+        return label.path_str in self.readme_content_by_path
 
 
 class ReadmesDBTest(unittest.TestCase):
@@ -88,12 +88,12 @@ class ReadmesDBTest(unittest.TestCase):
 
     def _mock_readme_files(self, file_paths: List[str]):
         for path in file_paths:
-            self.mock_content_by_path[Path(path)] = "Name: Foo"
+            self.mock_content_by_path[path] = "Name: Foo"
 
     def _assert_found_readme(self, for_label: str, expected_readme_path: str):
         readme = self.db.find_readme_for_label(GnLabel.from_str(for_label))
         self.assertIsNotNone(readme)
-        self.assertEqual(readme.readme_label.path, Path(expected_readme_path))
+        self.assertEqual(readme.readme_label.path_str, expected_readme_path)
 
     def _assert_readme_not_found(self, for_label: str):
         readme = self.db.find_readme_for_label(GnLabel.from_str(for_label))

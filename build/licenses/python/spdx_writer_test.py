@@ -13,7 +13,7 @@ import unittest
 
 class MockFileAccess(FileAccess):
     def read_text(self, label: GnLabel) -> str:
-        return f"TEXT FROM {label.path}"
+        return f"TEXT FROM {label.path_str}"
 
 
 class SpdxWriterTest(unittest.TestCase):
