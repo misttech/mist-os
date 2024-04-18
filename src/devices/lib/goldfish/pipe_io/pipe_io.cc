@@ -5,6 +5,7 @@
 #include "src/devices/lib/goldfish/pipe_io/pipe_io.h"
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
+#include <lib/dma-buffer/buffer.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/stdcompat/span.h>
@@ -49,12 +50,15 @@ zx_status_t PipeIo::SetupPipe() {
   }
   bti_ = std::move(result->value()->bti);
 
-  zx_status_t status = io_buffer_.Init(bti_.get(), PAGE_SIZE, IO_BUFFER_RW | IO_BUFFER_CONTIG);
-  io_buffer_size_ = io_buffer_.size();
+  std::unique_ptr<dma_buffer::BufferFactory> buffer_factory = dma_buffer::CreateBufferFactory();
+
+  zx_status_t status =
+      buffer_factory->CreateContiguous(bti_, /*size=*/PAGE_SIZE, /*alignment_log2=*/0, &io_buffer_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: Init IO buffer failed: %s", __func__, zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to create contiguous IO buffer: %s", zx_status_get_string(status));
     return status;
   }
+  io_buffer_size_ = io_buffer_->size();
 
   ZX_DEBUG_ASSERT(!pipe_event_.is_valid());
   status = zx::event::create(0u, &pipe_event_);
@@ -84,16 +88,13 @@ zx_status_t PipeIo::SetupPipe() {
     return set_event_result.status();
   }
 
-  status = cmd_buffer_.InitVmo(bti_.get(), vmo.get(), 0, IO_BUFFER_RW);
+  status = cmd_buffer_.Map(std::move(vmo));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: InitVmo failed: %s", __func__, zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to map the command buffer VMO: %s", zx_status_get_string(status));
     return status;
   }
 
-  auto release_buffer =
-      fit::defer([this]() TA_NO_THREAD_SAFETY_ANALYSIS { cmd_buffer_.release(); });
-
-  auto buffer = static_cast<PipeCmdBuffer*>(cmd_buffer_.virt());
+  auto buffer = static_cast<PipeCmdBuffer*>(cmd_buffer_.start());
   buffer->id = id_;
   buffer->cmd = static_cast<int32_t>(fuchsia_hardware_goldfish_pipe::PipeCmdCode::kOpen);
   buffer->status = static_cast<int32_t>(fuchsia_hardware_goldfish_pipe::PipeError::kInval);
@@ -108,10 +109,6 @@ zx_status_t PipeIo::SetupPipe() {
     zxlogf(ERROR, "%s: Open failed: %s", __func__, zx_status_get_string(buffer->status));
     return ZX_ERR_INTERNAL;
   }
-
-  // Keep buffer after successful execution of OPEN command. This way
-  // we'll send CLOSE later.
-  release_buffer.cancel();
 
   return ZX_OK;
 }
@@ -138,8 +135,8 @@ zx_status_t PipeIo::Init(const char* pipe_name) {
 PipeIo::~PipeIo() {
   fbl::AutoLock lock(&lock_);
   if (id_) {
-    if (cmd_buffer_.is_valid()) {
-      auto buffer = static_cast<PipeCmdBuffer*>(cmd_buffer_.virt());
+    if (cmd_buffer_.start() != nullptr) {
+      auto buffer = static_cast<PipeCmdBuffer*>(cmd_buffer_.start());
       buffer->id = id_;
       buffer->cmd = static_cast<int32_t>(fuchsia_hardware_goldfish_pipe::PipeCmdCode::kClose);
       buffer->status = static_cast<int32_t>(fuchsia_hardware_goldfish_pipe::PipeError::kInval);
@@ -153,12 +150,12 @@ PipeIo::~PipeIo() {
 }
 
 zx::result<uint32_t> PipeIo::TransferLocked(const TransferOp& op) {
-  auto buffer = static_cast<PipeCmdBuffer*>(cmd_buffer_.virt());
+  auto buffer = static_cast<PipeCmdBuffer*>(cmd_buffer_.start());
 
   buffer->rw_params.consumed_size = 0;
   buffer->rw_params.buffers_count = 1;
   buffer->rw_params.ptrs[0] = std::visit(
-      [base_addr = io_buffer_.phys()](const auto& data) -> zx_paddr_t {
+      [base_addr = io_buffer_->phys()](const auto& data) -> zx_paddr_t {
         using T = std::decay_t<decltype(data)>;
         if constexpr (std::is_same_v<T, TransferOp::IoBuffer>) {
           return base_addr + data.offset;
@@ -177,7 +174,7 @@ zx::result<uint32_t> PipeIo::TransferLocked(const TransferOp& op) {
 
 zx::result<uint32_t> PipeIo::TransferLocked(cpp20::span<const TransferOp> ops) {
   ZX_DEBUG_ASSERT(!ops.empty());
-  auto buffer = static_cast<PipeCmdBuffer*>(cmd_buffer_.virt());
+  auto buffer = static_cast<PipeCmdBuffer*>(cmd_buffer_.start());
 
   bool has_read = false;
   bool has_write = false;
@@ -201,7 +198,7 @@ zx::result<uint32_t> PipeIo::TransferLocked(cpp20::span<const TransferOp> ops) {
     }
 
     buffer->rw_params.ptrs[i] = std::visit(
-        [base_addr = io_buffer_.phys()](const auto& data) -> zx_paddr_t {
+        [base_addr = io_buffer_->phys()](const auto& data) -> zx_paddr_t {
           using T = std::decay_t<decltype(data)>;
           if constexpr (std::is_same_v<T, TransferOp::IoBuffer>) {
             return base_addr + data.offset;
@@ -220,7 +217,7 @@ zx::result<uint32_t> PipeIo::TransferLocked(cpp20::span<const TransferOp> ops) {
 
 zx::result<uint32_t> PipeIo::ExecTransferCommandLocked(bool has_write, bool has_read) {
   ZX_DEBUG_ASSERT(has_write || has_read);
-  auto buffer = static_cast<PipeCmdBuffer*>(cmd_buffer_.virt());
+  auto buffer = static_cast<PipeCmdBuffer*>(cmd_buffer_.start());
   buffer->id = id_;
   buffer->cmd =
       has_read
@@ -296,7 +293,7 @@ zx::result<size_t> PipeIo::ReadOnceLocked(void* buf, size_t size) {
   });
 
   if (status.is_ok()) {
-    memcpy(buf, io_buffer_.virt(), status.value());
+    memcpy(buf, io_buffer_->virt(), status.value());
   }
   return status;
 }
@@ -349,7 +346,7 @@ zx_status_t PipeIo::CallTo(cpp20::span<const WriteSrc> sources, void* read_dst, 
         return ZX_ERR_INVALID_ARGS;
       }
 
-      char* target_buf = reinterpret_cast<char*>(io_buffer_.virt()) + io_buffer_offset;
+      char* target_buf = reinterpret_cast<char*>(io_buffer_->virt()) + io_buffer_offset;
       std::copy(str->begin(), str->end(), target_buf);
       target_buf[str->length()] = '\0';
 
@@ -367,7 +364,7 @@ zx_status_t PipeIo::CallTo(cpp20::span<const WriteSrc> sources, void* read_dst, 
       }
 
       std::copy(span->begin(), span->end(),
-                reinterpret_cast<uint8_t*>(io_buffer_.virt()) + io_buffer_offset);
+                reinterpret_cast<uint8_t*>(io_buffer_->virt()) + io_buffer_offset);
       transfer_ops.push_back(TransferOp{
           .type = TransferOp::Type::kWrite,
           .data = TransferOp::IoBuffer{.offset = io_buffer_offset},
@@ -441,7 +438,7 @@ zx_status_t PipeIo::CallTo(cpp20::span<const WriteSrc> sources, void* read_dst, 
     }
   }
 
-  memcpy(read_dst, io_buffer_.virt(), read_size);
+  memcpy(read_dst, io_buffer_->virt(), read_size);
 
   return ZX_OK;
 }

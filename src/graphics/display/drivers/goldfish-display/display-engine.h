@@ -186,9 +186,6 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
       buffer_collections_;
 
   std::unique_ptr<RenderControl> rc_;
-  zx::bti bti_;
-  ddk::IoBuffer cmd_buffer_ TA_GUARDED(lock_);
-  ddk::IoBuffer io_buffer_ TA_GUARDED(lock_);
   DisplayState primary_display_device_ = {};
   fbl::Mutex flush_lock_;
   ddk::DisplayControllerInterfaceProtocolClient dc_intf_ TA_GUARDED(flush_lock_);

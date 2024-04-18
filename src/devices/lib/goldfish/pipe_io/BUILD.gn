@@ -18,6 +18,7 @@ source_set("pipe_io") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.goldfish:fuchsia.hardware.goldfish_cpp",
     "//sdk/fidl/fuchsia.hardware.goldfish.pipe:fuchsia.hardware.goldfish.pipe_cpp",
+    "//src/devices/lib/dma-buffer",
     "//src/devices/lib/goldfish/pipe_headers",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
     "//src/lib/ddk",
