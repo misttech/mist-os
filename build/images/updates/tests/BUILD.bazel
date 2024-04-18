@@ -34,7 +34,6 @@ fuchsia_product_configuration(
             "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "utility",
             "storage": {
-                "configure_fshost": True,
                 "filesystems": {
                     "image_name": "fx_publish",
                     "volume": {

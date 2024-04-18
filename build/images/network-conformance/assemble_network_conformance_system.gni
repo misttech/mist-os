@@ -53,7 +53,6 @@ template("assemble_network_conformance_system") {
         config_type = "none"
       }
       storage = {
-        configure_fshost = true
         filesystems = {
           image_name = _image_name
           volume = {
@@ -76,7 +75,6 @@ template("assemble_network_conformance_system") {
         config_type = "none"
       }
       storage = {
-        configure_fshost = true
         filesystems = {
           image_name = _image_name
         }

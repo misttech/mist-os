@@ -32,9 +32,6 @@ _PRODUCT_CONFIG_BASE_JSON = {
                 INPUT_DEVICE_TYPE.TOUCHSCREEN,
             ],
         },
-        "storage": {
-            "configure_fshost": True,
-        },
     },
     "product": {
         "build_info": DEFAULT_PRODUCT_BUILD_INFO,

@@ -189,10 +189,11 @@ if (is_fuchsia) {
   recovery_fdr_packages -= [ "//src/recovery/system:system_recovery" ]
   recovery_fdr_packages += [ "//src/recovery/system:system_recovery_fdr" ]
 
+  _storage_config = {
+  }
   if (!fxfs_blob) {
     _storage_config = {
       storage = {
-        configure_fshost = true
         filesystems = {
           volume = {
             fvm = {
@@ -204,12 +205,6 @@ if (is_fuchsia) {
             }
           }
         }
-      }
-    }
-  } else {
-    _storage_config = {
-      storage = {
-        configure_fshost = true
       }
     }
   }

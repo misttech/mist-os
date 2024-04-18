@@ -51,7 +51,6 @@ fuchsia_product_configuration(
             "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "bootstrap",
             "storage": {
-                "configure_fshost": True,
                 "filesystems": {
                     "volume": {
                         "fvm": {

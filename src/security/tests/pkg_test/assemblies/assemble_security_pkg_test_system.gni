@@ -231,7 +231,6 @@ template("assemble_security_pkg_test_system") {
       # code from the "main" assembly.
       feature_set_level = "bootstrap"
       storage = {
-        configure_fshost = true
         filesystems = {
           image_name = labels.assembly
           volume = {
@@ -262,7 +261,6 @@ template("assemble_security_pkg_test_system") {
       # code from the "main" assembly.
       feature_set_level = "bootstrap"
       storage = {
-        configure_fshost = true
         filesystems = {
           image_name = labels.assembly
         }

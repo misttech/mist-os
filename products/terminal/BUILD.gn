@@ -28,10 +28,6 @@ product_assembly_configuration("terminal") {
       snoop = "lazy"
     }
 
-    storage = {
-      configure_fshost = true
-    }
-
     development_support = {
       include_sl4f = true
 

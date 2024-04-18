@@ -129,7 +129,6 @@ if (labels.images == "//build/images/bringup") {
       build_type = "eng"
       feature_set_level = "utility"
       storage = {
-        configure_fshost = true
         filesystems = {
           no_zxcrypt = true
           volume = {
