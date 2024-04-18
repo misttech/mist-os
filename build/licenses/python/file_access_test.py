@@ -8,6 +8,7 @@
 from file_access import FileAccess
 from gn_label import GnLabel
 from pathlib import Path
+import os
 import tempfile
 import unittest
 
@@ -20,7 +21,9 @@ class FileAccessTest(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.temp_dir_path = Path(self.temp_dir.name)
-        self.file_access = FileAccess(fuchsia_source_path=self.temp_dir_path)
+        self.file_access = FileAccess(
+            fuchsia_source_path_str=self.temp_dir.name
+        )
 
         file_path1 = self.temp_dir_path / "foo"
         file_path1.write_text("FOO")
@@ -70,7 +73,7 @@ class FileAccessTest(unittest.TestCase):
     def test_search_directory_with_predicate(self):
         children = self.file_access.search_directory(
             GnLabel.from_str("//"),
-            path_predicate=lambda path: path.name == "bar",
+            path_predicate=lambda path: os.path.basename(path) == "bar",
         )
         children.sort()
         self.assertEqual(children, [GnLabel.from_str("//bar")])
@@ -86,7 +89,7 @@ class FileAccessTest(unittest.TestCase):
     def _assert_depfile(self, expected_content):
         depfile_path = self.temp_dir_path / "depfile"
         self.file_access.write_depfile(
-            dep_file_path=depfile_path, main_entry=Path("main")
+            dep_file_path=depfile_path, main_entry="main"
         )
         actual_depfile_contents = depfile_path.read_text()
         self.assertEqual(actual_depfile_contents, expected_content)
@@ -101,13 +104,13 @@ class FileAccessTest(unittest.TestCase):
 
     def test_write_depfile_after_directory_exists(self):
         self.file_access.directory_exists(GnLabel.from_str("//"))
-        self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}""")
+        self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}/""")
 
     def test_write_depfile_after_search_directory(self):
         self.file_access.search_directory(
             GnLabel.from_str("//"), path_predicate=lambda _: True
         )
-        self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}""")
+        self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}/""")
 
 
 if __name__ == "__main__":

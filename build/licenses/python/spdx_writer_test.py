@@ -22,7 +22,7 @@ class SpdxWriterTest(unittest.TestCase):
     def setUp(self) -> None:
         self.writer = SpdxWriter.create(
             root_package_name="root pkg",
-            file_access=MockFileAccess(fuchsia_source_path="unused"),
+            file_access=MockFileAccess(fuchsia_source_path_str="unused"),
         )
 
         return super().setUp()

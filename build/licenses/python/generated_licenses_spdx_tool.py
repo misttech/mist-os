@@ -103,7 +103,7 @@ def main() -> int:
     assert fuchsia_source_path.exists()
     logging.debug("fuchsia_source_path=%s", fuchsia_source_path)
 
-    file_access = FileAccess(fuchsia_source_path=fuchsia_source_path)
+    file_access = FileAccess(fuchsia_source_path_str=str(fuchsia_source_path))
 
     readmes_db = ReadmesDB(file_access=file_access)
 
@@ -176,9 +176,8 @@ def main() -> int:
                 return -1
 
     # Generate a GN depfile
-    dep_file_path = Path(args.dep_file)
-    logging.info(f"writing depfile {dep_file_path}")
-    file_access.write_depfile(dep_file_path, main_entry=spdx_output_path)
+    logging.info(f"writing depfile {args.dep_file}")
+    file_access.write_depfile(args.dep_file, main_entry=args.spdx_output)
 
     return 0
 

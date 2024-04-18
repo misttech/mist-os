@@ -7,7 +7,6 @@
 from collections import defaultdict
 import enum
 import logging
-from pathlib import Path
 from readme_fuchsia import ReadmesDB, Readme
 from gn_license_metadata import (
     GnApplicableLicensesMetadata,
@@ -17,6 +16,7 @@ from typing import Dict, List, Set, Tuple
 from gn_label import GnLabel
 from file_access import FileAccess
 import dataclasses
+import os
 
 
 @dataclasses.dataclass(frozen=True)
@@ -319,8 +319,8 @@ class Collector:
 
         public_package_name = label.name.split("/")[-1]
 
-        def license_file_predicate(path: Path) -> bool:
-            file_name_upper = path.name.upper()
+        def license_file_predicate(path: str) -> bool:
+            file_name_upper = os.path.basename(path).upper()
             return file_name_upper in (
                 "LICENSE",
                 "COPYRIGHT",

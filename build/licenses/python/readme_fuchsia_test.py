@@ -79,7 +79,7 @@ class ReadmesDBTest(unittest.TestCase):
         self.mock_content_by_path = {}
 
         file_access = MockFileAccess(
-            fuchsia_source_path=None,
+            fuchsia_source_path_str=None,
             readme_content_by_path=self.mock_content_by_path,
         )
         self.db = ReadmesDB(file_access=file_access)
