@@ -580,7 +580,7 @@ template("bazel_action") {
     } else if (optimize == "debug") {
       args += [ "--compilation_mode=dbg" ]
     } else if (optimize == "size" || optimize == "speed" ||
-               optimize == "profile") {
+               optimize == "profile" || optimize == "size_lto") {
       args += [ "--compilation_mode=opt" ]
     } else {
       assert("Unsupported mode optimize = $optimize")

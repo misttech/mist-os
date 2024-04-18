@@ -80,7 +80,7 @@ icu_rustc_library("lib") {
 
   test_configs = [
     "//build/config/rust:codegen_units_16",
-    "//build/config/rust:lto_disabled",
+    "//build/config/lto:no-lto",
   ]
 
   test_deps = [

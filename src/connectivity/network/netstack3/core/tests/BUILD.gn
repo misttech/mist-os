@@ -30,10 +30,12 @@ rustc_test("netstack3_core_threading_test") {
   # The loom crate documentation recommends compiling with optimizations since
   # the number of iterations can be large enough to make tests unreasonably
   # slow otherwise.
-  configs += [
-    "//build/config/rust:lto_thin",
-    "//build/config:optimize_default",
-  ]
+  configs += [ "//build/config:optimize_default" ]
+
+  # Add thinlto config if lto variants are not used.
+  if (!is_lto_variant) {
+    configs += [ "//build/config/lto:thinlto" ]
+  }
 }
 
 group("tests") {

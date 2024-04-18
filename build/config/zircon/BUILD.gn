@@ -347,8 +347,8 @@ config("pure") {
   # which is not PIC-friendly under LTO.
   if ((current_toolchain == shlib_toolchain ||
        toolchain_variant.is_pic_default) &&
-      toolchain_variant.tags + [ "lto" ] - [ "lto" ] !=
-      toolchain_variant.tags) {
+      (optimize == "size_lto" || toolchain_variant.tags + [ "lto" ] -
+                                 [ "lto" ] != toolchain_variant.tags)) {
     cflags = [ "-fno-jump-tables" ]
   }
 }

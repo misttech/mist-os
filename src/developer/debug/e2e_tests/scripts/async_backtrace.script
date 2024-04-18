@@ -1,4 +1,5 @@
 ## require is_lto=false
+## require optimize=none
 
 [zxdb] run-component fuchsia-pkg://fuchsia.com/zxdb_e2e_inferiors#meta/async_rust.cm
 Launched Process 1 state=Running koid=?? name=async_rust.cm component=async_rust.cm

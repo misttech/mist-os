@@ -15,6 +15,7 @@ declare_args() {
   # * `debug`: "optimized for debugging", light enough to avoid confusion
   # * `default`: default optimization level
   # * `size`:  optimized for space rather than purely for speed
+  # * `size_lto`:  optimize for space and use LTO
   # * `speed`: optimized purely for speed
   # * `sanitizer`: optimized for sanitizers (ASan, etc.)
   # * `profile`: optimized for coverage/profile data collection
@@ -27,6 +28,7 @@ _optimize_valid = [
   "debug",
   "default",
   "size",
+  "size_lto",
   "speed",
   "sanitizer",
   "profile",

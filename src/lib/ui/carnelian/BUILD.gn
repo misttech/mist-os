@@ -136,10 +136,12 @@ rustc_library("carnelian") {
 
 config("carnelian-performance") {
   # Enable all optimizations that benefit speed, even if they increase size
-  configs = [
-    "//build/config:optimize_speed",
-    "//build/config/lto:thinlto",
-  ]
+  configs = [ "//build/config:optimize_speed" ]
+
+  # Add thinlto config if lto variants are not used.
+  if (!is_lto_variant) {
+    configs += [ "//build/config/lto:thinlto" ]
+  }
 
   if (target_cpu == "x64") {
     # TODO(https://fxbug.dev/42168719): not all x64 targets are haswell.

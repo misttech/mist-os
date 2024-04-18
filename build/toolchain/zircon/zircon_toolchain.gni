@@ -875,7 +875,8 @@ template("zircon_toolchain") {
     # are very distinct.
 
     _zircon_optimize = zircon_optimize
-    if (optimize == "sanitizer" || optimize == "profile") {
+    if (optimize == "sanitizer" || optimize == "profile" ||
+        optimize == "size_lto") {
       _zircon_optimize = optimize
     }
 

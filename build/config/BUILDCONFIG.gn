@@ -464,8 +464,6 @@ if (zircon_toolchain == false) {
     ]
   }
 
-  default_common_binary_configs += [ "//build/config/lto:default" ]
-
   # Add and remove configs specified by the variant.
   default_common_binary_configs += toolchain_variant.configs
   default_common_binary_configs -= toolchain_variant.remove_common_configs
@@ -542,12 +540,10 @@ if (zircon_toolchain == false) {
 default_rust_proc_macro_configs = default_shared_library_configs + [
                                     "//build/config/lto",
                                     "//build/config/lto:thinlto",
-                                    "//build/config/lto:default",
                                   ] -
                                   [
                                     "//build/config/lto",
                                     "//build/config/lto:thinlto",
-                                    "//build/config/lto:default",
                                   ]
 
 # Known e2e test libraries. Any tests that transitively depend on these
@@ -2158,6 +2154,16 @@ is_fuzzer = select_variant + [
               "ubsan-fuzzer",
             ] != select_variant
 
+# Whether lto or thinlto variant is enabled.
+is_lto_variant = select_variant + [
+                   "lto",
+                   "thinlto",
+                 ] -
+                 [
+                   "lto",
+                   "thinlto",
+                 ] != select_variant
+
 # Do this only once, in the default toolchain context.    Then
 # clang_toolchain_suite will just pass the results through to every
 # other toolchain via toolchain_args so the work is not repeated.
@@ -3177,12 +3183,10 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
           configs += [
             "//build/config/lto",
             "//build/config/lto:thinlto",
-            "//build/config/lto:default",
           ]
           configs -= [
             "//build/config/lto",
             "//build/config/lto:thinlto",
-            "//build/config/lto:default",
           ]
         }
 

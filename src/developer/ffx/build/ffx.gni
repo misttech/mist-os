@@ -58,13 +58,16 @@ template("ffx") {
       if (is_debug) {
         # Disable lto for debug builds, as the additional codegen units imply the
         # use of thin-local lto
-        configs += [ "//build/config/rust:lto_disabled" ]
+        configs += [ "//build/config/lto:no-lto" ]
       } else {
         # Use thin lto (instead of implied thin-local), to run (thin) lto across
         # the entire set of dependency crates, to minimize final binary size
         # without spending an undue amount of time (this is still faster than
         # using codegen_units=1)
-        configs += [ "//build/config/rust:lto_thin" ]
+        # Add thinlto config if lto variants are not used.
+        if (!is_lto_variant) {
+          configs += [ "//build/config/lto:thinlto" ]
+        }
       }
     }
 
