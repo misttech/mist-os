@@ -193,6 +193,7 @@ class IgcDriver final : public fdf::DriverBase,
   void ReapTxBuffers();
 
   void EnableInterrupt();
+  void DisableInterrupt();
   void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq_base, zx_status_t status,
                  const zx_packet_interrupt_t* interrupt);
 

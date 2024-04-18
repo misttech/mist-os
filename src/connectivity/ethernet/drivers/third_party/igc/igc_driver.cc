@@ -232,7 +232,6 @@ zx_status_t IgcDriver::Initialize() {
   ** mac from that.
   */
   igc_reset_hw(hw);
-  igc_power_up_phy(hw);
 
   /* Make sure we have a good EEPROM before we read from it */
   if (igc_validate_nvm_checksum(hw) < 0) {
@@ -280,17 +279,10 @@ zx_status_t IgcDriver::Initialize() {
   adapter_->rxdr = reinterpret_cast<union igc_adv_rx_desc*>(adapter_->txdr + kEthTxDescRingCount);
   adapter_->rxd_phys = txrx_phy_addr + kEthTxDescBufTotalSize;
 
-  InitTransmitUnit();
-  InitReceiveUnit();
-
   u32 ctrl;
   ctrl = IGC_READ_REG(hw, IGC_CTRL);
   ctrl |= IGC_CTRL_VME;
   IGC_WRITE_REG(hw, IGC_CTRL, ctrl);
-
-  // Promiscuous settings.
-  IfSetPromisc(kIffPromisc);
-  igc_clear_hw_cntrs_base_generic(hw);
 
   // Clear all pending interrupts.
   IGC_READ_REG(hw, IGC_ICR);
@@ -612,26 +604,38 @@ void IgcDriver::Init(netdriver::wire::NetworkDeviceImplInitRequest* request, fdf
   port_binding_ = fdf::BindServer(netdev_dispatcher_.get(), std::move(endpoints->server), this);
   adapter_->netdev_ifc.buffer(arena)
       ->AddPort(kPortId, std::move(endpoints->client))
-      .Then([this, completer = completer.ToAsync()](
+      .Then([completer = completer.ToAsync()](
                 fdf::WireUnownedResult<netdriver::NetworkDeviceIfc::AddPort>& result) mutable {
         fdf::Arena arena(0u);
         if (!result.ok()) {
           FDF_LOG(ERROR, "Failed to add port: %s", result.FormatDescription().c_str());
         }
         completer.buffer(arena).Reply(result.status());
-        // Enable the interrupt now that the data path is set up. It's not safe to enable
-        // it before netdev_ifc is bound because the interrupt handler uses it.
-        EnableInterrupt();
       });
 }
 
 void IgcDriver::Start(fdf::Arena& arena, StartCompleter::Sync& completer) {
+  // Promiscuous settings.
+  IfSetPromisc(kIffPromisc);
+  igc_clear_hw_cntrs_base_generic(&adapter_->hw);
+
+  igc_power_up_phy(&adapter_->hw);
+
+  InitTransmitUnit();
+  InitReceiveUnit();
+
+  EnableInterrupt();
+
+  OnlineStatusUpdate();
+
   started_ = true;
   completer.buffer(arena).Reply(ZX_OK);
 }
 
 void IgcDriver::Stop(fdf::Arena& arena, StopCompleter::Sync& completer) {
   started_ = false;
+  DisableInterrupt();
+
   {
     // Reclaim all the buffers queued in rx descriptor ring.
     std::lock_guard lock(adapter_->rx_lock);
@@ -678,31 +682,38 @@ void IgcDriver::Stop(fdf::Arena& arena, StopCompleter::Sync& completer) {
     }
   }
 
-  // Reclaim all tx buffers. Tx data path is protected by start lock.
-  // Assume TX depth here to simplify this and avoid having to deal with batching.
-  static_assert(kEthTxBufCount < netdriver::wire::kMaxTxResults,
-                "TX depth exceeds maximum TX results that can be completed");
-  // Just use the provided arena here, no need to try to optimize this by trying to get everything
-  // allocated on the stack. This is not part of the critical path.
-  fidl::VectorView<netdriver::wire::TxResult> results(arena, kEthTxBufCount);
+  {
+    // Reclaim all tx buffers.
+    std::lock_guard lock(adapter_->tx_lock);
+    // Assume TX depth here to simplify this and avoid having to deal with batching.
+    static_assert(kEthTxBufCount < netdriver::wire::kMaxTxResults,
+                  "TX depth exceeds maximum TX results that can be completed");
+    // Just use the provided arena here, no need to try to optimize this by trying to get everything
+    // allocated on the stack. This is not part of the critical path.
+    fidl::VectorView<netdriver::wire::TxResult> results(arena, kEthTxBufCount);
 
-  size_t res_idx = 0;
-  uint32_t& txh = adapter_->txh_ind;
-  while (adapter_->txr_len > 0) {
-    adapter_->txdr[txh].upper.fields.status = 0;
-    results[res_idx].id = tx_buffers_[txh].buffer_id;
-    results[res_idx].status = ZX_ERR_UNAVAILABLE;
-    res_idx++;
-    adapter_->txr_len--;
-    txh = (txh + 1) & (kEthTxDescRingCount - 1);
-  }
-  if (res_idx > 0) {
-    results.set_count(res_idx);
-    if (fidl::OneWayStatus status = adapter_->netdev_ifc.buffer(arena)->CompleteTx(results);
-        !status.ok()) {
-      FDF_LOG(ERROR, "Failed to complete TX during stop: %s", status.FormatDescription().c_str());
+    size_t res_idx = 0;
+    uint32_t& txh = adapter_->txh_ind;
+    while (adapter_->txr_len > 0) {
+      adapter_->txdr[txh].upper.fields.status = 0;
+      results[res_idx].id = tx_buffers_[txh].buffer_id;
+      results[res_idx].status = ZX_ERR_UNAVAILABLE;
+      res_idx++;
+      adapter_->txr_len--;
+      txh = (txh + 1) & (kEthTxDescRingCount - 1);
+    }
+    if (res_idx > 0) {
+      results.set_count(res_idx);
+      if (fidl::OneWayStatus status = adapter_->netdev_ifc.buffer(arena)->CompleteTx(results);
+          !status.ok()) {
+        FDF_LOG(ERROR, "Failed to complete TX during stop: %s", status.FormatDescription().c_str());
+      }
     }
   }
+
+  igc_reset_hw(&adapter_->hw);
+  IGC_WRITE_REG(&adapter_->hw, IGC_WUC, 0);
+
   completer.buffer(arena).Reply();
 }
 
@@ -921,7 +932,15 @@ void IgcDriver::SetMode(netdriver::wire::MacAddrSetModeRequest* request, fdf::Ar
   completer.buffer(arena).Reply();
 }
 
-void IgcDriver::EnableInterrupt() { IGC_WRITE_REG(&adapter_->hw, IGC_IMS, IMS_ENABLE_MASK); }
+void IgcDriver::EnableInterrupt() {
+  IGC_WRITE_REG(&adapter_->hw, IGC_IMS, IMS_ENABLE_MASK);
+  IGC_WRITE_FLUSH(&adapter_->hw);
+}
+
+void IgcDriver::DisableInterrupt() {
+  IGC_WRITE_REG(&adapter_->hw, IGC_IMC, 0xFFFFFFFFu);
+  IGC_WRITE_FLUSH(&adapter_->hw);
+}
 
 void IgcDriver::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq_base,
                           zx_status_t status, const zx_packet_interrupt_t* interrupt) {
