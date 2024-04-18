@@ -3,9 +3,6 @@
 # found in the LICENSE file.
 
 declare_args() {
-  # Disable LTO if disable_lto = true.
-  disable_lto = false
-
   # Number of parallel ThinLTO jobs.
   thinlto_jobs = 8
 
