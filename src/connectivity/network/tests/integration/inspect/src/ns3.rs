@@ -932,20 +932,44 @@ async fn inspect_filtering_state(name: &str) {
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Filtering State": {
             "IPv4": {
-                "ingress": {},
-                "local_ingress": {},
-                "forwarding": {},
-                "local_egress": {},
-                "egress": {},
-                "uninstalled": {},
+                "ingress": {
+                    "routines": 0u64,
+                },
+                "local_ingress": {
+                    "routines": 0u64,
+                },
+                "forwarding": {
+                    "routines": 0u64,
+                },
+                "local_egress": {
+                    "routines": 0u64,
+                },
+                "egress": {
+                    "routines": 0u64,
+                },
+                "uninstalled": {
+                    "routines": 0u64,
+                },
             },
             "IPv6": {
-                "ingress": {},
-                "local_ingress": {},
-                "forwarding": {},
-                "local_egress": {},
-                "egress": {},
-                "uninstalled": {},
+                "ingress": {
+                    "routines": 0u64,
+                },
+                "local_ingress": {
+                    "routines": 0u64,
+                },
+                "forwarding": {
+                    "routines": 0u64,
+                },
+                "local_egress": {
+                    "routines": 0u64,
+                },
+                "egress": {
+                    "routines": 0u64,
+                },
+                "uninstalled": {
+                    "routines": 0u64,
+                },
             },
         }
     });
@@ -1027,7 +1051,9 @@ async fn inspect_filtering_state(name: &str) {
         "Filtering State": {
             "IPv4": {
                 "ingress": {
+                    "routines": 1u64,
                     "0": {
+                        "rules": 2u64,
                         "0": {
                             "matchers": {
                                 "transport_protocol": "TransportProtocolMatcher { \
@@ -1046,11 +1072,19 @@ async fn inspect_filtering_state(name: &str) {
                         },
                     },
                 },
-                "local_ingress": {},
-                "forwarding": {},
-                "local_egress": {},
+                "local_ingress": {
+                    "routines": 0u64,
+                },
+                "forwarding": {
+                    "routines": 0u64,
+                },
+                "local_egress": {
+                    "routines": 0u64,
+                },
                 "egress": {
+                    "routines": 1u64,
                     "0": {
+                        "rules": 1u64,
                         "0": {
                             // Note that this rule is only included in the IPv4 filtering state
                             // because it has an address matcher with an IPv4 subnet.
@@ -1067,12 +1101,17 @@ async fn inspect_filtering_state(name: &str) {
                 // Because the uninstalled routine is only jumped to from an IPv4 routine, it
                 // only exists in the IPv4 filtering state.
                 "uninstalled": {
-                    "2": {},
+                    "routines": 1u64,
+                    "2": {
+                        "rules": 0u64,
+                    },
                 },
             },
             "IPv6": {
                 "ingress": {
+                    "routines": 1u64,
                     "0": {
+                        "rules": 2u64,
                         "0": {
                             "matchers": {
                                 "transport_protocol": "TransportProtocolMatcher { \
@@ -1091,13 +1130,24 @@ async fn inspect_filtering_state(name: &str) {
                         },
                     },
                 },
-                "local_ingress": {},
-                "forwarding": {},
-                "local_egress": {},
-                "egress": {
-                    "0": {},
+                "local_ingress": {
+                    "routines": 0u64,
                 },
-                "uninstalled": {},
+                "forwarding": {
+                    "routines": 0u64,
+                },
+                "local_egress": {
+                    "routines": 0u64,
+                },
+                "egress": {
+                    "routines": 1u64,
+                    "0": {
+                        "rules": 0u64,
+                    },
+                },
+                "uninstalled": {
+                    "routines": 0u64,
+                },
             },
         }
     });

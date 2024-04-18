@@ -176,6 +176,7 @@ pub struct Routine<I: IpExt, DeviceClass, RuleInfo> {
 impl<I: IpExt, DeviceClass: Debug> Inspectable for Routine<I, DeviceClass, ()> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
         let Self { rules } = self;
+        inspector.record_usize("rules", rules.len());
         for rule in rules {
             inspector.record_unnamed_child(|inspector| inspector.delegate_inspectable(rule));
         }
@@ -195,6 +196,7 @@ pub struct Hook<I: IpExt, DeviceClass, RuleInfo> {
 impl<I: IpExt, DeviceClass: Debug> Inspectable for Hook<I, DeviceClass, ()> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
         let Self { routines } = self;
+        inspector.record_usize("routines", routines.len());
         for routine in routines {
             inspector.record_unnamed_child(|inspector| {
                 inspector.delegate_inspectable(routine);
@@ -289,6 +291,7 @@ impl<I: IpExt, DeviceClass: Debug> Inspectable for State<I, DeviceClass> {
         inspector.record_child("egress", |inspector| inspector.delegate_inspectable(egress));
 
         inspector.record_child("uninstalled", |inspector| {
+            inspector.record_usize("routines", uninstalled_routines.len());
             for routine in uninstalled_routines {
                 inspector.delegate_inspectable(routine);
             }
