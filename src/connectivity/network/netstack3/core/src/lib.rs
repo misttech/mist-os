@@ -111,10 +111,10 @@ pub mod filter {
     #[cfg(test)]
     pub(crate) use netstack3_filter::testutil::NoopImpl;
     pub use netstack3_filter::{
-        Action, AddressMatcher, AddressMatcherType, FilterApi, FilterBindingsTypes, Hook,
-        InterfaceMatcher, InterfaceProperties, IpRoutines, NatRoutines, PacketMatcher, PortMatcher,
-        ProofOfEgressCheck, Routine, Routines, Rule, TransportProtocolMatcher, UninstalledRoutine,
-        ValidationError,
+        Action, AddressMatcher, AddressMatcherType, FilterApi, FilterBindingsContext,
+        FilterBindingsTypes, Hook, InterfaceMatcher, InterfaceProperties, IpRoutines, NatRoutines,
+        PacketMatcher, PortMatcher, ProofOfEgressCheck, Routine, Routines, Rule,
+        TransportProtocolMatcher, UninstalledRoutine, ValidationError,
     };
     pub(crate) use netstack3_filter::{
         ConntrackConnection, FilterContext, FilterHandler, FilterImpl, FilterIpContext,

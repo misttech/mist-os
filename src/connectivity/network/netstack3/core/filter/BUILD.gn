@@ -48,13 +48,13 @@ rustc_library_with_features("netstack3-filter") {
       target_name = "netstack3-filter-instrumented"
       features = [ "instrumented" ]
       with_unit_tests = true
-      deps += [
-        "//src/connectivity/network/netstack3/core/base:netstack3-base",
-        "//src/connectivity/network/netstack3/core/sync:netstack3-sync-instrumented",
-      ]
+      deps += [ "//src/connectivity/network/netstack3/core/sync:netstack3-sync-instrumented" ]
+      non_test_deps =
+          [ "//src/connectivity/network/netstack3/core/base:netstack3-base" ]
       test_deps = [
         "//src/connectivity/lib/ip-test-macro",
         "//src/connectivity/lib/net-declare",
+        "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
         "//src/lib/const-unwrap",
         "//third_party/rust_crates:test-case",
       ]

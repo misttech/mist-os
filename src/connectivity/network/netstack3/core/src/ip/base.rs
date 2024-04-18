@@ -13,6 +13,7 @@ use core::{
 };
 
 use const_unwrap::const_unwrap_option;
+use derivative::Derivative;
 use explicit::ResultExt as _;
 use lock_order::lock::UnlockedAccess;
 use lock_order::{
@@ -47,8 +48,9 @@ use crate::{
     data_structures::token_bucket::TokenBucket,
     device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
     filter::{
-        ConntrackConnection, FilterBindingsTypes, FilterHandler as _, FilterHandlerProvider,
-        FilterIpMetadata, ForwardedPacket, IpPacket, MaybeTransportPacket, NestedWithInnerIpPacket,
+        ConntrackConnection, FilterBindingsContext, FilterBindingsTypes, FilterHandler as _,
+        FilterHandlerProvider, FilterIpMetadata, ForwardedPacket, IpPacket, MaybeTransportPacket,
+        NestedWithInnerIpPacket,
     },
     inspect::{Inspectable, Inspector},
     ip::{
@@ -136,20 +138,23 @@ enum TransportReceiveErrorInner {
 ///
 /// NOTE: This metadata may be reset after a packet goes through reassembly, and
 /// consumers must be able to handle this case.
-#[derive(Default)]
-pub struct IpLayerPacketMetadata<I: packet_formats::ip::IpExt> {
-    conntrack_connection: Option<ConntrackConnection<I>>,
+#[derive(Derivative)]
+#[derivative(Default(bound = ""))]
+pub struct IpLayerPacketMetadata<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes> {
+    conntrack_connection: Option<ConntrackConnection<I, BT>>,
 }
 
-impl<I: packet_formats::ip::IpExt> FilterIpMetadata<I> for IpLayerPacketMetadata<I> {
-    fn take_conntrack_connection(&mut self) -> Option<ConntrackConnection<I>> {
+impl<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes> FilterIpMetadata<I, BT>
+    for IpLayerPacketMetadata<I, BT>
+{
+    fn take_conntrack_connection(&mut self) -> Option<ConntrackConnection<I, BT>> {
         self.conntrack_connection.take()
     }
 
     fn replace_conntrack_connection(
         &mut self,
-        conn: ConntrackConnection<I>,
-    ) -> Option<ConntrackConnection<I>> {
+        conn: ConntrackConnection<I, BT>,
+    ) -> Option<ConntrackConnection<I, BT>> {
         self.conntrack_connection.replace(conn)
     }
 }
@@ -638,7 +643,7 @@ pub enum IpLayerEvent<DeviceId, I: Ip> {
 
 /// The bindings execution context for the IP layer.
 pub trait IpLayerBindingsContext<I: Ip, DeviceId>:
-    InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext + FilterBindingsTypes
+    InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext + FilterBindingsContext
 {
 }
 impl<
@@ -647,7 +652,7 @@ impl<
         BC: InstantContext
             + EventContext<IpLayerEvent<DeviceId, I>>
             + TracingContext
-            + FilterBindingsTypes,
+            + FilterBindingsContext,
     > IpLayerBindingsContext<I, DeviceId> for BC
 {
 }
@@ -930,7 +935,7 @@ impl<
             SpecifiedAddr<I::Addr>,
         >,
         body: S,
-        packet_metadata: IpLayerPacketMetadata<I>,
+        packet_metadata: IpLayerPacketMetadata<I, BC>,
     ) -> Result<(), S>
     where
         S: Serializer + MaybeTransportPacket,
@@ -1241,11 +1246,11 @@ pub struct Ipv4State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> {
     pub(super) inner: IpStateInner<Ipv4, StrongDeviceId, BT>,
     pub(super) icmp: Icmpv4State<StrongDeviceId::Weak, BT>,
     pub(super) next_packet_id: AtomicU16,
-    pub(super) filter: RwLock<crate::filter::State<Ipv4, BT::DeviceClass>>,
+    pub(super) filter: RwLock<crate::filter::State<Ipv4, BT>>,
 }
 
 impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv4State<StrongDeviceId, BT> {
-    pub fn filter(&self) -> &RwLock<crate::filter::State<Ipv4, BT::DeviceClass>> {
+    pub fn filter(&self) -> &RwLock<crate::filter::State<Ipv4, BT>> {
         &self.filter
     }
 
@@ -1276,7 +1281,7 @@ pub struct Ipv6State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> {
     pub(super) inner: IpStateInner<Ipv6, StrongDeviceId, BT>,
     pub(super) icmp: Icmpv6State<StrongDeviceId::Weak, BT>,
     pub(super) slaac_counters: SlaacCounters,
-    pub(super) filter: RwLock<crate::filter::State<Ipv6, BT::DeviceClass>>,
+    pub(super) filter: RwLock<crate::filter::State<Ipv6, BT>>,
 }
 
 impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv6State<StrongDeviceId, BT> {
@@ -1284,7 +1289,7 @@ impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv6State<StrongDeviceI
         &self.slaac_counters
     }
 
-    pub fn filter(&self) -> &RwLock<crate::filter::State<Ipv6, BT::DeviceClass>> {
+    pub fn filter(&self) -> &RwLock<crate::filter::State<Ipv6, BT>> {
         &self.filter
     }
 
@@ -1650,7 +1655,7 @@ fn dispatch_receive_ipv4_packet<
     proto: Ipv4Proto,
     body: B,
     parse_metadata: Option<ParseMetadata>,
-    mut packet_metadata: IpLayerPacketMetadata<Ipv4>,
+    mut packet_metadata: IpLayerPacketMetadata<Ipv4, BC>,
 ) {
     core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet);
 
@@ -1751,7 +1756,7 @@ fn dispatch_receive_ipv6_packet<
     proto: Ipv6Proto,
     body: B,
     parse_metadata: Option<ParseMetadata>,
-    mut packet_metadata: IpLayerPacketMetadata<Ipv6>,
+    mut packet_metadata: IpLayerPacketMetadata<Ipv6, BC>,
 ) {
     // TODO(https://fxbug.dev/42095067): Once we support multiple extension
     // headers in IPv6, we will need to verify that the callers of this
@@ -1842,7 +1847,7 @@ pub(crate) fn send_ip_frame<I, CC, BC, S>(
     next_hop: SpecifiedAddr<I::Addr>,
     mut body: S,
     broadcast: Option<I::BroadcastMarker>,
-    mut packet_metadata: IpLayerPacketMetadata<I>,
+    mut packet_metadata: IpLayerPacketMetadata<I, BC>,
 ) -> Result<(), S>
 where
     I: IpLayerIpExt,
@@ -2981,7 +2986,7 @@ pub(crate) fn send_ip_packet_from_device<I, BC, CC, S>(
         Option<SpecifiedAddr<I::Addr>>,
     >,
     body: S,
-    packet_metadata: IpLayerPacketMetadata<I>,
+    packet_metadata: IpLayerPacketMetadata<I, BC>,
 ) -> Result<(), S>
 where
     I: IpLayerIpExt,

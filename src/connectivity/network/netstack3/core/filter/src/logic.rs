@@ -101,7 +101,7 @@ pub trait FilterHandler<I: IpExt, BT: FilterBindingsTypes> {
     where
         P: IpPacket<I>,
         D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I>;
+        M: FilterIpMetadata<I, BT>;
 
     /// The local ingress hook intercepts incoming traffic that is destined for
     /// the local host.
@@ -114,7 +114,7 @@ pub trait FilterHandler<I: IpExt, BT: FilterBindingsTypes> {
     where
         P: IpPacket<I>,
         D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I>;
+        M: FilterIpMetadata<I, BT>;
 
     /// The forwarding hook intercepts incoming traffic that is destined for
     /// another host.
@@ -128,7 +128,7 @@ pub trait FilterHandler<I: IpExt, BT: FilterBindingsTypes> {
     where
         P: IpPacket<I>,
         D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I>;
+        M: FilterIpMetadata<I, BT>;
 
     /// The local egress hook intercepts locally-generated traffic before a
     /// routing decision has been made.
@@ -141,7 +141,7 @@ pub trait FilterHandler<I: IpExt, BT: FilterBindingsTypes> {
     where
         P: IpPacket<I>,
         D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I>;
+        M: FilterIpMetadata<I, BT>;
 
     /// The egress hook intercepts all outgoing traffic after a routing decision
     /// has been made.
@@ -154,7 +154,7 @@ pub trait FilterHandler<I: IpExt, BT: FilterBindingsTypes> {
     where
         P: IpPacket<I>,
         D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I>;
+        M: FilterIpMetadata<I, BT>;
 }
 
 /// The "production" implementation of packet filtering.
@@ -170,7 +170,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
     where
         P: IpPacket<I>,
         D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I>,
+        M: FilterIpMetadata<I, BT>,
     {
         let Self(this) = self;
         this.with_filter_state(|state| {
@@ -191,7 +191,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
     where
         P: IpPacket<I>,
         D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I>,
+        M: FilterIpMetadata<I, BT>,
     {
         let Self(this) = self;
         this.with_filter_state(|state| {
@@ -213,7 +213,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
     where
         P: IpPacket<I>,
         D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I>,
+        M: FilterIpMetadata<I, BT>,
     {
         let Self(this) = self;
         this.with_filter_state(|state| {
@@ -234,7 +234,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
     where
         P: IpPacket<I>,
         D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I>,
+        M: FilterIpMetadata<I, BT>,
     {
         let Self(this) = self;
         this.with_filter_state(|state| {
@@ -255,7 +255,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
     where
         P: IpPacket<I>,
         D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I>,
+        M: FilterIpMetadata<I, BT>,
     {
         let Self(this) = self;
         (
@@ -288,7 +288,7 @@ pub mod testutil {
         where
             P: IpPacket<I>,
             D: InterfaceProperties<BT::DeviceClass>,
-            M: FilterIpMetadata<I>,
+            M: FilterIpMetadata<I, BT>,
         {
             Verdict::Accept
         }
@@ -297,7 +297,7 @@ pub mod testutil {
         where
             P: IpPacket<I>,
             D: InterfaceProperties<BT::DeviceClass>,
-            M: FilterIpMetadata<I>,
+            M: FilterIpMetadata<I, BT>,
         {
             Verdict::Accept
         }
@@ -306,7 +306,7 @@ pub mod testutil {
         where
             P: IpPacket<I>,
             D: InterfaceProperties<BT::DeviceClass>,
-            M: FilterIpMetadata<I>,
+            M: FilterIpMetadata<I, BT>,
         {
             Verdict::Accept
         }
@@ -315,7 +315,7 @@ pub mod testutil {
         where
             P: IpPacket<I>,
             D: InterfaceProperties<BT::DeviceClass>,
-            M: FilterIpMetadata<I>,
+            M: FilterIpMetadata<I, BT>,
         {
             Verdict::Accept
         }
@@ -329,7 +329,7 @@ pub mod testutil {
         where
             P: IpPacket<I>,
             D: InterfaceProperties<BT::DeviceClass>,
-            M: FilterIpMetadata<I>,
+            M: FilterIpMetadata<I, BT>,
         {
             (Verdict::Accept, ProofOfEgressCheck::forge_proof_for_test())
         }
@@ -406,17 +406,17 @@ mod tests {
 
     struct NullMetadata {}
 
-    impl<I: IpExt> FilterIpMetadata<I> for NullMetadata {
+    impl<I: IpExt, BT: FilterBindingsTypes> FilterIpMetadata<I, BT> for NullMetadata {
         fn take_conntrack_connection(
             &mut self,
-        ) -> Option<crate::conntrack::Connection<I, ConntrackExternalData>> {
+        ) -> Option<crate::conntrack::Connection<I, BT, ConntrackExternalData>> {
             unimplemented!();
         }
 
         fn replace_conntrack_connection(
             &mut self,
-            _conn: crate::conntrack::Connection<I, ConntrackExternalData>,
-        ) -> Option<crate::conntrack::Connection<I, ConntrackExternalData>> {
+            _conn: crate::conntrack::Connection<I, BT, ConntrackExternalData>,
+        ) -> Option<crate::conntrack::Connection<I, BT, ConntrackExternalData>> {
             unimplemented!();
         }
     }

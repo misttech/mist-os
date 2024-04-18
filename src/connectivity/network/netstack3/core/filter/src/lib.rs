@@ -18,10 +18,10 @@ mod packets;
 mod state;
 
 /// A connection as tracked by conntrack.
-pub type ConntrackConnection<I> = conntrack::Connection<I, state::ConntrackExternalData>;
+pub type ConntrackConnection<I, BT> = conntrack::Connection<I, BT, state::ConntrackExternalData>;
 
 pub use api::FilterApi;
-pub use context::{FilterBindingsTypes, FilterContext, FilterIpContext};
+pub use context::{FilterBindingsContext, FilterBindingsTypes, FilterContext, FilterIpContext};
 pub use logic::{FilterHandler, FilterImpl, ProofOfEgressCheck, Verdict};
 pub use matchers::{
     AddressMatcher, AddressMatcherType, InterfaceMatcher, InterfaceProperties, PacketMatcher,

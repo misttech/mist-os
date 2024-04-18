@@ -15,7 +15,7 @@ use net_types::ip::{GenericOverIp, Ip};
 use netstack3_base::{Inspectable, Inspector as _};
 use packet_formats::ip::IpExt;
 
-use crate::{conntrack, matchers::PacketMatcher, ValidRoutines};
+use crate::{conntrack, context::FilterBindingsTypes, matchers::PacketMatcher, ValidRoutines};
 
 /// The action to take on a packet.
 #[derive(Derivative)]
@@ -258,21 +258,21 @@ pub struct Routines<I: IpExt, DeviceClass, RuleInfo> {
 /// IP version-specific filtering state.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct State<I: IpExt, DeviceClass> {
+pub struct State<I: IpExt, BT: FilterBindingsTypes> {
     /// Routines used for filtering packets that are installed on hooks.
-    pub installed_routines: ValidRoutines<I, DeviceClass>,
+    pub installed_routines: ValidRoutines<I, BT::DeviceClass>,
     /// Routines that are only executed if jumped to from other routines.
     ///
     /// Jump rules refer to their targets by holding a reference counted pointer
     /// to the inner routine; we hold this index of all uninstalled routines
     /// that have any references in order to report them in inspect data.
-    pub(crate) uninstalled_routines: Vec<UninstalledRoutine<I, DeviceClass, ()>>,
+    pub(crate) uninstalled_routines: Vec<UninstalledRoutine<I, BT::DeviceClass, ()>>,
     /// Connection tracking state.
     #[allow(dead_code)]
-    pub(crate) conntrack: conntrack::Table<I, ConntrackExternalData>,
+    pub(crate) conntrack: conntrack::Table<I, BT, ConntrackExternalData>,
 }
 
-impl<I: IpExt, DeviceClass: Debug> Inspectable for State<I, DeviceClass> {
+impl<I: IpExt, BT: FilterBindingsTypes> Inspectable for State<I, BT> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
         let Self { installed_routines, uninstalled_routines, conntrack: _ } = self;
         // TODO(https://fxbug.dev/318717702): when we implement NAT, report NAT
@@ -301,16 +301,16 @@ impl<I: IpExt, DeviceClass: Debug> Inspectable for State<I, DeviceClass> {
 
 /// A trait for interacting with the pieces of packet metadata that are
 /// important for filtering.
-pub trait FilterIpMetadata<I: IpExt> {
+pub trait FilterIpMetadata<I: IpExt, BT: FilterBindingsTypes> {
     /// Removes the conntrack connection, if it exists.
     fn take_conntrack_connection(
         &mut self,
-    ) -> Option<conntrack::Connection<I, ConntrackExternalData>>;
+    ) -> Option<conntrack::Connection<I, BT, ConntrackExternalData>>;
 
     /// Puts a new conntrack connection into the metadata struct, returning the
     /// previous value.
     fn replace_conntrack_connection(
         &mut self,
-        conn: conntrack::Connection<I, ConntrackExternalData>,
-    ) -> Option<conntrack::Connection<I, ConntrackExternalData>>;
+        conn: conntrack::Connection<I, BT, ConntrackExternalData>,
+    ) -> Option<conntrack::Connection<I, BT, ConntrackExternalData>>;
 }

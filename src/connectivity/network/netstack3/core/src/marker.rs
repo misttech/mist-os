@@ -18,7 +18,7 @@ use crate::{
         self, AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes, EthernetDeviceId,
         EthernetLinkDevice, EthernetWeakDeviceId, WeakDeviceId,
     },
-    filter::FilterBindingsTypes,
+    filter::{FilterBindingsContext, FilterBindingsTypes},
     ip::{
         self,
         device::{
@@ -142,6 +142,7 @@ pub trait IpBindingsContext<I: IpExt>:
     + RngContext
     + UdpBindingsContext<I, DeviceId<Self>>
     + TcpBindingsContext<I, WeakDeviceId<Self>>
+    + FilterBindingsContext
     + IcmpBindingsContext<I, DeviceId<Self>>
     + IpDeviceBindingsContext<I, DeviceId<Self>>
     + IpLayerBindingsContext<I, DeviceId<Self>>
@@ -161,6 +162,7 @@ where
         + RngContext
         + UdpBindingsContext<I, DeviceId<Self>>
         + TcpBindingsContext<I, WeakDeviceId<Self>>
+        + FilterBindingsContext
         + IcmpBindingsContext<I, DeviceId<Self>>
         + IpDeviceBindingsContext<I, DeviceId<Self>>
         + IpLayerBindingsContext<I, DeviceId<Self>>
