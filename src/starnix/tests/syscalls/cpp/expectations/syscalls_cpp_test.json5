@@ -53,6 +53,16 @@
                 // TODO(https://fxbug.dev/333037315)
                 "OverlayFs/FsMountTest.OpenWithTruncAndCreatWithExistingFileSucceeds/0",
                 "OverlayFs/FsMountTest.OpenWithTruncAndCreatOnReadOnlyFsReturnsEROFS/0",
+
+                // TODO(https://fxbug.dev/331965660)
+                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/0",
+                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/1",
+                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/2",
+                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/3",
+                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/8",
+                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/9",
+                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/10",
+                "FuseServerPermissionCheck/FuseServerPermissionCheck.PermissionCheck/11",
             ],
         },
     ],
