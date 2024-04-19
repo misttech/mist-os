@@ -9,10 +9,13 @@ rust_wlan_integration_test("fullmac-tests") {
   binary_deps = [
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
     "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_rust",
+    "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
     "//src/connectivity/wlan/lib/common/rust/:wlan-common",
     "//src/connectivity/wlan/tests/drivers-only/common",
     "//src/connectivity/wlan/tests/helpers/fullmac-helpers",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:rand",
   ]
