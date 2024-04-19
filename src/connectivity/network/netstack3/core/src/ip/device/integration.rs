@@ -4,7 +4,6 @@
 
 //! The integrations for protocols built on top of an IP device.
 
-use alloc::boxed::Box;
 use core::{
     borrow::Borrow,
     marker::PhantomData,
@@ -84,14 +83,52 @@ pub(crate) struct SlaacAddrs<'a, BC: BindingsContext> {
         crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
         BC,
     >,
-    pub(crate) device_id: <CoreCtxWithIpDeviceConfiguration<
-        'a,
-        &'a Ipv6DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
-        BC,
-    > as DeviceIdContext<AnyDevice>>::DeviceId,
+    pub(crate) device_id: DeviceId<BC>,
     pub(crate) config: &'a Ipv6DeviceConfiguration,
-    pub(crate) _marker: PhantomData<BC>,
+}
+
+/// Provides an Iterator for `SlaacAddrs` to implement `SlaacAddresses`.
+///
+/// Note that we use concrete types here instead of going through traits because
+/// it's the only way to satisfy the GAT bounds on `SlaacAddresses`' associated
+/// type.
+pub(crate) struct SlaacAddrsIter<'x, BC: BindingsContext> {
+    core_ctx: CoreCtx<'x, BC, crate::lock_ordering::IpDeviceAddresses<Ipv6>>,
+    addrs: ip::device::state::AddressIdIter<'x, BC::Instant, Ipv6>,
+    device_id: &'x DeviceId<BC>,
+}
+
+impl<'x, BC> Iterator for SlaacAddrsIter<'x, BC>
+where
+    BC: BindingsContext,
+{
+    type Item = SlaacAddressEntry<BC::Instant>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { core_ctx, addrs, device_id } = self;
+        // NB: This form is equivalent to using the `filter_map` combinator but
+        // keeps the type signature simple.
+        addrs.by_ref().find_map(|addr_id| {
+            device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
+                core_ctx,
+                device_id,
+                &addr_id,
+                |Ipv6AddressState {
+                     flags: Ipv6AddressFlags { deprecated, assigned: _ },
+                     config,
+                 }| {
+                    let addr_sub = addr_id.addr_sub();
+                    match config {
+                        Ipv6AddrConfig::Slaac(config) => Some(SlaacAddressEntry {
+                            addr_sub,
+                            config: *config,
+                            deprecated: *deprecated,
+                        }),
+                        Ipv6AddrConfig::Manual(_manual_config) => None,
+                    }
+                },
+            )
+        })
+    }
 }
 
 impl<'a, BC: BindingsContext> CounterContext<SlaacCounters> for SlaacAddrs<'a, BC> {
@@ -102,7 +139,7 @@ impl<'a, BC: BindingsContext> CounterContext<SlaacCounters> for SlaacAddrs<'a, B
 
 impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
     fn for_each_addr_mut<F: FnMut(SlaacAddressEntryMut<'_, BC::Instant>)>(&mut self, mut cb: F) {
-        let SlaacAddrs { core_ctx, device_id, config: _, _marker } = self;
+        let SlaacAddrs { core_ctx, device_id, config: _ } = self;
         let CoreCtxWithIpDeviceConfiguration { config: _, core_ctx } = core_ctx;
         crate::device::integration::with_ip_device_state(core_ctx, device_id, |mut state| {
             let (addrs, mut locked) =
@@ -129,39 +166,15 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
         })
     }
 
-    fn with_addrs<
-        O,
-        F: FnOnce(Box<dyn Iterator<Item = SlaacAddressEntry<BC::Instant>> + '_>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let SlaacAddrs { core_ctx, device_id, config: _, _marker } = self;
+    type AddrsIter<'x> = SlaacAddrsIter<'x, BC>;
+
+    fn with_addrs<O, F: FnOnce(Self::AddrsIter<'_>) -> O>(&mut self, cb: F) -> O {
+        let SlaacAddrs { core_ctx, device_id, config: _ } = self;
         device::IpDeviceStateContext::<Ipv6, BC>::with_address_ids(
             core_ctx,
             device_id,
             |addrs, core_ctx| {
-                cb(Box::new(addrs.filter_map(|addr_id| {
-                    device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
-                        core_ctx,
-                        device_id,
-                        &addr_id,
-                        |Ipv6AddressState {
-                             flags: Ipv6AddressFlags { deprecated, assigned: _ },
-                             config,
-                         }| {
-                            let addr_sub = addr_id.addr_sub();
-                            match config {
-                                Ipv6AddrConfig::Slaac(config) => Some(SlaacAddressEntry {
-                                    addr_sub,
-                                    config: *config,
-                                    deprecated: *deprecated,
-                                }),
-                                Ipv6AddrConfig::Manual(_manual_config) => None,
-                            }
-                        },
-                    )
-                })))
+                cb(SlaacAddrsIter { core_ctx: core_ctx.as_owned(), addrs, device_id })
             },
         )
     }
@@ -173,7 +186,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
         slaac_config: SlaacConfig<BC::Instant>,
         and_then: F,
     ) -> Result<O, ExistsError> {
-        let SlaacAddrs { core_ctx, device_id, config, _marker } = self;
+        let SlaacAddrs { core_ctx, device_id, config } = self;
 
         add_ip_addr_subnet_with_config(
             core_ctx,
@@ -210,7 +223,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
         addr: &Ipv6DeviceAddr,
     ) -> Result<(AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, SlaacConfig<BC::Instant>), NotFoundError>
     {
-        let SlaacAddrs { core_ctx, device_id, config, _marker } = self;
+        let SlaacAddrs { core_ctx, device_id, config } = self;
         del_ip_addr_inner(
             core_ctx,
             bindings_ctx,
@@ -717,8 +730,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
 
         let core_ctx = CoreCtxWithIpDeviceConfiguration { config, core_ctx: core_ctx.as_owned() };
 
-        let mut addrs =
-            SlaacAddrs { core_ctx, device_id: device_id.clone(), config, _marker: PhantomData };
+        let mut addrs = SlaacAddrs { core_ctx, device_id: device_id.clone(), config };
 
         cb(SlaacAddrsMutAndConfig {
             addrs: &mut addrs,

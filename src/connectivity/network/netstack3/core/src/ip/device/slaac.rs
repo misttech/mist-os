@@ -8,7 +8,7 @@
 //! [RFC 4862]: https://datatracker.ietf.org/doc/html/rfc4862
 //! [RFC 8981]: https://datatracker.ietf.org/doc/html/rfc8981
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 use core::{marker::PhantomData, num::NonZeroU16, ops::ControlFlow, time::Duration};
 
 use assert_matches::assert_matches;
@@ -105,7 +105,7 @@ impl<DeviceId> SlaacTimerId<DeviceId> {
 
 /// The state associated with a SLAAC address.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(super) struct SlaacAddressEntry<Instant> {
+pub struct SlaacAddressEntry<Instant> {
     pub(super) addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     pub(super) config: SlaacConfig<Instant>,
     pub(super) deprecated: bool,
@@ -123,14 +123,11 @@ pub(super) trait SlaacAddresses<BC: InstantContext> {
     /// state.
     fn for_each_addr_mut<F: FnMut(SlaacAddressEntryMut<'_, BC::Instant>)>(&mut self, cb: F);
 
-    /// Returns an iterator over the SLAAC addresses.
-    fn with_addrs<
-        O,
-        F: FnOnce(Box<dyn Iterator<Item = SlaacAddressEntry<BC::Instant>> + '_>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O;
+    /// The iterator provided to `with_addrs`.
+    type AddrsIter<'x>: Iterator<Item = SlaacAddressEntry<BC::Instant>>;
+
+    /// Calls the callback with an iterator over the addresses.
+    fn with_addrs<O, F: FnOnce(Self::AddrsIter<'_>) -> O>(&mut self, cb: F) -> O;
 
     fn add_addr_sub_and_then<O, F: FnOnce(SlaacAddressEntryMut<'_, BC::Instant>, &mut BC) -> O>(
         &mut self,
@@ -1737,15 +1734,11 @@ mod tests {
             })
         }
 
-        fn with_addrs<
-            O,
-            F: FnOnce(Box<dyn Iterator<Item = SlaacAddressEntry<FakeInstant>> + '_>) -> O,
-        >(
-            &mut self,
-            cb: F,
-        ) -> O {
+        type AddrsIter<'b> =
+            core::iter::Cloned<core::slice::Iter<'b, SlaacAddressEntry<FakeInstant>>>;
+        fn with_addrs<O, F: FnOnce(Self::AddrsIter<'_>) -> O>(&mut self, cb: F) -> O {
             let FakeSlaacAddrs { slaac_addrs, non_slaac_addr: _, counters: _ } = self;
-            cb(Box::new(slaac_addrs.iter().cloned()))
+            cb(slaac_addrs.iter().cloned())
         }
 
         fn add_addr_sub_and_then<

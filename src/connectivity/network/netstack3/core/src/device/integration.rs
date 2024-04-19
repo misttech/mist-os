@@ -899,9 +899,9 @@ impl<BC: DeviceLayerTypes + socket::DeviceSocketBindingsContext<DeviceId<BC>>>
     }
 }
 
-impl<BC: BindingsContext, L> DeviceIdContext<AnyDevice> for CoreCtx<'_, BC, L> {
-    type DeviceId = DeviceId<BC>;
-    type WeakDeviceId = WeakDeviceId<BC>;
+impl<BT: BindingsTypes, L> DeviceIdContext<AnyDevice> for CoreCtx<'_, BT, L> {
+    type DeviceId = DeviceId<BT>;
+    type WeakDeviceId = WeakDeviceId<BT>;
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetRxDequeue>>
