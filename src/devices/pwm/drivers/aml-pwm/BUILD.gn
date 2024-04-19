@@ -54,7 +54,7 @@ test("aml-pwm-test-bin") {
   ]
   deps = [
     ":common",
-    "//src/devices/testing/mock-mmio-reg-zxtest",
+    "//src/devices/testing/mock-mmio-reg:mock-mmio-reg-zxtest",
     "//src/devices/testing/no_ddk",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",

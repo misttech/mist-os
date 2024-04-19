@@ -13,7 +13,7 @@
 #include <memory>
 #include <queue>
 
-#include <mock-mmio-reg-zxtest/mock-mmio-reg.h>
+#include <mock-mmio-reg/mock-mmio-reg.h>
 #include <soc/aml-common/aml-rawnand.h>
 #include <zxtest/zxtest.h>
 

@@ -23,7 +23,7 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
-#include <mock-mmio-reg-zxtest/mock-mmio-reg.h>
+#include <mock-mmio-reg/mock-mmio-reg.h>
 #include <zxtest/zxtest.h>
 
 #include "src/devices/lib/mmio/test-helper.h"

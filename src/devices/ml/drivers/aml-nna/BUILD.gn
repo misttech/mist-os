@@ -68,7 +68,7 @@ test("aml-nna-test-bin") {
     "//src/devices/lib/mmio",
     "//src/devices/registers/testing/mock-registers",
     "//src/devices/testing/mock-ddk",
-    "//src/devices/testing/mock-mmio-reg-zxtest",
+    "//src/devices/testing/mock-mmio-reg:mock-mmio-reg-zxtest",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

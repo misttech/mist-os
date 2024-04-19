@@ -88,7 +88,7 @@ test("ti-lp8556-test") {
     "//src/devices/i2c/testing/mock-i2c",
     "//src/devices/lib/mmio",
     "//src/devices/testing/mock-ddk",
-    "//src/devices/testing/mock-mmio-reg-zxtest",
+    "//src/devices/testing/mock-mmio-reg:mock-mmio-reg-zxtest",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop",

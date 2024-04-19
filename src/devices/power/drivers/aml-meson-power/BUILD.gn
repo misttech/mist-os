@@ -74,7 +74,6 @@ test("aml-meson-power-test-bin") {
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
-    "//src/devices/testing/mock-mmio-reg-zxtest",
     "//src/devices/testing/no_ddk",
     "//src/lib/ddk",
     "//src/lib/ddktl",
