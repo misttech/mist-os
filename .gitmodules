@@ -28,7 +28,7 @@
 	url = https://fuchsia.googlesource.com/third_party/rapidjson
 	name = third_party/rapidjson
 	ignore = all
-[submodule "third_party/re2"]
+[submodule "third_party/re2/src"]
 	path = third_party/re2/src
 	url = https://fuchsia.googlesource.com/third_party/re2
 	name = third_party/re2
@@ -38,9 +38,3 @@
 	url = https://fuchsia.googlesource.com/third_party/zstd
 	name = third_party/zstd
 	ignore = all
-[submodule "llvm-project/libc"]
-	path = third_party/llvm-libc/src
-	url = https://llvm.googlesource.com/llvm-project/libc
-[submodule "third_party/zstd"]
-	path = third_party/zstd/src
-	url = https://fuchsia.googlesource.com/third_party/zstd
