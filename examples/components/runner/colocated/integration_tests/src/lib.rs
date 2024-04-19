@@ -132,7 +132,6 @@ async fn test_attribute_memory() {
 
     // Add a child to receive these capabilities so that we can use them in this test.
     // - fuchsia.memory.attribution.Provider
-    // - fuchsia.kernel.RootJobForInspect
     // - fuchsia.component.Realm
     struct Capabilities {
         attribution_provider: fattribution::ProviderProxy,
@@ -161,10 +160,8 @@ async fn test_attribute_memory() {
                         })
                         .await
                         .unwrap();
-                    // TODO(https://fxbug.dev/303919602): Until the component framework reliably
-                    // drains capability requests when a component is stopped, we need to
-                    // keep running the component.
-                    std::future::pending().await
+
+                    Ok(())
                 }
                 .boxed()
             },
@@ -246,7 +243,7 @@ async fn test_attribute_memory() {
     //
     // - elf_runner.cm
     //     - colocated_runner.cm
-    //         - colocated_component-64mb.cm
+    //         - colocated_component.cm
     //             - Some VMO
     //         - overhead
     //     - overhead
