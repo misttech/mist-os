@@ -5,7 +5,7 @@
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
 
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
-#include <lib/driver/compat/cpp/logging.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/trace/event.h>
 
@@ -129,7 +129,7 @@ zx_status_t RenderControl::InitRcPipe(
     fidl::WireSyncClient<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe) {
   pipe_io_ = std::make_unique<PipeIo>(std::move(pipe), kPipeName);
   if (!pipe_io_->valid()) {
-    zxlogf(ERROR, "PipeIo failed to initialize");
+    FDF_LOG(ERROR, "PipeIo failed to initialize");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -137,7 +137,7 @@ zx_status_t RenderControl::InitRcPipe(
   PipeIo::WriteSrc src[] = {{.data = ToByteSpan(kClientFlags)}};
   auto status = pipe_io_->Write(src, true);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Write client flags failed");
+    FDF_LOG(ERROR, "Write client flags failed");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
