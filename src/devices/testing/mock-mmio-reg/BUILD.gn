@@ -17,8 +17,6 @@ config("zxtest-backend") {
   defines = [ "MOCK_MMIO_REG_USE_ZXTEST" ]
 }
 
-# TODO(b/328812587) Move everything over to this target from
-# mock-mmio-reg-zxtest.
 source_set("mock-mmio-reg-zxtest") {
   public = [ "include/mock-mmio-reg/mock-mmio-reg.h" ]
   deps = [

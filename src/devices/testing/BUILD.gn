@@ -15,7 +15,6 @@ group("tests") {
     "mock-ddk:tests",
     "mock-mmio-range:tests",
     "mock-mmio-reg:tests",
-    "mock-mmio-reg-zxtest:tests",
     "syslog:tests",
   ]
 }
