@@ -11,4 +11,13 @@
         binary: "driver/fake-cpu-ctrl.so",
         bind: "meta/bind/bind-to-temp.bindbc",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.cpu.ctrl.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.cpu.ctrl.Service",
+            from: "self",
+        },
+    ],
 }

@@ -26,9 +26,9 @@ class AmlCpuPerformanceDomain : public AmlCpu {
 
   zx::vmo inspect_vmo() { return inspector_.DuplicateVmo(); }
 
- private:
   void CpuCtrlConnector(fidl::ServerEnd<fuchsia_hardware_cpu_ctrl::Device> server);
 
+ private:
   async_dispatcher_t* dispatcher_;
   fidl::ServerBindingGroup<fuchsia_hardware_cpu_ctrl::Device> bindings_;
   driver_devfs::Connector<fuchsia_hardware_cpu_ctrl::Device> devfs_connector_;

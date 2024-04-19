@@ -65,6 +65,16 @@ zx::result<> AmlCpuDriver::Start() {
       FDF_LOG(ERROR, "Failed to add child for performance domain: %s", st.status_string());
       return st.take_error();
     }
+    fuchsia_hardware_cpu_ctrl::Service::InstanceHandler handler({
+        .device = fit::bind_member<&AmlCpuPerformanceDomain::CpuCtrlConnector>(&**device),
+    });
+
+    auto result = outgoing()->AddService<fuchsia_hardware_cpu_ctrl::Service>(std::move(handler),
+                                                                             device->GetName());
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to add service: %s", result.status_string());
+      return result.take_error();
+    }
 
     performance_domains_.push_back(std::move(device.value()));
   }
