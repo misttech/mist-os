@@ -95,6 +95,7 @@ group("tests") {
     "trace:tests",
     "transfer_manifest:tests",
     "trivial-allocator:tests",
+    "ubsan-custom:tests",
     "ui:tests",
     "unwinder:tests",
     "usb_bulk:tests",
