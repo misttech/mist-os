@@ -858,13 +858,6 @@ mod tests {
             unimplemented!();
         }
 
-        async fn set_power_state(
-            &mut self,
-            _low_power_enabled: fidl_fuchsia_wlan_common::PowerSaveType,
-        ) -> Result<fuchsia_zircon::Status, anyhow::Error> {
-            unimplemented!();
-        }
-
         fn record_defect(&mut self, _defect: Defect) {
             unimplemented!();
         }
