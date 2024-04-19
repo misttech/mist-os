@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::CapabilitySource;
 use crate::model::component::WeakComponentInstance;
-use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
+use ::routing::error::RoutingError;
 use async_trait::async_trait;
 use bedrock_error::{BedrockError, Explain};
 use cm_types::Availability;
@@ -134,16 +133,6 @@ impl Router {
             .boxed()
         };
         Router::new(route_fn)
-    }
-
-    /// Returns a router that ensures the capability request is allowed by the
-    /// policy in [`GlobalPolicyChecker`].
-    pub fn with_policy_check(
-        self,
-        capability_source: CapabilitySource,
-        policy_checker: GlobalPolicyChecker,
-    ) -> Self {
-        Router::new(PolicyCheckRouter::new(capability_source, policy_checker, self))
     }
 
     /// Returns a [Dict] equivalent to `dict`, but with all [Router]s replaced with [Open].
@@ -302,35 +291,6 @@ impl Routable for Dict {
 impl Routable for BedrockError {
     async fn route(&self, _: Request) -> Result<Capability, BedrockError> {
         Err(self.clone())
-    }
-}
-
-pub struct PolicyCheckRouter {
-    capability_source: CapabilitySource,
-    policy_checker: GlobalPolicyChecker,
-    router: Router,
-}
-
-impl PolicyCheckRouter {
-    pub fn new(
-        capability_source: CapabilitySource,
-        policy_checker: GlobalPolicyChecker,
-        router: Router,
-    ) -> Self {
-        PolicyCheckRouter { capability_source, policy_checker, router }
-    }
-}
-
-#[async_trait]
-impl Routable for PolicyCheckRouter {
-    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
-        match self
-            .policy_checker
-            .can_route_capability(&self.capability_source, &request.target.moniker)
-        {
-            Ok(()) => self.router.route(request).await,
-            Err(policy_error) => Err(RoutingError::PolicyError(policy_error).into()),
-        }
     }
 }
 

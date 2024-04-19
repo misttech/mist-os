@@ -9,6 +9,7 @@ use {
             component::instance::ResolvedInstanceState,
             component::{ComponentInstance, WeakComponentInstance},
             routing::router::{Request, Router},
+            routing::router_ext::RouterExt,
             structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
         },
         sandbox_util::{DictExt, LaunchTaskOnReceive, RoutableExt},
