@@ -4,6 +4,5 @@
 {
     program: {
         runner: "colocated",
-        vmo_size: "67108864",
     },
 }

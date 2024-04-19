@@ -121,6 +121,9 @@ impl FrameworkCapability for IntrospectorFrameworkCapability {
         lazy_static! {
             static ref MEMORY_MONITOR: Moniker =
                 Moniker::parse_str("/core/memory_monitor").unwrap();
+            /// Moniker for integration tests.
+            static ref RECEIVER: Moniker =
+                Moniker::parse_str("receiver").unwrap();
         };
         // TODO(https://fxbug.dev/318904493): Temporary workaround to prevent other components from
         // using `Introspector` while improvements to framework capability allowlists are under way.
@@ -131,7 +134,10 @@ impl FrameworkCapability for IntrospectorFrameworkCapability {
         // realm, then exposed from `/`.
         //
         // All other cases are disallowed.
-        if target.moniker != *MEMORY_MONITOR && !target.moniker.is_root() {
+        if target.moniker != *MEMORY_MONITOR
+            && target.moniker != *RECEIVER
+            && !target.moniker.is_root()
+        {
             return Box::new(AccessDeniedCapabilityProvider {
                 target,
                 source_moniker: scope.moniker,

@@ -39,23 +39,17 @@ pub enum AttributionServerPublishError {
 /// [Observer] object using [AttributionServer::new_observer].
 /// [Publisher]s, created using [AttributionServer::new_publisher], should be
 /// used to push attribution changes.
-pub struct AttributionServer {
-    inner: Arc<Mutex<AttributionServerInner>>,
+#[derive(Clone)]
+pub struct AttributionServerHandle {
+    inner: Arc<Mutex<AttributionServer>>,
 }
 
-impl AttributionServer {
-    /// Create a new memory attribution server.
-    ///
-    /// `state` is a function returning the complete attribution state (not partial updates).
-    pub fn new(state: Box<GetAttributionFn>) -> Self {
-        Self { inner: Arc::new(Mutex::new(AttributionServerInner::new(state))) }
-    }
-
+impl AttributionServerHandle {
     /// Create a new [Observer] that represents a single client.
     ///
     /// Each FIDL client connection should get its own [Observer] object.
     pub fn new_observer(&self, control_handle: fattribution::ProviderControlHandle) -> Observer {
-        AttributionServerInner::register(&self.inner, control_handle)
+        AttributionServer::register(&self.inner, control_handle)
     }
 
     /// Create a new [Publisher] that can push updates to observers.
@@ -68,7 +62,7 @@ impl AttributionServer {
 /// get calls. These will be notified when the state changes or immediately the first time
 /// an `Observer` registers an observation.
 pub struct Observer {
-    inner: Arc<Mutex<AttributionServerInner>>,
+    inner: Arc<Mutex<AttributionServer>>,
 }
 
 impl Observer {
@@ -92,7 +86,7 @@ impl Drop for Observer {
 
 /// A [Publisher] should be used to send updates to [Observer]s.
 pub struct Publisher {
-    inner: Arc<Mutex<AttributionServerInner>>,
+    inner: Arc<Mutex<AttributionServer>>,
 }
 
 impl Publisher {
@@ -109,14 +103,19 @@ impl Publisher {
     }
 }
 
-struct AttributionServerInner {
+pub struct AttributionServer {
     state: Box<GetAttributionFn>,
     consumer: Option<AttributionConsumer>,
 }
 
-impl AttributionServerInner {
-    pub fn new(state: Box<GetAttributionFn>) -> Self {
-        Self { state, consumer: None }
+impl AttributionServer {
+    /// Create a new memory attribution server.
+    ///
+    /// `state` is a function returning the complete attribution state (not partial updates).
+    pub fn new(state: Box<GetAttributionFn>) -> AttributionServerHandle {
+        AttributionServerHandle {
+            inner: Arc::new(Mutex::new(AttributionServer { state, consumer: None })),
+        }
     }
 
     pub fn on_update(
@@ -266,7 +265,12 @@ impl AttributionConsumer {
     /// Create a new [AttributionConsumer] without an `observer` and an initial `dirty`
     /// value of `true`.
     pub fn new(observer_control_handle: fattribution::ProviderControlHandle) -> Self {
-        AttributionConsumer { first: true, pending: HashMap::new(), observer_control_handle: observer_control_handle, responder: None }
+        AttributionConsumer {
+            first: true,
+            pending: HashMap::new(),
+            observer_control_handle: observer_control_handle,
+            responder: None,
+        }
     }
 
     /// Register a new observation request. The observer will be notified immediately if
@@ -488,7 +492,6 @@ mod tests {
 
         assert_matches!(result2, Err(ClientChannelClosed { status: zx::Status::BAD_STATE, .. }));
         assert_matches!(result, Err(ClientChannelClosed { status: zx::Status::BAD_STATE, .. }));
-
     }
 
     /// Tests that the first get call returns the full state, not updates.
@@ -513,14 +516,14 @@ mod tests {
         .detach();
 
         server
-        .new_publisher()
-        .on_update(vec![fattribution::AttributionUpdate::Update(
-            fattribution::UpdatedPrincipal {
-                identifier: Some(fattribution::Identifier::Self_(fattribution::Self_)),
-                ..Default::default()
-            },
-        )])
-        .expect("Error sending the update");
+            .new_publisher()
+            .on_update(vec![fattribution::AttributionUpdate::Update(
+                fattribution::UpdatedPrincipal {
+                    identifier: Some(fattribution::Identifier::Self_(fattribution::Self_)),
+                    ..Default::default()
+                },
+            )])
+            .expect("Error sending the update");
 
         // As this is the first call, we should get the full state, not the update.
         let attributions =

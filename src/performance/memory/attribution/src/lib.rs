@@ -4,4 +4,7 @@
 
 mod attribution_server;
 
-pub use attribution_server::{AttributionServer, AttributionServerObservationError};
+pub use attribution_server::{
+    AttributionServer, AttributionServerHandle, AttributionServerObservationError, Observer,
+    Publisher,
+};

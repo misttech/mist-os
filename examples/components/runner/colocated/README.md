@@ -7,13 +7,14 @@ an address space.
 ## What does this runner do
 
 The `colocated` runner demonstrates how to attribute memory to each component
-it runs. A program run by the `colocated` runner will allocate and map a VMO of
-a user-specified size, and then fill it with randomized bytes, to cause the
-pages to be physically allocated.
+it runs. A program run by the `colocated` runner will create and hold a VMO.
+This VMO will be reported by the runner as part of the memory attribution
+protocol.
 
-If the program is started with a `PA_USER0` numbered handle, it will signal the
-`USER_0` signal on the peer handle once it has done filling the VMO, to indicate
-that all the backing pages have been allocated.
+If the program is started with a `PA_USER0` numbered handle, it will serve the
+`fuchsia.examples.colocated.Colocated` protocol over this channel, which can be
+used to retrieve the koid of the VMO created by the colocated component, from
+the component itself.
 
 ## Program schema
 
@@ -50,14 +51,11 @@ collection for running colocated components using that runner.
 To run a colocated component, provide this URL to `ffx component run`:
 
 ```bash
-$ ffx component run /core/ffx-laboratory:colocated-runner-example/collection:1 'fuchsia-pkg://fuchsia.com/colocated-runner-example#meta/colocated-component-32mb.cm'
+$ ffx component run /core/ffx-laboratory:colocated-runner-example/collection:1 'fuchsia-pkg://fuchsia.com/colocated-runner-example#meta/colocated-component.cm'
 ```
 
-This will start a component that attempts to use 32 MiB of memory, living inside
-the address space of the `colocated` runner.
-
-You may replace `32mb` with `64mb` or `128mb` to test different sizes of memory
-usage.
+This will start a component that lives inside the address space of the
+`colocated` runner.
 
 You may replace `collection:1` with `collection:2` etc. to start multiple
 colocated components in this collection.

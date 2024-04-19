@@ -22,21 +22,24 @@ rustc_binary("bin") {
   edition = "2021"
 
   deps = [
+    "//examples/components/runner/colocated/fidl:colocated_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
+    "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/mapped-vmo",
+    "//src/lib/fuchsia-sync",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/performance/memory/attribution",
     "//src/sys/lib/runner",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:rand",
     "//third_party/rust_crates:scopeguard",
     "//third_party/rust_crates:tracing",
   ]
@@ -64,26 +67,14 @@ fuchsia_component("colocated-runner-example-realm") {
   manifest = "meta/colocated-runner-example.cml"
 }
 
-fuchsia_component("colocated-component-32mb") {
-  component_name = "colocated-component-32mb"
-  manifest = "meta/colocated-component-32mb.cml"
-}
-
-fuchsia_component("colocated-component-64mb") {
-  component_name = "colocated-component-64mb"
-  manifest = "meta/colocated-component-64mb.cml"
-}
-
-fuchsia_component("colocated-component-128mb") {
-  component_name = "colocated-component-128mb"
-  manifest = "meta/colocated-component-128mb.cml"
+fuchsia_component("colocated-component") {
+  component_name = "colocated-component"
+  manifest = "meta/colocated-component.cml"
 }
 
 fuchsia_package("colocated-runner-example") {
   deps = [
-    ":colocated-component-128mb",
-    ":colocated-component-32mb",
-    ":colocated-component-64mb",
+    ":colocated-component",
     ":colocated-runner",
     ":colocated-runner-example-realm",
   ]
@@ -92,11 +83,14 @@ fuchsia_package("colocated-runner-example") {
 fuchsia_unittest_package("colocated-runner-unittests") {
   deps = [
     ":bin_test",
-    ":colocated-component-64mb",
+    ":colocated-component",
   ]
 }
 
 group("hermetic_tests") {
   testonly = true
-  deps = [ ":colocated-runner-unittests" ]
+  deps = [
+    ":colocated-runner-unittests",
+    "integration_tests",
+  ]
 }
