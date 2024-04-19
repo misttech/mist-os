@@ -6,7 +6,7 @@
 
 # Build variables
 MISTOSROOT ?= $(PWD)
-OUTPUT ?= out/Default
+OUTPUT ?= out/default
 HOST_ARCH ?= $(shell $(MISTOSROOT)/meta/scripts/host-arch.sh)
 HOST_OS ?= $(shell $(MISTOSROOT)/meta/scripts/host-os.sh)
 GN ?= $(MISTOSROOT)/prebuilt/third_party/gn/$(HOST_OS)-$(HOST_ARCH)/gn
