@@ -86,9 +86,8 @@ fn new_command_thread(
         executor.run_singlethreaded(async move {
             while let Ok(cmd) = receiver.recv().await {
                 if let LibraryCommand::ShutdownLib = cmd {
-                    if let Some(n) = notifier.lock().await.take() {
-                        n.close().await;
-                    }
+                    // Dropping the notifier will cause spawned tasks to be dropped.
+                    *notifier.lock().await = None;
                     break;
                 }
                 cmd.run().await;
@@ -98,7 +97,7 @@ fn new_command_thread(
 }
 
 pub(crate) struct LibNotifier {
-    pipe_reader_task: Task<()>,
+    _pipe_reader_task: Task<()>,
     handle_notification_sender: async_channel::Sender<zx_types::zx_handle_t>,
     pipe_rx: RawFd,
 }
@@ -128,7 +127,7 @@ impl LibNotifier {
                 }
             }
         });
-        Ok(Self { handle_notification_sender: tx, pipe_reader_task, pipe_rx })
+        Ok(Self { handle_notification_sender: tx, _pipe_reader_task: pipe_reader_task, pipe_rx })
     }
 
     fn receiver(&self) -> RawFd {
@@ -137,10 +136,5 @@ impl LibNotifier {
 
     fn sender(&self) -> async_channel::Sender<zx_types::zx_handle_t> {
         self.handle_notification_sender.clone()
-    }
-
-    /// Cancels and destroys the internal reader that handles notifications.
-    async fn close(self) {
-        let _ = self.pipe_reader_task.cancel().await;
     }
 }

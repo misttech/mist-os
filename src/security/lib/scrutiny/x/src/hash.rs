@@ -50,13 +50,12 @@ impl api::AsBytes for Hash {
 #[cfg(test)]
 mod tests {
     use super::Hash;
-    use fuchsia_merkle::MerkleTree as FuchsiaMerkleTree;
 
     #[fuchsia::test]
     fn test_hex_merkle_root_fmt() {
         let contents = "hello_world";
         let hash = Hash::from_contents(contents.as_bytes());
-        let merkle_root = FuchsiaMerkleTree::from_reader(contents.as_bytes()).unwrap().root();
+        let merkle_root = fuchsia_merkle::from_slice(contents.as_bytes()).root();
         assert_eq!(format!("{}", hash), format!("{}", merkle_root));
     }
 

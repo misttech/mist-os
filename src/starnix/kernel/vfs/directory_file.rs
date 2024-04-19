@@ -9,7 +9,7 @@ use crate::{
         FsString, SeekTarget,
     },
 };
-use starnix_sync::Mutex;
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::{error, errors::Errno, off_t};
 use std::ops::Bound;
 
@@ -92,6 +92,7 @@ impl FileOps for MemoryDirectoryFile {
 
     fn readdir(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,

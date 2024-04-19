@@ -775,3 +775,28 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                     ),
                     f"Did not find substring, output was:\n{output.getvalue()}",
                 )
+
+    @mock.patch("main.termout.is_valid", return_value=False)
+    async def test_log_to_stdout(self, _termout_mock: mock.Mock) -> None:
+        """Test that we can log everything to stdout, and it parses as JSON lines"""
+
+        _command_mock = self._mock_run_command(0)
+        _subprocess_mock = self._mock_subprocess_call(0)
+        self._mock_has_device_connected(True)
+        self._mock_has_tests_in_base([])
+
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            ret = await main.async_main_wrapper(
+                args.parse_args(["--logpath", "-"])
+            )
+            self.assertEqual(ret, 0)
+        for line in output.getvalue().splitlines():
+            if not line:
+                continue
+            try:
+                json.loads(line)
+            except json.JSONDecodeError as e:
+                self.fail(
+                    f"Failed to parse line as JSON.\nLine: {line}\nError: {e}"
+                )

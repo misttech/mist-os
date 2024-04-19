@@ -1655,13 +1655,6 @@ mod tests {
             self.wpa3_iface.is_some()
         }
 
-        async fn set_power_state(
-            &mut self,
-            _low_power_enabled: fidl_fuchsia_wlan_common::PowerSaveType,
-        ) -> Result<fuchsia_zircon::Status, anyhow::Error> {
-            unimplemented!();
-        }
-
         fn record_defect(&mut self, defect: Defect) {
             self.defects.push(defect);
         }

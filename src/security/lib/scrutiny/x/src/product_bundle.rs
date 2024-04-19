@@ -223,7 +223,7 @@ pub mod test {
                 name: V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string(),
                 metadata_path,
                 blobs_path,
-                delivery_blob_type: None,
+                delivery_blob_type: 1,
                 root_private_key_path: None,
                 targets_private_key_path: None,
                 snapshot_private_key_path: None,
@@ -269,7 +269,7 @@ pub mod test {
                     name: V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string(),
                     metadata_path: a_metadata_path,
                     blobs_path: a_blobs_path,
-                    delivery_blob_type: None,
+                    delivery_blob_type: 1,
                     root_private_key_path: None,
                     targets_private_key_path: None,
                     snapshot_private_key_path: None,
@@ -279,7 +279,7 @@ pub mod test {
                     name: V2_SDK_B_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string(),
                     metadata_path: b_metadata_path,
                     blobs_path: b_blobs_path,
-                    delivery_blob_type: None,
+                    delivery_blob_type: 1,
                     root_private_key_path: None,
                     targets_private_key_path: None,
                     snapshot_private_key_path: None,
@@ -289,7 +289,7 @@ pub mod test {
                     name: V2_SDK_R_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string(),
                     metadata_path: r_metadata_path,
                     blobs_path: r_blobs_path,
-                    delivery_blob_type: None,
+                    delivery_blob_type: 1,
                     root_private_key_path: None,
                     targets_private_key_path: None,
                     snapshot_private_key_path: None,
@@ -397,12 +397,7 @@ mod tests {
     }
 
     fn blob_path(blob: &[u8]) -> String {
-        format!(
-            "{}",
-            fuchsia_merkle::MerkleTree::from_reader(blob)
-                .expect("merkle tree from string bytes")
-                .root()
-        )
+        format!("{}", fuchsia_merkle::from_slice(blob).root())
     }
 
     fn blob_hash(blob: &[u8]) -> Box<dyn api::Hash> {

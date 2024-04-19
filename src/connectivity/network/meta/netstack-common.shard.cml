@@ -14,8 +14,6 @@
             protocol: [
                 "fuchsia.net.debug.Diagnostics",
                 "fuchsia.net.debug.Interfaces",
-                "fuchsia.net.filter.Control",
-                "fuchsia.net.filter.deprecated.Filter",
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.multicast.admin.Ipv6RoutingTableController",
@@ -43,8 +41,6 @@
             protocol: [
                 "fuchsia.net.debug.Diagnostics",
                 "fuchsia.net.debug.Interfaces",
-                "fuchsia.net.filter.Control",
-                "fuchsia.net.filter.deprecated.Filter",
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.multicast.admin.Ipv6RoutingTableController",

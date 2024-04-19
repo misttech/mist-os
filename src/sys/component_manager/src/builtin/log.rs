@@ -17,7 +17,7 @@ pub struct ReadOnlyLog {
 
 impl ReadOnlyLog {
     /// Create a service to provide a read-only version of the kernel log.
-    /// Note that the root resource is passed in here, rather than a read-only log handle to be
+    /// Note that the debuglog resource is passed in here, rather than a read-only log handle to be
     /// duplicated, because a fresh debuglog (LogDispatcher) object needs to be returned for each call.
     /// This is because LogDispatcher holds the implicit read location for reading from the log, so if a
     /// handle to the same object was duplicated, this would mistakenly share read location amongst all
@@ -66,19 +66,19 @@ impl WriteOnlyLog {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, fuchsia_async as fasync, fuchsia_component::client::connect_to_protocol,
-        fuchsia_zircon::AsHandleRef,
+        super::*, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
+        fuchsia_component::client::connect_to_protocol, fuchsia_zircon::AsHandleRef,
     };
 
-    async fn get_root_resource() -> Result<zx::Resource, Error> {
-        let root_resource_provider = connect_to_protocol::<fboot::RootResourceMarker>()?;
-        let root_resource_handle = root_resource_provider.get().await?;
-        Ok(zx::Resource::from(root_resource_handle))
+    async fn get_debuglog_resource() -> Result<zx::Resource, Error> {
+        let debuglog_resource_provider = connect_to_protocol::<fkernel::DebuglogResourceMarker>()?;
+        let debuglog_resource_handle = debuglog_resource_provider.get().await?;
+        Ok(zx::Resource::from(debuglog_resource_handle))
     }
 
     #[fuchsia::test]
     async fn has_correct_rights_for_read_only() -> Result<(), Error> {
-        let resource = get_root_resource().await?;
+        let resource = get_debuglog_resource().await?;
         let read_only_log = ReadOnlyLog::new(resource);
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fboot::ReadOnlyLogMarker>()?;

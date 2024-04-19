@@ -21,13 +21,6 @@ group("tests") {
   ]
 }
 
-# Forwarding declaration for //vendor/* dependencies.
-# Remove after soft transition.
-group("fuchsia.power.broker_rust") {
-  public_deps = [ "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust" ]
-  visibility = [ "//vendor/*" ]
-}
-
 rustc_binary("bin") {
   output_name = "power-broker"
   edition = "2021"

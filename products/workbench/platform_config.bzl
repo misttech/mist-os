@@ -50,9 +50,6 @@ workbench_platform_config = {
             ],
         },
     },
-    "storage": {
-        "configure_fshost": True,
-    },
     "session": {
         "enabled": True,
     },

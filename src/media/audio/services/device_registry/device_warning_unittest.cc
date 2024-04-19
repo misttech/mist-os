@@ -6,17 +6,12 @@
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
-#include <lib/fidl/cpp/enum.h>
-#include <zircon/errors.h>
-#include <zircon/types.h>
 
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/common_unittest.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/device_unittest.h"
-#include "src/media/audio/services/device_registry/testing/fake_codec.h"
-#include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 #include "src/media/audio/services/device_registry/validate.h"
 
 namespace media_audio {
@@ -236,7 +231,11 @@ TEST_F(CodecWarningTest, SetInvalidDaiFormat) {
 
   RunLoopUntilIdle();
   EXPECT_FALSE(notify()->dai_format());
-  // TODO: Expect a NotSet notification here.
+  auto error_notify =
+      notify()->dai_format_errors().find(fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+  ASSERT_TRUE(error_notify != notify()->dai_format_errors().end());
+  EXPECT_EQ(error_notify->second,
+            fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat);
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
@@ -267,7 +266,10 @@ TEST_F(CodecWarningTest, SetUnsupportedDaiFormat) {
 
   RunLoopUntilIdle();
   EXPECT_FALSE(notify()->dai_format());
-  // TODO: Expect a NotSet notification here.
+  auto error_notify =
+      notify()->dai_format_errors().find(fuchsia_audio_device::kDefaultDaiInterconnectElementId);
+  ASSERT_TRUE(error_notify != notify()->dai_format_errors().end());
+  EXPECT_EQ(error_notify->second, fuchsia_audio_device::ControlSetDaiFormatError::kFormatMismatch);
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
@@ -699,52 +701,52 @@ TEST_F(CompositeWarningTest, CreateRingBufferUnsupportedFormat) {
 
 // CreateRingBufferSizeTooLarge test?
 
-// TODO: negative RingBufferProperties cases?
+// Negative RingBufferProperties cases?
 // Device with error
 
-// TODO: negative GetVmo cases?
+// Negative GetVmo cases?
 // Device with error
 
-// TODO: negative SetActiveChannels cases.
+// Negative SetActiveChannels cases.
 // Device with error
 
-// TODO: negative RingBuffer Start cases.
+// Negative RingBuffer Start cases.
 // Device with error
 
-// TODO: negative RingBuffer Stop  cases.
+// Negative RingBuffer Stop  cases.
 // Device with error
 
-// TODO: negative WatchDelayInfo cases.
+// Negative WatchDelayInfo cases.
 // Device with error
 
-// TODO: negative WatchClockRecoveryPositionInfo cases?
+// Negative WatchClockRecoveryPositionInfo cases?
 // Device with error
 
 ////////////////////////////////////////////////////////
 // Signalprocessing test cases
 //
-// TODO: negative cases for GetTopologies?
+// Negative cases for GetTopologies?
 // GetTopologies on error device
 
-// TODO: negative cases for GetElements?
+// Negative cases for GetElements?
 // GetElements on error device
 
-// TODO: negative cases for WatchTopology?
+// Negative cases for WatchTopology?
 // WatchTopology on error device
 // WatchTopology while pending
 
-// TODO: negative cases for WatchElementState
+// Negative cases for WatchElementState
 // WatchElementState on error device
 // WatchElementState with unknown element_id
 // WatchElementState while pending
 
-// TODO: negative cases for SetTopology
+// Negative cases for SetTopology
 // SetTopology on error device
 // SetTopology without Control.
 // SetTopology with unknown topology_id
 // Try pipelining a bunch of these calls without waiting and see if errors occur
 
-// TODO: negative cases for SetElementState
+// Negative cases for SetElementState
 // SetElementState on error device
 // SetElementState without Control
 // SetElementState with unknown element_id

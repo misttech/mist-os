@@ -5,9 +5,13 @@
 use alloc::{collections::HashMap, sync::Arc};
 use core::hash::Hash;
 
+use derivative::Derivative;
 use packet_formats::ip::IpExt;
 
-use crate::{packets::TransportPacket, IpPacket, MaybeTransportPacket};
+use crate::{
+    context::FilterBindingsContext, packets::TransportPacket, FilterBindingsTypes, IpPacket,
+    MaybeTransportPacket,
+};
 use netstack3_sync::Mutex;
 
 /// Implements a connection tracking subsystem.
@@ -16,15 +20,16 @@ use netstack3_sync::Mutex;
 /// struct and can be extracted with the [`Connection::external_data()`]
 /// function.
 #[allow(dead_code)]
-#[derive(Default)]
-pub struct Table<I: IpExt, E> {
+#[derive(Derivative)]
+#[derivative(Default(bound = ""))]
+pub struct Table<I: IpExt, BT: FilterBindingsTypes, E> {
     /// A connection is inserted into the map twice: once for the original
     /// tuple, and once for the reply tuple.
-    map: Mutex<HashMap<Tuple<I>, Arc<ConnectionShared<I, E>>>>,
+    map: Mutex<HashMap<Tuple<I>, Arc<ConnectionShared<I, BT, E>>>>,
 }
 
 #[allow(dead_code)]
-impl<I: IpExt, E> Table<I, E> {
+impl<I: IpExt, BT: FilterBindingsTypes, E> Table<I, BT, E> {
     pub(crate) fn new() -> Self {
         Self { map: Mutex::new(HashMap::new()) }
     }
@@ -49,7 +54,7 @@ impl<I: IpExt, E> Table<I, E> {
     /// to be able to manipulate its internal map.
     pub(crate) fn finalize_connection(
         &self,
-        connection: Connection<I, E>,
+        connection: Connection<I, BT, E>,
     ) -> Result<bool, FinalizeConnectionError> {
         let exclusive = match connection {
             Connection::Exclusive(c) => c,
@@ -94,7 +99,7 @@ impl<I: IpExt, E> Table<I, E> {
 }
 
 #[allow(dead_code)]
-impl<I: IpExt, E: Default> Table<I, E> {
+impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
     /// Returns a [`Connection`] for the packet's flow. If a connection does not
     /// currently exist, a new one is created.
     ///
@@ -106,16 +111,30 @@ impl<I: IpExt, E: Default> Table<I, E> {
     /// connection.
     pub(crate) fn get_connection_for_packet_and_update<P: IpPacket<I>>(
         &self,
+        bindings_ctx: &BC,
         packet: &P,
-    ) -> Option<Connection<I, E>> {
+    ) -> Option<Connection<I, BC, E>> {
         let tuple = Tuple::from_packet(packet)?;
 
-        // TODO(https://fxbug.dev/328064022): Add call to Connection::update()
-        // once that's implemented.
-        if let Some(connection) = self.map.lock().get(&tuple) {
-            Some(Connection::Shared(connection.clone()))
-        } else {
-            Some(Connection::Exclusive(tuple.into()))
+        let mut connection = match self.map.lock().get(&tuple) {
+            Some(connection) => Connection::Shared(connection.clone()),
+            None => {
+                Connection::Exclusive(ConnectionExclusive::from_tuple(bindings_ctx, tuple.clone()))
+            }
+        };
+
+        match connection.update(bindings_ctx, &tuple) {
+            Ok(()) => Some(connection),
+            Err(e) => match e {
+                ConnectionUpdateError::NonMatchingTuple => {
+                    panic!(
+                        "Tuple didn't match. tuple={:?}, conn.original={:?}, conn.reply={:?}",
+                        &tuple,
+                        connection.original_tuple(),
+                        connection.reply_tuple()
+                    );
+                }
+            },
         }
     }
 }
@@ -186,22 +205,29 @@ pub(crate) enum FinalizeConnectionError {
     Conflict,
 }
 
+/// An error returned from [`Connection::update`].
+#[derive(Debug)]
+pub(crate) enum ConnectionUpdateError {
+    /// The provided tuple doesn't belong to the connection being updated.
+    NonMatchingTuple,
+}
+
 /// A `Connection` contains all of the information about a single connection
 /// tracked by conntrack.
 #[derive(Debug)]
 #[allow(dead_code)]
-pub enum Connection<I: IpExt, E> {
+pub enum Connection<I: IpExt, BT: FilterBindingsTypes, E> {
     /// A connection that is directly owned by the packet that originated the
     /// connection and no others. All fields are modifiable.
-    Exclusive(ConnectionExclusive<I, E>),
+    Exclusive(ConnectionExclusive<I, BT, E>),
 
     /// This is an existing connection, and there are possibly many other
     /// packets that are concurrently modifying it.
-    Shared(Arc<ConnectionShared<I, E>>),
+    Shared(Arc<ConnectionShared<I, BT, E>>),
 }
 
 #[allow(dead_code)]
-impl<I: IpExt, E> Connection<I, E> {
+impl<I: IpExt, BT: FilterBindingsTypes, E> Connection<I, BT, E> {
     /// Returns the tuple of the original direction of this connection
     pub(crate) fn original_tuple(&self) -> &Tuple<I> {
         match self {
@@ -242,6 +268,30 @@ impl<I: IpExt, E> Connection<I, E> {
             None
         }
     }
+
+    /// Returns a copy of the internal connection state
+    pub(crate) fn state(&self) -> ConnectionState<BT> {
+        match self {
+            Connection::Exclusive(c) => c.state.clone(),
+            Connection::Shared(c) => c.state.lock().clone(),
+        }
+    }
+}
+
+impl<I: IpExt, BC: FilterBindingsContext, E> Connection<I, BC, E> {
+    fn update(&mut self, bindings_ctx: &BC, tuple: &Tuple<I>) -> Result<(), ConnectionUpdateError> {
+        let direction = match self.direction(tuple) {
+            Some(d) => d,
+            None => return Err(ConnectionUpdateError::NonMatchingTuple),
+        };
+
+        let now = bindings_ctx.now();
+
+        match self {
+            Connection::Exclusive(c) => c.state.update(direction, now),
+            Connection::Shared(c) => c.state.lock().update(direction, now),
+        }
+    }
 }
 
 /// Fields common to both [`ConnectionExclusive`] and [`ConnectionShared`].
@@ -261,6 +311,37 @@ pub struct ConnectionCommon<I: IpExt, E> {
     pub(crate) external_data: E,
 }
 
+/// Dynamic per-connection state.
+#[derive(Debug, Derivative)]
+#[derivative(Clone(bound = ""))]
+pub(crate) struct ConnectionState<BT: FilterBindingsTypes> {
+    /// Whether this connection has seen packets in both directions.
+    established: bool,
+
+    /// The time the last packet was seen for this connection (in either of the
+    /// original or reply directions).
+    last_packet_time: BT::Instant,
+}
+
+impl<BT: FilterBindingsTypes> ConnectionState<BT> {
+    fn update(
+        &mut self,
+        dir: ConnectionDirection,
+        now: BT::Instant,
+    ) -> Result<(), ConnectionUpdateError> {
+        match dir {
+            ConnectionDirection::Original => (),
+            ConnectionDirection::Reply => self.established = true,
+        };
+
+        if self.last_packet_time < now {
+            self.last_packet_time = now;
+        }
+
+        Ok(())
+    }
+}
+
 /// A conntrack connection with single ownership.
 ///
 /// Because of this, many fields may be updated without synchronization. There
@@ -268,25 +349,27 @@ pub struct ConnectionCommon<I: IpExt, E> {
 /// out-of-sync with the table (e.g. by changing the tuples once the connection
 /// has been inserted).
 #[derive(Debug)]
-pub struct ConnectionExclusive<I: IpExt, E> {
+pub struct ConnectionExclusive<I: IpExt, BT: FilterBindingsTypes, E> {
     pub(crate) inner: ConnectionCommon<I, E>,
+    pub(crate) state: ConnectionState<BT>,
 }
 
 #[allow(dead_code)]
-impl<I: IpExt, E> ConnectionExclusive<I, E> {
+impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionExclusive<I, BT, E> {
     /// Turn this exclusive connection into a shared one. This is required in
     /// order to insert into the [`Table`] table.
-    fn make_shared(self) -> Arc<ConnectionShared<I, E>> {
-        Arc::new(ConnectionShared { inner: self.inner })
+    fn make_shared(self) -> Arc<ConnectionShared<I, BT, E>> {
+        Arc::new(ConnectionShared { inner: self.inner, state: Mutex::new(self.state) })
     }
 }
 
-impl<I: IpExt, E: Default> From<Tuple<I>> for ConnectionExclusive<I, E> {
-    fn from(original_tuple: Tuple<I>) -> Self {
+impl<I: IpExt, BC: FilterBindingsContext, E: Default> ConnectionExclusive<I, BC, E> {
+    fn from_tuple(bindings_ctx: &BC, original_tuple: Tuple<I>) -> Self {
         let reply_tuple = original_tuple.clone().invert();
 
         Self {
             inner: ConnectionCommon { original_tuple, reply_tuple, external_data: E::default() },
+            state: ConnectionState { established: false, last_packet_time: bindings_ctx.now() },
         }
     }
 }
@@ -297,13 +380,14 @@ impl<I: IpExt, E: Default> From<Tuple<I>> for ConnectionExclusive<I, E> {
 /// itself, will be depending on them not to change. Fields must be accessed
 /// through the associated methods.
 #[derive(Debug)]
-pub struct ConnectionShared<I: IpExt, E> {
+pub struct ConnectionShared<I: IpExt, BT: FilterBindingsTypes, E> {
     inner: ConnectionCommon<I, E>,
+    state: Mutex<ConnectionState<BT>>,
 }
 
 #[cfg(test)]
 mod tests {
-    use core::convert::Infallible as Never;
+    use core::{convert::Infallible as Never, time::Duration};
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
@@ -313,7 +397,10 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::packets::testutil::internal::{FakeIpPacket, FakeTcpSegment, TransportPacketExt};
+    use crate::{
+        context::testutil::FakeBindingsCtx,
+        packets::testutil::internal::{FakeIpPacket, FakeTcpSegment, TransportPacketExt},
+    };
 
     trait TestIpExt: Ip {
         const SRC_ADDR: Self::Addr;
@@ -409,6 +496,8 @@ mod tests {
     #[test_case(IpProto::Udp)]
     #[test_case(IpProto::Tcp)]
     fn connection_from_tuple<I: Ip + IpExt + TestIpExt>(protocol: IpProto) {
+        let bindings_ctx = FakeBindingsCtx::new();
+
         let original_tuple = Tuple::<I> {
             protocol: protocol.into(),
             src_addr: I::SRC_ADDR,
@@ -418,7 +507,8 @@ mod tests {
         };
         let reply_tuple = original_tuple.clone().invert();
 
-        let connection: ConnectionExclusive<I, ()> = original_tuple.clone().into();
+        let connection =
+            ConnectionExclusive::<_, _, ()>::from_tuple(&bindings_ctx, original_tuple.clone());
 
         assert_eq!(&connection.inner.original_tuple, &original_tuple);
         assert_eq!(&connection.inner.reply_tuple, &reply_tuple);
@@ -426,6 +516,8 @@ mod tests {
 
     #[ip_test]
     fn connection_make_shared_has_same_underlying_info<I: Ip + IpExt + TestIpExt>() {
+        let bindings_ctx = FakeBindingsCtx::new();
+
         let original_tuple = Tuple::<I> {
             protocol: I::Proto::from(IpProto::Tcp),
             src_addr: I::SRC_ADDR,
@@ -435,7 +527,7 @@ mod tests {
         };
         let reply_tuple = original_tuple.clone().invert();
 
-        let mut connection: ConnectionExclusive<I, u32> = original_tuple.clone().into();
+        let mut connection = ConnectionExclusive::from_tuple(&bindings_ctx, original_tuple.clone());
         connection.inner.external_data = 1234;
         let shared = connection.make_shared();
 
@@ -453,6 +545,8 @@ mod tests {
     #[test_case(ConnectionKind::Exclusive)]
     #[test_case(ConnectionKind::Shared)]
     fn connection_getters<I: Ip + IpExt + TestIpExt>(connection_kind: ConnectionKind) {
+        let bindings_ctx = FakeBindingsCtx::new();
+
         let original_tuple = Tuple::<I> {
             protocol: I::Proto::from(IpProto::Tcp),
             src_addr: I::SRC_ADDR,
@@ -462,7 +556,7 @@ mod tests {
         };
         let reply_tuple = original_tuple.clone().invert();
 
-        let mut connection: ConnectionExclusive<I, u32> = original_tuple.clone().into();
+        let mut connection = ConnectionExclusive::from_tuple(&bindings_ctx, original_tuple.clone());
         connection.inner.external_data = 1234;
 
         let connection = match connection_kind {
@@ -479,6 +573,8 @@ mod tests {
     #[test_case(ConnectionKind::Exclusive)]
     #[test_case(ConnectionKind::Shared)]
     fn connection_direction<I: Ip + IpExt + TestIpExt>(connection_kind: ConnectionKind) {
+        let bindings_ctx = FakeBindingsCtx::new();
+
         let original_tuple = Tuple::<I> {
             protocol: I::Proto::from(IpProto::Tcp),
             src_addr: I::SRC_ADDR,
@@ -491,7 +587,8 @@ mod tests {
         let mut other_tuple = original_tuple.clone();
         other_tuple.src_port_or_id += 1;
 
-        let connection: ConnectionExclusive<I, ()> = original_tuple.clone().into();
+        let connection =
+            ConnectionExclusive::<_, _, ()>::from_tuple(&bindings_ctx, original_tuple.clone());
         let connection = match connection_kind {
             ConnectionKind::Exclusive => Connection::Exclusive(connection),
             ConnectionKind::Shared => Connection::Shared(connection.make_shared()),
@@ -503,8 +600,60 @@ mod tests {
     }
 
     #[ip_test]
+    #[test_case(ConnectionKind::Exclusive)]
+    #[test_case(ConnectionKind::Shared)]
+    fn connection_update<I: Ip + IpExt + TestIpExt>(connection_kind: ConnectionKind) {
+        let mut bindings_ctx = FakeBindingsCtx::new();
+        bindings_ctx.set_time_elapsed(Duration::from_secs(12));
+
+        let original_tuple = Tuple::<I> {
+            protocol: I::Proto::from(IpProto::Tcp),
+            src_addr: I::SRC_ADDR,
+            dst_addr: I::DST_ADDR,
+            src_port_or_id: I::SRC_PORT,
+            dst_port_or_id: I::DST_PORT,
+        };
+        let reply_tuple = original_tuple.clone().invert();
+
+        let mut other_tuple = original_tuple.clone();
+        other_tuple.src_port_or_id += 1;
+
+        let connection =
+            ConnectionExclusive::<_, _, ()>::from_tuple(&bindings_ctx, original_tuple.clone());
+        let mut connection = match connection_kind {
+            ConnectionKind::Exclusive => Connection::Exclusive(connection),
+            ConnectionKind::Shared => Connection::Shared(connection.make_shared()),
+        };
+
+        assert_matches!(connection.update(&bindings_ctx, &original_tuple), Ok(()));
+        let state = connection.state();
+        assert!(!state.established);
+        assert_eq!(state.last_packet_time.offset, Duration::from_secs(12));
+
+        // Tuple in reply direction should set established to true and obviously
+        // update last packet time.
+        bindings_ctx.set_time_elapsed(Duration::from_secs(13));
+        assert_matches!(connection.update(&bindings_ctx, &reply_tuple), Ok(()));
+        let state = connection.state();
+        assert!(state.established);
+        assert_eq!(state.last_packet_time.offset, Duration::from_secs(13));
+
+        // Unrelated connection should return an error and otherwise not touch
+        // anything.
+        bindings_ctx.set_time_elapsed(Duration::from_secs(14));
+        assert_matches!(
+            connection.update(&bindings_ctx, &other_tuple),
+            Err(ConnectionUpdateError::NonMatchingTuple)
+        );
+        assert!(state.established);
+        assert_eq!(state.last_packet_time.offset, Duration::from_secs(13));
+    }
+
+    #[ip_test]
     fn table_get_exclusive_connection_and_finalize_shared<I: Ip + IpExt + TestIpExt>() {
-        let table = Table::<I, ()>::new();
+        let mut bindings_ctx = FakeBindingsCtx::new();
+        bindings_ctx.set_time_elapsed(Duration::from_secs(12));
+        let table = Table::<_, _, ()>::new();
 
         let packet = FakeIpPacket::<I, _> {
             src_ip: I::SRC_ADDR,
@@ -521,9 +670,12 @@ mod tests {
         let original_tuple = Tuple::from_packet(&packet).expect("packet should be valid");
         let reply_tuple = Tuple::from_packet(&reply_packet).expect("packet should be valid");
 
-        // TODO(https://fxbug.dev/328064022): Add check for state update.
-        let conn =
-            table.get_connection_for_packet_and_update(&packet).expect("packet should be valid");
+        let conn = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid");
+        let state = conn.state();
+        assert!(!state.established);
+        assert_eq!(state.last_packet_time.offset, Duration::from_secs(12));
 
         // Since the connection isn't present in the map, we should get a
         // freshly-allocated exclusive connection and the map should not have
@@ -539,17 +691,27 @@ mod tests {
 
         // We should now get a shared connection back for packets in either
         // direction now that the connection is present in the table.
-        let conn = table.get_connection_for_packet_and_update(&packet);
-        let conn = assert_matches!(conn, Some(Connection::Shared(conn)) => conn);
+        bindings_ctx.set_time_elapsed(Duration::from_secs(13));
+        let conn = table.get_connection_for_packet_and_update(&bindings_ctx, &packet);
+        let conn = assert_matches!(conn, Some(conn) => conn);
+        let state = conn.state();
+        assert!(!state.established);
+        assert_eq!(state.last_packet_time.offset, Duration::from_secs(13));
+        let conn = assert_matches!(conn, Connection::Shared(conn) => conn);
 
-        let reply_conn = table.get_connection_for_packet_and_update(&reply_packet);
-        let reply_conn = assert_matches!(reply_conn, Some(Connection::Shared(conn)) => conn);
+        bindings_ctx.set_time_elapsed(Duration::from_secs(14));
+        let reply_conn = table.get_connection_for_packet_and_update(&bindings_ctx, &reply_packet);
+        let reply_conn = assert_matches!(reply_conn, Some(conn) => conn);
+        let state = reply_conn.state();
+        assert!(state.established);
+        assert_eq!(state.last_packet_time.offset, Duration::from_secs(14));
+        let reply_conn = assert_matches!(reply_conn, Connection::Shared(conn) => conn);
 
         // We should be getting the same connection in both directions.
         assert!(Arc::ptr_eq(&conn, &reply_conn));
 
         // Inserting the connection a second time shouldn't change the map.
-        let conn = table.get_connection_for_packet_and_update(&packet).unwrap();
+        let conn = table.get_connection_for_packet_and_update(&bindings_ctx, &packet).unwrap();
         assert_matches!(table.finalize_connection(conn), Ok(false));
         assert!(table.contains_tuple(&original_tuple));
         assert!(table.contains_tuple(&reply_tuple));
@@ -557,7 +719,8 @@ mod tests {
 
     #[ip_test]
     fn table_conflict<I: Ip + IpExt + TestIpExt>() {
-        let table = Table::new();
+        let bindings_ctx = FakeBindingsCtx::new();
+        let table = Table::<_, _, ()>::new();
 
         let original_tuple = Tuple::<I> {
             protocol: I::Proto::from(IpProto::Tcp),
@@ -583,17 +746,22 @@ mod tests {
             dst_port_or_id: I::SRC_PORT + 1,
         };
 
-        let conn1: Connection<I, ()> = Connection::Exclusive(original_tuple.clone().into());
+        let conn1 = Connection::Exclusive(ConnectionExclusive::<_, _, ()>::from_tuple(
+            &bindings_ctx,
+            original_tuple.clone(),
+        ));
 
         // Fake NAT that ends up allocating the same reply tuple as an existing
         // connection.
-        let mut conn2: ConnectionExclusive<I, ()> = original_tuple.clone().into();
+        let mut conn2 =
+            ConnectionExclusive::<_, _, ()>::from_tuple(&bindings_ctx, original_tuple.clone());
         conn2.inner.original_tuple = nated_original_tuple.clone();
         let conn2 = Connection::Exclusive(conn2);
 
         // Fake NAT that ends up allocating the same original tuple as an
         // existing connection.
-        let mut conn3: ConnectionExclusive<I, ()> = original_tuple.clone().into();
+        let mut conn3 =
+            ConnectionExclusive::<_, _, ()>::from_tuple(&bindings_ctx, original_tuple.clone());
         conn3.inner.reply_tuple = nated_reply_tuple.clone();
         let conn3 = Connection::Exclusive(conn3);
 

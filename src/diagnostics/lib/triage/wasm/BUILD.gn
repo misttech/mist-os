@@ -46,10 +46,14 @@ if (current_toolchain == unknown_wasm32_toolchain) {
     name = "triage_lib"
     edition = "2021"
 
-    configs += [
-      ":env",
-      "//build/config/lto:thinlto",
-    ]
+    configs += [ ":env" ]
+
+    # Add thinlto config if lto variants are not used.
+    if (!is_lto_variant) {
+      # Allow cross-crate optimization since netstack3 is split between multiple
+      # crates.
+      configs += [ "//build/config/lto:thinlto" ]
+    }
 
     deps = lib_deps + [ "//third_party/rust_crates:wasm-bindgen" ]
 

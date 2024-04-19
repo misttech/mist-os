@@ -699,18 +699,16 @@ impl vfs::node::Node for FxDirectory {
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
         let props = self.directory.get_properties().await.map_err(map_to_status)?;
-        // TODO(https://fxbug.dev/324112547): Missing POSIX attributes should not be reported (i.e.
-        // they should be set to `None` instead of `0`).
         Ok(attributes!(
             requested_attributes,
             Mutable {
                 creation_time: props.creation_time.as_nanos(),
                 modification_time: props.modification_time.as_nanos(),
                 access_time: props.access_time.as_nanos(),
-                mode: props.posix_attributes.map(|a| a.mode).unwrap_or(0),
-                uid: props.posix_attributes.map(|a| a.uid).unwrap_or(0),
-                gid: props.posix_attributes.map(|a| a.gid).unwrap_or(0),
-                rdev: props.posix_attributes.map(|a| a.rdev).unwrap_or(0),
+                mode: props.posix_attributes.map(|a| a.mode),
+                uid: props.posix_attributes.map(|a| a.uid),
+                gid: props.posix_attributes.map(|a| a.gid),
+                rdev: props.posix_attributes.map(|a| a.rdev),
             },
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
@@ -2133,6 +2131,8 @@ mod tests {
                 .await
                 .expect("FIDL call failed");
             assert_eq!(attrs.mutable_attributes.mode.unwrap(), mode);
+            // Since the POSIX mode attribute was set, we expect default values for the other POSIX
+            // attributes.
             assert_eq!(attrs.mutable_attributes.uid.unwrap(), 0);
             // Expect these attributes to be None as they were not queried in `get_attributes(..)`
             assert!(attrs.mutable_attributes.gid.is_none());
@@ -2205,8 +2205,9 @@ mod tests {
                 .get_attributes(fio::NodeAttributesQuery::MODE)
                 .await
                 .expect("FIDL call failed");
-            // As mode was requested, `get_attributes(..)` must return a (default) value.
-            assert_eq!(attrs.mutable_attributes.mode.unwrap(), 0);
+            // Although mode was requested, it was not set when creating the directory. So we
+            // expect None.
+            assert!(attrs.mutable_attributes.mode.is_none());
             // The attributes not requested should be None.
             assert!(attrs.mutable_attributes.uid.is_none());
             assert!(attrs.mutable_attributes.gid.is_none());
@@ -2339,8 +2340,9 @@ mod tests {
                 .get_attributes(fio::NodeAttributesQuery::MODE)
                 .await
                 .expect("FIDL call failed");
-            // As mode was requested, `get_attributes(..)` must return a (default) value.
-            assert_eq!(attrs.mutable_attributes.mode.unwrap(), 0);
+            // Although mode was requested, it was not set when creating the directory. So we
+            // expect that it is None.
+            assert!(attrs.mutable_attributes.mode.is_none());
             // The attributes not requested should be None.
             assert!(attrs.mutable_attributes.uid.is_none());
             assert!(attrs.mutable_attributes.gid.is_none());

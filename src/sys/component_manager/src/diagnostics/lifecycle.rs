@@ -101,8 +101,8 @@ impl Hook for ComponentLifecycleTimeStats {
                 }
             }
             EventType::Stopped => {
-                if let EventPayload::Stopped { .. } = &event.payload {
-                    self.on_component_stopped(target_moniker, zx::Time::get_monotonic());
+                if let EventPayload::Stopped { stop_time, .. } = &event.payload {
+                    self.on_component_stopped(target_moniker, *stop_time);
                 }
             }
             _ => {}

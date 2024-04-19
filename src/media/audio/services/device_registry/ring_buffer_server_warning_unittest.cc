@@ -6,10 +6,8 @@
 #include <fidl/fuchsia.audio.device/cpp/markers.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
-#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 
-#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/common/testing/test_server_and_async_client.h"
@@ -23,7 +21,6 @@
 namespace media_audio {
 namespace {
 
-using ::testing::Optional;
 using Control = fuchsia_audio_device::Control;
 using RingBuffer = fuchsia_audio_device::RingBuffer;
 using DriverClient = fuchsia_audio_device::DriverClient;
@@ -75,49 +72,13 @@ class RingBufferServerCompositeWarningTest : public RingBufferServerWarningTest 
  protected:
   std::shared_ptr<Device> EnableDriverAndAddDevice(
       const std::shared_ptr<FakeComposite>& fake_driver) {
-    auto device = Device::Create(adr_service_, dispatcher(), "Test composite name",
+    auto device = Device::Create(adr_service(), dispatcher(), "Test composite name",
                                  fuchsia_audio_device::DeviceType::kComposite,
                                  DriverClient::WithComposite(fake_driver->Enable()));
-    adr_service_->AddDevice(device);
+    adr_service()->AddDevice(device);
 
     RunLoopUntilIdle();
     return device;
-  }
-
-  void PrepareRingBufferClientForNegativeTesting(const std::shared_ptr<FakeComposite>& fake_driver,
-                                                 ElementId element_id) {
-    fake_driver->ReserveRingBufferSize(element_id, 8192);
-    auto device = EnableDriverAndAddDevice(fake_driver);
-    auto format = SafeRingBufferFormatFromElementRingBufferFormatSets(
-        element_id, device->ring_buffer_format_sets());
-
-    auto registry = CreateTestRegistryServer();
-    auto token_id = WaitForAddedDeviceTokenId(registry->client());
-    ASSERT_TRUE(token_id);
-
-    auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
-    ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
-    auto control_ = CreateTestControlServer(added_device);
-
-    auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
-    bool received_callback = false;
-    control_->client()
-        ->CreateRingBuffer({{
-            element_id,
-            fuchsia_audio_device::RingBufferOptions{
-                {.format = format, .ring_buffer_min_bytes = 2000}},
-            std::move(ring_buffer_server_end),
-        }})
-        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
-          EXPECT_TRUE(result.is_ok()) << result.error_value();
-          received_callback = true;
-        });
-
-    RunLoopUntilIdle();
-    ASSERT_TRUE(received_callback);
-    ring_buffer_client_ = std::move(ring_buffer_client);
-    EXPECT_TRUE(ring_buffer_client_.is_valid());
-    device_ = std::move(added_device);
   }
 
   fidl::Client<fuchsia_audio_device::RingBuffer>& ring_buffer_client() {
@@ -142,7 +103,7 @@ TEST_F(RingBufferServerCompositeWarningTest, SetActiveChannelsMissingChannelBitm
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control_ = CreateTestControlServer(added_device);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -197,7 +158,7 @@ TEST_F(RingBufferServerCompositeWarningTest, SetActiveChannelsBadChannelBitmask)
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control_ = CreateTestControlServer(added_device);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -252,7 +213,7 @@ TEST_F(RingBufferServerCompositeWarningTest, SetActiveChannelsWhilePending) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control_ = CreateTestControlServer(added_device);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -310,7 +271,7 @@ TEST_F(RingBufferServerCompositeWarningTest, StartWhilePending) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control_ = CreateTestControlServer(added_device);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -370,7 +331,7 @@ TEST_F(RingBufferServerCompositeWarningTest, StartWhileStarted) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control_ = CreateTestControlServer(added_device);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -435,7 +396,7 @@ TEST_F(RingBufferServerCompositeWarningTest, StopBeforeStarted) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control_ = CreateTestControlServer(added_device);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -485,7 +446,7 @@ TEST_F(RingBufferServerCompositeWarningTest, StopWhilePending) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control_ = CreateTestControlServer(added_device);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -559,7 +520,7 @@ TEST_F(RingBufferServerCompositeWarningTest, StopAfterStopped) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control_ = CreateTestControlServer(added_device);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -637,7 +598,7 @@ TEST_F(RingBufferServerCompositeWarningTest, WatchDelayInfoWhilePending) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control_ = CreateTestControlServer(added_device);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -704,9 +665,9 @@ TEST_F(RingBufferServerCompositeWarningTest, WatchDelayInfoWhilePending) {
 class RingBufferServerStreamConfigWarningTest : public RingBufferServerWarningTest {
  protected:
   void EnableDriverAndAddDevice(const std::shared_ptr<FakeStreamConfig>& fake_driver) {
-    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test input name",
-                                           fuchsia_audio_device::DeviceType::kInput,
-                                           DriverClient::WithStreamConfig(fake_driver->Enable())));
+    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test input name",
+                                            fuchsia_audio_device::DeviceType::kInput,
+                                            DriverClient::WithStreamConfig(fake_driver->Enable())));
 
     RunLoopUntilIdle();
   }
@@ -720,7 +681,7 @@ TEST_F(RingBufferServerStreamConfigWarningTest, SetActiveChannelsMissingChannelB
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(added_device);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -768,7 +729,7 @@ TEST_F(RingBufferServerStreamConfigWarningTest, SetActiveChannelsBadChannelBitma
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(added_device);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -817,7 +778,7 @@ TEST_F(RingBufferServerStreamConfigWarningTest, SetActiveChannelsWhilePending) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(added_device);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -871,7 +832,7 @@ TEST_F(RingBufferServerStreamConfigWarningTest, StartWhilePending) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -926,7 +887,7 @@ TEST_F(RingBufferServerStreamConfigWarningTest, StartWhileStarted) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -987,7 +948,7 @@ TEST_F(RingBufferServerStreamConfigWarningTest, StopBeforeStarted) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -1031,7 +992,7 @@ TEST_F(RingBufferServerStreamConfigWarningTest, StopWhilePending) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -1094,7 +1055,7 @@ TEST_F(RingBufferServerStreamConfigWarningTest, StopAfterStopped) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -1160,7 +1121,7 @@ TEST_F(RingBufferServerStreamConfigWarningTest, WatchDelayInfoWhilePending) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();

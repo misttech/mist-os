@@ -43,8 +43,8 @@ async fn build_realm() -> RoutingTest {
                 .offer(
                     OfferBuilder::directory()
                         .name("data")
-                        .source(OfferSource::static_child("c".to_string()))
-                        .target(OfferTarget::static_child("b".to_string()))
+                        .source_static_child("c")
+                        .target_static_child("b")
                         .rights(fio::R_STAR_DIR),
                 )
                 .child_default("b")

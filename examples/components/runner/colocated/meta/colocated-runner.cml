@@ -6,6 +6,7 @@
     program: {
         runner: "elf",
         binary: "bin/colocated_runner",
+        memory_attribution: "true",
     },
     capabilities: [
         { protocol: "fuchsia.component.runner.ComponentRunner" },
@@ -13,6 +14,7 @@
             runner: "colocated",
             path: "/svc/fuchsia.component.runner.ComponentRunner",
         },
+        { protocol: "fuchsia.memory.attribution.Provider" },
     ],
     expose: [
         {
@@ -21,6 +23,10 @@
         },
         {
             runner: "colocated",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.memory.attribution.Provider",
             from: "self",
         },
     ],

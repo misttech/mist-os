@@ -23,7 +23,6 @@ fuchsia_product_configuration(
             "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "bootstrap",
             "storage": {
-                "configure_fshost": True,
                 "filesystems": {
                     "image_name": "zedboot",
                     "image_mode": "no_image",
@@ -48,7 +47,6 @@ fuchsia_product_configuration(
             "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "bootstrap",
             "storage": {
-                "configure_fshost": True,
                 "filesystems": {
                     "image_name": "zedboot",
                     "image_mode": "no_image",
@@ -64,8 +62,6 @@ fuchsia_product_configuration(
     legacy_bundle = ZEDBOOT_IMAGE_ARGS["legacy_bundle"],
     package_mode = ZEDBOOT_IMAGE_ARGS["package_mode"],
     platform_artifacts = ZEDBOOT_IMAGE_ARGS["platform_artifacts"],
-    # TODO(awolter): Use ZEDBOOT_IMAGE_ARGS from zedboot_images_args.bzl when
-    # `configure_fshost: True` is enabled in v/g.
     product_config = "//products/zedboot:zedboot",
 ) for board in [
     "x64",
@@ -82,8 +78,6 @@ fuchsia_product_configuration(
     legacy_bundle = ZEDBOOT_IMAGE_ARGS["legacy_bundle"],
     package_mode = ZEDBOOT_IMAGE_ARGS["package_mode"],
     platform_artifacts = ZEDBOOT_IMAGE_ARGS["platform_artifacts"],
-    # TODO(awolter): Use ZEDBOOT_IMAGE_ARGS from zedboot_images_args.bzl when
-    # `configure_fshost: True` is enabled in v/g.
     product_config = "//products/zedboot:zedboot",
 ) for board in [
     "x64",
@@ -99,8 +93,6 @@ fuchsia_product_configuration(
     legacy_bundle = ZEDBOOT_IMAGE_ARGS["legacy_bundle"],
     package_mode = ZEDBOOT_IMAGE_ARGS["package_mode"],
     platform_artifacts = ZEDBOOT_IMAGE_ARGS["platform_artifacts"],
-    # TODO(awolter): Use ZEDBOOT_IMAGE_ARGS from zedboot_images_args.bzl when
-    # `configure_fshost: True` is enabled in v/g.
     product_config = "//products/zedboot:zedboot_with_fvm",
 ) for board in [
     "x64",

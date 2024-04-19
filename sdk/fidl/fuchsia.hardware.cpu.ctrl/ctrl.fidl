@@ -68,3 +68,7 @@ closed protocol Device {
         id uint64;
     });
 };
+
+service Service {
+    device client_end:Device;
+};

@@ -344,7 +344,7 @@ impl Repository {
 #[cfg(test)]
 mod tests {
 
-    use {super::*, crate::package::PackageBuilder, fuchsia_merkle::MerkleTree};
+    use {super::*, crate::package::PackageBuilder};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_repo_builder() {
@@ -388,7 +388,7 @@ mod tests {
         assert_eq!(blobs.len(), 5);
 
         // Spot check the contents of a blob in the repo.
-        let same_contents_merkle = MerkleTree::from_reader(&same_contents[..]).unwrap().root();
+        let same_contents_merkle = fuchsia_merkle::from_slice(&same_contents[..]).root();
         assert_eq!(repo.read_blob(&same_contents_merkle).unwrap(), same_contents);
         assert_eq!(
             repo.read_delivery_blob(1, &same_contents_merkle).unwrap(),

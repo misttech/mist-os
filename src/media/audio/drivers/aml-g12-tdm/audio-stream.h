@@ -22,7 +22,6 @@
 #include <audio-proto/audio-proto.h>
 #include <ddktl/device-internal.h>
 #include <ddktl/device.h>
-#include <ddktl/metadata/audio.h>
 #include <fbl/mutex.h>
 #include <soc/aml-common/aml-tdm-audio.h>
 

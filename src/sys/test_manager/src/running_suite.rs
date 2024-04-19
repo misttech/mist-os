@@ -1047,13 +1047,11 @@ async fn run_invocations(
 
     futures::select! {
         () = timeout_fut => {
-                let mut all_tasks = vec![];
-                let mut tasks = tasks.lock().await;
-                all_tasks.append(&mut tasks);
-                drop(tasks);
-                for t in all_tasks {
-                    t.cancel().await;
-                }
+            let mut all_tasks = vec![];
+            let mut tasks = tasks.lock().await;
+            all_tasks.append(&mut tasks);
+            drop(tasks);
+            drop(all_tasks);
                 let running_test_cases = running_test_cases.lock().await;
                 for i in &*running_test_cases {
                     sender

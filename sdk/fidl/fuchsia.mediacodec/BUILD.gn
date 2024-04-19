@@ -9,7 +9,7 @@ fidl("fuchsia.mediacodec") {
   excluded_checks = [ "invalid-case-for-decl-name" ]
 
   sdk_category = "partner"
-  sdk_area = "Unknown"
+  sdk_area = "Media"
 
   sources = [ "codec_factory.fidl" ]
 

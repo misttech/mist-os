@@ -14,7 +14,7 @@ fidl("fuchsia.ui.gfx") {
   ]
 
   sdk_category = "partner"
-  sdk_area = "Unknown"
+  sdk_area = "Graphics"
 
   sources = [
     "commands.fidl",

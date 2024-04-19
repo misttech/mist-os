@@ -45,6 +45,8 @@ rustc_library("config_schema") {
     "//third_party/rust_crates:serde_json",
   ]
 
+  test_deps = [ "//third_party/rust_crates:serde_json5" ]
+
   non_rust_deps = [ ":git_info_json" ]
 
   sources = [
@@ -54,6 +56,7 @@ rustc_library("config_schema") {
     "src/developer_overrides.rs",
     "src/image_assembly_config.rs",
     "src/lib.rs",
+    "src/merge.rs",
     "src/platform_config.rs",
     "src/platform_config/battery_config.rs",
     "src/platform_config/bluetooth_config.rs",

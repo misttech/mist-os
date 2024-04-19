@@ -467,8 +467,8 @@ async fn bind_action_sequence() {
     // Child of root should start out discovered but not resolved yet.
     let m = Moniker::parse_str("/system").unwrap();
     model.start(ComponentInput::default()).await;
-    event_stream.wait_until(EventType::Resolved, vec![].try_into().unwrap()).await.unwrap();
     event_stream.wait_until(EventType::Discovered, m.clone()).await.unwrap();
+    event_stream.wait_until(EventType::Resolved, vec![].try_into().unwrap()).await.unwrap();
     event_stream.wait_until(EventType::Started, vec![].try_into().unwrap()).await.unwrap();
 
     // Start child and check that it gets resolved, with a Resolve event and action.

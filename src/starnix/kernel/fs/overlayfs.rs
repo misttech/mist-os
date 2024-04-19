@@ -202,9 +202,11 @@ impl ActiveEntry {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut sink = DirentSinkAdapter::default();
-        self.entry()
-            .open_anonymous(locked, current_task, OpenFlags::DIRECTORY)?
-            .readdir(current_task, &mut sink)?;
+        self.entry().open_anonymous(locked, current_task, OpenFlags::DIRECTORY)?.readdir(
+            locked,
+            current_task,
+            &mut sink,
+        )?;
         Ok(sink.items)
     }
 }
@@ -316,7 +318,14 @@ impl OverlayNode {
                     SymlinkTarget::Path(path) => path,
                 };
                 parent_upper.create_entry(current_task, name.as_ref(), |dir, mount, name| {
-                    dir.create_symlink(current_task, mount, name, link_path.as_ref(), info.cred())
+                    dir.create_symlink(
+                        locked,
+                        current_task,
+                        mount,
+                        name,
+                        link_path.as_ref(),
+                        info.cred(),
+                    )
                 })
             } else if info.mode.is_reg() && copy_mode == UpperCopyMode::CopyAll {
                 // Regular files need to be copied from lower FS to upper FS.
@@ -587,15 +596,15 @@ impl FsNodeOps for Arc<OverlayNode> {
 
     fn mkdir(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
         let new_upper_node =
-            self.create_entry(&mut locked, current_task, name, |locked, dir, temp_name| {
+            self.create_entry(locked, current_task, name, |locked, dir, temp_name| {
                 let entry =
                     dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
                         dir_node.mknod(
@@ -620,17 +629,24 @@ impl FsNodeOps for Arc<OverlayNode> {
 
     fn create_symlink(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
         target: &FsStr,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
         let new_upper_node =
-            self.create_entry(&mut locked, current_task, name, |_, dir, temp_name| {
+            self.create_entry(locked, current_task, name, |locked, dir, temp_name| {
                 dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
-                    dir_node.create_symlink(current_task, mount, name, target, owner.clone())
+                    dir_node.create_symlink(
+                        locked,
+                        current_task,
+                        mount,
+                        name,
+                        target,
+                        owner.clone(),
+                    )
                 })
             })?;
         Ok(self.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
@@ -692,14 +708,14 @@ impl FsNodeOps for Arc<OverlayNode> {
         Ok(())
     }
 
-    fn refresh_info<'a>(
+    fn fetch_and_refresh_info<'a>(
         &self,
         _node: &FsNode,
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         let mut lock = info.write();
-        *lock = self.main_entry().entry().node.refresh_info(current_task)?.clone();
+        *lock = self.main_entry().entry().node.fetch_and_refresh_info(current_task)?.clone();
         Ok(RwLockWriteGuard::downgrade(lock))
     }
 
@@ -744,7 +760,7 @@ impl OverlayDirectory {
         current_task: &CurrentTask,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut entries = DirEntries::new();
 
@@ -799,13 +815,13 @@ impl FileOps for OverlayDirectory {
 
     fn readdir(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): FileOpsReaddir before FileOpsCore
         if sink.offset() == 0 {
-            self.refresh_dir_entries(&mut locked, current_task)?;
+            self.refresh_dir_entries(locked, current_task)?;
         }
 
         emit_dotdot(file, sink)?;

@@ -23,6 +23,9 @@ lock_level!(FileOpsCore);
 lock_level!(WriteOps);
 lock_level!(FileOpsToHandle);
 
+// Lock levels for binder operations
+lock_level!(ResourceAccessorAddFile);
+
 // Lock level for DeviceOps.open. Must be before FileOpsCore because of get_or_create_loop_device
 lock_level!(DeviceOpen);
 lock_level!(FsNodeAllocate);
@@ -37,7 +40,8 @@ impl_lock_after!(Unlocked => DiagnosticsCoreDumpList);
 impl_lock_after!(Unlocked => MmDumpable);
 
 impl_lock_after!(Unlocked => TaskRelease);
-impl_lock_after!(TaskRelease => FileOpsToHandle);
+impl_lock_after!(TaskRelease => ResourceAccessorAddFile);
+impl_lock_after!(ResourceAccessorAddFile => FileOpsToHandle);
 impl_lock_after!(FileOpsToHandle => DeviceOpen);
 impl_lock_after!(DeviceOpen => FsNodeAllocate);
 impl_lock_after!(FsNodeAllocate => FileOpsCore);

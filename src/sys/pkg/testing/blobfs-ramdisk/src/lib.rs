@@ -14,7 +14,7 @@ use {
     fidl::endpoints::ClientEnd,
     fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio,
     fuchsia_component::server::ServiceFs,
-    fuchsia_merkle::{Hash, MerkleTreeBuilder},
+    fuchsia_merkle::Hash,
     fuchsia_zircon::{self as zx, prelude::*},
     futures::prelude::*,
     std::{borrow::Cow, collections::BTreeSet, ffi::CString},
@@ -39,9 +39,7 @@ where
 {
     fn from(bytes: B) -> Self {
         let bytes = bytes.into();
-        let mut tree = MerkleTreeBuilder::new();
-        tree.write(&bytes);
-        Self { merkle: tree.finish().root(), contents: bytes }
+        Self { merkle: fuchsia_merkle::from_slice(&bytes).root(), contents: bytes }
     }
 }
 
@@ -617,10 +615,7 @@ mod tests {
         let c = BlobInfo::from(Cow::from(&b"cow"[..]));
         assert_ne!(a.merkle, b.merkle);
         assert_ne!(b.merkle, c.merkle);
-        assert_eq!(
-            a.merkle,
-            fuchsia_merkle::MerkleTree::from_reader(&b"static slice"[..]).unwrap().root()
-        );
+        assert_eq!(a.merkle, fuchsia_merkle::from_slice(&b"static slice"[..]).root());
 
         // Verify the following calling patterns build, but don't bother building the ramdisk.
         let _ = BlobfsRamdisk::builder()
@@ -656,8 +651,8 @@ mod tests {
             .unwrap();
 
         let expected = BTreeSet::from([
-            fuchsia_merkle::MerkleTree::from_reader(&b"blob 1"[..]).unwrap().root(),
-            fuchsia_merkle::MerkleTree::from_reader(&b"blob 2"[..]).unwrap().root(),
+            fuchsia_merkle::from_slice(&b"blob 1"[..]).root(),
+            fuchsia_merkle::from_slice(&b"blob 2"[..]).root(),
         ]);
         assert_eq!(expected.len(), 2);
         assert_eq!(blobfs.list_blobs().unwrap(), expected);
@@ -706,7 +701,7 @@ mod tests {
     /// Writes a blob to blobfs, returning the computed merkle root of the blob.
     #[allow(clippy::zero_prefixed_literal)]
     fn write_blob(dir: &openat::Dir, payload: &[u8]) -> String {
-        let merkle = fuchsia_merkle::MerkleTree::from_reader(payload).unwrap().root().to_string();
+        let merkle = fuchsia_merkle::from_slice(payload).root().to_string();
         let compressed_data = Type1Blob::generate(payload, CompressionMode::Always);
         let mut f = dir.new_file(delivery_blob_path(&merkle), 0600).unwrap();
         f.set_len(compressed_data.len() as u64).unwrap();
@@ -765,7 +760,7 @@ mod tests {
 
         assert_eq!(list_blobs(&root), Vec::<String>::new());
         let data = "Hello blobfs!".as_bytes();
-        let merkle = fuchsia_merkle::MerkleTree::from_reader(data).unwrap().root();
+        let merkle = fuchsia_merkle::from_slice(data).root();
         blobfs.write_blob(merkle, data).await.unwrap();
 
         assert_eq!(list_blobs(&root), vec![merkle.to_string()]);
@@ -781,7 +776,7 @@ mod tests {
         assert_eq!(list_blobs(&root), Vec::<String>::new());
 
         let bytes = [1u8; 40];
-        let hash = fuchsia_merkle::MerkleTree::from_reader(&bytes[..]).unwrap().root();
+        let hash = fuchsia_merkle::from_slice(&bytes).root();
         let compressed_data = Type1Blob::generate(&bytes, CompressionMode::Always);
 
         let blob_creator = blobfs.blob_creator_proxy().unwrap().unwrap();
@@ -803,7 +798,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn fxblob_blob_reader_api() {
         let data = "Hello blobfs!".as_bytes();
-        let hash = fuchsia_merkle::MerkleTree::from_reader(data).unwrap().root();
+        let hash = fuchsia_merkle::from_slice(data).root();
         let blobfs = BlobfsRamdisk::builder().fxblob().with_blob(data).start().await.unwrap();
 
         let root = blobfs.root_dir().unwrap();

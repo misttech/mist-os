@@ -798,9 +798,7 @@ impl RecoveryViewAssistant {
                         self.countdown_task = Some(fasync::Task::local(f));
                     }
                     FactoryResetState::CancelCountdown => {
-                        self.countdown_task
-                            .take()
-                            .and_then(|task| Some(fasync::Task::local(task.cancel())));
+                        self.countdown_task = None;
                         let state =
                             self.reset_state_machine.handle_event(ResetEvent::CountdownCancelled);
                         assert_eq!(state, fdr::FactoryResetState::Waiting);

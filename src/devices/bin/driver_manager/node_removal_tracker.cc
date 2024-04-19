@@ -62,6 +62,7 @@ void NodeRemovalTracker::OnRemovalTimeout() {
     LOGF(INFO, "  Node '%s' in state %s", node.name.c_str(),
          ShutdownHelper::NodeStateAsString(node.state));
   }
+  handle_timeout_task_.PostDelayed(dispatcher_, kRemovalTimeoutDuration);
 }
 
 void NodeRemovalTracker::CheckRemovalDone() {

@@ -204,10 +204,13 @@ rustc_binary("fxfs") {
   configs += [
     # Optimize for size
     "//build/config/rust:bootfs",
-
-    # Optimize for speed (Fxfs is split into several crates; apply optimizations across them).
-    "//build/config/rust:lto_thin",
   ]
+
+  # Add thinlto config if lto variants are not used.
+  if (!is_lto_variant) {
+    # Optimize for speed (Fxfs is split into several crates; apply optimizations across them).
+    configs += [ "//build/config/lto:thinlto" ]
+  }
 }
 
 fuchsia_component("fxfs_component") {

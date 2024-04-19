@@ -107,11 +107,9 @@ python_library("honeydew_no_testonly") {
     "utils/properties.py",
   ]
   library_deps = [
+    ":honeydew_ffx_tool_deps",
     ":honeydew_fidl_ir_and_deps",
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
-
-    # For "ffx starnix adb" command
-    "//src/developer/ffx/tools/starnix:ffx_starnix_test_data",
     "//third_party/pypng",
   ]
 
@@ -125,9 +123,7 @@ python_library("honeydew_no_testonly") {
   ]
 }
 
-# This data is specific to ONLY Fuchsia Controller based tests. Other Fuchsia
-# Controller based tests will need to add their respective host test data
-# definitions to include the proper FIDL IR json.
+# FIDL dependencies that will be used in Honeydew using Fuchsia-Controller.
 group("honeydew_fidl_ir_and_deps") {
   # Needed for SDK inclusion.
   testonly = false
@@ -146,6 +142,18 @@ group("honeydew_fidl_ir_and_deps") {
 
     # Required by Fuchsia Controller itself.
     "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
+  ]
+}
+
+# FFX tools that will be used in Honeydew.
+group("honeydew_ffx_tool_deps") {
+  # Needed for SDK inclusion.
+  testonly = false
+
+  deps = [
+    "//src/developer/ffx/plugins/log:ffx_log_tool_test_data",
+    "//src/developer/ffx/plugins/test:ffx_test_tool_test_data",
+    "//src/developer/ffx/tools/starnix:ffx_starnix_test_data",
   ]
 }
 

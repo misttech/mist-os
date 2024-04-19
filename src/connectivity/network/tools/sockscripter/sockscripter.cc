@@ -208,6 +208,10 @@ const struct Command {
 #if PACKET_SOCKETS
     {"packet-bind", "<protocol>:<if-name-string>",
      "bind a packet socket to the given protocol and interface", &SockScripter::PacketBind},
+    {"packet-send-to", "<protocol>:<if-name-string>",
+     "send send_buf on a packet socket with the given protocol out the given interface.",
+     &SockScripter::PacketSendTo},
+
 #endif
 };
 
@@ -785,42 +789,37 @@ bool SockScripter::Bind(char* arg) {
 }
 
 #if PACKET_SOCKETS
+bool SockScripter::PacketSendTo(char* arg) {
+  std::string argstr = arg;
+  std::optional<sockaddr_ll> sll = ParseSockAddrLlFromArg(argstr, api_);
+  if (!sll.has_value()) {
+    return false;
+  }
+  auto snd_buf = snd_buf_gen_.GetSndStr();
+  LOG(INFO) << "PacketSendTo(data:\"" << Escaped(snd_buf) << "\", len:" << snd_buf.length()
+            << ", fd" << sockfd_ << ", protocol:" << ntohs(sll->sll_protocol)
+            << ", if_index:" << sll->sll_ifindex << ")";
+
+  ssize_t sent = api_->sendto(sockfd_, snd_buf.c_str(), snd_buf.length(), snd_flags_,
+                              reinterpret_cast<const struct sockaddr*>(&sll), sizeof(sll));
+  if (sent < 0) {
+    LOG(ERROR) << "Error-PacketSendTo(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
+               << strerror(errno);
+    return false;
+  }
+
+  LOG(INFO) << "Sent [" << sent << "] on fd:" << sockfd_;
+  return true;
+}
 bool SockScripter::PacketBind(char* arg) {
   std::string argstr = arg;
-  size_t col_pos = argstr.find_first_of(':');
-  if (col_pos == std::string::npos) {
-    LOG(ERROR) << "Error-Cannot parse packet-bind arg='" << argstr
-               << "' for <protocol>:<ifname> - missing separating colon ':'!";
+  std::optional<sockaddr_ll> sll = ParseSockAddrLlFromArg(argstr, api_);
+  if (!sll.has_value()) {
     return false;
   }
+  LOG(INFO) << "PacketBind(fd:" << sockfd_ << ", protocol:" << ntohs(sll->sll_protocol)
+            << ", if_index:" << sll->sll_ifindex << ")";
 
-  std::string protocol_str = argstr.substr(0, col_pos);
-  std::string ifname_str = argstr.substr(col_pos + 1);
-
-  int protocol;
-  if (!str2int(protocol_str, &protocol)) {
-    LOG(ERROR) << "Error-Cannot parse protocol number='" << protocol_str << "'!";
-    return false;
-  }
-
-  unsigned int if_index = 0;
-  if (!ifname_str.empty()) {
-    if_index = api_->if_nametoindex(ifname_str.c_str());
-    if (!if_index) {
-      LOG(ERROR) << "Error-if_nametoindex(" << ifname_str << ") failed -" << "[" << errno << "]"
-                 << strerror(errno);
-      return false;
-    }
-  }
-
-  const struct sockaddr_ll sll = {
-      .sll_family = AF_PACKET,
-      .sll_protocol = htons(static_cast<uint16_t>(protocol)),
-      .sll_ifindex = static_cast<int>(if_index),
-  };
-
-  LOG(INFO) << "PacketBind(fd:" << sockfd_ << ", protocol:" << protocol << ", if_index:" << if_index
-            << ")";
   if (api_->bind(sockfd_, reinterpret_cast<const struct sockaddr*>(&sll), sizeof(sll)) < 0) {
     LOG(ERROR) << "Error-PacketBind(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
                << strerror(errno);
@@ -829,7 +828,7 @@ bool SockScripter::PacketBind(char* arg) {
 
   return true;
 }
-#endif
+#endif  // PACKET_SOCKETS
 
 bool SockScripter::Shutdown(char* arg) {
   std::string howStr(arg);

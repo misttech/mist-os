@@ -57,7 +57,7 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
     auto [control_client_end, control_server_end] =
         CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Control>();
     auto control_client = fidl::Client<fuchsia_audio_device::Control>(
-        std::move(control_client_end), dispatcher(), control_fidl_handler_.get());
+        std::move(control_client_end), dispatcher(), control_fidl_handler().get());
     bool received_callback = false;
     control_creator_client
         ->Create({{
@@ -89,9 +89,9 @@ class ControlServerCodecWarningTest : public ControlServerWarningTest {
   std::shared_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeCodecInput();
 
-    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
-                                           fuchsia_audio_device::DeviceType::kCodec,
-                                           DriverClient::WithCodec(fake_driver->Enable())));
+    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
+                                            fuchsia_audio_device::DeviceType::kCodec,
+                                            DriverClient::WithCodec(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -102,9 +102,9 @@ class ControlServerCompositeWarningTest : public ControlServerWarningTest {
   std::shared_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeComposite();
 
-    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test composite name",
-                                           fuchsia_audio_device::DeviceType::kComposite,
-                                           DriverClient::WithComposite(fake_driver->Enable())));
+    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
+                                            fuchsia_audio_device::DeviceType::kComposite,
+                                            DriverClient::WithComposite(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -121,14 +121,14 @@ class ControlServerCompositeWarningTest : public ControlServerWarningTest {
 
     RunLoopUntilIdle();
     ASSERT_EQ(ControlServer::count(), 1u);
-    auto device = *adr_service_->devices().begin();
+    auto device = *adr_service()->devices().begin();
 
     for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
       fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
       auto [ring_buffer_client_end, ring_buffer_server_end] =
           CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
       auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-          std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler_.get());
+          std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler().get());
       bool received_callback = false;
 
       control_client
@@ -149,6 +149,8 @@ class ControlServerCompositeWarningTest : public ControlServerWarningTest {
       EXPECT_TRUE(received_callback);
       EXPECT_EQ(ControlServer::count(), 1u);
     }
+    EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+    EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
   }
 };
 
@@ -157,9 +159,9 @@ class ControlServerStreamConfigWarningTest : public ControlServerWarningTest {
   std::shared_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeStreamConfigOutput();
 
-    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
-                                           fuchsia_audio_device::DeviceType::kOutput,
-                                           DriverClient::WithStreamConfig(fake_driver->Enable())));
+    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test output name",
+                                            fuchsia_audio_device::DeviceType::kOutput,
+                                            DriverClient::WithStreamConfig(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -172,26 +174,26 @@ class ControlServerStreamConfigWarningTest : public ControlServerWarningTest {
   void TestSetGainBadState(const std::optional<fuchsia_audio_device::GainState>& bad_state,
                            fuchsia_audio_device::ControlSetGainError expected_error) {
     auto fake_driver = CreateFakeStreamConfigOutput();
-
     fake_driver->set_can_mute(false);
     fake_driver->set_can_agc(false);
     fake_driver->AllocateRingBuffer(8192);
-    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
-                                           fuchsia_audio_device::DeviceType::kOutput,
-                                           DriverClient::WithStreamConfig(fake_driver->Enable())));
-    RunLoopUntilIdle();
+    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test output name",
+                                            fuchsia_audio_device::DeviceType::kOutput,
+                                            DriverClient::WithStreamConfig(fake_driver->Enable())));
 
+    RunLoopUntilIdle();
     auto registry = CreateTestRegistryServer();
+
     auto added_id = WaitForAddedDeviceTokenId(registry->client());
     auto control_creator = CreateTestControlCreatorServer();
     auto control_client = ConnectToControl(control_creator->client(), *added_id);
-    RunLoopUntilIdle();
 
+    RunLoopUntilIdle();
     ASSERT_EQ(ControlServer::count(), 1u);
     auto [ring_buffer_client_end, ring_buffer_server_end] =
         CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
     auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-        std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler_.get());
+        std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler().get());
     bool received_callback = false;
 
     control_client
@@ -208,6 +210,9 @@ class ControlServerStreamConfigWarningTest : public ControlServerWarningTest {
     RunLoopUntilIdle();
     EXPECT_TRUE(received_callback);
     EXPECT_EQ(ControlServer::count(), 1u);
+    EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+    EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+        << *control_creator_fidl_error_status();
   }
 
   void TestCreateRingBufferBadOptions(
@@ -215,17 +220,18 @@ class ControlServerStreamConfigWarningTest : public ControlServerWarningTest {
       fuchsia_audio_device::ControlCreateRingBufferError expected_error) {
     auto fake_driver = CreateAndEnableDriverWithDefaults();
     fake_driver->AllocateRingBuffer(8192);
+
     auto registry = CreateTestRegistryServer();
     auto added_id = WaitForAddedDeviceTokenId(registry->client());
     auto control_creator = CreateTestControlCreatorServer();
     auto control_client = ConnectToControl(control_creator->client(), *added_id);
-    RunLoopUntilIdle();
 
+    RunLoopUntilIdle();
     ASSERT_EQ(ControlServer::count(), 1u);
     auto [ring_buffer_client_end, ring_buffer_server_end] =
         CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
     auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-        std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler_.get());
+        std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler().get());
     bool received_callback = false;
 
     control_client
@@ -244,6 +250,9 @@ class ControlServerStreamConfigWarningTest : public ControlServerWarningTest {
     RunLoopUntilIdle();
     EXPECT_TRUE(received_callback);
     EXPECT_EQ(ControlServer::count(), 1u);
+    EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+    EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+        << *control_creator_fidl_error_status();
   }
 };
 
@@ -256,7 +265,7 @@ TEST_F(ControlServerCodecWarningTest, SetDaiFormatWhenAlreadyPending) {
   auto registry = CreateTestRegistryServer();
 
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -289,14 +298,17 @@ TEST_F(ControlServerCodecWarningTest, SetDaiFormatWhenAlreadyPending) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback && received_callback2);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // SetDaiFormat invalid
 TEST_F(ControlServerCodecWarningTest, SetDaiFormatInvalidFormat) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -321,14 +333,17 @@ TEST_F(ControlServerCodecWarningTest, SetDaiFormatInvalidFormat) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // SetDaiFormat unsupported
 TEST_F(ControlServerCodecWarningTest, SetDaiFormatUnsupportedFormat) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -352,14 +367,17 @@ TEST_F(ControlServerCodecWarningTest, SetDaiFormatUnsupportedFormat) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Start when already pending
 TEST_F(ControlServerCodecWarningTest, CodecStartWhenAlreadyPending) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -398,14 +416,17 @@ TEST_F(ControlServerCodecWarningTest, CodecStartWhenAlreadyPending) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback && received_callback2);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Start before SetDaiFormat
 TEST_F(ControlServerCodecWarningTest, CodecStartBeforeSetDaiFormat) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -426,14 +447,17 @@ TEST_F(ControlServerCodecWarningTest, CodecStartBeforeSetDaiFormat) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Start when Started
 TEST_F(ControlServerCodecWarningTest, CodecStartWhenStarted) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -475,14 +499,17 @@ TEST_F(ControlServerCodecWarningTest, CodecStartWhenStarted) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Stop when already pending
 TEST_F(ControlServerCodecWarningTest, CodecStopWhenAlreadyPending) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -491,6 +518,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenAlreadyPending) {
   auto dai_format =
       SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
   auto received_callback = false;
+
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
       .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
@@ -501,6 +529,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenAlreadyPending) {
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
   received_callback = false;
+
   control->client()->CodecStart().Then(
       [&received_callback](fidl::Result<Control::CodecStart>& result) {
         received_callback = true;
@@ -530,14 +559,17 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenAlreadyPending) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback && received_callback2);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Stop before SetDaiFormat
 TEST_F(ControlServerCodecWarningTest, CodecStopBeforeSetDaiFormat) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -558,14 +590,17 @@ TEST_F(ControlServerCodecWarningTest, CodecStopBeforeSetDaiFormat) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Stop when Stopped
 TEST_F(ControlServerCodecWarningTest, CodecStopWhenStopped) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -574,6 +609,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenStopped) {
   auto dai_format =
       SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
   auto received_callback = false;
+
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
       .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
@@ -598,14 +634,17 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenStopped) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // SetGain WRONG_DEVICE_TYPE
 TEST_F(ControlServerCodecWarningTest, SetGainWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -633,25 +672,26 @@ TEST_F(ControlServerCodecWarningTest, SetGainWrongDeviceType) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 TEST_F(ControlServerCodecWarningTest, CreateRingBufferWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto received_callback = false;
-
   auto [ring_buffer_client_end, ring_buffer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
-
   auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-      std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler_.get());
+      std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler().get());
+  auto received_callback = false;
 
   control->client()
       ->CreateRingBuffer({{
@@ -677,6 +717,8 @@ TEST_F(ControlServerCodecWarningTest, CreateRingBufferWrongDeviceType) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain),
@@ -693,7 +735,7 @@ TEST_F(ControlServerCodecWarningTest, WatchTopologyUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto control = CreateTestControlServer(device);
@@ -724,7 +766,9 @@ TEST_F(ControlServerCodecWarningTest, WatchTopologyUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_TRUE(control->client().is_valid());
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  ASSERT_TRUE(control_fidl_error_status().has_value());
+  EXPECT_EQ(*control_fidl_error_status(), ZX_ERR_NOT_SUPPORTED);
 }
 
 // Verify WatchElementState if the driver has an error.
@@ -736,7 +780,7 @@ TEST_F(ControlServerCodecWarningTest, WatchElementStateUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto control = CreateTestControlServer(device);
@@ -768,7 +812,9 @@ TEST_F(ControlServerCodecWarningTest, WatchElementStateUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_TRUE(control->client().is_valid());
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  ASSERT_TRUE(control_fidl_error_status().has_value());
+  EXPECT_EQ(*control_fidl_error_status(), ZX_ERR_NOT_SUPPORTED);
 }
 
 // Verify SetTopology if the driver has an error.
@@ -780,7 +826,7 @@ TEST_F(ControlServerCodecWarningTest, SetTopologyUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto control = CreateTestControlServer(device);
@@ -800,6 +846,8 @@ TEST_F(ControlServerCodecWarningTest, SetTopologyUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify SetElementState if the driver has an error.
@@ -811,7 +859,7 @@ TEST_F(ControlServerCodecWarningTest, SetElementStateUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto control = CreateTestControlServer(device);
@@ -833,6 +881,8 @@ TEST_F(ControlServerCodecWarningTest, SetElementStateUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 /////////////////////
@@ -844,7 +894,7 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatWhenAlreadyPending) {
   auto registry = CreateTestRegistryServer();
 
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -886,6 +936,9 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatWhenAlreadyPending) {
     EXPECT_TRUE(received_callback && received_callback2);
     EXPECT_EQ(ControlServer::count(), 1u);
   }
+
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // SetDaiFormat invalid
@@ -894,7 +947,7 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatInvalidFormat) {
   auto registry = CreateTestRegistryServer();
 
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -925,6 +978,9 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatInvalidFormat) {
     EXPECT_TRUE(received_callback);
     EXPECT_EQ(ControlServer::count(), 1u);
   }
+
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // SetDaiFormat unsupported
@@ -933,7 +989,7 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatUnsupportedFormat) {
   auto registry = CreateTestRegistryServer();
 
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -963,6 +1019,9 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatUnsupportedFormat) {
     EXPECT_TRUE(received_callback);
     EXPECT_EQ(ControlServer::count(), 1u);
   }
+
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // SetDaiFormat on RingBuffer element
@@ -971,7 +1030,7 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatWrongElementType) {
   auto registry = CreateTestRegistryServer();
 
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -1000,6 +1059,8 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatWrongElementType) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // SetDaiFormat on unknown element_id
@@ -1008,7 +1069,7 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatUnknownElementId) {
   auto registry = CreateTestRegistryServer();
 
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -1037,6 +1098,8 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatUnknownElementId) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 TEST_F(ControlServerCompositeWarningTest, SetGainWrongDeviceType) {
@@ -1044,7 +1107,7 @@ TEST_F(ControlServerCompositeWarningTest, SetGainWrongDeviceType) {
   auto registry = CreateTestRegistryServer();
 
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -1072,6 +1135,8 @@ TEST_F(ControlServerCompositeWarningTest, SetGainWrongDeviceType) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 TEST_F(ControlServerCompositeWarningTest, CodecStartWrongDeviceType) {
@@ -1079,7 +1144,7 @@ TEST_F(ControlServerCompositeWarningTest, CodecStartWrongDeviceType) {
   auto registry = CreateTestRegistryServer();
 
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
 
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -1099,6 +1164,8 @@ TEST_F(ControlServerCompositeWarningTest, CodecStartWrongDeviceType) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 TEST_F(ControlServerCompositeWarningTest, CodecStopWrongDeviceType) {
@@ -1106,7 +1173,7 @@ TEST_F(ControlServerCompositeWarningTest, CodecStopWrongDeviceType) {
   auto registry = CreateTestRegistryServer();
 
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
 
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -1126,6 +1193,8 @@ TEST_F(ControlServerCompositeWarningTest, CodecStopWrongDeviceType) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 TEST_F(ControlServerCompositeWarningTest, CreateRingBufferWrongElementType) {
@@ -1133,7 +1202,7 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferWrongElementType) {
   auto registry = CreateTestRegistryServer();
 
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -1146,7 +1215,7 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferWrongElementType) {
         CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
 
     auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-        std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler_.get());
+        std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler().get());
 
     control->client()
         ->CreateRingBuffer({{
@@ -1174,6 +1243,9 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferWrongElementType) {
     EXPECT_TRUE(received_callback);
     EXPECT_EQ(ControlServer::count(), 1u);
   }
+
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 TEST_F(ControlServerCompositeWarningTest, CreateRingBufferMissingOptions) {
@@ -1296,8 +1368,7 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferMissingRingBufferMinBy
       fuchsia_audio_device::ControlCreateRingBufferError::kInvalidMinBytes);
 }
 
-// TODO: enable
-TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferWhilePending) {
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferWhilePending) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
 
@@ -1306,22 +1377,22 @@ TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferWhilePending)
   auto control_client = ConnectToControl(control_creator->client(), *added_id);
 
   RunLoopUntilIdle();
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   ASSERT_EQ(ControlServer::count(), 1u);
 
   for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
+    fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
     auto [ring_buffer_client_end1, ring_buffer_server_end1] =
         CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
     auto [ring_buffer_client_end2, ring_buffer_server_end2] =
         CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
-
-    fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
-    bool received_callback_1 = false, received_callback_2 = false;
     auto options = fuchsia_audio_device::RingBufferOptions{{
         .format = SafeRingBufferFormatFromElementRingBufferFormatSets(
             ring_buffer_element_id, device->ring_buffer_format_sets()),
-        .ring_buffer_min_bytes = 8192,
+        .ring_buffer_min_bytes = 4096,
     }};
+    bool received_callback_1 = false, received_callback_2 = false;
+
     control_client
         ->CreateRingBuffer({{
             ring_buffer_element_id,
@@ -1329,8 +1400,10 @@ TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferWhilePending)
             std::move(ring_buffer_server_end1),
         }})
         .Then([&received_callback_1](fidl::Result<Control::CreateRingBuffer>& result) {
-          ASSERT_TRUE(result.is_ok()) << result.error_value();
           received_callback_1 = true;
+          ASSERT_TRUE(result.is_ok()) << result.error_value();
+          EXPECT_TRUE(result->properties().has_value());
+          EXPECT_TRUE(result->ring_buffer().has_value());
         });
     control_client
         ->CreateRingBuffer({{
@@ -1339,12 +1412,12 @@ TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferWhilePending)
             std::move(ring_buffer_server_end2),
         }})
         .Then([&received_callback_2](fidl::Result<Control::CreateRingBuffer>& result) {
+          received_callback_2 = true;
           ASSERT_TRUE(result.is_error());
           ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
           EXPECT_EQ(result.error_value().domain_error(),
                     fuchsia_audio_device::ControlCreateRingBufferError::kAlreadyPending)
               << result.error_value();
-          received_callback_2 = true;
         });
 
     RunLoopUntilIdle();
@@ -1352,6 +1425,11 @@ TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferWhilePending)
     EXPECT_EQ(ControlServer::count(), 1u);
     EXPECT_TRUE(control_client.is_valid());
   }
+
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+      << *control_creator_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 TEST_F(ControlServerCompositeWarningTest, CreateRingBufferUnknownElementId) {
@@ -1363,7 +1441,7 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferUnknownElementId) {
   auto control_client = ConnectToControl(control_creator->client(), *added_id);
 
   RunLoopUntilIdle();
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   ASSERT_EQ(ControlServer::count(), 1u);
   auto ring_buffer_element_id_unused = *device->ring_buffer_endpoint_ids().begin();
   // fake_driver->ReserveRingBufferSize(ring_buffer_element_id_unused, 8192);
@@ -1395,7 +1473,8 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferUnknownElementId) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
-  EXPECT_TRUE(control_client.is_valid());
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 TEST_F(ControlServerCompositeWarningTest, CreateRingBufferMissingRingBufferServerEnd) {
@@ -1408,7 +1487,7 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferMissingRingBufferServe
 
   RunLoopUntilIdle();
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   bool received_callback = false;
 
   for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
@@ -1439,27 +1518,34 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferMissingRingBufferServe
     EXPECT_TRUE(received_callback);
     EXPECT_EQ(ControlServer::count(), 1u);
   }
+
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+      << *control_creator_fidl_error_status();
 }
 
-// TODO: enable
-TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferBadRingBufferServerEnd) {
+// If the ServerEnd<RingBuffer> passed to CreateRingBuffer is invalid, the Control will disconnect.
+// We recreate it for each RING_BUFFER element so we can probe each one.
+TEST_F(ControlServerCompositeWarningTest, CreateRingBufferBadRingBufferServerEnd) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
 
   auto added_id = WaitForAddedDeviceTokenId(registry->client());
   auto control_creator = CreateTestControlCreatorServer();
-  auto control_client = ConnectToControl(control_creator->client(), *added_id);
-
-  RunLoopUntilIdle();
-  ASSERT_EQ(ControlServer::count(), 1u);
-  auto device = *adr_service_->devices().begin();
-  bool received_callback = false;
+  auto device = *adr_service()->devices().begin();
 
   for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
+    auto control_client = ConnectToControl(control_creator->client(), *added_id);
+
+    RunLoopUntilIdle();
+    ASSERT_EQ(ControlServer::count(), 1u);
+    bool received_callback = false;
+
     fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
     control_client
         ->CreateRingBuffer({{
-            .options = fuchsia_audio_device::RingBufferOptions{{
+            ring_buffer_element_id,
+            fuchsia_audio_device::RingBufferOptions{{
                 .format = fuchsia_audio::Format{{
                     .sample_type = fuchsia_audio::SampleType::kInt16,
                     .channel_count = 2,
@@ -1467,7 +1553,7 @@ TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferBadRingBuffer
                 }},
                 .ring_buffer_min_bytes = 8192,
             }},
-            .ring_buffer_server = {},  // bad value
+            fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(),  // bad value
         }})
         .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
           ASSERT_TRUE(result.is_error());
@@ -1480,7 +1566,12 @@ TEST_F(ControlServerCompositeWarningTest, DISABLED_CreateRingBufferBadRingBuffer
     RunLoopUntilIdle();
     EXPECT_TRUE(received_callback);
     EXPECT_EQ(ControlServer::count(), 0u);
+    ASSERT_TRUE(control_fidl_error_status().has_value());
+    EXPECT_EQ(*control_fidl_error_status(), ZX_ERR_INVALID_ARGS);
   }
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+      << *control_creator_fidl_error_status();
 }
 
 // TODO(https://fxbug.dev/42069012): Create a unittest to test the upper limit of VMO size (4Gb).
@@ -1497,7 +1588,7 @@ TEST_F(ControlServerCompositeWarningTest, WatchTopologyWhilePending) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device);
 
@@ -1518,10 +1609,11 @@ TEST_F(ControlServerCompositeWarningTest, WatchTopologyWhilePending) {
 
   control->client()->WatchTopology().Then(
       [&received_callback1](fidl::Result<Control::WatchTopology>& result) {
+        // This should pend until the subsequent WatchTopology fails, causing a disconnect.
+        // The epitaph of that disconnect is ZX_ERR_BAD_STATE.
         received_callback1 = true;
         ASSERT_TRUE(result.is_error());
         EXPECT_EQ(result.error_value().status(), ZX_ERR_BAD_STATE);
-        // EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
@@ -1539,6 +1631,9 @@ TEST_F(ControlServerCompositeWarningTest, WatchTopologyWhilePending) {
   // After a failing WatchTopology call, the binding should not be usable, so the previous
   // WatchElementState will complete with a failure.
   EXPECT_TRUE(received_callback1);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  ASSERT_TRUE(control_fidl_error_status().has_value());
+  EXPECT_EQ(*control_fidl_error_status(), ZX_ERR_BAD_STATE);
 }
 
 // Verify WatchElementState if the driver has an error.
@@ -1549,7 +1644,7 @@ TEST_F(ControlServerCompositeWarningTest, WatchElementStateUnknownElementId) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device);
 
@@ -1587,7 +1682,9 @@ TEST_F(ControlServerCompositeWarningTest, WatchElementStateUnknownElementId) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_TRUE(control->client().is_valid());
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  ASSERT_TRUE(control_fidl_error_status().has_value());
+  EXPECT_EQ(*control_fidl_error_status(), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(ControlServerCompositeWarningTest, WatchElementStateWhilePending) {
@@ -1596,7 +1693,7 @@ TEST_F(ControlServerCompositeWarningTest, WatchElementStateWhilePending) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device);
 
@@ -1655,7 +1752,9 @@ TEST_F(ControlServerCompositeWarningTest, WatchElementStateWhilePending) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback1);
-  EXPECT_TRUE(control->client().is_valid());
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  ASSERT_TRUE(control_fidl_error_status().has_value());
+  EXPECT_EQ(*control_fidl_error_status(), ZX_ERR_BAD_STATE);
 }
 
 // Verify SetTopology if the driver has an error.
@@ -1666,7 +1765,7 @@ TEST_F(ControlServerCompositeWarningTest, SetTopologyUnknownId) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device);
 
@@ -1697,6 +1796,8 @@ TEST_F(ControlServerCompositeWarningTest, SetTopologyUnknownId) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify SetTopology if the driver does not support signalprocessing.
@@ -1911,8 +2012,10 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferWhilePending) {
           .ring_buffer_server = std::move(ring_buffer_server_end1),
       }})
       .Then([&received_callback_1](fidl::Result<Control::CreateRingBuffer>& result) {
-        ASSERT_TRUE(result.is_ok()) << result.error_value();
         received_callback_1 = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        EXPECT_TRUE(result->properties().has_value());
+        EXPECT_TRUE(result->ring_buffer().has_value());
       });
   control_client
       ->CreateRingBuffer({{
@@ -1920,18 +2023,21 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferWhilePending) {
           .ring_buffer_server = std::move(ring_buffer_server_end2),
       }})
       .Then([&received_callback_2](fidl::Result<Control::CreateRingBuffer>& result) {
+        received_callback_2 = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::ControlCreateRingBufferError::kAlreadyPending)
             << result.error_value();
-        received_callback_2 = true;
       });
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback_1 && received_callback_2);
   EXPECT_EQ(ControlServer::count(), 1u);
-  EXPECT_TRUE(control_client.is_valid());
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+      << *control_creator_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // TODO(https://fxbug.dev/42069012): Enable this unittest to test the upper limit of VMO size
@@ -1950,9 +2056,9 @@ TEST_F(ControlServerStreamConfigWarningTest, DISABLED_CreateRingBufferHugeRingBu
   fake_driver->set_valid_bits_per_sample(0, {8});
   fake_driver->set_frame_rates(0, {48000});
 
-  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
-                                         fuchsia_audio_device::DeviceType::kOutput,
-                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test output name",
+                                          fuchsia_audio_device::DeviceType::kOutput,
+                                          DriverClient::WithStreamConfig(fake_driver->Enable())));
   fake_driver->AllocateRingBuffer(8192);
 
   RunLoopUntilIdle();
@@ -1967,7 +2073,7 @@ TEST_F(ControlServerStreamConfigWarningTest, DISABLED_CreateRingBufferHugeRingBu
   auto [ring_buffer_client_end, ring_buffer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
   auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-      std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler_.get());
+      std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler().get());
   bool received_callback = false;
 
   control_client
@@ -2032,6 +2138,8 @@ TEST_F(ControlServerStreamConfigWarningTest, DISABLED_CreateRingBufferHugeRingBu
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferMissingRingBufferServerEnd) {
@@ -2070,6 +2178,8 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferMissingRingBufferSe
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferBadRingBufferServerEnd) {
@@ -2080,8 +2190,8 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferBadRingBufferServer
   auto added_id = WaitForAddedDeviceTokenId(registry->client());
   auto control_creator = CreateTestControlCreatorServer();
   auto control_client = ConnectToControl(control_creator->client(), *added_id);
-  RunLoopUntilIdle();
 
+  RunLoopUntilIdle();
   ASSERT_EQ(ControlServer::count(), 1u);
   bool received_callback = false;
 
@@ -2108,6 +2218,9 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferBadRingBufferServer
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 0u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  ASSERT_TRUE(control_fidl_error_status().has_value());
+  EXPECT_EQ(*control_fidl_error_status(), ZX_ERR_INVALID_ARGS);
 }
 
 // TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
@@ -2121,7 +2234,7 @@ TEST_F(ControlServerStreamConfigWarningTest, SetDaiFormatWrongDeviceType) {
   auto registry = CreateTestRegistryServer();
 
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
 
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -2154,6 +2267,8 @@ TEST_F(ControlServerStreamConfigWarningTest, SetDaiFormatWrongDeviceType) {
 
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 TEST_F(ControlServerStreamConfigWarningTest, CodecStartWrongDeviceType) {
@@ -2161,7 +2276,7 @@ TEST_F(ControlServerStreamConfigWarningTest, CodecStartWrongDeviceType) {
   auto registry = CreateTestRegistryServer();
 
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
 
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -2181,6 +2296,8 @@ TEST_F(ControlServerStreamConfigWarningTest, CodecStartWrongDeviceType) {
 
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 TEST_F(ControlServerStreamConfigWarningTest, CodecStopWrongDeviceType) {
@@ -2188,7 +2305,7 @@ TEST_F(ControlServerStreamConfigWarningTest, CodecStopWrongDeviceType) {
   auto registry = CreateTestRegistryServer();
 
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
 
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -2208,6 +2325,8 @@ TEST_F(ControlServerStreamConfigWarningTest, CodecStopWrongDeviceType) {
 
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 TEST_F(ControlServerStreamConfigWarningTest, ResetWrongDeviceType) {
@@ -2215,7 +2334,7 @@ TEST_F(ControlServerStreamConfigWarningTest, ResetWrongDeviceType) {
   auto registry = CreateTestRegistryServer();
 
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
 
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -2234,6 +2353,8 @@ TEST_F(ControlServerStreamConfigWarningTest, ResetWrongDeviceType) {
 
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // TODO(https://fxbug.dev/323270827): implement signalprocessing, including in the FakeStreamConfig
@@ -2248,7 +2369,7 @@ TEST_F(ControlServerStreamConfigWarningTest, WatchTopologyUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto control = CreateTestControlServer(device);
@@ -2282,7 +2403,9 @@ TEST_F(ControlServerStreamConfigWarningTest, WatchTopologyUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_TRUE(control->client().is_valid());
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  ASSERT_TRUE(control_fidl_error_status().has_value());
+  EXPECT_EQ(*control_fidl_error_status(), ZX_ERR_NOT_SUPPORTED);
 }
 
 // Verify WatchElementState if the driver does not support signalprocessing.
@@ -2292,7 +2415,7 @@ TEST_F(ControlServerStreamConfigWarningTest, WatchElementStateUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto control = CreateTestControlServer(device);
@@ -2327,7 +2450,9 @@ TEST_F(ControlServerStreamConfigWarningTest, WatchElementStateUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_TRUE(control->client().is_valid());
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  ASSERT_TRUE(control_fidl_error_status().has_value());
+  EXPECT_EQ(*control_fidl_error_status(), ZX_ERR_NOT_SUPPORTED);
 }
 
 // Verify SetTopology if the driver does not support signalprocessing.
@@ -2337,7 +2462,7 @@ TEST_F(ControlServerStreamConfigWarningTest, SetTopologyUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto control = CreateTestControlServer(device);
@@ -2357,6 +2482,8 @@ TEST_F(ControlServerStreamConfigWarningTest, SetTopologyUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify SetElementState if the driver does not support signalprocessing.
@@ -2366,7 +2493,7 @@ TEST_F(ControlServerStreamConfigWarningTest, SetElementStateUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto control = CreateTestControlServer(device);
@@ -2388,6 +2515,8 @@ TEST_F(ControlServerStreamConfigWarningTest, SetElementStateUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 }  // namespace

@@ -7,7 +7,6 @@
 
 #include <gtest/gtest.h>
 
-#include "src/media/audio/services/common/testing/test_server_and_async_client.h"
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 #include "src/media/audio/services/device_registry/control_creator_server.h"
 
@@ -20,6 +19,7 @@ using DriverClient = fuchsia_audio_device::DriverClient;
 
 class ControlCreatorServerWarningTest : public AudioDeviceRegistryServerTestBase {};
 class ControlCreatorServerCodecWarningTest : public ControlCreatorServerWarningTest {};
+class ControlCreatorServerCompositeWarningTest : public ControlCreatorServerWarningTest {};
 class ControlCreatorServerStreamConfigWarningTest : public ControlCreatorServerWarningTest {};
 
 /////////////////////
@@ -32,7 +32,7 @@ TEST_F(ControlCreatorServerWarningTest, MissingId) {
 
   auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler().get());
   auto received_callback = false;
   control_creator->client()
       ->Create({{
@@ -50,6 +50,7 @@ TEST_F(ControlCreatorServerWarningTest, MissingId) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value());
 }
 
 /////////////////////
@@ -62,12 +63,12 @@ TEST_F(ControlCreatorServerCodecWarningTest, BadId) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
-                                         fuchsia_audio_device::DeviceType::kCodec,
-                                         DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
+                                          fuchsia_audio_device::DeviceType::kCodec,
+                                          DriverClient::WithCodec(fake_driver->Enable())));
   RunLoopUntilIdle();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto received_callback = false;
   std::optional<TokenId> added_device_id;
 
@@ -87,7 +88,7 @@ TEST_F(ControlCreatorServerCodecWarningTest, BadId) {
   ASSERT_TRUE(added_device_id);
   auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler().get());
   received_callback = false;
 
   control_creator->client()
@@ -106,6 +107,9 @@ TEST_F(ControlCreatorServerCodecWarningTest, BadId) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+      << *control_creator_fidl_error_status();
 }
 
 TEST_F(ControlCreatorServerCodecWarningTest, MissingServerEnd) {
@@ -114,13 +118,13 @@ TEST_F(ControlCreatorServerCodecWarningTest, MissingServerEnd) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeCodecInput();
-  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
-                                         fuchsia_audio_device::DeviceType::kCodec,
-                                         DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
+                                          fuchsia_audio_device::DeviceType::kCodec,
+                                          DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto received_callback = false;
   std::optional<TokenId> added_device_id;
 
@@ -139,7 +143,7 @@ TEST_F(ControlCreatorServerCodecWarningTest, MissingServerEnd) {
   ASSERT_TRUE(added_device_id);
   auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler().get());
   received_callback = false;
 
   control_creator->client()
@@ -158,19 +162,22 @@ TEST_F(ControlCreatorServerCodecWarningTest, MissingServerEnd) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+      << *control_creator_fidl_error_status();
 }
 
 TEST_F(ControlCreatorServerCodecWarningTest, BadServerEnd) {
   auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
-                                         fuchsia_audio_device::DeviceType::kCodec,
-                                         DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
+                                          fuchsia_audio_device::DeviceType::kCodec,
+                                          DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   std::optional<TokenId> added_device_id;
   auto received_callback = false;
 
@@ -191,12 +198,13 @@ TEST_F(ControlCreatorServerCodecWarningTest, BadServerEnd) {
 
     RunLoopUntilIdle();
     ASSERT_TRUE(received_callback);
+    EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   }
 
   ASSERT_TRUE(added_device_id);
   auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler().get());
   received_callback = false;
 
   control_creator->client()
@@ -215,19 +223,21 @@ TEST_F(ControlCreatorServerCodecWarningTest, BadServerEnd) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 0u);
+  ASSERT_TRUE(control_creator_fidl_error_status().has_value());
+  EXPECT_EQ(*control_creator_fidl_error_status(), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(ControlCreatorServerCodecWarningTest, IdAlreadyControlled) {
   auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   auto fake_driver = CreateFakeCodecInput();
-  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
-                                         fuchsia_audio_device::DeviceType::kCodec,
-                                         DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
+                                          fuchsia_audio_device::DeviceType::kCodec,
+                                          DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   std::optional<TokenId> added_device_id;
   auto received_callback = false;
 
@@ -248,13 +258,14 @@ TEST_F(ControlCreatorServerCodecWarningTest, IdAlreadyControlled) {
 
     RunLoopUntilIdle();
     ASSERT_TRUE(received_callback);
+    EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   }
 
   ASSERT_TRUE(added_device_id);
   ASSERT_EQ(ControlServer::count(), 0u);
   auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_1 = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler().get());
   received_callback = false;
 
   control_creator->client()
@@ -273,7 +284,9 @@ TEST_F(ControlCreatorServerCodecWarningTest, IdAlreadyControlled) {
   EXPECT_TRUE(control_client_1.is_valid());
   auto [client2, server2] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_2 = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(client2), dispatcher(), control_fidl_handler_.get());
+      std::move(client2), dispatcher(), control_fidl_handler().get());
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+      << *control_creator_fidl_error_status();
   received_callback = false;
 
   control_creator->client()
@@ -293,6 +306,268 @@ TEST_F(ControlCreatorServerCodecWarningTest, IdAlreadyControlled) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+      << *control_creator_fidl_error_status();
+}
+
+// TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
+//   unhealthy before ControlCreator/Create. Expect Obs/Ctl/RingBuf to drop + Reg/WatcDevRemoved.
+
+/////////////////////
+// Composite tests
+//
+// ControlCreator/Create with an unknown ID should fail.
+TEST_F(ControlCreatorServerCompositeWarningTest, BadId) {
+  auto control_creator = CreateTestControlCreatorServer();
+  ASSERT_EQ(ControlCreatorServer::count(), 1u);
+  auto registry = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  auto fake_driver = CreateFakeComposite();
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
+                                          fuchsia_audio_device::DeviceType::kComposite,
+                                          DriverClient::WithComposite(fake_driver->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  std::optional<TokenId> added_device_id;
+  auto received_callback = false;
+
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback,
+       &added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 1u);
+        ASSERT_TRUE(result->devices()->at(0).token_id());
+        added_device_id = *result->devices()->at(0).token_id();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(added_device_id);
+  auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
+  auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
+      std::move(client), dispatcher(), control_fidl_handler().get());
+  received_callback = false;
+
+  control_creator->client()
+      ->Create({{
+          .token_id = *added_device_id - 1,  // Bad token_id
+          .control_server = std::move(server),
+      }})
+      .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlCreatorError::kDeviceNotFound)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+      << *control_creator_fidl_error_status();
+}
+
+TEST_F(ControlCreatorServerCompositeWarningTest, MissingServerEnd) {
+  auto control_creator = CreateTestControlCreatorServer();
+  ASSERT_EQ(ControlCreatorServer::count(), 1u);
+  auto registry = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  auto fake_driver = CreateFakeComposite();
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
+                                          fuchsia_audio_device::DeviceType::kComposite,
+                                          DriverClient::WithComposite(fake_driver->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  std::optional<TokenId> added_device_id;
+  auto received_callback = false;
+
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback,
+       &added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 1u);
+        ASSERT_TRUE(result->devices()->at(0).token_id());
+        added_device_id = *result->devices()->at(0).token_id();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  ASSERT_TRUE(added_device_id);
+
+  auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
+  auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
+      std::move(client), dispatcher(), control_fidl_handler().get());
+  received_callback = false;
+
+  control_creator->client()
+      ->Create({{
+          .token_id = *added_device_id,
+          // Missing server_end
+      }})
+      .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlCreatorError::kInvalidControl)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+      << *control_creator_fidl_error_status();
+}
+
+TEST_F(ControlCreatorServerCompositeWarningTest, BadServerEnd) {
+  auto control_creator = CreateTestControlCreatorServer();
+  ASSERT_EQ(ControlCreatorServer::count(), 1u);
+  auto fake_driver = CreateFakeComposite();
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
+                                          fuchsia_audio_device::DeviceType::kComposite,
+                                          DriverClient::WithComposite(fake_driver->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  std::optional<TokenId> added_device_id;
+  auto received_callback = false;
+
+  {
+    auto registry = CreateTestRegistryServer();
+    ASSERT_EQ(RegistryServer::count(), 1u);
+
+    registry->client()->WatchDevicesAdded().Then(
+        [&received_callback,
+         &added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+          received_callback = true;
+          ASSERT_TRUE(result.is_ok()) << result.error_value();
+          ASSERT_TRUE(result->devices());
+          ASSERT_EQ(result->devices()->size(), 1u);
+          ASSERT_TRUE(result->devices()->at(0).token_id());
+          added_device_id = *result->devices()->at(0).token_id();
+        });
+
+    RunLoopUntilIdle();
+    ASSERT_TRUE(received_callback);
+    EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  }
+
+  ASSERT_TRUE(added_device_id);
+  auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
+  auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
+      std::move(client), dispatcher(), control_fidl_handler().get());
+  received_callback = false;
+
+  control_creator->client()
+      ->Create({{
+          .token_id = *added_device_id,
+          .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(),  // Bad server_end
+      }})
+      .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_framework_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 0u);
+  ASSERT_TRUE(control_creator_fidl_error_status().has_value());
+  EXPECT_EQ(*control_creator_fidl_error_status(), ZX_ERR_INVALID_ARGS);
+}
+
+TEST_F(ControlCreatorServerCompositeWarningTest, IdAlreadyControlled) {
+  auto control_creator = CreateTestControlCreatorServer();
+  ASSERT_EQ(ControlCreatorServer::count(), 1u);
+  auto fake_driver = CreateFakeComposite();
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
+                                          fuchsia_audio_device::DeviceType::kComposite,
+                                          DriverClient::WithComposite(fake_driver->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  std::optional<TokenId> added_device_id;
+  auto received_callback = false;
+
+  {
+    auto registry = CreateTestRegistryServer();
+    ASSERT_EQ(RegistryServer::count(), 1u);
+
+    registry->client()->WatchDevicesAdded().Then(
+        [&received_callback,
+         &added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+          received_callback = true;
+          ASSERT_TRUE(result.is_ok()) << result.error_value();
+          ASSERT_TRUE(result->devices());
+          ASSERT_EQ(result->devices()->size(), 1u);
+          ASSERT_TRUE(result->devices()->at(0).token_id());
+          added_device_id = *result->devices()->at(0).token_id();
+        });
+
+    RunLoopUntilIdle();
+    ASSERT_TRUE(received_callback);
+    EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  }
+
+  ASSERT_TRUE(added_device_id);
+  ASSERT_EQ(ControlServer::count(), 0u);
+  auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
+  auto control_client_1 = fidl::Client<fuchsia_audio_device::Control>(
+      std::move(client), dispatcher(), control_fidl_handler().get());
+  received_callback = false;
+
+  control_creator->client()
+      ->Create({{
+          .token_id = *added_device_id,
+          .control_server = std::move(server),
+      }})
+      .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  EXPECT_TRUE(control_client_1.is_valid());
+  auto [client2, server2] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
+  auto control_client_2 = fidl::Client<fuchsia_audio_device::Control>(
+      std::move(client2), dispatcher(), control_fidl_handler().get());
+  received_callback = false;
+
+  control_creator->client()
+      ->Create({{
+          .token_id = *added_device_id,
+          .control_server = std::move(server2),
+      }})
+      .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlCreatorError::kAlreadyAllocated)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+      << *control_creator_fidl_error_status();
 }
 
 // TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
@@ -308,13 +583,13 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, BadId) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeStreamConfigOutput();
-  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
-                                         fuchsia_audio_device::DeviceType::kOutput,
-                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test output name",
+                                          fuchsia_audio_device::DeviceType::kOutput,
+                                          DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   std::optional<TokenId> added_device_id;
   auto received_callback = false;
 
@@ -333,7 +608,7 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, BadId) {
   ASSERT_TRUE(added_device_id);
   auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler().get());
   received_callback = false;
 
   control_creator->client()
@@ -352,6 +627,9 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, BadId) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+      << *control_creator_fidl_error_status();
 }
 
 TEST_F(ControlCreatorServerStreamConfigWarningTest, MissingServerEnd) {
@@ -360,13 +638,13 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, MissingServerEnd) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeStreamConfigInput();
-  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test input name",
-                                         fuchsia_audio_device::DeviceType::kInput,
-                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test input name",
+                                          fuchsia_audio_device::DeviceType::kInput,
+                                          DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   std::optional<TokenId> added_device_id;
   auto received_callback = false;
 
@@ -387,7 +665,7 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, MissingServerEnd) {
 
   auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler().get());
   received_callback = false;
 
   control_creator->client()
@@ -406,19 +684,22 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, MissingServerEnd) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+      << *control_creator_fidl_error_status();
 }
 
 TEST_F(ControlCreatorServerStreamConfigWarningTest, BadServerEnd) {
   auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   auto fake_driver = CreateFakeStreamConfigOutput();
-  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
-                                         fuchsia_audio_device::DeviceType::kOutput,
-                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test output name",
+                                          fuchsia_audio_device::DeviceType::kOutput,
+                                          DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   std::optional<TokenId> added_device_id;
   auto received_callback = false;
 
@@ -439,12 +720,13 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, BadServerEnd) {
 
     RunLoopUntilIdle();
     ASSERT_TRUE(received_callback);
+    EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   }
 
   ASSERT_TRUE(added_device_id);
   auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler().get());
   received_callback = false;
 
   control_creator->client()
@@ -463,19 +745,21 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, BadServerEnd) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 0u);
+  ASSERT_TRUE(control_creator_fidl_error_status().has_value());
+  EXPECT_EQ(*control_creator_fidl_error_status(), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(ControlCreatorServerStreamConfigWarningTest, IdAlreadyControlled) {
   auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   auto fake_driver = CreateFakeStreamConfigInput();
-  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test input name",
-                                         fuchsia_audio_device::DeviceType::kInput,
-                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test input name",
+                                          fuchsia_audio_device::DeviceType::kInput,
+                                          DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   std::optional<TokenId> added_device_id;
   auto received_callback = false;
 
@@ -496,13 +780,14 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, IdAlreadyControlled) {
 
     RunLoopUntilIdle();
     ASSERT_TRUE(received_callback);
+    EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   }
 
   ASSERT_TRUE(added_device_id);
   ASSERT_EQ(ControlServer::count(), 0u);
   auto [client, server] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_1 = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(client), dispatcher(), control_fidl_handler_.get());
+      std::move(client), dispatcher(), control_fidl_handler().get());
   received_callback = false;
 
   control_creator->client()
@@ -521,7 +806,7 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, IdAlreadyControlled) {
   EXPECT_TRUE(control_client_1.is_valid());
   auto [client2, server2] = fidl::Endpoints<fuchsia_audio_device::Control>::Create();
   auto control_client_2 = fidl::Client<fuchsia_audio_device::Control>(
-      std::move(client2), dispatcher(), control_fidl_handler_.get());
+      std::move(client2), dispatcher(), control_fidl_handler().get());
   received_callback = false;
 
   control_creator->client()
@@ -541,6 +826,8 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, IdAlreadyControlled) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value())
+      << *control_creator_fidl_error_status();
 }
 
 // TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes

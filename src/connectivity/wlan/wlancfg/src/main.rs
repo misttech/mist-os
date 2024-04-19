@@ -10,7 +10,6 @@ use {
     anyhow::{format_err, Context as _, Error},
     diagnostics_log::PublishOptions,
     fidl_fuchsia_location_namedplace::RegulatoryRegionWatcherMarker,
-    fidl_fuchsia_power_clientlevel as fidl_lp, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_device_service::DeviceMonitorMarker,
     fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync,
     fuchsia_async::DurationExt,
@@ -36,11 +35,8 @@ use {
         config_management::{SavedNetworksManager, SavedNetworksManagerApi},
         legacy::{self, IfaceRef},
         mode_management::{
-            create_iface_manager, device_monitor,
-            iface_manager_api::IfaceManagerApi,
-            low_power_manager::PowerModeManager,
-            phy_manager::{PhyManager, PhyManagerApi},
-            recovery,
+            create_iface_manager, device_monitor, iface_manager_api::IfaceManagerApi,
+            phy_manager::PhyManager, recovery,
         },
         regulatory_manager::RegulatoryManager,
         telemetry::{
@@ -224,57 +220,6 @@ async fn run_regulatory_manager(
     Ok(())
 }
 
-// wlancfg can respond to low power services updates provided the service is available.  If the
-// service is not available, wlancfg will simply disable power save.  If the service is available,
-// wlancfg will listen for updates to WLAN power level and apply the desired power configuration
-// to all PHYs.
-async fn run_low_power_manager(
-    phy_manager: Arc<Mutex<PhyManager>>,
-    telemetry_sender: TelemetrySender,
-) -> Result<(), Error> {
-    // Check if the low power service is offered to wlancfg.
-    let req = match fuchsia_component::client::new_protocol_connector::<fidl_lp::ConnectorMarker>()
-    {
-        Ok(req) => req,
-        Err(e) => {
-            warn!("error probing low power client connector service: {:?}", e);
-            return Ok(());
-        }
-    };
-
-    // Only proceed with monitoring for updates if the Connector service exists and if we can
-    // connect to it.
-    if !req.exists().await.context("error checking for low power Connector existence")? {
-        warn!("Low power Connector is not available");
-        return Ok(());
-    }
-
-    // To ensure that the policy layer starts off in a known power state, set the PHYs to
-    // performance mode.
-    let mut phy_manager_lock = phy_manager.lock().await;
-    if let Err(e) =
-        phy_manager_lock.set_power_state(fidl_common::PowerSaveType::PsModePerformance).await
-    {
-        warn!("Failed to initialize PHYs to performance mode: {:?}", e);
-    }
-    drop(phy_manager_lock);
-
-    // At this point, the low power service is known to exist and wlancfg will attempt to monitor
-    // for low power updates and to apply the low power settings to all PHYs as new updates and
-    // new PHYs are discovered.  Any error in this process should be considered fatal.
-    let lp_connector = req.connect().context("Unable to connect to low power Connector service")?;
-    let (watcher_proxy, watcher_service) =
-        fidl::endpoints::create_proxy::<fidl_lp::WatcherMarker>()?;
-    if let Err(e) = lp_connector.connect(fidl_lp::ClientType::Wlan, watcher_service) {
-        warn!("Client level connector is unavailable: {:?}", e);
-        return Ok(());
-    }
-
-    let lp_manager = PowerModeManager::new(watcher_proxy, phy_manager, telemetry_sender);
-    lp_manager.run().await;
-    Ok(())
-}
-
 async fn run_all_futures() -> Result<(), Error> {
     let monitor_svc = fuchsia_component::client::connect_to_protocol::<DeviceMonitorMarker>()
         .context("failed to connect to device monitor")?;
@@ -446,7 +391,6 @@ async fn run_all_futures() -> Result<(), Error> {
 
     let saved_networks_metrics_fut = saved_networks_manager_metrics_loop(saved_networks.clone());
     let regulatory_fut = run_regulatory_manager(iface_manager.clone(), regulatory_sender);
-    let low_power_fut = run_low_power_manager(phy_manager.clone(), telemetry_sender);
 
     let _ = futures::try_join!(
         fidl_fut,
@@ -455,7 +399,6 @@ async fn run_all_futures() -> Result<(), Error> {
         saved_networks_metrics_fut.map(Ok),
         scanning_service,
         regulatory_fut,
-        low_power_fut,
         telemetry_fut.map(Ok),
         persistence_req_forwarder_fut.map(Ok),
         roam_manager_service_fut.map(Ok),

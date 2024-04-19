@@ -190,13 +190,13 @@ type Foo = @available(added=2) struct {};
     TestLibrary library(source);
     library.SelectVersion("example", "1");
     ASSERT_COMPILED(library);
-    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
+    ASSERT_FALSE(library.HasStruct("Foo"));
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "2");
     ASSERT_COMPILED(library);
-    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_TRUE(library.HasStruct("Foo"));
   }
 }
 
@@ -222,6 +222,15 @@ library example;
   library.SelectVersion("example", "HEAD");
   library.ExpectFail(ErrInvalidVersion, 0);
   ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningAttributeTests, GoodVersionMaxNumeric) {
+  TestLibrary library(R"FIDL(
+@available(added=9223372036854775807) // 2^63-1
+library example;
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  ASSERT_COMPILED(library);
 }
 
 TEST(VersioningAttributeTests, BadInvalidVersionAboveMaxNumeric) {

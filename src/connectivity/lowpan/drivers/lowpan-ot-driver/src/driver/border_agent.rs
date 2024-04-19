@@ -282,7 +282,7 @@ impl<OT: ot::InstanceInterface, NI, BI> OtDriver<OT, NI, BI> {
 
             if let Some(task) = original_task {
                 // We must wait for the original task to fully stop.
-                if let Err(err) = task.cancel().await.transpose() {
+                if let Err(err) = task.cancel().transpose() {
                     warn!(tag="meshcop","update_border_agent_service: Previous publication task ended with an error: {:?}", err);
                 }
             }
@@ -293,7 +293,7 @@ impl<OT: ot::InstanceInterface, NI, BI> OtDriver<OT, NI, BI> {
                 .border_agent_service
                 .lock()
                 .replace(fasync::Task::spawn(task))
-                .and_then(|x| x.cancel().now_or_never().flatten())
+                .and_then(|x| x.cancel())
                 .transpose()
             {
                 warn!(tag="meshcop","update_border_agent_service: Previous publication task ended with an error: {:?}", err);

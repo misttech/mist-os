@@ -60,13 +60,6 @@ inline constexpr auto Enum<SerialDebugSyscalls> = [](auto&& Switch) {
 };
 
 template <>
-inline constexpr auto Enum<GfxConsoleFont> = [](auto&& Switch) {
-  return Switch  //
-      .Case("9x16", GfxConsoleFont::k9x16)
-      .Case("18x32", GfxConsoleFont::k18x32);
-};
-
-template <>
 inline constexpr auto Enum<RootJobBehavior> = [](auto&& Switch) {
   return Switch  //
       .Case("halt", RootJobBehavior::kHalt)

@@ -71,9 +71,6 @@ void platform_resume();
 // Returns true if this system has a debug serial port that is enabled
 bool platform_serial_enabled();
 
-// Returns true if the early graphics console is enabled
-bool platform_early_console_enabled();
-
 // Accessors for the HW reboot reason which may or may not have been delivered
 // by the bootloader.
 void platform_set_hw_reboot_reason(zbi_hw_reboot_reason_t reason);

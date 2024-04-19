@@ -154,6 +154,7 @@ template("generated_licenses_spdx") {
     }
 
     generated_file(_targets.generated_metadata) {
+      forward_variables_from(invoker, [ "testonly" ])
       outputs = [ _files.generated_metadata ]
       data_keys = [
         "license",

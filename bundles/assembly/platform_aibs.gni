@@ -234,9 +234,10 @@ user_platform_aib_names =
       "feedback_user_config",
       "feedback_userdebug_config",
 
-      # Kernel Compression
+      # Kernel Reclamation
       "kernel_anonymous_memory_compression",
       "kernel_anonymous_memory_compression_eager_lru",
+      "kernel_evict_continuous",
 
       # Recovery
       "factory_reset_trigger",

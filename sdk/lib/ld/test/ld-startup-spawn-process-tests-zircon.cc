@@ -147,7 +147,7 @@ void LdStartupSpawnProcessTests::Load(std::string_view executable_name) {
   std::string interp;
   ASSERT_NO_FATAL_FAILURE(interp = FindInterp(executable_.borrow()));
   if (!interp.empty()) {
-    ASSERT_NO_FATAL_FAILURE(LdsvcExpectLoadObject(interp));
+    ASSERT_NO_FATAL_FAILURE(LdsvcExpectDependency(interp));
   }
 }
 

@@ -22,6 +22,7 @@ if (is_host) {
   python_binary("generated_licenses_spdx_tool") {
     main_source = "generated_licenses_spdx_tool.py"
     sources = common_sources
+    enable_mypy = true
   }
 
   # The following tests can be run conveniently also via:

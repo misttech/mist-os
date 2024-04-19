@@ -23,7 +23,6 @@ use {
     },
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_hash::Hash,
-    fuchsia_merkle::MerkleTreeBuilder,
     fuchsia_runtime::vmar_root_self,
     fuchsia_zircon::{self as zx, HandleBased},
     gpt::{partition_types, GptConfig},
@@ -204,9 +203,7 @@ pub async fn write_test_blob(
     data: &[u8],
     as_delivery_blob: bool,
 ) -> Hash {
-    let mut builder = MerkleTreeBuilder::new();
-    builder.write(&data);
-    let hash = builder.finish().root();
+    let hash = fuchsia_merkle::from_slice(data).root();
     let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
     let (name, data) = if as_delivery_blob {
         (delivery_blob_path(hash), compressed_data.as_slice())
@@ -235,9 +232,7 @@ pub async fn write_test_blob(
 /// Write a blob to the fxfs blob volume to ensure that on format, the blob volume does not get
 /// wiped.
 pub async fn write_test_blob_fxblob(blob_creator: BlobCreatorProxy, data: &[u8]) -> Hash {
-    let mut builder = MerkleTreeBuilder::new();
-    builder.write(&data);
-    let hash = builder.finish().root();
+    let hash = fuchsia_merkle::from_slice(data).root();
     let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
 
     let blob_writer_client_end = blob_creator

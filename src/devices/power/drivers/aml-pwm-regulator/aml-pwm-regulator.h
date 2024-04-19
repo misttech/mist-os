@@ -16,17 +16,17 @@
 
 namespace aml_pwm_regulator {
 
-using fuchsia_hardware_vreg::wire::PwmVregMetadataEntry;
+using fuchsia_hardware_vreg::wire::PwmVregMetadata;
 
 class AmlPwmRegulatorDriver;
 
 class AmlPwmRegulator : public fidl::WireServer<fuchsia_hardware_vreg::Vreg> {
  public:
-  explicit AmlPwmRegulator(const PwmVregMetadataEntry& vreg_range,
+  explicit AmlPwmRegulator(const PwmVregMetadata& vreg_range,
                            fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_proto_client,
                            AmlPwmRegulatorDriver* driver, std::string_view name);
-  static zx::result<std::unique_ptr<AmlPwmRegulator>> Create(
-      const PwmVregMetadataEntry& metadata_entry, AmlPwmRegulatorDriver* driver);
+  static zx::result<std::unique_ptr<AmlPwmRegulator>> Create(const PwmVregMetadata& metadata,
+                                                             AmlPwmRegulatorDriver* driver);
 
   // Vreg Implementation.
   void SetVoltageStep(SetVoltageStepRequestView request,
@@ -61,7 +61,7 @@ class AmlPwmRegulatorDriver : public fdf::DriverBase {
  private:
   friend class AmlPwmRegulator;
 
-  std::vector<std::unique_ptr<AmlPwmRegulator>> regulators_;
+  std::unique_ptr<AmlPwmRegulator> regulators_;
 };
 
 }  // namespace aml_pwm_regulator

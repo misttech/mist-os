@@ -37,6 +37,7 @@
 #include "src/developer/debug/zxdb/symbols/collection.h"
 #include "src/developer/debug/zxdb/symbols/data_member.h"
 #include "src/developer/debug/zxdb/symbols/identifier.h"
+#include "src/developer/debug/zxdb/symbols/modified_type.h"
 #include "src/developer/debug/zxdb/symbols/process_symbols.h"
 #include "src/developer/debug/zxdb/symbols/symbol.h"
 #include "src/developer/debug/zxdb/symbols/template_parameter.h"
@@ -415,16 +416,73 @@ void FormatActiveTasksHashMapTuple(
         auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
         out->Append("Task(id = " + std::to_string(task_id) + ")\n", TextForegroundColor::kGreen);
         out->Append(kAwaiteeMarker);
-        // Arc -> Task -> AtomicFuture -> UnsafeCell -> ManuallyDrop -> FutureObj -> LocalFutureObj
-        ErrOrValue future =
-            ResolveNonstaticMember(context, arc_inner.value(),
-                                   {"data", "future", "future", "value", "value", "__0", "future"});
-        if (future.has_error())
-          return cb(task_id, FormatError("Invalid HashMap tuple (6)", future.err()));
+        // Arc -> Task -> AtomicFuture
+        ErrOrValue atomic_future =
+            ResolveNonstaticMember(context, arc_inner.value(), {"data", "future"});
+        if (atomic_future.has_error())
+          return cb(task_id, FormatError("Invalid HashMap tuple (4)", atomic_future.err()));
 
-        // |future| is a $(*mut dyn core::future::future::Future<Output=()>).
-        out->Complete(FormatFuture(future.value(), options, context, 3));
-        cb(task_id, out);
+        ErrOrValue state = ResolveNonstaticMember(context, atomic_future.value(), {"state"});
+        if (state.has_error())
+          return cb(task_id, FormatError("Invalid HashMap tuple (5)", state.err()));
+
+        // Read the state of the future.
+        uint64_t state_value;
+        if (auto result = state.value().PromoteTo64(&state_value); result.has_error())
+          return cb(task_id, FormatError("Invalid HashMap tuple (6)", result));
+
+        // See if the future is DONE.
+        if (state_value & (1 << 2)) {
+          out->Complete("Finished\n");
+          return cb(task_id, out);
+        }
+
+        // AtomicFuture -> UnsafeCell -> Box<dyn FutureOrResult>
+        ErrOrValue value =
+            ResolveNonstaticMember(context, atomic_future.value(), {"future", "value"});
+
+        // Now we have `Box<dyn FutureOrResult>`.  To determine the concrete type of the future we
+        // need to find the future's drop function.  We can't use FutureOrResult's drop because it
+        // doesn't have a drop method (it uses ManuallyDrop), so we have to find the `drop_future`
+        // method from the `FutureOrResult` trait.
+
+        // Extract pointer and vtable from the fat pointer.
+        ErrOrValue pointer_val = ResolveNonstaticMember(context, value.value(), {"pointer"});
+        ErrOrValue vtable_val = ResolveNonstaticMember(context, value.value(), {"vtable"});
+        TargetPointer vtable = 0;
+        if (pointer_val.has_error() || vtable_val.has_error() ||
+            vtable_val.value().PromoteTo64(&vtable).has_error())
+          return cb(task_id, FormatMessage(Syntax::kError, "Invalid HashMap tuple (7)"));
+
+        // We want to get to the `drop_future` method which is the first method in the trait.  The
+        // vtable should be <drop, size, align, trait methods...>, so it's the fourth pointer.
+        context->GetDataProvider()->GetMemoryAsync(
+            vtable + 3 * sizeof(TargetPointer), sizeof(TargetPointer),
+            [=, cb = std::move(cb), pointer = pointer_val.value()](
+                const Err& err, std::vector<uint8_t> data) mutable {
+              if (err.has_error() || data.size() != sizeof(TargetPointer))
+                return cb(task_id, FormatMessage(Syntax::kError, "Invalid HashMap tuple (8)"));
+
+              // Assume the same endian.
+              TargetPointer drop_in_place_addr = *reinterpret_cast<TargetPointer*>(data.data());
+              Location loc = context->GetLocationForAddress(drop_in_place_addr);
+              if (!loc.symbol())
+                return cb(task_id, FormatMessage(Syntax::kError, "Invalid HashMap tuple (9)"));
+
+              const Function* func = loc.symbol().Get()->As<Function>();
+              if (!func || func->template_params().empty())
+                return cb(task_id, FormatMessage(Syntax::kError, "Invalid HashMap tuple (10)"));
+
+              // Get the templated parameter and create a ModifiedType to that type.
+              LazySymbol pointed_to =
+                  func->template_params()[0].Get()->As<TemplateParameter>()->type();
+              auto derived = fxl::MakeRefCounted<ModifiedType>(DwarfTag::kPointerType, pointed_to);
+
+              out->Complete(FormatFuture(ExprValue(derived, pointer.data(), pointer.source()),
+                                         options, context, 3));
+
+              cb(task_id, out);
+            });
       });
 }
 
@@ -433,7 +491,7 @@ fxl::RefPtr<AsyncOutputBuffer> FormatActiveTasksHashMap(const ErrOrValue& hashma
                                                         const FormatFutureOptions& options,
                                                         const fxl::RefPtr<EvalContext>& context) {
   if (hashmap.has_error()) {
-    return FormatError("Cannot locate active_tasks", hashmap.err());
+    return FormatError("Cannot locate all_tasks", hashmap.err());
   }
   if (StripTemplate(hashmap.value().type()->GetFullName()) !=
       "std::collections::hash::map::HashMap") {
@@ -534,17 +592,22 @@ void OnStackReady(Stack& stack, fxl::RefPtr<CommandContext> cmd_context,
     if (!stack[i]->GetLocation().has_symbols())
       continue;
     std::string func_name(StripTemplate(stack[i]->GetLocation().symbol().Get()->GetFullName()));
-    if (func_name == "fuchsia_async::runtime::fuchsia::executor::local::LocalExecutor::run" ||
-        func_name == "fuchsia_async::runtime::fuchsia::executor::send::SendExecutor::run") {
-      auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
-      auto context = stack[i]->GetEvalContext();
-      EvalExpression("self.inner->data.active_tasks.data.value", context, false,
-                     [out, options, context](const ErrOrValue& value) {
-                       out->Complete(FormatActiveTasksHashMap(value, options, context));
-                     });
-      cmd_context->Output(out);
-      return;
+    std::string expr;
+    if (func_name == "fuchsia_async::runtime::fuchsia::executor::local::LocalExecutor::run") {
+      expr = "self.ehandle.inner->data.task_state.data.value.all_tasks";
+    } else if (func_name == "fuchsia_async::runtime::fuchsia::executor::send::SendExecutor::run") {
+      expr = "self.inner->data.task_state.data.value.all_tasks";
+    } else {
+      continue;
     }
+
+    auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
+    auto context = stack[i]->GetEvalContext();
+    EvalExpression(expr, context, false, [out, options, context](const ErrOrValue& value) {
+      out->Complete(FormatActiveTasksHashMap(value, options, context));
+    });
+    cmd_context->Output(out);
+    return;
   }
   cmd_context->ReportError(Err("Cannot locate the async executor on the stack."));
 }

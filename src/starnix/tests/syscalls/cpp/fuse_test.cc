@@ -13,9 +13,13 @@
 #include <sys/xattr.h>
 #include <unistd.h>
 
+#include <algorithm>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <thread>
 #include <vector>
 
@@ -132,6 +136,10 @@ class FuseTest : public ::testing::Test {
 
 class FuseServer {
  public:
+  FuseServer() : FuseServer(0, S_IFREG) {}
+  FuseServer(uint32_t want_init_flags, uint32_t file_type)
+      : want_init_flags_(want_init_flags), file_type_(file_type) {}
+
   virtual ~FuseServer() {}
 
   const test_helper::ScopedFD& fuse_fd() { return fuse_fd_; }
@@ -164,6 +172,25 @@ class FuseServer {
     return true;
   }
 
+  template <typename R = void>
+  R WaitForInit(std::function<R()> f = std::function<R()>()) {
+    std::unique_lock guard(init_mtx_);
+    init_cv_.wait(guard, [&]() { return init_done_; });
+    if (f) {
+      return f();
+    }
+    return R();
+  }
+
+  testing::AssertionResult SendInitResponse(const fuse_in_header* in_header, uint32_t flags) {
+    fuse_init_out init_out = {
+        .major = FUSE_KERNEL_VERSION,
+        .minor = FUSE_KERNEL_MINOR_VERSION,
+        .flags = flags,
+    };
+    return WriteStructResponse(in_header, init_out);
+  }
+
  protected:
   virtual testing::AssertionResult HandleFuseMessage(const std::vector<std::byte>& message) {
     const struct fuse_in_header* in_header =
@@ -183,10 +210,17 @@ class FuseServer {
         OK_OR_RETURN(HandleAccess(in_header, &access_in, message));
         break;
       }
+      case FUSE_GETATTR: {
+        struct fuse_getattr_in getattr_in = {};
+        memcpy(&getattr_in, in_payload, sizeof(getattr_in));
+        OK_OR_RETURN(HandleGetAttr(in_header, &getattr_in, message));
+        break;
+      }
       case FUSE_LOOKUP: {
         OK_OR_RETURN(HandleLookup(in_header, message));
         break;
       }
+      case FUSE_OPENDIR:
       case FUSE_OPEN: {
         struct fuse_open_in open_in = {};
         memcpy(&open_in, in_payload, sizeof(open_in));
@@ -199,25 +233,43 @@ class FuseServer {
         OK_OR_RETURN(HandleFlush(in_header, &flush_in, message));
         break;
       }
+      case FUSE_RELEASEDIR:
       case FUSE_RELEASE: {
         struct fuse_release_in release_in = {};
         memcpy(&release_in, in_payload, sizeof(release_in));
         OK_OR_RETURN(HandleRelease(in_header, &release_in, message));
         break;
       }
+      case FUSE_GETXATTR: {
+        OK_OR_RETURN(WriteDataFreeResponse(in_header, -ENOSYS));
+        break;
+      }
+      case FUSE_BATCH_FORGET:
+      case FUSE_FORGET:
+        // no-op; these don't expect a response.
+        break;
       default:
         return testing::AssertionFailure() << "Unknown FUSE opcode: " << in_header->opcode;
     }
     return testing::AssertionSuccess();
   }
 
+  void NotifyInitWaiters(std::function<void()> f = std::function<void()>()) {
+    std::unique_lock guard(init_mtx_);
+    init_done_ = true;
+    if (f) {
+      f();
+    }
+    init_cv_.notify_all();
+  }
+
   virtual testing::AssertionResult HandleInit(const struct fuse_in_header* in_header,
                                               const struct fuse_init_in* init_in,
                                               const std::vector<std::byte>& message) {
-    struct fuse_init_out init_out = {};
-    init_out.major = FUSE_KERNEL_VERSION;
-    init_out.minor = FUSE_KERNEL_MINOR_VERSION;
-    return WriteStructResponse(in_header, init_out);
+    EXPECT_EQ(init_in->flags & want_init_flags_, want_init_flags_);
+    OK_OR_RETURN(SendInitResponse(in_header, want_init_flags_));
+    NotifyInitWaiters();
+    return testing::AssertionSuccess();
   }
 
   virtual testing::AssertionResult HandleAccess(const struct fuse_in_header* in_header,
@@ -226,13 +278,18 @@ class FuseServer {
     return WriteAckResponse(in_header);
   }
 
+  virtual testing::AssertionResult HandleGetAttr(const struct fuse_in_header* in_header,
+                                                 const struct fuse_getattr_in* getattr_in,
+                                                 const std::vector<std::byte>& message) {
+    fuse_attr_out attr_out = {};
+    PopulateDefaultAttr(in_header->nodeid, attr_out.attr);
+    return WriteStructResponse(in_header, attr_out);
+  }
+
   virtual testing::AssertionResult HandleLookup(const struct fuse_in_header* in_header,
                                                 const std::vector<std::byte>& message) {
-    struct fuse_entry_out entry_out = {};
-    entry_out.nodeid = next_nodeid_++;
-    entry_out.generation = 1;
-    entry_out.attr.ino = entry_out.nodeid;
-    entry_out.attr.mode = S_IFREG;
+    fuse_entry_out entry_out;
+    PopulateDefaultEntry(entry_out);
     return WriteStructResponse(in_header, entry_out);
   }
 
@@ -298,6 +355,26 @@ class FuseServer {
 
   uint64_t GetNextFileHandle() { return next_fh_++; }
 
+  void PopulateDefaultEntry(fuse_entry_out& entry_out) {
+    entry_out = {
+        .nodeid = next_nodeid_++,
+        .generation = 1,
+    };
+    PopulateDefaultAttr(entry_out.nodeid, entry_out.attr);
+  }
+
+  void PopulateDefaultAttr(uint64_t ino, fuse_attr& attr) {
+    attr = {
+        .ino = ino,
+        // Consider the root node as a directory and everything else as the
+        // specified kind. The node will also have read/write/exec permissions
+        // for the owning user, group and world. For current testing needs,
+        // this is sufficient.
+        .mode = static_cast<uint32_t>(ino == FUSE_ROOT_ID ? S_IFDIR : file_type_) | S_IRWXU |
+                S_IRWXG | S_IRWXO,
+    };
+  }
+
  private:
   testing::AssertionResult ReadRequest(std::vector<std::byte>* request, bool* unmounted) {
     // There doesn't seem to be a good value to use for the max request size. We just pick
@@ -330,6 +407,13 @@ class FuseServer {
   test_helper::ScopedFD fuse_fd_;
   uint64_t next_fh_ = 1;
   uint64_t next_nodeid_ = 2;  // 1 is reserved for the root.
+
+  std::mutex init_mtx_;
+  std::condition_variable init_cv_;
+  bool init_done_ = false;
+
+  uint32_t want_init_flags_;
+  uint32_t file_type_;
 };
 
 class FuseServerTest : public ::testing::Test {
@@ -637,6 +721,49 @@ TEST_F(FuseTest, XAttr) {
   ASSERT_EQ(errno, ENODATA);
 }
 
+TEST_F(FuseServerTest, NoReqsUntilInitResponse) {
+  class NoReqsUntilInitResponseServer : public FuseServer {
+   public:
+    fuse_in_header WaitForInitAndReturnRequestHeader() {
+      return WaitForInit(std::function<fuse_in_header()>([&]() { return init_hdr_; }));
+    }
+
+   protected:
+    testing::AssertionResult HandleInit(const struct fuse_in_header* in_header,
+                                        const struct fuse_init_in* init_in,
+                                        const std::vector<std::byte>& message) {
+      // Don't actually complete the request, just store the init request's header so
+      // that we can respond to it later.
+      NotifyInitWaiters([&]() { init_hdr_ = *in_header; });
+      return testing::AssertionSuccess();
+    }
+
+   private:
+    fuse_in_header init_hdr_;
+  };
+
+  std::shared_ptr<NoReqsUntilInitResponseServer> server(new NoReqsUntilInitResponseServer());
+  ASSERT_TRUE(Mount(server));
+  const fuse_in_header init_hdr = server->WaitForInitAndReturnRequestHeader();
+
+  // Create a new thread to perform a request against the FUSE server.
+  std::atomic_bool access_done = false;
+  std::thread thrd([&]() {
+    std::string filename = GetMountDir() + "/file";
+    EXPECT_EQ(access(filename.c_str(), R_OK), 0) << strerror(errno);
+    access_done = true;
+  });
+  // Make sure that the request is not completed.
+  sleep(1);
+  EXPECT_FALSE(access_done);
+
+  // Send our (delayed) response to the FUSE_INIT request and make sure that the
+  // access request is now completed.
+  server->SendInitResponse(&init_hdr, 0);
+  thrd.join();
+  EXPECT_TRUE(access_done);
+}
+
 TEST_F(FuseServerTest, OpenAndClose) {
   ASSERT_TRUE(Mount(std::make_shared<FuseServer>()));
 
@@ -700,40 +827,306 @@ TEST_F(FuseServerTest, OverlongHeaderLength) {
   fd.reset();
 }
 
-TEST_F(FuseServerTest, BypassUnimplementedAccess) {
-  class BypassUnimplementedAccessServer : public FuseServer {
-   public:
-    uint64_t AccessCount() { return calls_to_access_.load(std::memory_order_relaxed); }
-
-   protected:
-    testing::AssertionResult HandleAccess(const struct fuse_in_header* in_header,
-                                          const struct fuse_access_in* access_in,
-                                          const std::vector<std::byte>& message) override {
-      calls_to_access_.fetch_add(1, std::memory_order_relaxed);
-      return WriteDataFreeResponse(in_header, -ENOSYS);
-    }
-
-   private:
-    std::atomic_uint64_t calls_to_access_;
-  };
-
-  std::shared_ptr<BypassUnimplementedAccessServer> server(new BypassUnimplementedAccessServer());
-  ASSERT_TRUE(Mount(server));
-  EXPECT_EQ(server->AccessCount(), 0u);
-
-  // Run the checks in a separate thread where we drop the |CAP_DAC_OVERRIDE|
-  // capability which bypasses file permission checks. See capabilities(7).
+// Run the checks in a separate thread where we drop the |CAP_DAC_OVERRIDE|
+// capability which bypasses file permission checks. See capabilities(7).
+template <typename F>
+void InThreadWithoutCapDacOverride(F f) {
   std::thread thrd([&]() {
     test_helper::UnsetCapability(CAP_DAC_OVERRIDE);
 
-    auto check_access = [&](const char* file) {
+    f();
+  });
+  thrd.join();
+}
+
+struct BypassAccessTestCase {
+  uint32_t want_init_flags;
+  int access_reply;
+  uint64_t max_access_count;
+};
+
+class CountingFuseServer : public FuseServer {
+ public:
+  CountingFuseServer(uint32_t want_init_flags, uint32_t file_type, int access_reply)
+      : FuseServer(want_init_flags, file_type), access_reply_(access_reply) {}
+
+  uint64_t LookupCount() { return calls_to_lookup_.load(std::memory_order_relaxed); }
+  uint64_t AccessCount() { return calls_to_access_.load(std::memory_order_relaxed); }
+  uint64_t NonRootGetAttrCount() {
+    return calls_to_non_root_getattr_.load(std::memory_order_relaxed);
+  }
+
+ protected:
+  testing::AssertionResult HandleLookup(const struct fuse_in_header* in_header,
+                                        const std::vector<std::byte>& message) override {
+    calls_to_lookup_.fetch_add(1, std::memory_order_relaxed);
+    return FuseServer::HandleLookup(in_header, message);
+  }
+
+  testing::AssertionResult HandleAccess(const struct fuse_in_header* in_header,
+                                        const struct fuse_access_in* access_in,
+                                        const std::vector<std::byte>& message) override {
+    calls_to_access_.fetch_add(1, std::memory_order_relaxed);
+    return WriteDataFreeResponse(in_header, access_reply_);
+  }
+
+  testing::AssertionResult HandleGetAttr(const struct fuse_in_header* in_header,
+                                         const struct fuse_getattr_in* getattr_in,
+                                         const std::vector<std::byte>& message) override {
+    if (in_header->nodeid != FUSE_ROOT_ID) {
+      calls_to_non_root_getattr_.fetch_add(1, std::memory_order_relaxed);
+    }
+    return FuseServer::HandleGetAttr(in_header, getattr_in, message);
+  }
+
+ private:
+  int access_reply_;
+  std::atomic_uint64_t calls_to_lookup_ = 0;
+  std::atomic_uint64_t calls_to_access_ = 0;
+  std::atomic_uint64_t calls_to_non_root_getattr_ = 0;
+};
+
+struct PermissionCheckTestCase {
+  std::optional<uint32_t> need_cap;
+  uint32_t want_init_flags;
+  uint32_t file_type;
+  std::function<void(const std::string&)> fn;
+  uint64_t expected_lookup_count;
+  uint64_t expected_access_count;
+  uint64_t expected_non_root_getattr_count;
+};
+
+class FuseServerPermissionCheck : public FuseServerTest,
+                                  public ::testing::WithParamInterface<PermissionCheckTestCase> {};
+
+TEST_P(FuseServerPermissionCheck, PermissionCheck) {
+  const PermissionCheckTestCase& test_case = GetParam();
+
+  if (test_case.need_cap && !test_helper::HasCapability(test_case.need_cap.value())) {
+    GTEST_SKIP() << "Need extra capability " << test_case.need_cap.value();
+  }
+
+  std::shared_ptr<CountingFuseServer> server(
+      new CountingFuseServer(test_case.want_init_flags, test_case.file_type, 0));
+  ASSERT_TRUE(Mount(server));
+  server->WaitForInit();
+  EXPECT_EQ(server->LookupCount(), 0u);
+  EXPECT_EQ(server->AccessCount(), 0u);
+  EXPECT_EQ(server->NonRootGetAttrCount(), 0u);
+
+  std::string path = GetMountDir() + "/node";
+  ASSERT_NO_FATAL_FAILURE(test_case.fn(path));
+  EXPECT_EQ(server->LookupCount(), test_case.expected_lookup_count);
+  EXPECT_EQ(server->AccessCount(), test_case.expected_access_count);
+  EXPECT_EQ(server->NonRootGetAttrCount(), test_case.expected_non_root_getattr_count);
+}
+
+void TestChdir(const std::string& path) {
+  test_helper::ForkHelper fork_helper;
+  // Run in a forked process to not modify the state of the current
+  // process which may run other tests.
+  fork_helper.RunInForkedProcess([&] { ASSERT_EQ(chdir(path.c_str()), 0) << strerror(errno); });
+  ASSERT_TRUE(fork_helper.WaitForChildren());
+}
+
+void TestChroot(const std::string& path) {
+  test_helper::ForkHelper fork_helper;
+  // Run in a forked process to not modify the state of the current
+  // process which may run other tests.
+  fork_helper.RunInForkedProcess([&] { ASSERT_EQ(chroot(path.c_str()), 0) << strerror(errno); });
+  ASSERT_TRUE(fork_helper.WaitForChildren());
+}
+
+void TestAccess(const std::string& path) {
+  ASSERT_EQ(access(path.c_str(), R_OK), 0) << strerror(errno);
+}
+
+void TestStat(const std::string& path) {
+  struct stat s;
+  ASSERT_EQ(stat(path.c_str(), &s), 0) << strerror(errno);
+}
+
+void TestOpenWithFlags(const std::string& path, int flags) {
+  test_helper::ScopedFD fd(open(path.c_str(), flags));
+  ASSERT_TRUE(fd.is_valid());
+}
+
+INSTANTIATE_TEST_SUITE_P(FuseServerPermissionCheck, FuseServerPermissionCheck,
+                         testing::Values(
+                             // When performing a path walk, we should only use |FUSE_LOOKUP|
+                             // for _initial_ permission/access checking.
+                             PermissionCheckTestCase{
+                                 .want_init_flags = 0,
+                                 .file_type = S_IFREG,
+                                 .fn =
+                                     [](const std::string& path) {
+                                       ASSERT_NO_FATAL_FAILURE(TestOpenWithFlags(path, O_RDWR));
+                                     },
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 0,
+                                 .expected_non_root_getattr_count = 0,
+                             },
+                             PermissionCheckTestCase{
+                                 .want_init_flags = 0,
+                                 .file_type = S_IFDIR,
+                                 .fn =
+                                     [](const std::string& path) {
+                                       ASSERT_NO_FATAL_FAILURE(TestOpenWithFlags(path, O_RDONLY));
+                                     },
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 0,
+                                 .expected_non_root_getattr_count = 0,
+                             },
+                             PermissionCheckTestCase{
+                                 .want_init_flags = 0,
+                                 .file_type = S_IFREG,
+                                 .fn = TestStat,
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 0,
+                                 .expected_non_root_getattr_count = 1,
+                             },
+                             PermissionCheckTestCase{
+                                 .want_init_flags = 0,
+                                 .file_type = S_IFDIR,
+                                 .fn = TestStat,
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 0,
+                                 .expected_non_root_getattr_count = 1,
+                             },
+                             // These are the same as the above, but with the `FUSE_POSIX_ACL`
+                             // init flag set.
+                             PermissionCheckTestCase{
+                                 .want_init_flags = FUSE_POSIX_ACL,
+                                 .file_type = S_IFREG,
+                                 .fn =
+                                     [](const std::string& path) {
+                                       ASSERT_NO_FATAL_FAILURE(TestOpenWithFlags(path, O_RDWR));
+                                     },
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 0,
+                                 .expected_non_root_getattr_count = 1,
+                             },
+                             PermissionCheckTestCase{
+                                 .want_init_flags = FUSE_POSIX_ACL,
+                                 .file_type = S_IFDIR,
+                                 .fn =
+                                     [](const std::string& path) {
+                                       ASSERT_NO_FATAL_FAILURE(TestOpenWithFlags(path, O_RDONLY));
+                                     },
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 0,
+                                 .expected_non_root_getattr_count = 1,
+                             },
+                             PermissionCheckTestCase{
+                                 .want_init_flags = FUSE_POSIX_ACL,
+                                 .file_type = S_IFREG,
+                                 .fn = TestStat,
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 0,
+                                 .expected_non_root_getattr_count = 1,
+                             },
+                             PermissionCheckTestCase{
+                                 .want_init_flags = FUSE_POSIX_ACL,
+                                 .file_type = S_IFDIR,
+                                 .fn = TestStat,
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 0,
+                                 .expected_non_root_getattr_count = 1,
+                             },
+
+                             // Only the |access|, |chdir| and |chroot| family of
+                             // syscalls may trigger |FUSE_ACCESS|.
+                             PermissionCheckTestCase{
+                                 .want_init_flags = 0,
+                                 .file_type = S_IFREG,
+                                 .fn = TestAccess,
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 1,
+                                 .expected_non_root_getattr_count = 0,
+                             },
+                             PermissionCheckTestCase{
+                                 .want_init_flags = 0,
+                                 .file_type = S_IFDIR,
+                                 .fn = TestAccess,
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 1,
+                                 .expected_non_root_getattr_count = 0,
+                             },
+                             PermissionCheckTestCase{
+                                 .want_init_flags = 0,
+                                 .file_type = S_IFDIR,
+                                 .fn = TestChdir,
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 1,
+                                 .expected_non_root_getattr_count = 0,
+                             },
+                             PermissionCheckTestCase{
+                                 .need_cap = CAP_SYS_CHROOT,
+                                 .want_init_flags = 0,
+                                 .file_type = S_IFDIR,
+                                 .fn = TestChroot,
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 1,
+                                 .expected_non_root_getattr_count = 0,
+                             },
+                             // These are the same as the above, but with the `FUSE_POSIX_ACL`
+                             // init flag set.
+                             PermissionCheckTestCase{
+                                 .want_init_flags = FUSE_POSIX_ACL,
+                                 .file_type = S_IFREG,
+                                 .fn = TestAccess,
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 0,
+                                 .expected_non_root_getattr_count = 1,
+                             },
+                             PermissionCheckTestCase{
+                                 .want_init_flags = FUSE_POSIX_ACL,
+                                 .file_type = S_IFDIR,
+                                 .fn = TestAccess,
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 0,
+                                 .expected_non_root_getattr_count = 1,
+                             },
+                             PermissionCheckTestCase{
+                                 .want_init_flags = FUSE_POSIX_ACL,
+                                 .file_type = S_IFDIR,
+                                 .fn = TestChdir,
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 0,
+                                 .expected_non_root_getattr_count = 1,
+                             },
+                             PermissionCheckTestCase{
+                                 .need_cap = CAP_SYS_CHROOT,
+                                 .want_init_flags = FUSE_POSIX_ACL,
+                                 .file_type = S_IFDIR,
+                                 .fn = TestChroot,
+                                 .expected_lookup_count = 1,
+                                 .expected_access_count = 0,
+                                 .expected_non_root_getattr_count = 1,
+                             }));
+
+class FuseServerBypassAccessTest : public FuseServerTest,
+                                   public ::testing::WithParamInterface<BypassAccessTestCase> {};
+
+TEST_P(FuseServerBypassAccessTest, BypassAccess) {
+  const BypassAccessTestCase& test_case = GetParam();
+
+  std::shared_ptr<CountingFuseServer> server(
+      new CountingFuseServer(test_case.want_init_flags, S_IFREG, test_case.access_reply));
+  ASSERT_TRUE(Mount(server));
+  server->WaitForInit();
+  EXPECT_EQ(server->AccessCount(), 0u);
+
+  InThreadWithoutCapDacOverride([&]() {
+    auto check_access = [&, max_access_count = test_case.max_access_count](const char* file) {
       const std::string filename = GetMountDir() + "/" + file;
       ASSERT_EQ(access(filename.c_str(), R_OK), 0) << strerror(errno);
-      EXPECT_EQ(server->AccessCount(), 1u);
+      EXPECT_EQ(server->AccessCount(), max_access_count);
     };
 
     // No matter how many times we access a file, we should have only ever made
-    // the |FUSE_ACCESS| request once for the lifetime of the connection/server.
+    // the |FUSE_ACCESS| request |params.max_access_count| times for the lifetime
+    // of the connection/server.
     for (int i = 0; i < 3; ++i) {
       ASSERT_NO_FATAL_FAILURE(check_access("somefile1"));
     }
@@ -742,5 +1135,143 @@ TEST_F(FuseServerTest, BypassUnimplementedAccess) {
     // part of the same connection.
     ASSERT_NO_FATAL_FAILURE(check_access("somefile2"));
   });
-  thrd.join();
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    FuseServerBypassAccessTest, FuseServerBypassAccessTest,
+    testing::Values(
+        // The kernel should stop sending |FUSE_ACCESS| requests once we send an
+        // |ENOSYS| response.
+        BypassAccessTestCase{.want_init_flags = 0, .access_reply = -ENOSYS, .max_access_count = 1},
+        // The kernel should never send a |FUSE_ACCESS| request if we set the
+        // |FUSE_POSIX_ACL| init flag.
+        BypassAccessTestCase{
+            .want_init_flags = FUSE_POSIX_ACL, .access_reply = 0, .max_access_count = 0}));
+
+enum class ExpectedGetAttrBehaviour {
+  kNone,
+  kOncePerFile,
+  kOncePerAccess,
+};
+
+uint64_t ExpectedGetAttrsValue(ExpectedGetAttrBehaviour behaviour, uint64_t access_count) {
+  switch (behaviour) {
+    case ExpectedGetAttrBehaviour::kNone:
+      return 0;
+    case ExpectedGetAttrBehaviour::kOncePerFile:
+      return std::min(access_count, 1ul);
+    case ExpectedGetAttrBehaviour::kOncePerAccess:
+      return access_count;
+  }
+}
+
+struct CacheAttributesTestCase {
+  uint64_t lookup_attr_timeout;
+  uint64_t getattr_attr_timeout;
+  ExpectedGetAttrBehaviour expected_getattr_behaviour;
+};
+
+class FuseServerCacheAttributesTest
+    : public FuseServerTest,
+      public ::testing::WithParamInterface<CacheAttributesTestCase> {};
+
+TEST_P(FuseServerCacheAttributesTest, CacheAttributes) {
+  const CacheAttributesTestCase& test_case = GetParam();
+
+  class CacheAttributesServer : public FuseServer {
+   public:
+    CacheAttributesServer(uint64_t lookup_attr_valid, uint64_t getattr_attr_valid)
+        : FuseServer(FUSE_POSIX_ACL, S_IFREG),
+          lookup_attr_valid_(lookup_attr_valid),
+          getattr_attr_valid_(getattr_attr_valid) {}
+
+    uint64_t NonRootGetAttrCount() {
+      return calls_to_non_root_getattr_.load(std::memory_order_relaxed);
+    }
+
+   protected:
+    testing::AssertionResult HandleLookup(const struct fuse_in_header* in_header,
+                                          const std::vector<std::byte>& message) override {
+      fuse_entry_out entry_out;
+      PopulateDefaultEntry(entry_out);
+      // Instruct the kernel to not immediately evict the |dcache| entry (|dentry|)
+      // for this node by setting a really high entry value. This value is used to
+      // determine when a FUSE-based |dentry| has gone stale. This test isn't focused
+      // on the |dcache| or |dentry| so this is ok. For more details, see:
+      //  - https://www.halolinux.us/kernel-reference/the-dentry-cache.html
+      //  - https://www.kernel.org/doc/html/latest/filesystems/path-lookup.html
+      //  - https://lwn.net/Articles/649115/
+      //  -
+      //  https://www.infradead.org/~mchehab/kernel_docs/filesystems/path-walking.html#dcache-name-lookup
+      entry_out.entry_valid = std::numeric_limits<uint64_t>::max();
+      entry_out.attr_valid = lookup_attr_valid_;
+      return WriteStructResponse(in_header, entry_out);
+    }
+
+    testing::AssertionResult HandleGetAttr(const struct fuse_in_header* in_header,
+                                           const struct fuse_getattr_in* getattr_in,
+                                           const std::vector<std::byte>& message) override {
+      if (in_header->nodeid != FUSE_ROOT_ID) {
+        calls_to_non_root_getattr_.fetch_add(1, std::memory_order_relaxed);
+      }
+      fuse_attr_out attr_out = {
+          .attr_valid = getattr_attr_valid_,
+      };
+      PopulateDefaultAttr(in_header->nodeid, attr_out.attr);
+      return WriteStructResponse(in_header, attr_out);
+    }
+
+   private:
+    uint64_t lookup_attr_valid_;
+    uint64_t getattr_attr_valid_;
+    std::atomic_uint64_t calls_to_non_root_getattr_ = 0;
+  };
+
+  std::shared_ptr<CacheAttributesServer> server(
+      new CacheAttributesServer(test_case.lookup_attr_timeout, test_case.getattr_attr_timeout));
+  ASSERT_TRUE(Mount(server));
+  server->WaitForInit();
+  EXPECT_EQ(server->NonRootGetAttrCount(), 0u);
+
+  InThreadWithoutCapDacOverride([&]() {
+    auto check_getattr = [&](const char* file, uint64_t expected_getattrs) {
+      const std::string filename = GetMountDir() + "/" + file;
+      ASSERT_EQ(access(filename.c_str(), R_OK), 0) << strerror(errno);
+      EXPECT_EQ(server->NonRootGetAttrCount(), expected_getattrs);
+    };
+
+    uint64_t count_after_file1;
+    for (uint64_t i = 1; i <= 3; ++i) {
+      count_after_file1 = ExpectedGetAttrsValue(test_case.expected_getattr_behaviour, i);
+      ASSERT_NO_FATAL_FAILURE(check_getattr("somefile1", count_after_file1));
+    }
+
+    for (uint64_t i = 1; i <= 5; ++i) {
+      ASSERT_NO_FATAL_FAILURE(check_getattr(
+          "somefile2",
+          count_after_file1 + ExpectedGetAttrsValue(test_case.expected_getattr_behaviour, i)));
+    }
+  });
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    FuseServerCacheAttributesTest, FuseServerCacheAttributesTest,
+    testing::Values(
+        // When we don't cache the attributes, expect the kernel to refresh the
+        // attributes each call.
+        CacheAttributesTestCase{
+            .lookup_attr_timeout = 0,
+            .getattr_attr_timeout = 0,
+            .expected_getattr_behaviour = ExpectedGetAttrBehaviour::kOncePerAccess},
+
+        // When we respond to the lookup request with a cache timeout, it should
+        // be respected.
+        CacheAttributesTestCase{.lookup_attr_timeout = std::numeric_limits<uint64_t>::max(),
+                                .getattr_attr_timeout = 0,
+                                .expected_getattr_behaviour = ExpectedGetAttrBehaviour::kNone},
+        // When don't provide a cache timeout with lookup, but do for getattr,
+        // respect the cached attributes after the getattr request.
+        CacheAttributesTestCase{
+            .lookup_attr_timeout = 0,
+            .getattr_attr_timeout = std::numeric_limits<uint64_t>::max(),
+            .expected_getattr_behaviour = ExpectedGetAttrBehaviour::kOncePerFile}));

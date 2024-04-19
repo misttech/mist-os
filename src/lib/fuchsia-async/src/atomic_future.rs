@@ -2,32 +2,103 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use futures::future::FutureObj;
-use futures::FutureExt;
-use std::cell::UnsafeCell;
-use std::mem::ManuallyDrop;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
-use std::task::Context;
+use {
+    futures::ready,
+    std::{
+        cell::UnsafeCell,
+        future::Future,
+        marker::PhantomData,
+        mem::ManuallyDrop,
+        pin::Pin,
+        sync::atomic::{
+            AtomicUsize,
+            Ordering::{Acquire, Relaxed, Release},
+        },
+        task::{Context, Poll},
+    },
+};
 
 /// A lock-free thread-safe future.
-pub struct AtomicFuture {
+// The debugger knows the layout so that async backtraces work, so if this changes the debugger
+// might need to be changed too.
+// LINT.IfChange
+pub struct AtomicFuture<'a> {
     // A bitfield (holds the bits INACTIVE, READY or DONE).
     state: AtomicUsize,
 
     // `future` is safe to access after successfully clearing the INACTIVE bit and the `DONE` bit
-    // isn't set.  The debugger knows the layout so that async backtraces work, so if this changes
-    // the debugger might need to be changed too.
+    // isn't set.
+    future: UnsafeCell<Box<dyn FutureOrResultAccess<'a>>>,
+}
+// LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
+
+trait FutureOrResultAccess<'a>: 'a {
+    /// Drops the future.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the future hasn't been dropped.
+    // zxdb uses this method to figure out the concrete type of the future and it currently assumes
+    // it is the first method in the trait.
     // LINT.IfChange
-    future: UnsafeCell<ManuallyDrop<FutureObj<'static, ()>>>,
+    unsafe fn drop_future(&mut self);
     // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
+
+    /// Polls the future.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the future hasn't been dropped.
+    unsafe fn poll(&mut self, cx: &mut Context<'_>) -> Poll<()>;
+
+    /// Gets the result.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the future is finished and the result hasn't been taken or dropped.
+    unsafe fn get_result(&self) -> *const ();
+
+    /// Drops the result.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the future is finished and the result hasn't already been taken or
+    /// dropped.
+    unsafe fn drop_result(&mut self);
+}
+
+union FutureOrResult<'a, F: 'a, R: 'a> {
+    future: ManuallyDrop<F>,
+    result: ManuallyDrop<R>,
+    lifetime: PhantomData<&'a ()>,
+}
+
+impl<'a, F: Future<Output = R> + 'a, R: 'a> FutureOrResultAccess<'a> for FutureOrResult<'a, F, R> {
+    unsafe fn poll(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+        let result = ready!(Pin::new_unchecked(&mut *self.future).poll(cx));
+        // This might panic which will leave ourselves in a bad state.  We deal with this by
+        // aborting (see below).
+        ManuallyDrop::drop(&mut self.future);
+        self.result = ManuallyDrop::new(result);
+        Poll::Ready(())
+    }
+
+    unsafe fn drop_future(&mut self) {
+        ManuallyDrop::drop(&mut self.future);
+    }
+
+    unsafe fn get_result(&self) -> *const () {
+        &*self.result as *const R as *const ()
+    }
+
+    unsafe fn drop_result(&mut self) {
+        ManuallyDrop::drop(&mut self.result);
+    }
 }
 
 /// `AtomicFuture` is safe to access from multiple threads at once.
-unsafe impl Sync for AtomicFuture {}
-#[allow(dead_code)]
-trait AssertSend: Send {}
-impl AssertSend for AtomicFuture {}
+unsafe impl Sync for AtomicFuture<'_> {}
+unsafe impl Send for AtomicFuture<'_> {}
 
 /// State Bits
 
@@ -37,13 +108,22 @@ const INACTIVE: usize = 1 << 0;
 // Set to indicate the future needs to be polled again.
 const READY: usize = 1 << 1;
 
-// Terminal state: the future is dropped upon entry to this state.  When in this state, the READY
-// bit can be set, but it has no meaning.
+// Terminal state: the future is dropped upon entry to this state.  When in this state, other bits
+// can be set, including READY (which has no meaning).
 const DONE: usize = 1 << 2;
+
+// The task has been detached.
+const DETACHED: usize = 1 << 3;
+
+// The task has been cancelled.
+const CANCELLED: usize = 1 << 4;
+
+// The result has been taken.
+const RESULT_TAKEN: usize = 1 << 5;
 
 /// The result of a call to `try_poll`.
 /// This indicates the result of attempting to `poll` the future.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub enum AttemptPollResult {
     /// The future was being polled by another thread, but it was notified
     /// to poll at least once more before yielding.
@@ -58,14 +138,33 @@ pub enum AttemptPollResult {
     /// The future was polled, did not complete, but it is woken whilst it is polled so it
     /// should be polled again.
     Yield,
+    /// The future was cancelled.
+    Cancelled,
 }
 
-impl AtomicFuture {
+impl<'a> AtomicFuture<'a> {
     /// Create a new `AtomicFuture`.
-    pub fn new(future: FutureObj<'static, ()>) -> Self {
+    pub fn new<F: Future<Output = R> + Send + 'a, R: Send + 'a>(future: F, detached: bool) -> Self {
+        unsafe { Self::new_local(future, detached) }
+    }
+
+    /// Create a new `AtomicFuture` from a !Send future.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold the Send requirements.
+    pub unsafe fn new_local<F: Future<Output = R> + 'a, R: 'a>(future: F, detached: bool) -> Self {
         AtomicFuture {
-            state: AtomicUsize::new(INACTIVE),
-            future: UnsafeCell::new(ManuallyDrop::new(future)),
+            state: AtomicUsize::new(
+                INACTIVE + {
+                    if detached {
+                        DETACHED
+                    } else {
+                        0
+                    }
+                },
+            ),
+            future: UnsafeCell::new(Box::new(FutureOrResult { future: ManuallyDrop::new(future) })),
         }
     }
 
@@ -84,7 +183,15 @@ impl AtomicFuture {
                 return AttemptPollResult::SomeoneElseFinished;
             }
             if old & INACTIVE != 0 {
-                // We are now the (only) active worker. proceed to poll!
+                // We are now the (only) active worker, proceed to poll...
+                if old & CANCELLED != 0 {
+                    // The future was cancelled.
+                    // SAFETY: We have exclusive access.
+                    unsafe {
+                        self.drop_future_unchecked();
+                    }
+                    return AttemptPollResult::Cancelled;
+                }
                 break;
             }
             // Future was already active; this shouldn't really happen because we shouldn't be
@@ -101,20 +208,27 @@ impl AtomicFuture {
             // the future won't be in a run queue.
         }
 
-        // This `UnsafeCell` access is valid because `self.future.get()` is only called here,
-        // inside the critical section where we performed the transition from INACTIVE to
-        // ACTIVE.
-        let future: &mut FutureObj<'static, ()> = unsafe { &mut *self.future.get() };
+        // We cannot recover from panics.
+        struct Bomb;
+        impl Drop for Bomb {
+            fn drop(&mut self) {
+                std::process::abort();
+            }
+        }
 
-        if future.poll_unpin(cx).is_ready() {
+        let bomb = Bomb;
+
+        // This `UnsafeCell` access is valid because `self.future.get()` is only called here, inside
+        // the critical section where we performed the transition from INACTIVE to ACTIVE.
+        let result = unsafe { (*self.future.get()).poll(cx) };
+
+        std::mem::forget(bomb);
+
+        if let Poll::Ready(()) = result {
+            // The future will have been dropped, so we just need to set the state.
+            self.state.fetch_or(DONE, Relaxed);
             // No one else will read `future` unless they see `INACTIVE`, which will never
             // happen again.
-
-            // SAFETY: We have exclusive access.
-            unsafe {
-                self.drop_future_unchecked();
-            }
-
             AttemptPollResult::IFinished
         } else if self.state.fetch_or(INACTIVE, Release) & READY == 0 {
             AttemptPollResult::Pending
@@ -126,8 +240,9 @@ impl AtomicFuture {
 
     /// Marks the future as ready and returns true if it needs to be added to a run queue, i.e.
     /// it isn't already ready, active or done.
+    #[must_use]
     pub fn mark_ready(&self) -> bool {
-        self.state.fetch_or(READY, Relaxed) == INACTIVE
+        self.state.fetch_or(READY, Relaxed) & (INACTIVE | READY | DONE) == INACTIVE
     }
 
     /// Drops the future without checking its current state.
@@ -139,8 +254,8 @@ impl AtomicFuture {
     /// the future.
     pub unsafe fn drop_future_unchecked(&self) {
         // Set the state first in case we panic when we drop.
-        self.state.store(DONE, Relaxed);
-        ManuallyDrop::drop(&mut *self.future.get());
+        assert!(self.state.fetch_or(DONE | RESULT_TAKEN, Relaxed) & DONE == 0);
+        (*self.future.get()).drop_future();
     }
 
     /// Drops the future if it is not currently being polled. Returns success if the future was
@@ -159,14 +274,51 @@ impl AtomicFuture {
             Err(())
         }
     }
+
+    /// Cancels the task.  Returns true if the task needs to be added to a run queue.
+    #[must_use]
+    pub fn cancel(&self) -> bool {
+        self.state.fetch_or(CANCELLED | READY, Relaxed) & (INACTIVE | READY | DONE) == INACTIVE
+    }
+
+    /// Marks the task as detached.
+    pub fn detach(&self) {
+        self.state.fetch_or(DETACHED, Relaxed);
+    }
+
+    /// Returns true if the task is detached or cancelled.
+    pub fn is_detached_or_cancelled(&self) -> bool {
+        self.state.load(Relaxed) & (DETACHED | CANCELLED) != 0
+    }
+
+    /// Takes the result.
+    ///
+    /// # Safety
+    ///
+    /// The caller must guarantee that `R` is the correct type.
+    pub unsafe fn take_result<R>(&self) -> Option<R> {
+        if self.state.load(Relaxed) & (DONE | RESULT_TAKEN) == DONE
+            && self.state.fetch_or(RESULT_TAKEN, Relaxed) & RESULT_TAKEN == 0
+        {
+            Some(((*self.future.get()).get_result() as *const R).read())
+        } else {
+            None
+        }
+    }
 }
 
-impl Drop for AtomicFuture {
+impl Drop for AtomicFuture<'_> {
     fn drop(&mut self) {
-        if *self.state.get_mut() & DONE == 0 {
-            // SAFETY: The state isn't DONE so we must drop.
+        let state = *self.state.get_mut();
+        if state & DONE == 0 {
+            // SAFETY: The state isn't DONE so we must drop the future.
             unsafe {
-                ManuallyDrop::drop(self.future.get_mut());
+                (*self.future.get()).drop_future();
+            }
+        } else if state & RESULT_TAKEN == 0 {
+            // SAFETY: The result hasn't been taken so we must drop the result.
+            unsafe {
+                (*self.future.get()).drop_result();
             }
         }
     }

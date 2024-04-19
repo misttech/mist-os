@@ -627,8 +627,9 @@ mod tests {
         cm_rust::{
             Availability, CapabilityTypeName, ChildDecl, ComponentDecl, DependencyType,
             DirectoryDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget, OfferDirectoryDecl,
-            OfferSource, OfferTarget, ProgramDecl, UseDirectoryDecl, UseSource, UseStorageDecl,
+            OfferSource, ProgramDecl, UseDirectoryDecl, UseSource, UseStorageDecl,
         },
+        cm_rust_testing::*,
         cm_types::Path,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
         fuchsia_merkle::{Hash, HASH_SIZE},
@@ -799,10 +800,10 @@ mod tests {
                 ],
                 offers: vec![
                     OfferDirectoryDecl{
-                        source: OfferSource::static_child("one_dir_provider".to_string()),
+                        source: offer_source_static_child("one_dir_provider"),
                         source_name: "exposed_by_provider".parse().unwrap(),
                         source_dictionary: Default::default(),
-                        target: OfferTarget::static_child("two_dir_user".to_string()),
+                        target: offer_target_static_child("two_dir_user"),
                         target_name: "routed_from_provider".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         rights: Some(fio::Operations::CONNECT),
@@ -813,7 +814,7 @@ mod tests {
                         source: OfferSource::Self_,
                         source_name: "root_dir".parse().unwrap(),
                         source_dictionary: Default::default(),
-                        target: OfferTarget::static_child("two_dir_user".to_string()),
+                        target: offer_target_static_child("two_dir_user"),
                         target_name: "routed_from_root".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         rights: Some(fio::Operations::CONNECT),

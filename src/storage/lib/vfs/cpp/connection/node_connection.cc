@@ -48,9 +48,7 @@ zx::result<> NodeConnection::Unbind() {
   return zx::ok();
 }
 void NodeConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
-  // The NODE_REFERENCE flag should be preserved when cloning a node connection.
-  Connection::NodeClone(request->flags | fio::OpenFlags::kNodeReference,
-                        std::move(request->object));
+  Connection::NodeClone(request->flags, VnodeProtocol::kNode, std::move(request->object));
 }
 
 void NodeConnection::Close(CloseCompleter::Sync& completer) { completer.Reply(Unbind()); }

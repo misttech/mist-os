@@ -26,6 +26,18 @@ type BatteryUnit = strict enum {
     MA = 1;
 };
 
+/// Type of data that are determined by manufacturer
+type BatterySpec = table {
+    /// Represent the battery's charging current spec in micro amps
+    1: max_charging_current_ua int32;
+
+    /// Represent the battery's charging voltage spec in micro volt
+    2: max_charnging_voltage_uv int32;
+
+    /// Battery Full Charge Design Capacity in micro amp hour
+    3: design_capacity_uah int32;
+};
+
 type BatteryInfo = struct {
     /// capacity unit. all voltage fields are in millivolts
     unit BatteryUnit;
@@ -52,6 +64,9 @@ type BatteryInfo = struct {
     present_rate int32;
     remaining_capacity uint32;
     present_voltage uint32;
+
+    /// specifications set by the manufacturer.
+    battery_spec BatterySpec;
 };
 
 closed protocol Source {

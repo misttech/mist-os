@@ -6,19 +6,16 @@
 #define SRC_DEVICES_LIB_GOLDFISH_PIPE_IO_PIPE_IO_H_
 
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/io-buffer.h>
-#include <lib/fit/function.h>
-#include <lib/fpromise/result.h>
+#include <lib/dma-buffer/buffer.h>
+#include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/result.h>
 
-#include <map>
 #include <vector>
 
-#include <ddktl/device.h>
 #include <fbl/mutex.h>
 
 namespace goldfish {
@@ -210,8 +207,8 @@ class PipeIo {
   bool valid_ = false;
   int32_t id_ = 0;
   zx::bti bti_ TA_GUARDED(lock_);
-  ddk::IoBuffer cmd_buffer_ TA_GUARDED(lock_);
-  ddk::IoBuffer io_buffer_ TA_GUARDED(lock_);
+  fzl::OwnedVmoMapper cmd_buffer_ TA_GUARDED(lock_);
+  std::unique_ptr<dma_buffer::ContiguousBuffer> io_buffer_ TA_GUARDED(lock_);
   size_t io_buffer_size_ = 0u;
   zx::event pipe_event_;
 

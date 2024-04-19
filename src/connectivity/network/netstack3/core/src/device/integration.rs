@@ -4,7 +4,6 @@
 
 //! Implementations of device layer traits for [`CoreCtx`].
 
-use alloc::boxed::Box;
 use core::{num::NonZeroU8, ops::Deref as _};
 
 use lock_order::{
@@ -52,9 +51,10 @@ use crate::{
                 NudUserConfig,
             },
             state::{
-                AssignedAddress as _, DualStackIpDeviceState, IpDeviceFlags, Ipv4AddressEntry,
-                Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState,
-                Ipv6DadState, Ipv6DeviceConfiguration, Ipv6NetworkLearnedParameters,
+                AddressIdIter, AssignedAddress as _, DualStackIpDeviceState, IpDeviceFlags,
+                Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddressEntry,
+                Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration,
+                Ipv6NetworkLearnedParameters,
             },
             IpDeviceAddressContext, IpDeviceAddressIdContext, IpDeviceConfigurationContext,
             IpDeviceIpExt, IpDeviceSendContext, IpDeviceStateContext, Ipv6DeviceAddr,
@@ -395,12 +395,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         })
     }
 
+    type AddressIdsIter<'a> = AddressIdIter<'a, BC::Instant, Ipv4>;
     fn with_address_ids<
         O,
-        F: FnOnce(
-            Box<dyn Iterator<Item = Self::AddressId> + '_>,
-            &mut Self::IpDeviceAddressCtx<'_>,
-        ) -> O,
+        F: FnOnce(Self::AddressIdsIter<'_>, &mut Self::IpDeviceAddressCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -411,7 +409,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
                 .read_lock_with_and::<crate::lock_ordering::IpDeviceAddresses<Ipv4>, _>(|c| {
                     c.right()
                 });
-            cb(Box::new(state.iter().map(PrimaryRc::clone_strong)), &mut locked.cast_core_ctx())
+            cb(state.strong_iter(), &mut locked.cast_core_ctx())
         })
     }
 
@@ -686,12 +684,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         })
     }
 
+    type AddressIdsIter<'a> = AddressIdIter<'a, BC::Instant, Ipv6>;
     fn with_address_ids<
         O,
-        F: FnOnce(
-            Box<dyn Iterator<Item = Self::AddressId> + '_>,
-            &mut Self::IpDeviceAddressCtx<'_>,
-        ) -> O,
+        F: FnOnce(Self::AddressIdsIter<'_>, &mut Self::IpDeviceAddressCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -702,7 +698,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
                 .read_lock_with_and::<crate::lock_ordering::IpDeviceAddresses<Ipv6>, _>(
                 |c| c.right(),
             );
-            cb(Box::new(state.iter().map(PrimaryRc::clone_strong)), &mut core_ctx.cast_core_ctx())
+            cb(state.strong_iter(), &mut core_ctx.cast_core_ctx())
         })
     }
 

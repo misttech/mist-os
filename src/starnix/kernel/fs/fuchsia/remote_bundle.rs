@@ -187,7 +187,7 @@ impl FsNodeOps for File {
         Ok(Box::new(VmoFile { vmo, size }))
     }
 
-    fn refresh_info<'a>(
+    fn fetch_and_refresh_info<'a>(
         &self,
         _node: &FsNode,
         _current_task: &CurrentTask,
@@ -358,6 +358,7 @@ impl FileOps for DirectoryObject {
 
     fn readdir(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -632,7 +633,7 @@ mod test {
         }
 
         let mut sink = Sink { offset: 0, entries: HashMap::new() };
-        opened_dir.readdir(&current_task, &mut sink).expect("readdir failed");
+        opened_dir.readdir(&mut locked, &current_task, &mut sink).expect("readdir failed");
 
         assert_eq!(
             sink.entries,

@@ -63,6 +63,7 @@
 #include <linux/random.h>
 #include <linux/reboot.h>
 #include <linux/resource.h>
+#include <linux/rtnetlink.h>
 #include <linux/sched.h>
 #include <linux/sched/types.h>
 #include <linux/seccomp.h>

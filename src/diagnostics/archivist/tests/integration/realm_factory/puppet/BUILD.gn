@@ -18,6 +18,7 @@ rustc_binary("bin") {
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/inspect/rust/testing:inspect_testing",
+    "//src/lib/diagnostics/log/encoding/rust",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fidl_table_validation",

@@ -13,7 +13,6 @@
 #include <zircon/errors.h>
 
 #include <string>
-#include <unordered_map>
 
 #include <gtest/gtest.h>
 
@@ -384,25 +383,15 @@ void FakeComposite::CreateRingBuffer(CreateRingBufferRequest& request,
 
   auto match_turn_on_delay = turn_on_delay_overrides_.find(element_id);
   if (match_turn_on_delay != turn_on_delay_overrides_.end()) {
-    FX_LOGS(INFO) << "Setting turn_on_delay to "
-                  << (match_turn_on_delay->second.has_value()
-                          ? (std::to_string(match_turn_on_delay->second->get()) + " ns")
-                          : "nullopt");
     match_turn_on_delay->second ? ring_buffer_impl->set_turn_on_delay(*match_turn_on_delay->second)
                                 : ring_buffer_impl->clear_turn_on_delay();
   }
   auto match_internal_delay = internal_delay_overrides_.find(element_id);
   if (match_internal_delay != internal_delay_overrides_.end()) {
-    FX_LOGS(INFO) << "Setting internal_delay to "
-                  << std::to_string(match_internal_delay->second.get()) + " ns";
     ring_buffer_impl->set_internal_delay(match_internal_delay->second);
   }
   auto match_external_delay = external_delay_overrides_.find(element_id);
   if (match_external_delay != external_delay_overrides_.end()) {
-    FX_LOGS(INFO) << "Setting external_delay to "
-                  << (match_external_delay->second.has_value()
-                          ? (std::to_string(match_external_delay->second->get()) + " ns")
-                          : "nullopt");
     match_external_delay->second
         ? ring_buffer_impl->set_external_delay(*match_external_delay->second)
         : ring_buffer_impl->clear_external_delay();

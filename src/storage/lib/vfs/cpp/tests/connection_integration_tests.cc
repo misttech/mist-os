@@ -12,7 +12,6 @@
 #include <stdio.h>
 #include <zircon/errors.h>
 
-#include <atomic>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -77,11 +76,12 @@ zx::result<fio::wire::NodeInfoDeprecated> GetOnOpenResponse(
   // can lead to races with test teardown where binding the channel happens after the dispatcher has
   // been shutdown, which results in a panic in the FIDL runtime.
   {
-    const fidl::WireResult result = fidl::WireCall(channel)->Sync();
-    EXPECT_OK(result.status());
-    const fit::result response = result.value();
-    EXPECT_TRUE(response.is_error());
-    EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED, response.error_value());
+    const fidl::WireResult result = fidl::WireCall(channel)->GetFlags();
+    zx_status_t status = result.ok() ? zx_status_t{result.value().s} : result.status();
+    if (status != ZX_OK) {
+      ADD_FAILURE("fuchisa.io/Node.GetFlags failed unexpectedly: %s", zx_status_get_string(status));
+      return zx::error(status);
+    }
   }
   return zx::ok(std::move(response.info.value()));
 }
@@ -278,27 +278,68 @@ TEST_F(ConnectionTest, NegotiateProtocol) {
   ASSERT_OK(ConnectClient(std::move(root.server)));
 
   // Connect to polymorphic node as a directory, by passing |kOpenFlagDirectory|.
-  zx::result dc = fidl::CreateEndpoints<fio::Node>();
-  ASSERT_OK(dc.status_value());
-  ASSERT_OK(fidl::WireCall(root.client)
-                ->Open(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kDescribe |
-                           fio::wire::OpenFlags::kDirectory,
-                       {}, fidl::StringView("file_or_dir"), std::move(dc->server))
-                .status());
-  zx::result<fio::wire::NodeInfoDeprecated> dir_info = GetOnOpenResponse(dc->client);
-  ASSERT_OK(dir_info);
-  ASSERT_TRUE(dir_info->is_directory());
-
-  // Connect to polymorphic node as a file, by passing |kOpenFlagNotDirectory|.
-  auto fc = fidl::Endpoints<fio::Node>::Create();
-  ASSERT_OK(fidl::WireCall(root.client)
-                ->Open(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kDescribe |
-                           fio::wire::OpenFlags::kNotDirectory,
-                       {}, fidl::StringView("file_or_dir"), std::move(fc.server))
-                .status());
-  zx::result<fio::wire::NodeInfoDeprecated> file_info = GetOnOpenResponse(fc.client);
-  ASSERT_OK(file_info);
-  ASSERT_TRUE(file_info->is_file());
+  {
+    auto [dir_client, dir_server] = fidl::Endpoints<fio::Node>::Create();
+    ASSERT_OK(fidl::WireCall(root.client)
+                  ->Open(fio::OpenFlags::kRightReadable | fio::OpenFlags::kDescribe |
+                             fio::OpenFlags::kDirectory,
+                         {}, fidl::StringView("file_or_dir"), std::move(dir_server))
+                  .status());
+    zx::result<fio::wire::NodeInfoDeprecated> dir_info = GetOnOpenResponse(dir_client);
+    ASSERT_OK(dir_info);
+    ASSERT_TRUE(dir_info->is_directory());
+    // Check that if we clone the connection, we still get the directory protocol.
+    auto [clone_client, clone_server] = fidl::Endpoints<fio::Node>::Create();
+    ASSERT_OK(fidl::WireCall(dir_client)
+                  ->Clone(fio::OpenFlags::kDescribe | fio::OpenFlags::kCloneSameRights,
+                          std::move(clone_server))
+                  .status());
+    zx::result<fio::wire::NodeInfoDeprecated> cloned_info = GetOnOpenResponse(clone_client);
+    ASSERT_OK(cloned_info);
+    ASSERT_TRUE(cloned_info->is_directory());
+  }
+  {
+    // Connect to polymorphic node as a file, by passing |kOpenFlagNotDirectory|.
+    auto [file_client, file_server] = fidl::Endpoints<fio::Node>::Create();
+    ASSERT_OK(fidl::WireCall(root.client)
+                  ->Open(fio::OpenFlags::kRightReadable | fio::OpenFlags::kDescribe |
+                             fio::OpenFlags::kNotDirectory,
+                         {}, fidl::StringView("file_or_dir"), std::move(file_server))
+                  .status());
+    zx::result<fio::wire::NodeInfoDeprecated> file_info = GetOnOpenResponse(file_client);
+    ASSERT_OK(file_info);
+    ASSERT_TRUE(file_info->is_file());
+    // Check that if we clone the connection, we still get the file protocol.
+    auto [clone_client, clone_server] = fidl::Endpoints<fio::Node>::Create();
+    ASSERT_OK(fidl::WireCall(file_client)
+                  ->Clone(fio::OpenFlags::kDescribe | fio::OpenFlags::kCloneSameRights,
+                          std::move(clone_server))
+                  .status());
+    zx::result<fio::wire::NodeInfoDeprecated> cloned_info = GetOnOpenResponse(clone_client);
+    ASSERT_OK(cloned_info);
+    ASSERT_TRUE(cloned_info->is_file());
+  }
+  {
+    // Connect to polymorphic node as a node reference, by passing |kNodeReference|.
+    auto [node_client, node_server] = fidl::Endpoints<fio::Node>::Create();
+    ASSERT_OK(fidl::WireCall(root.client)
+                  ->Open(fio::OpenFlags::kNodeReference | fio::OpenFlags::kDescribe, {},
+                         fidl::StringView("file_or_dir"), std::move(node_server))
+                  .status());
+    zx::result<fio::wire::NodeInfoDeprecated> node_info = GetOnOpenResponse(node_client);
+    ASSERT_OK(node_info);
+    // In io1, node reference connections map to the service representation in the OnOpen event.
+    ASSERT_TRUE(node_info->is_service());
+    // Check that if we clone the connection, we still get the node protocol.
+    auto [clone_client, clone_server] = fidl::Endpoints<fio::Node>::Create();
+    ASSERT_OK(fidl::WireCall(node_client)
+                  ->Clone(fio::OpenFlags::kDescribe | fio::OpenFlags::kCloneSameRights,
+                          std::move(clone_server))
+                  .status());
+    zx::result<fio::wire::NodeInfoDeprecated> cloned_info = GetOnOpenResponse(clone_client);
+    ASSERT_OK(cloned_info);
+    ASSERT_TRUE(cloned_info->is_service());
+  }
 }
 
 TEST_F(ConnectionTest, PrevalidateFlagsOpenFailure) {
@@ -306,11 +347,10 @@ TEST_F(ConnectionTest, PrevalidateFlagsOpenFailure) {
   auto root = fidl::Endpoints<fio::Directory>::Create();
   ASSERT_OK(ConnectClient(std::move(root.server)));
 
-  // Flag combination which should return INVALID_ARGS (see PrevalidateFlags in connection.cc).
-  constexpr fio::wire::OpenFlags kInvalidFlagCombo =
-      fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kDescribe |
-      fio::wire::OpenFlags::kDirectory | fio::wire::OpenFlags::kNodeReference |
-      fio::wire::OpenFlags::kAppend;
+  // The only invalid flag combination for fuchsia.io/Node.Clone is specifying CLONE_SAME_RIGHTS
+  // with any other rights.
+  constexpr fio::OpenFlags kInvalidFlagCombo =
+      fio::OpenFlags::kCloneSameRights | fio::OpenFlags::kRightReadable | fio::OpenFlags::kDescribe;
   zx::result dc = fidl::CreateEndpoints<fio::Node>();
   ASSERT_OK(dc.status_value());
   // Ensure that invalid flag combination returns INVALID_ARGS.

@@ -1065,7 +1065,6 @@ pub(crate) enum Service {
     DebugInterfaces(fidl_fuchsia_net_debug::InterfacesRequestStream),
     FilterControl(fidl_fuchsia_net_filter::ControlRequestStream),
     FilterState(fidl_fuchsia_net_filter::StateRequestStream),
-    FilterDeprecated(fidl_fuchsia_net_filter_deprecated::FilterRequestStream),
     Interfaces(fidl_fuchsia_net_interfaces::StateRequestStream),
     InterfacesAdmin(fidl_fuchsia_net_interfaces_admin::InstallerRequestStream),
     NeighborController(fidl_fuchsia_net_neighbor::ControllerRequestStream),
@@ -1452,9 +1451,6 @@ impl NetstackSeed {
                                     )
                                 })
                                 .await
-                        }
-                        Service::FilterDeprecated(filter) => {
-                            filter.serve_with(|rs| filter::serve_deprecated(rs)).await
                         }
                         Service::Neighbor(neighbor) => {
                             neighbor

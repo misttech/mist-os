@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 mod assert;
-mod constants;
 mod inspect;
 mod logs;
 mod puppet;

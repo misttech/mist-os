@@ -201,10 +201,10 @@ mod tests {
     use fidl_fuchsia_testing_sl4f::FacadeProviderMarker;
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
-    use pin_utils::pin_mut;
     use serde_json::json;
     use std::cell::RefCell;
     use std::collections::HashMap;
+    use std::pin::pin;
     use std::task::Poll;
 
     /// TestFacade provides a trivial Facade implementation which supports commands to interact
@@ -343,11 +343,10 @@ mod tests {
             drop(proxy);
             Ok::<(), Error>(())
         };
-        let combined_fut = async {
+        let mut combined_fut = pin!(async {
             let (_, res) = futures::join!(server_fut, client_fut);
             res.unwrap();
-        };
-        pin_mut!(combined_fut);
+        });
 
         assert_eq!(Poll::Ready(()), executor.run_until_stalled(&mut combined_fut));
 

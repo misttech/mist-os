@@ -246,7 +246,7 @@ macro_rules! attributes {
             fio::NodeAttributes2 {
                 mutable_attributes: fio::MutableNodeAttributes {
                     $($mut_a: if $requested.contains(attribute_query!($mut_a)) {
-                        Some($mut_v)
+                        Option::from($mut_v)
                     } else {
                         None
                     }),*,

@@ -36,7 +36,6 @@ group("all") {
     "//src/fonts",
     "//src/power:battery",
     "//src/zircon/bin/hwstress",
-    "//third_party/sbase:sbase-pkgs",
   ]
 }
 
@@ -96,7 +95,6 @@ group("cmdutils") {
     "//src/zircon/bin/hwstress",
     "//src/zircon/bin/time",
     "//src/zircon/bin/uname",
-    "//third_party/sbase:sbase-pkgs",
   ]
 }
 

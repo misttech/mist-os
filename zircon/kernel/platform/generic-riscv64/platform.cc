@@ -28,7 +28,6 @@
 #include <arch/mp.h>
 #include <arch/riscv64.h>
 #include <arch/riscv64/sbi.h>
-#include <dev/display.h>
 #include <dev/hw_rng.h>
 #include <dev/interrupt.h>
 #include <dev/power.h>
@@ -594,9 +593,6 @@ int legacy_platform_pgetc(char* c) {
   return 0;
 }
 
-/* no built in framebuffer */
-zx_status_t display_get_info(struct display_info* info) { return ZX_ERR_NOT_FOUND; }
-
 void platform_specific_halt(platform_halt_action suggested_action, zircon_crash_reason_t reason,
                             bool halt_on_panic) {
   TRACEF("suggested_action %u, reason %u, halt_on_panic %d\n", suggested_action,
@@ -650,8 +646,6 @@ void platform_mexec(mexec_asm_func mexec_assembly, memmov_ops_t* ops, uintptr_t 
                     size_t new_bootimage_len, uintptr_t entry64_addr) {
   PANIC_UNIMPLEMENTED;
 }
-
-bool platform_early_console_enabled() { return false; }
 
 // Initialize Resource system after the heap is initialized.
 static void riscv64_resource_dispatcher_init_hook(unsigned int rl) {

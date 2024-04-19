@@ -13,7 +13,7 @@ use {
     fidl::endpoints::{ClientEnd, RequestStream, ServerEnd},
     fidl_fuchsia_io as fio,
     fuchsia_async::Task,
-    fuchsia_merkle::{Hash, MerkleTree},
+    fuchsia_merkle::Hash,
     fuchsia_pkg_testing::{Package, RepositoryBuilder, SystemImageBuilder},
     fuchsia_zircon::Status,
     futures::{future::BoxFuture, prelude::*},
@@ -218,10 +218,8 @@ async fn make_blobfs_with_minimal_system_image() -> (BlobfsRamdisk, Hash) {
 async fn make_pkg_for_mock_blobfs_tests(package_name: &str) -> (Package, String, String) {
     let pkg = make_pkg_with_extra_blobs(package_name, 1).await;
     let pkg_merkle = pkg.hash().to_string();
-    let blob_merkle = MerkleTree::from_reader(extra_blob_contents(package_name, 0).as_slice())
-        .expect("merkle slice")
-        .root()
-        .to_string();
+    let blob_merkle =
+        fuchsia_merkle::from_slice(&extra_blob_contents(package_name, 0)).root().to_string();
     (pkg, pkg_merkle, blob_merkle)
 }
 

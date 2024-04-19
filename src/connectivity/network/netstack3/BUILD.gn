@@ -12,7 +12,6 @@ common_deps = [
   "//sdk/fidl/fuchsia.net.debug:fuchsia.net.debug_rust",
   "//sdk/fidl/fuchsia.net.dhcp:fuchsia.net.dhcp_rust",
   "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
-  "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated_rust",
   "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
   "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
   "//sdk/fidl/fuchsia.net.name:fuchsia.net.name_rust",
@@ -145,13 +144,16 @@ config("disable-rbe") {
 config("netstack3_configs") {
   if (!is_debug) {
     configs = [
-      # Allow cross-crate optimization since netstack3 is split between multiple
-      # crates.
-      "//build/config/lto:thinlto",
-
       # Always optimize speed, even if it increases size.
       "//build/config:optimize_speed",
     ]
+
+    # Add thinlto config if lto variants are not used.
+    if (!is_lto_variant) {
+      # Allow cross-crate optimization since netstack3 is split between multiple
+      # crates.
+      configs += [ "//build/config/lto:thinlto" ]
+    }
   }
 }
 

@@ -7,10 +7,12 @@
 import json
 import hashlib
 import dataclasses
-from pathlib import Path
 from file_access import FileAccess
 from gn_label import GnLabel
-from typing import Callable, Dict, List, Any, Tuple
+from typing import Callable, Dict, List, Any, Tuple, TypeAlias
+import os
+
+AnyDict: TypeAlias = Dict[Any, Any]
 
 
 @dataclasses.dataclass(frozen=False)
@@ -36,14 +38,15 @@ class SpdxWriter:
     extracted_licenses: List[Dict[str, Any]] = dataclasses.field(
         default_factory=list
     )
-    license_json_by_ref: Dict[str, Dict] = dataclasses.field(
+    license_json_by_ref: Dict[str, AnyDict] = dataclasses.field(
         default_factory=dict
     )
-    package_json_by_ids: Dict[str, Dict] = dataclasses.field(
+    package_json_by_ids: Dict[str, AnyDict] = dataclasses.field(
         default_factory=dict
     )
 
-    def create(root_package_name: str, file_access: FileAccess):
+    @staticmethod
+    def create(root_package_name: str, file_access: FileAccess) -> "SpdxWriter":
         writer = SpdxWriter(
             file_access=file_access,
             document_id="SPDXRef-DOCUMENT",
@@ -53,7 +56,7 @@ class SpdxWriter:
         writer._init_json()
         return writer
 
-    def _init_json(self):
+    def _init_json(self) -> None:
         self.json_document.update(
             {
                 "spdxVersion": "SPDX-2.3",
@@ -61,7 +64,7 @@ class SpdxWriter:
                 "name": self.root_package_name,
                 "documentNamespace": "",
                 "creationInfo": {
-                    "creators": [f"Tool: {Path(__file__).name}"],
+                    "creators": [f"Tool: {os.path.basename(__file__)}"],
                 },
                 "dataLicense": "CC0-1.0",
                 "documentDescribes": self.document_describes,
@@ -84,7 +87,7 @@ class SpdxWriter:
         public_package_name: str,
         license_labels: Tuple[GnLabel],
         collection_hint: str,
-    ):
+    ) -> None:
         package_id = self._spdx_package_id(public_package_name, license_labels)
 
         if package_id in self.package_json_by_ids:
@@ -136,7 +139,7 @@ class SpdxWriter:
             }
         )
 
-    def _sort_elements(self):
+    def _sort_elements(self) -> None:
         """Sorts all output elements alphabetically.
 
         This ensures consistent and developer-friendly output independent on input ordering.
@@ -150,7 +153,7 @@ class SpdxWriter:
             key=lambda x: x["spdxElementId"] + x["relatedSpdxElement"]
         )
 
-    def save(self, file_path: Path):
+    def save(self, file_path: str) -> None:
         self._sort_elements()
         with open(file_path, "w") as f:
             json.dump(self.json_document, f, indent=4)
@@ -160,20 +163,20 @@ class SpdxWriter:
         return json.dumps(self.json_document, indent=4)
 
     def _spdx_package_id(
-        self, public_package_name, license_labels: Tuple[GnLabel]
+        self, public_package_name: str, license_labels: Tuple[GnLabel]
     ) -> str:
         md5 = hashlib.md5()
         md5.update(public_package_name.strip().encode("utf-8"))
         for ll in license_labels:
-            md5.update(str(ll.path).encode("utf-8"))
+            md5.update(str(ll.path_str).encode("utf-8"))
         digest = md5.hexdigest()
         return f"SPDXRef-Package-{digest}"
 
     def _spdx_license_ref(
-        self, public_package_name, license_label: GnLabel
+        self, public_package_name: str, license_label: GnLabel
     ) -> str:
         md5 = hashlib.md5()
         md5.update(public_package_name.strip().encode("utf-8"))
-        md5.update(str(license_label.path).encode("utf-8"))
+        md5.update(str(license_label.path_str).encode("utf-8"))
         digest = md5.hexdigest()
         return f"LicenseRef-{digest}"

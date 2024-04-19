@@ -11,14 +11,6 @@ declare_args() {
   # Can be true for any API level, including the default level.
   sdk_inside_sub_build = false
 
-  # Whether currently building a sub-build for a specific supported API level
-  # rather than a build or sub-build at the default API level.
-  # Note that this can be false in sub-builds - specifically, when building the
-  # default API level for target CPUs other than the host.
-  # `sdk_inside_sub_build` must be true and `override_target_api_level` must be
-  # set to a valid level.
-  sdk_inside_supported_api_sub_build = false
-
   # An upper bound on the maximum number of subbuilds that may be running at the
   # same time. A larger number means these good things:
   # - Better parallelization of the inherently single-threaded parts of GN and

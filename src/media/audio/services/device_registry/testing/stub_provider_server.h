@@ -11,7 +11,6 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <memory>
-#include <optional>
 #include <string_view>
 
 #include "src/media/audio/services/common/base_fidl_server.h"

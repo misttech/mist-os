@@ -391,10 +391,11 @@ static void scanner_init_func(uint level) {
   pmm_page_queues()->SetActiveRatioMultiplier(gBootOptions->page_scanner_active_ratio_multiplier);
   pmm_page_queues()->StartThreads(ZX_SEC(gBootOptions->page_scanner_min_aging_interval),
                                   ZX_SEC(gBootOptions->page_scanner_max_aging_interval));
-  // Set the access scan to 1 second over the min page scanning interval. This both ensures that the
-  // access scan period is never 0, and always gives the page scanner a chance to trigger harvesting
-  // first if it is rapidly aging.
-  accessed_scan_period = ZX_SEC(gBootOptions->page_scanner_min_aging_interval + 1u);
+  // Set the access scan to at least 1 second over the min page scanning interval. This both ensures
+  // that the access scan period is never 0 and that redundant scanning before the page queues can
+  // age does not occur.
+  accessed_scan_period = ZX_SEC(ktl::max(gBootOptions->page_scanner_min_aging_interval + 1u,
+                                         gBootOptions->page_scanner_accessed_scan_interval));
 
   if (fbl::RefPtr<VmCompression> compression = VmCompression::CreateDefault()) {
     zx_status_t status = pmm_set_page_compression(ktl::move(compression));

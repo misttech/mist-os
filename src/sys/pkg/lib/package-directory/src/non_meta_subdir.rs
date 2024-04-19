@@ -132,17 +132,9 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for No
             return;
         }
 
-        let directory_path = file_path + "/";
-        for k in self.root_dir.non_meta_files.keys() {
-            if k.starts_with(&directory_path) {
-                let () = NonMetaSubdir::new(self.root_dir.clone(), directory_path).open(
-                    scope,
-                    flags,
-                    VfsPath::dot(),
-                    server_end,
-                );
-                return;
-            }
+        if let Some(subdir) = self.root_dir.get_non_meta_subdir(file_path + "/") {
+            let () = subdir.open(scope, flags, VfsPath::dot(), server_end);
+            return;
         }
 
         let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
@@ -186,16 +178,8 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for No
             return self.root_dir.non_meta_storage.open2(blob, protocols, scope, object_request);
         }
 
-        let directory_path = file_path + "/";
-        for k in self.root_dir.non_meta_files.keys() {
-            if k.starts_with(&directory_path) {
-                return NonMetaSubdir::new(self.root_dir.clone(), directory_path).open2(
-                    scope,
-                    VfsPath::dot(),
-                    protocols,
-                    object_request,
-                );
-            }
+        if let Some(subdir) = self.root_dir.get_non_meta_subdir(file_path + "/") {
+            return subdir.open2(scope, VfsPath::dot(), protocols, object_request);
         }
 
         Err(zx::Status::NOT_FOUND)

@@ -98,6 +98,100 @@ AtomMeta = (
 )
 
 
+@dataclasses.dataclass
+class PartialAtom:
+    """Metadata and files associated with a single Atom from a single subbuild.
+
+    Attributes:
+        meta (AtomMeta): JSON object from the atom's `meta.json` file.
+        meta_src (pathlib.Path): The path from which `meta` was read.
+        dest_to_src (dict[pathlib.Path, pathlib.Path]): All non-metadata files
+            associated with this atom belong in this dictionary. The key is the
+            file path relative to the final IDK directory. The value is either
+            absolute or relative to the current working directory.
+    """
+
+    meta: AtomMeta
+    meta_src: pathlib.Path
+    dest_to_src: dict[pathlib.Path, pathlib.Path]
+
+
+@dataclasses.dataclass
+class PartialIDK:
+    """A model of the parts of an IDK from a single subbuild.
+
+    Attributes:
+        manifest_src (pathlib.Path): Source path for the overall build manifest.
+            Either absolute or relative to the current working directory.
+        atoms (dict[pathlib.Path, PartialAtom]): Atoms to include in the IDK,
+            indexed by the path to their metadata file, relative to the final
+            IDK directory (e.g., `bind/fuchsia.ethernet/meta.json`).
+    """
+
+    manifest_src: pathlib.Path
+    atoms: dict[pathlib.Path, PartialAtom]
+
+    @staticmethod
+    def load(
+        build_dir: pathlib.Path, relative_manifest_path: pathlib.Path
+    ) -> PartialIDK:
+        """Load relevant information about a piece of the IDK from a subbuild
+        dir."""
+        result = PartialIDK(
+            manifest_src=(build_dir / relative_manifest_path), atoms={}
+        )
+        with (build_dir / relative_manifest_path).open() as f:
+            build_manifest: BuildManifestJson = json.load(f)
+
+        for atom in build_manifest["atoms"]:
+            # sdk_noop_atoms have no metadata specified. Skip them.
+            if not atom["meta"]:
+                continue
+
+            meta_dest = pathlib.Path(atom["meta"])
+            meta_src = None
+            dest_to_src = {}
+            for file in atom["files"]:
+                src_path = build_dir / file["source"]
+                dest_path = pathlib.Path(file["destination"])
+
+                # Determine if this file is the metadata file for this atom.
+                if dest_path == meta_dest:
+                    meta_src = src_path
+                else:
+                    assert dest_path not in dest_to_src, (
+                        "File specified multiple times in atom: %s" % dest_path
+                    )
+                    dest_to_src[dest_path] = src_path
+
+            assert meta_src, (
+                "Atom does not include its metadata file in 'files': %s" % atom
+            )
+
+            with meta_src.open() as f:
+                assert meta_dest not in result.atoms, (
+                    "Atom metadata file specified multiple times: %s"
+                    % meta_dest
+                )
+                result.atoms[meta_dest] = PartialAtom(
+                    meta=json.load(f),
+                    meta_src=meta_src,
+                    dest_to_src=dest_to_src,
+                )
+
+        return result
+
+    def input_files(self) -> set[pathlib.Path]:
+        """Return the set of input files in this PartialIDK for generating a
+        depfile."""
+        result = set()
+        result.add(self.manifest_src)
+        for atom in self.atoms.values():
+            result.add(atom.meta_src)
+            result |= set(atom.dest_to_src.values())
+        return result
+
+
 class AtomMergeError(Exception):
     def __init__(self, atom_path: pathlib.Path):
         super(AtomMergeError, self).__init__(
@@ -106,7 +200,7 @@ class AtomMergeError(Exception):
 
 
 @dataclasses.dataclass
-class PartialIDK:
+class MergedIDK:
     """A model of a (potentially incomplete) IDK.
 
     Attributes:
@@ -120,55 +214,29 @@ class PartialIDK:
             relative to the current working directory.
     """
 
-    atoms: dict[pathlib.Path, AtomMeta]
-    dest_to_src: dict[pathlib.Path, pathlib.Path]
+    atoms: dict[pathlib.Path, AtomMeta] = dataclasses.field(
+        default_factory=dict
+    )
+    dest_to_src: dict[pathlib.Path, pathlib.Path] = dataclasses.field(
+        default_factory=dict
+    )
 
-    @staticmethod
-    def load(
-        build_dir: pathlib.Path, relative_manifest_path: pathlib.Path
-    ) -> PartialIDK:
-        """Load relevant information about a piece of the IDK from a subbuild
-        dir."""
-        with (build_dir / relative_manifest_path).open() as f:
-            build_manifest: BuildManifestJson = json.load(f)
-
-        result = PartialIDK(atoms={}, dest_to_src={})
-        for atom in build_manifest["atoms"]:
-            for file in atom["files"]:
-                src_path = build_dir / file["source"]
-                dest_path = pathlib.Path(file["destination"])
-
-                # Determine if this file is the metadata file for this atom.
-                if atom["meta"] == file["destination"]:
-                    with src_path.open() as f:
-                        assert dest_path not in result.atoms, (
-                            "Atom metadata file specified multiple times: %s"
-                            % dest_path
-                        )
-                        result.atoms[dest_path] = json.load(f)
-                else:
-                    # Some files may be listed under multiple atoms, for
-                    # example, package blobs. That's fine, but they must always
-                    # have the same source file.
-                    if prev_src := result.dest_to_src.get(dest_path):
-                        assert src_path.samefile(prev_src), (
-                            "IDK file '%s' listed with multiple sources:\n- %s\n- %s"
-                            % (dest_path, prev_src, src_path)
-                        )
-                    else:
-                        result.dest_to_src[dest_path] = src_path
-
-        return result
-
-    def merge_with(self, other: PartialIDK) -> PartialIDK:
-        """Merge the contents of this PartialIDK with another.
+    def merge_with(self, other: PartialIDK) -> MergedIDK:
+        """Merge the contents of this MergedIDK with a PartialIDK and return the
+        result.
 
         Put enough of them together, and you get a full IDK!
         """
-        return PartialIDK(
+        result = MergedIDK(
             atoms=_merge_atoms(self.atoms, other.atoms),
-            dest_to_src=_merge_other_files(self.dest_to_src, other.dest_to_src),
+            dest_to_src=self.dest_to_src,
         )
+
+        for atom in other.atoms.values():
+            result.dest_to_src = _merge_other_files(
+                result.dest_to_src, atom.dest_to_src
+            )
+        return result
 
     def sdk_manifest_json(
         self, host_arch: str, target_arch: list[str], release_version: str
@@ -204,7 +272,7 @@ class PartialIDK:
 
 
 def _merge_atoms(
-    a: dict[pathlib.Path, AtomMeta], b: dict[pathlib.Path, AtomMeta]
+    a: dict[pathlib.Path, AtomMeta], b: dict[pathlib.Path, PartialAtom]
 ) -> dict[pathlib.Path, AtomMeta]:
     """Merge two dictionaries full of atoms."""
     result = {}
@@ -219,25 +287,26 @@ def _merge_atoms(
                 # Treat version_history.json specially, since it doesn't have a
                 # 'type' field.
                 assert (
-                    atom_a == atom_b
+                    atom_a == atom_b.meta
                 ), "A and B had different 'version_history' values. Huh?"
                 result[atom_path] = atom_a
             else:
                 # Merge atoms found in both IDKs.
                 try:
-                    result[atom_path] = _merge_atom(atom_a, atom_b)
+                    result[atom_path] = _merge_atom_meta(atom_a, atom_b.meta)
                 except Exception as e:
                     raise AtomMergeError(atom_path) from e
         elif atom_a:
             result[atom_path] = atom_a
         else:
             assert atom_b, "unreachable. Atom '%s' had falsy value?" % atom_path
-            result[atom_path] = atom_b
+            result[atom_path] = atom_b.meta
     return result
 
 
 def _merge_other_files(
-    a: dict[pathlib.Path, pathlib.Path], b: dict[pathlib.Path, pathlib.Path]
+    a: dict[pathlib.Path, pathlib.Path],
+    b: dict[pathlib.Path, pathlib.Path],
 ) -> dict[pathlib.Path, pathlib.Path]:
     """Merge two dictionaries from (destination -> src). Shared keys are only
     allowed if the value files have the same contents."""
@@ -330,7 +399,7 @@ def _merge_disjoint_dicts(
         return a or b or {}
 
 
-def _merge_atom(a: AtomMeta, b: AtomMeta) -> AtomMeta:
+def _merge_atom_meta(a: AtomMeta, b: AtomMeta) -> AtomMeta:
     """Merge two atoms, according to type-specific rules."""
     if a["type"] in (
         "cc_source_library",

@@ -230,6 +230,7 @@ impl FsNodeOps for TmpfsDirectory {
 
     fn mkdir(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         _name: &FsStr,
@@ -264,6 +265,7 @@ impl FsNodeOps for TmpfsDirectory {
 
     fn create_symlink(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         _name: &FsStr,

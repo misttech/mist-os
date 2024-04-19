@@ -155,5 +155,6 @@ group("tests") {
   deps = [
     ":platform-bus-unittest-package",
     "test:platform-bus-test",
+    "test/power-integration-test:power-integration-tests-package",
   ]
 }

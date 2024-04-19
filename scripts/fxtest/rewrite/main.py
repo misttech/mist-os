@@ -149,11 +149,16 @@ async def async_main(
     """
     do_status_output_signal: asyncio.Event = asyncio.Event()
 
-    tasks.append(
-        asyncio.create_task(
-            console.console_printer(recorder, flags, do_status_output_signal)
+    do_output_to_stdout = flags.logpath == args.LOG_TO_STDOUT_OPTION
+
+    if not do_output_to_stdout:
+        tasks.append(
+            asyncio.create_task(
+                console.console_printer(
+                    recorder, flags, do_status_output_signal
+                )
+            )
         )
-    )
 
     # Initialize event recording.
     recorder.emit_init()
@@ -183,7 +188,7 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
         return 1
 
     # Initialize status printing at this point, if desired.
-    if flags.status:
+    if flags.status and not do_output_to_stdout:
         do_status_output_signal.set()
         termout.init()
 
@@ -200,11 +205,12 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
 
     # Configure file logging based on flags.
     if flags.log and exec_env.log_file:
-        tasks.append(
-            asyncio.create_task(
-                log.writer(recorder, gzip.open(exec_env.log_file, "wt"))
-            )
-        )
+        output_file: typing.TextIO
+        if exec_env.log_to_stdout():
+            output_file = sys.stdout
+        else:
+            output_file = gzip.open(exec_env.log_file, "wt")
+        tasks.append(asyncio.create_task(log.writer(recorder, output_file)))
         recorder.emit_instruction_message(
             f"Logging all output to: {exec_env.log_file}"
         )
@@ -215,13 +221,14 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
         # For convenience, display the log output path when the program exits.
         # Since the async loop may already be exited at that point, directly
         # print to the console.
-        atexit.register(
-            print,
-            statusinfo.dim(
-                f"Output was logged to: {os.path.relpath(exec_env.log_file, os.getcwd())}",
-                style=flags.style,
-            ),
-        )
+        if not exec_env.log_to_stdout():
+            atexit.register(
+                print,
+                statusinfo.dim(
+                    f"Output was logged to: {os.path.relpath(exec_env.log_file, os.getcwd())}",
+                    style=flags.style,
+                ),
+            )
 
     if flags.has_debugger():
         recorder.emit_warning_message(
@@ -307,7 +314,8 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
             "Use --no-updateifinbase to skip updating base packages."
         )
         build_return_code = await run_build_with_suspended_output(
-            ["build/images/updates"]
+            ["build/images/updates"],
+            show_output=not exec_env.log_to_stdout(),
         )
         if build_return_code != 0:
             recorder.emit_end(
@@ -557,7 +565,9 @@ async def do_build(
     status_suffix = " Status output suspended." if termout.is_init() else ""
     recorder.emit_info_message(f"\nExecuting build.{status_suffix}")
 
-    return_code = await run_build_with_suspended_output(build_command_line)
+    return_code = await run_build_with_suspended_output(
+        build_command_line, show_output=not exec_env.log_to_stdout()
+    )
 
     error = None
     if return_code != 0:
@@ -705,6 +715,7 @@ async def has_device_connected(
 
 async def run_build_with_suspended_output(
     build_command_line: list[str],
+    show_output: bool = True,
 ) -> int:
     # Allow display to update.
     await asyncio.sleep(0.1)
@@ -713,8 +724,11 @@ async def run_build_with_suspended_output(
         # Clear the status output while we are doing the build.
         termout.write_lines([])
 
+    stdout = None if show_output else subprocess.DEVNULL
+    stderr = None if show_output else subprocess.DEVNULL
+
     return_code = subprocess.call(
-        ["fx", "build"] + build_command_line,
+        ["fx", "build"] + build_command_line, stdout=stdout, stderr=stderr
     )
     return return_code
 

@@ -27,6 +27,7 @@ common_deps = [
   "//src/devices/lib/driver",
   "//src/devices/lib/driver:driver_runtime",
   "//src/devices/lib/goldfish/pipe_io",
+  "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
   "//src/lib/ddk",
   "//src/lib/ddktl",
   "//zircon/system/ulib/async-loop:async-loop-cpp",

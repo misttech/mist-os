@@ -4,19 +4,13 @@
 
 #include "src/media/audio/services/device_registry/device_detector.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
-#include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/zx/channel.h>
 
 #include <memory>
-#include <vector>
-
-#include <fbl/unique_fd.h>
 
 #include "src/lib/fsl/io/device_watcher.h"
 #include "src/media/audio/services/device_registry/logging.h"
@@ -120,36 +114,13 @@ void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Dir
     }
     driver_client = DriverClient::WithCodec(std::move(client));
   } else if (device_type == fuchsia_audio_device::DeviceType::kComposite) {
-    // Composite devices such as aml-g12-tdm are DFv2: we can connect directly to them.
-    // TODO(https://fxbug.dev/304551042): Convert VirtualAudioComposite to DFv2; remove 'else'.
-    if constexpr (kDetectDFv2CompositeDevices) {
-      zx::result client_end = component::ConnectAt<fuchsia_hardware_audio::Composite>(dir, name);
-      if (client_end.is_error()) {
-        FX_PLOGS(ERROR, client_end.error_value())
-            << "DeviceDetector failed to connect to DFv2 Composite node at '" << name << "'";
-        return;
-      }
-      driver_client = DriverClient::WithComposite(std::move(client_end.value()));
+    zx::result client_end = component::ConnectAt<fuchsia_hardware_audio::Composite>(dir, name);
+    if (client_end.is_error()) {
+      FX_PLOGS(ERROR, client_end.error_value())
+          << "DeviceDetector failed to connect to DFv2 Composite node at '" << name << "'";
+      return;
     }
-    // The VirtualAudioComposite implementation is DFv1: connect via CompositeConnector.
-    else {
-      zx::result client_end =
-          component::ConnectAt<fuchsia_hardware_audio::CompositeConnector>(dir, name);
-      if (client_end.is_error()) {
-        FX_PLOGS(ERROR, client_end.error_value())
-            << "DeviceDetector failed to connect to device node at '" << name << "'";
-        return;
-      }
-      fidl::Client connector(std::move(client_end.value()), dispatcher_);
-      auto [client, server] = fidl::Endpoints<fuchsia_hardware_audio::Composite>::Create();
-      auto status = connector->Connect(std::move(server));
-      if (!status.is_ok()) {
-        FX_PLOGS(ERROR, status.error_value().status())
-            << "Connector/Connect failed for " << device_type;
-        return;
-      }
-      driver_client = DriverClient::WithComposite(std::move(client));
-    }
+    driver_client = DriverClient::WithComposite(std::move(client_end.value()));
   } else if (device_type == fuchsia_audio_device::DeviceType::kInput ||
              device_type == fuchsia_audio_device::DeviceType::kOutput) {
     zx::result client_end =

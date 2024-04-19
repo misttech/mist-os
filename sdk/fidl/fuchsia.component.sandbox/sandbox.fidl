@@ -13,6 +13,7 @@ const MAX_DATA_LENGTH uint32 = 8192;
 /// Maximum number of items returned by [DictionaryIterator].
 const MAX_DICTIONARY_ITEMS_CHUNK uint32 = 128;
 
+@available(added=HEAD)
 closed protocol HandleCapability {
     compose fuchsia.unknown.Cloneable;
     strict GetHandle() -> (resource struct {
@@ -22,6 +23,7 @@ closed protocol HandleCapability {
     };
 };
 
+@available(added=HEAD)
 type DataCapability = flexible union {
     1: bytes vector<byte>:MAX_DATA_LENGTH;
     2: string string:MAX_DATA_LENGTH;
@@ -29,6 +31,7 @@ type DataCapability = flexible union {
     4: uint64 uint64;
 };
 
+@available(added=HEAD)
 type Capability = flexible resource union {
     1: unit @generated_name("UnitCapability") struct {};
     2: handle client_end:HandleCapability;
@@ -41,19 +44,23 @@ type Capability = flexible resource union {
 
 /// The maximum length of a dictionary key. This should coincide with
 /// fuchsia.component.MAX_NAME_LENGTH.
+@available(added=HEAD)
 const MAX_NAME_LENGTH uint64 = fuchsia.io.MAX_NAME_LENGTH;
 
 /// The key of a [`DictionaryItem`]. The constraints for valid keys are documented at
 /// https://fuchsia.dev/reference/cml#names.
+@available(added=HEAD)
 alias DictionaryKey = string:MAX_NAME_LENGTH;
 
 /// A key-value pair in a [`Dictionary`].
+@available(added=HEAD)
 type DictionaryItem = resource struct {
     key DictionaryKey;
     value Capability;
 };
 
 /// Error returned from methods in [`Dictionary`].
+@available(added=HEAD)
 type DictionaryError = flexible enum {
     /// The Dictionary does not contain an item with the given key.
     NOT_FOUND = 1;
@@ -74,6 +81,7 @@ type DictionaryError = flexible enum {
 };
 
 @discoverable
+@available(added=20)
 open protocol Dictionary {
     /// Creates a new connection to the same underlying dictionary.
     ///
@@ -84,11 +92,13 @@ open protocol Dictionary {
     ///
     /// * error `DictionaryError.ALREADY_EXISTS` if the dictionary already contains an
     /// item with the same key.
+    @available(added=HEAD)
     flexible Insert(DictionaryItem) -> () error DictionaryError;
 
     /// Get a clone of a capability from this dictionary.
     ///
     /// * error `DictionaryError.NOT_FOUND` if the dictionary does not contain the key.
+    @available(added=HEAD)
     flexible Get(struct {
         key DictionaryKey;
     }) -> (resource struct {
@@ -98,6 +108,7 @@ open protocol Dictionary {
     /// Removes a key from the dictionary, returning the [`Capability`] value.
     ///
     /// * error `DictionaryError.NOT_FOUND` if the dictionary does not contain the key.
+    @available(added=HEAD)
     flexible Remove(struct {
         key DictionaryKey;
     }) -> (resource struct {
@@ -108,6 +119,7 @@ open protocol Dictionary {
     ///
     /// This operation creates shallow clones of values.
     // TODO(b/314361448): Remove once callers use Dictionary.Enumerate instead
+    @available(added=HEAD)
     flexible Read() -> (resource struct {
         items vector<DictionaryItem>:MAX;
     });
@@ -118,6 +130,7 @@ open protocol Dictionary {
     /// For example, if this dictionary contains nested dictionaries, the newly
     /// created dictionary will contain references to those same nested
     /// dictionaries because the entries are cloned rather than copied.
+    @available(added=HEAD)
     flexible Copy(resource struct {
         request server_end:Dictionary;
     });
@@ -125,6 +138,7 @@ open protocol Dictionary {
     /// Enumerates the entries in this dictionary.
     ///
     /// Creates a clone of each item during enumeration.
+    @available(added=HEAD)
     flexible Enumerate(resource struct {
         contents server_end:DictionaryIterator;
     });
@@ -133,11 +147,13 @@ open protocol Dictionary {
     ///
     /// If `contents` is not provided, all the items are discarded without
     /// enumerating them.
+    @available(added=HEAD)
     flexible Drain(resource struct {
         contents server_end:<DictionaryIterator, optional>;
     });
 };
 
+@available(added=HEAD)
 open protocol DictionaryIterator {
     flexible GetNext() -> (resource struct {
         items vector<DictionaryItem>:MAX_DICTIONARY_ITEMS_CHUNK;
@@ -147,6 +163,7 @@ open protocol DictionaryIterator {
 /// A sender allows a client to send a channel to the framework
 /// so that it can be connected.
 @discoverable
+@available(added=HEAD)
 open protocol Sender {
     compose fuchsia.unknown.Cloneable;
 
@@ -157,18 +174,21 @@ open protocol Sender {
 /// A receiver is served by clients and allows them to receive channels
 /// from the framework.
 @discoverable
+@available(added=HEAD)
 open protocol Receiver {
     /// Sends a channel to this receiver.
     flexible Receive(ProtocolPayload);
 };
 
 /// Contains a protocol open request.
+@available(added=HEAD)
 type ProtocolPayload = resource struct {
     channel zx.Handle:CHANNEL;
 };
 
 /// Entrypoint for instantiation of sandbox types.
 @discoverable
+@available(added=HEAD)
 open protocol Factory {
     /// Creates a `Sender` from a client served `Receiver`.
     flexible CreateSender(resource struct {

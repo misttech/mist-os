@@ -133,14 +133,6 @@ config("default_debug_assertions") {
   }
 }
 
-config("lto_disabled") {
-  # Fully disable lto.
-  #
-  # This is the default when -Ccodegen_units=1 or when optimizations are off
-  # (-Copt-level=0)
-  rustflags = [ "-Clto=off" ]
-}
-
 # Enables linker plugin LTO.
 #
 # If an rlib is only ever going to get used later with a -Clto compilation then
@@ -155,11 +147,6 @@ config("linker_plugin_lto") {
     "-Clinker-plugin-lto",
     "-Zsplit-lto-unit",
   ]
-}
-
-config("lto_thin") {
-  # Enable "thin" lto across all crates being linked
-  rustflags = [ "-Clto=thin" ]
 }
 
 # Best practices for Rust binaries that go into size-constrained bootfs.

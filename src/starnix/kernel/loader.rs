@@ -7,7 +7,7 @@ use crate::{
         vmo::round_up_to_system_page_size, DesiredAddress, MappingName, MappingOptions,
         MemoryAccessor, MemoryManager, ProtectionFlags, PAGE_SIZE, VMEX_RESOURCE,
     },
-    selinux::hooks::thread_group_hooks::SeLinuxResolvedElfState,
+    security,
     task::CurrentTask,
     vfs::{FileHandle, FileWriteGuardMode, FileWriteGuardRef},
 };
@@ -249,7 +249,7 @@ pub struct ResolvedElf {
     /// The environment to initialize for the new process.
     pub environ: Vec<CString>,
     /// The SELinux state for the new process. None if SELinux is disabled.
-    pub selinux_state: Option<SeLinuxResolvedElfState>,
+    pub security_state: Option<security::ResolvedElfState>,
     /// Exec/write lock.
     pub file_write_guard: FileWriteGuardRef,
 }
@@ -278,13 +278,13 @@ pub fn resolve_executable<L>(
     path: CString,
     argv: Vec<CString>,
     environ: Vec<CString>,
-    selinux_state: Option<SeLinuxResolvedElfState>,
+    security_state: Option<security::ResolvedElfState>,
 ) -> Result<ResolvedElf, Errno>
 where
     L: LockBefore<FileOpsCore>,
     L: LockBefore<DeviceOpen>,
 {
-    resolve_executable_impl(locked, current_task, file, path, argv, environ, 0, selinux_state)
+    resolve_executable_impl(locked, current_task, file, path, argv, environ, 0, security_state)
 }
 
 /// Resolves a file into a validated executable ELF, following script interpreters to a fixed
@@ -297,7 +297,7 @@ fn resolve_executable_impl<L>(
     argv: Vec<CString>,
     environ: Vec<CString>,
     recursion_depth: usize,
-    selinux_state: Option<SeLinuxResolvedElfState>,
+    security_state: Option<security::ResolvedElfState>,
 ) -> Result<ResolvedElf, Errno>
 where
     L: LockBefore<FileOpsCore>,
@@ -324,10 +324,10 @@ where
             argv,
             environ,
             recursion_depth,
-            selinux_state,
+            security_state,
         )
     } else {
-        resolve_elf(locked, current_task, file, vmo, argv, environ, selinux_state)
+        resolve_elf(locked, current_task, file, vmo, argv, environ, security_state)
     }
 }
 
@@ -340,7 +340,7 @@ fn resolve_script<L>(
     argv: Vec<CString>,
     environ: Vec<CString>,
     recursion_depth: usize,
-    selinux_state: Option<SeLinuxResolvedElfState>,
+    security_state: Option<security::ResolvedElfState>,
 ) -> Result<ResolvedElf, Errno>
 where
     L: LockBefore<FileOpsCore>,
@@ -374,7 +374,7 @@ where
         args,
         environ,
         recursion_depth + 1,
-        selinux_state,
+        security_state,
     )
 }
 
@@ -424,7 +424,7 @@ fn resolve_elf<L>(
     vmo: Arc<zx::Vmo>,
     argv: Vec<CString>,
     environ: Vec<CString>,
-    selinux_state: Option<SeLinuxResolvedElfState>,
+    security_state: Option<security::ResolvedElfState>,
 ) -> Result<ResolvedElf, Errno>
 where
     L: LockBefore<FileOpsCore>,
@@ -456,7 +456,7 @@ where
     };
     let file_write_guard =
         file.name.entry.node.create_write_guard(FileWriteGuardMode::Exec)?.into_ref();
-    Ok(ResolvedElf { file, vmo, interp, argv, environ, selinux_state, file_write_guard })
+    Ok(ResolvedElf { file, vmo, interp, argv, environ, security_state, file_write_guard })
 }
 
 /// Loads a resolved ELF into memory, along with an interpreter if one is defined, and initializes

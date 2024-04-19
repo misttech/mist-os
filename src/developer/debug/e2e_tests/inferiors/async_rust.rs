@@ -6,6 +6,7 @@ use {fuchsia_async as fasync, futures::FutureExt};
 
 #[fasync::run_singlethreaded]
 async fn main() {
+    let _task = fasync::Task::spawn(async {});
     let block = async {
         fasync::Task::spawn(baz(20)).detach();
         let task = fasync::Task::spawn(baz(21));

@@ -228,7 +228,7 @@ pub fn sys_eventfd(
 }
 
 pub fn sys_getdents(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_buffer: UserAddress,
@@ -237,7 +237,7 @@ pub fn sys_getdents(
     let file = current_task.files.get(fd)?;
     let mut offset = file.offset.lock();
     let mut sink = DirentSink32::new(current_task, &mut offset, user_buffer, user_capacity);
-    let result = file.readdir(current_task, &mut sink);
+    let result = file.readdir(locked, current_task, &mut sink);
     sink.map_result_with_actual(result)
 }
 

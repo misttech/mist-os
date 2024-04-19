@@ -39,6 +39,7 @@ async fn main() {
         serde_json::to_string_pretty(&results).unwrap(),
     )
     .unwrap();
+    fxfs_admin_proxy.shutdown().await.unwrap();
 }
 
 async fn wait_for_results(

@@ -13,6 +13,7 @@ use crate::{
         arp::ArpCounters, DeviceCounters, DeviceId, DeviceLayerState, EthernetDeviceCounters,
         PureIpDeviceCounters, WeakDeviceId,
     },
+    filter::FilterBindingsTypes,
     ip::{
         self,
         device::nud::NudCounters,
@@ -94,11 +95,11 @@ impl<BT: BindingsTypes> StackState<BT> {
 
     pub(crate) fn filter<I: packet_formats::ip::IpExt>(
         &self,
-    ) -> &RwLock<crate::filter::State<I, BT::DeviceClass>> {
+    ) -> &RwLock<crate::filter::State<I, BT>> {
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
-        struct Wrap<'a, I: packet_formats::ip::IpExt, DeviceClass>(
-            &'a RwLock<crate::filter::State<I, DeviceClass>>,
+        struct Wrap<'a, I: packet_formats::ip::IpExt, BT: FilterBindingsTypes>(
+            &'a RwLock<crate::filter::State<I, BT>>,
         );
         let Wrap(state) = I::map_ip(
             IpInvariant(self),

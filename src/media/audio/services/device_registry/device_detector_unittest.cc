@@ -5,18 +5,12 @@
 #include "src/media/audio/services/device_registry/device_detector.h"
 
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
-#include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/test_base.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/namespace.h>
-#include <lib/fidl/cpp/binding.h>
-#include <lib/fidl/cpp/channel.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
-#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 
 #include <memory>
@@ -85,18 +79,10 @@ class FakeAudioComposite : public fidl::testing::TestBase<Composite>,
   void GetProperties(GetPropertiesCompleter::Sync& completer) override { completer.Reply({}); }
 
   fbl::RefPtr<fs::Service> AsService() {
-    // TODO(https://fxbug.dev/304551042): Convert VirtualAudioComposite to DFv2; remove 'else'.
-    if constexpr (kDetectDFv2CompositeDevices) {
-      return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<Composite> c) {
-        binding_ = fidl::BindServer(dispatcher(), std::move(c), this);
-        return ZX_OK;
-      });
-    } else {
-      return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<CompositeConnector> c) {
-        connector_binding_ = fidl::BindServer(dispatcher(), std::move(c), this);
-        return ZX_OK;
-      });
-    }
+    return fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<Composite> c) {
+      binding_ = fidl::BindServer(dispatcher(), std::move(c), this);
+      return ZX_OK;
+    });
   }
 
   bool is_bound() const { return binding_.has_value(); }

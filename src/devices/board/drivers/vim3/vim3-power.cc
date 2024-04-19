@@ -53,13 +53,6 @@ static_assert((kMaxVoltageUv - kMinVoltageUv) % kVoltageStepUv == 0,
               "Voltage step must be a factor of (kMaxVoltageUv - kMinVoltageUv)\n");
 const uint32_t kNumSteps = (kMaxVoltageUv - kMinVoltageUv) / kVoltageStepUv + 1;
 
-enum VregIdx {
-  PWM_AO_D_VREG,
-  PWM_A_VREG,
-
-  VREG_COUNT,
-};
-
 const std::vector<fuchsia_driver_framework::BindRule> kVregPwmAoDRules = {
     fdf::MakeAcceptBindRule(bind_fuchsia_hardware_vreg::SERVICE,
                             bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
@@ -199,6 +192,69 @@ zx_status_t AddLittleCore(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pla
   return ZX_OK;
 }
 
+zx_status_t AddVreg(uint32_t pwm_id,
+                    fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
+  auto gpio_init_node = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                             bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)},
+      .properties = {fdf::MakeProperty(bind_fuchsia::INIT_STEP,
+                                       bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)},
+  }};
+
+  fidl::Arena<> fidl_arena;
+  vreg::PwmVregMetadata pwm_vreg_metadata = vreg::BuildMetadata(
+      fidl_arena, pwm_id, kA311dPwmPeriodNs, kMinVoltageUv, kVoltageStepUv, kNumSteps);
+
+  fit::result encoded_metadata = fidl::Persist(pwm_vreg_metadata);
+  if (!encoded_metadata.is_ok()) {
+    zxlogf(ERROR, "%s: Could not build metadata %s\n", __func__,
+           encoded_metadata.error_value().FormatDescription().c_str());
+    return encoded_metadata.error_value().status();
+  }
+
+  char name[20];
+  snprintf(name, sizeof(name), "vreg-%d", pwm_id);
+  fpbus::Node vreg_dev;
+  vreg_dev.name() = name;
+  vreg_dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
+  vreg_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  vreg_dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_PWM_VREG;
+  vreg_dev.instance_id() = pwm_id;
+  vreg_dev.metadata() = std::vector<fpbus::Metadata>{
+      {{
+          .type = DEVICE_METADATA_VREG,
+          .data = encoded_metadata.value(),
+      }},
+  };
+
+  auto vreg_pwm_node = fdf::ParentSpec{{
+      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                                             bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+                     fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, pwm_id)},
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                                bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+          },
+  }};
+
+  auto vreg_node_spec = fuchsia_driver_framework::CompositeNodeSpec{{
+      .name = name,
+      .parents = {{vreg_pwm_node, gpio_init_node}},
+  }};
+
+  fdf::Arena fdf_arena('VREG');
+  fdf::WireUnownedResult vreg_result = pbus.buffer(fdf_arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, vreg_dev), fidl::ToWire(fidl_arena, vreg_node_spec));
+  if (!vreg_result.ok() || vreg_result.value().is_error()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec for %sfailed, error = %s", name,
+           vreg_result.FormatDescription().c_str());
+    return vreg_result.ok() ? vreg_result->error_value() : vreg_result.status();
+  }
+
+  return ZX_OK;
+}
+
 }  // namespace
 
 zx_status_t Vim3::PowerInit() {
@@ -214,86 +270,23 @@ zx_status_t Vim3::PowerInit() {
   // function 3 which puts in PWM_D mode. A73 cluster (Big)
   gpio_init_steps_.push_back({A311D_GPIOE(2), GpioSetAltFunction(A311D_GPIOE_2_PWM_D_FN)});
 
-  // Add voltage regulator
-  fidl::Arena<2048> allocator;
-  fidl::VectorView<vreg::PwmVregMetadataEntry> pwm_vreg_entries(allocator, VREG_COUNT);
-
-  pwm_vreg_entries[PWM_AO_D_VREG] = vreg::BuildMetadata(
-      allocator, A311D_PWM_AO_D, kA311dPwmPeriodNs, kMinVoltageUv, kVoltageStepUv, kNumSteps);
-  pwm_vreg_entries[PWM_A_VREG] = vreg::BuildMetadata(allocator, A311D_PWM_A, kA311dPwmPeriodNs,
-                                                     kMinVoltageUv, kVoltageStepUv, kNumSteps);
-
-  auto metadata = vreg::BuildMetadata(allocator, pwm_vreg_entries);
-  fit::result encoded_metadata = fidl::Persist(metadata);
-  if (!encoded_metadata.is_ok()) {
-    zxlogf(ERROR, "%s: Could not build metadata %s\n", __func__,
-           encoded_metadata.error_value().FormatDescription().c_str());
-    return encoded_metadata.error_value().status();
+  // Add PWM_AO_D voltage regulator
+  auto status = AddVreg(bind_fuchsia_amlogic_platform_a311d::BIND_PWM_ID_PWM_AO_D, pbus_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "AddVreg for ID %d failed. status = %s",
+           bind_fuchsia_amlogic_platform_a311d::BIND_PWM_ID_PWM_AO_D, zx_status_get_string(status));
+    return status;
   }
 
-  fpbus::Node vreg_dev;
-  vreg_dev.name() = "vreg";
-  vreg_dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
-  vreg_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
-  vreg_dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_PWM_VREG;
-  vreg_dev.metadata() = std::vector<fpbus::Metadata>{
-      {{
-          .type = DEVICE_METADATA_VREG,
-          .data = encoded_metadata.value(),
-      }},
-  };
-
-  auto vreg_pwm_9_node = fdf::ParentSpec{{
-      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
-                                             bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-                     fdf::MakeAcceptBindRule(
-                         bind_fuchsia::PWM_ID,
-                         bind_fuchsia_amlogic_platform_a311d::BIND_PWM_ID_PWM_AO_D)},
-      .properties = {fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
-                                       bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-                     fdf::MakeProperty(
-                         bind_fuchsia_pwm::PWM_ID_FUNCTION,
-                         bind_fuchsia_pwm::PWM_ID_FUNCTION_CORE_POWER_LITTLE_CLUSTER)},
-  }};
-
-  auto vreg_pwm_0_node = fuchsia_driver_framework::ParentSpec{{
-      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
-                                             bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-                     fdf::MakeAcceptBindRule(
-                         bind_fuchsia::PWM_ID,
-                         bind_fuchsia_amlogic_platform_a311d::BIND_PWM_ID_PWM_A)},
-      .properties = {fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
-                                       bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-                     fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
-                                       bind_fuchsia_pwm::PWM_ID_FUNCTION_CORE_POWER_BIG_CLUSTER)},
-  }};
-
-  auto gpio_init_node = fuchsia_driver_framework::ParentSpec{{
-      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
-                                             bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)},
-      .properties = {fdf::MakeProperty(bind_fuchsia::INIT_STEP,
-                                       bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)},
-  }};
-
-  auto vreg_node_spec = fuchsia_driver_framework::CompositeNodeSpec{{
-      .name = "vreg",
-      .parents = {{vreg_pwm_9_node, vreg_pwm_0_node, gpio_init_node}},
-  }};
+  // Add PWM_A voltage regulator
+  status = AddVreg(bind_fuchsia_amlogic_platform_a311d::BIND_PWM_ID_PWM_A, pbus_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "AddVreg for ID %d failed. status = %s",
+           bind_fuchsia_amlogic_platform_a311d::BIND_PWM_ID_PWM_A, zx_status_get_string(status));
+    return status;
+  }
 
   fidl::Arena<> fidl_arena;
-  fdf::Arena vreg_arena('VREG');
-  fdf::WireUnownedResult vreg_result =
-      pbus_.buffer(vreg_arena)
-          ->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, vreg_dev),
-                                 fidl::ToWire(fidl_arena, vreg_node_spec));
-  if (!vreg_result.ok() || vreg_result.value().is_error()) {
-    zxlogf(ERROR, "AddCompositeNodeSpec for vreg failed, error = %s",
-           vreg_result.FormatDescription().c_str());
-    return vreg_result.ok() ? vreg_result->error_value() : vreg_result.status();
-  }
-
-  fidl_arena.Reset();
-
   fdf::Arena arena('PWR_');
   const std::vector<fdf::ParentSpec> kAmlPowerImplComposite = {
       fdf::ParentSpec{{kVregPwmAoDRules, kVregPwmAoDProperties}},
@@ -313,27 +306,28 @@ zx_status_t Vim3::PowerInit() {
     return result->error_value();
   }
 
-  zx_status_t st = AddBigCore(pbus_);
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "%s: CompositeDeviceAdd for power domain Big Arm Core failed, st = %d",
-           __FUNCTION__, st);
-    return st;
+  status = AddBigCore(pbus_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: CompositeDeviceAdd for power domain Big Arm Core failed, status = %d",
+           __FUNCTION__, status);
+    return status;
   }
 
-  st = AddLittleCore(pbus_);
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "%s: CompositeDeviceAdd for power domain Little Arm Core failed, st = %d",
-           __FUNCTION__, st);
-    return st;
+  status = AddLittleCore(pbus_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: CompositeDeviceAdd for power domain Little Arm Core failed, status = %d",
+           __FUNCTION__, status);
+    return status;
   }
 
   // Add USB power delivery unit
-  st = DdkAddCompositeNodeSpec(
+  status = DdkAddCompositeNodeSpec(
       "fusb302",
       ddk::CompositeNodeSpec(kI2cRules, kI2cProperties).AddParentSpec(kGpioRules, kGpioProperties));
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "%s: DdkAddCompositeNodeSpec for fusb302 failed, st = %d", __FUNCTION__, st);
-    return st;
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: DdkAddCompositeNodeSpec for fusb302 failed, status = %d", __FUNCTION__,
+           status);
+    return status;
   }
 
   return ZX_OK;

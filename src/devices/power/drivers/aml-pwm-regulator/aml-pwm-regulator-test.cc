@@ -14,14 +14,7 @@
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/sync/cpp/completion.h>
 
-#include <iterator>
-#include <vector>
-
 #include <zxtest/zxtest.h>
-
-#include "fidl/fuchsia.hardware.vreg/cpp/wire_types.h"
-#include "lib/fidl/cpp/wire/wire_messaging_declarations.h"
-#include "lib/fidl/cpp/wire/wire_types.h"
 #include "src/devices/lib/metadata/llcpp/vreg.h"
 
 bool operator==(const fuchsia_hardware_pwm::wire::PwmConfig& lhs,
@@ -153,12 +146,8 @@ class AmlPwmRegulatorTest : public zxtest::Test {
 
       // Setup metadata.
       fidl::Arena<2048> allocator;
-      fuchsia_hardware_vreg::wire::PwmVregMetadataEntry pwm_entries[] = {
-          vreg::BuildMetadata(allocator, 0, 1250, 690'000, 1'000, 11)};
-      auto metadata = vreg::BuildMetadata(
-          allocator,
-          fidl::VectorView<fuchsia_hardware_vreg::wire::PwmVregMetadataEntry>::FromExternal(
-              pwm_entries));
+      fuchsia_hardware_vreg::wire::PwmVregMetadata metadata =
+          vreg::BuildMetadata(allocator, 0, 1250, 690'000, 1'000, 11);
       auto encoded = fidl::Persist(metadata);
       ASSERT_TRUE(encoded.is_ok());
       incoming->compat_server.AddMetadata(DEVICE_METADATA_VREG, encoded.value().data(),
@@ -172,7 +161,7 @@ class AmlPwmRegulatorTest : public zxtest::Test {
       // Serve mock pwm server.
       auto result =
           incoming->test_env.incoming_directory().AddService<fuchsia_hardware_pwm::Service>(
-              incoming->mock_pwm_server.GetInstanceHandler(), "pwm-0");
+              incoming->mock_pwm_server.GetInstanceHandler(), "pwm");
       ASSERT_TRUE(result.is_ok());
 
       incoming->mock_pwm_server.ExpectEnable();

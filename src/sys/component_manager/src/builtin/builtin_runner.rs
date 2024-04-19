@@ -258,16 +258,20 @@ impl ElfRunnerProgram {
         let svc = Dict::new();
         {
             let mut entries = svc.lock_entries();
-            entries.insert(
-                fcrunner::ComponentRunnerMarker::PROTOCOL_NAME.parse().unwrap(),
-                elf_runner.into_sender(WeakComponentInstance::invalid()).into(),
-            );
-            entries.insert(
-                fattribution::ProviderMarker::PROTOCOL_NAME.parse().unwrap(),
-                snapshot_provider.into_sender(WeakComponentInstance::invalid()).into(),
-            );
+            entries
+                .insert(
+                    fcrunner::ComponentRunnerMarker::PROTOCOL_NAME.parse().unwrap(),
+                    elf_runner.into_sender(WeakComponentInstance::invalid()).into(),
+                )
+                .ok();
+            entries
+                .insert(
+                    fattribution::ProviderMarker::PROTOCOL_NAME.parse().unwrap(),
+                    snapshot_provider.into_sender(WeakComponentInstance::invalid()).into(),
+                )
+                .ok();
         }
-        output.lock_entries().insert(SVC.parse().unwrap(), Capability::Dictionary(svc));
+        output.lock_entries().insert(SVC.parse().unwrap(), Capability::Dictionary(svc)).ok();
 
         let this = Self { task_group, execution_scope: ExecutionScope::new(), output, job };
         this

@@ -47,7 +47,7 @@ where
     };
 
     mkdir(locked, "shm".into());
-    create_symlink(current_task, root, "fd".into(), "/proc/self/fd".into()).unwrap();
+    create_symlink(locked, current_task, root, "fd".into(), "/proc/self/fd".into()).unwrap();
     fs
 }
 
@@ -187,18 +187,23 @@ pub fn devtmpfs_create_symlink<L>(
 where
     L: LockBefore<FileOpsCore>,
 {
-    create_symlink(current_task, dev_tmp_fs(locked, current_task).root(), name, target)
+    let root = dev_tmp_fs(locked, current_task).root();
+    create_symlink(locked, current_task, root, name, target)
 }
 
-fn create_symlink(
+fn create_symlink<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     entry: &DirEntryHandle,
     name: &FsStr,
     target: &FsStr,
-) -> Result<DirEntryHandle, Errno> {
+) -> Result<DirEntryHandle, Errno>
+where
+    L: LockBefore<FileOpsCore>,
+{
     // This creates content inside the temporary FS. This doesn't depend on the mount
     // information.
     entry.create_entry(current_task, &MountInfo::detached(), name, |dir, mount, name| {
-        dir.create_symlink(current_task, mount, name, target, FsCred::root())
+        dir.create_symlink(locked, current_task, mount, name, target, FsCred::root())
     })
 }

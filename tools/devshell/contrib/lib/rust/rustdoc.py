@@ -83,9 +83,13 @@ def main():
     ):
         env[f"CARGO_TARGET_{target}_LINKER"] = clang
         if "FUCHSIA" in target:
-            env[
-                f"CARGO_TARGET_{target}_RUSTFLAGS"
-            ] = f"-Clink-arg=--sysroot={fuchsia_sysroot} -Lnative={shared_libs_root}"
+            env[f"CARGO_TARGET_{target}_RUSTFLAGS"] = " ".join(
+                [
+                    f"-Clink-arg=--sysroot={fuchsia_sysroot}",
+                    f"-Lnative={shared_libs_root}",
+                    f"@{ROOT_PATH / build_dir}/rust_api_level_cfg_flags.txt",
+                ]
+            )
         if "LINUX" in target:
             env[
                 f"CARGO_TARGET_{target}_RUSTFLAGS"

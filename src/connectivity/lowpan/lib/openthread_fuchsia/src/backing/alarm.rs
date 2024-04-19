@@ -96,10 +96,7 @@ impl AlarmInstance {
         // The receiver end of the channel is being serviced by Platform::process_poll,
         // which makes sure that the timer callback gets fired on the main
         // thread. The previous alarm task, if any, is cancelled.
-        if let Some(old_task) = self.task_alarm.replace(Some(fasync::Task::spawn(future))) {
-            // Cancel the previous/old alarm task, if any.
-            old_task.cancel().now_or_never();
-        }
+        self.task_alarm.set(Some(fasync::Task::spawn(future)));
     }
 
     fn on_alarm_milli_stop(&self, _instance: Option<&ot::Instance>) {
@@ -113,11 +110,8 @@ impl AlarmInstance {
             )
         }
 
-        if let Some(old_task) = self.task_alarm.take() {
+        if self.task_alarm.take().is_some() {
             trace!(tag = "alarm", "on_alarm_milli_stop: Alarm cancelled");
-
-            // Cancel the previous/old alarm task, if any.
-            old_task.cancel().now_or_never();
         }
     }
 

@@ -4,7 +4,7 @@
 
 use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt, ProcMapsFile, ProcSmapsFile, PAGE_SIZE},
-    selinux::fs::selinux_proc_attrs,
+    security::fs::selinux_proc_attrs,
     task::{CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -139,11 +139,12 @@ impl FileOps for TaskDirectory {
 
     fn readdir(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
-        self.file_ops.readdir(file, current_task, sink)
+        self.file_ops.readdir(locked, file, current_task, sink)
     }
 
     fn as_pid(&self, _file: &FileObject) -> Result<pid_t, Errno> {
@@ -275,6 +276,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
         // owned by the effective user and effective group ID of the process."
         dir.entry_creds(task.creds().euid_as_fscred());
         dir.dir_creds(task.creds().euid_as_fscred());
+        // TODO(b/322850635): Add get/set_procattr hooks and move procattr impl here.
         selinux_proc_attrs(current_task, task, dir);
     });
     dir.entry(current_task, "ns", NsDirectory { task: task.into() }, mode!(IFDIR, 0o777));

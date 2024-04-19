@@ -4,7 +4,6 @@
 
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
 
-#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/markers.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <lib/fit/result.h>

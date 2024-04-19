@@ -5,28 +5,16 @@
 #ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_COMPOSITE_RING_BUFFER_H_
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_COMPOSITE_RING_BUFFER_H_
 
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/test_base.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/test_base.h>
-#include <lib/fidl/cpp/unified_messaging_declarations.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
-#include <lib/fit/result.h>
-#include <lib/fzl/vmo-mapper.h>
-#include <lib/zx/channel.h>
-#include <lib/zx/clock.h>
-#include <zircon/errors.h>
-#include <zircon/time.h>
 
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
-#include <memory>
 #include <optional>
 #include <string_view>
 
 #include "src/media/audio/services/device_registry/basic_types.h"
-#include "src/media/audio/services/device_registry/logging.h"
 
 namespace media_audio {
 

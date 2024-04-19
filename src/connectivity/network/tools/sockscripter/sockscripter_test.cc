@@ -9,6 +9,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "testutil.h"
+
 #if PACKET_SOCKETS
 #include <netpacket/packet.h>
 #endif
@@ -37,79 +39,6 @@ TEST(SendBufferGenTest, CounterBuffer) {
   }
   EXPECT_EQ(gen.GetSndStr(), "Packet number 10.");
 }
-
-class TestApi : ApiAbstraction {
- public:
-  MOCK_METHOD(int, socket, (int domain, int type, int protocol), (override));
-
-  MOCK_METHOD(int, close, (int fd), (override));
-
-  MOCK_METHOD(int, setsockopt,
-              (int fd, int level, int optname, const void* optval, socklen_t optlen), (override));
-
-  MOCK_METHOD(int, getsockopt, (int fd, int level, int optname, void* optval, socklen_t* optlen),
-              (override));
-
-  MOCK_METHOD(int, bind, (int fd, const struct sockaddr* addr, socklen_t len), (override));
-
-  MOCK_METHOD(int, shutdown, (int fd, int how), (override));
-
-  MOCK_METHOD(int, connect, (int fd, const struct sockaddr* addr, socklen_t len), (override));
-
-  MOCK_METHOD(int, accept, (int fd, struct sockaddr* addr, socklen_t* len), (override));
-
-  MOCK_METHOD(int, listen, (int fd, int backlog), (override));
-
-  MOCK_METHOD(ssize_t, send, (int fd, const void* buf, size_t len, int flags), (override));
-
-  MOCK_METHOD(ssize_t, sendto,
-              (int fd, const void* buf, size_t buflen, int flags, const struct sockaddr* addr,
-               socklen_t addrlen),
-              (override));
-
-  MOCK_METHOD(ssize_t, recv, (int fd, void* buf, size_t len, int flags), (override));
-
-  MOCK_METHOD(ssize_t, recvfrom,
-              (int fd, void* buf, size_t buflen, int flags, struct sockaddr* addr,
-               socklen_t* addrlen),
-              (override));
-
-  MOCK_METHOD(int, getsockname, (int fd, struct sockaddr* addr, socklen_t* len), (override));
-
-  MOCK_METHOD(int, getpeername, (int fd, struct sockaddr* addr, socklen_t* len), (override));
-
-  MOCK_METHOD(unsigned int, if_nametoindex, (const char* ifname), (override));
-
-  int RunCommandLine(const std::string& line) {
-    SockScripter scripter(this);
-
-    std::unique_ptr<char[]> parsing(new char[line.length() + 1]);
-    strcpy(parsing.get(), line.c_str());
-    auto* p = parsing.get();
-    char* start = nullptr;
-    char program[] = "sockscripter";
-    std::vector<char*> args;
-    args.push_back(program);
-
-    while (*p) {
-      if (!start) {
-        start = p;
-      }
-      if (*p == ' ') {
-        if (strlen(start)) {
-          args.push_back(start);
-          start = nullptr;
-        }
-        *p = '\0';
-      }
-      p++;
-    }
-    if (start && strlen(start)) {
-      args.push_back(start);
-    }
-    return scripter.Execute(static_cast<int>(args.size()), args.data());
-  }
-};
 
 std::string TestPacketNumber(int c) {
   std::stringstream ss;
@@ -513,7 +442,37 @@ TEST(CommandLine, PacketBindNoInterface) {
       .WillOnce(testing::Return(0));
   EXPECT_EQ(test.RunCommandLine("packet packet-bind 2048: recvfrom"), 0);
 }
-#endif
+
+TEST(CommandLine, PacketSendTo) {
+  constexpr unsigned int kIfIndex = 5;
+  constexpr uint16_t kIpv4Protocol = 2048;
+  testing::StrictMock<TestApi> test;
+  testing::InSequence s;
+  EXPECT_CALL(test, socket(AF_PACKET, SOCK_DGRAM, 0)).WillOnce(testing::Return(kSockFd));
+  EXPECT_CALL(test, if_nametoindex(testing::_)).WillOnce([](const char* ifname) {
+    EXPECT_EQ(std::string(ifname), "myinterfacename");
+    return kIfIndex;
+  });
+  EXPECT_CALL(test, sendto(kSockFd, testing::_, testing::_, testing::_, testing::_, testing::_))
+      .WillOnce([](testing::Unused, const void* buf, size_t len, testing::Unused,
+                   const struct sockaddr* addr, socklen_t addrlen) {
+        EXPECT_EQ(std::string(static_cast<const char*>(buf), len), TestPacketNumber(0));
+        const struct sockaddr_ll expected_addr = {
+            .sll_family = AF_PACKET,
+            .sll_protocol = htons(kIpv4Protocol),
+            .sll_ifindex = kIfIndex,
+        };
+        EXPECT_GE(addrlen, sizeof(expected_addr));
+        const auto& addr_ll = *reinterpret_cast<const struct sockaddr_ll*>(addr);
+        EXPECT_EQ(addr_ll.sll_family, expected_addr.sll_family);
+        EXPECT_EQ(addr_ll.sll_protocol, expected_addr.sll_protocol);
+        EXPECT_EQ(addr_ll.sll_ifindex, expected_addr.sll_ifindex);
+        return 0;
+      });
+  EXPECT_EQ(test.RunCommandLine("packet packet-send-to 2048:myinterfacename"), 0);
+}
+
+#endif  // PACKET_SOCKETS
 
 struct SockOptParam {
   SockOptParam(std::string name, std::string arg, int level, int optname,

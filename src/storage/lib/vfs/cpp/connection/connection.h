@@ -112,7 +112,8 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   // methods, used by all connection subclasses. Use caution when working with FIDL wire types,
   // as certain wire types may reference external data.
 
-  void NodeClone(fuchsia_io::wire::OpenFlags flags, fidl::ServerEnd<fuchsia_io::Node> server_end);
+  void NodeClone(fuchsia_io::OpenFlags flags, VnodeProtocol protocol,
+                 fidl::ServerEnd<fuchsia_io::Node> server_end);
   zx::result<VnodeAttributes> NodeGetAttr() const;
   zx::result<> NodeSetAttr(fuchsia_io::wire::NodeAttributeFlags flags,
                            const fuchsia_io::wire::NodeAttributes& attributes);

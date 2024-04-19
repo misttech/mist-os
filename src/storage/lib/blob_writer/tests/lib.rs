@@ -10,7 +10,6 @@ mod tests {
         fidl_fuchsia_fxfs::MountOptions,
         fs_management::{filesystem::Filesystem, Fxfs},
         fuchsia_component::client::connect_to_protocol_at_dir_svc,
-        fuchsia_merkle::MerkleTreeBuilder,
         ramdevice_client::RamdiskClient,
         rand::{thread_rng, Rng},
     };
@@ -42,9 +41,7 @@ mod tests {
         let mut data = vec![1; 196608];
         thread_rng().fill(&mut data[..]);
 
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&data);
-        let hash = builder.finish().root();
+        let hash = fuchsia_merkle::from_slice(&data).root();
 
         let compressed_data: Vec<u8> = Type1Blob::generate(&data, CompressionMode::Always);
 
@@ -94,9 +91,7 @@ mod tests {
         let mut data = vec![1; 499712];
         thread_rng().fill(&mut data[..]);
 
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&data);
-        let hash = builder.finish().root();
+        let hash = fuchsia_merkle::from_slice(&data).root();
 
         let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
 

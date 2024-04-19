@@ -4,37 +4,34 @@
 
 use async_lock::OnceCell;
 use async_trait::async_trait;
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_examples_colocated as fcolocated;
 use fidl_fuchsia_process::HandleInfo;
 use fuchsia_async as fasync;
 use fuchsia_runtime::HandleType;
 use fuchsia_zircon as zx;
-use futures::{
-    channel::oneshot,
-    future::{BoxFuture, FutureExt},
-};
-use mapped_vmo::Mapping;
+use futures::future::{BoxFuture, FutureExt};
+use futures::TryStreamExt;
 use runner::component::{ChannelEpitaph, Controllable};
-use std::{ops::DerefMut, sync::Arc};
+use std::sync::Arc;
 use tracing::warn;
-use zx::Peered;
+use zx::{AsHandleRef, Koid};
 
 /// [`ColocatedProgram `] represents an instance of a program run by the
 /// colocated runner. Its state is held in this struct and its behavior
 /// is run in the `task`.
 pub struct ColocatedProgram {
     task: Option<fasync::Task<()>>,
-    filled: Option<oneshot::Receiver<Mapping>>,
     terminated: Arc<OnceCell<()>>,
+    vmo_koid: Koid,
 }
 
 impl ColocatedProgram {
-    pub fn new(vmo_size: u64, numbered_handles: Vec<HandleInfo>) -> Result<Self, anyhow::Error> {
-        let vmo = zx::Vmo::create(vmo_size)?;
-        let vmo_size = vmo.get_size()?;
-        let (filled_sender, filled) = oneshot::channel();
+    pub fn new(numbered_handles: Vec<HandleInfo>) -> Result<Self, anyhow::Error> {
+        let vmo = zx::Vmo::create(1024)?;
+        let vmo_koid = vmo.get_koid()?;
+
         let terminated = Arc::new(OnceCell::new());
-        let fill_vmo_task =
-            fasync::unblock(move || ColocatedProgram::fill_vmo(vmo, vmo_size, filled_sender));
         let terminated_clone = terminated.clone();
         let guard = scopeguard::guard((), move |()| {
             _ = terminated_clone.set_blocking(());
@@ -44,22 +41,29 @@ impl ColocatedProgram {
             // which happens when this task is dropped.
             let _guard = guard;
 
-            fill_vmo_task.await;
-
             // Signal to the outside world that the pages have been allocated.
-            for info in numbered_handles.into_iter().filter(|info| {
-                match fuchsia_runtime::HandleInfo::try_from(info.id) {
+            let handle_info = numbered_handles
+                .into_iter()
+                .filter(|info| match fuchsia_runtime::HandleInfo::try_from(info.id) {
                     Ok(handle_info) => {
                         handle_info == fuchsia_runtime::HandleInfo::new(HandleType::User0, 0)
                     }
                     Err(_) => false,
-                }
-            }) {
-                let handle = zx::EventPair::from(info.handle);
-                match handle.signal_peer(zx::Signals::empty(), zx::Signals::USER_0) {
-                    Ok(()) => {}
-                    Err(status) => {
-                        warn!("Failed to signal USER0 handle: {status}");
+                })
+                .next()
+                .unwrap();
+
+            let channel = zx::Channel::from(handle_info.handle);
+            let mut request_stream = fcolocated::ColocatedRequestStream::from_channel(
+                fasync::Channel::from_channel(channel),
+            );
+            while let Some(request) = request_stream.try_next().await.unwrap() {
+                match request {
+                    fcolocated::ColocatedRequest::GetVmos { responder } => {
+                        responder.send(&[vmo_koid.raw_koid()]).unwrap();
+                    }
+                    fcolocated::ColocatedRequest::_UnknownMethod { .. } => {
+                        panic!("Unknown method");
                     }
                 }
             }
@@ -68,41 +72,7 @@ impl ColocatedProgram {
             std::future::pending().await
         };
         let task = fasync::Task::spawn(task);
-        Ok(Self { task: Some(task), filled: Some(filled), terminated })
-    }
-
-    fn fill_vmo(vmo: zx::Vmo, vmo_size: u64, filled: oneshot::Sender<Mapping>) {
-        // Map the VMO into the address space.
-        let vmo_size = vmo_size as usize;
-        let mut mapping = Mapping::create_from_vmo(
-            &vmo,
-            vmo_size,
-            zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
-        )
-        .unwrap();
-        let buffer = mapping.deref_mut();
-
-        // Fill the VMO with randomized bytes, to cause pages to be physically allocated.
-        // This approach will defeat page deduplication and page compression, for ease of
-        // memory usage analysis. This program should more or less use `vmo_size` bytes.
-        use rand::RngCore;
-        let mut rng = rand::thread_rng();
-        let mut offset: usize = 0;
-        const BLOCK_SIZE: usize = 512;
-        let mut bytes = vec![0u8; BLOCK_SIZE];
-        loop {
-            rng.fill_bytes(&mut bytes);
-            buffer.write_at(offset, &bytes);
-            offset += BLOCK_SIZE;
-            if offset > vmo_size {
-                break;
-            }
-        }
-        buffer.release_writes();
-
-        // Send the mapping to the program to be kept alive. This will keep those pages
-        // committed.
-        _ = filled.send(mapping);
+        Ok(Self { task: Some(task), terminated, vmo_koid })
     }
 
     /// Returns a future that will resolve when the program is terminated.
@@ -113,6 +83,12 @@ impl ColocatedProgram {
             ChannelEpitaph::ok()
         }
         .boxed()
+    }
+
+    /// Returns the koid of the program's VMO, so the runner can report its memory as attributed to
+    /// this component.
+    pub fn get_vmo_koid(&self) -> Koid {
+        self.vmo_koid
     }
 }
 
@@ -125,11 +101,7 @@ impl Controllable for ColocatedProgram {
 
     fn stop<'a>(&mut self) -> BoxFuture<'a, ()> {
         let task = self.task.take();
-        let filled = self.filled.take();
         async {
-            if let Some(filled) = filled {
-                _ = filled.await;
-            }
             if let Some(task) = task {
                 _ = task.cancel();
             }

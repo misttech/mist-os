@@ -4,6 +4,7 @@
 #ifndef SRC_CAMERA_BIN_CAMERA_GYM_SCREEN_UTIL_H_
 #define SRC_CAMERA_BIN_CAMERA_GYM_SCREEN_UTIL_H_
 
+#include <cstdint>
 #include <tuple>
 
 namespace screen_util {

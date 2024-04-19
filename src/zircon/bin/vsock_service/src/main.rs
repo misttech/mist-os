@@ -8,43 +8,35 @@ use {
     anyhow::{Context as _, Error},
     fidl_fuchsia_hardware_vsock::DeviceMarker,
     fuchsia_async as fasync,
+    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_component::server::ServiceFs,
-    fuchsia_fs::{directory::Watcher, OpenFlags},
-    fuchsia_zircon as zx,
+    fuchsia_fs::OpenFlags,
+    futures::TryStreamExt,
     futures::{StreamExt, TryFutureExt},
 };
 
 use vsock_service_lib as service;
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main]
 async fn main() -> Result<(), Error> {
     tracing::info!("Starting vsock service");
 
-    let vsock_device_path = std::path::Path::new("/dev/class/vsock");
-    let (client, device) = zx::Channel::create();
-    let vsock_dir = fuchsia_fs::directory::open_in_namespace(
-        vsock_device_path.to_str().unwrap(),
-        OpenFlags::RIGHT_READABLE,
-    )
-    .context("Open vsock dir")?;
-    let mut watcher = Watcher::new(&vsock_dir).await.context("Create watcher")?;
+    const DEV_CLASS_VSOCK: &str = "/dev/class/vsock";
+    let vsock_dir =
+        fuchsia_fs::directory::open_in_namespace(DEV_CLASS_VSOCK, OpenFlags::RIGHT_READABLE)
+            .context("Open vsock dir")?;
+    let path = device_watcher::watch_for_files(&vsock_dir)
+        .await
+        .with_context(|| format!("Watching for files in {}", DEV_CLASS_VSOCK))?
+        .try_next()
+        .await
+        .with_context(|| format!("Getting a file from {}", DEV_CLASS_VSOCK))?;
+    let path = path.ok_or(anyhow::anyhow!("Could not find device in {}", DEV_CLASS_VSOCK))?;
+    let path = path.to_str().ok_or(anyhow::anyhow!("Expected valid utf-8 device name"))?;
+    let path = format!("{path}/device_protocol");
 
-    let event = loop {
-        let event = watcher.next().await.unwrap().context("Get watch event")?;
-        if event.filename.as_path().to_str().unwrap() == "."
-            || event.filename.as_path().to_str().unwrap() == ".."
-        {
-            continue;
-        }
-        break event;
-    };
-
-    let device_path = vsock_device_path.join(&event.filename);
-    fdio::service_connect(device_path.as_path().to_str().unwrap(), device)
-        .context("open service")?;
-    let dev = fidl::endpoints::ClientEnd::<DeviceMarker>::new(client)
-        .into_proxy()
-        .context("Failed to make channel")?;
+    let dev = connect_to_named_protocol_at_dir_root::<DeviceMarker>(&vsock_dir, &path)
+        .context("Failed to connect vsock device")?;
 
     let (service, event_loop) =
         service::Vsock::new(dev).await.context("Failed to initialize vsock service")?;

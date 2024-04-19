@@ -755,7 +755,7 @@ pub fn sys_faccessat2(
 }
 
 pub fn sys_getdents64(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_buffer: UserAddress,
@@ -764,7 +764,7 @@ pub fn sys_getdents64(
     let file = current_task.files.get(fd)?;
     let mut offset = file.offset.lock();
     let mut sink = DirentSink64::new(current_task, &mut offset, user_buffer, user_capacity);
-    let result = file.readdir(current_task, &mut sink);
+    let result = file.readdir(locked, current_task, &mut sink);
     sink.map_result_with_actual(result)
 }
 
@@ -1508,7 +1508,7 @@ pub fn sys_symlinkat(
         current_task,
         new_dir_fd,
         user_path,
-        |_, context, parent, basename| {
+        |locked, context, parent, basename| {
             // The path to a new symlink cannot end in `/`. That would imply that we are dereferencing
             // the symlink to a directory.
             //
@@ -1516,7 +1516,7 @@ pub fn sys_symlinkat(
             if context.must_be_directory {
                 return error!(ENOENT);
             }
-            parent.create_symlink(current_task, basename, target.as_ref())
+            parent.create_symlink(locked, current_task, basename, target.as_ref())
         },
     );
     res?;

@@ -10,6 +10,7 @@ use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_syslog_listener::run_log_listener_with_proxy;
 use futures::{channel::mpsc, prelude::*};
+use std::pin::pin;
 
 #[fuchsia::test]
 async fn launch_example_and_read_hello_world() {
@@ -17,7 +18,8 @@ async fn launch_example_and_read_hello_world() {
     let _: BinderProxy = connect_to_protocol::<BinderMarker>().expect("launched log example");
 
     let (logs, mut new_logs, _tasks) = listen_to_logs();
-    pin_utils::pin_mut!(logs);
+
+    let mut logs = pin!(logs);
 
     let (next, new_next) = (logs.next().await.unwrap(), new_logs.next().await.unwrap());
     assert_eq!(Severity::try_from(next.severity).unwrap(), Severity::Info);

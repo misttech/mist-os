@@ -5,9 +5,6 @@
 #ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_DEVICE_PRESENCE_WATCHER_H_
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_DEVICE_PRESENCE_WATCHER_H_
 
-#include <lib/fidl/cpp/wire/internal/transport.h>
-#include <lib/syslog/cpp/macros.h>
-
 #include <unordered_set>
 
 #include <gtest/gtest.h>

@@ -1,20 +1,25 @@
 # What Tests to Write
 
-## Motivation
+**Tests help uncover potential issues in code**, and the various types of tests offer different levels of coverage.
 
-Fuchsia developers seek guidance on what tests are actually necessary
-to validate the software they write. This includes component authors,
-driver authors, and anyone who publishes or maintains aspects of
-the API and ABI surface area of Fuchsia.
+This document guides developers (component authors, driver authors, and API/ABI maintainers) on the essential tests for validating Fuchsia software.
 
-We generally **write tests to detect things that may go wrong**
-with our code, and different types of tests provide coverage for
-different potential problems.
+The table below provides an overview of the types of tests categorized
+by what needs that type of test.
 
-This document describes the kinds of tests that provide different
-types of coverage.
-
-## Guidance
+|                                                            |Source Code|Components|Drivers|Protocols|
+|------------------------------------------------------------|-----------|----------|-------|---------|
+|[Unit](#unit-tests)                                         |All        |-         |-      |-        |
+|[Integration](#integration-tests)                           |-          |All       |Some   |-        |
+|[Compatibility (CTF)](#compatibility-tests)                 |-          |Some      |Some   |All (SDK)|
+|[Spec Conformance](#spec-conformance-tests)                 |-          |Some      |All    |Some     |
+|[Platform Expectation](#platform-expectation-tests)         |-          |Some      |Some   |Some     |
+|[System Interaction (Product)](#system-interaction-tests)   |-          |Some      |Some   |Some     |
+<!-- TODO(b/308191530): Fill out these sections
+|[Microbenchmarks](#microbenchmarks)|All (performance critical)|-|-|-
+|[Mezzobenchmarks](#mezzobenchmarks)|-|Some|Some|-
+|[Macrobenchmarks](#macrobenchmarks)|-|Some|Some|-
+-->
 
 The following sections categorize types of tests in terms of the
 following criteria:
@@ -33,36 +38,17 @@ coverage)
 * When does Fuchsia run this type of test (when in the release
 pipeline is this kind of test run)
 
-The below table provides an overview of the types of tests categorized
-by what needs that type of test.
+## Unit Tests {#unit-tests}
 
-|                                                            |Source Code|Components|Drivers|Protocols|
-|------------------------------------------------------------|-----------|----------|-------|---------|
-|[Unit](#unit-tests)                                         |All        |-         |-      |-        |
-|[Hermetic integration](#hermetic-integration-tests)         |-          |All       |Some   |-        |
-|[Non-hermetic integration](#non-hermetic-integration-tests) |-          |Few       |Few    |-        |
-|[Compatibility (CTF)](#compatibility-tests)                 |-          |Some      |Some   |All (SDK)|
-|[Spec Conformance](#conformance-tests)                      |-          |Some      |Some   |Some     |
-|[On-device System Validation](#system-validation-tests)     |-          |Some      |Some   |Some     |
-|[Host-driven System Automation (Lacewing)](#lacewing-tests) |-          |Some      |Some   |Some     |
-<!-- TODO(b/308191530): Fill out these sections
-|[Microbenchmarks](#microbenchmarks)|All (performance critical)|-|-|-
-|[Mezzobenchmarks](#mezzobenchmarks)|-|Some|Some|-
-|[Macrobenchmarks](#macrobenchmarks)|-|Some|Some|-
--->
-
-
-### Unit Tests {#unit-tests}
-
-* What needs it: All source code
-* What does it test for: Code contracts for individual units of software
-* What are its key benefits: Permits more effective refactoring,
+* **What needs it:** All source code
+* **What does it test for:** Code contracts for individual units of software
+* **What are its key benefits:** Permits more effective refactoring,
 optimization, and development.
-* Where to view coverage: https://analysis.chromium.org/coverage/p/fuchsia
-* How to implement: Use a test framework for your language of choice
-* Who writes this kind of test: All component/driver owners
-* Where are the sources stored: Adjacent to the code being tested
-* When does Fuchsia run this type of test: Commit-Queue and Continuous
+* **Where to view coverage:** https://analysis.chromium.org/coverage/p/fuchsia
+* **How to implement:** Use a test framework for your language of choice
+* **Who writes this kind of test:** All component/driver owners
+* **Where are the sources stored:**  Adjacent to the code being tested
+* **When does Fuchsia run this type of test:** Commit-Queue and Continuous
 Integration
 
 All code should be covered by the smallest possible test that is
@@ -93,20 +79,37 @@ scripts to process the coverage output of tests.
 Learn how to write driver unit tests in the
 [Driver unit testing quick start](/docs/development/sdk/driver-testing/driver-unit-testing-quick-start.md).
 
-### Hermetic Integration Tests {#hermetic-integration-tests}
+The diagram below shows unit tests running in a Fuchsia system.
+![Unit Tests](images/unit-test.png "Diagram shows unit tests  running in a Fuchsia system.")
 
-* What needs it: All components and many drivers
-* What does it test for: Runtime behavior and contracts
-* What are its key benefits: Ensures that a component or driver can
+### Integration Tests {#integration-tests}
+
+Integration tests check that the interface and behavior of one component works alongside another component that calls it.
+Validate that different components work together as a system and interact as expected.
+
+The following scenarios are validated for the component under test:
+
+* It can actually start up and respond to requests
+* It responds as expected to requests
+* It interacts as expected with its own dependencies
+* If the driver is made up of multiple components, check the components are behaving correctly inside the driver
+
+The recommendation is to to run integration tests hermetically (in isolation) using [Test Realm Factory](/docs/development/testing/components/test_realm_factory.md), but they can be run in non-hermetically if needed.
+
+### Hermetic Integration Tests
+
+* **What needs it:** All components and many drivers
+* **What does it test for:** Runtime behavior and contracts
+* **What are its key benefits:** Ensures that a component or driver can
 start up, initialize itself, and interact with dependencies
-* Where to view coverage: https://analysis.chromium.org/coverage/p/fuchsia.
+* **Where to view coverage:** https://analysis.chromium.org/coverage/p/fuchsia.
 Note that OOT use cases require build option changes to output
 coverage information and process it.
-* How to implement: [Test Realm
+* **How to implement:** [Test Realm
 Factory](/docs/development/testing/components/test_realm_factory.md)
-* Who writes this kind of test: All component authors, many driver developers
-* Where are the sources stored: Adjacent to the code being tested
-* When does Fuchsia run this type of test: Commit-Queue and Continuous
+* **Who writes this kind of test:** All component authors, many driver developers
+* **Where are the sources stored:**  Adjacent to the code being tested
+* **When does Fuchsia run this type of test:** Commit-Queue and Continuous
 Integration
 
 While unit tests are small and focused on specific pieces of business
@@ -131,11 +134,14 @@ isolated test contexts (for example,
 [DriverTestRealm](/docs/development/drivers/testing/driver_test_realm.md) and
 [Test UI Stack](/docs/contribute/governance/rfcs/0180_test_ui_stack.md)).
 
+The diagram below shows hermetic integration tests using the Test Realm pattern.
+![Integration Tests](images/integration-test.png "Diagram shows hermetic integration tests using the Test Realm pattern.")
+
 All tests on Fuchsia are hermetic by default, which means they
 automatically benefit from provable hermeticity and the ability to
 arbitrarily nest dependencies.
 
-**Hermetic Integration Tests** simply build on top of this foundation
+Hermetic Integration Tests simply build on top of this foundation
 to run a component or driver in an isolated test environment and
 interact with it using FIDL protocols. These tests cover the following
 scenarios for a component/driver:
@@ -171,22 +177,22 @@ of the below types of tests.
 those tests should use TRF.**
 
 
-### Non-hermetic Integration Tests {#non-hermetic-integration-tests}
+### Non-hermetic Integration Tests
 
-* What needs it: Some components and drivers. Specifically those
+* **What needs it:** Some components and drivers. Specifically those
 that have dependencies that are difficult to mock or isolate (e.g. Vulkan).
-* What does it test for: System behavior and contracts
-* What are its key benefits: Ensures that a component or driver can
+* **What does it test for:** System behavior and contracts
+* **What are its key benefits:** Ensures that a component or driver can
 start up, initialize itself, and interact with dependencies, even
 when some of those dependencies are system-wide and non-hermetic.
-* Where to view coverage: https://analysis.chromium.org/coverage/p/fuchsia.
+* **Where to view coverage:** https://analysis.chromium.org/coverage/p/fuchsia.
 Note that OOT use cases require build option changes to output
 coverage information and process it.
-* How to implement: [Test Realm
+* **How to implement:** [Test Realm
 Factory](/docs/development/testing/components/test_realm_factory.md)
-* Who writes this kind of test: Some component and driver authors
-* Where are the sources stored: Adjacent to the code being tested
-* When does Fuchsia run this type of test: Commit-Queue and Continuous
+* **Who writes this kind of test:** Some component and driver authors
+* **Where are the sources stored:**  Adjacent to the code being tested
+* **When does Fuchsia run this type of test:** Commit-Queue and Continuous
 Integration
 
 While Hermetic Integration Tests are what we should strive for,
@@ -195,6 +201,9 @@ because those tests have difficulty with dependencies that are not
 yet written in a way that can be hermetically packaged. For instance,
 we do not yet have a high-fidelity mock for Vulkan, so we allow
 certain tests access to the system-wide Vulkan capabilities.
+
+The diagram below shows non-hermetic integration tests with an outside system, component or driver interaction.
+![Integration Tests](images/integration-test-non-hermetic.png "Diagram shows non-hermetic integration tests with an outside system, component or driver interaction.")
 
 Tests that access system capabilities are called **Non-hermetic
 Integration Tests**. While they are technically not hermetic, they
@@ -224,26 +233,29 @@ assert on the behavior of a given system globally** (see instead
 System Interaction Tests](#lacewing-tests)).
 
 
-### Compatibility Tests (CTF) {#compatibility-tests}
+## Compatibility Tests (CTF) {#compatibility-tests}
 
-* What needs it: Protocols exposed in the SDK, but is also applicable
+* **What needs it:** Protocols exposed in the SDK, but is also applicable
 to client libraries and tools.
-* What does it test for: Platform ABI/API behavior consistency and
+* **What does it test for:** Platform ABI/API behavior consistency and
 compatibility
-* What are its key benefits: Ensures that the behavior of platform
+* **What are its key benefits:** Ensures that the behavior of platform
 protocols does not unexpectedly change in incompatible ways.
 Especially important for platform stability.
-* Where to view coverage: CTF coverage dashboard.
-* How to implement: Write a Test Realm Factory (TRF) integration
+* **Where to view coverage:** CTF coverage dashboard.
+* **How to implement:** Write a Test Realm Factory (TRF) integration
 test, [enable CTF
 mode](/docs/development/testing/ctf/contributing_tests.md).
-* Who writes this kind of test: All owners of SDK protocol
+* **Who writes this kind of test:** All owners of SDK protocol
 implementations
-* Where are the sources stored: fuchsia.git
-* When does Fuchsia run this type of test: Commit-Queue and Continuous
+* **Where are the sources stored:**  fuchsia.git
+* **When does Fuchsia run this type of test:** Commit-Queue and Continuous
 Integration
 
-In general, every FIDL protocol's stable API exposed by the SDK
+Compatibility tests provide early warning
+that a downstream breakage is possible due to a platform change,
+and it is especially important to ensure that our platform ABI
+remains stable. In general, every FIDL protocol's stable API exposed by the SDK
 should have a compatibility test for its API levels.
 
 These tests verify that _clients_ of the protocols, targeting a
@@ -277,10 +289,10 @@ The end result is that the old expectations for behavior of exposed
 protocols are maintained across future modifications. Failing to
 provide this coverage means that subtle changes to the behavior or
 interface of SDK protocols will cause downstream breakages that are
-especially difficult to root cause. CTF tests provide early warning
-that a downstream breakage is possible due to a platform change,
-and it is especially important to ensure that our platform ABI
-remains stable.
+especially difficult to root cause.
+
+The diagram below shows compatibility tests for using the Test Realm Factory (TRF) pattern and a frozen component fake.
+![Compatibility Tests](images/compatibility-test.png "Diagram shows compatibility tests for using the Test Realm Factory (TRF) pattern and a frozen component fake.")
 
 Enabling CTF mode for a TRF test is a simple configuration option,
 and converting existing integration tests to TRF is straightforward
@@ -293,27 +305,27 @@ large scale change overhead.
 **All components exposing protocols in the partner or public SDK
 should have a CTF test.**
 
-### Spec Conformance Tests {#conformance-tests}
+## Spec Conformance Tests {#spec-conformance-tests}
 
-* What needs it: Out-of-tree (OOT) drivers, components undergoing
+* **What needs it:** Out-of-tree (OOT) drivers, components undergoing
 migration from one implementation to another, (some) framework
 clients.
-* What does it test for: Consistency between different implementations
+* **What does it test for:** Consistency between different implementations
 of a protocol or library, to ensute they conform to the spec.
-* What are its key benefits: Ensures that different implementations
+* **What are its key benefits:** Ensures that different implementations
 of the same interface exhibit compatible behavior. This is especially
 useful for drivers where there may be multiple implementers of the
 same interface.
-* Where to view coverage: TODO
-* How to implement: Use parts of an existing TRF integration test
+* **Where to view coverage:** TODO
+* **How to implement:** Use parts of an existing TRF integration test
 to create a new TRF test. Alternatively write this test in Lacewing
 to interact with a complete system.
-* Who writes this kind of test: Contract/protocol owners define a
+* **Who writes this kind of test:** Contract/protocol owners define a
 test for requirements, and downstream users reuse or compose pieces
 of that test to ensure their code meets the requirements.
-* Where are the sources stored: fuchsia.git or built via the SDK
+* **Where are the sources stored:**  fuchsia.git or built via the SDK
 in stand-alone repos
-* When does Fuchsia run this type of test: Commit-Queue, out-of-tree
+* **When does Fuchsia run this type of test:** Commit-Queue, out-of-tree
 continuous integration.
 
 It is common for the Fuchsia Platform to define a contract that
@@ -338,8 +350,12 @@ It is important to know that an implementation conforms to the
 specification, and a Spec Conformance Test is used to validate this is
 the case.
 
+
+### Hermetic approach to spec conformance tests
+We test driver conformance by exercising the driver and checking for expected behaviour - for drivers that control devices this will require running on hardware (recommended approach). This is run by driver developers using the SDK at their desk (on hardware), and in their CI/CQ
+
 Spec Conformance Tests may build on top of TRF tests to have identical
-structure to Compatibility Tests. In this scenario, the primary
+structure to [Compatibility Tests](#compatibility-tests). In this scenario, the primary
 difference is in how the different pieces of the TRF test are used.
 
 The recommended pattern for Spec Conformance testing is to define a
@@ -356,6 +372,16 @@ implement their own RealmFactory that wraps their implementation
 behind the FIDL protocol.  This means that the same exact set of
 tests that define the contract are applied to each implementation.
 
+The diagram below shows an approach for running spec conformance tests in a hermetic way.
+![Spec conformance tests (Hermetic)](images/specification-conformance-test.png "Diagram shows an approach for running spec conformance tests in a hermetic way")
+
+### Non-hermetic approach to spec conformance tests
+The non-hermetic approach to test spec conformance is to run the test on a working system using Lacewing for (hardware-dependent implementation). This is run by developers in their CI/CQ against the product implementation.
+
+The diagram below shows an approach for running spec conformance tests in a non-hermetic way.
+![Spec conformance tests (non-hermetic)](images/specification-conformance-test-non-hermetic.png "Diagram shows an approach for running spec conformance tests in a non-hermetic way.")
+
+### Host-driven approach to spec conformance tests
 Alternatively, Spec Conformance tests may be written using Lacewing
 and run as host-driven system interaction tests. This is particularly
 useful when the implementer of the protocol is a driver or otherwise
@@ -363,20 +389,23 @@ depends on specific hardware. This is especially useful to assert that
 product images including the driver both conform to the spec and
 were appropriately assembled to support interacting with hardware.
 
+The diagram below shows an approach for running spec conformance tests in a host-driven way.
+![Spec conformance tests (Host-driven)](images/specification-conformance-test-host-driven.png "Diagram shows an approach for running spec conformance tests in a host-driven way.")
+
 More concretely, we can solve the above examples as follows:
 
-1. **Drivers**
+1. **Drivers:**
    Define driver FIDL in fuchsia.git. Create a TRF test with
    associated Test Suite and FIDL protocol; ship them in the SDK.
    In an out-of-tree driver repo, implement the driver, create a
    RealmFactory that wraps the driver and implements the test
    FIDL. Run the distributed Test Suite against that RealmFactory.
-1. **Drivers (Lacewing)**
+1. **Drivers (Lacewing):**
    Create a Lacewing test that interacts with the driver's FIDL
    protocols from the host. Ship this test as a binary artifact
    that can be run in out-of-tree driver repos or during product
    assembly.
-1. **Component rewrite**
+1. **Component rewrite:**
    Create a new code base for the rewrite, create a skeleton TRF
    test implementing the test FIDL (following best practices to
    return non-failing
@@ -385,7 +414,7 @@ More concretely, we can solve the above examples as follows:
    Incrementally rewrite the component, and as test cases begin
    pass set failures for those cases to blocking. When all test
    cases pass, the rewrite is done, delete the old implementation.
-1. **Client libraries in multiple languages**
+1. **Client libraries in multiple languages:**
    Define the operations that are possible in your library as a
    test FIDL. Create a TRF test for one implementation of the
    library, then use the Test Suite from that implementation for
@@ -394,26 +423,29 @@ More concretely, we can solve the above examples as follows:
 **Interfaces that are expected to be implemented multiple times should ship
 a spec conformance test for integrators to build on top of.**
 
-### On-device System Validation Tests {#system-validation-tests}
+## Platform Expectation Tests {#platform-expectation-tests}
 
-* What needs it: Many platform components and drivers. For example,
+* **What needs it:** Many platform components and drivers. For example,
 drivers should ensure they interact with actual hardware on an
 assembled system.
-* What does it test for: Behavior of the component/driver on an
+* **What does it test for:** Behavior of the component/driver on an
 assembled product image
-* What are its key benefits: Ensures that a platform component/driver
+* **What are its key benefits:** Ensures that a platform component/driver
 behaves as expected when installed in an actual product. Helps to
 catch issues with capability routing and interactions with real
 hardware.
-* Where to view coverage: TODO
-* How to implement: Write a Test Realm Factory (TRF) integration
-test, create an execution realm, enable system validation mode
-(TODO).
-* Who writes this kind of test: Owners of platform components and drivers
-* Where are the sources stored: fuchsia.git, shipped in the SDK to
+* **Where to view coverage:** TODO
+* **How to implement:** Write a Test Realm Factory (TRF) integration
+test, create an execution realm, enable system validation mode (TODO). Take tests that assert on specifications and run these at every stage of the pipeline (reuse is highly encouraged). Leverage Platform Expectations Test Suit (PETS). <!-- do we want to talk about this? -->
+* **Who writes this kind of test:** Owners of platform components and drivers
+* **Where are the sources stored:**  fuchsia.git, shipped in the SDK to
 out-of-tree repositories
-* When does Fuchsia run this type of test: Commit-Queue, out-of-tree
+* **When does Fuchsia run this type of test:** Commit-Queue, out-of-tree
 continuous integration.
+
+The diagram below shows platform expectation tests where the tests are shipped with the SDK.
+
+![Platform expectation tests](images/platform-expectation-tests.png "Diagram shows platform expectation tests where the tests are shipped with the SDK.")
 
 Hermetic integration tests ensure that a component performs correctly
 in isolation, but it does not validate that an assembled system
@@ -422,7 +454,7 @@ tests are a special kind of non-hermetic integration test that
 ensures the real component behaves as expected, subject to some
 constraints.
 
-On-device system validation tests are typically based on hermetic TRF tests
+Platform Expectation tests are typically based on hermetic TRF tests
 consisting of a RealmFactory and Test Suite. Instead of using the
 RealmFactory (which instantiates isolated components under test),
 system validation tests use a stand-in component that provides
@@ -465,26 +497,27 @@ validation tests, recognizing that some system validation tasks
 cannot happen within the context of a device (e.g. rebooting the
 device as part of testing requires some process external to the
 device to coordinate). Certain host-driven system interaction
-tests (implemented using [Lacewing](#lacewing-tests)) can
-provide the same coverage as on-device system validation tests.
+tests (implemented as [System Interaction Tests](#system-interaction-tests)) can
+provide the same coverage as Platform Expectation tests.
 
-### Host-driven System Interaction Tests (Lacewing) {#lacewing-tests}
+## System Interaction (Product) Tests  {#system-interaction-tests}
+<!-- (Lacewing) -->
 
-* What needs it: Some components and drivers; individual user
+* **What needs it:** Some components and drivers; individual user
 journeys (for instance, validating responses when the user touches
 the screen).
-* What does it test for: Behavioral regressions in system services
+* **What does it test for:** Behavioral regressions in system services
 and individual user journeys.
-* What are its key benefits: Has complete control over one or more
+* **What are its key benefits:** Has complete control over one or more
 Fuchsia devices and non-Fuchsia peripherals. Covers cases requiring
 multiple devices, rebooting devices, or simulating user interaction
 with a device.
-* Where to view coverage: TODO
-* How to implement: Write a Python test using
+* **Where to view coverage:** TODO
+* **How to implement:** Write a Python test using
 [Mobly/Lacewing](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/testing/end_to_end/examples)
-* Who writes this kind of test: Component/driver owners; product owners
-* Where are the sources stored: fuchsia.git or OOT
-* When does Fuchsia run this type of test: Commit-Queue, OOT
+* **Who writes this kind of test:** Component/driver owners; product owners
+* **Where are the sources stored:**  fuchsia.git or OOT
+* **When does Fuchsia run this type of test:** Commit-Queue, OOT
 Continuous Integration as needed
 
 Fuchsia makes hermetic testing possible for a wide range of cases
@@ -497,10 +530,9 @@ one or more devices to exercise end-to-end code paths.
 A host-driven system interaction test has the ability to fully
 control a Fuchsia device using SDK tools and direct connection to
 services on the device. They are written using the Lacewing framework
-(build on Mobly), so we will refer to them as **Lacewing tests for
-short**.
+(build on Mobly).
 
-Lacewing tests can arbitrarily connect to services on a target
+Tests that use Lacewing can arbitrarily connect to services on a target
 system. Some tests are written to target specific drivers or
 subsystems (e.g. does the real-time clock save time across reboots?),
 some are written to cover user journeys that require device-wide
@@ -509,10 +541,13 @@ navigate to a web page?), and some are written to control a number
 of Fuchsia and non-Fuchsia devices in concert (e.g. can a Fuchsia
 device pair with a bluetooth accessory?).
 
-Lacewing test's interactions with the device are handled through
+With the Lacewing Framework, interactions with the device are handled through
 "affordances," which provide evolvable interfaces to interact with
 specific device subsystems (e.g. Bluetooth affordance, WLAN affordance,
 etc).
+
+Diagram shows an approach for running system interaction tests using Lacewing.
+![System Interaction Tests](images/system-interaction-test.png "Diagram shows an approach for running system interaction tests using Lacewing")
 
 As with most end-to-end (E2E) tests, this kind of testing can be
 expensive for several reasons:
@@ -529,7 +564,7 @@ gaps: ensuring that a real user interacting with a system will see
 the desired outputs.
 
 **Some system components and drivers need this kind of test,** but
-the main benefit of Lacewing tests is to cover real-world device
+the main benefit of using Lacewing is to cover real-world device
 interactions that cannot be covered by isolated on-device tests.
 Choosing between system validation and Lacewing is often a judgement
 call, but there is space for both kinds of testing in a complete

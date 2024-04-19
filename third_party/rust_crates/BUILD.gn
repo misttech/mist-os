@@ -630,8 +630,8 @@ group("pin-project") {
   public_deps = [ ":pin-project-v1_0_11" ]
 }
 
-group("pin-utils") {
-  public_deps = [ ":pin-utils-v0_1_0" ]
+group("pin-project-lite") {
+  public_deps = [ ":pin-project-lite-v0_2_13" ]
 }
 
 group("pkcs8") {

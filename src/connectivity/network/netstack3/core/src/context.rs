@@ -1017,14 +1017,17 @@ pub(crate) mod testutil {
     /// A fake [`FrameContext`].
     pub struct FakeFrameCtx<Meta> {
         frames: Vec<(Meta, Vec<u8>)>,
-        should_error_for_frame: Option<Box<dyn Fn(&Meta) -> bool>>,
+        should_error_for_frame: Option<Box<dyn Fn(&Meta) -> bool + Send>>,
     }
 
     #[cfg(test)]
     impl<Meta> FakeFrameCtx<Meta> {
         /// Closure which can decide to cause an error to be thrown when
         /// handling a frame, based on the metadata.
-        pub(crate) fn set_should_error_for_frame<F: Fn(&Meta) -> bool + 'static>(&mut self, f: F) {
+        pub(crate) fn set_should_error_for_frame<F: Fn(&Meta) -> bool + Send + 'static>(
+            &mut self,
+            f: F,
+        ) {
             self.should_error_for_frame = Some(Box::new(f));
         }
     }

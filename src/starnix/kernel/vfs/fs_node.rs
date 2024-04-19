@@ -5,7 +5,7 @@
 use crate::{
     device::DeviceMode,
     mm::PAGE_SIZE,
-    selinux::hooks::current_task_hooks::{get_fs_node_security_id, post_setxattr},
+    security::{get_fs_node_security_id, post_setxattr},
     signals::{send_standard_signal, SignalInfo},
     task::{CurrentTask, Kernel, WaitQueue, Waiter},
     time::utc,
@@ -557,6 +557,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Create and return the given child node as a subdirectory.
     fn mkdir(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -567,6 +568,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Creates a symlink with the given `target` path.
     fn create_symlink(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -662,8 +664,8 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// File systems that keep the FsNodeInfo up-to-date do not need to
     /// override this function.
     ///
-    /// Return a reader lock on the updated information.
-    fn refresh_info<'a>(
+    /// Return a read guard for the updated information.
+    fn fetch_and_refresh_info<'a>(
         &self,
         _node: &FsNode,
         _current_task: &CurrentTask,
@@ -676,7 +678,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     ///
     /// Starnix updates the timestamps in node.info directly. However, if the filesystem can manage
     /// the timestamps, then Starnix does not need to do so. `node.info`` will be refreshed with the
-    /// timestamps from the filesystem by calling `refresh_info(..)`.
+    /// timestamps from the filesystem by calling `fetch_and_refresh_info(..)`.
     fn filesystem_manages_timestamps(&self, _node: &FsNode) -> bool {
         false
     }
@@ -791,6 +793,7 @@ macro_rules! fs_node_impl_dir_readonly {
     () => {
         fn mkdir(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &crate::vfs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::vfs::FsStr,
@@ -815,6 +818,7 @@ macro_rules! fs_node_impl_dir_readonly {
 
         fn create_symlink(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &crate::vfs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::vfs::FsStr,
@@ -921,6 +925,7 @@ macro_rules! fs_node_impl_not_dir {
 
         fn mkdir(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &crate::vfs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::vfs::FsStr,
@@ -932,6 +937,7 @@ macro_rules! fs_node_impl_not_dir {
 
         fn create_symlink(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &crate::vfs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::vfs::FsStr,
@@ -1240,7 +1246,8 @@ impl FsNode {
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
 
         if mode.is_dir() {
-            self.ops().mkdir(self, current_task, name, mode, owner)
+            let mut locked = locked.cast_locked::<FileOpsCore>();
+            self.ops().mkdir(&mut locked, self, current_task, name, mode, owner)
         } else {
             // https://man7.org/linux/man-pages/man2/mknod.2.html says:
             //
@@ -1261,16 +1268,21 @@ impl FsNode {
         }
     }
 
-    pub fn create_symlink(
+    pub fn create_symlink<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
         target: &FsStr,
         owner: FsCred,
-    ) -> Result<FsNodeHandle, Errno> {
+    ) -> Result<FsNodeHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         self.check_access(current_task, mount, Access::WRITE)?;
-        self.ops().create_symlink(self, current_task, name, target, owner)
+        let mut locked = locked.cast_locked::<FileOpsCore>();
+        self.ops().create_symlink(&mut locked, self, current_task, name, target, owner)
     }
 
     pub fn create_tmpfile(
@@ -1748,7 +1760,7 @@ impl FsNode {
     }
 
     pub fn stat(&self, current_task: &CurrentTask) -> Result<uapi::stat, Errno> {
-        let info = self.refresh_info(current_task)?;
+        let info = self.fetch_and_refresh_info(current_task)?;
 
         let time_to_kernel_timespec_pair = |t| {
             let timespec { tv_sec, tv_nsec } = timespec_from_time(t);
@@ -1801,7 +1813,7 @@ impl FsNode {
         let info = if flags.contains(StatxFlags::AT_STATX_DONT_SYNC) {
             self.info()
         } else {
-            self.refresh_info(current_task)?
+            self.fetch_and_refresh_info(current_task)?
         };
         if mask & STATX__RESERVED == STATX__RESERVED {
             return error!(EINVAL);
@@ -1931,12 +1943,12 @@ impl FsNode {
         self.info.read()
     }
 
-    /// Refreshes the `FsNodeInfo` if necessary and returns a read lock.
-    pub fn refresh_info(
+    /// Refreshes the `FsNodeInfo` if necessary and returns a read guard.
+    pub fn fetch_and_refresh_info(
         &self,
         current_task: &CurrentTask,
     ) -> Result<RwLockReadGuard<'_, FsNodeInfo>, Errno> {
-        self.ops().refresh_info(self, current_task, &self.info)
+        self.ops().fetch_and_refresh_info(self, current_task, &self.info)
     }
 
     pub fn update_info<F, T>(&self, mutator: F) -> T

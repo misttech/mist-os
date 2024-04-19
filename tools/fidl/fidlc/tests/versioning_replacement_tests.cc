@@ -8,20 +8,31 @@
 
 // This file tests how FIDL versioning distinguishes "removal" from
 // "replacement", and validation that replacement is done correctly.
+// Tests are run for all the versions given in INSTANTIATE_TEST_SUITE_P.
 
 namespace fidlc {
 namespace {
 
-TEST(VersioningReplacementTests, BadRemovedWithReplacement) {
+class VersioningReplacementTest : public testing::TestWithParam<Version> {};
+
+const Version V1 = Version::From(1).value();
+const Version V2 = Version::From(2).value();
+const Version V3 = Version::From(3).value();
+
+INSTANTIATE_TEST_SUITE_P(VersioningReplacementTests, VersioningReplacementTest,
+                         testing::Values(V1, V2, V3),
+                         [](auto info) { return info.param.ToString(); });
+
+TEST_P(VersioningReplacementTest, BadRemovedWithReplacement) {
   TestLibrary library;
+  library.SelectVersion("test", GetParam());
   library.AddFile("bad/fi-0205.test.fidl");
-  library.SelectVersion("test", "HEAD");
   library.ExpectFail(ErrRemovedWithReplacement, "Bar", Version::From(2).value(),
                      "bad/fi-0205.test.fidl:11:14");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(VersioningReplacementTests, BadRemovedNamedToAnonymous) {
+TEST_P(VersioningReplacementTest, BadRemovedNamedToAnonymous) {
   TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
@@ -34,14 +45,14 @@ type Bar = struct {
     foo struct {};
 };
 )FIDL");
-  library.SelectVersion("example", "HEAD");
+  library.SelectVersion("example", GetParam());
   library.ExpectFail(ErrRemovedWithReplacement, "Foo", Version::From(2).value(),
                      "example.fidl:10:9");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(VersioningReplacementTests, GoodRemovedAnonymousToNamed) {
-  auto source = R"FIDL(
+TEST_P(VersioningReplacementTest, GoodRemovedAnonymousToNamed) {
+  TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
 
@@ -54,28 +65,15 @@ type Bar = struct {
 
 @available(added=2)
 type Foo = table {};
-)FIDL";
-
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "1");
-    ASSERT_COMPILED(library);
-
-    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
-    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
-  }
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "2");
-    ASSERT_COMPILED(library);
-
-    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
-    EXPECT_NE(library.LookupTable("Foo"), nullptr);
-  }
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.HasStruct("Foo"), GetParam() == V1);
+  EXPECT_EQ(library.HasTable("Foo"), GetParam() >= V2);
 }
 
-TEST(VersioningReplacementTests, GoodRemovedAnonymousToAnonymous) {
-  auto source = R"FIDL(
+TEST_P(VersioningReplacementTest, GoodRemovedAnonymousToAnonymous) {
+  TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
 
@@ -90,36 +88,23 @@ type Bar2 = struct {
     @available(added=2)
     foo table {};
 };
-)FIDL";
-
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "1");
-    ASSERT_COMPILED(library);
-
-    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
-    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
-  }
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "2");
-    ASSERT_COMPILED(library);
-
-    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
-    EXPECT_NE(library.LookupTable("Foo"), nullptr);
-  }
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.HasStruct("Foo"), GetParam() == V1);
+  EXPECT_EQ(library.HasTable("Foo"), GetParam() >= V2);
 }
 
-TEST(VersioningReplacementTests, BadReplacedWithoutReplacement) {
+TEST_P(VersioningReplacementTest, BadReplacedWithoutReplacement) {
   TestLibrary library;
+  library.SelectVersion("test", GetParam());
   library.AddFile("bad/fi-0206.test.fidl");
-  library.SelectVersion("test", "HEAD");
   library.ExpectFail(ErrReplacedWithoutReplacement, "Bar", Version::From(2).value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(VersioningReplacementTests, GoodAnonymousReplacedWithoutReplacement) {
-  auto source = R"FIDL(
+TEST_P(VersioningReplacementTest, GoodAnonymousReplacedWithoutReplacement) {
+  TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
 
@@ -131,26 +116,14 @@ type Bar = struct {
     @available(added=2)
     foo string;
 };
-)FIDL";
-
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "1");
-    ASSERT_COMPILED(library);
-
-    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
-  }
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "2");
-    ASSERT_COMPILED(library);
-
-    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
-  }
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.HasStruct("Foo"), GetParam() == V1);
 }
 
-TEST(VersioningReplacementTests, GoodReplacedNamedToAnonymous) {
-  auto source = R"FIDL(
+TEST_P(VersioningReplacementTest, GoodReplacedNamedToAnonymous) {
+  TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
 
@@ -161,28 +134,15 @@ type Bar = struct {
     @available(added=2)
     foo table {};
 };
-)FIDL";
-
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "1");
-    ASSERT_COMPILED(library);
-
-    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
-    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
-  }
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "2");
-    ASSERT_COMPILED(library);
-
-    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
-    EXPECT_NE(library.LookupTable("Foo"), nullptr);
-  }
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.HasStruct("Foo"), GetParam() == V1);
+  EXPECT_EQ(library.HasTable("Foo"), GetParam() >= V2);
 }
 
-TEST(VersioningReplacementTests, GoodReplacedAnonymousToNamed) {
-  auto source = R"FIDL(
+TEST_P(VersioningReplacementTest, GoodReplacedAnonymousToNamed) {
+  TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
 
@@ -195,28 +155,15 @@ type Bar = struct {
 
 @available(added=2)
 type Foo = table {};
-)FIDL";
-
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "1");
-    ASSERT_COMPILED(library);
-
-    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
-    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
-  }
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "2");
-    ASSERT_COMPILED(library);
-
-    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
-    EXPECT_NE(library.LookupTable("Foo"), nullptr);
-  }
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.HasStruct("Foo"), GetParam() == V1);
+  EXPECT_EQ(library.HasTable("Foo"), GetParam() >= V2);
 }
 
-TEST(VersioningReplacementTests, GoodReplacedAnonymousToAnonymous) {
-  auto source = R"FIDL(
+TEST_P(VersioningReplacementTest, GoodReplacedAnonymousToAnonymous) {
+  TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
 
@@ -231,28 +178,15 @@ type Bar2 = struct {
     @available(added=2)
     foo table {};
 };
-)FIDL";
-
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "1");
-    ASSERT_COMPILED(library);
-
-    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
-    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
-  }
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "2");
-    ASSERT_COMPILED(library);
-
-    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
-    EXPECT_NE(library.LookupTable("Foo"), nullptr);
-  }
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.HasStruct("Foo"), GetParam() == V1);
+  EXPECT_EQ(library.HasTable("Foo"), GetParam() >= V2);
 }
 
-TEST(VersioningReplacementTests, GoodReplacedTwice) {
-  auto source = R"FIDL(
+TEST_P(VersioningReplacementTest, GoodReplacedTwice) {
+  TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
 
@@ -264,35 +198,12 @@ type Foo = table {};
 
 @available(added=3)
 type Foo = union {};
-)FIDL";
-
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "1");
-    ASSERT_COMPILED(library);
-
-    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
-    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
-    EXPECT_EQ(library.LookupUnion("Foo"), nullptr);
-  }
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "2");
-    ASSERT_COMPILED(library);
-
-    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
-    EXPECT_NE(library.LookupTable("Foo"), nullptr);
-    EXPECT_EQ(library.LookupUnion("Foo"), nullptr);
-  }
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "3");
-    ASSERT_COMPILED(library);
-
-    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
-    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
-    EXPECT_NE(library.LookupUnion("Foo"), nullptr);
-  }
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.HasStruct("Foo"), GetParam() == V1);
+  EXPECT_EQ(library.HasTable("Foo"), GetParam() == V2);
+  EXPECT_EQ(library.HasUnion("Foo"), GetParam() >= V3);
 }
 
 }  // namespace

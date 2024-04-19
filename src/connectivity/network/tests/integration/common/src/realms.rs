@@ -71,7 +71,6 @@ impl NetstackVersion {
         macro_rules! common_services_and {
             ($($name:expr),*) => {[
                 fnet_debug::InterfacesMarker::PROTOCOL_NAME,
-                fnet_filter_deprecated::FilterMarker::PROTOCOL_NAME,
                 fnet_interfaces_admin::InstallerMarker::PROTOCOL_NAME,
                 fnet_interfaces::StateMarker::PROTOCOL_NAME,
                 fnet_name::DnsServerWatcherMarker::PROTOCOL_NAME,
@@ -99,6 +98,7 @@ impl NetstackVersion {
         match self {
             NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
             | NetstackVersion::ProdNetstack2 => &common_services_and!(
+                fnet_filter_deprecated::FilterMarker::PROTOCOL_NAME,
                 fnet_multicast_admin::Ipv4RoutingTableControllerMarker::PROTOCOL_NAME,
                 fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME,
                 fnet_stack::LogMarker::PROTOCOL_NAME,
@@ -400,6 +400,11 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                             .chain(
                                 [
                                     fnetemul::Capability::LogSink(fnetemul::Empty {}),
+                                    fnetemul::Capability::ChildDep(protocol_dep::<
+                                        fnet_filter::ControlMarker,
+                                    >(
+                                        constants::netstack::COMPONENT_NAME,
+                                    )),
                                     fnetemul::Capability::ChildDep(protocol_dep::<
                                         fnet_filter_deprecated::FilterMarker,
                                     >(

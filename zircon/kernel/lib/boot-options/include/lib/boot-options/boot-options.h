@@ -100,8 +100,8 @@ struct BootOptions {
 
   // Overloads parse and print values of various types.
   // |Parse| returns true on successfully parsing the value.
-#define OPTION_TYPE(T)                                  \
-  bool Parse(std::string_view, T BootOptions::*member); \
+#define OPTION_TYPE(T)                                   \
+  bool Parse(std::string_view, T BootOptions::* member); \
   static void PrintValue(const T& value, FILE* out = stdout)
 
   OPTION_TYPE(bool);
@@ -112,7 +112,6 @@ struct BootOptions {
   OPTION_TYPE(RedactedHex);
   OPTION_TYPE(OomBehavior);
   OPTION_TYPE(EntropyTestSource);
-  OPTION_TYPE(GfxConsoleFont);
   OPTION_TYPE(SerialDebugSyscalls);
   OPTION_TYPE(PageTableEvictionPolicy);
   OPTION_TYPE(RootJobBehavior);

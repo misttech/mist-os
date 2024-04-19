@@ -61,7 +61,7 @@ use {
     },
     manager::ComponentManagerInstance,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
-    sandbox::{Capability, Dict, Open},
+    sandbox::{Capability, Dict, DictEntries, Open},
     std::{
         clone::Clone,
         collections::{HashMap, HashSet},
@@ -509,7 +509,7 @@ impl ComponentInstance {
             };
             let dict_entries = {
                 let mut entries = dict.lock_entries();
-                std::mem::replace(&mut *entries, std::collections::BTreeMap::new())
+                std::mem::replace(&mut *entries, DictEntries::new())
             };
             let capabilities = child_input.capabilities();
             let mut child_dict_entries = capabilities.lock_entries();
@@ -527,9 +527,8 @@ impl ComponentInstance {
                     _ => return Err(AddDynamicChildError::InvalidDictionary),
                 };
 
-                if child_dict_entries
-                    .insert(key.clone(), Capability::Router(Box::new(router)))
-                    .is_some()
+                if let Err(_) =
+                    child_dict_entries.insert(key.clone(), Capability::Router(Box::new(router)))
                 {
                     return Err(AddDynamicChildError::StaticRouteConflict { capability_name: key });
                 }
@@ -626,17 +625,17 @@ impl ComponentInstance {
     ) -> Result<(), StopActionError> {
         // If the component is started, we first move it back to the resolved state. We will move
         // it to the shutdown state after the stopping is complete.
-        let mut runtime = None;
+        let mut started = None;
         self.lock_state().await.replace(|instance_state| match instance_state {
             InstanceState::Started(resolved_state, started_state) => {
-                runtime = Some(started_state);
+                started = Some(started_state);
                 InstanceState::Resolved(resolved_state)
             }
             other_state => other_state,
         });
 
         let stop_result = {
-            if let Some(runtime) = &mut runtime {
+            if let Some(started) = started {
                 let stop_timer = Box::pin(async move {
                     let timer = fasync::Timer::new(fasync::Time::after(zx::Duration::from(
                         self.environment.stop_timeout(),
@@ -649,8 +648,8 @@ impl ComponentInstance {
                     )));
                     timer.await;
                 });
-                let ret = runtime
-                    .stop_program(stop_timer, kill_timer)
+                let ret = started
+                    .stop(stop_timer, kill_timer)
                     .await
                     .map_err(StopActionError::ProgramStopError)?;
                 if ret.outcome.request == StopRequestSuccess::KilledAfterTimeout
@@ -673,11 +672,6 @@ impl ComponentInstance {
                         .await
                         .map_err(|_| StopActionError::GetTopInstanceFailed)?;
                     top_instance.trigger_reboot().await;
-                }
-
-                if let Some(execution_controller_task) = runtime.execution_controller_task.as_mut()
-                {
-                    execution_controller_task.set_stop_status(ret.outcome.component_exit_status);
                 }
                 Some(ret)
             } else {
@@ -709,8 +703,13 @@ impl ComponentInstance {
                 };
             }
 
-            let event =
-                Event::new(self, EventPayload::Stopped { status: outcome.component_exit_status });
+            let event = Event::new(
+                self,
+                EventPayload::Stopped {
+                    status: outcome.component_exit_status,
+                    stop_time: zx::Time::get_monotonic(),
+                },
+            );
             self.hooks.dispatch(&event).await;
         }
 
@@ -1625,8 +1624,8 @@ pub mod tests {
     async fn shutdown_component_interface_no_dynamic() {
         let example_offer = OfferBuilder::directory()
             .name("foo")
-            .source(OfferSource::static_child("a".to_string()))
-            .target(OfferTarget::static_child("b".to_string()))
+            .source_static_child("a")
+            .target_static_child("b")
             .build();
         let example_capability = CapabilityBuilder::protocol().name("bar").build();
         let example_expose =
@@ -1693,8 +1692,8 @@ pub mod tests {
     async fn shutdown_component_interface_dynamic_children_and_offers() {
         let example_offer = OfferBuilder::directory()
             .name("foo")
-            .source(OfferSource::static_child("a".to_string()))
-            .target(OfferTarget::static_child("b".to_string()))
+            .source_static_child("a")
+            .target_static_child("b")
             .build();
 
         let components = vec![
@@ -1914,7 +1913,7 @@ pub mod tests {
         let example_offer = OfferBuilder::service()
             .name("foo")
             .source(OfferSource::Collection("coll".parse().unwrap()))
-            .target(OfferTarget::static_child("static_child".to_string()))
+            .target_static_child("static_child")
             .build();
 
         let components = vec![
@@ -2449,7 +2448,7 @@ pub mod tests {
                         OfferBuilder::protocol()
                             .name(flogger::LogSinkMarker::PROTOCOL_NAME)
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child(TEST_CHILD_NAME.to_string())),
+                            .target_static_child(TEST_CHILD_NAME),
                     )
                     .child_default(TEST_CHILD_NAME)
                     .build(),

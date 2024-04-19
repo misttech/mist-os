@@ -31,7 +31,6 @@
 #include <arch/arm64/mp.h>
 #include <arch/arm64/periphmap.h>
 #include <arch/mp.h>
-#include <dev/display.h>
 #include <dev/hw_rng.h>
 #include <dev/interrupt.h>
 #include <dev/power.h>
@@ -515,9 +514,6 @@ int legacy_platform_pgetc(char* c) {
   return 0;
 }
 
-/* no built in framebuffer */
-zx_status_t display_get_info(display_info* info) { return ZX_ERR_NOT_FOUND; }
-
 void platform_specific_halt(platform_halt_action suggested_action, zircon_crash_reason_t reason,
                             bool halt_on_panic) {
   if (suggested_action == HALT_ACTION_REBOOT) {
@@ -586,8 +582,6 @@ NO_ASAN void platform_mexec(mexec_asm_func mexec_assembly, memmov_ops_t* ops,
   mexec_assembly((uintptr_t)new_bootimage_addr, 0, 0, arm64_get_boot_el(), ops,
                  (void*)kernel_dst_phys);
 }
-
-bool platform_early_console_enabled() { return false; }
 
 // Initialize Resource system after the heap is initialized.
 static void arm_resource_dispatcher_init_hook(unsigned int rl) {

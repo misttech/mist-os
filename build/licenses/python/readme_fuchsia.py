@@ -13,7 +13,7 @@ from typing import ClassVar, Dict, List, Tuple, Any, Set
 @dataclasses.dataclass
 class Readme:
     readme_label: GnLabel
-    package_name: str
+    package_name: str | None
     license_files: Tuple[GnLabel]
 
     def from_text(
@@ -47,7 +47,9 @@ class Readme:
 @dataclasses.dataclass
 class ReadmesDB:
     file_access: FileAccess
-    cache: Dict[GnLabel, Readme] = dataclasses.field(default_factory=dict)
+    cache: Dict[GnLabel, Readme | None] = dataclasses.field(
+        default_factory=dict
+    )
 
     _barrier_dir_names: ClassVar[Set[str]] = set(
         [
@@ -59,30 +61,31 @@ class ReadmesDB:
         ]
     )
 
-    def find_readme_for_label(self, target_label: GnLabel) -> Readme:
+    def find_readme_for_label(self, target_label: GnLabel) -> Readme | None:
         GnLabel.check_type(target_label)
 
         logging.debug("Finding readme for %s", target_label)
-
         if target_label.toolchain:
             target_label = target_label.without_toolchain()
         if target_label.is_local_name:
             target_label = target_label.parent_label()
         assert not target_label.is_local_name
 
-        if target_label in self.cache:
-            value = self.cache[target_label]
+        value = self.cache.get(target_label, False)
+        if value != False:
             logging.debug("Found %s in cache", value)
+            assert not isinstance(value, bool)  # quiet mypy false positive.
             return value
 
+        if target_label.path_str:
+            readme_fuchsia_suffix = f"{target_label.path_str}/README.fuchsia"
+        else:
+            readme_fuchsia_suffix = "README.fuchsia"
+
         potential_readme_files = [
-            "vendor/google/tools/check-licenses/assets/readmes"
-            / target_label.path
-            / "README.fuchsia",
-            "tools/check-licenses/assets/readmes"
-            / target_label.path
-            / "README.fuchsia",
-            target_label.path / "README.fuchsia",
+            f"vendor/google/tools/check-licenses/assets/readmes/{readme_fuchsia_suffix}",
+            f"tools/check-licenses/assets/readmes/{readme_fuchsia_suffix}",
+            readme_fuchsia_suffix,
         ]
         for readme_source_path in potential_readme_files:
             readme_label = GnLabel.from_path(readme_source_path)
@@ -101,14 +104,15 @@ class ReadmesDB:
                 )
                 self.cache[target_label] = readme
                 return readme
-            else:
-                logging.debug("%s does not exist", readme_label)
+
+            logging.debug("%s does not exist", readme_label)
 
         if target_label.name in ReadmesDB._barrier_dir_names:
             logging.debug("%s is a barrier path", target_label)
             self.cache[target_label] = None
             return None
-        elif target_label.has_parent_label():
+
+        if target_label.has_parent_label():
             parent = target_label.parent_label()
             logging.debug(
                 "Trying with parent of %s: %s...", target_label, parent
@@ -120,7 +124,7 @@ class ReadmesDB:
             )
             self.cache[target_label] = parent_result
             return parent_result
-        else:
-            logging.debug(f"No readme found for %s", target_label)
-            self.cache[target_label] = None
-            return None
+
+        logging.debug(f"No readme found for %s", target_label)
+        self.cache[target_label] = None
+        return None

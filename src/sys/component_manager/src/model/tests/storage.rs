@@ -119,7 +119,7 @@ async fn use_in_collection_from_parent() {
                         .name("data")
                         .target_name("minfs")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("b".to_string()))
+                        .target_static_child("b")
                         .rights(fio::RW_STAR_DIR),
                 )
                 .child_default("b")
@@ -259,13 +259,13 @@ async fn use_in_collection_from_grandparent() {
                     OfferBuilder::storage()
                         .name("data")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("b".to_string())),
+                        .target_static_child("b"),
                 )
                 .offer(
                     OfferBuilder::storage()
                         .name("cache")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("b".to_string())),
+                        .target_static_child("b"),
                 )
                 .child_default("b")
                 .capability(
@@ -480,7 +480,7 @@ async fn use_restricted_storage_start_failure() {
                     OfferBuilder::storage()
                         .name("cache")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("parent_consumer".to_string())),
+                        .target_static_child("parent_consumer"),
                 )
                 .child_default("parent_consumer")
                 .build(),
@@ -493,7 +493,7 @@ async fn use_restricted_storage_start_failure() {
                     OfferBuilder::storage()
                         .name("cache")
                         .source(OfferSource::Parent)
-                        .target(OfferTarget::static_child("child_consumer".to_string())),
+                        .target_static_child("child_consumer"),
                 )
                 .child_default("child_consumer")
                 .build(),
@@ -573,7 +573,7 @@ async fn use_restricted_storage_open_failure() {
                     OfferBuilder::storage()
                         .name("cache")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("parent_consumer".to_string())),
+                        .target_static_child("parent_consumer"),
                 )
                 .child_default("parent_consumer")
                 .build(),
@@ -698,7 +698,7 @@ async fn open_storage_subdirectory() {
                     OfferBuilder::storage()
                         .name("cache")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("consumer".to_string())),
+                        .target_static_child("consumer"),
                 )
                 .child_default("consumer")
                 .build(),
@@ -808,13 +808,13 @@ async fn storage_persistence_moniker_path() {
                     OfferBuilder::storage()
                         .name("data")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("b".to_string())),
+                        .target_static_child("b"),
                 )
                 .offer(
                     OfferBuilder::protocol()
                         .name("fuchsia.sys2.StorageAdmin")
                         .source(OfferSource::Capability("data".parse().unwrap()))
-                        .target(OfferTarget::static_child("b".to_string())),
+                        .target_static_child("b"),
                 )
                 .child_default("b")
                 .build(),
@@ -971,13 +971,13 @@ async fn storage_persistence_instance_id_path() {
                     OfferBuilder::storage()
                         .name("data")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("b".to_string())),
+                        .target_static_child("b"),
                 )
                 .offer(
                     OfferBuilder::protocol()
                         .name("fuchsia.sys2.StorageAdmin")
                         .source(OfferSource::Capability("data".parse().unwrap()))
-                        .target(OfferTarget::static_child("b".to_string())),
+                        .target_static_child("b"),
                 )
                 .child_default("b")
                 .build(),
@@ -1138,7 +1138,7 @@ async fn storage_persistence_inheritance() {
                     OfferBuilder::storage()
                         .name("data")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("b".to_string())),
+                        .target_static_child("b"),
                 )
                 .child_default("b")
                 .build(),
@@ -1176,7 +1176,7 @@ async fn storage_persistence_inheritance() {
                     OfferBuilder::storage()
                         .name("data")
                         .source(OfferSource::Parent)
-                        .target(OfferTarget::static_child("d".to_string())),
+                        .target_static_child("d"),
                 )
                 .offer(
                     OfferBuilder::storage()
@@ -1365,7 +1365,7 @@ async fn storage_persistence_disablement() {
                     OfferBuilder::storage()
                         .name("data")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::static_child("b".to_string())),
+                        .target_static_child("b"),
                 )
                 .child_default("b")
                 .build(),
@@ -1403,7 +1403,7 @@ async fn storage_persistence_disablement() {
                     OfferBuilder::storage()
                         .name("data")
                         .source(OfferSource::Parent)
-                        .target(OfferTarget::static_child("d".to_string())),
+                        .target_static_child("d"),
                 )
                 .offer(
                     OfferBuilder::storage()

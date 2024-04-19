@@ -5,6 +5,7 @@
 use {
     crate::sandbox_util::DictExt,
     cm_types::{IterablePath, Name},
+    fidl_fuchsia_component_sandbox as fsandbox,
     lazy_static::lazy_static,
     sandbox::{Capability, Dict},
     std::{fmt, marker::PhantomData},
@@ -49,10 +50,10 @@ impl<T: StructuredDict> StructuredDict for StructuredDictMap<T> {
 
 #[allow(private_bounds)]
 impl<T: StructuredDict> StructuredDictMap<T> {
-    pub fn insert(&mut self, key: Name, value: T) {
+    pub fn insert(&mut self, key: Name, value: T) -> Result<(), fsandbox::DictionaryError> {
         let mut entries = self.inner.lock_entries();
         let dict: Dict = value.into();
-        entries.insert(key, dict.into());
+        entries.insert(key, dict.into())
     }
 
     pub fn get(&self, key: &Name) -> Option<T> {
@@ -115,8 +116,8 @@ impl ComponentInput {
     pub fn new(environment: ComponentEnvironment) -> Self {
         let dict = Dict::new();
         let mut entries = dict.lock_entries();
-        entries.insert(PARENT.clone(), Dict::new().into());
-        entries.insert(ENVIRONMENT.clone(), Dict::from(environment).into());
+        entries.insert(PARENT.clone(), Dict::new().into()).ok();
+        entries.insert(ENVIRONMENT.clone(), Dict::from(environment).into()).ok();
         drop(entries);
         Self(dict)
     }
@@ -131,8 +132,10 @@ impl ComponentInput {
         // inner sandboxes.
         let dict = Dict::new();
         let mut entries = dict.lock_entries();
-        entries.insert(PARENT.clone(), self.capabilities().shallow_copy().into());
-        entries.insert(ENVIRONMENT.clone(), Dict::from(self.environment()).shallow_copy().into());
+        entries.insert(PARENT.clone(), self.capabilities().shallow_copy().into()).ok();
+        entries
+            .insert(ENVIRONMENT.clone(), Dict::from(self.environment()).shallow_copy().into())
+            .ok();
         drop(entries);
         Self(dict)
     }
@@ -157,7 +160,11 @@ impl ComponentInput {
         ComponentEnvironment(dict.clone())
     }
 
-    pub fn insert_capability(&self, path: &impl IterablePath, capability: Capability) {
+    pub fn insert_capability(
+        &self,
+        path: &impl IterablePath,
+        capability: Capability,
+    ) -> Result<(), fsandbox::DictionaryError> {
         self.capabilities().insert_capability(path, capability.into())
     }
 }
@@ -177,7 +184,7 @@ impl Default for ComponentEnvironment {
     fn default() -> Self {
         let dict = Dict::new();
         let mut entries = dict.lock_entries();
-        entries.insert(DEBUG.clone(), Dict::new().into());
+        entries.insert(DEBUG.clone(), Dict::new().into()).ok();
         drop(entries);
         Self(dict)
     }
@@ -210,7 +217,7 @@ impl ComponentEnvironment {
         // inner sandboxes.
         let dict = Dict::new();
         let mut entries = dict.lock_entries();
-        entries.insert(DEBUG.clone(), self.debug().shallow_copy().into());
+        entries.insert(DEBUG.clone(), self.debug().shallow_copy().into()).ok();
         drop(entries);
         Self(dict)
     }
@@ -226,6 +233,7 @@ impl From<ComponentEnvironment> for Dict {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use sandbox::DictKey;
 
     impl StructuredDict for Dict {
         fn from_dict(dict: Dict) -> Self {
@@ -238,43 +246,52 @@ mod tests {
         let dict1 = Dict::new();
         {
             let mut entries = dict1.lock_entries();
-            entries.insert("a".parse().unwrap(), Dict::new().into());
+            entries
+                .insert("a".parse().unwrap(), Dict::new().into())
+                .expect("dict entry already exists");
         }
         let dict2 = Dict::new();
         {
             let mut entries = dict2.lock_entries();
-            entries.insert("b".parse().unwrap(), Dict::new().into());
+            entries
+                .insert("b".parse().unwrap(), Dict::new().into())
+                .expect("dict entry already exists");
         }
         let dict2_alt = Dict::new();
         {
             let mut entries = dict2_alt.lock_entries();
-            entries.insert("c".parse().unwrap(), Dict::new().into());
+            entries
+                .insert("c".parse().unwrap(), Dict::new().into())
+                .expect("dict entry already exists");
         }
         let name1 = Name::new("1").unwrap();
         let name2 = Name::new("2").unwrap();
 
         let mut map: StructuredDictMap<Dict> = Default::default();
         assert_matches!(map.get(&name1), None);
-        map.insert(name1.clone(), dict1);
+        assert!(map.insert(name1.clone(), dict1).is_ok());
         let d = map.get(&name1).unwrap();
         {
             let entries = d.lock_entries();
-            assert!(entries.contains_key("a"));
+            let key = DictKey::new("a").unwrap();
+            assert!(entries.get(&key).is_some());
         }
 
-        map.insert(name2.clone(), dict2);
+        assert!(map.insert(name2.clone(), dict2).is_ok());
         let d = map.remove(&name2).unwrap();
         assert_matches!(map.remove(&name2), None);
         {
             let entries = d.lock_entries();
-            assert!(entries.contains_key("b"));
+            let key = DictKey::new("b").unwrap();
+            assert!(entries.get(&key).is_some());
         }
 
-        map.insert(name2.clone(), dict2_alt);
+        assert!(map.insert(name2.clone(), dict2_alt).is_ok());
         let d = map.get(&name2).unwrap();
         {
             let entries = d.lock_entries();
-            assert!(entries.contains_key("c"));
+            let key = DictKey::new("c").unwrap();
+            assert!(entries.get(&key).is_some());
         }
     }
 }

@@ -1,0 +1,19 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+composite fake_power_parent;
+
+using fuchsia.test.platform;
+
+primary node "power" {
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.test.platform.BIND_PLATFORM_DEV_VID.TEST;
+  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.test.platform.BIND_PLATFORM_DEV_PID.POWER_TEST;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.test.platform.BIND_PLATFORM_DEV_DID.FAKE_POWER_PARENT;
+}
+
+node "platform-device" {
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.test.platform.BIND_PLATFORM_DEV_VID.TEST;
+  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.test.platform.BIND_PLATFORM_DEV_PID.POWER_TEST;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.test.platform.BIND_PLATFORM_DEV_DID.FAKE_POWER_PLATFORM_DEVICE_PARENT;
+}

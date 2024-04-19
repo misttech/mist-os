@@ -6,9 +6,6 @@
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_BASIC_TYPES_H_
 
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/markers.h>
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_messaging.h>
-#include <lib/fidl/cpp/unified_messaging.h>
 
 #include <array>
 
@@ -27,7 +24,6 @@ using UniqueId = std::array<uint8_t, fuchsia_audio_device::kUniqueInstanceIdSize
 struct ElementRecord {
   fuchsia_hardware_audio_signalprocessing::Element element;
   std::optional<fuchsia_hardware_audio_signalprocessing::ElementState> state;
-  bool state_change_to_notify = true;
 };
 
 }  // namespace media_audio

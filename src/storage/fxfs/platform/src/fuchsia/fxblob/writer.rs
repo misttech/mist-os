@@ -612,9 +612,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let data = vec![];
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&data);
-        let hash = builder.finish().root();
+        let hash = fuchsia_merkle::from_slice(&data).root();
         let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
 
         {
@@ -678,9 +676,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let data = vec![3; 1_000];
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&data[..data.len() - 1]);
-        let incorrect_hash = builder.finish().root();
+        let incorrect_hash = fuchsia_merkle::from_slice(&data[..data.len() - 1]).root();
         let delivery_data = Type1Blob::generate(&data, CompressionMode::Never);
 
         {
@@ -715,9 +711,7 @@ mod tests {
         let mut data = vec![1; 196608];
         thread_rng().fill(&mut data[..]);
 
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&data);
-        let hash = builder.finish().root();
+        let hash = fuchsia_merkle::from_slice(&data).root();
         let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
 
         {
@@ -798,9 +792,7 @@ mod tests {
             // an OUT_OF_SPACE error on the second write.
             let data = vec![1; 4194304];
 
-            let mut builder = MerkleTreeBuilder::new();
-            builder.write(&data);
-            let hash = builder.finish().root();
+            let hash = fuchsia_merkle::from_slice(&data).root();
             let compressed_data = Type1Blob::generate(&data, CompressionMode::Never);
 
             {
@@ -844,9 +836,7 @@ mod tests {
         let mut data = vec![1; 196608];
         thread_rng().fill(&mut data[..]);
 
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&data);
-        let hash = builder.finish().root();
+        let hash = fuchsia_merkle::from_slice(&data).root();
         let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
 
         {
@@ -886,9 +876,7 @@ mod tests {
 
         let data = vec![1; 65536];
 
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&data);
-        let hash = builder.finish().root();
+        let hash = fuchsia_merkle::from_slice(&data).root();
         let delivery_data = Type1Blob::generate(&data, CompressionMode::Never);
 
         {
@@ -924,9 +912,7 @@ mod tests {
         let mut data = vec![1; 1024921];
         thread_rng().fill(&mut data[..]);
 
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&data);
-        let hash = builder.finish().root();
+        let hash = fuchsia_merkle::from_slice(&data).root();
         let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
         assert!(compressed_data.len() as u64 > *RING_BUFFER_SIZE);
 
@@ -992,9 +978,7 @@ mod tests {
             let mut data = vec![1; 1024921];
             thread_rng().fill(&mut data[..]);
 
-            let mut builder = MerkleTreeBuilder::new();
-            builder.write(&data);
-            let hash = builder.finish().root();
+            let hash = fuchsia_merkle::from_slice(&data).root();
             let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
             assert!(compressed_data.len() as u64 > *RING_BUFFER_SIZE);
 
@@ -1037,9 +1021,7 @@ mod tests {
         // Generate a delivery blob (size doesn't matter).
         let mut data = vec![1; 196608];
         thread_rng().fill(&mut data[..]);
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&data);
-        let hash = builder.finish().root();
+        let hash = fuchsia_merkle::from_slice(&data).root();
         let blob_data = Type1Blob::generate(&data, CompressionMode::Always);
         // To simplify the test, we make sure to write enough bytes on the first call to bytes_ready
         // so that the header can be decoded (and thus the length mismatch is detected).

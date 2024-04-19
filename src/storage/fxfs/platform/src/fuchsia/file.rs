@@ -302,18 +302,16 @@ impl vfs::node::Node for FxFile {
         let props = self.handle.get_properties().await.map_err(map_to_status)?;
         let descriptor =
             self.handle.uncached_handle().get_descriptor().await.map_err(map_to_status)?;
-        // TODO(https://fxbug.dev/324112547): Missing POSIX attributes should not be reported (i.e.
-        // they should be set to `None` instead of `0`).
         Ok(attributes!(
             requested_attributes,
             Mutable {
                 creation_time: props.creation_time.as_nanos(),
                 modification_time: props.modification_time.as_nanos(),
                 access_time: props.access_time.as_nanos(),
-                mode: props.posix_attributes.map(|a| a.mode).unwrap_or(0),
-                uid: props.posix_attributes.map(|a| a.uid).unwrap_or(0),
-                gid: props.posix_attributes.map(|a| a.gid).unwrap_or(0),
-                rdev: props.posix_attributes.map(|a| a.rdev).unwrap_or(0),
+                mode: props.posix_attributes.map(|a| a.mode),
+                uid: props.posix_attributes.map(|a| a.uid),
+                gid: props.posix_attributes.map(|a| a.gid),
+                rdev: props.posix_attributes.map(|a| a.rdev),
             },
             Immutable {
                 protocols: fio::NodeProtocolKinds::FILE,
@@ -588,7 +586,7 @@ mod tests {
         },
         anyhow::format_err,
         fidl_fuchsia_io as fio,
-        fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder},
+        fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions},
         fuchsia_async as fasync,
         fuchsia_fs::file,
         fuchsia_zircon::Status,
@@ -1714,11 +1712,10 @@ mod tests {
                 .expect("write failed");
         }
 
-        let mut builder = MerkleTreeBuilder::new(FsVerityHasher::Sha256(
-            FsVerityHasherOptions::new(vec![0xFF; 8], 4096),
-        ));
-        builder.write(data.as_slice());
-        let tree = builder.finish();
+        let tree = fsverity_merkle::from_slice(
+            &data,
+            FsVerityHasher::Sha256(FsVerityHasherOptions::new(vec![0xFF; 8], 4096)),
+        );
         let mut expected_root = tree.root().to_vec();
         expected_root.extend_from_slice(&[0; 32]);
 

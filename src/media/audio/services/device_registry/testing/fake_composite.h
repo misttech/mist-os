@@ -9,14 +9,9 @@
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/test_base.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/test_base.h>
-#include <lib/fidl/cpp/unified_messaging_declarations.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
-#include <lib/fit/result.h>
-#include <lib/fzl/vmo-mapper.h>
 #include <lib/zx/channel.h>
-#include <lib/zx/clock.h>
 #include <zircon/errors.h>
-#include <zircon/time.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -31,7 +26,7 @@
 
 namespace media_audio {
 
-static constexpr bool kLogFakeComposite = true;
+static constexpr bool kLogFakeComposite = false;
 
 class FakeCompositeRingBuffer;
 

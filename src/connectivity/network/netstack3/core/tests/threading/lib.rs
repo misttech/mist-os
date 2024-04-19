@@ -35,6 +35,34 @@ use packet_formats::{
     udp::{UdpPacket, UdpParseArgs},
 };
 
+/// Spawns a loom thread with a safe stack size.
+#[track_caller]
+fn loom_spawn<F, T>(f: F) -> loom::thread::JoinHandle<T>
+where
+    F: FnOnce() -> T + Send + 'static,
+    T: Send + 'static,
+{
+    // Picked to allow all the tests in this file to run safely. We've had
+    // problems in the past with coverage builders using too much stack.
+    const THREAD_STACK_SIZE: usize = 0x10000;
+    loom::thread::Builder::new().stack_size(THREAD_STACK_SIZE).spawn(f).unwrap()
+}
+
+/// A wrapper around loom's base modelling calls.
+///
+/// We use this function directly because it allows us to specify the stack size
+/// of the "main" thread that we're running on by using `loom_spawn`. Otherwise,
+/// loom uses a default value that causes segfaults in some of our tests.
+///
+/// TODO(https://github.com/tokio-rs/loom/issues/345): Remove this when we can
+/// just set our stack size from the model builder.
+fn loom_model<F>(model: loom::model::Builder, f: F)
+where
+    F: Fn() + Copy + Sync + Send + 'static,
+{
+    model.check(move || loom_spawn(f).join().unwrap())
+}
+
 #[test]
 fn packet_socket_change_device_and_protocol_atomic() {
     const DEVICE_MAC: Mac = net_mac!("22:33:44:55:66:77");
@@ -50,7 +78,7 @@ fn packet_socket_change_device_and_protocol_atomic() {
     let first_proto: NonZeroU16 = NonZeroU16::new(EtherType::Ipv4.into()).unwrap();
     let second_proto: NonZeroU16 = NonZeroU16::new(EtherType::Ipv6.into()).unwrap();
 
-    loom::model(move || {
+    loom_model(Default::default(), move || {
         let mut builder = FakeEventDispatcherBuilder::default();
         let dev_indexes =
             [(); 2].map(|()| builder.add_device(UnicastAddr::new(DEVICE_MAC).unwrap()));
@@ -68,7 +96,7 @@ fn packet_socket_change_device_and_protocol_atomic() {
         );
 
         let thread_vars = (ctx.clone(), devs.clone());
-        let deliver = loom::thread::spawn(move || {
+        let deliver = loom_spawn(move || {
             let (mut ctx, devs) = thread_vars;
             let [dev_a, dev_b] = devs;
             for (device_id, ethertype) in [
@@ -86,7 +114,7 @@ fn packet_socket_change_device_and_protocol_atomic() {
 
         let thread_vars = (ctx.clone(), devs[1].clone(), socket.clone());
 
-        let change_device = loom::thread::spawn(move || {
+        let change_device = loom_spawn(move || {
             let (mut ctx, dev, socket) = thread_vars;
             ctx.core_api().device_socket().set_device_and_protocol(
                 &socket,
@@ -246,7 +274,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
     let mut model = loom::model::Builder::new();
     model.preemption_bound = Some(3);
 
-    model.check(move || {
+    loom_model(model, move || {
         let mut builder = FakeEventDispatcherBuilder::default();
         let dev_index = builder.add_device_with_ip(
             UnicastAddr::new(DEVICE_MAC).unwrap(),
@@ -309,7 +337,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
         //  - Queueing of another packet to that neighbor.
 
         let thread_vars = (ctx.clone(), device.clone());
-        let resolve_neighbor = loom::thread::spawn(move || {
+        let resolve_neighbor = loom_spawn(move || {
             let (mut ctx, device_id) = thread_vars;
             ctx.core_api().device::<EthernetLinkDevice>().receive_frame(
                 RecvEthernetFrameMeta { device_id },
@@ -318,7 +346,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
         });
 
         let thread_vars = (ctx.clone(), socket.clone());
-        let queue_packet = loom::thread::spawn(move || {
+        let queue_packet = loom_spawn(move || {
             let (mut ctx, socket) = thread_vars;
             ctx.core_api()
                 .udp()
@@ -366,7 +394,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
 #[ip_test]
 #[netstack3_core::context_ip_bounds(I, FakeBindingsCtx)]
 fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
-    loom::model(move || {
+    loom_model(Default::default(), move || {
         let mut builder = FakeEventDispatcherBuilder::default();
         let dev_index = builder.add_device_with_ip(
             UnicastAddr::new(DEVICE_MAC).unwrap(),
@@ -416,7 +444,7 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
         // will cause a panic.
 
         let thread_vars = (ctx.clone(), socket.clone());
-        let create_incomplete_neighbor = loom::thread::spawn(move || {
+        let create_incomplete_neighbor = loom_spawn(move || {
             let (mut ctx, socket) = thread_vars;
             ctx.core_api()
                 .udp()
@@ -430,7 +458,7 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
         });
 
         let thread_vars = (ctx.clone(), device.clone());
-        let set_static_neighbor = loom::thread::spawn(move || {
+        let set_static_neighbor = loom_spawn(move || {
             let (mut ctx, device) = thread_vars;
             ctx.core_api()
                 .neighbor::<I, EthernetLinkDevice>()

@@ -40,18 +40,7 @@ pub fn from_read<R>(reader: &mut R) -> Result<MerkleTree, io::Error>
 where
     R: Read,
 {
-    let mut buf = [0; BLOCK_SIZE];
-    let mut builder = MerkleTreeBuilder::new();
-
-    loop {
-        let len = reader.read(&mut buf)?;
-        if len == 0 {
-            break;
-        }
-        builder.write(&buf[0..len]);
-    }
-
-    Ok(builder.finish())
+    MerkleTree::from_reader(reader)
 }
 
 /// Compute a merkle tree from a `futures::io::AsyncRead`.

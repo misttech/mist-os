@@ -1,6 +1,7 @@
 # LTO or ThinLTO+release will cause p to be optimized out.
 ## require is_lto=false
 ## require is_thinlto=false
+## require optimize=none
 
 [zxdb] b main
 Created Breakpoint 1 @ main

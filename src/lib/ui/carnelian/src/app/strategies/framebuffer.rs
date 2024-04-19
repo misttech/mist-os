@@ -115,13 +115,7 @@ impl AutoRepeatTimer for AutoRepeatContext {
     }
 
     fn cancel_autorepeat_timer(&mut self) {
-        let task = self.keyboard_autorepeat_task.take();
-        if let Some(task) = task {
-            fasync::Task::local(async move {
-                task.cancel().await;
-            })
-            .detach();
-        }
+        self.keyboard_autorepeat_task = None;
     }
 }
 

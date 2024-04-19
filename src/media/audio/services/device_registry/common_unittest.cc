@@ -5,12 +5,9 @@
 #include "src/media/audio/services/device_registry/common_unittest.h"
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
-#include <lib/syslog/cpp/macros.h>
 
 #include <gtest/gtest.h>
 
-#include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/validate.h"
 
 namespace media_audio {

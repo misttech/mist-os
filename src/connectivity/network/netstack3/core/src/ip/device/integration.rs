@@ -1015,12 +1015,13 @@ impl<'a, Config, BC: BindingsContext> Ipv6RouteDiscoveryContext<BC>
         CoreCtx<'b, BC, crate::lock_ordering::Ipv6DeviceRouteDiscovery>;
 
     fn with_discovered_routes_mut<
-        F: FnOnce(&mut Ipv6RouteDiscoveryState, &mut Self::WithDiscoveredRoutesMutCtx<'_>),
+        O,
+        F: FnOnce(&mut Ipv6RouteDiscoveryState<BC>, &mut Self::WithDiscoveredRoutesMutCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
-    ) {
+    ) -> O {
         let Self { config: _, core_ctx } = self;
         crate::device::integration::with_ip_device_state_and_core_ctx(
             core_ctx,
@@ -1166,12 +1167,11 @@ where
         device::IpDeviceStateContext::<I, BC>::get_address_id(core_ctx, device_id, addr)
     }
 
+    type AddressIdsIter<'b> =
+        <CoreCtx<'a, BC, L> as device::IpDeviceStateContext<I, BC>>::AddressIdsIter<'b>;
     fn with_address_ids<
         O,
-        F: FnOnce(
-            Box<dyn Iterator<Item = Self::AddressId> + '_>,
-            &mut Self::IpDeviceAddressCtx<'_>,
-        ) -> O,
+        F: FnOnce(Self::AddressIdsIter<'_>, &mut Self::IpDeviceAddressCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,

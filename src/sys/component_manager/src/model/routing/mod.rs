@@ -5,6 +5,7 @@
 pub mod open;
 pub mod providers;
 pub mod router;
+pub mod router_ext;
 pub mod service;
 pub use ::routing::error::RoutingError;
 pub use open::*;

@@ -28,7 +28,7 @@ rustc_library("fuchsia-async") {
   deps = [
     "//src/lib/fuchsia-async-macro",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:pin-utils",
+    "//third_party/rust_crates:pin-project-lite",
   ]
   sources = [
     "src/atomic_future.rs",

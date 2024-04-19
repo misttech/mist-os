@@ -1,0 +1,35 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "driver_component/driver.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: 'driver',
+        binary: 'driver/test-power-parent.so',
+        bind: 'meta/bind/test-power-parent-bind.bindbc',
+        default_dispatcher_ops: [ "allow_sync_calls" ],
+    },
+    capabilities: [
+        { protocol: "fuchsia.test.power-integration.Test" },
+        { service: "fuchsia.hardware.power.PowerTokenService" },
+    ],
+    use: [
+        { protocol: "fuchsia.power.broker.Topology" },
+        { service: "fuchsia.hardware.platform.device.Service" },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.power-integration.Test",
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.power.PowerTokenService",
+            from: "self",
+        },
+    ],
+
+    // TODO add `expose` of token provider protocol
+}

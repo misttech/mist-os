@@ -31,6 +31,7 @@ TEST_F(ProviderServerTest, CleanClientDrop) {
   ASSERT_EQ(ProviderServer::count(), 1u);
 
   (void)provider->client().UnbindMaybeGetEndpoint();
+
   // No WARNING logging should occur.
 }
 
@@ -40,6 +41,7 @@ TEST_F(ProviderServerTest, CleanServerShutdown) {
   ASSERT_EQ(ProviderServer::count(), 1u);
 
   provider->server().Shutdown(ZX_ERR_PEER_CLOSED);
+
   // No WARNING logging should occur.
 }
 
@@ -66,15 +68,15 @@ TEST_F(ProviderServerCodecTest, AddedDeviceThatOutlivesProvider) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 
   (void)provider->client().UnbindMaybeGetEndpoint();
 
   RunLoopUntilIdle();
   EXPECT_TRUE(provider->server().WaitForShutdown(zx::sec(1)));
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 1u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 }
 
 // An added Codec can be dropped without affecting the used Provider.
@@ -97,15 +99,16 @@ TEST_F(ProviderServerCodecTest, ProviderCanOutliveAddedDevice) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 
   fake_driver->DropCodec();
 
   RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
   EXPECT_EQ(ProviderServer::count(), 1u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
 // For Codecs added by Provider, ensure that Add-then-Watch works as expected.
@@ -130,8 +133,8 @@ TEST_F(ProviderServerCodecTest, AddThenWatch) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 1u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   received_callback = false;
 
   registry_wrapper->client()->WatchDevicesAdded().Then(
@@ -144,6 +147,8 @@ TEST_F(ProviderServerCodecTest, AddThenWatch) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
 // For Codecs added by Provider, ensure that Watch-then-Add works as expected.
@@ -179,8 +184,10 @@ TEST_F(ProviderServerCodecTest, WatchThenAdd) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback1);
   EXPECT_TRUE(received_callback2);
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 1u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
 /////////////////////
@@ -206,15 +213,15 @@ TEST_F(ProviderServerCompositeTest, AddedDeviceThatOutlivesProvider) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 
   provider->client() = fidl::Client<Provider>();
 
   RunLoopUntilIdle();
   EXPECT_TRUE(provider->server().WaitForShutdown(zx::sec(1)));
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 1u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 }
 
 // An added Composite can be dropped without affecting the used Provider.
@@ -237,15 +244,16 @@ TEST_F(ProviderServerCompositeTest, ProviderCanOutliveAddedDevice) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 
   fake_driver->DropComposite();
 
   RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
   EXPECT_EQ(ProviderServer::count(), 1u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 // For Composites added by Provider, ensure that Add-then-Watch works as expected.
@@ -270,8 +278,8 @@ TEST_F(ProviderServerCompositeTest, AddThenWatch) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 1u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   received_callback = false;
 
   registry_wrapper->client()->WatchDevicesAdded().Then(
@@ -284,6 +292,8 @@ TEST_F(ProviderServerCompositeTest, AddThenWatch) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
 // For Composites added by Provider, ensure that Watch-then-Add works as expected.
@@ -319,8 +329,10 @@ TEST_F(ProviderServerCompositeTest, WatchThenAdd) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback1);
   EXPECT_TRUE(received_callback2);
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 1u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
 /////////////////////
@@ -347,15 +359,15 @@ TEST_F(ProviderServerStreamConfigTest, AddedDeviceThatOutlivesProvider) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 
   (void)provider->client().UnbindMaybeGetEndpoint();
 
   RunLoopUntilIdle();
   EXPECT_TRUE(provider->server().WaitForShutdown(zx::sec(1)));
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 1u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 }
 
 // An added StreamConfig can be dropped without affecting the used Provider.
@@ -379,15 +391,16 @@ TEST_F(ProviderServerStreamConfigTest, ProviderCanOutliveAddedDevice) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 
   fake_driver->DropStreamConfig();
 
   RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 0u);
   EXPECT_EQ(ProviderServer::count(), 1u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
 }
 
 // For StreamConfigs added by Provider, ensure that Add-then-Watch works as expected.
@@ -413,8 +426,8 @@ TEST_F(ProviderServerStreamConfigTest, AddThenWatch) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 1u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   received_callback = false;
 
   registry_wrapper->client()->WatchDevicesAdded().Then(
@@ -427,6 +440,8 @@ TEST_F(ProviderServerStreamConfigTest, AddThenWatch) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
 // For StreamConfigs added by Provider, ensure that Watch-then-Add works as expected.
@@ -463,8 +478,10 @@ TEST_F(ProviderServerStreamConfigTest, WatchThenAdd) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback1);
   EXPECT_TRUE(received_callback2);
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  EXPECT_EQ(adr_service()->devices().size(), 1u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
 }  // namespace

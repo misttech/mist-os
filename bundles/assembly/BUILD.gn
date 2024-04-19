@@ -1014,6 +1014,15 @@ assembly_input_bundle("core_realm_eng") {
     },
   ]
 
+  # wlancfg's donut tool.
+  on_demand = [ "//src/connectivity/wlan/wlancfg/tool:donut" ]
+  shell_commands += [
+    {
+      package = "donut"
+      components = [ "donut" ]
+    },
+  ]
+
   # Included with //bundles/tools.
   shell_commands += [
     {
@@ -1080,10 +1089,7 @@ assembly_input_bundle("core_realm_eng") {
       package = "net-cli"
       components = [ "net" ]
     },
-    {
-      package = "donut"
-      components = [ "donut" ]
-    },
+
     {
       package = "dai-info"
       components = [ "dai-info" ]
@@ -1202,18 +1208,34 @@ assembly_input_bundle("core_realm_eng") {
     },
   ]
 
-  # Document the sbase shell commands in the on-demand package set (these are
-  # not added to the product image).
+  # Add the sbase binaries, some of which are in base, but most are in the
+  # on_demand package set.
+  _sbase_bins_in_base = [
+    # Always include 'ls'
+    "ls",
+
+    # This is used by Chromium test infrastructure, and needs to always be
+    # available.
+    "sha1sum",
+  ]
   on_demand = []
   foreach(bin, sbase_binaries) {
-    # To be enabled soon, but will cause errors in assembly.
-    # on_demand += [ "//third_party/sbase:${bin}_pkg" ]
+    # Always create the shell_commands entry.
     shell_commands += [
       {
         package = bin
         components = [ bin ]
       },
     ]
+
+    # Add to the base package set if it's in the _sbase_bins_in_base list,
+    # otherwise add it to on_demand
+    _sbase_target = "//third_party/sbase:${bin}_pkg"
+    if (_sbase_bins_in_base != _sbase_bins_in_base + [ bin ] - [ bin ]) {
+      base_packages += [ _sbase_target ]
+    } else {
+      on_demand += [ _sbase_target ]
+    }
   }
 
   compiled_packages = [
@@ -1888,7 +1910,6 @@ assembly_input_bundle("input_group_one") {
 
 assembly_input_bundle("input_group_two") {
   kernel_cmdline = [ "kernel.render-dlog-to-crashlog=true" ]
-  base_packages = []
   flexible_packages = [
     "//src/connectivity/location/emergency",
     "//src/media/sessions:mediasession",
@@ -3699,12 +3720,6 @@ assembly_input_bundle("emulator_support") {
   deps = qemu_boot_shim.deps
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("third_party_sbase_for_transition") {
-  public_deps = [ "//third_party/sbase:sbase-pkgs" ]
-}
-
 # Assembly may select at most one bundle with `intl_services` name prefix.
 icu_assembly_input_bundle("intl_services") {
   icu_base_packages = [ "//src/intl/intl_services:pkg" ]
@@ -3887,6 +3902,12 @@ assembly_input_bundle("kernel_contiguous_physical_pages") {
 # "kernel_compression" is also included.
 assembly_input_bundle("kernel_anonymous_memory_compression_eager_lru") {
   kernel_cmdline = [ "kernel.page-scanner.lru-action=compress_only" ]
+}
+
+# Performs eviction continuously while under memory pressure instead of only once when the pressure
+# level changes.
+assembly_input_bundle("kernel_evict_continuous") {
+  kernel_cmdline = [ "kernel.oom.evict-continuous=true" ]
 }
 
 # Assembly selects whether to include this AIB or not.

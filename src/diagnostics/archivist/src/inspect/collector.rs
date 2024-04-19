@@ -10,8 +10,7 @@ use {
     fidl_fuchsia_inspect_deprecated::{InspectMarker, InspectProxy},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::stream::StreamExt,
-    pin_utils::pin_mut,
-    std::collections::HashMap,
+    std::{collections::HashMap, pin::pin},
     tracing::error,
 };
 
@@ -74,15 +73,15 @@ pub async fn populate_data_map(inspect_handles: &[InspectHandle]) -> DataMap {
 async fn populate_data_map_from_dir(inspect_proxy: &fio::DirectoryProxy) -> DataMap {
     // TODO(https://fxbug.dev/42112326): Use a streaming and bounded readdir API when available to avoid
     // being hung.
-    let entries = fuchsia_fs::directory::readdir_recursive(inspect_proxy, /* timeout= */ None)
-        .filter_map(|result| {
-            async move {
-                // TODO(https://fxbug.dev/42126094): decide how to show directories that we failed to read.
-                result.ok()
-            }
-        });
+    let mut entries =
+        pin!(fuchsia_fs::directory::readdir_recursive(inspect_proxy, /* timeout= */ None)
+            .filter_map(|result| {
+                async move {
+                    // TODO(https://fxbug.dev/42126094): decide how to show directories that we failed to read.
+                    result.ok()
+                }
+            }));
     let mut data_map = DataMap::new();
-    pin_mut!(entries);
     // TODO(https://fxbug.dev/42138410) convert this async loop to a stream so we can carry backpressure
     while let Some(entry) = entries.next().await {
         // We are only currently interested in inspect VMO files (root.inspect) and

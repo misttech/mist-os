@@ -10,7 +10,10 @@ if (is_host) {
   python_binary("generate_idk") {
     visibility = [ "*" ]
     main_source = "cmd.py"
-    deps = [ ":lib" ]
+    deps = [
+      ":lib",
+      "//build/python/modules/depfile",
+    ]
     enable_mypy = true
   }
 

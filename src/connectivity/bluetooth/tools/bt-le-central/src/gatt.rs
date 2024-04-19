@@ -740,7 +740,7 @@ async fn do_disable_notify<'a>(
     };
     match task {
         Some(task) => {
-            let _ = task.cancel().await;
+            let _ = task.cancel();
             println!("(id = {}) done", id);
         }
         None => println!("(id = {}) notifications not enabled", id),

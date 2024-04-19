@@ -7,7 +7,9 @@
 import os
 import tempfile
 import unittest
+from parameterized import parameterized, param
 from typing import Any
+from typing import Callable
 from unittest import mock
 
 import fidl.fuchsia_tracing_controller as f_tracingcontroller
@@ -20,7 +22,9 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import fuchsia_controller as fc_transport
 
 
-def _custom_test_name_func(testcase_func, _, param) -> str:
+def _custom_test_name_func(
+    testcase_func: Callable[..., None], _: str, param: param
+) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
@@ -76,7 +80,9 @@ class TracingFCTests(unittest.TestCase):
         "initialize_tracing",
     )
     def test_initialize(
-        self, parameterized_dict, mock_tracingcontroller_initialize
+        self,
+        parameterized_dict: dict[str, Any],
+        mock_tracingcontroller_initialize: mock.Mock,
     ) -> None:
         """Test for Tracing.initialize() method."""
         # Perform setup based on parameters.
@@ -99,7 +105,9 @@ class TracingFCTests(unittest.TestCase):
         f_tracingcontroller.Controller.Client,
         "initialize_tracing",
     )
-    def test_initialize_error(self, mock_tracingcontroller_initialize) -> None:
+    def test_initialize_error(
+        self, mock_tracingcontroller_initialize: mock.Mock
+    ) -> None:
         """Test for Tracing.initialize() when the FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
         mock_tracingcontroller_initialize.side_effect = fc.ZxStatus(
@@ -144,7 +152,10 @@ class TracingFCTests(unittest.TestCase):
         new_callable=mock.AsyncMock,
     )
     def test_start(
-        self, parameterized_dict, mock_tracingcontroller_start, *unused_args
+        self,
+        parameterized_dict: dict[str, Any],
+        mock_tracingcontroller_start: mock.Mock,
+        *unused_args: Any,
     ) -> None:
         """Test for Tracing.start() method."""
         # Perform setup based on parameters.
@@ -174,7 +185,7 @@ class TracingFCTests(unittest.TestCase):
         new_callable=mock.AsyncMock,
     )
     def test_start_error(
-        self, mock_tracingcontroller_start, *unused_args
+        self, mock_tracingcontroller_start: mock.Mock, *unused_args: Any
     ) -> None:
         """Test for Tracing.start() when the FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
@@ -227,7 +238,10 @@ class TracingFCTests(unittest.TestCase):
         new_callable=mock.AsyncMock,
     )
     def test_stop(
-        self, parameterized_dict, mock_tracingcontroller_stop, *unused_args
+        self,
+        parameterized_dict: dict[str, Any],
+        mock_tracingcontroller_stop: mock.Mock,
+        *unused_args: Any,
     ) -> None:
         """Test for Tracing.stop() method."""
         # Perform setup based on parameters.
@@ -262,7 +276,7 @@ class TracingFCTests(unittest.TestCase):
         new_callable=mock.AsyncMock,
     )
     def test_stop_error(
-        self, mock_tracingcontroller_stop, *unused_args
+        self, mock_tracingcontroller_stop: mock.Mock, *unused_args: Any
     ) -> None:
         """Test for Tracing.stop() when the FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
@@ -302,7 +316,10 @@ class TracingFCTests(unittest.TestCase):
         new_callable=mock.AsyncMock,
     )
     def test_terminate(
-        self, parameterized_dict, mock_tracingcontroller_terminate, *unused_args
+        self,
+        parameterized_dict: dict[str, Any],
+        mock_tracingcontroller_terminate: mock.Mock,
+        *unused_args: Any,
     ) -> None:
         """Test for Tracing.terminate() method."""
         # Perform setup based on parameters.
@@ -328,7 +345,7 @@ class TracingFCTests(unittest.TestCase):
         new_callable=mock.AsyncMock,
     )
     def test_terminate_error(
-        self, mock_tracingcontroller_terminate, *unused_args
+        self, mock_tracingcontroller_terminate: mock.Mock, *unused_args: Any
     ) -> None:
         """Test for Tracing.terminate() when the FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
@@ -378,10 +395,10 @@ class TracingFCTests(unittest.TestCase):
     @mock.patch.object(fc_tracing.fc, "Socket")
     def test_terminate_and_download(
         self,
-        parameterized_dict,
-        mock_fc_socket,
-        mock_tracingcontroller_terminate,
-        *unused_args,
+        parameterized_dict: dict[str, Any],
+        mock_fc_socket: mock.Mock,
+        mock_tracingcontroller_terminate: mock.Mock,
+        *unused_args: Any,
     ) -> None:
         """Test for Tracing.terminate_and_download() method."""
         # Mock out the tracing Socket.
@@ -406,7 +423,7 @@ class TracingFCTests(unittest.TestCase):
                     self.tracing_obj.terminate_and_download(directory=tmpdir)
                 return
 
-            trace_file: str = parameterized_dict.get("trace_file")
+            trace_file: str = parameterized_dict.get("trace_file", "")
             trace_path: str = self.tracing_obj.terminate_and_download(
                 directory=tmpdir, trace_file=trace_file
             )
@@ -470,10 +487,10 @@ class TracingFCTests(unittest.TestCase):
     @mock.patch.object(fc_tracing.fc, "Socket")
     def test_trace_session(
         self,
-        parameterized_dict,
-        mock_fc_socket,
-        mock_tracingcontroller_terminate,
-        *unused_args,
+        parameterized_dict: dict[str, Any],
+        mock_fc_socket: mock.MagicMock,
+        mock_tracingcontroller_terminate: mock.MagicMock,
+        *unused_args: Any,
     ) -> None:
         """Test for Tracing.trace_session() method."""
         # Mock out the tracing Socket.
@@ -489,8 +506,10 @@ class TracingFCTests(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            trace_file: str = parameterized_dict.get("trace_file")
-            download_trace: bool = parameterized_dict.get("download_trace")
+            trace_file: str = parameterized_dict.get("trace_file", "")
+            download_trace: bool = parameterized_dict.get(
+                "download_trace", False
+            )
 
             if parameterized_dict.get("session_initialized"):
                 self.tracing_obj.initialize()

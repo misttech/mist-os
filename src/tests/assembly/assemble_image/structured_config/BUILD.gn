@@ -14,7 +14,6 @@ test_assembly_config("structured_config") {
     feature_set_level = "bootstrap"
     build_type = "eng"
     storage = {
-      configure_fshost = true
       filesystems = {
         image_name = "assemble_test"
         volume = {

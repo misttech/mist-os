@@ -625,7 +625,6 @@ mod tests {
         fidl_fuchsia_hardware_block_volume::VolumeAndNodeMarker,
         fidl_fuchsia_io as fio,
         fs_management::{filesystem::Filesystem, Blobfs},
-        fuchsia_merkle::MerkleTree,
         fuchsia_zircon as zx,
         futures::join,
         remote_block_device::{BlockClient, RemoteBlockClient, VmoId},
@@ -1035,8 +1034,7 @@ mod tests {
                 let serving = blobfs.serve().await.expect("serve blobfs failed");
 
                 let content = String::from("Hello world!").into_bytes();
-                let merkle_root_hash =
-                    MerkleTree::from_reader(&content[..]).unwrap().root().to_string();
+                let merkle_root_hash = fuchsia_merkle::from_slice(&content).root().to_string();
                 {
                     let file = fuchsia_fs::directory::open_file(
                         serving.root(),

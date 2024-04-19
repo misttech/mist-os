@@ -623,7 +623,7 @@ mod tests {
                 next_hop,
                 body,
                 broadcast,
-                IpLayerPacketMetadata::<Ipv6>::default(),
+                IpLayerPacketMetadata::default(),
             )
         }
     }

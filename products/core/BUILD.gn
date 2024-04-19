@@ -70,15 +70,8 @@ _platform_configuration_base = {
   }
 }
 
-_storage_default = {
-  storage = {
-    configure_fshost = true
-  }
-}
-
 _storage_f2fs = {
   storage = {
-    configure_fshost = true
     filesystems = {
       volume = {
         fvm = {
@@ -95,7 +88,6 @@ _storage_f2fs = {
 
 _storage_minfs = {
   storage = {
-    configure_fshost = true
     filesystems = {
       volume = {
         fvm = {
@@ -121,7 +113,6 @@ product_assembly_configuration("core") {
   testonly = true
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
-    forward_variables_from(_storage_default, "*")
   }
   product = {
     build_info = default_product_build_info
@@ -166,7 +157,6 @@ product_assembly_configuration("core_with_netstack3") {
   testonly = true
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
-    forward_variables_from(_storage_default, "*")
 
     connectivity = {
       network = {
@@ -187,7 +177,6 @@ product_assembly_configuration("core_with_dfv2_fuzzing") {
   testonly = true
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
-    forward_variables_from(_storage_default, "*")
 
     driver_framework = {
       test_fuzzing_config = {

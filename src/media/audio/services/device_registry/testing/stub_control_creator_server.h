@@ -6,8 +6,6 @@
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_STUB_CONTROL_CREATOR_SERVER_H_
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
-#include <lib/fidl/cpp/wire/internal/transport_channel.h>
-#include <lib/fit/internal/result.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <memory>

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.hardware.vreg;
 
-type PwmVregMetadataEntry = table {
+type PwmVregMetadata = table {
     /// PWM index corresponding to the voltage regulator. Should correspond to id in pwm_id_t
     /// defined in //src/lib/ddk/include/ddk/metadata/pwm.h
     1: pwm_index uint32;
@@ -21,9 +21,4 @@ type PwmVregMetadataEntry = table {
     /// inclusive and step size 20 uV. Total number of steps is (1000 uV - 400 uV) / 20 uV + 1 = 31
     /// steps.
     5: num_steps uint32;
-};
-
-type Metadata = table {
-    /// Vector of PWM Vreg metadata. One for each PWM voltage regulator.
-    1: pwm_vreg vector<PwmVregMetadataEntry>:MAX;
 };

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/lto/config.gni")
 import("//build/dist/resource.gni")
 import("//build/testing/host_test_data.gni")
 import("//build/toolchain/ifs_shared_library.gni")
@@ -646,6 +647,7 @@ test_shared_library("tls-dep") {
   # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
   # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
   remove_configs = [ "//build/config/lto" ]
+  configs += [ "//build/config/lto:no-lto" ]
 }
 
 # This is the same as tls-dep but using TLSDESC, with no __tls_get_addr.
@@ -658,6 +660,7 @@ test_shared_library("tls-desc-dep") {
   # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
   # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
   remove_configs = [ "//build/config/lto" ]
+  configs += [ "//build/config/lto:no-lto" ]
 }
 
 test_executable("tls-exec-shlib") {
@@ -697,6 +700,7 @@ test_shared_library("tls-ie-dep") {
   # TODO(https://fxbug.dev/42085421): LTO insists on using LE accesses. Remove this when
   # the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
   remove_configs = [ "//build/config/lto" ]
+  configs = [ "//build/config/lto:no-lto" ]
 }
 
 test_executable("tls-gd") {

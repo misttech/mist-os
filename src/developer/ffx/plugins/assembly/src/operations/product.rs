@@ -5,9 +5,10 @@
 use crate::operations::product::assembly_builder::ImageAssemblyConfigBuilder;
 use anyhow::{bail, Context, Result};
 use assembly_config_schema::assembly_config::{
-    AdditionalPackageContents, CompiledPackageDefinition,
+    AdditionalPackageContents, AssemblyConfigWrapperForOverrides, CompiledPackageDefinition,
 };
 use assembly_config_schema::developer_overrides::DeveloperOverrides;
+use assembly_config_schema::platform_config::PlatformConfig;
 use assembly_config_schema::{
     AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSupportLevel,
 };
@@ -37,19 +38,52 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         developer_overrides,
     } = args;
 
-    let developer_overrides = if let Some(overrides_path) = developer_overrides {
-        let developer_overrides =
-            read_config(&overrides_path).context("Reading developer overrides")?;
-        print_developer_overrides_banner(&developer_overrides, &overrides_path);
-        Some(developer_overrides)
-    } else {
-        None
-    };
-
     info!("Reading configuration files.");
     info!("  product: {}", product);
 
-    let config: AssemblyConfig = read_config(&product).context("Reading product configuration")?;
+    let (platform, product, developer_overrides) = if let Some(overrides_path) = developer_overrides
+    {
+        // If developer overrides are in use, parse to intermediate types so
+        // that overrides can be applied.
+        let AssemblyConfigWrapperForOverrides { platform, product } =
+            read_config(&product).context("Reading product configuration")?;
+
+        let developer_overrides =
+            read_config(&overrides_path).context("Reading developer overrides")?;
+        print_developer_overrides_banner(&developer_overrides, &overrides_path)
+            .context("Displaying developer overrides.")?;
+
+        // Extract the platform config overrides so that we can apply them to the platform config.
+        let platform_config_overrides = developer_overrides.platform;
+
+        // Merge the platform config with the overrides.
+        let merged_platform: serde_json::Value =
+            assembly_config_schema::try_merge_into(platform, platform_config_overrides)
+                .context("Merging developer overrides")?;
+
+        // Because serde_json and serde_json5 deserialize enums differently, we need to bounce the
+        // serde_json::Value of the platform config through a string so that we can re-parse it
+        // using serde_json5.
+        let merged_platform_json5 = serde_json::to_string_pretty(&merged_platform)
+            .context("Creating temporary json5 from merged config")?;
+
+        // Now deserialize the merged and serialized json5 of the platform configuration.  This
+        // works around the issue with enums.
+        let platform: PlatformConfig = serde_json5::from_str(&merged_platform_json5)
+            .context("Deserializing platform configuration merged with developer overrides.")?;
+
+        // Reconstitute the developer overrides struct, but with a null platform config, since it's
+        // been used to modify the platform configuration.
+        let developer_overrides =
+            DeveloperOverrides { platform: serde_json::Value::Null, ..developer_overrides };
+
+        (platform, product, Some(developer_overrides))
+    } else {
+        let AssemblyConfig { platform, product } =
+            read_config(&product).context("Reading product configuration")?;
+
+        (platform, product, None)
+    };
 
     let board_info_path = board_info;
     let board_info = read_config::<BoardInformation>(&board_info_path)
@@ -102,7 +136,8 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     let ramdisk_image = mode == PackageMode::DiskImageInZbi;
     let resource_dir = input_bundles_dir.join("resources");
     let configuration = assembly_platform_configuration::define_configuration(
-        &config,
+        &platform,
+        &product,
         &board_info,
         ramdisk_image,
         &outdir,
@@ -111,12 +146,15 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
 
     // Now that all the configuration has been determined, create the builder
     // and start doing the work of creating the image assembly config.
-    let mut builder = ImageAssemblyConfigBuilder::new(config.platform.build_type.clone());
+    let mut builder = ImageAssemblyConfigBuilder::new(platform.build_type.clone());
 
     // Set the developer overrides, if any.
     if let Some(developer_overrides) = developer_overrides {
         builder
-            .add_developer_overrides(developer_overrides)
+            .add_developer_overrides(
+                developer_overrides.developer_only_options,
+                developer_overrides.kernel,
+            )
             .context("Setting developer overrides")?;
     }
 
@@ -156,7 +194,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         builder
             .add_board_input_bundle(
                 bundle,
-                config.platform.feature_set_level == FeatureSupportLevel::Bootstrap,
+                platform.feature_set_level == FeatureSupportLevel::Bootstrap,
             )
             .with_context(|| format!("Adding board input bundle from: {bundle_path}"))?;
     }
@@ -194,12 +232,10 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     builder.add_bootfs_files(&configuration.bootfs.files).context("Adding bootfs files")?;
 
     // Add product-specified packages and configuration
-    builder
-        .add_product_packages(config.product.packages)
-        .context("Adding product-provided packages")?;
+    builder.add_product_packages(product.packages).context("Adding product-provided packages")?;
 
     builder
-        .add_product_base_drivers(config.product.base_drivers)
+        .add_product_base_drivers(product.base_drivers)
         .context("Adding product-provided base-drivers")?;
 
     if let Some(package_config_path) = additional_packages_path {
@@ -245,7 +281,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     let mut image_assembly =
         builder.build(&outdir, &tools).context("Building Image Assembly config")?;
     let images = ImagesConfig::from_product_and_board(
-        &config.platform.storage.filesystems,
+        &platform.storage.filesystems,
         &board_info.filesystems,
     )
     .context("Constructing images config")?;
@@ -272,7 +308,10 @@ fn make_bundle_path(bundles_dir: &Utf8PathBuf, name: &str) -> Utf8PathBuf {
     bundles_dir.join(name).join("assembly_config.json")
 }
 
-fn print_developer_overrides_banner(overrides: &DeveloperOverrides, overrides_path: &Utf8PathBuf) {
+fn print_developer_overrides_banner(
+    overrides: &DeveloperOverrides,
+    overrides_path: &Utf8PathBuf,
+) -> Result<()> {
     let overrides_target = if let Some(target_name) = &overrides.target_name {
         target_name.as_str()
     } else {
@@ -286,6 +325,15 @@ fn print_developer_overrides_banner(overrides: &DeveloperOverrides, overrides_pa
         println!("  Options:");
         println!("    all_packages_in_base: enabled")
     }
+
+    if !overrides.platform.is_null() {
+        println!();
+        println!("  Platform Configuration Overrides / Additions:");
+        for line in serde_json::to_string_pretty(&overrides.platform)?.lines() {
+            println!("    {}", line);
+        }
+    }
+
     if !overrides.kernel.command_line_args.is_empty() {
         println!();
         println!("  Additional kernel command line arguments:");
@@ -294,4 +342,5 @@ fn print_developer_overrides_banner(overrides: &DeveloperOverrides, overrides_pa
         }
     }
     println!();
+    Ok(())
 }

@@ -108,6 +108,7 @@ impl FileOps for LayeredFsRootNodeOps {
 
     fn readdir(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -155,7 +156,7 @@ impl FileOps for LayeredFsRootNodeOps {
         let mut wrapper =
             DirentSinkWrapper { sink, mappings: &self.fs.mappings, offset: &mut root_file_offset };
 
-        self.root_file.readdir(current_task, &mut wrapper)
+        self.root_file.readdir(locked, current_task, &mut wrapper)
     }
 }
 
@@ -194,7 +195,7 @@ mod test {
         fs.root()
             .open_anonymous(locked, current_task, OpenFlags::RDONLY)
             .expect("open")
-            .readdir(current_task, &mut sink)
+            .readdir(locked, current_task, &mut sink)
             .expect("readdir");
         std::mem::take(&mut sink.names)
     }

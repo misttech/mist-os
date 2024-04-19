@@ -24,9 +24,6 @@ product_assembly_configuration("minimal") {
         "touchscreen",
       ]
     }
-    storage = {
-      configure_fshost = true
-    }
 
     # If the 'authorized_ssh_keys_path' GN arg has been set, then pass that path
     # as part of the platform configuration.

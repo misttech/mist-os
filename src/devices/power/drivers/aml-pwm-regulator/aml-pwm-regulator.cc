@@ -19,7 +19,7 @@ const std::string_view kDriverName = "aml-pwm-regulator";
 
 namespace aml_pwm_regulator {
 
-AmlPwmRegulator::AmlPwmRegulator(const PwmVregMetadataEntry& vreg_range,
+AmlPwmRegulator::AmlPwmRegulator(const PwmVregMetadata& vreg_range,
                                  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_proto_client,
                                  AmlPwmRegulatorDriver* driver, std::string_view name)
     : pwm_index_(vreg_range.pwm_index()),
@@ -80,18 +80,15 @@ void AmlPwmRegulator::GetRegulatorParams(GetRegulatorParamsCompleter::Sync& comp
 }
 
 zx::result<std::unique_ptr<AmlPwmRegulator>> AmlPwmRegulator::Create(
-    const PwmVregMetadataEntry& metadata_entry, AmlPwmRegulatorDriver* driver) {
-  uint32_t idx = metadata_entry.pwm_index();
-  char name[20];
-  snprintf(name, sizeof(name), "pwm-%u", idx);
-
-  auto connect_result = driver->incoming()->Connect<fuchsia_hardware_pwm::Service::Pwm>(name);
+    const PwmVregMetadata& metadata, AmlPwmRegulatorDriver* driver) {
+  auto connect_result = driver->incoming()->Connect<fuchsia_hardware_pwm::Service::Pwm>("pwm");
   if (connect_result.is_error()) {
     FDF_LOG(ERROR, "Unable to connect to fidl protocol - status: %s",
             connect_result.status_string());
     return connect_result.take_error();
   }
 
+  uint32_t idx = metadata.pwm_index();
   fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_proto_client(
       std::move(connect_result.value()));
   auto result = pwm_proto_client->Enable();
@@ -103,10 +100,12 @@ zx::result<std::unique_ptr<AmlPwmRegulator>> AmlPwmRegulator::Create(
     FDF_LOG(ERROR, "Unable to enable PWM %u, %s", idx, zx_status_get_string(result->error_value()));
     return result->take_error();
   }
+
+  char name[20];
   snprintf(name, sizeof(name), "pwm-%u-regulator", idx);
 
   auto device =
-      std::make_unique<AmlPwmRegulator>(metadata_entry, std::move(pwm_proto_client), driver, name);
+      std::make_unique<AmlPwmRegulator>(metadata, std::move(pwm_proto_client), driver, name);
 
   // Initialize our compat server.
   {
@@ -170,7 +169,7 @@ AmlPwmRegulatorDriver::AmlPwmRegulatorDriver(fdf::DriverStartArgs start_args,
 
 zx::result<> AmlPwmRegulatorDriver::Start() {
   fidl::Arena arena;
-  auto decoded = compat::GetMetadata<fuchsia_hardware_vreg::wire::Metadata>(
+  auto decoded = compat::GetMetadata<fuchsia_hardware_vreg::wire::PwmVregMetadata>(
       incoming(), arena, DEVICE_METADATA_VREG, "pdev");
   if (decoded.is_error()) {
     FDF_LOG(ERROR, "Failed to get vreg metadata: %s", decoded.status_string());
@@ -180,25 +179,18 @@ zx::result<> AmlPwmRegulatorDriver::Start() {
   const auto& metadata = *decoded.value();
 
   // Validate
-  if (!metadata.has_pwm_vreg()) {
+  if (!metadata.has_pwm_index() || !metadata.has_period_ns() || !metadata.has_min_voltage_uv() ||
+      !metadata.has_voltage_step_uv() || !metadata.has_num_steps()) {
     FDF_LOG(ERROR, "Metadata incomplete");
     return zx::error(ZX_ERR_INTERNAL);
   }
-  for (const auto& pwm_vreg : metadata.pwm_vreg()) {
-    if (!pwm_vreg.has_pwm_index() || !pwm_vreg.has_period_ns() || !pwm_vreg.has_min_voltage_uv() ||
-        !pwm_vreg.has_voltage_step_uv() || !pwm_vreg.has_num_steps()) {
-      FDF_LOG(ERROR, "Metadata incomplete");
-      return zx::error(ZX_ERR_INTERNAL);
-    }
+
+  // Build Voltage Regulator
+  auto regulator = AmlPwmRegulator::Create(metadata, this);
+  if (regulator.is_error()) {
+    return regulator.take_error();
   }
-  // Build Voltage Regulators
-  for (const auto& pwm_vreg : metadata.pwm_vreg()) {
-    auto regulator = AmlPwmRegulator::Create(pwm_vreg, this);
-    if (regulator.is_error()) {
-      return regulator.take_error();
-    }
-    regulators_.push_back(std::move(*regulator));
-  }
+  regulators_ = std::move(*regulator);
   return zx::ok();
 }
 

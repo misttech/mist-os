@@ -14,7 +14,7 @@ group("tests") {
 
 zx_library("mmio") {
   sdk = "source"
-  sdk_publishable = "internal"
+  sdk_publishable = "partner"
   sdk_headers = [
     "lib/mmio/mmio.h",
     "lib/mmio/mmio-buffer.h",

@@ -129,7 +129,6 @@ rustc_library("lib") {
     "//src/testing/fidl:placeholders_rust",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:lazy_static",
-    "//third_party/rust_crates:pin-utils",
     "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:test-case",
   ]

@@ -19,7 +19,7 @@ use {
         stream::{FusedStream, Stream},
         Future,
     },
-    pin_utils::unsafe_pinned,
+    pin_project::pin_project,
 };
 
 mod flatten_unordered;
@@ -131,20 +131,11 @@ where
 /// BUT the Tagged type combinator provides a statically nameable type that can easily be expressed
 /// in type signatures such as `IndexedStreams` below.
 #[cfg_attr(test, derive(Debug))]
+#[pin_project]
 pub struct Tagged<K, St> {
     tag: K,
+    #[pin]
     stream: St,
-}
-
-impl<K, St: Unpin> Unpin for Tagged<K, St> {}
-
-impl<K, St> Tagged<K, St> {
-    // It is safe to take a pinned projection to `stream` as:
-    // * Tagged does not implement `Drop`
-    // * Tagged only implements Unpin if `stream` is Unpin.
-    // * Tagged is not #[repr(packed)].
-    // see: pin_utils::unsafe_pinned docs for details
-    unsafe_pinned!(stream: St);
 }
 
 impl<K: Clone, St> Tagged<K, St> {
@@ -171,7 +162,7 @@ impl<K: Clone, Fut: Future> Future for Tagged<K, Fut> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let k = self.tag.clone();
-        match self.stream().poll(cx) {
+        match self.project().stream.poll(cx) {
             Poll::Ready(out) => Poll::Ready((k, out)),
             Poll::Pending => Poll::Pending,
         }
@@ -183,7 +174,7 @@ impl<K: Clone, St: Stream> Stream for Tagged<K, St> {
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let k = self.tag.clone();
-        match self.stream().poll_next(cx) {
+        match self.project().stream.poll_next(cx) {
             Poll::Ready(Some(item)) => Poll::Ready(Some((k, item))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,

@@ -68,6 +68,18 @@ type TimeRemaining = flexible union {
     3: full_charge zx.Duration;
 };
 
+/// Type of data that are determined by manufacturer
+type BatterySpec = table {
+    /// Represent the battery's charging current spec in micro amps
+    1: max_charging_current_ua int32;
+
+    /// Represent the battery's charging voltage spec in micro volt
+    2: max_charnging_voltage_uv int32;
+
+    /// Battery Full Charge Design Capacity in micro amp hour
+    3: design_capacity_uah int32;
+};
+
 /// Current battery state information
 type BatteryInfo = table {
     /// General battery status with respect to presence & availability
@@ -102,6 +114,9 @@ type BatteryInfo = table {
 
     /// Forward the battery capqacity in uAh
     10: remaining_capacity_uah uint32;
+
+    /// Battery spec
+    11: battery_spec BatterySpec;
 };
 
 /// Provider interface used to obtain battery status details

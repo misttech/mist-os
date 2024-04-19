@@ -7,7 +7,6 @@
 /// servicing fuchsia.pkg.PackageResolver.Resolve FIDL requests.
 use {
     assert_matches::assert_matches,
-    fuchsia_merkle::MerkleTree,
     fuchsia_pkg_testing::{
         serve::{responder, HttpResponder},
         Package, PackageBuilder, RepositoryBuilder,
@@ -81,10 +80,10 @@ async fn second_resolve_succeeds_when_blob_404() {
     let pkg = make_pkg_with_extra_blobs("second_resolve_succeeds_when_blob_404", 1).await;
     let path_to_override = format!(
         "/blobs/1/{}",
-        MerkleTree::from_reader(
-            extra_blob_contents("second_resolve_succeeds_when_blob_404", 0).as_slice()
-        )
-        .expect("merkle slice")
+        fuchsia_merkle::from_slice(&extra_blob_contents(
+            "second_resolve_succeeds_when_blob_404",
+            0
+        ))
         .root()
     );
 
@@ -124,10 +123,7 @@ async fn second_resolve_succeeds_when_blob_errors_mid_download() {
         .build()
         .await
         .unwrap();
-    let path_to_override = format!(
-        "/blobs/1/{}",
-        MerkleTree::from_reader(blob.as_slice()).expect("merkle slice").root()
-    );
+    let path_to_override = format!("/blobs/1/{}", fuchsia_merkle::from_slice(&blob).root());
 
     verify_resolve_fails_then_succeeds(
         pkg,
@@ -165,10 +161,7 @@ async fn second_resolve_succeeds_disconnect_before_blob_complete() {
         .build()
         .await
         .unwrap();
-    let path_to_override = format!(
-        "/blobs/1/{}",
-        MerkleTree::from_reader(blob.as_slice()).expect("merkle slice").root()
-    );
+    let path_to_override = format!("/blobs/1/{}", fuchsia_merkle::from_slice(&blob).root());
 
     verify_resolve_fails_then_succeeds(
         pkg,
@@ -195,10 +188,7 @@ async fn second_resolve_succeeds_when_far_corrupted() {
 async fn second_resolve_succeeds_when_blob_corrupted() {
     let pkg = make_pkg_with_extra_blobs("second_resolve_succeeds_when_blob_corrupted", 1).await;
     let blob = extra_blob_contents("second_resolve_succeeds_when_blob_corrupted", 0);
-    let path_to_override = format!(
-        "/blobs/1/{}",
-        MerkleTree::from_reader(blob.as_slice()).expect("merkle slice").root()
-    );
+    let path_to_override = format!("/blobs/1/{}", fuchsia_merkle::from_slice(&blob).root());
 
     verify_resolve_fails_then_succeeds(
         pkg,

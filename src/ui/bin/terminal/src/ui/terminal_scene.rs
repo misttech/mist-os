@@ -61,14 +61,10 @@ impl HideScrollThumbTimer {
         }
     }
 
-    // Cancel existing task. Returns true if task was scheduled.
+    // Cancel existing task. Returns true if a task was cancelled..
     fn cancel(&mut self) -> bool {
-        let task = self.task.take();
-        if let Some(task) = task {
-            fasync::Task::local(async move {
-                task.cancel().await;
-            })
-            .detach();
+        if let Some(task) = self.task.take() {
+            std::mem::drop(task);
             if let Some(app_sender) = &self.app_sender {
                 app_sender.queue_message(
                     MessageTarget::View(self.view_id),

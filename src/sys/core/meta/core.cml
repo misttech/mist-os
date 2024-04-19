@@ -142,6 +142,12 @@
             dependency: "weak",
         },
         {
+            from: "parent",
+            to: "#network",
+            config: "fuchsia.http-client.StopOnIdleTimeoutMillis",
+            availability: "same_as_target",
+        },
+        {
             protocol: [ "fuchsia.ui.activity.Provider" ],
             from: "#activity",
             to: [ "#cobalt_system_metrics" ],

@@ -567,7 +567,7 @@ type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", "LEGACY");
   ASSERT_COMPILED(library);
-  ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
+  ASSERT_FALSE(library.HasStruct("Foo"));
 }
 
 TEST(VersioningInheritanceTests, GoodLegacyParentNotRemovedChildTrue) {
@@ -580,7 +580,7 @@ type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", "LEGACY");
   ASSERT_COMPILED(library);
-  ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+  ASSERT_TRUE(library.HasStruct("Foo"));
 }
 
 TEST(VersioningInheritanceTests, GoodLegacyParentFalseChildFalse) {
@@ -593,7 +593,7 @@ type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", "LEGACY");
   ASSERT_COMPILED(library);
-  ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
+  ASSERT_FALSE(library.HasStruct("Foo"));
 }
 
 TEST(VersioningInheritanceTests, BadLegacyParentFalseChildTrue) {
@@ -629,7 +629,7 @@ type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", "LEGACY");
   ASSERT_COMPILED(library);
-  ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+  ASSERT_TRUE(library.HasStruct("Foo"));
 }
 
 TEST(VersioningInheritanceTests, GoodLegacyParentTrueChildFalse) {
@@ -642,7 +642,7 @@ type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", "LEGACY");
   ASSERT_COMPILED(library);
-  ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
+  ASSERT_FALSE(library.HasStruct("Foo"));
 }
 
 TEST(VersioningInheritanceTests, GoodMemberInheritsFromParent) {

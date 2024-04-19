@@ -10,13 +10,12 @@
 #include <trace.h>
 #include <zircon/types.h>
 
-#include <fbl/intrusive_double_list.h>
 #include <fbl/macros.h>
 #include <vm/pmm.h>
 
 class PmmNode;
 
-class PmmArena : public fbl::DoublyLinkedListable<PmmArena*> {
+class PmmArena {
  public:
   constexpr PmmArena() = default;
   ~PmmArena() = default;

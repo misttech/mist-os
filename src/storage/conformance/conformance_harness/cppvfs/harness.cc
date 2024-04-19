@@ -83,7 +83,7 @@ class TestHarness : public fio_test::Io1Harness {
       }
     }
 
-    fs::VnodeConnectionOptions options = fs::VnodeConnectionOptions::FromIoV1Flags(
+    fs::VnodeConnectionOptions options = fs::VnodeConnectionOptions::FromOpen1Flags(
         fuchsia_io::OpenFlags{static_cast<uint32_t>(flags)});
     zx_status_t status = vfs_->Serve(std::move(dir), directory_request.TakeChannel(), options);
     if (status != ZX_OK) {

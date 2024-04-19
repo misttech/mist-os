@@ -3,15 +3,15 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
+        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/goldfish-display.so",
         bind: "meta/bind/goldfish-display-bind.bindbc",
         colocate: "false",
-        compat: "driver/goldfish-display.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },

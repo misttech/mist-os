@@ -297,6 +297,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// at `sink.offset()` to read the current offset into the file.
     fn readdir(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _sink: &mut dyn DirentSink,
@@ -481,11 +482,12 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn readdir(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
-        self.deref().readdir(file, current_task, sink)
+        self.deref().readdir(locked, file, current_task, sink)
     }
 
     fn wait_async(
@@ -795,8 +797,13 @@ pub fn default_ioctl(
                 return error!(ENOTTY);
             }
 
-            let size =
-                file.name.entry.node.refresh_info(current_task).map_err(|_| errno!(EINVAL))?.size;
+            let size = file
+                .name
+                .entry
+                .node
+                .fetch_and_refresh_info(current_task)
+                .map_err(|_| errno!(EINVAL))?
+                .size;
             let offset = usize::try_from(*file.offset.lock()).map_err(|_| errno!(EINVAL))?;
             let remaining =
                 if size < offset { 0 } else { i32::try_from(size - offset).unwrap_or(i32::MAX) };
@@ -907,6 +914,7 @@ impl FileOps for OPathOps {
     }
     fn readdir(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _sink: &mut dyn DirentSink,
@@ -973,12 +981,6 @@ impl FileOps for ProxyFileOps {
             options: MappingOptions,
             filename: NamespaceNode,
         ) -> Result<UserAddress, Errno>;
-        fn readdir(
-            &self,
-            _file: &FileObject,
-            _current_task: &CurrentTask,
-            _sink: &mut dyn DirentSink,
-        ) -> Result<(), Errno>;
         fn wait_async(
             &self,
             _file: &FileObject,
@@ -1039,6 +1041,15 @@ impl FileOps for ProxyFileOps {
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         self.0.ops().ioctl(locked, &self.0, current_task, request, arg)
+    }
+    fn readdir(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        sink: &mut dyn DirentSink,
+    ) -> Result<(), Errno> {
+        self.0.ops().readdir(locked, &self.0, current_task, sink)
     }
 }
 
@@ -1472,16 +1483,21 @@ impl FileObject {
         self.ops().mmap(self, current_task, addr, vmo_offset, length, prot_flags, options, filename)
     }
 
-    pub fn readdir(
+    pub fn readdir<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let mut locked = locked.cast_locked::<FileOpsCore>();
         if self.name.entry.is_dead() {
             return error!(ENOENT);
         }
 
-        self.ops().readdir(self, current_task, sink)?;
+        self.ops().readdir(&mut locked, self, current_task, sink)?;
         self.update_atime();
         Ok(())
     }

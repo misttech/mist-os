@@ -139,6 +139,17 @@ impl FidlPipe {
     pub fn target_address(&self) -> SocketAddr {
         self.address
     }
+
+    pub fn try_drain_errors(&self) -> Option<Vec<anyhow::Error>> {
+        let mut pipe_errors = Vec::new();
+        while let Ok(err) = self.error_queue.try_recv() {
+            pipe_errors.push(err)
+        }
+        if pipe_errors.is_empty() {
+            return None;
+        }
+        Some(pipe_errors)
+    }
 }
 
 impl Drop for FidlPipe {
@@ -177,6 +188,26 @@ mod test {
         }
     }
 
+    #[derive(Debug)]
+    struct DoNothingConnector;
+
+    impl OvernetConnector for DoNothingConnector {
+        async fn connect(&mut self) -> Result<OvernetConnection> {
+            let (sock1, sock2) = fidl::Socket::create_stream();
+            let sock1 = fidl::AsyncSocket::from_socket(sock1);
+            let sock2 = fidl::AsyncSocket::from_socket(sock2);
+            let (_error_tx, error_rx) = async_channel::unbounded();
+            let error_task = Task::local(async move {});
+            Ok(OvernetConnection {
+                output: Box::new(BufReader::new(sock1)),
+                input: Box::new(sock2),
+                errors: error_rx,
+                compat: None,
+                main_task: Some(error_task),
+            })
+        }
+    }
+
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_error_queue() {
         // These sockets will do nothing of import.
@@ -194,5 +225,26 @@ mod test {
         let mut errors = fidl_pipe.error_stream();
         let err = errors.next().await.unwrap();
         assert_eq!(anyhow::anyhow!("boom").to_string(), err.to_string());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_empty_error_queue() {
+        let (local_socket, _remote_socket) = fidl::Socket::create_stream();
+        let local_socket = fidl::AsyncSocket::from_socket(local_socket);
+        let (reader, writer) = tokio::io::split(local_socket);
+        let fidl_pipe = FidlPipe::start_internal(
+            "127.0.0.1:22".parse().unwrap(),
+            reader,
+            writer,
+            DoNothingConnector,
+        )
+        .await
+        .unwrap();
+        // So, this DoNothingConnector is going to ensure no errors are placed onto the queue,
+        // however, even if AutoFailConnector was used here it still wouldn't work, since there is
+        // no polling happening between the creation of FidlPipe and the attempt to drain errors
+        // off of the queue.
+        let errs = fidl_pipe.try_drain_errors();
+        assert!(errs.is_none());
     }
 }

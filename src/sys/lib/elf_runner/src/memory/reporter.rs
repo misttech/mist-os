@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use attribution::AttributionServer;
+use attribution::{AttributionServer, AttributionServerHandle};
 use fidl::endpoints::RequestStream;
 use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker};
 use fidl_fuchsia_io as fio;
@@ -16,7 +16,7 @@ use zx::AsHandleRef;
 use crate::{component::ElfComponentInfo, ComponentSet};
 
 pub struct MemoryReporter {
-    server: AttributionServer,
+    server: AttributionServerHandle,
     components: Arc<ComponentSet>,
 }
 

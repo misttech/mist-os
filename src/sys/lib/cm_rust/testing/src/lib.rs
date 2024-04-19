@@ -1036,6 +1036,14 @@ impl From<ExposeBuilder> for cm_rust::ExposeDecl {
     }
 }
 
+pub fn offer_source_static_child(name: &str) -> cm_rust::OfferSource {
+    cm_rust::OfferSource::Child(cm_rust::ChildRef { name: name.into(), collection: None })
+}
+
+pub fn offer_target_static_child(name: &str) -> cm_rust::OfferTarget {
+    cm_rust::OfferTarget::Child(cm_rust::ChildRef { name: name.into(), collection: None })
+}
+
 /// A convenience builder for constructing [OfferDecl]s.
 ///
 /// To use, call the constructor matching their capability type ([OfferBuilder::protocol],
@@ -1146,9 +1154,17 @@ impl OfferBuilder {
         self
     }
 
+    pub fn source_static_child(self, source: &str) -> Self {
+        self.source(offer_source_static_child(source))
+    }
+
     pub fn target(mut self, target: cm_rust::OfferTarget) -> Self {
         self.target = Some(target);
         self
+    }
+
+    pub fn target_static_child(self, target: &str) -> Self {
+        self.target(offer_target_static_child(target))
     }
 
     pub fn availability(mut self, availability: cm_rust::Availability) -> Self {

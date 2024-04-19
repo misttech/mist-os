@@ -19,7 +19,7 @@ mod unit;
 pub use self::any::{AnyCapability, AnyCast, ErasedCapability};
 pub use self::capability::{Capability, CapabilityTrait, ConversionError, RemoteError};
 pub use self::data::Data;
-pub use self::dict::{Dict, Key as DictKey};
+pub use self::dict::{Dict, DictEntries, Key as DictKey};
 pub use self::directory::Directory;
 pub use self::handle::OneShotHandle;
 pub use self::open::Open;

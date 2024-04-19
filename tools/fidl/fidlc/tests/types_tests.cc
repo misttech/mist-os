@@ -235,13 +235,13 @@ type TypeDecl = struct {
   auto type_decl_vector_anon = library.LookupStruct("V3");
   ASSERT_NE(type_decl_vector_anon, nullptr);
   EXPECT_EQ(type_decl_vector_anon->members.size(), 2u);
-  ASSERT_NE(library.LookupStruct("I0"), nullptr);
-  ASSERT_NE(library.LookupStruct("I1"), nullptr);
+  ASSERT_TRUE(library.HasStruct("I0"));
+  ASSERT_TRUE(library.HasStruct("I1"));
   auto type_decl_array_anon = library.LookupStruct("A3");
   ASSERT_NE(type_decl_array_anon, nullptr);
   EXPECT_EQ(type_decl_array_anon->members.size(), 2u);
-  ASSERT_NE(library.LookupStruct("I2"), nullptr);
-  ASSERT_NE(library.LookupStruct("I3"), nullptr);
+  ASSERT_TRUE(library.HasStruct("I2"));
+  ASSERT_TRUE(library.HasStruct("I3"));
 }
 
 TEST(TypesTests, GoodLayoutMemberConstraints) {

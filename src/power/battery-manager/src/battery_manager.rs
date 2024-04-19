@@ -197,6 +197,14 @@ impl BatteryManager {
 
                 new_battery_info.present_voltage_mv = Some(bi.present_voltage);
 
+                let battery_spec = fpower::BatterySpec {
+                    max_charging_current_ua: bi.battery_spec.max_charging_current_ua,
+                    max_charnging_voltage_uv: bi.battery_spec.max_charnging_voltage_uv,
+                    design_capacity_uah: bi.battery_spec.design_capacity_uah,
+                    ..Default::default()
+                };
+                new_battery_info.battery_spec = Some(battery_spec);
+
                 match bi.unit {
                     hpower::BatteryUnit::Ma => {
                         new_battery_info.remaining_capacity_uah =
@@ -387,6 +395,12 @@ mod tests {
             present_rate: -500,
             remaining_capacity: 3000,
             present_voltage: 7000,
+            battery_spec: hpower::BatterySpec {
+                max_charging_current_ua: Some(500000),
+                max_charnging_voltage_uv: Some(5000000),
+                design_capacity_uah: Some(380000),
+                ..Default::default()
+            },
         };
         return battery_info;
     }

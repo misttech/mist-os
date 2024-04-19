@@ -59,7 +59,7 @@ if (is_linux && has_board) {
   }
 }
 
-group("tests") {
+group("e2e_tests") {
   if (host_os == "linux" && has_board) {
     deps = [ ":conformance_emulator_test($host_toolchain)" ]
   }

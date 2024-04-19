@@ -214,7 +214,12 @@ impl StarnixNodeConnection {
             sink: Some(directory::dirents_sink::AppendResult::Ok(sink)),
             offset: &mut file_offset,
         };
-        self.file.readdir(&current_task, &mut dirent_sink)?;
+        let kernel = self.kernel().unwrap().clone();
+        self.file.readdir(
+            kernel.kthreads.unlocked_for_async().deref_mut(),
+            &current_task,
+            &mut dirent_sink,
+        )?;
         match dirent_sink.sink {
             Some(directory::dirents_sink::AppendResult::Sealed(seal)) => {
                 Ok((directory::traversal_position::TraversalPosition::End, seal))

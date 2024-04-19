@@ -108,7 +108,8 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
       }
     }
 
-    fs::VnodeConnectionOptions options = fs::VnodeConnectionOptions::FromIoV1Flags(request.flags());
+    fs::VnodeConnectionOptions options =
+        fs::VnodeConnectionOptions::FromOpen1Flags(request.flags());
     ZX_ASSERT(memfs_->Serve(root_dir, request.directory_request().TakeChannel(), options) == ZX_OK);
   }
 

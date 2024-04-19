@@ -125,7 +125,7 @@ runners as well), for example:
 Including the host test data rule will also include the FIDL IR, so no need
 to include both dependencies.
 
-### Add the Python import block {:#add-the-python-imnport-block .numbered}
+### Add the Python import block {:#add-the-python-import-block .numbered}
 
 Once all dependencies are all included, we can add the following libraries
 in the Python main file:
@@ -488,6 +488,87 @@ There are a few things to note when implementing a server:
 * Unlike Rust's async code, when creating an async task, you must keep
   the returned object until you're done with it. Otherwise, the task may
   be garbage collected and canceled.
+
+### Experimenting with the Python Interpreter {:.numbered}
+
+If you're unsure of how to construct certain types and you want to skip through
+building and running an executable, it is possible to use the Python interpreter
+to inspect FIDL structures.
+
+To start, you need to make sure you have the prerequisite FIDL libraries built
+and available for use in Python (covered above), as Python will need access to
+the FIDL IR in order to function.
+
+The following commands will change depending on your fuchsia build directory (
+which defaults to `$FUCHSIA_DIR/out/default`):
+
+```sh
+FUCHSIA_BUILD_DIR="$FUCHSIA_DIR/out/default" # Change depending on build dir.
+export FIDL_IR_PATH="$FUCHSIA_BUILD_DIR/fidling/gen/ir_root"
+__PYTHONPATH="$FUCHSIA_BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python"
+if [ ! -z PYTHONPATH ]; then
+    __PYTHONPATH="$PYTHONPATH:$__PYTHONPATH"
+fi
+export PYTHONPATH="$__PYTHONPATH"
+```
+
+You can then start a python interpreter from anywhere, which will also support
+tab completion so you can inspect various types. For example:
+
+
+```sh {:.devsite-disable-click-to-copy}
+$ python3
+Python 3.11.8 (main, Feb  7 2024, 21:52:08) [GCC 13.2.0] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import fidl.fuchsia_hwinfo
+>>> fidl.fuchsia_hwinfo.<TAB><TAB>
+fidl.fuchsia_hwinfo.Architecture(
+fidl.fuchsia_hwinfo.Board()
+fidl.fuchsia_hwinfo.BoardGetInfoResponse(
+fidl.fuchsia_hwinfo.BoardInfo(
+fidl.fuchsia_hwinfo.Device()
+fidl.fuchsia_hwinfo.DeviceGetInfoResponse(
+fidl.fuchsia_hwinfo.DeviceInfo(
+fidl.fuchsia_hwinfo.MAX_VALUE_SIZE
+fidl.fuchsia_hwinfo.Product()
+fidl.fuchsia_hwinfo.ProductGetInfoResponse(
+fidl.fuchsia_hwinfo.ProductInfo(
+fidl.fuchsia_hwinfo.fullname
+```
+
+You can then see all values exported by this module. If you would like to
+experiment with async in `IPython`, you can also do the same environment setup
+as above, and execute `IPython`. First, make sure you have it installed:
+
+```sh
+sudo apt install python3-ipython
+```
+
+And then you can run `IPython`. The following example assumes that you run an
+emulator named `fuchsia-emulator` and run from the Fuchsia default build
+directory (otherwise, `"sdk.root"` needs to be changed):
+
+
+```sh {:.devsite-disable-click-to-copy}
+Python 3.11.8 (main, Feb  7 2024, 21:52:08) [GCC 13.2.0]
+Type 'copyright', 'credits' or 'license' for more information
+IPython 8.20.0 -- An enhanced Interactive Python. Type '?' for help.
+
+In [1]: from fuchsia_controller_py import Context
+
+In [2]: import fidl.fuchsia_buildinfo
+
+In [3]: ctx = Context(target="fuchsia-emulator", config={"sdk.root": "./sdk/exported/core"})
+
+In [4]: hdl = ctx.connect_device_proxy("/core/build-info", fidl.fuchsia_buildinfo.Provider.MARKER)
+
+In [5]: provider = fidl.fuchsia_buildinfo.Provider.Client(hdl)
+
+In [6]: await provider.get_build_info()
+Out[6]: ProviderGetBuildInfoResponse(build_info=BuildInfo(product_config='core', board_config='x64', version='2024-04-04T18:15:05+00:00', latest_commit_date='2024-04-04T18:15:05+00:00'))
+
+In [7]:
+```
 
 <!-- Reference links -->
 

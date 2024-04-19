@@ -88,7 +88,7 @@ pub(crate) async fn do_ssh(
         ssh_cmd = ssh_cmd.arg(arg);
     }
     ssh_cmd = ssh_cmd.arg(host.clone());
-    ssh_cmd = ssh_cmd.arg(format!(r#"echo 'Tunnel established'; sleep infinity"#));
+    ssh_cmd = ssh_cmd.arg(format!(r#"echo 'Tunnel established';echo 'Do not forget to run `ffx target add [::1]:8022`'; sleep infinity"#));
 
     // Disable stdin
     ssh_cmd = ssh_cmd.stdin(Stdio::null());

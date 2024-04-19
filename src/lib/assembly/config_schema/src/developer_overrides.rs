@@ -25,6 +25,13 @@ pub struct DeveloperOverrides {
     /// Using these will generate warnings.
     #[serde(default)]
     pub kernel: KernelOptions,
+
+    /// Developer overrides for the platform configuration.
+    ///
+    /// This is a 'Value' so that it can be be used to overlay the product's
+    /// platform configuration before that's parsed into it's real type.
+    #[serde(default)]
+    pub platform: serde_json::Value,
 }
 
 /// Special flags for assembly that can only be used in the context of developer
@@ -38,6 +45,7 @@ pub struct DeveloperOnlyOptions {
     /// This feature exists to enable the use of a product image that has cache
     /// or universe packages in a context where networking is unavailable or
     /// a package server cannot be run.
+    #[serde(default)]
     pub all_packages_in_base: bool,
 }
 
@@ -47,5 +55,6 @@ pub struct DeveloperOnlyOptions {
 #[serde(deny_unknown_fields)]
 pub struct KernelOptions {
     /// Additional kernel command line args to add to the assembled ZBI.
+    #[serde(default)]
     pub command_line_args: Vec<String>,
 }

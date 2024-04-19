@@ -4,9 +4,6 @@
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
-#include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <zircon/errors.h>
 
 #include <memory>
@@ -50,9 +47,9 @@ class ObserverServerCodecWarningTest : public ObserverServerWarningTest {
   std::shared_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeCodecNoDirection();
 
-    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
-                                           fuchsia_audio_device::DeviceType::kCodec,
-                                           DriverClient::WithCodec(fake_driver->Enable())));
+    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
+                                            fuchsia_audio_device::DeviceType::kCodec,
+                                            DriverClient::WithCodec(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -63,9 +60,9 @@ class ObserverServerCompositeWarningTest : public ObserverServerWarningTest {
   std::shared_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeComposite();
 
-    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test composite name",
-                                           fuchsia_audio_device::DeviceType::kComposite,
-                                           DriverClient::WithComposite(fake_driver->Enable())));
+    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
+                                            fuchsia_audio_device::DeviceType::kComposite,
+                                            DriverClient::WithComposite(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -76,9 +73,9 @@ class ObserverServerStreamConfigWarningTest : public ObserverServerWarningTest {
   std::shared_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeStreamConfigOutput();
 
-    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
-                                           fuchsia_audio_device::DeviceType::kOutput,
-                                           DriverClient::WithStreamConfig(fake_driver->Enable())));
+    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test output name",
+                                            fuchsia_audio_device::DeviceType::kOutput,
+                                            DriverClient::WithStreamConfig(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -90,14 +87,14 @@ class ObserverServerStreamConfigWarningTest : public ObserverServerWarningTest {
 // Codec: WatchGainState is unsupported
 TEST_F(ObserverServerCodecWarningTest, WatchGainStateWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(added_device);
   ASSERT_EQ(ObserverServer::count(), 1u);
@@ -117,20 +114,20 @@ TEST_F(ObserverServerCodecWarningTest, WatchGainStateWrongDeviceType) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ObserverServer::count(), 1u);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // While `WatchPlugState` is pending, calling this again is an error (but non-fatal).
 TEST_F(ObserverServerCodecWarningTest, WatchPlugStateWhilePending) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   // We'll always receive an immediate response from the first `WatchPlugState` call.
   auto observer = CreateTestObserverServer(added_device);
@@ -143,7 +140,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchPlugStateWhilePending) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_initial_callback);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
   bool received_second_callback = false;
   // The second `WatchPlugState` call should pend indefinitely (even after the third one fails).
   observer->client()->WatchPlugState().Then(
@@ -172,20 +169,20 @@ TEST_F(ObserverServerCodecWarningTest, WatchPlugStateWhilePending) {
   EXPECT_FALSE(received_second_callback);
   EXPECT_TRUE(received_third_callback);
   EXPECT_EQ(ObserverServer::count(), 1u);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Codec: GetReferenceClock is unsupported
 TEST_F(ObserverServerCodecWarningTest, GetReferenceClockWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(added_device);
   ASSERT_EQ(ObserverServer::count(), 1u);
@@ -205,7 +202,7 @@ TEST_F(ObserverServerCodecWarningTest, GetReferenceClockWrongDeviceType) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ObserverServer::count(), 1u);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain),
@@ -219,7 +216,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchTopologyUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto observer = CreateTestObserverServer(device);
@@ -261,7 +258,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchElementStateUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto observer = CreateTestObserverServer(device);
@@ -303,14 +300,14 @@ TEST_F(ObserverServerCodecWarningTest, WatchElementStateUnsupported) {
 // Verify that the Observer cannot handle a WatchGainState request from this type of device.
 TEST_F(ObserverServerCompositeWarningTest, WatchGainStateWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(added_device);
   ASSERT_EQ(ObserverServer::count(), 1u);
@@ -330,20 +327,20 @@ TEST_F(ObserverServerCompositeWarningTest, WatchGainStateWrongDeviceType) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ObserverServer::count(), 1u);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // Verify that the Observer cannot handle a WatchPlugState request from this type of device.
 TEST_F(ObserverServerCompositeWarningTest, WatchPlugStateWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(added_device);
   ASSERT_EQ(ObserverServer::count(), 1u);
@@ -363,7 +360,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchPlugStateWrongDeviceType) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ObserverServer::count(), 1u);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // WatchTopology cases (without using SetTopology): Watch-while-pending
@@ -373,7 +370,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchTopologyWhilePending) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
 
@@ -424,7 +421,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchElementStateUnknownElementId) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
 
@@ -472,7 +469,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchElementStateWhilePending) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
 
@@ -541,14 +538,14 @@ TEST_F(ObserverServerCompositeWarningTest, WatchElementStateWhilePending) {
 // A subsequent call to WatchGainState before the previous one completes should fail.
 TEST_F(ObserverServerStreamConfigWarningTest, WatchGainStateWhilePending) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   // We'll always receive an immediate response from the first `WatchGainState` call.
   auto observer = CreateTestObserverServer(added_device);
@@ -561,8 +558,8 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchGainStateWhilePending) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_initial_callback);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
-  // EXPECT_EQ(observer_fidl_error_status_.value_or(ZX_OK), ZX_OK);
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
+  // EXPECT_EQ(observer_fidl_error_status().value_or(ZX_OK), ZX_OK);
   bool received_second_callback = false;
   // The second `WatchGainState` call should pend indefinitely (even after the third one fails).
   observer->client()->WatchGainState().Then(
@@ -591,19 +588,19 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchGainStateWhilePending) {
   EXPECT_FALSE(received_second_callback);
   EXPECT_TRUE(received_third_callback);
   EXPECT_EQ(ObserverServer::count(), 1u);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 TEST_F(ObserverServerStreamConfigWarningTest, WatchPlugStateWhilePending) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  ASSERT_EQ(adr_service_->devices().size(), 1u);
-  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   // We'll always receive an immediate response from the first `WatchPlugState` call.
   auto observer = CreateTestObserverServer(added_device);
@@ -616,8 +613,8 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchPlugStateWhilePending) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_initial_callback);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
-  // EXPECT_EQ(observer_fidl_error_status_.value_or(ZX_OK), ZX_OK);
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
+  // EXPECT_EQ(observer_fidl_error_status().value_or(ZX_OK), ZX_OK);
   bool received_second_callback = false;
   // The second `WatchPlugState` call should pend indefinitely (even after the third one fails).
   observer->client()->WatchPlugState().Then(
@@ -646,7 +643,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchPlugStateWhilePending) {
   EXPECT_FALSE(received_second_callback);
   EXPECT_TRUE(received_third_callback);
   EXPECT_EQ(ObserverServer::count(), 1u);
-  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+  EXPECT_FALSE(observer_fidl_error_status().has_value()) << *observer_fidl_error_status();
 }
 
 // TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
@@ -669,7 +666,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchTopologyUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto observer = CreateTestObserverServer(device);
@@ -711,7 +708,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchElementStateUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto observer = CreateTestObserverServer(device);

@@ -59,7 +59,8 @@ void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& compl
   if (append()) {
     inherited_flags |= fio::OpenFlags::kAppend;
   }
-  Connection::NodeClone(request->flags | inherited_flags, std::move(request->object));
+  Connection::NodeClone(request->flags | inherited_flags, VnodeProtocol::kFile,
+                        std::move(request->object));
 }
 
 void FileConnection::Close(CloseCompleter::Sync& completer) { completer.Reply(Unbind()); }
@@ -198,7 +199,7 @@ void FileConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) 
 }
 
 zx_status_t FileConnection::ResizeInternal(uint64_t length) {
-  FS_PRETTY_TRACE_DEBUG("[FileTruncate] options: ", options());
+  FS_PRETTY_TRACE_DEBUG("[FileTruncate] rights: ", rights(), ", append: ", append());
   if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }

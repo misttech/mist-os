@@ -24,7 +24,6 @@
 
 #include <dev/interrupt.h>
 #include <dev/iommu.h>
-#include <dev/udisplay.h>
 #include <fbl/inline_array.h>
 #include <object/bus_transaction_initiator_dispatcher.h>
 #include <object/handle.h>
@@ -203,41 +202,7 @@ zx_status_t sys_framebuffer_get_info(zx_handle_t handle, user_out_ptr<uint32_t> 
 zx_status_t sys_framebuffer_set_range(zx_handle_t hrsrc, zx_handle_t vmo_handle, uint32_t len,
                                       uint32_t format, uint32_t width, uint32_t height,
                                       uint32_t stride) {
-  zx_status_t status;
-  if ((status = validate_resource_kind_base(hrsrc, ZX_RSRC_KIND_SYSTEM,
-                                            ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE)) < 0) {
-    return status;
-  }
-
-  if (vmo_handle == ZX_HANDLE_INVALID) {
-    udisplay_clear_framebuffer_vmo();
-    return ZX_OK;
-  }
-
-  auto up = ProcessDispatcher::GetCurrent();
-
-  // lookup the dispatcher from handle
-  fbl::RefPtr<VmObjectDispatcher> vmo;
-  status = up->handle_table().GetDispatcher(*up, vmo_handle, &vmo);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  status = udisplay_set_framebuffer(vmo->vmo());
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  display_info di;
-  memset(&di, 0, sizeof(display_info));
-  di.format = format;
-  di.width = width;
-  di.height = height;
-  di.stride = stride;
-  di.flags = DISPLAY_FLAG_HW_FRAMEBUFFER;
-  udisplay_set_display_info(&di);
-
-  return ZX_OK;
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
 // zx_status_t zx_iommu_create

@@ -127,6 +127,15 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 })?;
             }
 
+            if let Some(timeout) =
+                connectivity_config.network.http_client_stop_on_idle_timeout_millis
+            {
+                builder.set_config_capability(
+                    "fuchsia.http-client.StopOnIdleTimeoutMillis",
+                    Config::new(ConfigValueType::Int64, timeout.into()),
+                )?;
+            }
+
             // The use of netstack3 can be forcibly required by the board,
             // otherwise it's selectable by the product.
             match (

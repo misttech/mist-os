@@ -5,7 +5,6 @@
 use {
     async_trait::async_trait,
     fidl_fuchsia_io as fio,
-    fuchsia_merkle::MerkleTree,
     fuchsia_zircon::Status,
     storage_stress_test_utils::{data::FileFactory, io::Directory},
     stress_test::actor::{Actor, ActorError},
@@ -29,7 +28,7 @@ impl BlobActor {
     async fn create_blob(&mut self) -> Result<(), Status> {
         // Create the root hash for the blob
         let data_bytes = self.factory.generate_bytes();
-        let tree = MerkleTree::from_reader(&data_bytes[..]).unwrap();
+        let tree = fuchsia_merkle::from_slice(&data_bytes);
         let merkle_root_hash = tree.root().to_string();
 
         // Write the file to disk

@@ -239,11 +239,10 @@ template("sdk_atom") {
     rebase_path(meta_file, root_build_dir),
   ]
 
-  # api files are only valid for the HEAD API level. When
-  # override_target_api_level is set, some of them will fail to reflect
-  # the API of the atom being built. Disallow api verification when
-  # this is the case.
-  _verify_api = defined(invoker.api) && override_target_api_level == -1
+  # api files are only valid for the PLATFORM API level. When
+  # override_target_api_level is set, some of them will fail to reflect the API
+  # of the atom being built. Disallow api verification when this is the case.
+  _verify_api = defined(invoker.api) && override_target_api_level == "PLATFORM"
 
   if (_verify_api) {
     if (defined(invoker.api_contents)) {

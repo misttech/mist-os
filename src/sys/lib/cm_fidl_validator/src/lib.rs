@@ -2236,7 +2236,7 @@ impl<'a> ValidationContext<'a> {
                     source_dictionary,
                     o.target.as_ref(),
                     o.target_name.as_ref(),
-                    Some(&fdecl::Availability::Required),
+                    o.availability.as_ref(),
                     offer_type,
                 );
 

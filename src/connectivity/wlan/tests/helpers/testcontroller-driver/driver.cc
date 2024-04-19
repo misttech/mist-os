@@ -78,8 +78,15 @@ class WlanFullmacImplIfcToDriverBridge
   }
 
   void OnScanResult(OnScanResultRequest& request, OnScanResultCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->OnScanResult(request).ThenExactlyOnce(
+        ForwardResult<WlanFullmacImplIfc::OnScanResult>(completer.ToAsync()));
   }
-  void OnScanEnd(OnScanEndRequest& request, OnScanEndCompleter::Sync& completer) override {}
+  void OnScanEnd(OnScanEndRequest& request, OnScanEndCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->OnScanEnd(request).ThenExactlyOnce(
+        ForwardResult<WlanFullmacImplIfc::OnScanEnd>(completer.ToAsync()));
+  }
   void ConnectConf(ConnectConfRequest& request, ConnectConfCompleter::Sync& completer) override {}
   void RoamConf(RoamConfRequest& request, RoamConfCompleter::Sync& completer) override {}
   void AuthInd(AuthIndRequest& request, AuthIndCompleter::Sync& completer) override {}
@@ -107,7 +114,7 @@ class WlanFullmacImplIfcToDriverBridge
 
  private:
   fidl::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImplIfcBridge> binding_;
-  fdf::WireClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc> bridge_client_;
+  fdf::Client<fuchsia_wlan_fullmac::WlanFullmacImplIfc> bridge_client_;
 };
 
 // Server that forwards calls from WlanFullmacImpl to WlanFullmacImplBridge.
@@ -185,7 +192,11 @@ class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::
     bridge_client_->QuerySpectrumManagementSupport().ThenExactlyOnce(
         ForwardResult<WlanFullmacImplBridge::QuerySpectrumManagementSupport>(completer.ToAsync()));
   }
-  void StartScan(StartScanRequest& request, StartScanCompleter::Sync& completer) override {}
+  void StartScan(StartScanRequest& request, StartScanCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->StartScan(request).ThenExactlyOnce(
+        ForwardResult<WlanFullmacImplBridge::StartScan>(completer.ToAsync()));
+  }
   void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->Connect(request).ThenExactlyOnce(

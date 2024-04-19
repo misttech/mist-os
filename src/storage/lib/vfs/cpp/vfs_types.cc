@@ -14,29 +14,37 @@ namespace fio = fuchsia_io;
 
 namespace fs {
 
-VnodeConnectionOptions VnodeConnectionOptions::FromIoV1Flags(fio::OpenFlags fidl_flags) {
+VnodeConnectionOptions VnodeConnectionOptions::FromOpen1Flags(fio::OpenFlags open1_flags) {
   VnodeConnectionOptions options;
   // Filter out io1 OpenFlags.RIGHT_* flags, translated to io2 Rights below.
-  options.flags = fidl_flags & ~kAllIo1Rights;
+  options.flags = open1_flags & ~kAllIo1Rights;
 
   // Using Open1 requires GET_ATTRIBUTES as this is not expressible via |fio::OpenFlags|.
   // TODO(https://fxbug.dev/324080764): Restrict GET_ATTRIBUTES.
   options.rights = fio::Rights::kGetAttributes;
 
-  // Approximate a set of io2 Rights corresponding to what is expected by |fidl_flags|.
+  // Approximate a set of io2 Rights corresponding to what is expected by |open1_flags|.
   if (!(options.flags & fio::OpenFlags::kNodeReference)) {
-    if (fidl_flags & fio::OpenFlags::kRightReadable) {
+    if (open1_flags & fio::OpenFlags::kRightReadable) {
       options.rights |= fio::kRStarDir;
     }
-    if (fidl_flags & fio::OpenFlags::kRightWritable) {
+    if (open1_flags & fio::OpenFlags::kRightWritable) {
       options.rights |= fio::kWStarDir;
     }
-    if (fidl_flags & fio::OpenFlags::kRightExecutable) {
+    if (open1_flags & fio::OpenFlags::kRightExecutable) {
       options.rights |= fio::kXStarDir;
     }
   }
 
   return options;
+}
+
+VnodeConnectionOptions VnodeConnectionOptions::FromCloneFlags(fio::OpenFlags clone_flags) {
+  constexpr fio::OpenFlags kValidCloneFlags = kAllIo1Rights | fio::OpenFlags::kAppend |
+                                              fio::OpenFlags::kDescribe |
+                                              fio::OpenFlags::kCloneSameRights;
+  // Any flags not present in |kValidCloneFlags| should be ignored.
+  return FromOpen1Flags(clone_flags & kValidCloneFlags);
 }
 
 fio::OpenFlags VnodeConnectionOptions::ToIoV1Flags() const {
@@ -67,5 +75,32 @@ fio::wire::NodeAttributes VnodeAttributes::ToIoV1NodeAttributes() const {
                                    .creation_time = creation_time,
                                    .modification_time = modification_time};
 }
+
+namespace internal {
+
+bool ValidateCloneFlags(fio::OpenFlags flags) {
+  // If CLONE_SAME_RIGHTS is specified, the client cannot request any specific rights.
+  if (flags & fio::OpenFlags::kCloneSameRights) {
+    return !(flags & kAllIo1Rights);
+  }
+  // All other flags are ignored.
+  return true;
+}
+
+bool ValidateOpenFlags(fio::OpenFlags flags) {
+  if ((flags & fio::OpenFlags::kNodeReference) &&
+      (flags - fio::kOpenFlagsAllowedWithNodeReference)) {
+    return false;
+  }
+  if ((flags & fio::OpenFlags::kNotDirectory) && (flags & fio::OpenFlags::kDirectory)) {
+    return false;
+  }
+  if (flags & fio::OpenFlags::kCloneSameRights) {
+    return false;
+  }
+  return true;
+}
+
+}  // namespace internal
 
 }  // namespace fs

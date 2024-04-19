@@ -15,7 +15,7 @@ type PlugState = table {
     /// Required
     1: plugged bool;
 
-    /// Timestamps (using `CLOCK_DOMAIN_MONOTONIC`) the information provided in the other fields
+    /// Timestamps (using `ZX_CLOCK_MONOTONIC`) the information provided in the other fields
     /// of this table. Indicates when the transition described by this table occurred.
     ///
     /// Required.
@@ -62,8 +62,12 @@ type Endpoint = table {
 /// State for an `Element` with `type` equal to `ENDPOINT`.
 @available(added=12)
 type EndpointElementState = table {
-    /// The plug detect state for this endpoint.
+    /// If included the plug detect state for this endpoint.
     ///
-    /// Required.
+    /// This field should not be present in a `SetElementState` `state` since the plug state
+    /// can't be set by a client. It must be provided by the server in a `WatchElementState`
+    /// reply.
+    ///
+    /// Required for servers.
     1: plug_state PlugState;
 };

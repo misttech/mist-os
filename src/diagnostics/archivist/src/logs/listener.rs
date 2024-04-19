@@ -114,11 +114,10 @@ impl Listener {
         self.status == Status::Fine
     }
 
-    async fn send_new_logs<S>(&mut self, logs: S)
+    async fn send_new_logs<S>(&mut self, mut logs: S)
     where
         S: Stream<Item = Arc<LogsData>> + Unpin,
     {
-        pin_utils::pin_mut!(logs);
         while let Some(message) = logs.next().await {
             self.send_log(&message).await;
             if !self.is_healthy() {

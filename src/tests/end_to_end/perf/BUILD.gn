@@ -145,9 +145,7 @@ if (is_host) {
 }
 
 _python_benchmarks += [
-  "//src/connectivity/network/drivers/network-device/device:benchmarks",
-  "//src/connectivity/network/netstack3:benchmarks",
-  "//src/connectivity/network/tests/benchmarks",
+  "//src/connectivity/network:benchmarks",
   "//src/devices/bin/driver_runtime/microbenchmarks",
   "//src/diagnostics:benchmarks",
   "//src/lib/diagnostics:benchmarks",
@@ -166,8 +164,6 @@ group("test") {
   deps = _python_benchmarks
 
   deps += [
-    "//third_party/sbase:sbase-pkgs",
-
     # Many tests use sl4f to communicate with the target.
     "//src/testing/sl4f",
 

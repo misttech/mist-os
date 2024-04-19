@@ -121,7 +121,6 @@ impl FidlProtocol for ListenerProtocol {
                 let tasks = self.task_manager.drain();
                 for t in tasks {
                     tracing::info!("cancelling task {:?}", t);
-                    t.cancel().await;
                 }
                 responder.send(Ok(()))?;
                 Ok(())

@@ -400,7 +400,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("foo_data")
                             .target_name("bar_data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string()))
+                            .target_static_child("b")
                             .rights(fio::R_STAR_DIR),
                     )
                     .offer(
@@ -408,14 +408,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("foo")
                             .target_name("bar")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .offer(
                         OfferBuilder::protocol()
                             .name("file")
                             .target_name("device")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .build(),
@@ -640,7 +640,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("foo_data")
                             .target_name("bar_data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string()))
+                            .target_static_child("b")
                             .rights(fio::R_STAR_DIR),
                     )
                     .offer(
@@ -648,7 +648,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("foo")
                             .target_name("bar")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .build(),
@@ -661,7 +661,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("bar_data")
                             .target_name("baz_data")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .target_static_child("c")
                             .rights(fio::R_STAR_DIR),
                     )
                     .offer(
@@ -669,7 +669,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("bar")
                             .target_name("baz")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .child_default("c")
                     .build(),
@@ -718,7 +718,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::protocol()
                             .name("builtin.Echo")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .build(),
@@ -730,7 +730,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::protocol()
                             .name("builtin.Echo")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .child_default("c")
                     .build(),
@@ -781,16 +781,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::directory()
                             .name("bar_data")
                             .target_name("foobar_data")
-                            .source(OfferSource::static_child("d".to_string()))
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .source_static_child("d")
+                            .target_static_child("c")
                             .rights(fio::R_STAR_DIR),
                     )
                     .offer(
                         OfferBuilder::protocol()
                             .name("bar")
                             .target_name("foobar")
-                            .source(OfferSource::static_child("d".to_string()))
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .source_static_child("d")
+                            .target_static_child("c"),
                     )
                     .child_default("c")
                     .child_default("d")
@@ -858,16 +858,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::directory()
                             .name("bar_data")
                             .target_name("baz_data")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .source_static_child("b")
+                            .target_static_child("c")
                             .rights(fio::R_STAR_DIR),
                     )
                     .offer(
                         OfferBuilder::protocol()
                             .name("bar")
                             .target_name("baz")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .source_static_child("b")
+                            .target_static_child("c"),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -938,16 +938,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::directory()
                             .name("baz_data")
                             .target_name("foobar_data")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .source_static_child("b")
+                            .target_static_child("c")
                             .rights(fio::R_STAR_DIR),
                     )
                     .offer(
                         OfferBuilder::protocol()
                             .name("baz")
                             .target_name("foobar")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .source_static_child("b")
+                            .target_static_child("c"),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -1041,13 +1041,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("foo")
                             .target_name("foo_from_a_svc")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .offer(
                         OfferBuilder::directory()
                             .name("foo_from_d_data")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .source_static_child("b")
+                            .target_static_child("c")
                             .rights(fio::R_STAR_DIR),
                     )
                     .child_default("b")
@@ -1060,15 +1060,15 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(
                         OfferBuilder::directory()
                             .name("foo_from_d_data")
-                            .source(OfferSource::static_child("d".to_string()))
-                            .target(OfferTarget::static_child("e".to_string()))
+                            .source_static_child("d")
+                            .target_static_child("e")
                             .rights(fio::R_STAR_DIR),
                     )
                     .offer(
                         OfferBuilder::protocol()
                             .name("foo_from_a_svc")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("e".to_string())),
+                            .target_static_child("e"),
                     )
                     .expose(
                         ExposeBuilder::directory()
@@ -1087,14 +1087,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::directory()
                             .name("foo_from_d_data")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("f".to_string()))
+                            .target_static_child("f")
                             .rights(fio::R_STAR_DIR),
                     )
                     .offer(
                         OfferBuilder::protocol()
                             .name("foo_from_h_svc")
-                            .source(OfferSource::static_child("g".to_string()))
-                            .target(OfferTarget::static_child("f".to_string())),
+                            .source_static_child("g")
+                            .target_static_child("f"),
                     )
                     .child_default("f")
                     .child_default("g")
@@ -1245,7 +1245,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("foo_data")
                             .target_name("bar_data")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("b".to_string()))
+                            .target_static_child("b")
                             .rights(fio::R_STAR_DIR),
                     )
                     .offer(
@@ -1253,7 +1253,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("foo")
                             .target_name("bar")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .build(),
@@ -1349,15 +1349,15 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(
                         OfferBuilder::directory()
                             .name("hippo_data")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .source_static_child("b")
+                            .target_static_child("c")
                             .rights(fio::R_STAR_DIR),
                     )
                     .offer(
                         OfferBuilder::protocol()
                             .name("hippo")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .source_static_child("b")
+                            .target_static_child("c"),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -1410,14 +1410,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::directory()
                             .name("hippo_data")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .target_static_child("c")
                             .rights(fio::R_STAR_DIR),
                     )
                     .offer(
                         OfferBuilder::protocol()
                             .name("hippo")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .child_default("c")
                     .build(),
@@ -1566,16 +1566,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::directory()
                             .name("bar_data")
                             .target_name("baz_data")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .source_static_child("b")
+                            .target_static_child("c")
                             .rights(fio::R_STAR_DIR),
                     )
                     .offer(
                         OfferBuilder::protocol()
                             .name("bar")
                             .target_name("baz")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .source_static_child("b")
+                            .target_static_child("c"),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -1648,14 +1648,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::directory()
                             .name("hippo_data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string()))
+                            .target_static_child("b")
                             .rights(fio::R_STAR_DIR),
                     )
                     .offer(
                         OfferBuilder::protocol()
                             .name("hippo")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .build(),
@@ -1704,8 +1704,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(
                         OfferBuilder::service()
                             .name("foo")
-                            .source(OfferSource::static_child("b".parse().unwrap()))
-                            .target(OfferTarget::static_child("d".to_string()))
+                            .source_static_child("b")
+                            .target_static_child("d")
                             .source_instance_filter(vec![
                                 "instance_0".to_string(),
                                 "instance_1".to_string(),
@@ -1714,8 +1714,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(
                         OfferBuilder::service()
                             .name("foo")
-                            .source(OfferSource::static_child("c".parse().unwrap()))
-                            .target(OfferTarget::static_child("d".to_string()))
+                            .source_static_child("c")
+                            .target_static_child("d")
                             .source_instance_filter(vec![
                                 "instance_2".to_string(),
                                 "instance_3".to_string(),
@@ -1799,7 +1799,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::service()
                             .name("foo")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .capability(expected_service_decl.clone())
                     .child_default("b")
@@ -1811,20 +1811,20 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(
                         OfferBuilder::service()
                             .name("foo")
-                            .source(OfferSource::static_child("c".parse().unwrap()))
-                            .target(OfferTarget::static_child("d".to_string())),
+                            .source_static_child("c")
+                            .target_static_child("d"),
                     )
                     .offer(
                         OfferBuilder::service()
                             .name("foo")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("d".to_string())),
+                            .target_static_child("d"),
                     )
                     .offer(
                         OfferBuilder::service()
                             .name("foo")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("d".to_string())),
+                            .target_static_child("d"),
                     )
                     .capability(expected_service_decl.clone())
                     .child_default("c")
@@ -1898,8 +1898,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(
                         OfferBuilder::service()
                             .name("foo")
-                            .source(OfferSource::static_child("b".parse().unwrap()))
-                            .target(OfferTarget::static_child("d".to_string()))
+                            .source_static_child("b")
+                            .target_static_child("d")
                             .source_instance_filter(vec![
                                 "default".to_string(),
                                 "other_a".to_string(),
@@ -1908,8 +1908,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(
                         OfferBuilder::service()
                             .name("foo")
-                            .source(OfferSource::static_child("c".parse().unwrap()))
-                            .target(OfferTarget::static_child("d".to_string()))
+                            .source_static_child("c")
+                            .target_static_child("d")
                             .source_instance_filter(vec![
                                 "default".to_string(),
                                 "other_b".to_string(),
@@ -1978,7 +1978,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::directory()
                             .name("foo_data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string()))
+                            .target_static_child("b")
                             .rights(fio::R_STAR_DIR)
                             .subdir("s1/s2"),
                     )
@@ -1992,7 +1992,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::directory()
                             .name("foo_data")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .target_static_child("c")
                             .rights(fio::R_STAR_DIR)
                             .subdir("s3"),
                     )
@@ -2039,8 +2039,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(
                         OfferBuilder::directory()
                             .name("foo_data")
-                            .source(OfferSource::static_child("b".to_string()))
-                            .target(OfferTarget::static_child("c".to_string()))
+                            .source_static_child("b")
+                            .target_static_child("c")
                             .rights(fio::R_STAR_DIR)
                             .subdir("s3"),
                     )
@@ -2350,7 +2350,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("invalid")
                             .target_name("valid")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .build(),
@@ -2776,7 +2776,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("capability_requested")
                             .target_name("capability_requested_on_a")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .build(),
@@ -2824,7 +2824,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::protocol()
                             .name("hippo")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .build(),
@@ -2871,7 +2871,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("foo_data")
                             .target_name("bar_data")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string()))
+                            .target_static_child("b")
                             .rights(fio::R_STAR_DIR),
                     )
                     .child_default("b")
@@ -2922,7 +2922,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::protocol()
                             .name("hippo")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .build(),
@@ -2934,7 +2934,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::protocol()
                             .name("hippo")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .use_(UseBuilder::protocol().name("hippo"))
                     .child_default("c")
@@ -2998,7 +2998,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::protocol()
                             .name("hippo")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .build(),
@@ -3010,13 +3010,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::protocol()
                             .name("hippo")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("c".to_string())),
+                            .target_static_child("c"),
                     )
                     .offer(
                         OfferBuilder::protocol()
                             .name("hippo")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::static_child("d".to_string())),
+                            .target_static_child("d"),
                     )
                     .child_default("c")
                     .child_default("d")
@@ -3120,7 +3120,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         OfferBuilder::service()
                             .name("foo")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .service_default("foo")
                     .child_default("b")
@@ -3231,8 +3231,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(
                         OfferBuilder::service()
                             .name("foo")
-                            .source(OfferSource::static_child("c".parse().unwrap()))
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .source_static_child("c")
+                            .target_static_child("b"),
                     )
                     .child_default("b")
                     .child_default("c")
@@ -3302,8 +3302,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(
                         OfferBuilder::service()
                             .name("foo")
-                            .source(OfferSource::static_child("c".parse().unwrap()))
-                            .target(OfferTarget::static_child("b".to_string()))
+                            .source_static_child("c")
+                            .target_static_child("b")
                             .source_instance_filter(source_instance_filter)
                             .renamed_instances(renamed_instances),
                     )
@@ -3398,8 +3398,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(
                         OfferBuilder::service()
                             .name("foo")
-                            .source(OfferSource::static_child("c".parse().unwrap()))
-                            .target(OfferTarget::static_child("b".to_string()))
+                            .source_static_child("c")
+                            .target_static_child("b")
                             .source_instance_filter(source_instance_filter)
                             .renamed_instances(renamed_instances),
                     )
@@ -3556,7 +3556,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("elf")
                             .target_name("dwarf")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .runner_default("elf")
                     .build(),
@@ -4101,7 +4101,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("elf")
                             .target_name("dwarf")
                             .source(OfferSource::Self_)
-                            .target(OfferTarget::static_child("b".to_string())),
+                            .target_static_child("b"),
                     )
                     .runner_default("elf")
                     .child_default("b")

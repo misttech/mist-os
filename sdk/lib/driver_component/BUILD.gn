@@ -7,5 +7,5 @@ import("//build/sdk/sdk_component_manifests.gni")
 sdk_component_manifests("driver_component") {
   name = "driver_component"
   manifests = [ "driver.shard.cml" ]
-  category = "experimental"
+  category = "partner"
 }

@@ -6,7 +6,7 @@ use {
     anyhow::{anyhow, Context, Error},
     delivery_blob::compression::ChunkedArchive,
     fuchsia_async as fasync,
-    fuchsia_merkle::{Hash, MerkleTreeBuilder, HASH_SIZE},
+    fuchsia_merkle::{Hash, HASH_SIZE},
     futures::{try_join, SinkExt as _, StreamExt as _, TryStreamExt as _},
     fxfs::{
         errors::FxfsError,
@@ -321,9 +321,7 @@ fn generate_blob(hash: Hash, path: PathBuf, fs_block_size: usize) -> Result<Blob
         .with_context(|| format!("Unable to read contents of `{:?}'", &path))?;
     let hashes = {
         // TODO(https://fxbug.dev/42073036): Refactor to share implementation with blob.rs.
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&contents);
-        let tree = builder.finish();
+        let tree = fuchsia_merkle::from_slice(&contents);
         assert_eq!(tree.root(), hash);
         let mut hashes: Vec<[u8; HASH_SIZE]> = Vec::new();
         let levels = tree.as_ref();
@@ -376,7 +374,6 @@ mod tests {
         super::{make_blob_image, BlobsJsonOutput, BlobsJsonOutputEntry},
         assert_matches::assert_matches,
         fuchsia_async as fasync,
-        fuchsia_merkle::MerkleTreeBuilder,
         fxfs::{
             filesystem::FxFilesystem,
             object_store::{directory::Directory, volume::root_volume},
@@ -400,9 +397,7 @@ mod tests {
             let write_data = |path, data: &str| {
                 let mut file = File::create(&path).unwrap();
                 write!(file, "{}", data).unwrap();
-                let mut builder = MerkleTreeBuilder::new();
-                builder.write(data.as_bytes());
-                let tree = builder.finish();
+                let tree = fuchsia_merkle::from_slice(data.as_bytes());
                 (tree.root(), path)
             };
             vec![

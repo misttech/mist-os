@@ -16,9 +16,7 @@ use crate::{registry, CapabilityTrait};
 /// The directory may optionally be backed by a future that serves its contents.
 pub struct Directory {
     /// The FIDL representation of this [Directory].
-    ///
-    /// Invariant: Always Some when the Directory is outside of the registry.
-    client_end: Option<ClientEnd<fio::DirectoryMarker>>,
+    client_end: ClientEnd<fio::DirectoryMarker>,
 }
 
 impl Directory {
@@ -28,15 +26,7 @@ impl Directory {
     ///
     /// * `client_end` - A `fuchsia.io/Directory` client endpoint.
     pub fn new(client_end: ClientEnd<fio::DirectoryMarker>) -> Self {
-        Directory { client_end: Some(client_end) }
-    }
-
-    /// Sets this directory's client end to the provided one.
-    ///
-    /// This should only be used to put a remoted client end back into the Directory
-    /// after it is removed from the registry.
-    pub(crate) fn set_client_end(&mut self, client_end: ClientEnd<fio::DirectoryMarker>) {
-        self.client_end = Some(client_end)
+        Directory { client_end: client_end }
     }
 
     /// Turn the [Directory] into a remote VFS node.
@@ -58,7 +48,7 @@ impl Clone for Directory {
         // This is necessary because we the conversion consumes the ClientEnd, but we can't take
         // it out of non-mut `&self`.
         let (clone_client_end, clone_server_end) = zx::Channel::create();
-        let raw_handle = self.client_end.as_ref().unwrap().as_handle_ref().raw_handle();
+        let raw_handle = self.client_end.as_handle_ref().raw_handle();
         // SAFETY: the channel is forgotten at the end of scope so it is not double closed.
         unsafe {
             let borrowed: zx::Channel = zx::Handle::from_raw(raw_handle).into();
@@ -67,7 +57,7 @@ impl Clone for Directory {
             std::mem::forget(directory.into_channel());
         }
         let client_end: ClientEnd<fio::DirectoryMarker> = clone_client_end.into();
-        Self { client_end: Some(client_end) }
+        Self { client_end: client_end }
     }
 }
 
@@ -75,21 +65,22 @@ impl CapabilityTrait for Directory {}
 
 impl From<ClientEnd<fio::DirectoryMarker>> for Directory {
     fn from(client_end: ClientEnd<fio::DirectoryMarker>) -> Self {
-        Directory { client_end: Some(client_end) }
+        Directory { client_end: client_end }
     }
 }
 
 impl From<Directory> for ClientEnd<fio::DirectoryMarker> {
-    /// Returns the `fuchsia.io.Directory` client stored in this Directory, taking it out,
-    /// and moves the capability into the registry.
-    ///
-    /// The client end is put back when the Directory is removed from the registry.
-    fn from(mut directory: Directory) -> Self {
-        let client_end = directory.client_end.take().expect("BUG: missing client end");
+    /// Return a channel to the Directory and store the channel in
+    /// the registry.
+    fn from(directory: Directory) -> Self {
+        let Directory { client_end } = directory;
+        // Create a null directory for the registry.
+        let new_dict =
+            Directory::new(ClientEnd::<fio::DirectoryMarker>::new(zx::Handle::invalid().into()));
 
         // Move this capability into the registry.
         let koid = client_end.get_koid().unwrap();
-        registry::insert(directory.into(), koid);
+        registry::insert(new_dict.into(), koid);
 
         client_end
     }

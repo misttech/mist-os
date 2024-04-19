@@ -20,7 +20,6 @@
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/ti/platform/cpp/bind.h>
-#include <ddktl/metadata/audio.h>
 #include <soc/aml-common/aml-audio.h>
 #include <soc/aml-meson/sm1-clk.h>
 #include <soc/aml-s905d3/s905d3-gpio.h>

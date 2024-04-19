@@ -4,18 +4,18 @@
 
 use super::super::timer::TimerHeap;
 use super::{
-    common::{with_local_timer_heap, EHandle, ExecutorTime, Inner},
+    common::{with_local_timer_heap, EHandle, ExecutorTime, Inner, MAIN_TASK_ID},
     time::Time,
 };
+use crate::atomic_future::AtomicFuture;
 use futures::{
     future::{self, Either},
-    task::{AtomicWaker, FutureObj, LocalFutureObj},
-    FutureExt,
+    task::AtomicWaker,
 };
-use pin_utils::pin_mut;
 use std::{
     fmt,
     future::{poll_fn, Future},
+    pin::pin,
     sync::{
         atomic::{AtomicBool, AtomicI64, Ordering},
         Arc,
@@ -34,12 +34,12 @@ use std::{
 /// other words, zircon objects backed by a `LocalExecutor` must be dropped before it.
 pub struct LocalExecutor {
     /// The inner executor state.
-    inner: Arc<Inner>,
+    pub(crate) ehandle: EHandle,
 }
 
 impl fmt::Debug for LocalExecutor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("LocalExecutor").field("port", &self.inner.port).finish()
+        f.debug_struct("LocalExecutor").field("port", &self.ehandle.inner.port).finish()
     }
 }
 
@@ -52,7 +52,7 @@ impl LocalExecutor {
             /* num_threads */ 1,
         ));
         inner.clone().set_local(TimerHeap::default());
-        Self { inner }
+        Self { ehandle: EHandle { inner } }
     }
 
     /// Run a single future to completion on a single thread, also polling other active tasks.
@@ -61,36 +61,31 @@ impl LocalExecutor {
         F: Future,
     {
         assert!(
-            self.inner.is_real_time(),
+            self.ehandle.inner.is_real_time(),
             "Error: called `run_singlethreaded` on an executor using fake time"
         );
 
-        let mut result = None;
-        let main_future = main_future.map(|r| result = Some(r));
-        pin_mut!(main_future);
-
-        self.run::</* UNTIL_STALLED: */ false>(LocalFutureObj::new(main_future));
-
-        // The main future must have completed.
-        result.unwrap()
+        let Poll::Ready(result) = self.run::</* UNTIL_STALLED: */ false, F::Output>(
+            // SAFETY: This is a singlethreaded executor, so the future will never be sent across
+            // threads.
+            unsafe { AtomicFuture::new_local(main_future, true) }
+        ) else {
+            unreachable!()
+        };
+        result
     }
 
-    fn run<const UNTIL_STALLED: bool>(&mut self, main_future: LocalFutureObj<'_, ()>) {
+    fn run<const UNTIL_STALLED: bool, R>(&mut self, main_future: AtomicFuture<'_>) -> Poll<R> {
         /// # Safety
         ///
         /// See the comment below.
-        unsafe fn remove_lifetime(obj: FutureObj<'_, ()>) -> FutureObj<'static, ()> {
+        unsafe fn remove_lifetime(obj: AtomicFuture<'_>) -> AtomicFuture<'static> {
             std::mem::transmute(obj)
         }
 
-        // SAFETY: This is a single-threaded executor, so the future here will never be used
-        // across multiple threads, so we can safely convert from a non-`Send`able future to a
-        // `Send`able one.
-        let obj = unsafe { main_future.into_future_obj() };
-
         // SAFETY: Erasing the lifetime is safe because we make sure to drop the main task within
         // the required lifetime.
-        self.inner.spawn_main(unsafe { remove_lifetime(obj) });
+        self.ehandle.inner.spawn_main(unsafe { remove_lifetime(main_future) });
 
         struct DropMainTask<'a>(&'a Inner);
         impl Drop for DropMainTask<'_> {
@@ -100,21 +95,30 @@ impl LocalExecutor {
                 unsafe { self.0.drop_main_task() };
             }
         }
-        let _drop_main_task = DropMainTask(&self.inner);
+        let _drop_main_task = DropMainTask(&self.ehandle.inner);
 
-        self.inner.worker_lifecycle::<UNTIL_STALLED>();
+        self.ehandle.inner.worker_lifecycle::<UNTIL_STALLED>();
+
+        // SAFETY: We spawned the task earlier, so `R` (the return type) will be the correct type
+        // here.
+        unsafe {
+            self.ehandle.inner.poll_join_result(
+                MAIN_TASK_ID,
+                &mut Context::from_waker(&futures::task::noop_waker()),
+            )
+        }
     }
 
     #[cfg(test)]
     pub(crate) fn snapshot(&self) -> super::instrumentation::Snapshot {
-        self.inner.collector.snapshot()
+        self.ehandle.inner.collector.snapshot()
     }
 }
 
 impl Drop for LocalExecutor {
     fn drop(&mut self) {
-        self.inner.mark_done();
-        self.inner.on_parent_drop();
+        self.ehandle.inner.mark_done();
+        self.ehandle.inner.on_parent_drop();
     }
 }
 
@@ -139,12 +143,12 @@ impl TestExecutor {
             /* num_threads */ 1,
         ));
         inner.clone().set_local(TimerHeap::default());
-        Self { local: LocalExecutor { inner } }
+        Self { local: LocalExecutor { ehandle: EHandle { inner } } }
     }
 
     /// Return the current time according to the executor.
     pub fn now(&self) -> Time {
-        self.local.inner.now()
+        self.local.ehandle.inner.now()
     }
 
     /// Set the fake time to a given value.
@@ -153,7 +157,7 @@ impl TestExecutor {
     ///
     /// If the executor was not created with fake time
     pub fn set_fake_time(&self, t: Time) {
-        self.local.inner.set_fake_time(t)
+        self.local.ehandle.inner.set_fake_time(t)
     }
 
     /// Run a single future to completion on a single thread, also polling other active tasks.
@@ -173,14 +177,12 @@ impl TestExecutor {
     /// the knowledge of the executor.
     ///
     /// Unpin: this function requires all futures to be `Unpin`able, so any `!Unpin`
-    /// futures must first be pinned using the `pin_mut!` macro from the `pin-utils` crate.
+    /// futures must first be pinned using the `pin!` macro.
     pub fn run_until_stalled<F>(&mut self, main_future: &mut F) -> Poll<F::Output>
     where
         F: Future + Unpin,
     {
-        let mut result = None;
-        let main_future = main_future.map(|r| result = Some(r));
-        pin_mut!(main_future);
+        let mut main_future = pin!(main_future);
 
         // Set up an instance of UntilStalledData that works with `poll_until_stalled`.
         struct Cleanup(Arc<Inner>);
@@ -189,11 +191,19 @@ impl TestExecutor {
                 *self.0.owner_data.lock() = None;
             }
         }
-        let _cleanup = Cleanup(self.local.inner.clone());
-        *self.local.inner.owner_data.lock() = Some(Box::new(UntilStalledData { watcher: None }));
+        let _cleanup = Cleanup(self.local.ehandle.inner.clone());
+        *self.local.ehandle.inner.owner_data.lock() =
+            Some(Box::new(UntilStalledData { watcher: None }));
 
         loop {
-            self.local.run::</* UNTIL_STALLED: */ true>(LocalFutureObj::new(main_future.as_mut()));
+            let result = self.local.run::</* UNTIL_STALLED: */ true, F::Output>(
+                // SAFETY: We don't move the main future across threads.
+                unsafe { AtomicFuture::new_local(main_future.as_mut(), true) }
+            );
+            if result.is_ready() {
+                return result;
+            }
+
             // If a waker was set by `poll_until_stalled`, disarm, wake, and loop.
             if let Some(watcher) = with_data(|data| data.watcher.take()) {
                 watcher.waker.wake();
@@ -205,11 +215,7 @@ impl TestExecutor {
             }
         }
 
-        if let Some(result) = result {
-            Poll::Ready(result)
-        } else {
-            Poll::Pending
-        }
+        Poll::Pending
     }
 
     /// Wake all tasks waiting for expired timers, and return `true` if any task was woken.
@@ -260,7 +266,7 @@ impl TestExecutor {
 
     #[cfg(test)]
     pub(crate) fn snapshot(&self) -> super::instrumentation::Snapshot {
-        self.local.inner.collector.snapshot()
+        self.local.ehandle.inner.collector.snapshot()
     }
 
     /// Advances fake time to the specified time.  This will only work if the executor is being run
@@ -380,7 +386,6 @@ mod tests {
     use assert_matches::assert_matches;
     use fuchsia_zircon::{self as zx, AsHandleRef, DurationNum};
     use futures::StreamExt;
-    use pin_utils::pin_mut;
     use std::{
         cell::{Cell, RefCell},
         task::Waker,
@@ -415,7 +420,7 @@ mod tests {
         let mut executor = TestExecutor::new_with_fake_time();
         // Spawn the future rather than waking it the main task because run_until_stalled will wake
         // the main future on every call, and we want to wake it ourselves using the waker.
-        executor.local.inner.spawn_local(LocalFutureObj::new(fut));
+        executor.local.ehandle.spawn_local_detached(fut);
         assert_eq!(fut_step.get(), 0);
         assert_eq!(executor.run_until_stalled(&mut future::pending::<()>()), Poll::Pending);
         assert_eq!(fut_step.get(), 1);
@@ -430,8 +435,7 @@ mod tests {
     fn stepwise_timer() {
         let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(Time::from_nanos(0));
-        let fut = Timer::new(Time::after(1000.nanos()));
-        pin_mut!(fut);
+        let mut fut = pin!(Timer::new(Time::after(1000.nanos())));
 
         let _ = executor.run_until_stalled(&mut fut);
         assert_eq!(Time::now(), Time::from_nanos(0));
@@ -446,8 +450,7 @@ mod tests {
     fn stepwise_event() {
         let mut executor = TestExecutor::new_with_fake_time();
         let event = zx::Event::create();
-        let fut = OnSignals::new(&event, zx::Signals::USER_0);
-        pin_mut!(fut);
+        let mut fut = pin!(OnSignals::new(&event, zx::Signals::USER_0));
 
         let _ = executor.run_until_stalled(&mut fut);
 
@@ -466,10 +469,9 @@ mod tests {
             Timer::new(Time::after(5.seconds())).await;
             spawned_fut_completed_writer.store(true, Ordering::SeqCst);
         });
-        let main_fut = async {
+        let mut main_fut = pin!(async {
             Timer::new(Time::after(10.seconds())).await;
-        };
-        pin_mut!(main_fut);
+        });
         spawn(spawned_fut);
         assert_eq!(executor.run_until_stalled(&mut main_fut), Poll::Pending);
         executor.set_fake_time(Time::after(15.seconds()));
@@ -498,14 +500,13 @@ mod tests {
         let mut dropped = Arc::new(AtomicBool::new(false));
         let drop_spawner = DropSpawner { dropped: dropped.clone() };
         let mut executor = TestExecutor::new();
-        let main_fut = async move {
+        let mut main_fut = pin!(async move {
             spawn(async move {
                 // Take ownership of the drop spawner
                 let _drop_spawner = drop_spawner;
                 future::pending::<()>().await;
             });
-        };
-        pin_mut!(main_fut);
+        });
         assert!(executor.run_until_stalled(&mut main_fut).is_ready());
         assert_eq!(
             dropped.load(Ordering::SeqCst),
@@ -579,7 +580,7 @@ mod tests {
         let run = |n| {
             let mut executor = LocalExecutor::new();
             executor.run_singlethreaded(multi_wake(n));
-            let snapshot = executor.inner.collector.snapshot();
+            let snapshot = executor.ehandle.inner.collector.snapshot();
             snapshot.wakeups_notification
         };
         assert_eq!(run(5), run(10)); // Same number of notifications independent of wakeup calls
@@ -598,7 +599,7 @@ mod tests {
         let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(Time::from_nanos(0));
 
-        let fut = async {
+        let mut fut = pin!(async {
             let timer_fired = Arc::new(AtomicBool::new(false));
             futures::join!(
                 async {
@@ -630,8 +631,7 @@ mod tests {
                     TestExecutor::advance_to(Time::after(2.seconds())).await;
                 }
             )
-        };
-        pin_mut!(fut);
+        });
         assert!(executor.run_until_stalled(&mut fut).is_ready());
     }
 }

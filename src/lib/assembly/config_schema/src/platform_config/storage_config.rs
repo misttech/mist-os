@@ -14,9 +14,6 @@ pub struct StorageConfig {
     pub live_usb_enabled: bool,
 
     #[serde(default)]
-    pub configure_fshost: bool,
-
-    #[serde(default)]
     pub component_id_index: ComponentIdIndexConfig,
 
     #[serde(default)]

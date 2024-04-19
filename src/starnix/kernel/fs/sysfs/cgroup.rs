@@ -62,6 +62,7 @@ impl FsNodeOps for CgroupDirectoryNode {
 
     fn mkdir(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         _name: &FsStr,
@@ -117,6 +118,7 @@ impl FsNodeOps for CgroupDirectoryNode {
 
     fn create_symlink(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,

@@ -12,7 +12,8 @@
 
 use anyhow::{Context, Error, Result};
 use diagnostics_hierarchy::Property;
-use diagnostics_log::{OnInterestChanged, Publisher, PublisherOptions};
+use diagnostics_log::{OnInterestChanged, Publisher, PublisherOptions, TestRecord};
+use diagnostics_log_encoding::encode::{Argument, Value};
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_archivist_test as fpuppet;
 use fidl_fuchsia_diagnostics::Severity;
@@ -20,7 +21,7 @@ use fidl_table_validation::ValidFidlTable;
 use fuchsia_async::{Task, TaskGroup, Timer};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{component, health::Reporter, Inspector};
-use fuchsia_zircon::Duration;
+use fuchsia_zircon as zx;
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     lock::Mutex,
@@ -228,15 +229,34 @@ async fn handle_puppet_request(
             responder.send().expect("response succeeds")
         }
         fpuppet::PuppetRequest::Log { payload, responder, .. } => {
-            let request = LogRequest::try_from(payload).context("Log")?;
-            let LogRequest { message, severity, .. } = request;
+            let request = LogRequest::try_from(payload).context("Invalid log")?;
+            let LogRequest { message, severity, time, .. } = request;
 
-            match severity {
-                Severity::Debug => debug!("{message}"),
-                Severity::Error => error!("{message}"),
-                Severity::Info => info!("{message}"),
-                Severity::Warn => warn!("{message}"),
-                _ => unimplemented!("Logging with severity: {severity:?}"),
+            match time {
+                None => match severity {
+                    Severity::Debug => debug!("{message}"),
+                    Severity::Error => error!("{message}"),
+                    Severity::Info => info!("{message}"),
+                    Severity::Warn => warn!("{message}"),
+                    _ => unimplemented!("Logging with severity: {severity:?}"),
+                },
+                Some(time) => {
+                    tracing::dispatcher::get_default(|dispatcher| {
+                        let publisher: &diagnostics_log::Publisher =
+                            dispatcher.downcast_ref().unwrap();
+                        let record = TestRecord {
+                            severity: severity.into_primitive(),
+                            timestamp: zx::Time::from_nanos(time),
+                            file: None,
+                            line: None,
+                            record_arguments: vec![Argument {
+                                name: "message",
+                                value: Value::Text(&message),
+                            }],
+                        };
+                        publisher.event_for_testing(record);
+                    });
+                }
             }
             responder.send().expect("response succeeds")
         }
@@ -262,6 +282,8 @@ async fn handle_puppet_request(
 pub struct LogRequest {
     pub message: String,
     pub severity: Severity,
+    #[fidl_field_type(optional)]
+    pub time: Option<i64>,
 }
 
 // Converts InspectPuppet requests into callbacks that report inspect values lazily.
@@ -287,7 +309,7 @@ async fn record_lazy_values(
                     let properties = properties.clone();
                     async move {
                         if options.hang.unwrap_or_default() {
-                            Timer::new(Duration::from_minutes(60)).await;
+                            Timer::new(zx::Duration::from_minutes(60)).await;
                         }
                         let inspector = Inspector::default();
                         let node = inspector.root();

@@ -219,8 +219,8 @@ the driver runtime:
    #include <lib/fdf/cpp/channel.h>
    #include <lib/fdf/cpp/channel_read.h>
    #include <lib/fdf/cpp/dispatcher.h>
-   #include <lib/fidl/llcpp/connect_service.h>
-   #include <lib/fidl/llcpp/vector_view.h>
+   #include <lib/fidl/cpp/wire/connect_service.h>
+   #include <lib/fidl/cpp/wire/vector_view.h>
    ...
    ```
 
@@ -537,10 +537,10 @@ You may find the following practices helpful for making FIDL calls:
   above) needs to be implemented on the server end (see
   `MyExampleFunction()` below).
 
-  When the server end device class inherits the
-  `fdf::WireServer<ProtocolName>` object, virtual functions based on
-  your protocol definition are generated, similar to LLCPP. The following
-  is the format of this function:
+  When the server end device class inherits the `fdf::WireServer<ProtocolName>`
+  object, virtual functions based on your protocol definition are generated,
+  similar to `fidl::WireServer<ProtocolName>`. The following is the format of
+  this function:
 
   ```cpp
   void MyExampleFunction(MyExampleFunctionRequestView request, fdf::Arena& arena, MyExampleFunctionCompleter::Sync& completer);
@@ -802,7 +802,7 @@ All the **documentation pages** mentioned in this section:
 - [Banjo][banjo]
 - [FIDL][fidl]
 - [RFC-0126: Driver Runtime][driver-runtime-rfc]
-- [New C++ bindings tutorials][llcpp]
+- [New C++ bindings tutorials][cpp-tutorial]
 - [Driver dispatcher and threads][driver-dispatcher]
 - [FIDL attributes][fidl-attributes]
 - [Implement a C++ FIDL server][implement-fidl-server]
@@ -824,7 +824,7 @@ All the **documentation pages** mentioned in this section:
 [fidl]: /docs/concepts/fidl/overview.md
 [migrate-from-dfv1-to-dfv2]: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2/overview.md
 [driver-runtime-rfc]: /docs/contribute/governance/rfcs/0126_driver_runtime.md
-[llcpp]: /docs/development/languages/fidl/tutorials/cpp/README.md
+[cpp-tutorial]: /docs/development/languages/fidl/tutorials/cpp/README.md
 [synchronized-dispatchers]: /docs/concepts/drivers/driver-dispatcher-and-threads.md#synchronous-operations
 [wlanofmac-cml]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/wlan/drivers/wlansoftmac/meta/wlansoftmac.cml
 [driver-dispatcher]: /docs/concepts/drivers/driver-dispatcher-and-threads.md

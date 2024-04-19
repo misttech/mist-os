@@ -198,13 +198,16 @@ pub struct Snapshot {
 
 #[cfg(test)]
 mod tests {
-    use fuchsia_zircon::{self as zx, DurationNum};
-    use futures::future;
-    use pin_utils::pin_mut;
-
-    use super::*;
-    use crate::runtime::fuchsia::executor::Time;
-    use crate::{handle::channel::Channel, LocalExecutor, SendExecutor, TestExecutor, Timer};
+    use {
+        super::*,
+        crate::{
+            handle::channel::Channel, runtime::fuchsia::executor::Time, LocalExecutor,
+            SendExecutor, TestExecutor, Timer,
+        },
+        fuchsia_zircon::{self as zx, DurationNum},
+        futures::future,
+        std::pin::pin,
+    };
 
     const MICROSECOND: std::time::Duration = std::time::Duration::from_micros(1);
     use std::thread::sleep;
@@ -428,8 +431,7 @@ mod tests {
     #[test]
     fn instrumentation_until_stalled_smoke_test() {
         let mut executor = TestExecutor::new_with_fake_time();
-        let fut = simple_task_for_snapshot();
-        pin_mut!(fut);
+        let mut fut = pin!(simple_task_for_snapshot());
         assert!(executor.run_until_stalled(&mut fut).is_ready());
         let snapshot = executor.snapshot();
         snapshot_sanity_check(&snapshot);

@@ -42,6 +42,7 @@ def _gen_latest_date_and_timestamp_impl(ctx):
     # Build command line arguments.
     cmd_args = [
         ctx.file._py_script.path,
+        "--use-jiri-values",
         "--git",
         ctx.file._git.path,
         "--timestamp-file",
@@ -60,7 +61,8 @@ def _gen_latest_date_and_timestamp_impl(ctx):
     runfiles = ctx.runfiles(
         files = [
             ctx.file._integration_git_head,
-            ctx.file._py_script,
+            ctx.file._integration_commit_hash,
+            ctx.file._integration_commit_stamp,
         ],
         transitive_files = python3_runfiles.files,
     )
@@ -88,12 +90,22 @@ gen_latest_date_and_timestamp = rule(
             allow_single_file = True,
             default = "//build/info:gen_latest_commit_date.py",
         ),
+        # https://fxbug.dev/335391299: Remove this once the Jiri hook
+        # has been enabled.
         "_git": attr.label(
             allow_single_file = True,
             doc = "Git binary to use.",
             # LINT.IfChange
             default = "//:fuchsia_build_generated/git",
             # LINT.ThenChange(//build/bazel/scripts/update_workspace.py)
+        ),
+        "_integration_commit_hash": attr.label(
+            allow_single_file = True,
+            default = "//build/info:jiri_generated/integration_commit_hash.txt",
+        ),
+        "_integration_commit_stamp": attr.label(
+            allow_single_file = True,
+            default = "//build/info:jiri_generated/integration_commit_stamp.txt",
         ),
     } | PY_TOOLCHAIN_DEPS,
 )

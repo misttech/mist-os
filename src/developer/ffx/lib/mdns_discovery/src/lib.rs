@@ -539,9 +539,7 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
         {
             let mut tasks = socket_tasks.lock().await;
             for ip in to_delete {
-                if let Some(handle) = tasks.remove(&ip) {
-                    handle.cancel().await;
-                }
+                tasks.remove(&ip);
             }
         }
 

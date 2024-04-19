@@ -34,30 +34,18 @@ impl Sendable for mpsc::UnboundedSender<crate::Message> {
 }
 
 /// A capability that transfers another capability to a [Receiver].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Sender {
     inner: std::sync::Arc<dyn Sendable>,
-
-    /// The FIDL representation of this `Sender`.
-    ///
-    /// This will be `Some` if was previously converted into a `ClientEnd`, such as by calling
-    /// [into_fidl], and the capability is not currently in the registry.
-    client_end: Option<ClientEnd<fsandbox::SenderMarker>>,
-}
-
-impl Clone for Sender {
-    fn clone(&self) -> Self {
-        Self { inner: self.inner.clone(), client_end: None }
-    }
 }
 
 impl Sender {
     pub fn new_sendable(sender: impl Sendable + 'static) -> Self {
-        Self { inner: std::sync::Arc::new(sender), client_end: None }
+        Self { inner: std::sync::Arc::new(sender) }
     }
 
     pub(crate) fn new(sender: mpsc::UnboundedSender<Message>) -> Self {
-        Self { inner: std::sync::Arc::new(sender), client_end: None }
+        Self { inner: std::sync::Arc::new(sender) }
     }
 
     pub(crate) fn send_channel(&self, channel: zx::Channel) -> Result<(), ()> {
@@ -99,14 +87,6 @@ impl Sender {
         // Move this capability into the registry.
         registry::spawn_task(self.into(), koid, sender.serve_sender(stream));
     }
-
-    /// Sets this Sender's client end to the provided one.
-    ///
-    /// This should only be used to put a remoted client end back into the Sender after it is
-    /// removed from the registry.
-    pub(crate) fn set_client_end(&mut self, client_end: ClientEnd<fsandbox::SenderMarker>) {
-        self.client_end = Some(client_end)
-    }
 }
 
 impl From<Sender> for Open {
@@ -133,13 +113,11 @@ impl CapabilityTrait for Sender {
 
 impl From<Sender> for ClientEnd<fsandbox::SenderMarker> {
     /// Serves the `fuchsia.sandbox.Sender` protocol for this Sender and moves it into the registry.
-    fn from(mut sender: Sender) -> ClientEnd<fsandbox::SenderMarker> {
-        sender.client_end.take().unwrap_or_else(|| {
-            let (client_end, sender_stream) =
-                create_request_stream::<fsandbox::SenderMarker>().unwrap();
-            sender.serve_and_register(sender_stream, client_end.get_koid().unwrap());
-            client_end
-        })
+    fn from(sender: Sender) -> ClientEnd<fsandbox::SenderMarker> {
+        let (client_end, sender_stream) =
+            create_request_stream::<fsandbox::SenderMarker>().unwrap();
+        sender.serve_and_register(sender_stream, client_end.get_koid().unwrap());
+        client_end
     }
 }
 

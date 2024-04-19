@@ -90,7 +90,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2104
+From //build/config/BUILDCONFIG.gn:2100
 
 ### allowed_test_device_types
 
@@ -1156,7 +1156,7 @@ Enable compression of debug sections.
 
 **Current value (from the default):** `"zstd"`
 
-From //build/config/compiler.gni:90
+From //build/config/compiler.gni:92
 
 ### config_example_cpp_greeting
 
@@ -1399,7 +1399,7 @@ From //src/storage/fshost/generated_fshost_config.gni:12
 
 **Current value (from the default):** `"debug"`
 
-From //build/config/compiler.gni:52
+From //build/config/compiler.gni:54
 
 ### default_configs
 
@@ -1441,7 +1441,7 @@ Controls whether to promote warnings to errors.
 
 **Current value (from the default):** `true`
 
-From //build/config/BUILD.gn:35
+From //build/config/BUILD.gn:37
 
 ### dev_bootfs_labels
 
@@ -2739,7 +2739,7 @@ Explicitly specify DWARF version used.
 
 **Current value (from the default):** `5`
 
-From //build/config/compiler.gni:66
+From //build/config/compiler.gni:68
 
 ### e2e_test_labels
 
@@ -2815,7 +2815,7 @@ remove this option when the issues are addressed.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILD.gn:31
+From //build/config/BUILD.gn:33
 
 ### enable_grpc_ares
 
@@ -3253,7 +3253,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1839
+From //build/config/BUILDCONFIG.gn:1835
 
 ### extra_vbmeta_descriptors
 
@@ -4384,7 +4384,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1640
+From //build/config/BUILDCONFIG.gn:1636
 
 ### legacy_base_package_labels
 
@@ -5239,6 +5239,7 @@ From //third_party/openthread/etc/gn/openthread.gni:205
 * `debug`: "optimized for debugging", light enough to avoid confusion
 * `default`: default optimization level
 * `size`:  optimized for space rather than purely for speed
+* `size_lto`:  optimize for space and use LTO
 * `speed`: optimized purely for speed
 * `sanitizer`: optimized for sanitizers (ASan, etc.)
 * `profile`: optimized for coverage/profile data collection
@@ -5246,7 +5247,7 @@ From //third_party/openthread/etc/gn/openthread.gni:205
 
 **Current value (from the default):** `"size"`
 
-From //build/config/compiler.gni:22
+From //build/config/compiler.gni:23
 
 ### output_breakpad_syms
 
@@ -5267,16 +5268,20 @@ From //build/config/BUILDCONFIG.gn:32
 ### override_target_api_level
 
 Specify a specific target API level for the platform build.
-When set to -1, the platform is built targeting HEAD with runtime support
-for all supported and sunset API levels.
-Must be -1 or a positive integer corresponding to currently supported
-(not sunset) API level. This is primarily used by the SDK.
-Not all targets support the non-default value. In particular, `:default`
-currently fails.
 
-**Current value (from the default):** `-1`
+For the normal platform build, the API level is "PLATFORM", which is greater
+than (that is to say: "newer than") all other API levels.
 
-From //build/config/fuchsia/target_api_level.gni:13
+If this is _not_ set to "PLATFORM", then it must be set to a positive
+integer corresponding to a currently supported (not sunset) API level. In
+that case, the build will target the given API level.
+
+This is primarily used by the IDK. Not all targets support the non-default
+value. In particular, `:default` currently fails.
+
+**Current value (from the default):** `"PLATFORM"`
+
+From //build/config/fuchsia/target_api_level.gni:17
 
 ### package_flavor_selections
 
@@ -5496,7 +5501,7 @@ Example:
 
 **Current value (from the default):** `[]`
 
-From //build/assembly/developer_overrides.gni:117
+From //build/assembly/developer_overrides.gni:121
 
 ### product_bootfs_labels
 
@@ -7416,19 +7421,6 @@ Can be true for any API level, including the default level.
 
 From //build/sdk/config.gni:12
 
-### sdk_inside_supported_api_sub_build
-
-Whether currently building a sub-build for a specific supported API level
-rather than a build or sub-build at the default API level.
-Note that this can be false in sub-builds - specifically, when building the
-default API level for target CPUs other than the host.
-`sdk_inside_sub_build` must be true and `override_target_api_level` must be
-set to a valid level.
-
-**Current value (from the default):** `false`
-
-From //build/sdk/config.gni:20
-
 ### sdk_max_simultaneous_sub_builds
 
 An upper bound on the maximum number of subbuilds that may be running at the
@@ -7449,7 +7441,7 @@ But also these bad things:
 
 **Current value (from the default):** `5`
 
-From //build/sdk/config.gni:37
+From //build/sdk/config.gni:29
 
 ### sdk_sub_build_max_load_average
 
@@ -7459,7 +7451,7 @@ blank, the subbuild script will make a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:49
+From //build/sdk/config.gni:41
 
 ### sdk_sub_build_parallelism
 
@@ -7471,7 +7463,7 @@ a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:44
+From //build/sdk/config.gni:36
 
 ### select_variant
 
@@ -7543,7 +7535,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2094
+From //build/config/BUILDCONFIG.gn:2090
 
 ### select_variant_canonical
 
@@ -7553,7 +7545,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2099
+From //build/config/BUILDCONFIG.gn:2095
 
 ### select_variant_shortcuts
 
@@ -7611,7 +7603,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1885
+From //build/config/BUILDCONFIG.gn:1881
 
 ### size_checker_input
 
@@ -7989,7 +7981,7 @@ ThinLTO cache directory path.
 
 **Current value (from the default):** `"thinlto-cache"`
 
-From //build/config/lto/config.gni:16
+From //build/config/lto/config.gni:10
 
 ### thinlto_jobs
 
@@ -7997,7 +7989,7 @@ Number of parallel ThinLTO jobs.
 
 **Current value (from the default):** `8`
 
-From //build/config/lto/config.gni:13
+From //build/config/lto/config.gni:7
 
 ### time_trace
 
@@ -8086,7 +8078,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1869
+From //build/config/BUILDCONFIG.gn:1865
 
 ### universe_package_labels
 
@@ -8284,14 +8276,6 @@ From //build/toolchain/goma.gni:13
 
 From //zircon/system/ulib/c/libc.gni:18
 
-### use_lto
-
-Use link time optimization (LTO).
-
-**Current value (from the default):** `false`
-
-From //build/config/lto/config.gni:7
-
 ### use_null_vulkan_on_host
 
 TODO(liyl): Currently non-x64 platforms don't have Vulkan support,
@@ -8314,7 +8298,7 @@ Controls whether to use -Oz when `optimize` is set to `"size"`.
 
 **Current value (from the default):** `false`
 
-From //build/config/compiler.gni:41
+From //build/config/compiler.gni:43
 
 ### use_prebuilt_codec_runner_intel_gen
 
@@ -8378,14 +8362,6 @@ it only works when use_null_vulkan_on_host is set to false.
 **Current value (from the default):** `true`
 
 From //src/lib/vulkan/build/config.gni:42
-
-### use_thinlto
-
-Use ThinLTO variant of LTO if use_lto = true.
-
-**Current value (from the default):** `true`
-
-From //build/config/lto/config.gni:10
 
 ### use_udev
 

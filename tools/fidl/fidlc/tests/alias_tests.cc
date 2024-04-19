@@ -40,7 +40,7 @@ alias AliasOfDecl = TypeDecl;
   auto type_decl = library.LookupStruct("TypeDecl");
   ASSERT_NE(type_decl, nullptr);
   EXPECT_EQ(type_decl->members.size(), 2u);
-  ASSERT_NE(library.LookupAlias("AliasOfDecl"), nullptr);
+  ASSERT_TRUE(library.HasAlias("AliasOfDecl"));
 }
 
 TEST(AliasTests, GoodPrimitive) {

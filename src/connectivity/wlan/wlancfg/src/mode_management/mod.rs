@@ -22,7 +22,6 @@ pub mod device_monitor;
 mod iface_manager;
 pub mod iface_manager_api;
 mod iface_manager_types;
-pub mod low_power_manager;
 pub mod phy_manager;
 pub mod recovery;
 

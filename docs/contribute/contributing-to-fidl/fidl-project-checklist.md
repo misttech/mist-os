@@ -46,8 +46,8 @@ semantics changes.
     making a modification to tables, or create a new test file.
 
 It is expected for changes to FIDL which cascade to backends to update all
-Fuchsia FIDL team owned bindings, i.e. Rust, Go, Dart, HLCPP, New C++ (includes
-natural and wire APIs; the wire APIs were called LLCPP).
+Fuchsia FIDL team owned bindings, i.e. Rust, Go, Dart, HLCPP, New C++ (natural
+and wire).
 
 ## Changes to the JSON IR
 
@@ -75,7 +75,7 @@ natural and wire APIs; the wire APIs were called LLCPP).
 * Update any relevant guides:
   * [FIDL API rubric][api-rubric] for guidance on using this feature.
   * For example, when changing the memory allocation APIs in C++ wire types, the
-    [C++ wire domain object memory ownership guide][llcpp-allocators] should be
+    [C++ wire domain object memory ownership guide][cpp-allocators] should be
     updated.
   * We've also found it good practice to present to API Council in order to
     socialize new features, and explain to council members how to review APIs in
@@ -141,7 +141,7 @@ Add coverage to:
 [go-example]: /examples/fidl/go/fidl_packages/fidl_test.go
 [ldmsg]: /zircon/system/ulib/ldmsg/ldmsg.c
 [lexicon]: /docs/reference/fidl/language/lexicon.md
-[llcpp-allocators]: /docs/development/languages/fidl/tutorials/cpp/topics/wire-memory-ownership.md
+[cpp-allocators]: /docs/development/languages/fidl/tutorials/cpp/topics/wire-memory-ownership.md
 [measure-tape]: /tools/fidl/measure-tape
 [RELRO]: https://www.redhat.com/en/blog/hardening-elf-binaries-using-relocation-read-only-relro
 [sanitizer-abi]: /zircon/system/ulib/ldmsg/BUILD.gn

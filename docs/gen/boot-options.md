@@ -580,24 +580,6 @@ and passed by the bootloader as soon as it possibly can in the boot sequence,
 presuming that the bootloader provides enough information to know how to disable
 the WDT at all.
 
-### gfxconsole.early=\<bool>
-
-**Default:** `false`
-
-This option requests that the kernel start a graphics console
-during early boot (if possible), to display kernel debug print
-messages while the system is starting.  When userspace starts up, a usermode
-graphics console driver takes over.
-
-The early kernel console can be slow on some platforms, so if it is not
-needed for debugging it may speed up boot to disable it.
-
-### gfxconsole.font=\[9x16 | 18x32\]
-
-**Default:** `9x16`
-
-This option asks the graphics console to use a specific font.
-
 ### kernel.halt-on-panic=\<bool>
 
 **Default:** `false`
@@ -717,6 +699,16 @@ lose fidelity information by accumulating in the oldest bucket increasing the ch
 eviction happens a sub-optimal page is chosen.
 
 This value should be greater than or equal to `kernel.page-scanner.min-aging-interval`.
+
+### kernel.page-scanner.accessed-scan-interval=\<uint32_t>
+
+**Default:** `0x3`
+
+Sets the time, in seconds, between harvesting page access information. Lower values provide greater
+age fidelity and will improve accuracy of page reclamation choices at the expense of increased CPU
+time spent harvesting.
+
+There is no benefit to setting this to be lower than the `kernel.page-scanner.min-aging-interval`.
 
 ### kernel.page-scanner.active-ratio-multiplier=\<uint32_t>
 

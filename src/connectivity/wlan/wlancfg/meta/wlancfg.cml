@@ -39,7 +39,6 @@
                 "fuchsia.diagnostics.persist.DataPersistence-wlan",
                 "fuchsia.location.namedplace.RegulatoryRegionWatcher",
                 "fuchsia.metrics.MetricEventLoggerFactory",
-                "fuchsia.power.clientlevel.Connector",
                 "fuchsia.stash.SecureStore",
                 "fuchsia.wlan.device.service.DeviceMonitor",
             ],

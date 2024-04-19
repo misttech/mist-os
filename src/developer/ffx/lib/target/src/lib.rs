@@ -4,6 +4,7 @@
 
 use addr::TargetAddr;
 use anyhow::{Context as _, Result};
+use async_lock::Mutex;
 use compat_info::CompatibilityInfo;
 use discovery::{DiscoverySources, TargetEvent, TargetHandle, TargetState};
 use errors::{ffx_bail, FfxError};
@@ -474,53 +475,84 @@ impl OvernetClient {
     }
 }
 
-/// Identical to the above "knock" but does not use the daemon.
+/// Represents a direct (no daemon) connection to a Fuchsia target.
+pub struct DirectConnection {
+    overnet: OvernetClient,
+    fidl_pipe: FidlPipe,
+    rcs_proxy: Mutex<Option<RemoteControlProxy>>,
+}
+
+impl DirectConnection {
+    pub async fn new(target_spec: String, context: EnvironmentContext) -> Result<Self> {
+        let addr = resolve_target_address(Some(target_spec.clone()), &context)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Unable to resolve address of target '{target_spec}'"))
+            .context("resolving target address")?;
+        let node = overnet_core::Router::new(None)?;
+        let fidl_pipe = FidlPipe::new(context.clone(), addr, node.clone())
+            .await
+            .context("starting fidl pipe")?;
+        Ok(Self { overnet: OvernetClient { node }, fidl_pipe, rcs_proxy: Default::default() })
+    }
+
+    pub async fn rcs_proxy(&self) -> Result<RemoteControlProxy> {
+        let mut rcs = self.rcs_proxy.lock().await;
+        if rcs.is_none() {
+            *rcs = Some(
+                self.overnet
+                    .connect_remote_control()
+                    .await
+                    .map_err(|e| self.wrap_connection_errors(e).context("getting RCS proxy"))?,
+            );
+        }
+        Ok(rcs.as_ref().unwrap().clone())
+    }
+
+    pub async fn knock_rcs(&self) -> Result<Option<CompatibilityInfo>, KnockError> {
+        let mut rcs = self.rcs_proxy.lock().await;
+        // These are the two places where errors can propagate to the user. For other code using
+        // the FIDL pipe it might be trickier to ensure that errors from the pipe are caught.
+        // For things like FHO integration these errors will probably just be handled outside of
+        // the main subtool.
+        if rcs.is_none() {
+            *rcs = Some(self.overnet.connect_remote_control().await.map_err(|e| {
+                KnockError::CriticalError(
+                    self.wrap_connection_errors(e).context("finding RCS proxy"),
+                )
+            })?);
+        }
+        let res = rcs::knock_rcs(rcs.as_ref().unwrap()).await.map_err(|e| anyhow::anyhow!("{e:?}"));
+        match res {
+            Ok(()) => Ok(self.fidl_pipe.compatibility_info()),
+            Err(e) => Err(KnockError::NonCriticalError(
+                self.wrap_connection_errors(e).context("getting RCS proxy"),
+            )),
+        }
+    }
+
+    /// Takes a given connection error and, if there have been underlying connection errors, adds
+    /// additional context to the passed error, else leaves the error the same.
+    ///
+    /// This function is used to overcome some of the shortcomings around FIDL errors, as on the
+    /// host they are being used to simulate what is essentially a networked connection, and not an
+    /// OS-backed operation (like when using FIDL on a Fuchsia device).
+    pub fn wrap_connection_errors(&self, e: anyhow::Error) -> anyhow::Error {
+        if let Some(pipe_errors) = self.fidl_pipe.try_drain_errors() {
+            return anyhow::anyhow!("{e:?}\n{pipe_errors:?}");
+        }
+        e
+    }
+}
+
+/// Identical to the above "knock_target" but does not use the daemon.
 ///
 /// Unlike other errors, this is not intended to be run in a tight loop.
 pub async fn knock_target_daemonless(
     target_spec: String,
     context: &EnvironmentContext,
 ) -> Result<Option<CompatibilityInfo>, KnockError> {
-    let addr = resolve_target_address(Some(target_spec.clone()), context)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("Unable to resolve address of target '{target_spec}'"))
-        .context("resolving target address")?;
-    let node = overnet_core::Router::new(None)?;
-    let fidl_pipe =
-        FidlPipe::new(context.clone(), addr, node.clone()).await.context("starting fidl pipe")?;
-    knock_target_daemonless_with(node, fidl_pipe).await
-}
-
-async fn knock_target_daemonless_with(
-    node: Arc<overnet_core::Router>,
-    fidl_pipe: FidlPipe,
-) -> Result<Option<CompatibilityInfo>, KnockError> {
-    let error_stream = fidl_pipe.error_stream();
-    let client = OvernetClient { node };
-    // These are the two places where errors can propagate to the user. For other code using the FIDL
-    // pipe it might be trickier to ensure that errors from the pipe are caught. For things like
-    // FHO integration these errors will probably just be handled outside of the main subtool.
-    let result = async move {
-        let rcs_proxy = client.connect_remote_control().await?;
-        rcs::knock_rcs(&rcs_proxy).await.map_err(|e| anyhow::anyhow!("{e:?}"))
-    }
-    .await;
-    match result {
-        Ok(()) => Ok(fidl_pipe.compatibility_info()),
-        Err(e) => {
-            let mut pipe_errors = Vec::new();
-            while let Ok(err) = error_stream.try_recv() {
-                pipe_errors.push(err);
-            }
-            if !pipe_errors.is_empty() {
-                return Err(KnockError::NonCriticalError(anyhow::anyhow!(
-                    "Error getting RCS proxy: {e:?}\n{:?}",
-                    pipe_errors
-                )));
-            }
-            Err(KnockError::NonCriticalError(anyhow::anyhow!("{:?}", e)).into())
-        }
-    }
+    let conn = DirectConnection::new(target_spec, context.clone()).await?;
+    conn.knock_rcs().await
 }
 
 /// Get the target specifier.  This uses the normal config mechanism which
@@ -733,10 +765,10 @@ mod test {
                                 fidl::AsyncChannel::from_channel(server_channel),
                             );
                             // This task is here to ensure the channel stays open, but won't
-                            // necessarily do anything.
+                            // necessarily need do anything.
                             Task::spawn(async move {
                                 while let Ok(Some(req)) = stream.try_next().await {
-                                    eprintln!("Got a request: {req:?}");
+                                    eprintln!("Got a request: {req:?}")
                                 }
                             })
                             .detach();
@@ -746,6 +778,9 @@ mod test {
                         }
                     }
                     responder.send(Ok(())).unwrap();
+                }
+                rcs::RemoteControlRequest::EchoString { value, responder } => {
+                    responder.send(&value).unwrap()
                 }
                 _ => panic!("Received an unexpected request: {req:?}"),
             }
@@ -796,7 +831,7 @@ mod test {
         let circuit_node = overnet_core::Router::new(None).unwrap();
         let (_sender, error_receiver) = async_channel::unbounded();
         let circuit = FakeOvernet {
-            circuit_node,
+            circuit_node: circuit_node.clone(),
             error_receiver,
             behavior: FakeOvernetBehavior::KeepRcsOpen,
         };
@@ -804,7 +839,12 @@ mod test {
             FidlPipe::start_internal("127.0.0.1:22".parse().unwrap(), reader, writer, circuit)
                 .await
                 .unwrap();
-        assert!(knock_target_daemonless_with(node, fidl_pipe).await.is_ok());
+        let conn = DirectConnection {
+            overnet: OvernetClient { node },
+            fidl_pipe,
+            rcs_proxy: Default::default(),
+        };
+        assert!(conn.knock_rcs().await.is_ok());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -823,9 +863,46 @@ mod test {
             FidlPipe::start_internal("[::1]:22".parse().unwrap(), reader, writer, circuit)
                 .await
                 .unwrap();
+        let conn = DirectConnection {
+            overnet: OvernetClient { node },
+            fidl_pipe,
+            rcs_proxy: Default::default(),
+        };
         error_sender.send(anyhow::anyhow!("kaboom")).await.unwrap();
-        let err = knock_target_daemonless_with(node, fidl_pipe).await;
+        let err = conn.knock_rcs().await;
         assert!(err.is_err());
-        assert!(err.unwrap_err().to_string().contains("kaboom"));
+        let err_string = err.unwrap_err().to_string();
+        assert!(err_string.contains("kaboom"));
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_overnet_rcs_echo_multiple_times() {
+        let node = overnet_core::Router::new(None).unwrap();
+        let overnet_socket = create_overnet_socket(node.clone()).unwrap();
+        let (reader, writer) = tokio::io::split(overnet_socket);
+        let circuit_node = overnet_core::Router::new(None).unwrap();
+        let (_sender, error_receiver) = async_channel::unbounded();
+        let circuit = FakeOvernet {
+            circuit_node: circuit_node.clone(),
+            error_receiver,
+            behavior: FakeOvernetBehavior::KeepRcsOpen,
+        };
+        let fidl_pipe =
+            FidlPipe::start_internal("127.0.0.1:22".parse().unwrap(), reader, writer, circuit)
+                .await
+                .unwrap();
+        let conn = DirectConnection {
+            overnet: OvernetClient { node },
+            fidl_pipe,
+            rcs_proxy: Default::default(),
+        };
+        let rcs = conn.rcs_proxy().await.unwrap();
+        assert_eq!(rcs.echo_string("foobart").await.unwrap(), "foobart".to_owned());
+        let rcs2 = conn.rcs_proxy().await.unwrap();
+        assert_eq!(rcs2.echo_string("foobarr").await.unwrap(), "foobarr".to_owned());
+        drop(rcs);
+        drop(rcs2);
+        let rcs3 = conn.rcs_proxy().await.unwrap();
+        assert_eq!(rcs3.echo_string("foobarz").await.unwrap(), "foobarz".to_owned());
     }
 }

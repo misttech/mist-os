@@ -30,7 +30,7 @@ use {
     fuchsia_component_test::{
         Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, ScopedInstance,
     },
-    fuchsia_merkle::{Hash, MerkleTree},
+    fuchsia_merkle::Hash,
     fuchsia_pkg_testing::{serve::ServedRepository, Package, PackageBuilder},
     fuchsia_sync::Mutex,
     fuchsia_url::{PinnedAbsolutePackageUrl, RepositoryUrl},
@@ -874,7 +874,7 @@ pub struct TestEnv<B = BlobfsRamdisk> {
 
 impl TestEnv<BlobfsRamdisk> {
     pub fn add_slice_to_blobfs(&self, slice: &[u8]) {
-        let merkle = MerkleTree::from_reader(slice).expect("merkle slice").root().to_string();
+        let merkle = fuchsia_merkle::from_slice(slice).root().to_string();
         let mut blob = self
             .blobfs
             .root_dir()

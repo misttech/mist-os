@@ -97,7 +97,7 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     if (root.has_entries()) {
       PopulateDirectory(root.entries(), *directory);
     }
-    fs::VnodeConnectionOptions options = fs::VnodeConnectionOptions::FromIoV1Flags(
+    fs::VnodeConnectionOptions options = fs::VnodeConnectionOptions::FromOpen1Flags(
         fuchsia_io::OpenFlags{static_cast<uint32_t>(flags)});
     zx_status_t status =
         runner_->Serve(std::move(directory), directory_request.TakeChannel(), options);

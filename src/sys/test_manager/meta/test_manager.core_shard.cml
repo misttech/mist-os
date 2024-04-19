@@ -217,6 +217,7 @@
                 "fuchsia.boot.RootResource",
                 "fuchsia.device.NameProvider",
                 "fuchsia.kernel.CpuResource",
+                "fuchsia.kernel.DebuglogResource",
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.EnergyInfoResource",
                 "fuchsia.kernel.FramebufferResource",

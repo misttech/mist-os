@@ -7,12 +7,9 @@
 
 #include <fuchsia/hardware/audio/cpp/fidl.h>
 #include <fuchsia/hardware/audio/signalprocessing/cpp/fidl.h>
-#include <lib/async/cpp/time.h>
-#include <lib/fidl/cpp/binding_set.h>
+#include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/wire/channel.h>
-#include <lib/fpromise/result.h>
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>

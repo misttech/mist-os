@@ -6,7 +6,6 @@
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_LOGGING_H_
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
-#include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
@@ -48,7 +47,7 @@ inline constexpr bool kLogDeviceMethods = false;
 inline constexpr bool kLogObjectLifetimes = false;
 inline constexpr bool kLogDeviceState = false;
 inline constexpr bool kLogObjectCounts = false;
-inline constexpr bool kLogNotifyMethods = true;
+inline constexpr bool kLogNotifyMethods = false;
 
 // Driver FIDL methods
 inline constexpr bool kLogCodecFidlCalls = false;
@@ -63,9 +62,9 @@ inline constexpr bool kLogStreamConfigFidlCalls = false;
 inline constexpr bool kLogStreamConfigFidlResponses = false;
 inline constexpr bool kLogStreamConfigFidlResponseValues = false;
 
-inline constexpr bool kLogSignalProcessingFidlCalls = true;
-inline constexpr bool kLogSignalProcessingFidlResponses = true;
-inline constexpr bool kLogSignalProcessingFidlResponseValues = true;
+inline constexpr bool kLogSignalProcessingFidlCalls = false;
+inline constexpr bool kLogSignalProcessingFidlResponses = false;
+inline constexpr bool kLogSignalProcessingFidlResponseValues = false;
 
 inline constexpr bool kLogRingBufferState = false;
 inline constexpr bool kLogRingBufferMethods = false;
@@ -80,8 +79,8 @@ inline constexpr bool kLogControlCreatorServerResponses = false;
 inline constexpr bool kLogControlServerMethods = false;
 inline constexpr bool kLogControlServerResponses = false;
 
-inline constexpr bool kLogObserverServerMethods = true;
-inline constexpr bool kLogObserverServerResponses = true;
+inline constexpr bool kLogObserverServerMethods = false;
+inline constexpr bool kLogObserverServerResponses = false;
 
 inline constexpr bool kLogProviderServerMethods = false;
 inline constexpr bool kLogProviderServerResponses = false;

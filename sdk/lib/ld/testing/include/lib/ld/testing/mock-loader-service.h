@@ -15,7 +15,8 @@
 namespace ld::testing {
 
 // MockLoaderService is a mock interface for testing that specific requests
-// are made over the fuchsia.ldsvc.Loader protocol.
+// are made over the fuchsia.ldsvc.Loader protocol.  It is controlled by the
+// MockLoaderServiceForTest class (see below).
 //
 // This class initializes a mock server that serves the fuchsia.ldsvc.Loader
 // protocol and provides a reference to a FIDL client to make requests with.
@@ -50,10 +51,14 @@ class MockLoaderService {
   void Init();
 
   // Returns true if Init() has been called and succeeded.
-  bool Ready() const { return bool(mock_server_); }
+  bool Ready() const { return static_cast<bool>(mock_server_); }
 
+  // Tell the mock server to expect a LoadObject request for a VMO with `name`
+  // and to return the `expected_result`.
   void ExpectLoadObject(std::string_view name, zx::result<zx::vmo> expected_result);
 
+  // Tell the mock server to expect a Config request with `name` and to return
+  // `expected_result`.
   void ExpectConfig(std::string_view name, zx::result<> expected_result);
 
   fidl::ClientEnd<fuchsia_ldsvc::Loader>& client() { return mock_client_; }
@@ -66,6 +71,80 @@ class MockLoaderService {
   // The sequence guard enforces the fuchsia.ldsvc.Loader requests are made in
   // the order that Expect* functions are called.
   ::testing::InSequence sequence_guard_;
+};
+
+// MockLoaderForTest is used by tests to manage an instance of the
+// MockLoaderService. This class provides the public test API to prime the mock
+// loader with FIDL request expectations and the responses the mock loader
+// should return when receiving the request.
+//
+// MockLoaderForTest lazily initializes its mock_loader_ member, so tests must
+// call Init() before interacting with the mock loader service:
+//
+// ```
+// MockLoaderServiceForTest mock_;
+// ASSERT_NO_FATAL_FAILURE(mock_.Init());
+// mock_.ExpectLoadObject("foo.so", zx::ok(zx::vmo()));
+// ...
+// ```
+class MockLoaderServiceForTest {
+ public:
+  MockLoaderServiceForTest() = default;
+  MockLoaderServiceForTest(const MockLoaderServiceForTest&) = delete;
+  MockLoaderServiceForTest(MockLoaderServiceForTest&&) = delete;
+
+  // Prime the mock loader with the VMOs for the list of dependency names, and
+  // add the expectation on the mock loader that it will receive a LoadObject
+  // request for each of these dependencies in the order that they are listed.
+  void Needed(std::initializer_list<std::string_view> names);
+
+  // Similar to above, except that a boolean `found` is paired with the
+  // dependency name to potentially prime the mock loader to return a 'not found'
+  // error when it receives the LoadObject request for that dependency.
+  void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs);
+
+  // A generic interface to prime the mock loader with the `expected_result` for
+  // when it receives a LoadObject request for the given `name`.
+  void ExpectLoadObject(std::string_view name, zx::result<zx::vmo> expected_result);
+
+  // This is an overload that will check the validity of the VMO before priming
+  // the mock loader with a zx::ok result.
+  void ExpectLoadObject(std::string_view name, zx::vmo vmo);
+
+  // Prime the mock loader with a dependency VMO and add the expectation on the
+  // mock loader that it will receive a LoadObject request for that dependency.
+  void ExpectDependency(std::string_view name);
+
+  // Prime the mock loader with a root module VMO and add the expectation on the
+  // mock loader that it will receive a LoadObject request for that root module.
+  void ExpectRootModule(std::string_view name);
+
+  // Prime the mock loader with a 'not found' error for `name` and add the
+  // expectation that it will receive a LoadObject request for a VMO with the
+  // given `name`.
+  void ExpectMissing(std::string_view name);
+
+  // Prime the mock loader with config and add the expectation on the mock loader
+  // that it will receive a Config request.
+  void ExpectConfig(std::string_view config);
+
+  // TODO(caslyn): rename to TakeLdsvc
+  zx::channel GetLdsvc();
+
+  // TODO(caslyn): Introduce BorrowLdsvc function.
+
+  // TODO(caslyn): Introduce CallWithLoaderService function.
+
+ private:
+  // Fetch a dependency VMO from a specific path in the test package.
+  static zx::vmo GetDepVmo(std::string_view name);
+
+  // Fetch a the root module VMO from a specific path in the test package.
+  static zx::vmo GetRootModuleVmo(std::string_view name);
+
+  void ReadyMock();
+
+  std::unique_ptr<MockLoaderService> mock_loader_;
 };
 
 }  // namespace ld::testing

@@ -35,7 +35,7 @@ async fn main() {
     svc.dir("svc").add_fidl_service(IncomingRequest::TestAdmin);
 
     svc.take_and_serve_directory_handle().unwrap();
-    while let Some(request) = svc.next().await {
+    'outer: while let Some(request) = svc.next().await {
         match request {
             IncomingRequest::TestAdmin(mut stream) => {
                 while let Some(request) = stream.next().await {
@@ -72,9 +72,14 @@ async fn main() {
                                 .send(Ok(root_dir_for_main.into_client_end().unwrap()))
                                 .unwrap();
                         }
+                        TestFxfsAdminRequest::Shutdown { responder } => {
+                            responder.send().unwrap();
+                            break 'outer;
+                        }
                     }
                 }
             }
         }
     }
+    fs.shutdown().await;
 }

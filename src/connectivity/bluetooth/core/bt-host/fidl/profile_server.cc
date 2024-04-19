@@ -21,7 +21,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/uuid.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/weak_self.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/types.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/types.h"
 #include "zircon/errors.h"
 
@@ -282,7 +281,7 @@ void ProfileServer::AudioOffloadExt::GetSupportedFeatures(GetSupportedFeaturesCa
   }
 
   const uint32_t a2dp_offload_capabilities =
-      adapter_state.android_vendor_capabilities.a2dp_source_offload_capability_mask();
+      adapter_state.android_vendor_capabilities->a2dp_source_offload_capability_mask();
   const uint32_t sbc_capability = static_cast<uint32_t>(android_hci::A2dpCodecType::SBC);
   const uint32_t aac_capability = static_cast<uint32_t>(android_hci::A2dpCodecType::AAC);
 
@@ -987,7 +986,7 @@ fuchsia::bluetooth::bredr::Channel ProfileServer::ChannelToFidl(
   }
 
   if (adapter()->state().IsControllerFeatureSupported(FeaturesBits::kAndroidVendorExtensions) &&
-      adapter()->state().android_vendor_capabilities.a2dp_source_offload_capability_mask()) {
+      adapter()->state().android_vendor_capabilities->a2dp_source_offload_capability_mask()) {
     fidl_chan.set_ext_audio_offload(BindAudioOffloadExtServer(channel));
   }
 

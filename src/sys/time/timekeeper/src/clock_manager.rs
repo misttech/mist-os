@@ -446,9 +446,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
     /// and applying the most appropriate strategy and recording diagnostic events.
     async fn apply_clock_correction(&mut self, estimate_transform: &Transform) {
         // Any pending clock updates will be superseded by the handling of this one.
-        if let Some(task) = self.delayed_updates.take() {
-            task.cancel().await;
-        };
+        self.delayed_updates = None;
 
         let current_transform = Transform::from(self.clock.as_ref());
         let mono = zx::Time::get_monotonic();

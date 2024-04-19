@@ -29,7 +29,6 @@ group("core-tools") {
     "//third_party/openssh-portable:scp-shell-pkg",
     "//third_party/openssh-portable:ssh-keygen-shell-pkg",
     "//third_party/openssh-portable:ssh-shell-pkg",
-    "//third_party/sbase:sbase-pkgs",
     "//tools/check-licenses:host($host_toolchain)",
     "//tools/fidl/fidlmerge:host",
     "//tools/fidl/gidl:host",

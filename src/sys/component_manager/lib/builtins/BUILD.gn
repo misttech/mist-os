@@ -42,6 +42,7 @@ rustc_library("builtins") {
     "src/arguments.rs",
     "src/cpu_resource.rs",
     "src/debug_resource.rs",
+    "src/debuglog_resource.rs",
     "src/energy_info_resource.rs",
     "src/factory_items.rs",
     "src/framebuffer_resource.rs",

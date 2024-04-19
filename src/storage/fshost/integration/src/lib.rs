@@ -10,7 +10,6 @@ use {
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol_at_dir_root,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    fuchsia_merkle::MerkleTreeBuilder,
     fuchsia_zircon as zx,
     futures::{
         channel::mpsc::{self},
@@ -253,21 +252,14 @@ impl TestFixture {
     }
 
     pub async fn check_test_blob(&self, use_fxblob: bool) {
+        let expected_blob_hash = fuchsia_merkle::from_slice(&disk_builder::BLOB_CONTENTS).root();
         if use_fxblob {
-            let mut builder = MerkleTreeBuilder::new();
-            builder.write(&disk_builder::BLOB_CONTENTS);
-            let expected_blob_hash = builder.finish().root();
-
             let reader = connect_to_protocol_at_dir_root::<BlobReaderMarker>(
                 self.realm.root.get_exposed_dir(),
             )
             .expect("failed to connect to the BlobReader");
             let _vmo = reader.get_vmo(&expected_blob_hash.into()).await.unwrap().unwrap();
         } else {
-            let mut builder = MerkleTreeBuilder::new();
-            builder.write(&disk_builder::BLOB_CONTENTS);
-            let expected_blob_hash = builder.finish().root();
-
             let (blob, server_end) =
                 create_proxy::<fio::FileMarker>().expect("create_proxy failed");
             let path = &format!("{}", expected_blob_hash);

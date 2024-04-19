@@ -635,7 +635,7 @@ fn create_meta_subpackages_file(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, camino::Utf8Path, fuchsia_merkle::MerkleTreeBuilder, tempfile::TempDir};
+    use {super::*, camino::Utf8Path, tempfile::TempDir};
 
     const FAKE_ABI_REVISION: AbiRevision = AbiRevision::from_u64(0x5836508c2defac54);
 
@@ -668,9 +668,7 @@ mod tests {
         std::fs::write(&blob_source_file_path, blob_contents).unwrap();
 
         // Pre-calculate the blob's hash
-        let mut merkle_builder = MerkleTreeBuilder::new();
-        merkle_builder.write(blob_contents.as_bytes());
-        let blob_hash = merkle_builder.finish().root();
+        let blob_hash = fuchsia_merkle::from_slice(blob_contents.as_bytes()).root();
 
         let subpackage_url = "subpackage0".parse::<RelativePackageUrl>().unwrap();
         let subpackage_hash = Hash::from([0; fuchsia_hash::HASH_SIZE]);

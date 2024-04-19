@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{meta_file::MetaFile, root_dir::RootDir},
+    crate::root_dir::RootDir,
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
@@ -126,29 +126,16 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
             path.as_ref().strip_suffix('/').unwrap_or_else(|| path.as_ref())
         );
 
-        if let Some(location) = self.root_dir.meta_files.get(&file_path).copied() {
-            flags.to_object_request(server_end).handle(|object_request| {
-                vfs::file::serve(
-                    MetaFile::new(self.root_dir.clone(), location),
-                    scope,
-                    &flags,
-                    object_request,
-                )
-            });
+        if let Some(file) = self.root_dir.get_meta_file(&file_path) {
+            flags
+                .to_object_request(server_end)
+                .handle(|object_request| vfs::file::serve(file, scope, &flags, object_request));
             return;
         }
 
-        let directory_path = file_path + "/";
-        for k in self.root_dir.meta_files.keys() {
-            if k.starts_with(&directory_path) {
-                let () = MetaSubdir::new(self.root_dir.clone(), directory_path).open(
-                    scope,
-                    flags,
-                    VfsPath::dot(),
-                    server_end,
-                );
-                return;
-            }
+        if let Some(subdir) = self.root_dir.get_meta_subdir(file_path + "/") {
+            let () = subdir.open(scope, flags, VfsPath::dot(), server_end);
+            return;
         }
 
         let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
@@ -198,24 +185,12 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
             path.as_ref().strip_suffix('/').unwrap_or_else(|| path.as_ref())
         );
 
-        if let Some(location) = self.root_dir.meta_files.get(&file_path).copied() {
-            return vfs::file::serve(
-                MetaFile::new(self.root_dir.clone(), location),
-                scope,
-                &protocols,
-                object_request,
-            );
+        if let Some(file) = self.root_dir.get_meta_file(&file_path) {
+            return vfs::file::serve(file, scope, &protocols, object_request);
         }
-        let directory_path = file_path + "/";
-        for k in self.root_dir.meta_files.keys() {
-            if k.starts_with(&directory_path) {
-                return MetaSubdir::new(self.root_dir.clone(), directory_path).open2(
-                    scope,
-                    VfsPath::dot(),
-                    protocols,
-                    object_request,
-                );
-            }
+
+        if let Some(subdir) = self.root_dir.get_meta_subdir(file_path + "/") {
+            return subdir.open2(scope, VfsPath::dot(), protocols, object_request);
         }
 
         Err(zx::Status::NOT_FOUND)

@@ -6,7 +6,8 @@
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <lib/async/cpp/task.h>
-#include <lib/ddk/debug.h>
+
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace goldfish {
 

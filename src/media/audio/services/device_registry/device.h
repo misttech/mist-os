@@ -7,7 +7,7 @@
 
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.audio/cpp/natural_types.h>
-#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fit/function.h>

@@ -282,7 +282,6 @@ func (g *GCE) provisionSSHKey(ctx context.Context) error {
 	pubkey = strings.TrimSuffix(pubkey, "\n")
 	pubkey = fmt.Sprintf("\"%s %s\"", pubkey, g.currentUser)
 	cmds := []serial.Command{
-		{Cmd: []string{"/pkgfs/packages/sshd-host/0/bin/hostkeygen"}},
 		{Cmd: []string{"echo", pubkey, ">", "/data/ssh/authorized_keys"}},
 	}
 	if err := serial.RunCommands(ctx, g.serial, cmds); err != nil {

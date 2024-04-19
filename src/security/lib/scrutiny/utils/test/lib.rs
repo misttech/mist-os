@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    fuchsia_merkle::MerkleTree,
     once_cell::sync::Lazy,
     scrutiny_utils::artifact::{ArtifactReader, BlobFsArtifactReader, CompoundArtifactReader},
     std::path::PathBuf,
@@ -33,11 +32,7 @@ struct BlobfsPaths {
 }
 
 fn merkle_as_path_buf(data: &[u8]) -> PathBuf {
-    MerkleTree::from_reader(data)
-        .expect("compute merkle for blobfs file name")
-        .root()
-        .to_string()
-        .into()
+    fuchsia_merkle::from_slice(data).root().to_string().into()
 }
 
 #[test]

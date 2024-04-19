@@ -14,9 +14,8 @@ use {
         channel::mpsc::{channel, SendError},
         Sink, SinkExt, Stream, StreamExt, TryFutureExt,
     },
-    pin_utils::pin_mut,
     rustyline::{error::ReadlineError, CompletionType, Config, EditMode, Editor},
-    std::{fmt, thread, time::Duration},
+    std::{fmt, pin::pin, thread, time::Duration},
 };
 
 static PROMPT: &str = "\x1b[34mbattman>\x1b[0m ";
@@ -344,11 +343,8 @@ async fn run_repl(service: BatterySimulatorProxy) -> Result<(), Error> {
 async fn main() -> Result<(), Error> {
     println!("Welcome to the Battery Simulator. Type help and <Enter> to see all the options!");
     let battery_simulator = connect_to_protocol::<spower::BatterySimulatorMarker>()?;
-    let repl = run_repl(battery_simulator)
-        .unwrap_or_else(|e| eprintln!("REPL failed unexpectedly {:?}", e));
-
-    // Pins repl value on the stack
-    pin_mut!(repl);
+    let repl = pin!(run_repl(battery_simulator)
+        .unwrap_or_else(|e| eprintln!("REPL failed unexpectedly {:?}", e)));
 
     repl.await;
 

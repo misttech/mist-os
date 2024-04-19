@@ -127,6 +127,10 @@ struct FunctionFsState {
     // FunctionFs events that indicate the connection state, to be read through
     // the control endpoint.
     event_queue: VecDeque<usb_functionfs_event>,
+
+    // Whether FunctionFS has received the initial ADB header from the host.
+    // Used to reject unexpected payloads when an ADB header has not been read.
+    has_received_initial_adb_header: bool,
 }
 
 fn connect_to_device() -> Result<(fadb::DeviceSynchronousProxy, AdbHandle), Errno> {
@@ -197,6 +201,7 @@ impl FunctionFsRootDir {
             state.has_input_output_endpoints = false;
             state.adb_proxy = None;
             state.event_queue.clear();
+            state.has_received_initial_adb_header = false;
 
             let _ = state
                 .device_proxy
@@ -218,6 +223,33 @@ impl FunctionFsRootDir {
             return Ok(adb_proxy.clone());
         }
         error!(ENODEV)
+    }
+
+    // Hack for ADB: Discard ADB messages until the first ADB header is read.
+    // Returns false if an unexpected payload is received before the first ADB header.
+    //
+    // ADB daemon expects a 24-byte header message followed by 0 or more payload messages, and restarts
+    // if it reads an unexpected message. This resets FunctionFS, and causes ADB host to resend a connect
+    // request. The header of this request is likely to be missed again by FunctionFS as it comes back up,
+    // resulting in ADB daemon crash looping. See https://fxbug.dev/330386381 for details.
+    //
+    // This hack assumes that reads are not performed concurrently. While this is true for ADB daemon,
+    // where reads arrive from a read queue, there's nothing that guarantees this for other users.
+    fn should_forward_adb_message_to_daemon(&self, bytes: &[u8]) -> bool {
+        const ADB_HEADER_LEN: usize = 24;
+        let mut state = self.state.lock();
+
+        if state.has_received_initial_adb_header {
+            return true;
+        }
+
+        if bytes.len() == ADB_HEADER_LEN {
+            state.has_received_initial_adb_header = true;
+            true
+        } else {
+            log_warn!("Expected ADB header, instead got message of size {}", bytes.len());
+            false
+        }
     }
 }
 
@@ -516,7 +548,26 @@ impl FileOps for FunctionFsOutputFileObject {
                     // Instead of attempting this, we'll instead return error to the client.
                     return error!(EINVAL);
                 }
-                Ok(data.write(&payload).unwrap())
+
+                // Hack for ADB. See comment for `should_forward_adb_message_to_daemon`.
+                if rootdir.should_forward_adb_message_to_daemon(&payload) {
+                    data.write(&payload)
+                } else {
+                    log_warn!("Sending a reset message back to ADB host to force a retry.");
+
+                    // Arbitrary non-empty and non-zero message that does not look like a real ADB message.
+                    let garbage = [12, 23, 34, 45, 56, 67];
+                    match adb.queue_tx(&garbage, zx::Time::INFINITE) {
+                        Err(err) => {
+                            log_warn!("Failed to call UsbAdbImpl.QueueTx: {err}");
+                        }
+                        Ok(Err(err)) => {
+                            log_warn!("Failed to queue garbage message to adb driver: {err}");
+                        }
+                        Ok(Ok(_)) => {}
+                    }
+                    Ok(0)
+                }
             }
         }
     }

@@ -38,9 +38,9 @@ transport (Zircon primitives), you first need to make changes so that all
 communications in the driver take place using FIDL.
 
 The good news is that the syntax of the driver runtime FIDL is similar to
-FIDL [LLCPP][llcpp]. The only difference is that there are some additional
-parameters in the function calls. And the namespace of some classes or
-primitives it uses is `fdf` instead of the original one (for example,
+FIDL [C++ wire bindings][cpp-bindings]. The only difference is that there are
+some additional parameters in the function calls. And the namespace of some
+classes or primitives it uses is `fdf` instead of the original one (for example,
 `fdf::WireServer`), but FIDL wire binding types are still used in data
 transactions (for example, `fidl::VectorView`).
 
@@ -145,7 +145,7 @@ testing server or client) in the test class. For more information, see
 [fidl]: /docs/concepts/fidl/overview.md
 [migrate-from-dfv1-to-dfv2]: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2.md
 [driver-runtime-rfc]: /docs/contribute/governance/rfcs/0126_driver_runtime.md
-[llcpp]: /docs/development/languages/fidl/tutorials/cpp/README.md
+[cpp-bindings]: /docs/reference/fidl/bindings/cpp-bindings.md
 [synchronized-dispatchers]: /docs/concepts/drivers/driver-dispatcher-and-threads.md#synchronous-operations
 [wlanofmac-cml]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/wlan/drivers/wlansoftmac/meta/wlansoftmac.cml
 [driver-dispatcher]: /docs/concepts/drivers/driver-dispatcher-and-threads.md

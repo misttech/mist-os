@@ -20,6 +20,7 @@ import os
 import pathlib
 import sys
 
+import depfile
 import generate_idk
 
 
@@ -81,18 +82,22 @@ def main() -> int:
         type=pathlib.Path,
         required=True,
     )
+    parser.add_argument(
+        "--depfile",
+        help="Path to the stamp file",
+        type=pathlib.Path,
+    )
     args = parser.parse_args()
 
-    first_subbuild, *other_subbuilds = args.subbuild_directory
+    # Collect all possible input files, to make a depfile.
+    input_files: set[pathlib.Path] = set()
 
-    merged = generate_idk.PartialIDK.load(
-        first_subbuild, args.relative_manifest
-    )
-
-    for build_dir in other_subbuilds:
+    merged = generate_idk.MergedIDK()
+    for build_dir in args.subbuild_directory:
         manifest = generate_idk.PartialIDK.load(
             build_dir, args.relative_manifest
         )
+        input_files |= manifest.input_files()
         merged = merged.merge_with(manifest)
 
     output_dir: pathlib.Path = args.output_directory
@@ -133,6 +138,14 @@ def main() -> int:
         )
 
     args.stamp_file.touch()
+
+    if args.depfile:
+        depfile_path: pathlib.Path = args.depfile
+        depfile_path.parent.mkdir(parents=True, exist_ok=True)
+        with depfile_path.open("w") as depfile_out:
+            depfile.DepFile.from_deps(
+                str(args.stamp_file), set(str(d) for d in input_files)
+            ).write_to(depfile_out)
 
     return 0
 

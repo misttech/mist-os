@@ -10,6 +10,8 @@
 
 #ifdef FS_TRACE_DEBUG_ENABLED
 #include <fidl/fuchsia.io/cpp/natural_ostream.h>
+#include <fidl/fuchsia.io/cpp/type_conversions.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
 
 #include <cstdlib>
 #include <iostream>
@@ -33,6 +35,8 @@ void PrintEach(std::ostream& stream, T val, Args... args) {
     stream << val;
   } else if constexpr (std::is_same_v<T, fidl::StringView>) {
     stream << val.get();
+  } else if constexpr (fidl::IsWire<T>()) {
+    stream << fidl::ostream::Formatted(fidl::ToNatural(val));
   } else {
     stream << fidl::ostream::Formatted(val);
   }

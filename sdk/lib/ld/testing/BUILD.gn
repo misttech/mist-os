@@ -45,6 +45,11 @@ static_library("ld-testing") {
       "test-vmo.cc",
     ]
     deps += [
+      # TODO(https://fxbug.dev/335737373): this is included for `LD_TEST_LIBPREFIX`.
+      # Instead `load-test-modules-info` should extract the exact path for each
+      # artifact to make it possible for the caller to more simply map a
+      # string -> filename.
+      "../test:load-test-modules-info",
       "//sdk/lib/fdio",
       "//sdk/lib/stdcompat",
       "//src/lib/elfldltl/testing",

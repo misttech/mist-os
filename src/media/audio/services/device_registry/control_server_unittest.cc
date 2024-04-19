@@ -15,6 +15,7 @@
 
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 #include "src/media/audio/services/device_registry/common_unittest.h"
+#include "src/media/audio/services/device_registry/ring_buffer_server.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_composite.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
@@ -50,8 +51,9 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
     auto [control_client_end, control_server_end] =
         CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Control>();
     auto control_client = fidl::Client<fuchsia_audio_device::Control>(
-        std::move(control_client_end), dispatcher(), control_fidl_handler_.get());
+        std::move(control_client_end), dispatcher(), control_fidl_handler().get());
     bool received_callback = false;
+
     control_creator_client
         ->Create({{
             .token_id = token_id,
@@ -62,6 +64,7 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           received_callback = true;
         });
+
     RunLoopUntilIdle();
     EXPECT_TRUE(received_callback);
     EXPECT_TRUE(control_client.is_valid());
@@ -82,9 +85,9 @@ class ControlServerCodecTest : public ControlServerTest {
   std::shared_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeCodecOutput();
 
-    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
-                                           fuchsia_audio_device::DeviceType::kCodec,
-                                           DriverClient::WithCodec(fake_driver->Enable())));
+    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
+                                            fuchsia_audio_device::DeviceType::kCodec,
+                                            DriverClient::WithCodec(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -95,9 +98,9 @@ class ControlServerCompositeTest : public ControlServerTest {
   std::shared_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeComposite();
 
-    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test composite name",
-                                           fuchsia_audio_device::DeviceType::kComposite,
-                                           DriverClient::WithComposite(fake_driver->Enable())));
+    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
+                                            fuchsia_audio_device::DeviceType::kComposite,
+                                            DriverClient::WithComposite(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -108,9 +111,9 @@ class ControlServerStreamConfigTest : public ControlServerTest {
   std::shared_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeStreamConfigOutput();
 
-    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
-                                           fuchsia_audio_device::DeviceType::kOutput,
-                                           DriverClient::WithStreamConfig(fake_driver->Enable())));
+    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test output name",
+                                            fuchsia_audio_device::DeviceType::kOutput,
+                                            DriverClient::WithStreamConfig(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -122,18 +125,21 @@ class ControlServerStreamConfigTest : public ControlServerTest {
 // When client drops their Control, the server should cleanly unwind without hang or WARNING.
 TEST_F(ControlServerCodecTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
+
   RunLoopUntilIdle();
   ASSERT_EQ(ControlServer::count(), 1u);
 
   (void)control->client().UnbindMaybeGetEndpoint();
+
   // If Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a failure.
 }
 
 // When server closes a client connection, the shutdown should be orderly without hang or WARNING.
 TEST_F(ControlServerCodecTest, CleanServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
+
   RunLoopUntilIdle();
   ASSERT_EQ(ControlServer::count(), 1u);
 
@@ -149,17 +155,18 @@ TEST_F(ControlServerCodecTest, CleanServerShutdown) {
 TEST_F(ControlServerCodecTest, BasicClose) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   auto added_id = WaitForAddedDeviceTokenId(registry->client());
   auto control_creator = CreateTestControlCreatorServer();
   auto control_client = ConnectToControl(control_creator->client(), *added_id);
-  RunLoopUntilIdle();
 
+  RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(control_client.is_valid());
+
   (void)control_client.UnbindMaybeGetEndpoint();
 }
 
@@ -170,27 +177,30 @@ TEST_F(ControlServerCodecTest, ControlCreatorServerShutdownDoesNotAffectControl)
   auto added_id = WaitForAddedDeviceTokenId(registry->client());
   auto control_creator = CreateTestControlCreatorServer();
   auto control_client = ConnectToControl(control_creator->client(), *added_id);
-  RunLoopUntilIdle();
 
+  RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
   control_creator->server().Shutdown(ZX_ERR_PEER_CLOSED);
+
   RunLoopUntilIdle();
   EXPECT_TRUE(control_creator->server().WaitForShutdown(zx::sec(1)));
-
-  EXPECT_TRUE(control_client.is_valid());
   EXPECT_EQ(ControlServer::count(), 1u);
-  (void)control_client.UnbindMaybeGetEndpoint();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
+  ASSERT_TRUE(control_creator_fidl_error_status().has_value());
+  EXPECT_EQ(*control_creator_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
 // Verify that the ControlServer shuts down cleanly if the driver drops its Codec.
 TEST_F(ControlServerCodecTest, CodecDropCausesCleanControlServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   WaitForAddedDeviceTokenId(registry->client());
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
 
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -201,24 +211,28 @@ TEST_F(ControlServerCodecTest, CodecDropCausesCleanControlServerShutdown) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(control->server().WaitForShutdown(zx::sec(5)));
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  ASSERT_TRUE(control_fidl_error_status().has_value());
+  EXPECT_EQ(*control_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
 // Validate basic SetDaiFormat functionality, including valid CodecFormatInfo returned.
 TEST_F(ControlServerCodecTest, SetDaiFormat) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto received_callback = false;
-
   // Determine a safe DaiFormat to set
   auto dai_format =
       SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
+  auto received_callback = false;
+
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
       .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
@@ -231,22 +245,26 @@ TEST_F(ControlServerCodecTest, SetDaiFormat) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Validate basic CodecStart functionality including a current start_time.
 TEST_F(ControlServerCodecTest, CodecStart) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto received_callback = false;
   auto dai_format =
       SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
+  auto received_callback = false;
+
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
       .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
@@ -256,9 +274,9 @@ TEST_F(ControlServerCodecTest, CodecStart) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  received_callback = false;
   auto start_time = zx::time::infinite_past();
   auto time_before_start = zx::clock::get_monotonic();
+  received_callback = false;
 
   control->client()->CodecStart().Then(
       [&received_callback, &start_time](fidl::Result<Control::CodecStart>& result) {
@@ -272,14 +290,17 @@ TEST_F(ControlServerCodecTest, CodecStart) {
   EXPECT_TRUE(received_callback);
   EXPECT_GT(start_time.get(), time_before_start.get());
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Validate basic CodecStop functionality including a current stop_time.
 TEST_F(ControlServerCodecTest, CodecStop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -288,6 +309,7 @@ TEST_F(ControlServerCodecTest, CodecStop) {
   auto dai_format =
       SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
   auto received_callback = false;
+
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
       .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
@@ -298,6 +320,7 @@ TEST_F(ControlServerCodecTest, CodecStop) {
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
   received_callback = false;
+
   control->client()->CodecStart().Then(
       [&received_callback](fidl::Result<Control::CodecStart>& result) {
         received_callback = true;
@@ -322,14 +345,17 @@ TEST_F(ControlServerCodecTest, CodecStop) {
   EXPECT_TRUE(received_callback);
   EXPECT_GT(stop_time.get(), time_before_stop.get());
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Reset - validate that the DaiFormat and the Start state are reset.
 TEST_F(ControlServerCodecTest, Reset) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -338,6 +364,7 @@ TEST_F(ControlServerCodecTest, Reset) {
   auto dai_format =
       SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
   auto received_callback = false;
+
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
       .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
@@ -349,6 +376,7 @@ TEST_F(ControlServerCodecTest, Reset) {
   ASSERT_TRUE(received_callback);
   received_callback = false;
   zx::time first_start_time;
+
   control->client()->CodecStart().Then(
       [&received_callback, &first_start_time](fidl::Result<Control::CodecStart>& result) {
         received_callback = true;
@@ -370,6 +398,7 @@ TEST_F(ControlServerCodecTest, Reset) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   received_callback = false;
+
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
       .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
@@ -382,6 +411,7 @@ TEST_F(ControlServerCodecTest, Reset) {
   EXPECT_TRUE(received_callback);
   received_callback = false;
   zx::time second_start_time;
+
   control->client()->CodecStart().Then(
       [&received_callback, &second_start_time](fidl::Result<Control::CodecStart>& result) {
         received_callback = true;
@@ -394,6 +424,8 @@ TEST_F(ControlServerCodecTest, Reset) {
   EXPECT_TRUE(received_callback);
   EXPECT_GT(second_start_time.get(), first_start_time.get());
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 //
@@ -409,7 +441,7 @@ TEST_F(ControlServerCodecTest, GetTopologiesUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto control = CreateTestControlServer(device);
@@ -429,6 +461,8 @@ TEST_F(ControlServerCodecTest, GetTopologiesUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify GetElements if the driver does not support signalprocessing.
@@ -438,7 +472,7 @@ TEST_F(ControlServerCodecTest, GetElementsUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto control = CreateTestControlServer(device);
@@ -458,6 +492,8 @@ TEST_F(ControlServerCodecTest, GetElementsUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 /////////////////////
@@ -466,18 +502,21 @@ TEST_F(ControlServerCodecTest, GetElementsUnsupported) {
 // When client drops their Control, the server should cleanly unwind without hang or WARNING.
 TEST_F(ControlServerCompositeTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
+
   RunLoopUntilIdle();
   ASSERT_EQ(ControlServer::count(), 1u);
 
   (void)control->client().UnbindMaybeGetEndpoint();
+
   // If Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a failure.
 }
 
 // When server closes a client connection, the shutdown should be orderly without hang or WARNING.
 TEST_F(ControlServerCompositeTest, CleanServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
+
   RunLoopUntilIdle();
   ASSERT_EQ(ControlServer::count(), 1u);
 
@@ -493,17 +532,18 @@ TEST_F(ControlServerCompositeTest, CleanServerShutdown) {
 TEST_F(ControlServerCompositeTest, BasicClose) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   auto added_id = WaitForAddedDeviceTokenId(registry->client());
   auto control_creator = CreateTestControlCreatorServer();
   auto control_client = ConnectToControl(control_creator->client(), *added_id);
-  RunLoopUntilIdle();
 
+  RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(control_client.is_valid());
+
   (void)control_client.UnbindMaybeGetEndpoint();
 }
 
@@ -511,22 +551,25 @@ TEST_F(ControlServerCompositeTest, BasicClose) {
 TEST_F(ControlServerCompositeTest, ControlCreatorServerShutdownDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   auto added_id = WaitForAddedDeviceTokenId(registry->client());
   auto control_creator = CreateTestControlCreatorServer();
   auto control_client = ConnectToControl(control_creator->client(), *added_id);
-  RunLoopUntilIdle();
 
+  RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
   control_creator->server().Shutdown(ZX_ERR_PEER_CLOSED);
+
   RunLoopUntilIdle();
   EXPECT_TRUE(control_creator->server().WaitForShutdown(zx::sec(1)));
-
-  EXPECT_TRUE(control_client.is_valid());
   EXPECT_EQ(ControlServer::count(), 1u);
-  (void)control_client.UnbindMaybeGetEndpoint();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
+  ASSERT_TRUE(control_creator_fidl_error_status().has_value());
+  EXPECT_EQ(*control_creator_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
 // Verify that the ControlServer shuts down cleanly if the driver drops its Composite.
@@ -534,7 +577,7 @@ TEST_F(ControlServerCompositeTest, CompositeDropCausesCleanControlServerShutdown
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
   WaitForAddedDeviceTokenId(registry->client());
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
 
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -545,6 +588,9 @@ TEST_F(ControlServerCompositeTest, CompositeDropCausesCleanControlServerShutdown
 
   RunLoopUntilIdle();
   EXPECT_TRUE(control->server().WaitForShutdown(zx::sec(5)));
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  ASSERT_TRUE(control_fidl_error_status().has_value());
+  EXPECT_EQ(*control_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
 // Validate (in depth) the ring_buffer and properties returned from CreateRingBuffer -
@@ -554,8 +600,8 @@ TEST_F(ControlServerCompositeTest, CreateRingBuffer) {
   auto registry = CreateTestRegistryServer();
 
   WaitForAddedDeviceTokenId(registry->client());
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
-  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
+  auto device = *adr_service()->devices().begin();
 
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -569,7 +615,7 @@ TEST_F(ControlServerCompositeTest, CreateRingBuffer) {
     bool received_callback = false;
 
     auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-        std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler_.get());
+        std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler().get());
     auto requested_format = SafeRingBufferFormatFromElementRingBufferFormatSets(
         ring_buffer_element_id, device->ring_buffer_format_sets());
     uint32_t requested_ring_buffer_bytes = 2000;
@@ -653,8 +699,9 @@ TEST_F(ControlServerCompositeTest, CreateRingBuffer) {
 
   // Allow the ControlServer to destruct, if it (erroneously) wants to.
   RunLoopUntilIdle();
-  EXPECT_TRUE(control->client().is_valid());
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that the Control lives, even if the client drops its child RingBuffer.
@@ -663,8 +710,8 @@ TEST_F(ControlServerCompositeTest, ClientRingBufferDropDoesNotAffectControl) {
   auto registry = CreateTestRegistryServer();
 
   WaitForAddedDeviceTokenId(registry->client());
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
-  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
+  auto device = *adr_service()->devices().begin();
 
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -678,7 +725,7 @@ TEST_F(ControlServerCompositeTest, ClientRingBufferDropDoesNotAffectControl) {
     bool received_callback = false;
 
     auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-        std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler_.get());
+        std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler().get());
 
     control->client()
         ->CreateRingBuffer({{
@@ -708,8 +755,9 @@ TEST_F(ControlServerCompositeTest, ClientRingBufferDropDoesNotAffectControl) {
 
   // Allow the ControlServer to destruct, if it (erroneously) wants to.
   RunLoopUntilIdle();
-  EXPECT_TRUE(control->client().is_valid());
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that the Control lives, even if the driver drops its RingBuffer connection.
@@ -718,8 +766,8 @@ TEST_F(ControlServerCompositeTest, DriverRingBufferDropDoesNotAffectControl) {
   auto registry = CreateTestRegistryServer();
 
   WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto device = *adr_service()->devices().begin();
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
 
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -762,8 +810,9 @@ TEST_F(ControlServerCompositeTest, DriverRingBufferDropDoesNotAffectControl) {
 
   // Allow the ControlServer to destruct, if it (erroneously) wants to.
   RunLoopUntilIdle();
-  EXPECT_TRUE(control->client().is_valid());
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Validate basic SetDaiFormat functionality.
@@ -771,7 +820,7 @@ TEST_F(ControlServerCompositeTest, SetDaiFormat) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -800,6 +849,8 @@ TEST_F(ControlServerCompositeTest, SetDaiFormat) {
     EXPECT_TRUE(received_callback);
     EXPECT_EQ(ControlServer::count(), 1u);
   }
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Reset - validate that the DaiFormat and the Start state are reset.
@@ -807,7 +858,7 @@ TEST_F(ControlServerCompositeTest, Reset) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
   (void)WaitForAddedDeviceTokenId(registry->client());
-  auto device = *adr_service_->devices().begin();
+  auto device = *adr_service()->devices().begin();
   auto control = CreateTestControlServer(device);
 
   RunLoopUntilIdle();
@@ -861,6 +912,8 @@ TEST_F(ControlServerCompositeTest, Reset) {
 
     // Verify that the ControlNotify received the DaiFormat notification.
   }
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Retrieves the static list of Topologies and their properties.
@@ -871,7 +924,7 @@ TEST_F(ControlServerCompositeTest, GetTopologies) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto initial_topologies = device->info()->signal_processing_topologies();
   ASSERT_TRUE(initial_topologies.has_value() && !initial_topologies->empty());
@@ -892,6 +945,8 @@ TEST_F(ControlServerCompositeTest, GetTopologies) {
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(initial_topologies->size(), received_topologies.size());
   EXPECT_THAT(received_topologies, testing::ElementsAreArray(*initial_topologies));
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Retrieves the static list of Elements and their properties.
@@ -902,7 +957,7 @@ TEST_F(ControlServerCompositeTest, GetElements) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto initial_elements = device->info()->signal_processing_elements();
   ASSERT_TRUE(initial_elements.has_value() && !initial_elements->empty());
@@ -923,6 +978,9 @@ TEST_F(ControlServerCompositeTest, GetElements) {
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(initial_elements->size(), received_elements.size());
   EXPECT_THAT(received_elements, testing::ElementsAreArray(*initial_elements));
+
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that WatchTopology correctly returns the initial topology state.
@@ -932,7 +990,7 @@ TEST_F(ControlServerCompositeTest, WatchTopologyInitial) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
   auto control = CreateTestControlServer(device);
@@ -950,6 +1008,9 @@ TEST_F(ControlServerCompositeTest, WatchTopologyInitial) {
   EXPECT_TRUE(received_callback);
   EXPECT_TRUE(topology_id.has_value());
   EXPECT_FALSE(topology_map(device).find(*topology_id) == topology_map(device).end());
+
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that WatchTopology pends when called a second time (if no change).
@@ -959,7 +1020,7 @@ TEST_F(ControlServerCompositeTest, WatchTopologyNoChange) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
   auto control = CreateTestControlServer(device);
@@ -987,6 +1048,9 @@ TEST_F(ControlServerCompositeTest, WatchTopologyNoChange) {
 
   RunLoopUntilIdle();
   EXPECT_FALSE(received_callback);
+
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that WatchTopology works with dynamic changes, after initial query.
@@ -996,7 +1060,7 @@ TEST_F(ControlServerCompositeTest, WatchTopologyUpdate) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
   auto control = CreateTestControlServer(device);
@@ -1044,6 +1108,9 @@ TEST_F(ControlServerCompositeTest, WatchTopologyUpdate) {
   ASSERT_TRUE(topology_id.has_value());
   EXPECT_FALSE(topology_map(device).find(*topology_id) == topology_map(device).end());
   EXPECT_EQ(*topology_id, *topology_id_to_inject);
+
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that WatchElementState correctly returns the initial states of all elements.
@@ -1053,7 +1120,7 @@ TEST_F(ControlServerCompositeTest, WatchElementStateInitial) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
   auto control = CreateTestControlServer(device);
@@ -1088,6 +1155,9 @@ TEST_F(ControlServerCompositeTest, WatchElementStateInitial) {
         << "Device element_map did not contain ElementState for element_id ";
     EXPECT_EQ(element_states.find(element_id)->second, state_from_device);
   }
+
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that WatchElementState pends indefinitely, if there has been no change.
@@ -1097,12 +1167,11 @@ TEST_F(ControlServerCompositeTest, WatchElementStateNoChange) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
   auto control = CreateTestControlServer(device);
   auto& elements_from_device = element_map(device);
-  FX_LOGS(INFO) << "elements_from_device.size: " << elements_from_device.size();
   auto received_callback = false;
   std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>
       element_states;
@@ -1138,6 +1207,8 @@ TEST_F(ControlServerCompositeTest, WatchElementStateNoChange) {
   // We request all the states from the Elements again, then wait once.
   RunLoopUntilIdle();
   EXPECT_FALSE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that WatchElementState works with dynamic changes, after initial query.
@@ -1147,12 +1218,11 @@ TEST_F(ControlServerCompositeTest, WatchElementStateUpdate) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
   auto control = CreateTestControlServer(device);
   auto& elements_from_device = element_map(device);
-  FX_LOGS(INFO) << "elements_from_device.size: " << elements_from_device.size();
   auto received_callback = false;
   std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>
       element_states;
@@ -1277,6 +1347,9 @@ TEST_F(ControlServerCompositeTest, WatchElementStateUpdate) {
     const auto& state_from_device = elements_from_device.find(element_id)->second.state;
     EXPECT_EQ(state_received, state_from_device);
   }
+
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify SetTopology (OK to use WatchTopology in doing this)
@@ -1286,7 +1359,7 @@ TEST_F(ControlServerCompositeTest, SetTopology) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   if (device->topology_ids().size() == 1) {
     GTEST_SKIP() << "Fake driver does not expose multiple topologies";
@@ -1340,6 +1413,9 @@ TEST_F(ControlServerCompositeTest, SetTopology) {
   EXPECT_TRUE(received_callback);
   ASSERT_TRUE(new_topology_id.has_value());
   EXPECT_EQ(*new_topology_id, topology_id_to_set);
+
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify SetElementState (OK to use WatchElementState in doing this)
@@ -1350,7 +1426,8 @@ TEST_F(ControlServerCompositeTest, SetTopology) {
 // When client drops their Control, the server should cleanly unwind without hang or WARNING.
 TEST_F(ControlServerStreamConfigTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
+
   RunLoopUntilIdle();
   ASSERT_EQ(ControlServer::count(), 1u);
 
@@ -1362,7 +1439,8 @@ TEST_F(ControlServerStreamConfigTest, CleanClientDrop) {
 // When server closes a client connection, the shutdown should be orderly without hang or WARNING.
 TEST_F(ControlServerStreamConfigTest, CleanServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
+
   RunLoopUntilIdle();
   ASSERT_EQ(ControlServer::count(), 1u);
 
@@ -1378,17 +1456,18 @@ TEST_F(ControlServerStreamConfigTest, CleanServerShutdown) {
 TEST_F(ControlServerStreamConfigTest, BasicClose) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   auto added_id = WaitForAddedDeviceTokenId(registry->client());
   auto control_creator = CreateTestControlCreatorServer();
   auto control_client = ConnectToControl(control_creator->client(), *added_id);
-  RunLoopUntilIdle();
 
+  RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(control_client.is_valid());
+
   (void)control_client.UnbindMaybeGetEndpoint();
 }
 
@@ -1396,22 +1475,25 @@ TEST_F(ControlServerStreamConfigTest, BasicClose) {
 TEST_F(ControlServerStreamConfigTest, ControlCreatorServerShutdownDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
+
   auto added_id = WaitForAddedDeviceTokenId(registry->client());
   auto control_creator = CreateTestControlCreatorServer();
   auto control_client = ConnectToControl(control_creator->client(), *added_id);
-  RunLoopUntilIdle();
 
+  RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
   control_creator->server().Shutdown(ZX_ERR_PEER_CLOSED);
+
   RunLoopUntilIdle();
   EXPECT_TRUE(control_creator->server().WaitForShutdown(zx::sec(1)));
-
-  EXPECT_TRUE(control_client.is_valid());
   EXPECT_EQ(ControlServer::count(), 1u);
-  (void)control_client.UnbindMaybeGetEndpoint();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
+  ASSERT_TRUE(control_creator_fidl_error_status().has_value());
+  EXPECT_EQ(*control_creator_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
 // Verify that the ControlServer shuts down cleanly if the driver drops its StreamConfig.
@@ -1422,10 +1504,9 @@ TEST_F(ControlServerStreamConfigTest, StreamConfigDropCausesCleanControlServerSh
 
   WaitForAddedDeviceTokenId(registry->client());
 
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
 
   RunLoopUntilIdle();
-
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
@@ -1449,18 +1530,23 @@ TEST_F(ControlServerStreamConfigTest, StreamConfigDropCausesCleanControlServerSh
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
+
   RunLoopUntilIdle();
   EXPECT_EQ(RingBufferServer::count(), 1u);
   EXPECT_TRUE(received_callback);
 
   // Drop the driver StreamConfig connection.
   fake_driver->DropStreamConfig();
-  RunLoopUntilIdle();
 
+  RunLoopUntilIdle();
   while (RingBufferServer::count() > 0u) {
     RunLoopUntilIdle();
   }
+
   EXPECT_TRUE(control->server().WaitForShutdown(zx::sec(5)));
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  ASSERT_TRUE(control_fidl_error_status().has_value());
+  EXPECT_EQ(*control_fidl_error_status(), ZX_ERR_PEER_CLOSED);
 }
 
 // Verify that the Control lives, even if the client drops its child RingBuffer.
@@ -1471,10 +1557,9 @@ TEST_F(ControlServerStreamConfigTest, ClientRingBufferDropDoesNotAffectControl) 
 
   WaitForAddedDeviceTokenId(registry->client());
 
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
 
   RunLoopUntilIdle();
-
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
@@ -1484,7 +1569,7 @@ TEST_F(ControlServerStreamConfigTest, ClientRingBufferDropDoesNotAffectControl) 
     bool received_callback = false;
 
     auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-        std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler_.get());
+        std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler().get());
 
     control->client()
         ->CreateRingBuffer({{
@@ -1502,6 +1587,7 @@ TEST_F(ControlServerStreamConfigTest, ClientRingBufferDropDoesNotAffectControl) 
           ASSERT_TRUE(result.is_ok()) << result.error_value();
           received_callback = true;
         });
+
     RunLoopUntilIdle();
     EXPECT_TRUE(received_callback);
 
@@ -1516,8 +1602,9 @@ TEST_F(ControlServerStreamConfigTest, ClientRingBufferDropDoesNotAffectControl) 
 
   // Allow the ControlServer to destruct, if it (erroneously) wants to.
   RunLoopUntilIdle();
-  EXPECT_TRUE(control->client().is_valid());
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that the Control lives, even if the driver drops its RingBuffer connection.
@@ -1528,10 +1615,9 @@ TEST_F(ControlServerStreamConfigTest, DriverRingBufferDropDoesNotAffectControl) 
 
   WaitForAddedDeviceTokenId(registry->client());
 
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
 
   RunLoopUntilIdle();
-
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
@@ -1556,6 +1642,7 @@ TEST_F(ControlServerStreamConfigTest, DriverRingBufferDropDoesNotAffectControl) 
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
+
   RunLoopUntilIdle();
   EXPECT_EQ(RingBufferServer::count(), 1u);
   EXPECT_TRUE(received_callback);
@@ -1570,8 +1657,9 @@ TEST_F(ControlServerStreamConfigTest, DriverRingBufferDropDoesNotAffectControl) 
 
   // Allow the ControlServer to destruct, if it (erroneously) wants to.
   RunLoopUntilIdle();
-  EXPECT_TRUE(control->client().is_valid());
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that the ControlServer shuts down cleanly if the driver drops its StreamConfig.
@@ -1579,9 +1667,9 @@ TEST_F(ControlServerStreamConfigTest, SetGain) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
   auto registry = CreateTestRegistryServer();
-  (void)WaitForAddedDeviceTokenId(registry->client());
 
-  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto control = CreateTestControlServer(*adr_service()->devices().begin());
 
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -1597,10 +1685,12 @@ TEST_F(ControlServerStreamConfigTest, SetGain) {
         EXPECT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
-  RunLoopUntilIdle();
 
+  RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // TODO(https://fxbug.dev/323270827): implement signalprocessing, including in the FakeStreamConfig
@@ -1614,7 +1704,7 @@ TEST_F(ControlServerStreamConfigTest, GetTopologiesUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto control = CreateTestControlServer(device);
@@ -1634,6 +1724,8 @@ TEST_F(ControlServerStreamConfigTest, GetTopologiesUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify GetElements if the driver does not support signalprocessing.
@@ -1643,7 +1735,7 @@ TEST_F(ControlServerStreamConfigTest, GetElementsUnsupported) {
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-  auto [status, device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
   auto control = CreateTestControlServer(device);
@@ -1663,6 +1755,8 @@ TEST_F(ControlServerStreamConfigTest, GetElementsUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 }  // namespace

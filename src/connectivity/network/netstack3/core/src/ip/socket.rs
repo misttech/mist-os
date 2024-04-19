@@ -374,7 +374,7 @@ where
         bindings_ctx: &mut BC,
         meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
         body: S,
-        packet_metadata: IpLayerPacketMetadata<I>,
+        packet_metadata: IpLayerPacketMetadata<I, BC>,
     ) -> Result<(), S>
     where
         S: TransportPacketSerializer,

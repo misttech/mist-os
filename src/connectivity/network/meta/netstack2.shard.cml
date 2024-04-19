@@ -12,7 +12,6 @@
     expose: [
         {
             protocol: [
-                "fuchsia.net.filter.Control",
                 "fuchsia.net.stackmigrationdeprecated.Control",
                 "fuchsia.net.stackmigrationdeprecated.State",
             ],

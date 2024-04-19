@@ -13,7 +13,6 @@
 #include <lib/zx/clock.h>
 #include <zircon/errors.h>
 
-#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/common/testing/test_server_and_async_client.h"
@@ -26,7 +25,6 @@
 namespace media_audio {
 namespace {
 
-using ::testing::Optional;
 using Control = fuchsia_audio_device::Control;
 using RingBuffer = fuchsia_audio_device::RingBuffer;
 using DriverClient = fuchsia_audio_device::DriverClient;
@@ -90,7 +88,7 @@ RingBufferServerTest::SetupForCleanShutdownTesting(
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   FX_CHECK(token_id);
   auto control_creator = CreateTestControlCreatorServer();
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_TRUE(presence == AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -105,6 +103,9 @@ RingBufferServerTest::SetupForCleanShutdownTesting(
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_creator_fidl_error_status().has_value());
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
   return std::make_pair(std::move(control), std::move(ring_buffer_client));
 }
 
@@ -112,10 +113,10 @@ class RingBufferServerCompositeTest : public RingBufferServerTest {
  protected:
   std::shared_ptr<Device> EnableDriverAndAddDevice(
       const std::shared_ptr<FakeComposite>& fake_driver) {
-    auto device = Device::Create(adr_service_, dispatcher(), "Test composite name",
+    auto device = Device::Create(adr_service(), dispatcher(), "Test composite name",
                                  fuchsia_audio_device::DeviceType::kComposite,
                                  DriverClient::WithComposite(fake_driver->Enable()));
-    adr_service_->AddDevice(device);
+    adr_service()->AddDevice(device);
 
     RunLoopUntilIdle();
     return device;
@@ -137,6 +138,7 @@ TEST_F(RingBufferServerCompositeTest, CleanClientDrop) {
   (void)ring_buffer_client.UnbindMaybeGetEndpoint();
 
   RunLoopUntilIdle();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
   // If RingBuffer client doesn't drop cleanly, RingBufferServer emits a WARNING, which will fail.
 }
 
@@ -155,6 +157,7 @@ TEST_F(RingBufferServerCompositeTest, DriverRingBufferDropCausesCleanRingBufferS
   fake_driver->DropRingBuffer(element_id);
 
   RunLoopUntilIdle();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
   // If RingBufferServer doesn't shutdown cleanly, it emits a WARNING, which will cause a failure.
 }
 
@@ -173,6 +176,8 @@ TEST_F(RingBufferServerCompositeTest, DriverCompositeDropCausesCleanRingBufferSe
   fake_driver->DropComposite();
 
   RunLoopUntilIdle();
+  ASSERT_TRUE(control_fidl_error_status().has_value());
+  EXPECT_EQ(control_fidl_error_status(), ZX_ERR_PEER_CLOSED);
   // If RingBufferServer doesn't shutdown cleanly, it emits a WARNING, which will cause a failure.
 }
 
@@ -188,7 +193,7 @@ TEST_F(RingBufferServerCompositeTest, CreateRingBufferReturnParameters) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto requested_ring_buffer_bytes = 2000u;
@@ -235,7 +240,8 @@ TEST_F(RingBufferServerCompositeTest, CreateRingBufferReturnParameters) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  (void)ring_buffer_client.UnbindMaybeGetEndpoint();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that RingBuffer/SetActiveChannels succeeds and returns an expected set_time.
@@ -251,7 +257,7 @@ TEST_F(RingBufferServerCompositeTest, DriverSupportsSetActiveChannels) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -291,7 +297,8 @@ TEST_F(RingBufferServerCompositeTest, DriverSupportsSetActiveChannels) {
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(fake_driver->active_channels_bitmask(element_id), 0x0u);
   EXPECT_GT(fake_driver->active_channels_set_time(element_id), before_set_active_channels);
-  (void)ring_buffer_client.UnbindMaybeGetEndpoint();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 TEST_F(RingBufferServerCompositeTest, DriverDoesNotSupportSetActiveChannels) {
@@ -308,7 +315,7 @@ TEST_F(RingBufferServerCompositeTest, DriverDoesNotSupportSetActiveChannels) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(added_device);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -344,7 +351,8 @@ TEST_F(RingBufferServerCompositeTest, DriverDoesNotSupportSetActiveChannels) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(fake_driver->active_channels_bitmask(element_id), (1u << channel_count) - 1u);
-  (void)ring_buffer_client.UnbindMaybeGetEndpoint();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that RingBuffer/Start and /Stop function as expected, including start_time.
@@ -360,7 +368,7 @@ TEST_F(RingBufferServerCompositeTest, StartAndStop) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -427,7 +435,8 @@ TEST_F(RingBufferServerCompositeTest, StartAndStop) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  (void)ring_buffer_client.UnbindMaybeGetEndpoint();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that RingBuffer/WatchDelayInfo notifies of the delay received during initialization.
@@ -446,7 +455,7 @@ TEST_F(RingBufferServerCompositeTest, WatchDelayInfoInitialValues) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -485,7 +494,8 @@ TEST_F(RingBufferServerCompositeTest, WatchDelayInfoInitialValues) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  (void)ring_buffer_client.UnbindMaybeGetEndpoint();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that RingBuffer/WatchDelayInfo notifies of delay changes after initialization.
@@ -500,7 +510,7 @@ TEST_F(RingBufferServerCompositeTest, WatchDelayInfoDynamicUpdates) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -555,7 +565,8 @@ TEST_F(RingBufferServerCompositeTest, WatchDelayInfoDynamicUpdates) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  (void)ring_buffer_client.UnbindMaybeGetEndpoint();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that the RingBufferServer is destructed if the client drops the Control.
@@ -570,7 +581,7 @@ TEST_F(RingBufferServerCompositeTest, ControlClientDropCausesRingBufferDrop) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -591,12 +602,14 @@ TEST_F(RingBufferServerCompositeTest, ControlClientDropCausesRingBufferDrop) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 
   (void)control->client().UnbindMaybeGetEndpoint();
 
   RunLoopUntilIdle();
   EXPECT_TRUE(control->server().WaitForShutdown());
   EXPECT_EQ(RingBufferServer::count(), 0u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
 // Verify that the RingBufferServer is destructed if the ControlServer shuts down.
@@ -611,7 +624,7 @@ TEST_F(RingBufferServerCompositeTest, ControlServerShutdownCausesRingBufferDrop)
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -631,6 +644,7 @@ TEST_F(RingBufferServerCompositeTest, ControlServerShutdownCausesRingBufferDrop)
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
   EXPECT_EQ(ControlServer::count(), 1u);
   EXPECT_EQ(RingBufferServer::count(), 1u);
 
@@ -639,6 +653,7 @@ TEST_F(RingBufferServerCompositeTest, ControlServerShutdownCausesRingBufferDrop)
   RunLoopUntilIdle();
   EXPECT_TRUE(control->server().WaitForShutdown());
   EXPECT_EQ(RingBufferServer::count(), 0u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
 // Verify that RingBuffer works as expected, after RingBuffer being created/destroyed/recreated.
@@ -654,7 +669,7 @@ TEST_F(RingBufferServerCompositeTest, SecondRingBufferAfterDrop) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   {
     auto control = CreateTestControlServer(device_to_control);
@@ -692,6 +707,7 @@ TEST_F(RingBufferServerCompositeTest, SecondRingBufferAfterDrop) {
 
     RunLoopUntilIdle();
     ASSERT_TRUE(received_callback);
+    EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 
     // Now that we are started, we want to suddenly drop the RingBuffer connection.
     (void)ring_buffer_client.UnbindMaybeGetEndpoint();
@@ -737,17 +753,19 @@ TEST_F(RingBufferServerCompositeTest, SecondRingBufferAfterDrop) {
 
     RunLoopUntilIdle();
     EXPECT_TRUE(received_callback);
+    EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
   }
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
 class RingBufferServerStreamConfigTest : public RingBufferServerTest {
  protected:
   std::shared_ptr<Device> EnableDriverAndAddDevice(
       const std::shared_ptr<FakeStreamConfig>& fake_driver) {
-    auto device = Device::Create(adr_service_, dispatcher(), "Test output name",
+    auto device = Device::Create(adr_service(), dispatcher(), "Test output name",
                                  fuchsia_audio_device::DeviceType::kOutput,
                                  DriverClient::WithStreamConfig(fake_driver->Enable()));
-    adr_service_->AddDevice(device);
+    adr_service()->AddDevice(device);
 
     RunLoopUntilIdle();
     return device;
@@ -764,6 +782,7 @@ TEST_F(RingBufferServerStreamConfigTest, CleanClientDrop) {
   (void)ring_buffer_client.UnbindMaybeGetEndpoint();
 
   RunLoopUntilIdle();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
   // If RingBuffer client doesn't drop cleanly, RingBufferServer emits a WARNING, which will fail.
 }
 
@@ -776,6 +795,7 @@ TEST_F(RingBufferServerStreamConfigTest, DriverRingBufferDropCausesCleanRingBuff
   fake_driver->DropRingBuffer();
 
   RunLoopUntilIdle();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
   // If RingBufferServer doesn't shutdown cleanly, it emits a WARNING, which will cause a failure.
 }
 
@@ -789,6 +809,8 @@ TEST_F(RingBufferServerStreamConfigTest,
   fake_driver->DropStreamConfig();
 
   RunLoopUntilIdle();
+  ASSERT_TRUE(control_fidl_error_status().has_value());
+  EXPECT_EQ(control_fidl_error_status(), ZX_ERR_PEER_CLOSED);
   // If RingBufferServer doesn't shutdown cleanly, it emits a WARNING, which will cause a failure.
 }
 
@@ -801,7 +823,7 @@ TEST_F(RingBufferServerStreamConfigTest, CreateRingBufferReturnParameters) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -842,7 +864,8 @@ TEST_F(RingBufferServerStreamConfigTest, CreateRingBufferReturnParameters) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  (void)ring_buffer_client.UnbindMaybeGetEndpoint();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that RingBuffer/SetActiveChannels succeeds and returns an expected set_time.
@@ -854,7 +877,7 @@ TEST_F(RingBufferServerStreamConfigTest, DriverSupportsSetActiveChannels) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -892,7 +915,8 @@ TEST_F(RingBufferServerStreamConfigTest, DriverSupportsSetActiveChannels) {
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(fake_driver->active_channels_bitmask(), 0x0u);
   EXPECT_GT(fake_driver->active_channels_set_time(), before_set_active_channels);
-  (void)ring_buffer_client.UnbindMaybeGetEndpoint();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 TEST_F(RingBufferServerStreamConfigTest, DriverDoesNotSupportSetActiveChannels) {
@@ -905,7 +929,7 @@ TEST_F(RingBufferServerStreamConfigTest, DriverDoesNotSupportSetActiveChannels) 
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(added_device);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -939,7 +963,8 @@ TEST_F(RingBufferServerStreamConfigTest, DriverDoesNotSupportSetActiveChannels) 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(fake_driver->active_channels_bitmask(), 0x3u);
-  (void)ring_buffer_client.UnbindMaybeGetEndpoint();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that RingBuffer/Start and /Stop function as expected, including start_time.
@@ -952,7 +977,7 @@ TEST_F(RingBufferServerStreamConfigTest, StartAndStop) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -1017,7 +1042,8 @@ TEST_F(RingBufferServerStreamConfigTest, StartAndStop) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  (void)ring_buffer_client.UnbindMaybeGetEndpoint();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that RingBuffer/WatchDelayInfo notifies of the delay received during initialization.
@@ -1032,7 +1058,7 @@ TEST_F(RingBufferServerStreamConfigTest, WatchDelayInfoInitialValues) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -1069,7 +1095,8 @@ TEST_F(RingBufferServerStreamConfigTest, WatchDelayInfoInitialValues) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  (void)ring_buffer_client.UnbindMaybeGetEndpoint();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that RingBuffer/WatchDelayInfo notifies of delay changes after initialization.
@@ -1081,7 +1108,7 @@ TEST_F(RingBufferServerStreamConfigTest, WatchDelayInfoDynamicUpdates) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -1133,7 +1160,8 @@ TEST_F(RingBufferServerStreamConfigTest, WatchDelayInfoDynamicUpdates) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  (void)ring_buffer_client.UnbindMaybeGetEndpoint();
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
 // Verify that the RingBufferServer is destructed if the client drops the Control.
@@ -1145,7 +1173,7 @@ TEST_F(RingBufferServerStreamConfigTest, ControlClientDropCausesRingBufferDrop) 
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -1164,11 +1192,13 @@ TEST_F(RingBufferServerStreamConfigTest, ControlClientDropCausesRingBufferDrop) 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 
   (void)control->client().UnbindMaybeGetEndpoint();
 
   RunLoopUntilIdle();
   EXPECT_TRUE(control->server().WaitForShutdown());
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   EXPECT_EQ(RingBufferServer::count(), 0u);
 }
 
@@ -1181,7 +1211,7 @@ TEST_F(RingBufferServerStreamConfigTest, ControlServerShutdownCausesRingBufferDr
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
@@ -1200,12 +1230,14 @@ TEST_F(RingBufferServerStreamConfigTest, ControlServerShutdownCausesRingBufferDr
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
+  EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
   EXPECT_EQ(RingBufferServer::count(), 1u);
 
   control->server().Shutdown(ZX_ERR_PEER_CLOSED);
 
   RunLoopUntilIdle();
   EXPECT_TRUE(control->server().WaitForShutdown());
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   EXPECT_EQ(RingBufferServer::count(), 0u);
 }
 
@@ -1219,7 +1251,7 @@ TEST_F(RingBufferServerStreamConfigTest, SecondRingBufferAfterDrop) {
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto [presence, device_to_control] = adr_service_->FindDeviceByTokenId(*token_id);
+  auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   {
     auto control = CreateTestControlServer(device_to_control);
@@ -1255,6 +1287,7 @@ TEST_F(RingBufferServerStreamConfigTest, SecondRingBufferAfterDrop) {
 
     RunLoopUntilIdle();
     ASSERT_TRUE(received_callback);
+    EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 
     // Now that we are started, we want to suddenly drop the RingBuffer connection.
     (void)ring_buffer_client.UnbindMaybeGetEndpoint();
@@ -1298,7 +1331,9 @@ TEST_F(RingBufferServerStreamConfigTest, SecondRingBufferAfterDrop) {
 
     RunLoopUntilIdle();
     EXPECT_TRUE(received_callback);
+    EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
   }
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
 }  // namespace

@@ -105,6 +105,11 @@ where
         scheduled
     }
 
+    /// Gets an iterator over the installed timers.
+    pub fn iter(&self) -> impl Iterator<Item = (&K, &V, &BC::Instant)> {
+        self.heap.map.iter().map(|(k, MapEntry { time, value })| (k, value, time))
+    }
+
     fn heal_and_reschedule(&mut self, bindings_ctx: &mut BC) {
         let Self { next_wakeup, heap } = self;
         let mut new_top = None;

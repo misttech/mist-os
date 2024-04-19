@@ -10,6 +10,7 @@ pub mod board_config;
 pub mod common;
 pub mod developer_overrides;
 pub mod image_assembly_config;
+pub mod merge;
 pub mod platform_config;
 pub mod product_config;
 
@@ -19,6 +20,7 @@ pub use common::{
     DriverDetails, FeatureControl, PackageDetails, PackageSet, PackagedDriverDetails,
 };
 pub use image_assembly_config::{BoardDriverArguments, ImageAssemblyConfig};
+pub use merge::try_merge_into;
 pub use platform_config::{
     example_config::ExampleConfig,
     icu_config::{ICUConfig, Revision},

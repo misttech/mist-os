@@ -1,6 +1,7 @@
 # When LTO is enabled, puts will go though GOT directly rather than PLT stubs, similar to -fno-plt.
 # There won't be $plt(puts) symbol.
 ## require is_lto=false
+## require optimize=none
 
 [zxdb] break $plt(puts)
 Created Breakpoint 1 @ $plt(puts)

@@ -8,8 +8,8 @@ use {
     futures::{
         future::BoxFuture,
         stream::{FusedStream, FuturesUnordered, Stream},
+        StreamExt,
     },
-    pin_utils::unsafe_pinned,
     std::{
         collections::HashMap,
         pin::Pin,
@@ -23,8 +23,6 @@ use {
 pub struct PairingRequests<T> {
     inner: StreamMap<HostId, FuturesUnordered<Tagged<PeerId, BoxFuture<'static, T>>>>,
 }
-
-impl<T: Unpin> Unpin for PairingRequests<T> {}
 
 impl<T> PairingRequests<T> {
     /// Create a new empty PairingRequests<T>
@@ -51,15 +49,6 @@ impl<T> PairingRequests<T> {
             .map(|(host, mut futs)| (host, futs.iter_mut().map(|f| f.tag()).collect()))
             .collect()
     }
-
-    // It is safe to take a pinned projection to `inner` as:
-    // * PairingRequests does not implement `Drop`
-    // * PairingRequests only implements Unpin if `inner` is Unpin.
-    // * PairingRequests is not #[repr(packed)].
-    // see: pin_utils::unsafe_pinned docs for details
-    unsafe_pinned!(
-        inner: StreamMap<HostId, FuturesUnordered<Tagged<PeerId, BoxFuture<'static, T>>>>
-    );
 }
 
 impl<T> FusedStream for PairingRequests<T> {
@@ -72,7 +61,7 @@ impl<T> FusedStream for PairingRequests<T> {
 impl<T> Stream for PairingRequests<T> {
     type Item = (PeerId, T);
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        self.inner().poll_next(cx)
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.inner.poll_next_unpin(cx)
     }
 }

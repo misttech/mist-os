@@ -500,6 +500,7 @@ impl FsNodeOps for RemoteNode {
 
     fn mkdir(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -719,7 +720,7 @@ impl FsNodeOps for RemoteNode {
         match mode {
             FallocMode::Allocate { keep_size: false } => {
                 let allocate_size = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
-                let info = node.refresh_info(current_task)?;
+                let info = node.fetch_and_refresh_info(current_task)?;
                 if (info.size as u64) < allocate_size {
                     let mut locked = locked.cast_locked::<FileOpsCore>();
                     self.truncate(&mut locked, node, current_task, allocate_size)?;
@@ -730,7 +731,7 @@ impl FsNodeOps for RemoteNode {
         }
     }
 
-    fn refresh_info<'a>(
+    fn fetch_and_refresh_info<'a>(
         &self,
         node: &FsNode,
         _current_task: &CurrentTask,
@@ -802,6 +803,7 @@ impl FsNodeOps for RemoteNode {
 
     fn create_symlink(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1315,6 +1317,7 @@ impl FileOps for RemoteDirectoryObject {
 
     fn readdir(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -1810,7 +1813,7 @@ mod test {
         let fixture = TestFixture::new().await;
 
         {
-            let (kernel, current_task) = create_kernel_and_task();
+            let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
             let (server, client) = zx::Channel::create();
             fixture
                 .root()
@@ -1826,7 +1829,7 @@ mod test {
             .expect("new_fs failed");
             let ns = Namespace::new(fs);
             let root = ns.root();
-            root.create_symlink(&current_task, "symlink".into(), "target".into())
+            root.create_symlink(&mut locked, &current_task, "symlink".into(), "target".into())
                 .expect("symlink failed");
 
             let mut context = LookupContext::new(SymlinkMode::NoFollow);
@@ -2052,7 +2055,7 @@ mod test {
                         }
                     }
                     let mut sink = Sink::default();
-                    dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
+                    dir_handle.readdir(locked, &current_task, &mut sink).expect("readdir failed");
 
                     // inode_num for .. for the root should be the same as root.
                     assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.node_id);
@@ -2062,7 +2065,7 @@ mod test {
                         .open_anonymous(locked, &current_task, OpenFlags::RDONLY)
                         .expect("open failed");
                     let mut sink = Sink::default();
-                    dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
+                    dir_handle.readdir(locked, &current_task, &mut sink).expect("readdir failed");
 
                     // inode_num for .. for the first sub directory should be the same as root.
                     assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.node_id);
@@ -2072,7 +2075,7 @@ mod test {
                         .open_anonymous(locked, &current_task, OpenFlags::RDONLY)
                         .expect("open failed");
                     let mut sink = Sink::default();
-                    dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
+                    dir_handle.readdir(locked, &current_task, &mut sink).expect("readdir failed");
 
                     // inode_num for .. for the second sub directory should be the first sub directory.
                     assert_eq!(sink.dot_dot_inode_num, sub_dir1.entry.node.node_id);
@@ -2651,13 +2654,13 @@ mod test {
                     let file = child
                         .open(locked, &current_task, OpenFlags::RDWR, true)
                         .expect("open failed");
-                    // Call `refresh_info(..)` to refresh `time_modify` with the time managed by the
+                    // Call `fetch_and_refresh_info(..)` to refresh `time_modify` with the time managed by the
                     // underlying filesystem
                     let time_before_write = child
                         .entry
                         .node
-                        .refresh_info(&current_task)
-                        .expect("refresh info failed")
+                        .fetch_and_refresh_info(&current_task)
+                        .expect("fetch_and_refresh_info failed")
                         .time_modify;
                     let write_bytes: [u8; 5] = [1, 2, 3, 4, 5];
                     let written = file
@@ -2667,8 +2670,8 @@ mod test {
                     let last_modified = child
                         .entry
                         .node
-                        .refresh_info(&current_task)
-                        .expect("refresh info failed")
+                        .fetch_and_refresh_info(&current_task)
+                        .expect("fetch_and_refresh_info failed")
                         .time_modify;
                     assert!(last_modified > time_before_write);
                     last_modified
@@ -2718,8 +2721,8 @@ mod test {
                     let last_modified = child
                         .entry
                         .node
-                        .refresh_info(&current_task)
-                        .expect("refresh info failed")
+                        .fetch_and_refresh_info(&current_task)
+                        .expect("fetch_and_refresh_info failed")
                         .time_modify;
                     last_modified
                 }
@@ -2767,8 +2770,8 @@ mod test {
                     let info_original = child
                         .entry
                         .node
-                        .refresh_info(&current_task)
-                        .expect("refresh_info failed")
+                        .fetch_and_refresh_info(&current_task)
+                        .expect("fetch_and_refresh_info failed")
                         .clone();
 
                     child
@@ -2784,8 +2787,8 @@ mod test {
                     let info_after_update = child
                         .entry
                         .node
-                        .refresh_info(&current_task)
-                        .expect("refresh info failed")
+                        .fetch_and_refresh_info(&current_task)
+                        .expect("fetch_and_refresh_info failed")
                         .clone();
                     assert_eq!(info_after_update.time_modify, info_original.time_modify);
                     assert_eq!(info_after_update.time_access, zx::Time::from_nanos(30));
@@ -2803,8 +2806,8 @@ mod test {
                     let info_after_update2 = child
                         .entry
                         .node
-                        .refresh_info(&current_task)
-                        .expect("refresh_info failed")
+                        .fetch_and_refresh_info(&current_task)
+                        .expect("fetch_and_refresh_info failed")
                         .clone();
                     assert_eq!(info_after_update2.time_modify, zx::Time::from_nanos(50));
                     assert_eq!(info_after_update2.time_access, zx::Time::from_nanos(30));
@@ -2850,14 +2853,14 @@ mod test {
                     let file = child
                         .open(locked, &current_task, OpenFlags::RDWR, true)
                         .expect("open failed");
-                    // Call `refresh_info(..)` to refresh ctime and mtime with the time managed by the
+                    // Call `fetch_and_refresh_info(..)` to refresh ctime and mtime with the time managed by the
                     // underlying filesystem
                     let (ctime_before_write, mtime_before_write) = {
                         let info = child
                             .entry
                             .node
-                            .refresh_info(&current_task)
-                            .expect("refresh info failed");
+                            .fetch_and_refresh_info(&current_task)
+                            .expect("fetch_and_refresh_info failed");
                         (info.time_status_change, info.time_modify)
                     };
 
@@ -2885,8 +2888,8 @@ mod test {
                         let info = child
                             .entry
                             .node
-                            .refresh_info(&current_task)
-                            .expect("refresh info failed");
+                            .fetch_and_refresh_info(&current_task)
+                            .expect("fetch_and_refresh_info failed");
                         (info.time_status_change, info.time_modify)
                     };
                     assert_eq!(ctime_after_write_refresh, mtime_after_write_refresh);

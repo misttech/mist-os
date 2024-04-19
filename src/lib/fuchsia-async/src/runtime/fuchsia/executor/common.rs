@@ -12,7 +12,6 @@ use crate::atomic_future::{AtomicFuture, AttemptPollResult};
 use crossbeam::queue::SegQueue;
 use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx};
-use futures::future::{FutureObj, LocalFutureObj};
 use rustc_hash::FxHashMap as HashMap;
 use std::{
     any::Any,
@@ -23,7 +22,7 @@ use std::{
     panic::Location,
     sync::atomic::{AtomicBool, AtomicI64, AtomicU16, AtomicU64, AtomicUsize, Ordering},
     sync::{Arc, Weak},
-    task::{Context, RawWaker, RawWakerVTable, Waker},
+    task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
     u64, usize,
 };
 
@@ -82,7 +81,7 @@ pub(super) struct Inner {
     is_local: bool,
     receivers: Mutex<PacketReceiverMap<Arc<dyn PacketReceiver>>>,
     task_count: AtomicUsize,
-    active_tasks: Mutex<HashMap<usize, Arc<Task>>>,
+    task_state: Mutex<TaskState>,
     pub(super) ready_tasks: SegQueue<Arc<Task>>,
     time: ExecutorTime,
     pub(super) collector: Collector,
@@ -95,6 +94,11 @@ pub(super) struct Inner {
     // Data that belongs to the user that can be accessed via EHandle::local(). See
     // `TestExecutor::poll_until_stalled`.
     pub(super) owner_data: Mutex<Option<Box<dyn Any + Send>>>,
+}
+
+struct TaskState {
+    all_tasks: HashMap<usize, Arc<Task>>,
+    join_wakers: HashMap<usize, Waker>,
 }
 
 impl Inner {
@@ -112,7 +116,10 @@ impl Inner {
             is_local,
             receivers: Mutex::new(PacketReceiverMap::new()),
             task_count: AtomicUsize::new(MAIN_TASK_ID + 1),
-            active_tasks: Mutex::new(HashMap::default()),
+            task_state: Mutex::new(TaskState {
+                all_tasks: HashMap::default(),
+                join_wakers: HashMap::default(),
+            }),
             ready_tasks: SegQueue::new(),
             time,
             collector,
@@ -138,18 +145,15 @@ impl Inner {
                 let Some(task) = self.ready_tasks.pop() else {
                     return PollReadyTasksResult::NoneReady;
                 };
-                let complete = task.try_poll();
+                let complete = self.try_poll(&task);
                 local_collector.task_polled(
                     task.id,
                     task.source(),
                     complete,
                     self.ready_tasks.len(),
                 );
-                if complete {
-                    self.active_tasks.lock().remove(&task.id);
-                    if task.id == MAIN_TASK_ID {
-                        return PollReadyTasksResult::MainTaskCompleted;
-                    }
+                if complete && task.id == MAIN_TASK_ID {
+                    return PollReadyTasksResult::MainTaskCompleted;
                 }
                 self.polled.fetch_add(1, Ordering::Relaxed);
             }
@@ -174,42 +178,44 @@ impl Inner {
     }
 
     #[cfg_attr(trace_level_logging, track_caller)]
-    pub fn spawn(self: &Arc<Self>, future: FutureObj<'static, ()>) {
-        // Prevent a deadlock in `.active_tasks` when a task is spawned from a custom
+    pub fn spawn(self: &Arc<Self>, future: AtomicFuture<'static>) -> usize {
+        // Prevent a deadlock in `.all_tasks` when a task is spawned from a custom
         // Drop impl while the executor is being torn down.
         if self.done.load(Ordering::SeqCst) {
-            return;
+            return usize::MAX;
         }
         let next_id = self.task_count.fetch_add(1, Ordering::Relaxed);
         let task = Task::new(next_id, future, self.clone());
         self.collector.task_created(next_id, task.source());
-        self.active_tasks.lock().insert(next_id, task.clone());
+        self.task_state.lock().all_tasks.insert(next_id, task.clone());
         task.wake();
+        next_id
     }
 
     #[cfg_attr(trace_level_logging, track_caller)]
-    pub fn spawn_local(self: &Arc<Self>, future: LocalFutureObj<'static, ()>) {
+    pub fn spawn_local<F: Future<Output = R> + 'static, R: 'static>(
+        self: &Arc<Self>,
+        future: F,
+        detached: bool,
+    ) -> usize {
         if !self.is_local {
             panic!(
                 "Error: called `spawn_local` on multithreaded executor. \
-                Use `spawn` or a `LocalExecutor` instead."
+                 Use `spawn` or a `LocalExecutor` instead."
             );
         }
-        Inner::spawn(
-            self,
-            // SAFETY: We've confirmed that the boxed futures here will never be used
-            // across multiple threads, so we can safely convert from a non-`Send`able
-            // future to a `Send`able one.
-            unsafe { future.into_future_obj() },
-        );
+
+        // SAFETY: We've confirmed that the futures here will never be used across multiple threads,
+        // so the Send requirements that `new_local` requires should be met.
+        self.spawn(unsafe { AtomicFuture::new_local(future, detached) })
     }
 
     /// Spawns the main future.
-    pub fn spawn_main(self: &Arc<Self>, future: FutureObj<'static, ()>) {
+    pub fn spawn_main(self: &Arc<Self>, future: AtomicFuture<'static>) {
         let task = Task::new(MAIN_TASK_ID, future, self.clone());
         self.collector.task_created(MAIN_TASK_ID, task.source());
         assert!(
-            self.active_tasks.lock().insert(MAIN_TASK_ID, task.clone()).is_none(),
+            self.task_state.lock().all_tasks.insert(MAIN_TASK_ID, task.clone()).is_none(),
             "Existing main task"
         );
         task.wake();
@@ -381,7 +387,7 @@ impl Inner {
     /// https://github.com/tokio-rs/tokio/blob/b42f21ec3e212ace25331d0c13889a45769e6006/tokio/src/io/driver/mod.rs#L297
     pub fn on_parent_drop(&self) {
         // Drop all tasks
-        let active_tasks = std::mem::take(&mut *self.active_tasks.lock());
+        let all_tasks = std::mem::take(&mut self.task_state.lock().all_tasks);
 
         // Any use of fasync::unblock can involve a waker. Wakers hold weak references to tasks, but
         // as part of waking, there's an upgrade to a strong reference, so for a small amount of
@@ -389,7 +395,7 @@ impl Inner {
         // future for the task which in turn could hold references to receivers, which, if we did
         // nothing about it, would trip the assertion below. For that reason, we forcibly drop the
         // task futures here.
-        for (_, task) in active_tasks {
+        for (_, task) in all_tasks {
             task.future.try_drop().expect("Failed to drop task");
         }
 
@@ -547,12 +553,63 @@ impl Inner {
     ///
     /// The caller must guarantee that the executor isn't running.
     pub(super) unsafe fn drop_main_task(&self) {
-        if let Some(task) = self.active_tasks.lock().remove(&MAIN_TASK_ID) {
+        if let Some(task) = self.task_state.lock().all_tasks.remove(&MAIN_TASK_ID) {
             // Even though we've removed the task from active tasks, it could still be in
             // pending_tasks, so we have to drop the future here. At time of writing, this is only
             // used by the local executor and there could only be something in ready_tasks if
             // there's a panic.
             task.future.drop_future_unchecked();
+        }
+    }
+
+    /// Polls for a join result for the given task ID.
+    ///
+    /// # Safety
+    ///
+    /// The caller must guarantee that `R` is the correct type.
+    pub unsafe fn poll_join_result<R>(&self, task_id: usize, cx: &mut Context<'_>) -> Poll<R> {
+        let mut tasks = self.task_state.lock();
+        let Some(task) = tasks.all_tasks.get(&task_id) else { return Poll::Pending };
+        if let Some(result) = task.future.take_result() {
+            tasks.join_wakers.remove(&task_id);
+            tasks.all_tasks.remove(&task_id);
+            Poll::Ready(result)
+        } else {
+            tasks.join_wakers.insert(task_id, cx.waker().clone());
+            Poll::Pending
+        }
+    }
+
+    fn try_poll(&self, task: &Arc<Task>) -> bool {
+        // SAFETY: We meet the contract for RawWaker/RawWakerVtable.
+        let task_waker = unsafe {
+            Waker::from_raw(RawWaker::new(Arc::as_ptr(task) as *const (), &BORROWED_VTABLE))
+        };
+        match task.future.try_poll(&mut Context::from_waker(&task_waker)) {
+            AttemptPollResult::Yield => {
+                self.ready_tasks.push(task.clone());
+                false
+            }
+            AttemptPollResult::IFinished => {
+                let mut waker = None;
+                {
+                    let mut tasks = self.task_state.lock();
+                    if !task.future.is_detached_or_cancelled() {
+                        waker = tasks.join_wakers.remove(&task.id);
+                    } else if task.id != MAIN_TASK_ID {
+                        tasks.all_tasks.remove(&task.id);
+                    }
+                }
+                if let Some(waker) = waker {
+                    waker.wake();
+                }
+                true
+            }
+            AttemptPollResult::Cancelled => {
+                self.task_state.lock().all_tasks.remove(&task.id);
+                true
+            }
+            _ => false,
         }
     }
 }
@@ -620,13 +677,31 @@ impl EHandle {
         });
     }
 
+    /// See `Inner::spawn`.
+    #[cfg_attr(trace_level_logging, track_caller)]
+    pub(crate) fn spawn<R: Send + 'static>(
+        &self,
+        future: impl Future<Output = R> + Send + 'static,
+    ) -> usize {
+        self.inner.spawn(AtomicFuture::new(future, false))
+    }
+
     /// Spawn a new task to be run on this executor.
     ///
     /// Tasks spawned using this method must be thread-safe (implement the `Send` trait), as they
     /// may be run on either a singlethreaded or multithreaded executor.
     #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn_detached(&self, future: impl Future<Output = ()> + Send + 'static) {
-        self.inner.spawn(FutureObj::new(Box::new(future)))
+        self.inner.spawn(AtomicFuture::new(future, true));
+    }
+
+    /// See `Inner::spawn_local`.
+    #[cfg_attr(trace_level_logging, track_caller)]
+    pub(crate) fn spawn_local<R: 'static>(
+        &self,
+        future: impl Future<Output = R> + 'static,
+    ) -> usize {
+        self.inner.spawn_local(future, false)
     }
 
     /// Spawn a new task to be run on this executor.
@@ -636,13 +711,47 @@ impl EHandle {
     /// this executor is a LocalExecutor.
     #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn_local_detached(&self, future: impl Future<Output = ()> + 'static) {
-        self.inner.spawn_local(LocalFutureObj::new(Box::new(future)))
+        self.inner.spawn_local(future, true);
+    }
+
+    /// Marks the task as detached.
+    pub(crate) fn detach(&self, task_id: usize) {
+        let mut tasks = self.inner.task_state.lock();
+        if let Some(task) = tasks.all_tasks.get(&task_id) {
+            task.future.detach();
+        }
+        tasks.join_wakers.remove(&task_id);
+    }
+
+    /// Cancels the task.
+    ///
+    /// # Safety
+    ///
+    /// The caller must guarantee that `R` is the correct type.
+    pub(crate) unsafe fn cancel<R>(&self, task_id: usize) -> Option<R> {
+        let mut tasks = self.inner.task_state.lock();
+        tasks.join_wakers.remove(&task_id);
+        tasks.all_tasks.get(&task_id).and_then(|task| {
+            if task.future.cancel() {
+                self.inner.ready_tasks.push(task.clone());
+            }
+            task.future.take_result()
+        })
+    }
+
+    /// See `Inner::poll_join_result`.
+    pub(crate) unsafe fn poll_join_result<R>(
+        &self,
+        task_id: usize,
+        cx: &mut Context<'_>,
+    ) -> Poll<R> {
+        self.inner.poll_join_result(task_id, cx)
     }
 }
 
 pub(super) struct Task {
     id: usize,
-    future: AtomicFuture,
+    future: AtomicFuture<'static>,
     executor: Arc<Inner>,
     #[cfg(trace_level_logging)]
     source: &'static Location<'static>,
@@ -650,10 +759,10 @@ pub(super) struct Task {
 
 impl Task {
     #[cfg_attr(trace_level_logging, track_caller)]
-    fn new(id: usize, future: FutureObj<'static, ()>, executor: Arc<Inner>) -> Arc<Self> {
+    fn new(id: usize, future: AtomicFuture<'static>, executor: Arc<Inner>) -> Arc<Self> {
         let this = Arc::new(Self {
             id,
-            future: AtomicFuture::new(future),
+            future,
             executor,
             #[cfg(trace_level_logging)]
             source: Location::caller(),
@@ -670,18 +779,6 @@ impl Task {
             self.executor.ready_tasks.push(self.clone());
             self.executor.notify_task_ready();
         }
-    }
-
-    fn try_poll(self: &Arc<Self>) -> bool {
-        // SAFETY: We meet the contract for RawWaker/RawWakerVtable.
-        let task_waker = unsafe {
-            Waker::from_raw(RawWaker::new(Arc::as_ptr(self) as *const (), &BORROWED_VTABLE))
-        };
-        let result = self.future.try_poll(&mut Context::from_waker(&task_waker));
-        if result == AttemptPollResult::Yield {
-            self.executor.ready_tasks.push(self.clone());
-        }
-        result == AttemptPollResult::IFinished
     }
 
     fn source(&self) -> Option<&'static Location<'static>> {
@@ -741,5 +838,110 @@ fn waker_drop(weak_raw: *const ()) {
     // SAFETY: `weak_raw` comes from a previous call to `into_raw`.
     unsafe {
         Weak::from_raw(weak_raw as *const Task);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        crate::{LocalExecutor, Task},
+        std::{
+            future::poll_fn,
+            sync::{
+                atomic::{AtomicU32, Ordering},
+                Arc,
+            },
+            task::Poll,
+        },
+    };
+
+    async fn yield_to_executor() {
+        let mut done = false;
+        poll_fn(|cx| {
+            if done {
+                Poll::Ready(())
+            } else {
+                done = true;
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+        })
+        .await;
+    }
+
+    #[test]
+    fn test_detach() {
+        let mut e = LocalExecutor::new();
+        e.run_singlethreaded(async {
+            let counter = Arc::new(AtomicU32::new(0));
+
+            {
+                let counter = counter.clone();
+                Task::spawn(async move {
+                    for _ in 0..5 {
+                        yield_to_executor().await;
+                        counter.fetch_add(1, Ordering::Relaxed);
+                    }
+                })
+                .detach();
+            }
+
+            while counter.load(Ordering::Relaxed) != 5 {
+                yield_to_executor().await;
+            }
+        });
+
+        assert!(e.ehandle.inner.task_state.lock().join_wakers.is_empty());
+    }
+
+    #[test]
+    fn test_cancel() {
+        let mut e = LocalExecutor::new();
+        e.run_singlethreaded(async {
+            let ref_count = Arc::new(());
+            // First, just drop the task.
+            {
+                let ref_count = ref_count.clone();
+                let _ = Task::spawn(async move {
+                    let _ref_count = ref_count;
+                    let _: () = std::future::pending().await;
+                });
+            }
+
+            while Arc::strong_count(&ref_count) != 1 {
+                yield_to_executor().await;
+            }
+
+            // Now try explicitly cancelling.
+            let task = {
+                let ref_count = ref_count.clone();
+                Task::spawn(async move {
+                    let _ref_count = ref_count;
+                    let _: () = std::future::pending().await;
+                })
+            };
+
+            assert_eq!(task.cancel(), None);
+            while Arc::strong_count(&ref_count) != 1 {
+                yield_to_executor().await;
+            }
+
+            // Now cancel a task that has already finished.
+            let task = {
+                let ref_count = ref_count.clone();
+                Task::spawn(async move {
+                    let _ref_count = ref_count;
+                })
+            };
+
+            // Wait for it to finish.
+            while Arc::strong_count(&ref_count) != 1 {
+                yield_to_executor().await;
+            }
+
+            assert_eq!(task.cancel(), Some(()));
+        });
+
+        assert!(e.ehandle.inner.task_state.lock().join_wakers.is_empty());
     }
 }

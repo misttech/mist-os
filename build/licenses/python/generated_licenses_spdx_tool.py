@@ -7,6 +7,7 @@
 import argparse
 import sys
 import logging
+import os
 from file_access import FileAccess
 from gn_label import GnLabel
 from spdx_writer import SpdxWriter
@@ -17,7 +18,7 @@ from gn_license_metadata import GnLicenseMetadataDB
 from spdx_comparator import SpdxComparator
 
 
-def main():
+def main() -> int:
     """
     Generates licenses SPDX json file from GN license metadata.
     """
@@ -96,20 +97,21 @@ def main():
     log_level = args.log_level.upper()
 
     logging.basicConfig(
-        level=log_level, force="format='%(levelname)s:%(message)s'"
+        level=log_level, force=True, format="%(levelname)s:%(message)s"
     )
 
     fuchsia_source_path = Path(args.fuchsia_source_path).expanduser()
     assert fuchsia_source_path.exists()
     logging.debug("fuchsia_source_path=%s", fuchsia_source_path)
 
-    file_access = FileAccess(fuchsia_source_path=fuchsia_source_path)
+    fuchsia_source_path_str = str(fuchsia_source_path)
+    file_access = FileAccess(fuchsia_source_path_str=fuchsia_source_path_str)
 
     readmes_db = ReadmesDB(file_access=file_access)
 
     metadata_db = GnLicenseMetadataDB.from_file(
-        file_path=Path(args.generated_license_metadata),
-        fuchsia_source_path=fuchsia_source_path,
+        file_path=args.generated_license_metadata,
+        fuchsia_source_path=fuchsia_source_path_str,
     )
 
     # Collect licenses information
@@ -152,16 +154,15 @@ def main():
             else None,
         )
 
-    spdx_output_path = Path(args.spdx_output)
-    spdx_writer.save(spdx_output_path)
+    spdx_writer.save(args.spdx_output)
     logging.info(
-        f"Wrote spdx {spdx_output_path} (licenses={len(collector.unique_licenses)} size={spdx_output_path.stat().st_size})"
+        f"Wrote spdx {args.spdx_output} (licenses={len(collector.unique_licenses)} size={os.stat(args.spdx_output).st_size})"
     )
 
     if args.compare_with_legacy_spdx:
         # Compare with legacy spdx file
         comparator = SpdxComparator(
-            current_file=spdx_output_path,
+            current_file=args.spdx_output,
             legacy_file=Path(args.compare_with_legacy_spdx),
         )
         comparator.compare()
@@ -176,9 +177,8 @@ def main():
                 return -1
 
     # Generate a GN depfile
-    dep_file_path = Path(args.dep_file)
-    logging.info(f"writing depfile {dep_file_path}")
-    file_access.write_depfile(dep_file_path, main_entry=spdx_output_path)
+    logging.info(f"writing depfile {args.dep_file}")
+    file_access.write_depfile(args.dep_file, main_entry=args.spdx_output)
 
     return 0
 

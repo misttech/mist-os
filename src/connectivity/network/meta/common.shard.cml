@@ -210,6 +210,12 @@
             to: [ "#http-client" ],
         },
         {
+            from: "parent",
+            to: "#http-client",
+            config: "fuchsia.http-client.StopOnIdleTimeoutMillis",
+            availability: "same_as_target",
+        },
+        {
             storage: "cache",
             from: "parent",
             to: [ "#netstack" ],

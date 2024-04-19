@@ -124,7 +124,7 @@ generated_file("sysroot-meta-json") {
       "libc.ifs",
       "zircon.ifs",
     ]
-    if (override_target_api_level == -1) {
+    if (override_target_api_level == "PLATFORM") {
       versions = {
         if (target_cpu == "arm64") {
           arm64 = version_content
@@ -179,7 +179,7 @@ action("sysroot-meta") {
     "--manifest=" + rebase_path(outputs[1], root_build_dir),
     "--depfile=" + rebase_path(depfile, root_build_dir),
   ]
-  if (override_target_api_level == -1) {
+  if (override_target_api_level == "PLATFORM") {
     args += [ "--location=/versions/$target_cpu/debug_libs" ]
   }
   deps = [ ":sysroot-meta-json" ] + sysroot_sdk_deps

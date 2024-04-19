@@ -6,7 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.ui.activity.control") {
   sdk_category = "partner"
-  sdk_area = "Unknown"
+  sdk_area = "HCI"
 
   sources = [ "control.fidl" ]
 
