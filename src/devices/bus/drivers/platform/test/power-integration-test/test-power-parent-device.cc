@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/power/cpp/power-support.h>
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/test/platform/cpp/bind.h>
@@ -17,20 +18,16 @@ zx::result<> FakeParent::Start() {
   node_.Bind(std::move(node()));
   fdf::Arena arena('TEST');
 
-  std::vector<fuchsia_hardware_power::PowerElementConfiguration> power_config;
-  {
-    auto device_service =
-        incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("platform-device");
-    if (!device_service.is_ok()) {
-      return zx::error(ZX_ERR_INTERNAL);
-    }
-
-    fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> device_client(
-        std::move(device_service.value()));
-
-    power_config = fidl::ToNatural(device_client->GetPowerConfiguration().value()->config)
-                       .value_or(std::vector<fuchsia_hardware_power::PowerElementConfiguration>());
+  auto device_service =
+      incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("platform-device");
+  if (!device_service.is_ok()) {
+    return zx::error(ZX_ERR_INTERNAL);
   }
+
+  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> device_client(
+      std::move(device_service.value()));
+  auto config_result = device_client->GetPowerConfiguration();
+  auto power_config = config_result->value()->config.data();
 
   // connect to power broker
   auto power_broker_req = incoming()->Connect<fuchsia_power_broker::Topology>();
@@ -45,49 +42,47 @@ zx::result<> FakeParent::Start() {
         fidl::CreateEndpoints<fuchsia_power_broker::CurrentLevel>().value();
     fidl::Endpoints<fuchsia_power_broker::Lessor> lessor =
         fidl::CreateEndpoints<fuchsia_power_broker::Lessor>().value();
+    zx::event active, passive;
 
-    topology_client_ = fidl::WireClient<fuchsia_power_broker::Topology>(
-        std::move(power_broker_req.value()), dispatcher());
+    fidl::ClientEnd<fuchsia_power_broker::Topology> broker = std::move(power_broker_req.value());
 
-    fuchsia_power_broker::LevelControlChannels lvl_ctrl = {{
-        .current = std::move(current_level.server),
-        .required = std::move(required_level.server),
-    }};
-    fuchsia_power_broker::ElementSchema add_args = {{
-        .element_name = power_config[0].element()->name(),
-        .initial_current_level = fuchsia_power_broker::PowerLevel{0},
-        .valid_levels = std::vector<fuchsia_power_broker::PowerLevel>{},
-        .dependencies = std::vector<fuchsia_power_broker::LevelDependency>{},
-        .active_dependency_tokens_to_register =
-            std::vector<fuchsia_power_broker::DependencyToken>{},
-        .passive_dependency_tokens_to_register =
-            std::vector<fuchsia_power_broker::DependencyToken>{},
-        .level_control_channels = std::move(lvl_ctrl),
-        .lessor_channel = std::move(lessor.server),
-    }};
-    topology_client_->AddElement(fidl::ToWire(arena, std::move(add_args)))
-        .Then([&element_ctrl = this->element_ctrl_](
-                  fidl::WireUnownedResult<fuchsia_power_broker::Topology::AddElement>& result) {
-          if (!result.ok() || result->is_error()) {
-            return;
-          }
-          element_ctrl = std::move(result->value()->element_control_channel);
-        });
+    fit::result<fdf_power::Error, fdf_power::TokenMap> token_result =
+        fdf_power::GetDependencyTokens(*incoming(), power_config[0]);
+    if (token_result.is_error()) {
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+
+    fdf_power::TokenMap tokens = std::move(token_result.value());
+    fit::result<fdf_power::Error, fuchsia_power_broker::TopologyAddElementResponse> add_result =
+        fdf_power::AddElement(
+            broker, power_config[0], std::move(tokens), active.borrow(), passive.borrow(),
+            std::pair{std::move(current_level.server), std::move(required_level.server)},
+            std::move(lessor.server));
+
+    topology_client_ =
+        fidl::WireClient<fuchsia_power_broker::Topology>(std::move(broker), dispatcher());
+
+    if (!add_result.is_ok()) {
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    element_ctrl_ = std::move(add_result->element_control_channel());
   }
 
   // Add a child
   {
+    std::string power_element_name = std::string(power_config[0].element().name().data(),
+                                                 power_config[0].element().name().size());
+
     // First we'll set up a FIDL server that provides a token which gives
     // our child access to our power element.
-    server_ = std::make_unique<fake_parent_device::FakeParentServer>(std::string(
-        power_config[0].element()->name()->data(), power_config[0].element()->name()->size()));
+    server_ = std::make_unique<fake_parent_device::FakeParentServer>(power_element_name);
     {
       auto result = outgoing()->AddService<fuchsia_hardware_power::PowerTokenService>(
           fuchsia_hardware_power::PowerTokenService::InstanceHandler({
               .token_provider =
                   bindings_.CreateHandler(server_.get(), dispatcher(), fidl::kIgnoreBindingClosure),
           }),
-          power_config[0].element()->name().value());
+          power_element_name);
 
       if (!result.is_ok()) {
         return zx::error(ZX_ERR_INTERNAL);
@@ -111,15 +106,14 @@ zx::result<> FakeParent::Start() {
     {
       std::vector<fuchsia_component_decl::NameMapping> mappings =
           std::vector<fuchsia_component_decl::NameMapping>{fuchsia_component_decl::NameMapping{{
-              .source_name = power_config[0].element()->name().value(),
-              .target_name = power_config[0].element()->name().value(),
+              .source_name = power_element_name,
+              .target_name = power_element_name,
           }}};
 
       fuchsia_component_decl::OfferService services = fuchsia_component_decl::OfferService{{
           .source_name = std::string(fuchsia_hardware_power::PowerTokenService::Name),
           .target_name = std::string(fuchsia_hardware_power::PowerTokenService::Name),
-          .source_instance_filter =
-              std::vector<std::string>{power_config[0].element()->name().value()},
+          .source_instance_filter = std::vector<std::string>{power_element_name},
           .renamed_instances = mappings,
       }};
 
