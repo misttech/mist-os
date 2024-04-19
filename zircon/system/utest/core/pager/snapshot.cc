@@ -945,10 +945,10 @@ TEST(Snapshot, CloneAfterSliceRoot) {
 
 // Ensures that a snapshot-modified child can not be created on a VMO with pinned pages.
 TEST(Snapshot, PinBeforeCreateFailure) {
-  auto root_resource = maybe_standalone::GetRootResource();
+  auto system_resource = maybe_standalone::GetSystemResource();
 
-  if (!*root_resource) {
-    printf("Root resource not available, skipping\n");
+  if (!*system_resource) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
@@ -971,7 +971,12 @@ TEST(Snapshot, PinBeforeCreateFailure) {
     }
   });
 
-  ASSERT_OK(zx::iommu::create(*root_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
+
+  ASSERT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
   EXPECT_OK(zx::bti::create(iommu, 0, 0xdead1eaf, &bti));
 
   auto name = "PinBeforeCreateFailure";

@@ -84,7 +84,7 @@ __asm__(
 TEST_F(InterruptTest, VirtualNotWakeable) {
   zx::interrupt interrupt;
   ASSERT_EQ(ZX_ERR_INVALID_ARGS,
-            zx::interrupt::create(*root_resource(), 0,
+            zx::interrupt::create(*irq_resource(), 0,
                                   ZX_INTERRUPT_VIRTUAL | ZX_INTERRUPT_WAKE_VECTOR, &interrupt));
 }
 

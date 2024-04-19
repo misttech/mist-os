@@ -33,17 +33,13 @@ namespace vmo_test {
 class VmoClone2TestCase : public zxtest::Test {
  public:
   static void SetUpTestSuite() {
-    root_resource_ = maybe_standalone::GetRootResource();
-    if (root_resource_->is_valid()) {
+    zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+    if (system_resource->is_valid()) {
       ASSERT_EQ(dl_iterate_phdr(&DlIterpatePhdrCallback, nullptr), 0);
     }
   }
 
-  static const zx::resource& RootResource() { return *root_resource_; }
-
  private:
-  static zx::unowned_resource root_resource_;
-
   // Touch every page in the region to make sure it's been COW'd.
   __attribute__((no_sanitize("all"))) static void PrefaultPages(uintptr_t start, uintptr_t end) {
     while (start < end) {
@@ -93,8 +89,6 @@ class VmoClone2TestCase : public zxtest::Test {
     return 0;
   }
 };
-
-zx::unowned_resource VmoClone2TestCase::root_resource_;
 
 // Helper function which checks that the give vmo is contiguous.
 template <size_t N>
@@ -829,9 +823,9 @@ class VmoCloneResizeTests : public VmoClone2TestCase {
   static void ResizeTest(Contiguity contiguity, ResizeTarget target) {
     bool contiguous = contiguity == Contiguity::Contig;
     bool resize_child = target == ResizeTarget::Child;
-
-    if (contiguous && !RootResource()) {
-      printf("Root resource not available, skipping\n");
+    zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+    if (contiguous && !system_resource->is_valid()) {
+      printf("System resource not available, skipping\n");
       return;
     }
 
@@ -843,8 +837,14 @@ class VmoCloneResizeTests : public VmoClone2TestCase {
 
     if (contiguous) {
       zx_iommu_desc_dummy_t desc;
+
+      zx::result<zx::resource> result =
+          maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+      ASSERT_OK(result.status_value());
+      zx::resource iommu_resource = std::move(result.value());
+
       ASSERT_OK(
-          zx::iommu::create(RootResource(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
+          zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
       ASSERT_NO_FAILURES(bti =
                              vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef, "VmoCloneResizeTests"));
       ASSERT_OK(zx::vmo::create_contiguous(bti, 4 * zx_system_get_page_size(), 0, &vmo));
@@ -1349,8 +1349,9 @@ TEST_F(ProgressiveCloneDiscardTests, ProgressiveCloneTruncate) {
 }
 
 TEST_F(VmoClone2TestCase, ForbidContiguousVmo) {
-  if (!RootResource()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
@@ -1359,7 +1360,12 @@ TEST_F(VmoClone2TestCase, ForbidContiguousVmo) {
   zx_iommu_desc_dummy_t desc;
   auto final_bti_check = vmo_test::CreateDeferredBtiCheck(bti);
 
-  ASSERT_OK(zx::iommu::create(RootResource(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
+
+  ASSERT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
   ASSERT_NO_FAILURES(bti = vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef, "ForbidContiguousVmo"));
 
   zx::vmo vmo;
@@ -1374,8 +1380,9 @@ TEST_F(VmoClone2TestCase, ForbidContiguousVmo) {
 }
 
 TEST_F(VmoClone2TestCase, PinBeforeCreateFailure) {
-  if (!RootResource()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
@@ -1384,7 +1391,12 @@ TEST_F(VmoClone2TestCase, PinBeforeCreateFailure) {
   zx_iommu_desc_dummy_t desc;
   auto final_bti_check = vmo_test::CreateDeferredBtiCheck(bti);
 
-  ASSERT_OK(zx::iommu::create(RootResource(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
+
+  ASSERT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
   ASSERT_NO_FAILURES(bti =
                          vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef, "PinBeforeCreateFailure"));
 
@@ -1407,8 +1419,9 @@ TEST_F(VmoClone2TestCase, PinBeforeCreateFailure) {
 }
 
 TEST_F(VmoClone2TestCase, PinClonePages) {
-  if (!RootResource()) {
-    printf("Root resource not available, skipping\n");
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
     return;
   }
 
@@ -1416,7 +1429,12 @@ TEST_F(VmoClone2TestCase, PinClonePages) {
   zx::iommu iommu;
   zx::bti bti;
   zx_iommu_desc_dummy_t desc;
-  ASSERT_OK(zx::iommu::create(RootResource(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
+  ASSERT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
   ASSERT_NO_FAILURES(bti = vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef, "PinClonePages"));
   auto final_bti_check = vmo_test::CreateDeferredBtiCheck(bti);
 
@@ -1639,8 +1657,9 @@ TEST_F(VmoClone2TestCase, ParentStartLimitRegression) {
   } while (0)
 #endif
 
-// This is a regression test for https://fxbug.dev/42133843 and checks that if both children of a hidden parent
-// are dropped 'at the same time', then there are no races with their parallel destruction.
+// This is a regression test for https://fxbug.dev/42133843 and checks that if both children of a
+// hidden parent are dropped 'at the same time', then there are no races with their parallel
+// destruction.
 TEST_F(VmoClone2TestCase, DropChildrenInParallel) {
   // Try some N times and hope that if there is a bug we get the right timing. Prior to fixing
   // https://fxbug.dev/42133843 this was enough iterations to reliably trigger.
@@ -1764,11 +1783,11 @@ TEST_F(VmoClone2TestCase, MapRangeReadOnly) {
   EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.populated_bytes);
 }
 
-// Regression test for https://fxbug.dev/42080199. The hierarchy generation count was previously incremented
-// in the VmObjectPaged destructor, not in the VmCowPages destructor. But the actual changes to the
-// page list take place in the VmCowPages destructor, which would affect attribution counts. We drop
-// the lock between invoking the two destructors, so it was possible for someone to query the
-// attribution count in between and see an old cached count.
+// Regression test for https://fxbug.dev/42080199. The hierarchy generation count was previously
+// incremented in the VmObjectPaged destructor, not in the VmCowPages destructor. But the actual
+// changes to the page list take place in the VmCowPages destructor, which would affect attribution
+// counts. We drop the lock between invoking the two destructors, so it was possible for someone to
+// query the attribution count in between and see an old cached count.
 TEST_F(VmoClone2TestCase, DropParentCommittedBytes) {
   // Try some N times and hope that if there is a bug we get the right timing. Prior to fixing
   // https://fxbug.dev/42080199 this was enough iterations to reliably trigger.

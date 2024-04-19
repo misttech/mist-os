@@ -83,7 +83,7 @@ TEST_F(MsiTest, AllocateSyscall) {
 
   for (const auto& test : kTests) {
     zx::msi msi = {};
-    EXPECT_EQ(test.first, zx::msi::allocate(*root_resource(), test.second, &msi),
+    EXPECT_EQ(test.first, zx::msi::allocate(msi_resource(), test.second, &msi),
               "irq_cnt = %u failed.", test.second);
   }
 }
@@ -142,7 +142,7 @@ TEST_F(MsiTest, CreateSyscallArgs) {
   constexpr uint32_t msi_cnt = 8;
   auto msi_test_vmo = std::move(result.value());
   auto& vmo = msi_test_vmo->vmo();
-  ASSERT_OK(zx::msi::allocate(*root_resource(), msi_cnt, &msi));
+  ASSERT_OK(zx::msi::allocate(msi_resource(), msi_cnt, &msi));
   zx_info_msi_t msi_info;
   ASSERT_OK(msi.get_info(ZX_INFO_MSI, &msi_info, sizeof(msi_info), nullptr, nullptr));
   zx_info_vmo_t vmo_info;
@@ -190,7 +190,7 @@ TEST_F(MsiTest, Msi) {
 
   zx::msi msi;
   constexpr uint32_t msi_cnt = 8;
-  ASSERT_OK(zx::msi::allocate(*root_resource(), msi_cnt, &msi));
+  ASSERT_OK(zx::msi::allocate(msi_resource(), msi_cnt, &msi));
   zx::interrupt interrupt, interrupt_dup;
 
   auto msi_test_vmo = std::move(result.value());
@@ -236,7 +236,7 @@ TEST_F(MsiTest, Msix) {
 
   const uint32_t msi_cnt = 8;
   zx::msi msi = {};
-  ASSERT_OK(zx::msi::allocate(*root_resource(), msi_cnt, &msi));
+  ASSERT_OK(zx::msi::allocate(msi_resource(), msi_cnt, &msi));
 
   auto msi_test_vmo = std::move(result.value());
   auto& vmo = msi_test_vmo->vmo();
@@ -295,7 +295,7 @@ TEST_F(MsiTest, ContiguousNotSupported) {
   const size_t msi_cnt = 1;
   ASSERT_OK(zx::vmo::create_contiguous(*bti(), zx_system_get_page_size(), 0, &vmo));
   zx::msi msi;
-  ASSERT_OK(zx::msi::allocate(*root_resource(), msi_cnt, &msi));
+  ASSERT_OK(zx::msi::allocate(msi_resource(), msi_cnt, &msi));
 
   zx::interrupt interrupt;
   ASSERT_NE(ZX_OK, zx::msi::create(msi, 0, 0, vmo, 0, &interrupt));
