@@ -580,24 +580,6 @@ and passed by the bootloader as soon as it possibly can in the boot sequence,
 presuming that the bootloader provides enough information to know how to disable
 the WDT at all.
 
-### gfxconsole.early=\<bool>
-
-**Default:** `false`
-
-This option requests that the kernel start a graphics console
-during early boot (if possible), to display kernel debug print
-messages while the system is starting.  When userspace starts up, a usermode
-graphics console driver takes over.
-
-The early kernel console can be slow on some platforms, so if it is not
-needed for debugging it may speed up boot to disable it.
-
-### gfxconsole.font=\[9x16 | 18x32\]
-
-**Default:** `9x16`
-
-This option asks the graphics console to use a specific font.
-
 ### kernel.halt-on-panic=\<bool>
 
 **Default:** `false`

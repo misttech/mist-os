@@ -69,9 +69,6 @@ enum class EntropyTestSource { kHwRng, kJitterEntropy };
 // See kernel.page-scanner.eviction_policy.
 enum class PageTableEvictionPolicy { kOnRequest, kNever, kAlways };
 
-// See gfxconsole.font.
-enum class GfxConsoleFont { k9x16, k18x32 };
-
 // See kernel.enable-serial-syscalls.
 enum class SerialDebugSyscalls {
   kDisabled,
