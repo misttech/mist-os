@@ -34,10 +34,6 @@ declare_args() {
 }
 
 if (target_os == "") {
-  target_os = "fuchsia"
-}
-
-if (target_os == "mistos") {
   target_os = "mistos"
 }
 
