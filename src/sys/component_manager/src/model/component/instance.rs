@@ -1170,14 +1170,20 @@ pub struct StartedInstanceState {
 }
 
 impl StartedInstanceState {
+    /// Creates the state corresponding to a started component.
+    ///
+    /// If `program` is present, also creates a background task waiting for the program to
+    /// terminate. When that happens, uses the [`WeakComponentInstance`] to stop the component.
     pub fn new(
+        program: Option<Program>,
+        component: WeakComponentInstance,
         start_reason: StartReason,
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         logger: Option<ScopedLogger>,
     ) -> Self {
         let timestamp = zx::Time::get_monotonic();
         StartedInstanceState {
-            program: None,
+            program: program.map(|p| ProgramRuntime::new(p, component)),
             timestamp,
             binder_server_ends: vec![],
             start_reason,
@@ -1186,26 +1192,14 @@ impl StartedInstanceState {
         }
     }
 
-    /// If this component is associated with a running [Program], obtain a capability
-    /// representing its runtime directory.
+    /// If this component has a program, obtain a capability representing its runtime directory.
     pub fn runtime_dir(&self) -> Option<&fio::DirectoryProxy> {
         self.program.as_ref().map(|program_runtime| program_runtime.program.runtime())
-    }
-
-    /// Associates the [StartedInstanceState] with a running [Program].
-    ///
-    /// Creates a background task waiting for the program to terminate. When that happens, use the
-    /// [WeakComponentInstance] to stop the component.
-    pub fn set_program(&mut self, program: Program, component: WeakComponentInstance) {
-        self.program = Some(ProgramRuntime::new(program, component));
     }
 
     /// Stops the component. If the component has a program, the timer defines how long
     /// the runner is given to stop the program gracefully before we request the controller
     /// to terminate the program.
-    ///
-    /// Regardless if the runner honored our request, after this method, the [`StartedInstanceState`] is
-    /// no longer associated with a [Program].
     pub async fn stop<'a, 'b>(
         mut self,
         stop_timer: BoxFuture<'a, ()>,
