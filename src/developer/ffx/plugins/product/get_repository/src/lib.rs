@@ -55,7 +55,7 @@ fn extract_repository_info(
             name: repository.name.clone(),
             target_json: path_relative_from(target_json, &cmd.product_bundle)?,
             blobs_dir: path_relative_from(blobs_dir, &cmd.product_bundle)?,
-            delivery_blob_type: repository.delivery_blob_type.unwrap_or_default(),
+            delivery_blob_type: repository.delivery_blob_type,
         })
     }
     Ok(repository_infos)
@@ -92,7 +92,7 @@ mod tests {
                 name: "fuchsia.com".into(),
                 metadata_path: fuchsia_metadata_dir.clone(),
                 blobs_path: blobs_dir.clone(),
-                delivery_blob_type: Some(1),
+                delivery_blob_type: 1,
                 root_private_key_path: None,
                 targets_private_key_path: None,
                 snapshot_private_key_path: None,

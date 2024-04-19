@@ -1212,7 +1212,7 @@ mod test {
                 name: repo_name.into(),
                 metadata_path,
                 blobs_path: blobs_dir.clone(),
-                delivery_blob_type: None,
+                delivery_blob_type: 1,
                 root_private_key_path: None,
                 targets_private_key_path: None,
                 snapshot_private_key_path: None,

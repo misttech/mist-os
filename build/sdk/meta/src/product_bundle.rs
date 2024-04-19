@@ -253,7 +253,7 @@ pub fn get_repositories(product_bundle_dir: Utf8PathBuf) -> Result<Vec<FileSyste
 
     let mut repos = Vec::<FileSystemRepository>::new();
     for repo in pb.repositories {
-        let mut repo_builder = FileSystemRepository::builder(
+        let repo_builder = FileSystemRepository::builder(
             repo.metadata_path
                 .canonicalize()
                 .with_context(|| format!("failed to canonicalize {:?}", repo.metadata_path))?
@@ -263,10 +263,8 @@ pub fn get_repositories(product_bundle_dir: Utf8PathBuf) -> Result<Vec<FileSyste
                 .with_context(|| format!("failed to canonicalize {:?}", repo.blobs_path))?
                 .try_into()?,
         )
-        .alias(repo.name);
-        if let Some(blob_type) = repo.delivery_blob_type {
-            repo_builder = repo_builder.delivery_blob_type(blob_type.try_into()?);
-        }
+        .alias(repo.name)
+        .delivery_blob_type(repo.delivery_blob_type.try_into()?);
         repos.push(repo_builder.build());
     }
     Ok(repos)
