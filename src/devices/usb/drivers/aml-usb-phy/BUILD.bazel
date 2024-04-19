@@ -53,6 +53,7 @@ fuchsia_cc_driver(
     deps = [
         "//src/devices/lib/amlogic",
         "//src/lib/ddk:ddk_metadata",
+        "//zircon/system/ulib/ddk-platform-defs",
         "@fuchsia_sdk//bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cc",
         "@fuchsia_sdk//bind/fuchsia:fuchsia_cc",
         "@fuchsia_sdk//bind/fuchsia.platform:fuchsia.platform_cc",
@@ -66,7 +67,6 @@ fuchsia_cc_driver(
         "@internal_sdk//fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
-        "@internal_sdk//pkg/ddk-platform-defs",
         "@internal_sdk//pkg/driver_compat",
     ],
 )
@@ -118,6 +118,7 @@ fuchsia_cc_test(
     deps = [
         "//src/devices/lib/amlogic",
         "//src/lib/ddk:ddk_metadata",
+        "//zircon/system/ulib/ddk-platform-defs",
         "@com_google_googletest//:gtest_main",
         "@fuchsia_sdk//bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cc",
         "@fuchsia_sdk//bind/fuchsia:fuchsia_cc",
@@ -134,7 +135,6 @@ fuchsia_cc_test(
         "@internal_sdk//fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
-        "@internal_sdk//pkg/ddk-platform-defs",
         "@internal_sdk//pkg/driver_compat",
         "@internal_sdk//pkg/fake-mmio-reg",
         "@internal_sdk//pkg/mock-registers",
