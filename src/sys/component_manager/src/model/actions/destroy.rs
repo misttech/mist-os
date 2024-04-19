@@ -128,7 +128,6 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionErro
         join_all([
             pin!(resolve_shutdown) as Pin<&mut (dyn Future<Output = ()> + Send)>,
             pin!(start_shutdown),
-            pin!(component.blocking_task_group().join()),
             pin!(execution_scope.wait()),
         ])
         .await;
@@ -476,14 +475,16 @@ pub mod tests {
         let (mut task_start_tx, mut task_start_rx) = mpsc::channel::<()>(0);
         let (mut task_done_tx, mut task_done_rx) = mpsc::channel::<()>(0);
         let a = component_a.clone();
+        let guard = component_a.execution_scope.active_guard();
         let fut = async move {
+            let _guard = guard;
             task_start_rx.next().await;
             if matches!(*a.lock_state().await, InstanceState::Destroyed) {
                 panic!("component state was set to destroyed before blocking task finished");
             }
             task_done_tx.try_send(()).unwrap();
         };
-        component_a.blocking_task_group().spawn(fut);
+        component_a.execution_scope.spawn(fut);
 
         let mock_action_key = ActionKey::Start;
         let (mock_action, mut mock_action_unblocker) =

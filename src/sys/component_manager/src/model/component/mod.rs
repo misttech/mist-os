@@ -260,12 +260,9 @@ pub struct ComponentInstance {
     /// Tasks owned by this component instance that will be cancelled if the component is
     /// destroyed.
     nonblocking_task_group: TaskGroup,
-    /// Tasks owned by this component instance that will block destruction if the component is
-    /// destroyed.
-    blocking_task_group: TaskGroup,
     /// The ExecutionScope for this component. Pseudo directories should be hosted with this scope
     /// to tie their life-time to that of the component. Tasks can block component destruction by
-    /// using `active_guard()` (as an alternative to `blocking_task_group`).
+    /// using `active_guard()`.
     pub execution_scope: ExecutionScope,
 }
 
@@ -321,7 +318,6 @@ impl ComponentInstance {
             actions: Mutex::new(ActionSet::new()),
             hooks,
             nonblocking_task_group: TaskGroup::new(),
-            blocking_task_group: TaskGroup::new(),
             persistent_storage,
             execution_scope: ExecutionScope::new(),
         })
@@ -343,12 +339,6 @@ impl ComponentInstance {
     /// in this group will be cancelled when the component is destroyed.
     pub fn nonblocking_task_group(&self) -> TaskGroup {
         self.nonblocking_task_group.clone()
-    }
-
-    /// Returns a group for this instance where tasks can be run scoped to this instance. Tasks run
-    /// in this group will block destruction if the component is destroyed.
-    pub fn blocking_task_group(&self) -> TaskGroup {
-        self.blocking_task_group.clone()
     }
 
     /// Returns true if the component is started, i.e. when it has a runtime.
