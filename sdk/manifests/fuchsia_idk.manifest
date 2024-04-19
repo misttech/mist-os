@@ -86,6 +86,7 @@ cc_source_library://pkg/fidl_driver_natural
 cc_source_library://pkg/fidl_driver_transport
 cc_source_library://pkg/fit
 cc_source_library://pkg/fit-promise
+cc_source_library://pkg/hwreg
 cc_source_library://pkg/images_cpp
 cc_source_library://pkg/input_report_reader
 cc_source_library://pkg/inspect
@@ -93,6 +94,8 @@ cc_source_library://pkg/inspect_component_cpp
 cc_source_library://pkg/magma_common
 cc_source_library://pkg/media_cpp
 cc_source_library://pkg/media_cpp_no_converters
+cc_source_library://pkg/mmio
+cc_source_library://pkg/mmio-ptr
 cc_source_library://pkg/scenic_cpp
 cc_source_library://pkg/scenic_cpp_testing
 cc_source_library://pkg/stdcompat
@@ -109,12 +112,14 @@ cc_source_library://pkg/trace-vthread-headersonly
 cc_source_library://pkg/utf-utils
 cc_source_library://pkg/vfs_cpp
 cc_source_library://pkg/virtgralloc_headers
+cc_source_library://pkg/zbi-format
 cc_source_library://pkg/zx
 companion_host_tool://tools/x64/aemu_internal
 companion_host_tool://tools/x64/qemu_internal
 companion_host_tool://tools/x64/qemu_uefi_internal
 dart_library://dart/sl4f
 data://data/config/symbol_index
+data://pkg/driver_component/driver_component.json
 data://pkg/heapdump_instrumentation/heapdump_instrumentation_shard.json
 data://pkg/inspect/inspect.json
 data://pkg/sys/component/realm_builder_shard_sdk.json
@@ -227,6 +232,7 @@ fidl_library://fidl/fuchsia.hardware.audio.signalprocessing
 fidl_library://fidl/fuchsia.hardware.i2c
 fidl_library://fidl/fuchsia.hardware.light
 fidl_library://fidl/fuchsia.hardware.network
+fidl_library://fidl/fuchsia.hardware.pci
 fidl_library://fidl/fuchsia.hardware.platform.device
 fidl_library://fidl/fuchsia.hardware.power
 fidl_library://fidl/fuchsia.hardware.power.sensor

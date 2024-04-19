@@ -67,6 +67,7 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c",
   "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light",
   "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network",
+  "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci",
   "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device",
   "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power",
   "//sdk/fidl/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor",

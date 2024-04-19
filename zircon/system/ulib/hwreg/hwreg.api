@@ -1,0 +1,5 @@
+{
+  "pkg/hwreg/include/hwreg/bitfields.h": "c69468518238458364ef6608ab2796eb",
+  "pkg/hwreg/include/hwreg/internal.h": "66dbbbf06b19ee66fadea51b27a2dcf5",
+  "pkg/hwreg/include/hwreg/mmio.h": "a113c5806ffb204af26c95edc97c7335"
+}

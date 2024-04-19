@@ -560,6 +560,7 @@ sdk_molecule("core_packages_for_each_api_level_and_platform") {
 sdk_molecule("core_data") {
   deps = [
     # TODO(ddorwin): Rename these to make it clear that they are data (e.g., _shards).
+    "//sdk/lib/driver_component:driver_component",
     "//sdk/lib/heapdump_instrumentation:heapdump_instrumentation_shard",
     "//sdk/lib/inspect",
     "//sdk/lib/sys/component:realm_builder_shard_sdk",
@@ -639,6 +640,8 @@ sdk_molecule("core_cc_source_libraries") {
     "//sdk/lib/ui/scenic/cpp:cpp_sdk",
     "//sdk/lib/ui/scenic/cpp/testing:testing_sdk",
     "//sdk/lib/vfs/cpp:cpp_sdk",
+    "//sdk/lib/zbi-format:zbi-format_sdk",
+    "//src/devices/lib/mmio:mmio_sdk",
     "//src/lib/fidl/cpp:cpp_sdk",
     "//src/lib/fidl/cpp:hlcpp_conversion_sdk",
     "//src/lib/fidl/cpp:natural_ostream_sdk",
@@ -647,6 +650,7 @@ sdk_molecule("core_cc_source_libraries") {
     "//zircon/system/ulib/async-loop:async-loop-cpp_sdk",
     "//zircon/system/ulib/async-loop:async-loop_sdk",
     "//zircon/system/ulib/async-testing:async-testing_sdk",
+    "//zircon/system/ulib/hwreg:hwreg_sdk_sdk",
     "//zircon/system/ulib/inspect:inspect_sdk",
     "//zircon/system/ulib/trace:trace_sdk",
     "//zircon/system/ulib/trace-vthread:trace-vthread_sdk",
@@ -879,14 +883,6 @@ pool("subbuild_pool") {
   depth = sdk_max_simultaneous_sub_builds
 }
 
-# WARNING (https://fxbug.dev/287395493): the driver SDK will soon be removed.
-# DO NOT ADD anything here!
-sdk_molecule("driver_fidl") {
-  deps = [
-    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_sdk($fidl_toolchain)",
-  ]
-}
-
 # An SDK collection providing SDK atoms used for driver development.
 # Their API/ABI is not stable at all. Note: this cannot contain
 # testonly atoms.
@@ -908,18 +904,7 @@ sdk_collection("driver") {
 sdk_molecule("driver_atoms") {
   category = "experimental"
 
-  deps = [
-    ":driver_fidl",
-    ":fuchsia_idk_atoms",
-    "//sdk/lib/driver/runtime:driver_runtime_cpp_sdk",
-    "//sdk/lib/driver/runtime:driver_runtime_sdk",
-    "//sdk/lib/driver_component:driver_component",
-    "//sdk/lib/input_report_reader:input_report_reader_sdk",
-    "//src/devices/lib/mmio:mmio_sdk",
-    "//src/lib/ddk:ddk_metadata_sdk",
-    "//zircon/system/ulib/hwreg:hwreg_sdk_sdk",
-    "//zircon/system/ulib/hwreg-i2c:hwreg-i2c_sdk_sdk",
-  ]
+  deps = [ ":fuchsia_idk_atoms" ]
 }
 
 # These markers are used to define dependencies on FIDL bindings
