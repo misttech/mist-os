@@ -22,6 +22,9 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
         if kernel_config.lru_memory_compression {
             builder.platform_bundle("kernel_anonymous_memory_compression_eager_lru");
         }
+        if kernel_config.continuous_eviction {
+            builder.platform_bundle("kernel_evict_continuous");
+        }
 
         // If the board supports the PMM checker, and this is an eng build-type
         // build, enable the pmm checker.

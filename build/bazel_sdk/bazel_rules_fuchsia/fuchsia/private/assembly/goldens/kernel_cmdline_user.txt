@@ -8,6 +8,7 @@ blobfs.cache-eviction-policy=NEVER_EVICT
 ?kernel.enable-debugging-syscalls=false
 ?kernel.enable-serial-syscalls=false
 ?kernel.oom.behavior=reboot
+?kernel.oom.evict-continuous=true
 ?kernel.page-scanner.lru-action=compress_only
 ?kernel.ppb.borrow-in-supplypages=true
 ?kernel.ppb.borrow-on-mru=true

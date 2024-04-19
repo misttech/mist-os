@@ -12,4 +12,6 @@ pub struct PlatformKernelConfig {
     pub memory_compression: bool,
     #[serde(default)]
     pub lru_memory_compression: bool,
+    #[serde(default)]
+    pub continuous_eviction: bool,
 }

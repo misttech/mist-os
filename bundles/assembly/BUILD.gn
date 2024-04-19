@@ -3904,6 +3904,12 @@ assembly_input_bundle("kernel_anonymous_memory_compression_eager_lru") {
   kernel_cmdline = [ "kernel.page-scanner.lru-action=compress_only" ]
 }
 
+# Performs eviction continuously while under memory pressure instead of only once when the pressure
+# level changes.
+assembly_input_bundle("kernel_evict_continuous") {
+  kernel_cmdline = [ "kernel.oom.evict-continuous=true" ]
+}
+
 # Assembly selects whether to include this AIB or not.
 assembly_input_bundle("zoneinfo") {
   base_packages = [ "//src/intl/tzdata_provider:zoneinfo_provider_pkg" ]
