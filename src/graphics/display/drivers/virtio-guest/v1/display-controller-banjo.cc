@@ -121,8 +121,9 @@ config_check_result_t DisplayControllerBanjo::DisplayControllerImplCheckConfigur
 void DisplayControllerBanjo::DisplayControllerImplApplyConfiguration(
     const display_config_t** banjo_display_configs, size_t banjo_display_configs_count,
     const config_stamp_t* banjo_config_stamp) {
-  return engine_.ApplyConfiguration(banjo_display_configs, banjo_display_configs_count,
-                                    banjo_config_stamp);
+  cpp20::span<const display_config_t*> display_configs(banjo_display_configs,
+                                                       banjo_display_configs_count);
+  return engine_.ApplyConfiguration(display_configs, banjo_config_stamp);
 }
 
 void DisplayControllerBanjo::DisplayControllerImplSetEld(uint64_t banjo_display_id,

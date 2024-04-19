@@ -334,12 +334,11 @@ config_check_result_t DisplayEngine::CheckConfiguration(
   return CONFIG_CHECK_RESULT_OK;
 }
 
-void DisplayEngine::ApplyConfiguration(const display_config_t** display_configs,
-                                       size_t display_count,
+void DisplayEngine::ApplyConfiguration(cpp20::span<const display_config_t*> display_configs,
                                        const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(banjo_config_stamp);
   display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
-  uint64_t handle = display_count == 0 || display_configs[0]->layer_count == 0
+  uint64_t handle = display_configs.empty() || display_configs[0]->layer_count == 0
                         ? 0
                         : display_configs[0]->layer_list[0]->cfg.primary.image_handle;
 
