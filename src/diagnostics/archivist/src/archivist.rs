@@ -260,7 +260,11 @@ impl Archivist {
     /// Run archivist to completion.
     /// # Arguments:
     /// * `outgoing_channel`- channel to serve outgoing directory on.
-    pub async fn run(mut self, mut fs: ServiceFs<ServiceObj<'static, ()>>) -> Result<(), Error> {
+    pub async fn run(
+        mut self,
+        mut fs: ServiceFs<ServiceObj<'static, ()>>,
+        is_embedded: bool,
+    ) -> Result<(), Error> {
         debug!("Running Archivist.");
 
         // Start servicing all outgoing services.
@@ -320,7 +324,12 @@ impl Archivist {
         // should remain alive.
         let _logs_repo = self.logs_repository;
 
-        info!("archivist: Entering core loop.");
+        if is_embedded {
+            debug!("Entering core loop.");
+        } else {
+            info!("archivist: Entering core loop.");
+        }
+
         // Combine all three futures into a main future.
         future::join3(abortable_fut, stop_fut, all_msg).map(|_| Ok(())).await
     }
@@ -487,7 +496,7 @@ mod tests {
         archivist.set_lifecycle_request_stream(request_stream);
         let (signal_send, signal_recv) = oneshot::channel();
         fasync::Task::spawn(async move {
-            archivist.run(fs).await.expect("Cannot run archivist");
+            archivist.run(fs, false).await.expect("Cannot run archivist");
             signal_send.send(()).unwrap();
         })
         .detach();
@@ -501,7 +510,7 @@ mod tests {
         fs.serve_connection(server_end).unwrap();
         let archivist = init_archivist(&mut fs).await;
         fasync::Task::spawn(async move {
-            archivist.run(fs).await.expect("Cannot run archivist");
+            archivist.run(fs, false).await.expect("Cannot run archivist");
         })
         .detach();
         directory
