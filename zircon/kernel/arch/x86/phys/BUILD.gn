@@ -20,7 +20,10 @@ if (current_toolchain == default_toolchain) {
     environment = "kernel.phys32"
     with_shared = false
 
-    toolchain_tags = [ "kernel" ]
+    toolchain_tags = [
+      "kernel",
+      "no-floating-point",
+    ]
 
     configs = [ "//zircon/kernel/arch/x86/phys:phys32_config" ]
 

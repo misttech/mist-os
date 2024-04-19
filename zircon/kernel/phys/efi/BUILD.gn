@@ -21,8 +21,9 @@ if (current_toolchain == default_toolchain) {
       with_shared = false
 
       toolchain_tags = [
-        "kernel",
         "efi",
+        "kernel",
+        "no-floating-point",
       ]
 
       configs = [ "//zircon/kernel/phys/efi:efi_config" ]

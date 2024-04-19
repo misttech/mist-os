@@ -27,8 +27,10 @@ llvm_libc_source_set("converter") {
     "LIBC_COPT_PRINTF_DISABLE_WRITE_INT",
   ]
 
-  # Don't support FP types in minimal environments.
-  if (is_kernel || toolchain_environment == "user.basic") {
+  # Don't support FP types if the toolchain doesn't.
+  _no_floating_point = toolchain_variant.tags + [ "no-floating-point" ] -
+                       [ "no-floating-point" ] != toolchain_variant.tags
+  if (_no_floating_point) {
     defines += [ "LIBC_COPT_PRINTF_DISABLE_FLOAT" ]
   }
 

@@ -41,7 +41,10 @@ if (current_toolchain == default_toolchain) {
       with_shared = false
       is_pic_default = true
 
-      toolchain_tags = [ "kernel" ]
+      toolchain_tags = [
+        "kernel",
+        "no-floating-point",
+      ]
 
       configs = [ "//zircon/kernel/phys:phys_config" ]
 

@@ -60,6 +60,7 @@ if (current_toolchain == default_toolchain) {
 
       toolchain_tags = [
         "kernel",
+        "no-floating-point",
         "standalone",
       ]
 

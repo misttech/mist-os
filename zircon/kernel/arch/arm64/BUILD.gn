@@ -18,6 +18,7 @@ if (current_toolchain == default_toolchain) {
     configs = [ "//zircon/kernel/arch/arm64:physmem_config" ]
     toolchain_tags = [
       "kernel",
+      "no-floating-point",
       "strict-align",
     ]
     exclude_variant_tags = [ "instrumented" ]
