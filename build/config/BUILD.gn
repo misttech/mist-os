@@ -50,6 +50,15 @@ if (zircon_toolchain != false) {
 config("language") {
   cflags_c = [ "-std=c11" ]
   cflags_cc = [ "-std=c++$fuchsia_cxx_version" ]
+
+  if (fuchsia_cxx_version < 20) {
+    # TODO(https://fxbug.dev/42064981): libc++ now marks the C++20
+    # synchronization primitives as deprecated in older C++ standards which
+    # affects Fuchsia since we use these primitives across the codebase. We
+    # temporarily suppress these warnings until C++20 becomes the default.
+    defines = [ "_LIBCPP_DISABLE_DEPRECATION_WARNINGS" ]
+  }
+
   if (current_os == "mac") {
     # macOS needs this to not complain about C++17isms that older macOS
     # system libc++ doesn't support.  But we use our own toolchain's static
@@ -59,7 +68,7 @@ config("language") {
     # libc++ headers mark some symbols as unavailable on macOS by default
     # because the system libc++ doesn't support them.  But we use our own
     # toolchain's static libc++ anyway.
-    defines = [ "_LIBCPP_DISABLE_AVAILABILITY" ]
+    defines += [ "_LIBCPP_DISABLE_AVAILABILITY" ]
   }
 }
 
