@@ -936,16 +936,13 @@ mod tests {
             error::StopActionError,
             testing::{
                 test_helpers::{
-                    component_decl_with_test_runner, default_component_decl,
-                    execution_is_shut_down, has_child, ActionsTest, ComponentInfo,
+                    component_decl_with_test_runner, execution_is_shut_down, has_child,
+                    ActionsTest, ComponentInfo,
                 },
                 test_hook::Lifecycle,
             },
         },
-        cm_rust::{
-            Availability, ChildDecl, ComponentDecl, DependencyType, ExposeProtocolDecl,
-            ExposeSource, ExposeTarget,
-        },
+        cm_rust::{ComponentDecl, DependencyType, ExposeSource, ExposeTarget},
         cm_rust_testing::*,
         cm_types::AllowedOffers,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -1023,26 +1020,15 @@ mod tests {
 
     #[fuchsia::test]
     fn test_service_from_self() {
-        let decl = ComponentDecl {
-            offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
-                source: OfferSource::Self_,
-                source_name: "serviceSelf".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "serviceSelf".parse().unwrap(),
-                target: offer_target_static_child("childA"),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            })],
-            children: vec![ChildDecl {
-                name: "childA".to_string(),
-                url: "ignored:///child".to_string(),
-                startup: fdecl::StartupMode::Lazy,
-                environment: None,
-                on_terminate: None,
-                config_overrides: None,
-            }],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("serviceSelf")
+                    .source(OfferSource::Self_)
+                    .target_static_child("childA"),
+            )
+            .child_default("childA")
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -1055,26 +1041,16 @@ mod tests {
 
     #[test_case(DependencyType::Weak)]
     fn test_weak_service_from_self(weak_dep: DependencyType) {
-        let decl = ComponentDecl {
-            offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
-                source: OfferSource::Self_,
-                source_name: "serviceSelf".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "serviceSelf".parse().unwrap(),
-                target: offer_target_static_child("childA"),
-                dependency_type: weak_dep,
-                availability: Availability::Required,
-            })],
-            children: vec![ChildDecl {
-                name: "childA".to_string(),
-                url: "ignored:///child".to_string(),
-                startup: fdecl::StartupMode::Lazy,
-                environment: None,
-                on_terminate: None,
-                config_overrides: None,
-            }],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("serviceSelf")
+                    .source(OfferSource::Self_)
+                    .target_static_child("childA")
+                    .dependency(weak_dep),
+            )
+            .child_default("childA")
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -1087,25 +1063,15 @@ mod tests {
 
     #[fuchsia::test]
     fn test_service_from_child() {
-        let decl = ComponentDecl {
-            exposes: vec![ExposeDecl::Protocol(ExposeProtocolDecl {
-                target: ExposeTarget::Parent,
-                source_name: "serviceFromChild".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "serviceFromChild".parse().unwrap(),
-                source: ExposeSource::Child("childA".to_string()),
-                availability: cm_rust::Availability::Required,
-            })],
-            children: vec![ChildDecl {
-                name: "childA".to_string(),
-                url: "ignored:///child".to_string(),
-                startup: fdecl::StartupMode::Lazy,
-                environment: None,
-                on_terminate: None,
-                config_overrides: None,
-            }],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .expose(
+                ExposeBuilder::protocol()
+                    .name("serviceFromChild")
+                    .source(ExposeSource::Child("childA".into()))
+                    .target(ExposeTarget::Parent),
+            )
+            .child_default("childA")
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -1118,46 +1084,23 @@ mod tests {
 
     #[fuchsia::test]
     fn test_single_dependency() {
-        let child_a = ChildDecl {
-            name: "childA".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let child_b = ChildDecl {
-            name: "childB".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let decl = ComponentDecl {
-            offers: vec![
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "serviceParent".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "serviceParent".parse().unwrap(),
-                    target: offer_target_static_child("childA"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childB"),
-                    source_name: "childBOffer".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "serviceSibling".parse().unwrap(),
-                    target: offer_target_static_child("childA"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-            ],
-            children: vec![child_a.clone(), child_b.clone()],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("serviceParent")
+                    .source(OfferSource::Self_)
+                    .target_static_child("childA"),
+            )
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childBOffer")
+                    .target_name("serviceSibling")
+                    .source_static_child("childB")
+                    .target_static_child("childA"),
+            )
+            .child_default("childA")
+            .child_default("childB")
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -1174,33 +1117,25 @@ mod tests {
         let decl = ComponentDeclBuilder::new()
             .dictionary_default("dict")
             .protocol_default("serviceA")
-            .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                source: OfferSource::Self_,
-                source_name: "serviceA".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "serviceA".parse().unwrap(),
-                target: OfferTarget::Capability("dict".parse().unwrap()),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            }))
-            .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                source: offer_source_static_child("childA"),
-                source_name: "serviceB".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "serviceB".parse().unwrap(),
-                target: OfferTarget::Capability("dict".parse().unwrap()),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            }))
-            .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                source: OfferSource::Self_,
-                source_name: "serviceB".parse().unwrap(),
-                source_dictionary: "dict".parse().unwrap(),
-                target_name: "serviceB".parse().unwrap(),
-                target: offer_target_static_child("childB"),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            }))
+            .offer(
+                OfferBuilder::protocol()
+                    .name("serviceA")
+                    .source(OfferSource::Self_)
+                    .target(OfferTarget::Capability("dict".parse().unwrap())),
+            )
+            .offer(
+                OfferBuilder::protocol()
+                    .name("serviceB")
+                    .source_static_child("childA")
+                    .target(OfferTarget::Capability("dict".parse().unwrap())),
+            )
+            .offer(
+                OfferBuilder::protocol()
+                    .name("serviceB")
+                    .source(OfferSource::Self_)
+                    .from_dictionary("dict")
+                    .target_static_child("childB"),
+            )
             .child_default("childA")
             .child_default("childB")
             .build();
@@ -1229,24 +1164,18 @@ mod tests {
                 DictionarySource::Child(ChildRef { name: "childA".into(), collection: None }),
                 "remote/dict",
             ))
-            .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                source: offer_source_static_child("childB"),
-                source_name: "serviceA".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "serviceA".parse().unwrap(),
-                target: OfferTarget::Capability("other_dict".parse().unwrap()),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            }))
-            .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
-                source: OfferSource::Self_,
-                source_name: "dict".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "dict".parse().unwrap(),
-                target: offer_target_static_child("childC"),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            }))
+            .offer(
+                OfferBuilder::protocol()
+                    .name("serviceA")
+                    .source_static_child("childB")
+                    .target(OfferTarget::Capability("other_dict".parse().unwrap())),
+            )
+            .offer(
+                OfferBuilder::dictionary()
+                    .name("dict")
+                    .source(OfferSource::Self_)
+                    .target_static_child("childC"),
+            )
             .child_default("childA")
             .child_default("childB")
             .child_default("childC")
@@ -1267,21 +1196,17 @@ mod tests {
 
     #[fuchsia::test]
     fn test_environment_with_runner_from_parent() {
-        let decl = ComponentDecl {
-            environments: vec![EnvironmentBuilder::new()
-                .name("env")
-                .runner(cm_rust::RunnerRegistration {
+        let decl = ComponentDeclBuilder::new()
+            .environment(EnvironmentBuilder::new().name("env").runner(
+                cm_rust::RunnerRegistration {
                     source: RegistrationSource::Parent,
                     source_name: "foo".parse().unwrap(),
                     target_name: "foo".parse().unwrap(),
-                })
-                .build()],
-            children: vec![
-                ChildBuilder::new().name("childA").build(),
-                ChildBuilder::new().name("childB").environment("env").build(),
-            ],
-            ..default_component_decl()
-        };
+                },
+            ))
+            .child_default("childA")
+            .child(ChildBuilder::new().name("childB").environment("env"))
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -1295,21 +1220,17 @@ mod tests {
 
     #[fuchsia::test]
     fn test_environment_with_runner_from_self() {
-        let decl = ComponentDecl {
-            environments: vec![EnvironmentBuilder::new()
-                .name("env")
-                .runner(cm_rust::RunnerRegistration {
+        let decl = ComponentDeclBuilder::new()
+            .environment(EnvironmentBuilder::new().name("env").runner(
+                cm_rust::RunnerRegistration {
                     source: RegistrationSource::Self_,
                     source_name: "foo".parse().unwrap(),
                     target_name: "foo".parse().unwrap(),
-                })
-                .build()],
-            children: vec![
-                ChildBuilder::new().name("childA").build(),
-                ChildBuilder::new().name("childB").environment("env").build(),
-            ],
-            ..default_component_decl()
-        };
+                },
+            ))
+            .child_default("childA")
+            .child(ChildBuilder::new().name("childB").environment("env"))
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -1323,21 +1244,17 @@ mod tests {
 
     #[fuchsia::test]
     fn test_environment_with_runner_from_child() {
-        let decl = ComponentDecl {
-            environments: vec![EnvironmentBuilder::new()
-                .name("env")
-                .runner(cm_rust::RunnerRegistration {
+        let decl = ComponentDeclBuilder::new()
+            .environment(EnvironmentBuilder::new().name("env").runner(
+                cm_rust::RunnerRegistration {
                     source: RegistrationSource::Child("childA".to_string()),
                     source_name: "foo".parse().unwrap(),
                     target_name: "foo".parse().unwrap(),
-                })
-                .build()],
-            children: vec![
-                ChildBuilder::new().name("childA").build(),
-                ChildBuilder::new().name("childB").environment("env").build(),
-            ],
-            ..default_component_decl()
-        };
+                },
+            ))
+            .child_default("childA")
+            .child(ChildBuilder::new().name("childB").environment("env"))
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -1351,19 +1268,17 @@ mod tests {
 
     #[fuchsia::test]
     fn test_environment_with_runner_from_child_to_collection() {
-        let decl = ComponentDecl {
-            environments: vec![EnvironmentBuilder::new()
-                .name("env")
-                .runner(cm_rust::RunnerRegistration {
+        let decl = ComponentDeclBuilder::new()
+            .environment(EnvironmentBuilder::new().name("env").runner(
+                cm_rust::RunnerRegistration {
                     source: RegistrationSource::Child("childA".to_string()),
                     source_name: "foo".parse().unwrap(),
                     target_name: "foo".parse().unwrap(),
-                })
-                .build()],
-            collections: vec![CollectionBuilder::new().name("coll").environment("env").build()],
-            children: vec![ChildBuilder::new().name("childA").build()],
-            ..default_component_decl()
-        };
+                },
+            ))
+            .collection(CollectionBuilder::new().name("coll").environment("env"))
+            .child_default("childA")
+            .build();
 
         let instance = FakeComponent {
             decl,
@@ -1403,32 +1318,25 @@ mod tests {
 
     #[fuchsia::test]
     fn test_chained_environments() {
-        let decl = ComponentDecl {
-            environments: vec![
-                EnvironmentBuilder::new()
-                    .name("env")
-                    .runner(cm_rust::RunnerRegistration {
-                        source: RegistrationSource::Child("childA".to_string()),
-                        source_name: "foo".parse().unwrap(),
-                        target_name: "foo".parse().unwrap(),
-                    })
-                    .build(),
-                EnvironmentBuilder::new()
-                    .name("env2")
-                    .runner(cm_rust::RunnerRegistration {
-                        source: RegistrationSource::Child("childB".to_string()),
-                        source_name: "bar".parse().unwrap(),
-                        target_name: "bar".parse().unwrap(),
-                    })
-                    .build(),
-            ],
-            children: vec![
-                ChildBuilder::new().name("childA").build(),
-                ChildBuilder::new().name("childB").environment("env").build(),
-                ChildBuilder::new().name("childC").environment("env2").build(),
-            ],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .environment(EnvironmentBuilder::new().name("env").runner(
+                cm_rust::RunnerRegistration {
+                    source: RegistrationSource::Child("childA".to_string()),
+                    source_name: "foo".parse().unwrap(),
+                    target_name: "foo".parse().unwrap(),
+                },
+            ))
+            .environment(EnvironmentBuilder::new().name("env2").runner(
+                cm_rust::RunnerRegistration {
+                    source: RegistrationSource::Child("childB".to_string()),
+                    source_name: "bar".parse().unwrap(),
+                    target_name: "bar".parse().unwrap(),
+                },
+            ))
+            .child_default("childA")
+            .child(ChildBuilder::new().name("childB").environment("env"))
+            .child(ChildBuilder::new().name("childC").environment("env2"))
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -1447,31 +1355,25 @@ mod tests {
 
     #[fuchsia::test]
     fn test_environment_and_offer() {
-        let decl = ComponentDecl {
-            offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
-                source: offer_source_static_child("childB"),
-                source_name: "childBOffer".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "serviceSibling".parse().unwrap(),
-                target: offer_target_static_child("childC"),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            })],
-            environments: vec![EnvironmentBuilder::new()
-                .name("env")
-                .runner(cm_rust::RunnerRegistration {
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childBOffer")
+                    .target_name("serviceSibling")
+                    .source_static_child("childB")
+                    .target_static_child("childC"),
+            )
+            .environment(EnvironmentBuilder::new().name("env").runner(
+                cm_rust::RunnerRegistration {
                     source: RegistrationSource::Child("childA".into()),
                     source_name: "foo".parse().unwrap(),
                     target_name: "foo".parse().unwrap(),
-                })
-                .build()],
-            children: vec![
-                ChildBuilder::new().name("childA").build(),
-                ChildBuilder::new().name("childB").environment("env").build(),
-                ChildBuilder::new().name("childC").build(),
-            ],
-            ..default_component_decl()
-        };
+                },
+            ))
+            .child_default("childA")
+            .child(ChildBuilder::new().name("childB").environment("env"))
+            .child_default("childC")
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -1490,21 +1392,17 @@ mod tests {
 
     #[fuchsia::test]
     fn test_environment_with_resolver_from_parent() {
-        let decl = ComponentDecl {
-            environments: vec![EnvironmentBuilder::new()
-                .name("resolver_env")
-                .resolver(cm_rust::ResolverRegistration {
+        let decl = ComponentDeclBuilder::new()
+            .environment(EnvironmentBuilder::new().name("resolver_env").resolver(
+                cm_rust::ResolverRegistration {
                     source: RegistrationSource::Parent,
                     resolver: "foo".parse().unwrap(),
                     scheme: "httweeeeees".into(),
-                })
-                .build()],
-            children: vec![
-                ChildBuilder::new().name("childA").build(),
-                ChildBuilder::new().name("childB").environment("resolver_env").build(),
-            ],
-            ..default_component_decl()
-        };
+                },
+            ))
+            .child_default("childA")
+            .child(ChildBuilder::new().name("childB").environment("resolver_env"))
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -1518,21 +1416,17 @@ mod tests {
 
     #[fuchsia::test]
     fn test_environment_with_resolver_from_child() {
-        let decl = ComponentDecl {
-            environments: vec![EnvironmentBuilder::new()
-                .name("resolver_env")
-                .resolver(cm_rust::ResolverRegistration {
+        let decl = ComponentDeclBuilder::new()
+            .environment(EnvironmentBuilder::new().name("resolver_env").resolver(
+                cm_rust::ResolverRegistration {
                     source: RegistrationSource::Child("childA".to_string()),
                     resolver: "foo".parse().unwrap(),
                     scheme: "httweeeeees".into(),
-                })
-                .build()],
-            children: vec![
-                ChildBuilder::new().name("childA").build(),
-                ChildBuilder::new().name("childB").environment("resolver_env").build(),
-            ],
-            ..default_component_decl()
-        };
+                },
+            ))
+            .child_default("childA")
+            .child(ChildBuilder::new().name("childB").environment("resolver_env"))
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -1548,32 +1442,25 @@ mod tests {
 
     #[fuchsia::test]
     fn test_environment_with_chain_of_resolvers() {
-        let decl = ComponentDecl {
-            environments: vec![
-                EnvironmentBuilder::new()
-                    .name("env1")
-                    .resolver(cm_rust::ResolverRegistration {
-                        source: RegistrationSource::Child("childA".to_string()),
-                        resolver: "foo".parse().unwrap(),
-                        scheme: "httweeeeees".into(),
-                    })
-                    .build(),
-                EnvironmentBuilder::new()
-                    .name("env2")
-                    .resolver(cm_rust::ResolverRegistration {
-                        source: RegistrationSource::Child("childB".to_string()),
-                        resolver: "bar".parse().unwrap(),
-                        scheme: "httweeeeee".into(),
-                    })
-                    .build(),
-            ],
-            children: vec![
-                ChildBuilder::new().name("childA").build(),
-                ChildBuilder::new().name("childB").environment("env1").build(),
-                ChildBuilder::new().name("childC").environment("env2").build(),
-            ],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .environment(EnvironmentBuilder::new().name("env1").resolver(
+                cm_rust::ResolverRegistration {
+                    source: RegistrationSource::Child("childA".to_string()),
+                    resolver: "foo".parse().unwrap(),
+                    scheme: "httweeeeees".into(),
+                },
+            ))
+            .environment(EnvironmentBuilder::new().name("env2").resolver(
+                cm_rust::ResolverRegistration {
+                    source: RegistrationSource::Child("childB".to_string()),
+                    resolver: "bar".parse().unwrap(),
+                    scheme: "httweeeeee".into(),
+                },
+            ))
+            .child_default("childA")
+            .child(ChildBuilder::new().name("childB").environment("env1"))
+            .child(ChildBuilder::new().name("childC").environment("env2"))
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -1592,27 +1479,25 @@ mod tests {
 
     #[fuchsia::test]
     fn test_environment_with_resolver_and_runner_from_child() {
-        let decl = ComponentDecl {
-            environments: vec![EnvironmentBuilder::new()
-                .name("multi_env")
-                .resolver(cm_rust::ResolverRegistration {
-                    source: RegistrationSource::Child("childA".to_string()),
-                    resolver: "foo".parse().unwrap(),
-                    scheme: "httweeeeees".into(),
-                })
-                .runner(cm_rust::RunnerRegistration {
-                    source: RegistrationSource::Child("childB".to_string()),
-                    source_name: "bar".parse().unwrap(),
-                    target_name: "bar".parse().unwrap(),
-                })
-                .build()],
-            children: vec![
-                ChildBuilder::new().name("childA").build(),
-                ChildBuilder::new().name("childB").build(),
-                ChildBuilder::new().name("childC").environment("multi_env").build(),
-            ],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .environment(
+                EnvironmentBuilder::new()
+                    .name("multi_env")
+                    .resolver(cm_rust::ResolverRegistration {
+                        source: RegistrationSource::Child("childA".to_string()),
+                        resolver: "foo".parse().unwrap(),
+                        scheme: "httweeeeees".into(),
+                    })
+                    .runner(cm_rust::RunnerRegistration {
+                        source: RegistrationSource::Child("childB".to_string()),
+                        source_name: "bar".parse().unwrap(),
+                        target_name: "bar".parse().unwrap(),
+                    }),
+            )
+            .child_default("childA")
+            .child_default("childB")
+            .child(ChildBuilder::new().name("childC").environment("multi_env"))
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -1631,22 +1516,17 @@ mod tests {
 
     #[fuchsia::test]
     fn test_environment_with_collection_resolver_from_child() {
-        let decl = ComponentDecl {
-            environments: vec![EnvironmentBuilder::new()
-                .name("resolver_env")
-                .resolver(cm_rust::ResolverRegistration {
+        let decl = ComponentDeclBuilder::new()
+            .environment(EnvironmentBuilder::new().name("resolver_env").resolver(
+                cm_rust::ResolverRegistration {
                     source: RegistrationSource::Child("childA".to_string()),
                     resolver: "foo".parse().unwrap(),
                     scheme: "httweeeeees".into(),
-                })
-                .build()],
-            children: vec![ChildBuilder::new().name("childA").build()],
-            collections: vec![CollectionBuilder::new()
-                .name("coll")
-                .environment("resolver_env")
-                .build()],
-            ..default_component_decl()
-        };
+                },
+            ))
+            .child_default("childA")
+            .collection(CollectionBuilder::new().name("coll").environment("resolver_env"))
+            .build();
 
         let instance = FakeComponent {
             decl,
@@ -1705,36 +1585,30 @@ mod tests {
                 Child { moniker: "coll:dyn4".try_into().unwrap(), environment_name: None },
             ],
             dynamic_offers: vec![
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Child(ChildRef {
+                OfferBuilder::protocol()
+                    .name("test.protocol")
+                    .target_name("test.protocol")
+                    .source(OfferSource::Child(ChildRef {
                         name: "dyn1".into(),
                         collection: Some("coll".parse().unwrap()),
-                    }),
-                    target: OfferTarget::Child(ChildRef {
+                    }))
+                    .target(OfferTarget::Child(ChildRef {
                         name: "dyn2".into(),
                         collection: Some("coll".parse().unwrap()),
-                    }),
-                    source_name: "test.protocol".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "test.protocol".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Child(ChildRef {
+                    }))
+                    .build(),
+                OfferBuilder::protocol()
+                    .name("test.protocol")
+                    .target_name("test.protocol")
+                    .source(OfferSource::Child(ChildRef {
                         name: "dyn1".into(),
                         collection: Some("coll".parse().unwrap()),
-                    }),
-                    target: OfferTarget::Child(ChildRef {
+                    }))
+                    .target(OfferTarget::Child(ChildRef {
                         name: "dyn3".into(),
                         collection: Some("coll".parse().unwrap()),
-                    }),
-                    source_name: "test.protocol".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "test.protocol".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
+                    }))
+                    .build(),
             ],
         };
 
@@ -1778,36 +1652,28 @@ mod tests {
                 Child { moniker: "coll2:dyn2".try_into().unwrap(), environment_name: None },
             ],
             dynamic_offers: vec![
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Child(ChildRef {
+                OfferBuilder::protocol()
+                    .name("test.protocol")
+                    .source(OfferSource::Child(ChildRef {
                         name: "dyn1".into(),
                         collection: Some("coll1".parse().unwrap()),
-                    }),
-                    target: OfferTarget::Child(ChildRef {
+                    }))
+                    .target(OfferTarget::Child(ChildRef {
                         name: "dyn1".into(),
                         collection: Some("coll2".parse().unwrap()),
-                    }),
-                    source_name: "test.protocol".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "test.protocol".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Child(ChildRef {
+                    }))
+                    .build(),
+                OfferBuilder::protocol()
+                    .name("test.protocol")
+                    .source(OfferSource::Child(ChildRef {
                         name: "dyn2".into(),
                         collection: Some("coll2".parse().unwrap()),
-                    }),
-                    target: OfferTarget::Child(ChildRef {
+                    }))
+                    .target(OfferTarget::Child(ChildRef {
                         name: "dyn1".into(),
                         collection: Some("coll1".parse().unwrap()),
-                    }),
-                    source_name: "test.protocol".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "test.protocol".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
+                    }))
+                    .build(),
             ],
         };
 
@@ -1837,18 +1703,14 @@ mod tests {
                 Child { moniker: "coll:dyn1".try_into().unwrap(), environment_name: None },
                 Child { moniker: "coll:dyn2".try_into().unwrap(), environment_name: None },
             ],
-            dynamic_offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
-                source: OfferSource::Parent,
-                target: OfferTarget::Child(ChildRef {
+            dynamic_offers: vec![OfferBuilder::protocol()
+                .name("test.protocol")
+                .source(OfferSource::Parent)
+                .target(OfferTarget::Child(ChildRef {
                     name: "dyn1".into(),
                     collection: Some("coll".parse().unwrap()),
-                }),
-                source_name: "test.protocol".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "test.protocol".parse().unwrap(),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            })],
+                }))
+                .build()],
         };
 
         pretty_assertions::assert_eq!(
@@ -1873,18 +1735,14 @@ mod tests {
                 Child { moniker: "coll:dyn1".try_into().unwrap(), environment_name: None },
                 Child { moniker: "coll:dyn2".try_into().unwrap(), environment_name: None },
             ],
-            dynamic_offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
-                source: OfferSource::Self_,
-                target: OfferTarget::Child(ChildRef {
+            dynamic_offers: vec![OfferBuilder::protocol()
+                .name("test.protocol")
+                .source(OfferSource::Self_)
+                .target(OfferTarget::Child(ChildRef {
                     name: "dyn1".into(),
                     collection: Some("coll".parse().unwrap()),
-                }),
-                source_name: "test.protocol".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "test.protocol".parse().unwrap(),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            })],
+                }))
+                .build()],
         };
 
         pretty_assertions::assert_eq!(
@@ -1914,18 +1772,14 @@ mod tests {
                 Child { moniker: "coll:dyn1".try_into().unwrap(), environment_name: None },
                 Child { moniker: "coll:dyn2".try_into().unwrap(), environment_name: None },
             ],
-            dynamic_offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
-                source: OfferSource::Child(ChildRef { name: "childA".into(), collection: None }),
-                target: OfferTarget::Child(ChildRef {
+            dynamic_offers: vec![OfferBuilder::protocol()
+                .name("test.protocol")
+                .source_static_child("childA")
+                .target(OfferTarget::Child(ChildRef {
                     name: "dyn1".into(),
                     collection: Some("coll".parse().unwrap()),
-                }),
-                source_name: "test.protocol".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "test.protocol".parse().unwrap(),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            })],
+                }))
+                .build()],
         };
 
         pretty_assertions::assert_eq!(
@@ -1947,46 +1801,25 @@ mod tests {
 
     #[test_case(DependencyType::Weak)]
     fn test_single_weak_dependency(weak_dep: DependencyType) {
-        let child_a = ChildDecl {
-            name: "childA".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let child_b = ChildDecl {
-            name: "childB".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let decl = ComponentDecl {
-            offers: vec![
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "serviceSelf".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "serviceSelf".parse().unwrap(),
-                    target: offer_target_static_child("childA"),
-                    dependency_type: weak_dep.clone(),
-                    availability: Availability::Required,
-                }),
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childB"),
-                    source_name: "childBOffer".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "serviceSibling".parse().unwrap(),
-                    target: offer_target_static_child("childA"),
-                    dependency_type: weak_dep.clone(),
-                    availability: Availability::Required,
-                }),
-            ],
-            children: vec![child_a.clone(), child_b.clone()],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("serviceSelf")
+                    .source(OfferSource::Self_)
+                    .target_static_child("childA")
+                    .dependency(weak_dep.clone()),
+            )
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childBOffer")
+                    .target_name("serviceSibling")
+                    .source_static_child("childB")
+                    .target_static_child("childA")
+                    .dependency(weak_dep.clone()),
+            )
+            .child_default("childA")
+            .child_default("childB")
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -2000,55 +1833,30 @@ mod tests {
 
     #[fuchsia::test]
     fn test_multiple_dependencies_same_source() {
-        let child_a = ChildDecl {
-            name: "childA".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let child_b = ChildDecl {
-            name: "childB".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let decl = ComponentDecl {
-            offers: vec![
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: OfferSource::Self_,
-                    source_name: "serviceSelf".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "serviceSelf".parse().unwrap(),
-                    target: offer_target_static_child("childA"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childB"),
-                    source_name: "childBOffer".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "serviceSibling".parse().unwrap(),
-                    target: offer_target_static_child("childA"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childB"),
-                    source_name: "childBOtherOffer".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "serviceOtherSibling".parse().unwrap(),
-                    target: offer_target_static_child("childA"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-            ],
-            children: vec![child_a.clone(), child_b.clone()],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("serviceSelf")
+                    .source(OfferSource::Self_)
+                    .target_static_child("childA"),
+            )
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childBOffer")
+                    .target_name("serviceSibling")
+                    .source_static_child("childB")
+                    .target_static_child("childA"),
+            )
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childBOtherOffer")
+                    .target_name("serviceOtherSibling")
+                    .source_static_child("childB")
+                    .target_static_child("childA"),
+            )
+            .child_default("childA")
+            .child_default("childB")
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -2062,55 +1870,25 @@ mod tests {
 
     #[fuchsia::test]
     fn test_multiple_dependents_same_source() {
-        let child_a = ChildDecl {
-            name: "childA".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let child_b = ChildDecl {
-            name: "childB".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let child_c = ChildDecl {
-            name: "childC".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let decl = ComponentDecl {
-            offers: vec![
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childB"),
-                    source_name: "childBOffer".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "serviceSibling".parse().unwrap(),
-                    target: offer_target_static_child("childA"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childB"),
-                    source_name: "childBToC".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "serviceSibling".parse().unwrap(),
-                    target: offer_target_static_child("childC"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-            ],
-            children: vec![child_a.clone(), child_b.clone(), child_c.clone()],
-
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childBOffer")
+                    .target_name("serviceSibling")
+                    .source_static_child("childB")
+                    .target_static_child("childA"),
+            )
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childBToC")
+                    .target_name("serviceSibling")
+                    .source_static_child("childB")
+                    .target_static_child("childC"),
+            )
+            .child_default("childA")
+            .child_default("childB")
+            .child_default("childC")
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -2129,63 +1907,33 @@ mod tests {
 
     #[test_case(DependencyType::Weak)]
     fn test_multiple_dependencies(weak_dep: DependencyType) {
-        let child_a = ChildDecl {
-            name: "childA".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let child_b = ChildDecl {
-            name: "childB".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let child_c = ChildDecl {
-            name: "childC".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let decl = ComponentDecl {
-            offers: vec![
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childA"),
-                    source_name: "childBOffer".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "serviceSibling".parse().unwrap(),
-                    target: offer_target_static_child("childC"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childB"),
-                    source_name: "childBToC".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "serviceSibling".parse().unwrap(),
-                    target: offer_target_static_child("childC"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childC"),
-                    source_name: "childCToA".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "serviceSibling".parse().unwrap(),
-                    target: offer_target_static_child("childA"),
-                    dependency_type: weak_dep,
-                    availability: Availability::Required,
-                }),
-            ],
-            children: vec![child_a.clone(), child_b.clone(), child_c.clone()],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childBOffer")
+                    .target_name("serviceSibling")
+                    .source_static_child("childA")
+                    .target_static_child("childC"),
+            )
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childBToC")
+                    .target_name("serviceSibling")
+                    .source_static_child("childB")
+                    .target_static_child("childC"),
+            )
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childCToA")
+                    .target_name("serviceSibling")
+                    .source_static_child("childC")
+                    .target_static_child("childA")
+                    .dependency(weak_dep),
+            )
+            .child_default("childA")
+            .child_default("childB")
+            .child_default("childC")
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -2204,54 +1952,25 @@ mod tests {
 
     #[fuchsia::test]
     fn test_component_is_source_and_target() {
-        let child_a = ChildDecl {
-            name: "childA".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let child_b = ChildDecl {
-            name: "childB".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let child_c = ChildDecl {
-            name: "childC".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let decl = ComponentDecl {
-            offers: vec![
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childA"),
-                    source_name: "childBOffer".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "serviceSibling".parse().unwrap(),
-                    target: offer_target_static_child("childB"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childB"),
-                    source_name: "childBToC".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "serviceSibling".parse().unwrap(),
-                    target: offer_target_static_child("childC"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-            ],
-            children: vec![child_a.clone(), child_b.clone(), child_c.clone()],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childBOffer")
+                    .target_name("serviceSibling")
+                    .source_static_child("childA")
+                    .target_static_child("childB"),
+            )
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childBToC")
+                    .target_name("serviceSibling")
+                    .source_static_child("childB")
+                    .target_static_child("childC"),
+            )
+            .child_default("childA")
+            .child_default("childB")
+            .child_default("childC")
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -2279,103 +1998,43 @@ mod tests {
     ///      *>~~>*
     #[fuchsia::test]
     fn test_complex_routing() {
-        let child_a = ChildDecl {
-            name: "childA".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let child_b = ChildDecl {
-            name: "childB".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let child_c = ChildDecl {
-            name: "childC".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let child_d = ChildDecl {
-            name: "childD".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let child_e = ChildDecl {
-            name: "childE".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let decl = ComponentDecl {
-            offers: vec![
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childA"),
-                    source_name: "childAService".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "childAService".parse().unwrap(),
-                    target: offer_target_static_child("childB"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childA"),
-                    source_name: "childAService".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "childAService".parse().unwrap(),
-                    target: offer_target_static_child("childC"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childB"),
-                    source_name: "childBService".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "childBService".parse().unwrap(),
-                    target: offer_target_static_child("childD"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childC"),
-                    source_name: "childAService".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "childAService".parse().unwrap(),
-                    target: offer_target_static_child("childD"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                OfferDecl::Protocol(OfferProtocolDecl {
-                    source: offer_source_static_child("childC"),
-                    source_name: "childAService".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_name: "childAService".parse().unwrap(),
-                    target: offer_target_static_child("childE"),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-            ],
-            children: vec![
-                child_a.clone(),
-                child_b.clone(),
-                child_c.clone(),
-                child_d.clone(),
-                child_e.clone(),
-            ],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childAService")
+                    .source_static_child("childA")
+                    .target_static_child("childB"),
+            )
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childAService")
+                    .source_static_child("childA")
+                    .target_static_child("childC"),
+            )
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childBService")
+                    .source_static_child("childB")
+                    .target_static_child("childD"),
+            )
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childAService")
+                    .source_static_child("childC")
+                    .target_static_child("childD"),
+            )
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childAService")
+                    .source_static_child("childC")
+                    .target_static_child("childE"),
+            )
+            .child_default("childA")
+            .child_default("childB")
+            .child_default("childC")
+            .child_default("childD")
+            .child_default("childE")
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -2398,28 +2057,17 @@ mod tests {
 
     #[fuchsia::test]
     fn test_target_does_not_exist() {
-        let child_a = ChildDecl {
-            name: "childA".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
         // This declaration is invalid because the offer target doesn't exist
-        let decl = ComponentDecl {
-            offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
-                source: offer_source_static_child("childA"),
-                source_name: "childBOffer".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "serviceSibling".parse().unwrap(),
-                target: offer_target_static_child("childB"),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            })],
-            children: vec![child_a.clone()],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childBOffer")
+                    .target_name("serviceSibling")
+                    .source_static_child("childA")
+                    .target_static_child("childB"),
+            )
+            .child_default("childA")
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -2432,38 +2080,16 @@ mod tests {
 
     #[fuchsia::test]
     fn test_service_from_collection() {
-        let decl = ComponentDecl {
-            collections: vec![CollectionDecl {
-                name: "coll".parse().unwrap(),
-                durability: fdecl::Durability::Transient,
-                environment: None,
-                allowed_offers: cm_types::AllowedOffers::StaticOnly,
-                allow_long_names: false,
-                persistent_storage: Some(false),
-            }],
-            children: vec![ChildDecl {
-                name: "static_child".parse().unwrap(),
-                url: "fuchsia-pkg://imaginary".to_string(),
-                startup: fdecl::StartupMode::Lazy,
-                on_terminate: None,
-                environment: None,
-                config_overrides: None,
-            }],
-            offers: vec![OfferDecl::Service(OfferServiceDecl {
-                source: OfferSource::Collection("coll".parse().unwrap()),
-                source_name: "service_capability".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target: OfferTarget::Child(ChildRef {
-                    name: "static_child".into(),
-                    collection: None,
-                }),
-                target_name: "service_capbility".parse().unwrap(),
-                source_instance_filter: None,
-                renamed_instances: None,
-                availability: Availability::Required,
-            })],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .collection_default("coll")
+            .child_default("static_child")
+            .offer(
+                OfferBuilder::service()
+                    .name("service_capability")
+                    .source(OfferSource::Collection("coll".parse().unwrap()))
+                    .target_static_child("static_child"),
+            )
+            .build();
 
         let dynamic_child = ChildName::try_new("dynamic_child", Some("coll")).unwrap();
         let mut fake = FakeComponent::from_decl(decl);
@@ -2484,38 +2110,16 @@ mod tests {
 
     #[fuchsia::test]
     fn test_service_from_collection_with_multiple_instances() {
-        let decl = ComponentDecl {
-            collections: vec![CollectionDecl {
-                name: "coll".parse().unwrap(),
-                durability: fdecl::Durability::Transient,
-                environment: None,
-                allowed_offers: cm_types::AllowedOffers::StaticOnly,
-                allow_long_names: false,
-                persistent_storage: Some(false),
-            }],
-            children: vec![ChildDecl {
-                name: "static_child".parse().unwrap(),
-                url: "fuchsia-pkg://imaginary".to_string(),
-                startup: fdecl::StartupMode::Lazy,
-                on_terminate: None,
-                environment: None,
-                config_overrides: None,
-            }],
-            offers: vec![OfferDecl::Service(OfferServiceDecl {
-                source: OfferSource::Collection("coll".parse().unwrap()),
-                source_name: "service_capability".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target: OfferTarget::Child(ChildRef {
-                    name: "static_child".into(),
-                    collection: None,
-                }),
-                target_name: "service_capbility".parse().unwrap(),
-                source_instance_filter: None,
-                renamed_instances: None,
-                availability: Availability::Required,
-            })],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .collection_default("coll")
+            .child_default("static_child")
+            .offer(
+                OfferBuilder::service()
+                    .name("service_capability")
+                    .source(OfferSource::Collection("coll".parse().unwrap()))
+                    .target_static_child("static_child"),
+            )
+            .build();
 
         let dynamic_child1 = ChildName::try_new("dynamic_child1", Some("coll")).unwrap();
         let dynamic_child2 = ChildName::try_new("dynamic_child2", Some("coll")).unwrap();
@@ -2542,45 +2146,21 @@ mod tests {
 
     #[fuchsia::test]
     fn test_service_dependency_between_collections() {
-        let c1_name = "coll1".to_string();
-        let c2_name = "coll2".to_string();
-        let cap_name = "fuchsia.service.FakeService".to_string();
-        let decl = ComponentDecl {
-            collections: vec![
-                CollectionDecl {
-                    name: c1_name.parse().unwrap(),
-                    durability: fdecl::Durability::Transient,
-                    environment: None,
-                    allowed_offers: cm_types::AllowedOffers::StaticOnly,
-                    allow_long_names: false,
-                    persistent_storage: Some(false),
-                },
-                CollectionDecl {
-                    name: c2_name.parse().unwrap(),
-                    durability: fdecl::Durability::Transient,
-                    environment: None,
-                    allowed_offers: cm_types::AllowedOffers::StaticOnly,
-                    allow_long_names: false,
-                    persistent_storage: Some(false),
-                },
-            ],
-            offers: vec![OfferDecl::Service(OfferServiceDecl {
-                source: OfferSource::Collection(c1_name.parse().unwrap()),
-                source_name: cap_name.clone().parse().unwrap(),
-                source_dictionary: Default::default(),
-                target: OfferTarget::Collection(c2_name.parse().unwrap()),
-                target_name: cap_name.clone().parse().unwrap(),
-                source_instance_filter: None,
-                renamed_instances: None,
-                availability: Availability::Required,
-            })],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .collection_default("coll1")
+            .collection_default("coll2")
+            .offer(
+                OfferBuilder::service()
+                    .name("fuchsia.service.FakeService")
+                    .source(OfferSource::Collection("coll1".parse().unwrap()))
+                    .target(OfferTarget::Collection("coll2".parse().unwrap())),
+            )
+            .build();
 
-        let source_child1 = ChildName::try_new("source_child1", Some(&c1_name)).unwrap();
-        let source_child2 = ChildName::try_new("source_child2", Some(&c1_name)).unwrap();
-        let target_child1 = ChildName::try_new("target_child1", Some(&c2_name)).unwrap();
-        let target_child2 = ChildName::try_new("target_child2", Some(&c2_name)).unwrap();
+        let source_child1 = ChildName::try_new("source_child1", Some("coll1")).unwrap();
+        let source_child2 = ChildName::try_new("source_child2", Some("coll1")).unwrap();
+        let target_child1 = ChildName::try_new("target_child1", Some("coll2")).unwrap();
+        let target_child2 = ChildName::try_new("target_child2", Some("coll2")).unwrap();
 
         let mut fake = FakeComponent::from_decl(decl);
         fake.dynamic_children
@@ -2617,28 +2197,17 @@ mod tests {
 
     #[fuchsia::test]
     fn test_source_does_not_exist() {
-        let child_a = ChildDecl {
-            name: "childA".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
         // This declaration is invalid because the offer target doesn't exist
-        let decl = ComponentDecl {
-            offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
-                source: offer_source_static_child("childB"),
-                source_name: "childBOffer".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "serviceSibling".parse().unwrap(),
-                target: offer_target_static_child("childA"),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            })],
-            children: vec![child_a.clone()],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("childBOffer")
+                    .target_name("serviceSibling")
+                    .source_static_child("childB")
+                    .target_static_child("childA"),
+            )
+            .child_default("childA")
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -2651,34 +2220,21 @@ mod tests {
 
     #[fuchsia::test]
     fn test_use_from_child() {
-        let decl = ComponentDecl {
-            offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
-                source: OfferSource::Self_,
-                source_name: "serviceSelf".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "serviceSelf".parse().unwrap(),
-                target: offer_target_static_child("childA"),
-                dependency_type: DependencyType::Weak,
-                availability: Availability::Required,
-            })],
-            children: vec![ChildDecl {
-                name: "childA".to_string(),
-                url: "ignored:///child".to_string(),
-                startup: fdecl::StartupMode::Lazy,
-                environment: None,
-                on_terminate: None,
-                config_overrides: None,
-            }],
-            uses: vec![UseDecl::Protocol(UseProtocolDecl {
-                source: UseSource::Child("childA".to_string()),
-                source_name: "test.protocol".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_path: "/svc/test.protocol".parse().unwrap(),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            })],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("serviceSelf")
+                    .source(OfferSource::Self_)
+                    .target_static_child("childA")
+                    .dependency(DependencyType::Weak),
+            )
+            .child_default("childA")
+            .use_(
+                UseBuilder::protocol()
+                    .name("test.protocol")
+                    .source(UseSource::Child("childA".into())),
+            )
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -2693,24 +2249,19 @@ mod tests {
     fn test_use_from_dictionary() {
         let decl = ComponentDeclBuilder::new()
             .dictionary_default("dict")
-            .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                source: OfferSource::Self_,
-                source_name: "weakService".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "weakService".parse().unwrap(),
-                target: offer_target_static_child("childA"),
-                dependency_type: DependencyType::Weak,
-                availability: Availability::Required,
-            }))
-            .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                source: offer_source_static_child("childA"),
-                source_name: "serviceA".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "serviceA".parse().unwrap(),
-                target: OfferTarget::Capability("dict".parse().unwrap()),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            }))
+            .offer(
+                OfferBuilder::protocol()
+                    .name("weakService")
+                    .source(OfferSource::Self_)
+                    .target_static_child("childA")
+                    .dependency(DependencyType::Weak),
+            )
+            .offer(
+                OfferBuilder::protocol()
+                    .name("serviceA")
+                    .source_static_child("childA")
+                    .target(OfferTarget::Capability("dict".parse().unwrap())),
+            )
             .child_default("childA")
             .use_(
                 UseBuilder::protocol()
@@ -2732,22 +2283,12 @@ mod tests {
 
     #[fuchsia::test]
     fn test_use_runner_from_child() {
-        let decl = ComponentDecl {
-            children: vec![ChildDecl {
-                name: "childA".to_string(),
-                url: "ignored:///child".to_string(),
-                startup: fdecl::StartupMode::Lazy,
-                environment: None,
-                on_terminate: None,
-                config_overrides: None,
-            }],
-            uses: vec![UseDecl::Runner(UseRunnerDecl {
-                source: UseSource::Child("childA".to_string()),
-                source_name: "test.runner".parse().unwrap(),
-                source_dictionary: Default::default(),
-            })],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .child_default("childA")
+            .use_(
+                UseBuilder::runner().name("test.runner").source(UseSource::Child("childA".into())),
+            )
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -2760,44 +2301,22 @@ mod tests {
 
     #[fuchsia::test]
     fn test_use_from_some_children() {
-        let decl = ComponentDecl {
-            offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
-                source: OfferSource::Self_,
-                source_name: "serviceSelf".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "serviceSelf".parse().unwrap(),
-                target: offer_target_static_child("childA"),
-                dependency_type: DependencyType::Weak,
-                availability: Availability::Required,
-            })],
-            children: vec![
-                ChildDecl {
-                    name: "childA".to_string(),
-                    url: "ignored:///child".to_string(),
-                    startup: fdecl::StartupMode::Lazy,
-                    environment: None,
-                    on_terminate: None,
-                    config_overrides: None,
-                },
-                ChildDecl {
-                    name: "childB".to_string(),
-                    url: "ignored:///child".to_string(),
-                    startup: fdecl::StartupMode::Lazy,
-                    environment: None,
-                    on_terminate: None,
-                    config_overrides: None,
-                },
-            ],
-            uses: vec![UseDecl::Protocol(UseProtocolDecl {
-                source: UseSource::Child("childA".to_string()),
-                source_name: "test.protocol".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_path: "/svc/test.protocol".parse().unwrap(),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            })],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("serviceSelf")
+                    .source(OfferSource::Self_)
+                    .target_static_child("childA")
+                    .dependency(DependencyType::Weak),
+            )
+            .child_default("childA")
+            .child_default("childB")
+            .use_(
+                UseBuilder::protocol()
+                    .name("test.protocol")
+                    .source(UseSource::Child("childA".into())),
+            )
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -2814,67 +2333,39 @@ mod tests {
 
     #[fuchsia::test]
     fn test_use_from_child_offer_storage() {
-        let decl = ComponentDecl {
-            capabilities: vec![
-                CapabilityDecl::Storage(StorageDecl {
-                    name: "cdata".parse().unwrap(),
-                    source: StorageDirectorySource::Child("childB".to_string()),
-                    backing_dir: "directory".parse().unwrap(),
-                    subdir: Default::default(),
-                    storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                }),
-                CapabilityDecl::Storage(StorageDecl {
-                    name: "pdata".parse().unwrap(),
-                    source: StorageDirectorySource::Parent,
-                    backing_dir: "directory".parse().unwrap(),
-                    subdir: Default::default(),
-                    storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                }),
-            ],
-            offers: vec![
-                OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Self_,
-                    source_name: "cdata".parse().unwrap(),
-                    target_name: "cdata".parse().unwrap(),
-                    target: offer_target_static_child("childA"),
-                    availability: Availability::Required,
-                }),
-                OfferDecl::Storage(OfferStorageDecl {
-                    source: OfferSource::Self_,
-                    source_name: "pdata".parse().unwrap(),
-                    target_name: "pdata".parse().unwrap(),
-                    target: offer_target_static_child("childA"),
-                    availability: Availability::Required,
-                }),
-            ],
-            children: vec![
-                ChildDecl {
-                    name: "childA".to_string(),
-                    url: "ignored:///child".to_string(),
-                    startup: fdecl::StartupMode::Lazy,
-                    environment: None,
-                    on_terminate: None,
-                    config_overrides: None,
-                },
-                ChildDecl {
-                    name: "childB".to_string(),
-                    url: "ignored:///child".to_string(),
-                    startup: fdecl::StartupMode::Lazy,
-                    environment: None,
-                    on_terminate: None,
-                    config_overrides: None,
-                },
-            ],
-            uses: vec![UseDecl::Protocol(UseProtocolDecl {
-                source: UseSource::Child("childA".to_string()),
-                source_name: "test.protocol".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_path: "/svc/test.protocol".parse().unwrap(),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            })],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .capability(
+                CapabilityBuilder::storage()
+                    .name("cdata")
+                    .source(StorageDirectorySource::Child("childB".into()))
+                    .backing_dir("directory"),
+            )
+            .capability(
+                CapabilityBuilder::storage()
+                    .name("pdata")
+                    .source(StorageDirectorySource::Parent)
+                    .backing_dir("directory"),
+            )
+            .offer(
+                OfferBuilder::storage()
+                    .name("cdata")
+                    .source(OfferSource::Self_)
+                    .target_static_child("childA"),
+            )
+            .offer(
+                OfferBuilder::storage()
+                    .name("pdata")
+                    .source(OfferSource::Self_)
+                    .target_static_child("childA"),
+            )
+            .child_default("childA")
+            .child_default("childB")
+            .use_(
+                UseBuilder::protocol()
+                    .name("test.protocol")
+                    .source(UseSource::Child("childA".into())),
+            )
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -2890,34 +2381,21 @@ mod tests {
 
     #[fuchsia::test]
     fn test_use_from_child_weak() {
-        let decl = ComponentDecl {
-            offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
-                source: OfferSource::Self_,
-                source_name: "serviceSelf".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "serviceSelf".parse().unwrap(),
-                target: offer_target_static_child("childA"),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            })],
-            children: vec![ChildDecl {
-                name: "childA".to_string(),
-                url: "ignored:///child".to_string(),
-                startup: fdecl::StartupMode::Lazy,
-                environment: None,
-                on_terminate: None,
-                config_overrides: None,
-            }],
-            uses: vec![UseDecl::Protocol(UseProtocolDecl {
-                source: UseSource::Child("childA".to_string()),
-                source_name: "test.protocol".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_path: "/svc/test.protocol".parse().unwrap(),
-                dependency_type: DependencyType::Weak,
-                availability: Availability::Required,
-            })],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("serviceSelf")
+                    .source(OfferSource::Self_)
+                    .target_static_child("childA"),
+            )
+            .child_default("childA")
+            .use_(
+                UseBuilder::protocol()
+                    .name("test.protocol")
+                    .source(UseSource::Child("childA".into()))
+                    .dependency(DependencyType::Weak),
+            )
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -2930,54 +2408,28 @@ mod tests {
 
     #[fuchsia::test]
     fn test_use_from_some_children_weak() {
-        let decl = ComponentDecl {
-            offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
-                source: OfferSource::Self_,
-                source_name: "serviceSelf".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "serviceSelf".parse().unwrap(),
-                target: offer_target_static_child("childA"),
-                dependency_type: DependencyType::Weak,
-                availability: Availability::Required,
-            })],
-            children: vec![
-                ChildDecl {
-                    name: "childA".to_string(),
-                    url: "ignored:///child".to_string(),
-                    startup: fdecl::StartupMode::Lazy,
-                    environment: None,
-                    on_terminate: None,
-                    config_overrides: None,
-                },
-                ChildDecl {
-                    name: "childB".to_string(),
-                    url: "ignored:///child".to_string(),
-                    startup: fdecl::StartupMode::Lazy,
-                    environment: None,
-                    on_terminate: None,
-                    config_overrides: None,
-                },
-            ],
-            uses: vec![
-                UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Child("childA".to_string()),
-                    source_name: "test.protocol".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_path: "/svc/test.protocol".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Child("childB".to_string()),
-                    source_name: "test.protocol2".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_path: "/svc/test.protocol2".parse().unwrap(),
-                    dependency_type: DependencyType::Weak,
-                    availability: Availability::Required,
-                }),
-            ],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::protocol()
+                    .name("serviceSelf")
+                    .source(OfferSource::Self_)
+                    .target_static_child("childA")
+                    .dependency(DependencyType::Weak),
+            )
+            .child_default("childA")
+            .child_default("childB")
+            .use_(
+                UseBuilder::protocol()
+                    .name("test.protocol")
+                    .source(UseSource::Child("childA".into())),
+            )
+            .use_(
+                UseBuilder::protocol()
+                    .name("test.protocol2")
+                    .source(UseSource::Child("childB".into()))
+                    .dependency(DependencyType::Weak),
+            )
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -2992,33 +2444,16 @@ mod tests {
 
     #[fuchsia::test]
     fn test_resolver_capability_creates_dependency() {
-        let child_a = ChildDecl {
-            name: "childA".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let child_b = ChildDecl {
-            name: "childB".to_string(),
-            url: "ignored:///child".to_string(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        };
-        let decl = ComponentDecl {
-            offers: vec![OfferDecl::Resolver(OfferResolverDecl {
-                source: offer_source_static_child("childA"),
-                source_name: "resolver".parse().unwrap(),
-                source_dictionary: Default::default(),
-                target_name: "resolver".parse().unwrap(),
-                target: offer_target_static_child("childB"),
-            })],
-            children: vec![child_a.clone(), child_b.clone()],
-            ..default_component_decl()
-        };
+        let decl = ComponentDeclBuilder::new()
+            .offer(
+                OfferBuilder::resolver()
+                    .name("resolver")
+                    .source_static_child("childA")
+                    .target_static_child("childB"),
+            )
+            .child_default("childA")
+            .child_default("childB")
+            .build();
 
         pretty_assertions::assert_eq!(
             hashmap! {
@@ -3452,17 +2887,12 @@ mod tests {
     async fn shutdown_hierarchy() {
         let components = vec![
             ("root", ComponentDeclBuilder::new().child_default("a").build()),
-            (
-                "a",
-                ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("b").eager().build())
-                    .build(),
-            ),
+            ("a", ComponentDeclBuilder::new().child(ChildBuilder::new().name("b").eager()).build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("c").eager().build())
-                    .child(ChildBuilder::new().name("d").eager().build())
+                    .child(ChildBuilder::new().name("c").eager())
+                    .child(ChildBuilder::new().name("d").eager())
                     .build(),
             ),
             ("c", component_decl_with_test_runner()),
@@ -3539,18 +2969,13 @@ mod tests {
     async fn shutdown_with_multiple_deps() {
         let components = vec![
             ("root", ComponentDeclBuilder::new().child_default("a").build()),
-            (
-                "a",
-                ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("b").eager().build())
-                    .build(),
-            ),
+            ("a", ComponentDeclBuilder::new().child(ChildBuilder::new().name("b").eager()).build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("c").eager().build())
-                    .child(ChildBuilder::new().name("d").eager().build())
-                    .child(ChildBuilder::new().name("e").eager().build())
+                    .child(ChildBuilder::new().name("c").eager())
+                    .child(ChildBuilder::new().name("d").eager())
+                    .child(ChildBuilder::new().name("e").eager())
                     .offer(
                         OfferBuilder::protocol()
                             .name("serviceD")
@@ -3666,19 +3091,14 @@ mod tests {
     async fn shutdown_with_multiple_out_and_longer_chain() {
         let components = vec![
             ("root", ComponentDeclBuilder::new().child_default("a").build()),
-            (
-                "a",
-                ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("b").eager().build())
-                    .build(),
-            ),
+            ("a", ComponentDeclBuilder::new().child(ChildBuilder::new().name("b").eager()).build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("c").eager().build())
-                    .child(ChildBuilder::new().name("d").eager().build())
-                    .child(ChildBuilder::new().name("e").eager().build())
-                    .child(ChildBuilder::new().name("f").eager().build())
+                    .child(ChildBuilder::new().name("c").eager())
+                    .child(ChildBuilder::new().name("d").eager())
+                    .child(ChildBuilder::new().name("e").eager())
+                    .child(ChildBuilder::new().name("f").eager())
                     .offer(
                         OfferBuilder::protocol()
                             .name("serviceD")
@@ -3837,19 +3257,14 @@ mod tests {
     async fn shutdown_with_multiple_out_multiple_in() {
         let components = vec![
             ("root", ComponentDeclBuilder::new().child_default("a").build()),
-            (
-                "a",
-                ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("b").eager().build())
-                    .build(),
-            ),
+            ("a", ComponentDeclBuilder::new().child(ChildBuilder::new().name("b").eager()).build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("c").eager().build())
-                    .child(ChildBuilder::new().name("d").eager().build())
-                    .child(ChildBuilder::new().name("e").eager().build())
-                    .child(ChildBuilder::new().name("f").eager().build())
+                    .child(ChildBuilder::new().name("c").eager())
+                    .child(ChildBuilder::new().name("d").eager())
+                    .child(ChildBuilder::new().name("e").eager())
+                    .child(ChildBuilder::new().name("f").eager())
                     .offer(
                         OfferBuilder::protocol()
                             .name("serviceD")
@@ -4009,17 +3424,12 @@ mod tests {
     async fn shutdown_with_dependency() {
         let components = vec![
             ("root", ComponentDeclBuilder::new().child_default("a").build()),
-            (
-                "a",
-                ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("b").eager().build())
-                    .build(),
-            ),
+            ("a", ComponentDeclBuilder::new().child(ChildBuilder::new().name("b").eager()).build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("c").eager().build())
-                    .child(ChildBuilder::new().name("d").eager().build())
+                    .child(ChildBuilder::new().name("c").eager())
+                    .child(ChildBuilder::new().name("d").eager())
                     .offer(
                         OfferBuilder::protocol()
                             .name("serviceC")
@@ -4101,18 +3511,13 @@ mod tests {
     async fn shutdown_with_dictionary_dependency() {
         let components = vec![
             ("root", ComponentDeclBuilder::new().child_default("a").build()),
-            (
-                "a",
-                ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("b").eager().build())
-                    .build(),
-            ),
+            ("a", ComponentDeclBuilder::new().child(ChildBuilder::new().name("b").eager()).build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
                     .dictionary_default("dict")
-                    .child(ChildBuilder::new().name("c").eager().build())
-                    .child(ChildBuilder::new().name("d").eager().build())
+                    .child(ChildBuilder::new().name("c").eager())
+                    .child(ChildBuilder::new().name("d").eager())
                     .offer(
                         OfferBuilder::protocol()
                             .name("serviceC")
@@ -4202,8 +3607,8 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("b").eager().build())
-                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("b").eager())
+                    .child(ChildBuilder::new().name("c").eager())
                     .use_(
                         UseBuilder::protocol()
                             .source(UseSource::Child("b".to_string()))
@@ -4278,8 +3683,8 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("b").eager().build())
-                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("b").eager())
+                    .child(ChildBuilder::new().name("c").eager())
                     .use_(
                         UseBuilder::runner()
                             .source(UseSource::Child("b".to_string()))
@@ -4353,8 +3758,8 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("b").eager().build())
-                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("b").eager())
+                    .child(ChildBuilder::new().name("c").eager())
                     .use_(
                         UseBuilder::protocol()
                             .source(UseSource::Child("b".to_string()))
@@ -4443,8 +3848,8 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("b").eager().build())
-                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("b").eager())
+                    .child(ChildBuilder::new().name("c").eager())
                     .use_(
                         UseBuilder::protocol()
                             .source(UseSource::Child("b".to_string()))
@@ -4598,17 +4003,12 @@ mod tests {
     async fn shutdown_error() {
         let components = vec![
             ("root", ComponentDeclBuilder::new().child_default("a").build()),
-            (
-                "a",
-                ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("b").eager().build())
-                    .build(),
-            ),
+            ("a", ComponentDeclBuilder::new().child(ChildBuilder::new().name("b").eager()).build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("c").eager().build())
-                    .child(ChildBuilder::new().name("d").eager().build())
+                    .child(ChildBuilder::new().name("c").eager())
+                    .child(ChildBuilder::new().name("d").eager())
                     .build(),
             ),
             ("c", component_decl_with_test_runner()),
