@@ -11,7 +11,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/time.h>
 #include <lib/async/cpp/wait.h>
-#include <lib/ddk/debug.h>
+#include <lib/driver/compat/cpp/logging.h>
 #include <lib/image-format/image_format.h>
 #include <lib/trace/event.h>
 #include <lib/zx/result.h>

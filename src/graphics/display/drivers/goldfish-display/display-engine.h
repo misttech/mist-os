@@ -10,7 +10,6 @@
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async/cpp/wait.h>
-#include <lib/ddk/device.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/zircon-internal/thread_annotations.h>

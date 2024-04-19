@@ -12,7 +12,6 @@
 #include <map>
 #include <memory>
 
-#include <ddktl/device.h>
 #include <fbl/strong_int.h>
 
 #include "src/devices/lib/goldfish/pipe_io/pipe_io.h"

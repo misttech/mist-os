@@ -5,8 +5,9 @@
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
 
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
-#include <lib/ddk/trace/event.h>
+#include <lib/driver/compat/cpp/logging.h>
 #include <lib/fidl/cpp/wire/channel.h>
+#include <lib/trace/event.h>
 
 #include <memory>
 

@@ -8,9 +8,10 @@
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/driver.h>
+#include <lib/driver/compat/cpp/banjo_server.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/compat/cpp/logging.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
@@ -20,6 +21,8 @@
 #include <memory>
 #include <string_view>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/display/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/goldfish-display/display-engine.h"
@@ -36,10 +39,9 @@ zx_koid_t GetKoid(zx_handle_t handle) {
 }
 
 zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> CreateAndInitializeSysmemAllocator(
-    zx_device_t* parent) {
+    fdf::Namespace* incoming) {
   zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> connect_sysmem_service_result =
-      ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1>(
-          parent);
+      incoming->Connect<fuchsia_hardware_sysmem::Service::AllocatorV1>();
   if (connect_sysmem_service_result.is_error()) {
     zxlogf(ERROR, "Failed to connect to the sysmem Allocator FIDL protocol: %s",
            connect_sysmem_service_result.status_string());
@@ -62,10 +64,11 @@ zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> CreateAndInitializeSysmem
   return zx::ok(std::move(sysmem_allocator));
 }
 
-zx::result<std::unique_ptr<RenderControl>> CreateAndInitializeRenderControl(zx_device_t* parent) {
+zx::result<std::unique_ptr<RenderControl>> CreateAndInitializeRenderControl(
+    fdf::Namespace* incoming) {
   zx::result<fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe>>
-      render_control_connect_pipe_service_result = ddk::Device<void>::DdkConnectFidlProtocol<
-          fuchsia_hardware_goldfish_pipe::Service::Device>(parent);
+      render_control_connect_pipe_service_result =
+          incoming->Connect<fuchsia_hardware_goldfish_pipe::Service::Device>();
   if (render_control_connect_pipe_service_result.is_error()) {
     zxlogf(ERROR, "Failed to connect to the goldfish pipe FIDL service: %s",
            render_control_connect_pipe_service_result.status_string());
@@ -93,13 +96,16 @@ zx::result<std::unique_ptr<RenderControl>> CreateAndInitializeRenderControl(zx_d
 
 }  // namespace
 
-// static
-zx::result<> DisplayDriver::Create(zx_device_t* parent) {
-  ZX_DEBUG_ASSERT(parent != nullptr);
+DisplayDriver::DisplayDriver(fdf::DriverStartArgs start_args,
+                             fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+    : fdf::DriverBase("goldfish-display", std::move(start_args), std::move(driver_dispatcher)) {}
 
+DisplayDriver::~DisplayDriver() = default;
+
+zx::result<> DisplayDriver::Start() {
   zx::result<fidl::ClientEnd<fuchsia_hardware_goldfish::ControlDevice>>
       connect_control_service_result =
-          DdkConnectFidlProtocol<fuchsia_hardware_goldfish::ControlService::Device>(parent);
+          incoming()->Connect<fuchsia_hardware_goldfish::ControlService::Device>();
   if (connect_control_service_result.is_error()) {
     zxlogf(ERROR, "Failed to connect to the goldfish Control FIDL service: %s",
            connect_control_service_result.status_string());
@@ -110,7 +116,7 @@ zx::result<> DisplayDriver::Create(zx_device_t* parent) {
 
   zx::result<fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe>>
       connect_pipe_service_result =
-          DdkConnectFidlProtocol<fuchsia_hardware_goldfish_pipe::Service::Device>(parent);
+          incoming()->Connect<fuchsia_hardware_goldfish_pipe::Service::Device>();
   if (connect_pipe_service_result.is_error()) {
     zxlogf(ERROR, "Failed to connect to the goldfish pipe FIDL service: %s",
            connect_pipe_service_result.status_string());
@@ -120,7 +126,7 @@ zx::result<> DisplayDriver::Create(zx_device_t* parent) {
       std::move(connect_pipe_service_result).value();
 
   zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> create_sysmem_allocator_result =
-      CreateAndInitializeSysmemAllocator(parent);
+      CreateAndInitializeSysmemAllocator(incoming().get());
   if (create_sysmem_allocator_result.is_error()) {
     zxlogf(ERROR, "Failed to create and initialize sysmem allocator: %s",
            create_sysmem_allocator_result.status_string());
@@ -130,7 +136,7 @@ zx::result<> DisplayDriver::Create(zx_device_t* parent) {
       std::move(create_sysmem_allocator_result).value();
 
   zx::result<std::unique_ptr<RenderControl>> create_render_control_result =
-      CreateAndInitializeRenderControl(parent);
+      CreateAndInitializeRenderControl(incoming().get());
   if (create_render_control_result.is_error()) {
     zxlogf(ERROR, "Failed to create and initialize RenderControl: %s",
            create_render_control_result.status_string());
@@ -146,93 +152,54 @@ zx::result<> DisplayDriver::Create(zx_device_t* parent) {
            create_dispatcher_result.status_string());
     return create_dispatcher_result.take_error();
   }
-  fdf::SynchronizedDispatcher display_event_dispatcher =
-      std::move(create_dispatcher_result).value();
+  display_event_dispatcher_ = std::move(create_dispatcher_result).value();
 
   fbl::AllocChecker alloc_checker;
-  auto display_engine = fbl::make_unique_checked<DisplayEngine>(
+  display_engine_ = fbl::make_unique_checked<DisplayEngine>(
       &alloc_checker, std::move(control), std::move(pipe), std::move(sysmem_allocator),
-      std::move(render_control), display_event_dispatcher.async_dispatcher());
+      std::move(render_control), display_event_dispatcher_.async_dispatcher());
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx::result<> init_result = display_engine->Initialize();
+  zx::result<> init_result = display_engine_->Initialize();
   if (init_result.is_error()) {
     zxlogf(ERROR, "Failed to initialize DisplayEngine: %s", init_result.status_string());
     return init_result.take_error();
   }
 
-  auto display_driver = fbl::make_unique_checked<DisplayDriver>(
-      &alloc_checker, parent, std::move(display_event_dispatcher), std::move(display_engine));
-  if (!alloc_checker.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for DisplayDriver");
-    return zx::error(ZX_ERR_NO_MEMORY);
+  // Serves the [`fuchsia.hardware.display.controller/ControllerImpl`] protocol
+  // over the compatibility server.
+  banjo_server_ =
+      compat::BanjoServer(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL, /*ctx=*/display_engine_.get(),
+                          /*ops=*/display_engine_->display_controller_impl_protocol_ops());
+  compat::DeviceServer::BanjoConfig banjo_config;
+  banjo_config.callbacks[ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL] = banjo_server_->callback();
+  zx::result<> compat_server_init_result =
+      compat_server_.Initialize(incoming(), outgoing(), node_name(), name(),
+                                /*forward_metadata=*/compat::ForwardMetadata::None(),
+                                /*banjo_config=*/std::move(banjo_config));
+  if (compat_server_init_result.is_error()) {
+    return compat_server_init_result.take_error();
   }
 
-  zx::result<> bind_result = display_driver->Bind();
-  if (bind_result.is_error()) {
-    zxlogf(ERROR, "Failed to bind goldfish-display: %s", bind_result.status_string());
-    return bind_result.take_error();
+  const std::vector<fuchsia_driver_framework::NodeProperty> node_properties = {
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL,
+                        bind_fuchsia_display::BIND_PROTOCOL_CONTROLLER_IMPL),
+  };
+  const std::vector<fuchsia_driver_framework::Offer> node_offers = compat_server_.CreateOffers2();
+  zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> controller_client_result =
+      AddChild(name(), node_properties, node_offers);
+  if (controller_client_result.is_error()) {
+    zxlogf(ERROR, "Failed to add child node: %s", controller_client_result.status_string());
+    return controller_client_result.take_error();
   }
-
-  // Device manager now owns `display_driver`.
-  [[maybe_unused]] auto* display_driver_released = display_driver.release();
-  return zx::ok();
-}
-
-DisplayDriver::DisplayDriver(zx_device_t* parent,
-                             fdf::SynchronizedDispatcher display_event_dispatcher,
-                             std::unique_ptr<DisplayEngine> display_engine)
-    : DisplayType(parent),
-      display_event_dispatcher_(std::move(display_event_dispatcher)),
-      display_engine_(std::move(display_engine)) {
-  ZX_DEBUG_ASSERT(parent != nullptr);
-  ZX_DEBUG_ASSERT(display_event_dispatcher_.get() != nullptr);
-  ZX_DEBUG_ASSERT(display_engine_ != nullptr);
-}
-
-DisplayDriver::~DisplayDriver() = default;
-
-void DisplayDriver::DdkRelease() { delete this; }
-
-zx_status_t DisplayDriver::DdkGetProtocol(uint32_t proto_id, void* out) {
-  ZX_DEBUG_ASSERT(display_engine_ != nullptr);
-
-  switch (proto_id) {
-    case ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL: {
-      auto* proto = static_cast<ddk::AnyProtocol*>(out);
-      proto->ctx = display_engine_.get();
-      proto->ops = display_engine_->display_controller_impl_protocol_ops();
-      return ZX_OK;
-    }
-    default:
-      return ZX_ERR_NOT_SUPPORTED;
-  }
-}
-
-zx::result<> DisplayDriver::Bind() {
-  zx_status_t status = DdkAdd(
-      ddk::DeviceAddArgs("goldfish-display").set_proto_id(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add goldfish-display node: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
+  controller_ = fidl::WireSyncClient(std::move(controller_client_result).value());
 
   return zx::ok();
 }
 
 }  // namespace goldfish
 
-static constexpr zx_driver_ops_t kGoldfishDisplayDriverOps = []() -> zx_driver_ops_t {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = [](void* ctx, zx_device_t* parent) {
-    zx::result<> result = goldfish::DisplayDriver::Create(parent);
-    return result.status_value();
-  };
-  return ops;
-}();
-
-ZIRCON_DRIVER(goldfish_display, kGoldfishDisplayDriverOps, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(goldfish::DisplayDriver);
