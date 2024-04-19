@@ -232,6 +232,37 @@ impl<S: crate::NonMetaStorage> RootDir<S> {
             })
             .await
     }
+
+    /// Creates and returns a `MetaFile` if one exists at `path`.
+    pub(crate) fn get_meta_file(self: &Arc<Self>, path: &str) -> Option<Arc<MetaFile<S>>> {
+        let location = self.meta_files.get(path)?;
+        Some(MetaFile::new(self.clone(), *location))
+    }
+
+    /// Creates and returns a `MetaSubdir` if one exists at `path`. `path` must end in '/'.
+    pub(crate) fn get_meta_subdir(self: &Arc<Self>, path: String) -> Option<Arc<MetaSubdir<S>>> {
+        debug_assert!(path.ends_with("/"));
+        for k in self.meta_files.keys() {
+            if k.starts_with(&path) {
+                return Some(MetaSubdir::new(self.clone(), path));
+            }
+        }
+        None
+    }
+
+    /// Creates and returns a `NonMetaSubdir` if one exists at `path`. `path` must end in '/'.
+    pub(crate) fn get_non_meta_subdir(
+        self: &Arc<Self>,
+        path: String,
+    ) -> Option<Arc<NonMetaSubdir<S>>> {
+        debug_assert!(path.ends_with("/"));
+        for k in self.non_meta_files.keys() {
+            if k.starts_with(&path) {
+                return Some(NonMetaSubdir::new(self.clone(), path));
+            }
+        }
+        None
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -371,24 +402,16 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
         }
 
         if canonical_path.starts_with("meta/") {
-            if let Some(meta_file) = self.meta_files.get(canonical_path).copied() {
+            if let Some(meta_file) = self.get_meta_file(canonical_path) {
                 flags.to_object_request(server_end).handle(|object_request| {
-                    vfs::file::serve(MetaFile::new(self, meta_file), scope, &flags, object_request)
+                    vfs::file::serve(meta_file, scope, &flags, object_request)
                 });
                 return;
             }
 
-            let subdir_prefix = canonical_path.to_string() + "/";
-            for k in self.meta_files.keys() {
-                if k.starts_with(&subdir_prefix) {
-                    let () = MetaSubdir::new(self, subdir_prefix).open(
-                        scope,
-                        flags,
-                        VfsPath::dot(),
-                        server_end,
-                    );
-                    return;
-                }
+            if let Some(subdir) = self.get_meta_subdir(canonical_path.to_string() + "/") {
+                let () = subdir.open(scope, flags, VfsPath::dot(), server_end);
+                return;
             }
 
             let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
@@ -403,17 +426,9 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
             return;
         }
 
-        let subdir_prefix = canonical_path.to_string() + "/";
-        for k in self.non_meta_files.keys() {
-            if k.starts_with(&subdir_prefix) {
-                let () = NonMetaSubdir::new(self, subdir_prefix).open(
-                    scope,
-                    flags,
-                    VfsPath::dot(),
-                    server_end,
-                );
-                return;
-            }
+        if let Some(subdir) = self.get_non_meta_subdir(canonical_path.to_string() + "/") {
+            let () = subdir.open(scope, flags, VfsPath::dot(), server_end);
+            return;
         }
 
         let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
@@ -473,25 +488,12 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
         }
 
         if canonical_path.starts_with("meta/") {
-            if let Some(meta_file) = self.meta_files.get(canonical_path).copied() {
-                return vfs::file::serve(
-                    MetaFile::new(self, meta_file),
-                    scope,
-                    &protocols,
-                    object_request,
-                );
+            if let Some(file) = self.get_meta_file(canonical_path) {
+                return vfs::file::serve(file, scope, &protocols, object_request);
             }
 
-            let subdir_prefix = canonical_path.to_string() + "/";
-            for k in self.meta_files.keys() {
-                if k.starts_with(&subdir_prefix) {
-                    return MetaSubdir::new(self, subdir_prefix).open2(
-                        scope,
-                        VfsPath::dot(),
-                        protocols,
-                        object_request,
-                    );
-                }
+            if let Some(subdir) = self.get_meta_subdir(canonical_path.to_string() + "/") {
+                return subdir.open2(scope, VfsPath::dot(), protocols, object_request);
             }
             return Err(zx::Status::NOT_FOUND);
         }
@@ -500,16 +502,8 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
             return self.non_meta_storage.open2(blob, protocols, scope, object_request);
         }
 
-        let subdir_prefix = canonical_path.to_string() + "/";
-        for k in self.non_meta_files.keys() {
-            if k.starts_with(&subdir_prefix) {
-                return NonMetaSubdir::new(self, subdir_prefix).open2(
-                    scope,
-                    VfsPath::dot(),
-                    protocols,
-                    object_request,
-                );
-            }
+        if let Some(subdir) = self.get_non_meta_subdir(canonical_path.to_string() + "/") {
+            return subdir.open2(scope, VfsPath::dot(), protocols, object_request);
         }
 
         Err(zx::Status::NOT_FOUND)
