@@ -259,6 +259,7 @@ source_set("load-test-modules-info") {
     "./*",
     "//sdk/lib/dl/test/*",
     "//sdk/lib/ld/test/*",
+    "//sdk/lib/ld/testing/*",
   ]
   testonly = true
 

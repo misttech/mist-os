@@ -38,28 +38,21 @@ class LdLoadZirconLdsvcTestsBase : public LdLoadTestsBase {
     mock_.ExpectLoadObject(name, std::move(result));
   }
 
-  // Prime the MockLoaderService with the VMO for `name`, acquired by GetVmo
-  // (see below), and expect the MockLoader to load that dependency for the test.
-  void LdsvcExpectLoadObject(std::string_view name) { mock_.ExpectLoadObject(name, GetVmo); }
+  // Prime the MockLoaderService with the VMO for a dependency by name,
+  // and expect the MockLoader to load that dependency for the test.
+  void LdsvcExpectDependency(std::string_view name) { mock_.ExpectDependency(name); }
 
-  // This just is a shorthand for multiple LdsvcExpectLoadObject calls.
-  void Needed(std::initializer_list<std::string_view> names) { mock_.Needed(names, GetVmo); }
+  // This just is a shorthand for multiple LdsvcExpectDependency  calls.
+  void Needed(std::initializer_list<std::string_view> names) { mock_.Needed(names); }
 
-  // This just is a shorthand for multiple LdsvcExpectLoadObject calls.
+  // This just is a shorthand for multiple LdsvcExpectDependency  calls.
   void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs) {
-    mock_.Needed(name_found_pairs, GetVmo);
+    mock_.Needed(name_found_pairs);
   }
 
   zx::channel GetLdsvc() { return mock_.GetLdsvc(); }
 
  private:
-  // This function will be called by the MockLoaderServiceForTest to retrieve
-  // the VMO test files to prime the mock loader with.
-  static zx::vmo GetVmo(std::string_view name) {
-    const std::string path = std::filesystem::path("test") / "lib" / LD_TEST_LIBPREFIX / name;
-    return elfldltl::testing::GetTestLibVmo(path);
-  }
-
   MockLoaderServiceForTest mock_;
 };
 

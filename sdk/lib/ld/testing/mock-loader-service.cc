@@ -7,6 +7,9 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/dispatcher.h>
+#include <lib/elfldltl/testing/get-test-data.h>
+
+#include <filesystem>
 
 #include <gmock/gmock.h>
 
@@ -91,6 +94,17 @@ void MockLoaderService::ExpectLoadObject(std::string_view name,
 
 void MockLoaderService::ExpectConfig(std::string_view name, zx::result<> expected_result) {
   EXPECT_CALL(*mock_server_, MockConfig(std::string{name})).WillOnce(Return(expected_result));
+}
+
+zx::vmo MockLoaderServiceForTest::GetDepVmo(std::string_view name) {
+  // TODO(https://fxbug.dev/335737373): use a more direct means to look up the file.
+  const std::string path = std::filesystem::path("test") / "lib" / LD_TEST_LIBPREFIX / name;
+  return elfldltl::testing::GetTestLibVmo(path);
+}
+
+zx::vmo MockLoaderServiceForTest::GetRootModuleVmo(std::string_view name) {
+  const std::string path = std::filesystem::path("test") / "lib" / name;
+  return elfldltl::testing::GetTestLibVmo(path);
 }
 
 }  // namespace ld::testing
