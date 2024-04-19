@@ -11,7 +11,7 @@ use {
     fuchsia_component_test::RealmInstance,
     fuchsia_zircon::{self as zx},
     futures::{Future, StreamExt, TryStreamExt},
-    tracing::{error, info, warn},
+    tracing::{debug, error, warn},
 };
 
 // RealmProxy mediates a test suite's access to the services in a test realm.
@@ -168,7 +168,7 @@ pub async fn serve_with_proxy<P: RealmProxy>(
     }
 
     // Tell the user we're disconnecting in case this is a premature shutdown.
-    info!("done serving the RealmProxy connection");
+    debug!("done serving the RealmProxy connection");
     Ok(())
 }
 
