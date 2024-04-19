@@ -8,24 +8,40 @@ Returns CPU breakdown in a JSON file.
 """
 
 import argparse
-import os.path
+import json
 from trace_processing import trace_importing, trace_metrics, trace_model
 from trace_processing.metrics import cpu_breakdown
 import sys
 
 
+# Default cut-off for the percentage CPU. Any process that has CPU below this
+# won't be listed in the results. User can pass in a cutoff.
+DEFAULT_PERCENT_CUTOFF = 0.0
+
+
 def main() -> None:
     """
-    Takes in a trace file in JSON format.
+    Takes in a trace file in JSON format and outputs
+    a free-form JSON with breakdown metrics to `output_path`.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("path_to_json")
+    parser.add_argument("path_to_trace_json", type=str)
+    parser.add_argument("output_path", type=str)
+    parser.add_argument(
+        "--percent_cutoff", type=float, default=DEFAULT_PERCENT_CUTOFF
+    )
     args = parser.parse_args()
 
     model: trace_model.Model = trace_importing.create_model_from_file_path(
-        args.path_to_json
+        args.path_to_trace_json
     )
-    cpu_breakdown.CpuBreakdownMetricsProcessor(model).process_metrics()
+    breakdown = cpu_breakdown.CpuBreakdownMetricsProcessor(
+        model, args.percent_cutoff
+    ).process_metrics()
+
+    if args.output_path:
+        with open(args.output_path, "w") as json_file:
+            json.dump(breakdown, json_file)
 
 
 if __name__ == "__main__":

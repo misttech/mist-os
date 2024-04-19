@@ -12,23 +12,34 @@ import trace_processing.trace_time as trace_time
 
 _LOGGER: logging.Logger = logging.getLogger("CpuBreakdownMetricsProcessor")
 
+# Default cut-off for the percentage CPU. Any process that has CPU below this
+# won't be listed in the results. User can pass in a cutoff.
+DEFAULT_PERCENT_CUTOFF = 0.0
+
 
 class CpuBreakdownMetricsProcessor:
     """
-    Breaks down CPU metrics into a free-form metrics format, and
-    writes the metrics to JSON.
+    Breaks down CPU metrics into a free-form metrics format.
     """
 
-    def __init__(self, model: trace_model.Model) -> None:
+    def __init__(
+        self,
+        model: trace_model.Model,
+        output_path: str = "",
+        percent_cutoff: float = DEFAULT_PERCENT_CUTOFF,
+    ) -> None:
         self._model: trace_model.Model = model
+        self._percent_cutoff = percent_cutoff
+        self._output_path: str = output_path
         # Maps TID to a Dict of CPUs to total duration (ms) on that CPU.
         # E.g. For a TID of 1001 with 3 CPUs, this would be:
         #   {1001: {0: 1123.123, 1: 123123.123, 3: 1231.23}}
         self._tid_to_durations: Dict[int, Dict[int, float]] = {}
-        # Currently we just print this but we will output a JSON soon.
-        self._breakdown: Dict[str, Dict[int, float]] = {}
-        # Name composed of Process name and Thread name.
-        self._tid_to_name: Dict[int, str] = {}
+        self._breakdown: List[Dict[str, object]] = []
+        self._tid_to_thread_name: Dict[int, str] = {}
+        self._tid_to_process_name: Dict[int, str] = {}
+        # Map of CPU to total duration used (ms).
+        self._cpu_to_total_duration: Dict[int, float] = {}
 
     def _calculate_duration_per_cpu(
         self,
@@ -41,6 +52,11 @@ class CpuBreakdownMetricsProcessor:
         Uses a List of sorted ContextSwitch records to sum up the duration for each thread.
         It's possible that consecutive records do not have matching incoming_tid and outgoing_tid.
         """
+        smallest_timestamp = self._timestamp_ms(records[0].start)
+        largest_timestamp = self._timestamp_ms(records[-1].start)
+        total_duration = largest_timestamp - smallest_timestamp
+        self._cpu_to_total_duration[cpu] = total_duration
+
         for prev_record, curr_record in itertools.pairwise(records):
             # Check that the previous ContextSwitch's incoming_tid ("this thread is starting work
             # on this CPU") matches the current ContextSwitch's outgoing_tid ("this thread is being
@@ -59,7 +75,7 @@ class CpuBreakdownMetricsProcessor:
                 stop_ts = self._timestamp_ms(curr_record.start)
                 duration = stop_ts - start_ts
                 assert duration >= 0
-                if curr_record.outgoing_tid in self._tid_to_name:
+                if curr_record.outgoing_tid in self._tid_to_thread_name:
                     # Add duration to the total duration for that tid and CPU.
                     self._tid_to_durations.setdefault(
                         curr_record.outgoing_tid, {}
@@ -75,17 +91,18 @@ class CpuBreakdownMetricsProcessor:
         """
         return timestamp.to_epoch_delta().to_milliseconds_f()
 
-    def process_metrics(self) -> Dict[str, Dict[int, float]]:
+    def process_metrics(self) -> List[Dict[str, object]]:
         """
         Given TraceModel:
         - Iterates through all the SchedulingRecords and calculates the duration
         for each Process's Threads, and saves them by CPU.
-        - Writes durations into free-form-metric JSON file. (TODO: https://fxbug.dev/331457527)
+        - Writes durations into free-form-metric JSON file.
         """
         # Map tids to names.
         for p in self._model.processes:
             for t in p.threads:
-                self._tid_to_name[t.tid] = "%s: %s" % (p.name, t.name)
+                self._tid_to_process_name[t.tid] = p.name
+                self._tid_to_thread_name[t.tid] = t.name
 
         # Calculate durations for each CPU for each tid.
         for cpu, records in self._model.scheduling_records.items():
@@ -101,10 +118,30 @@ class CpuBreakdownMetricsProcessor:
                 ),
             )
 
-        # Return CPU breakdown.
-        # TODO: https://fxbug.dev/331457527 format this better.
-        for tid in self._tid_to_durations:
-            self._breakdown[self._tid_to_name[tid]] = self._tid_to_durations[
-                tid
-            ]
+        # Calculate the percent of time the thread spent on this CPU,
+        # compared to the total CPU duration.
+        # If the percent spent is at or above our cutoff, add metric to
+        # breakdown.
+        for tid, breakdown in self._tid_to_durations.items():
+            if tid in self._tid_to_thread_name:
+                for cpu, duration in breakdown.items():
+                    percent = round(
+                        duration / self._cpu_to_total_duration[cpu] * 100, 3
+                    )
+                    if percent >= self._percent_cutoff:
+                        metric = {
+                            "process_name": self._tid_to_process_name[tid],
+                            "thread_name": self._tid_to_thread_name[tid],
+                            "cpu": cpu,
+                            "percent": percent,
+                            "duration": duration,
+                        }
+                        self._breakdown.append(metric)
+
+        # Sort metrics by CPU (desc) and percent (desc).
+        self._breakdown = sorted(
+            self._breakdown,
+            key=lambda m: (m["cpu"], m["percent"]),
+            reverse=True,
+        )
         return self._breakdown

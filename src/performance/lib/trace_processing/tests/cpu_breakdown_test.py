@@ -29,11 +29,11 @@ class CpuBreakdownTest(unittest.TestCase):
         ]
 
         # CPU 2.
+        # Total time: 0 to 8000000000 = 8000 ms.
         records_2: List[trace_model.SchedulingRecord] = [
-            # "thread-1" is active from 500-1000 ms, 500 total duration.
-            trace_model.Waking(trace_time.TimePoint(100000000), 2, 612, {}),
+            # "thread-1" is active from 0 - 1500 ms, 1500 total duration.
             trace_model.ContextSwitch(
-                trace_time.TimePoint(500000000),
+                trace_time.TimePoint(0),
                 1,
                 100,
                 612,
@@ -42,7 +42,7 @@ class CpuBreakdownTest(unittest.TestCase):
                 {},
             ),
             trace_model.ContextSwitch(
-                trace_time.TimePoint(1000000000),
+                trace_time.TimePoint(1500000000),
                 100,
                 1,
                 612,
@@ -50,7 +50,7 @@ class CpuBreakdownTest(unittest.TestCase):
                 trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
                 {},
             ),
-            # "small-thread" is active from 1000 to 2000 ms, 1000 total duration.
+            # "small-thread" is active from 1500 to 2000 ms, 500 total duration.
             trace_model.ContextSwitch(
                 trace_time.TimePoint(2000000000),
                 1,
@@ -60,10 +60,10 @@ class CpuBreakdownTest(unittest.TestCase):
                 trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
                 {},
             ),
-            # "thread-2" is active from 3000-9000 ms, 6000 total duration.
+            # "thread-2" is active from 3000-8000 ms, 5000 total duration.
             # Switch the order of adding to records - shouldn't change behavior.
             trace_model.ContextSwitch(
-                trace_time.TimePoint(9000000000),
+                trace_time.TimePoint(8000000000),
                 100,
                 2,
                 612,
@@ -84,8 +84,10 @@ class CpuBreakdownTest(unittest.TestCase):
         ]
 
         # CPU 3.
+        # Total time: 3000000000 to 6000000000 = 3000 ms.
         records_3: List[trace_model.SchedulingRecord] = [
-            # "thread-3" (incoming) is idle; don't log it.
+            # "thread-3" (incoming) is idle; don't log it in breakdown,
+            # but do log it in the total CPU duration for CPU 3.
             trace_model.ContextSwitch(
                 trace_time.TimePoint(3000000000),
                 3,
@@ -105,7 +107,8 @@ class CpuBreakdownTest(unittest.TestCase):
                 trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
                 {},
             ),
-            # TID 70 (outgoing) is idle; don't log it.
+            # TID 70 (outgoing) is idle; don't log it in breakdown,
+            # but do log it in the total CPU duration for CPU 3.
             # "thread-2" (incoming) is not idle.
             trace_model.ContextSwitch(
                 trace_time.TimePoint(5000000000),
@@ -129,10 +132,11 @@ class CpuBreakdownTest(unittest.TestCase):
         ]
 
         # CPU 5.
+        # Total time: 500000000 to 6000000000 = 5500
         records_5: List[trace_model.SchedulingRecord] = []
         # Add 5 Waking and ContextSwitch events for "thread-1" where the incoming_tid
         # is 1 and the outgoing_tid (70) is not mapped to a Thread in our Process.
-        for i in range(1, 6):
+        for i in range(1, 7):
             records_5.append(
                 trace_model.Waking(
                     trace_time.TimePoint(i * 1000000000 - 500000000),
@@ -187,17 +191,49 @@ class CpuBreakdownTest(unittest.TestCase):
         processor = cpu_breakdown.CpuBreakdownMetricsProcessor(model)
         breakdown = processor.process_metrics()
 
-        self.assertEqual(len(breakdown), 3)
+        self.assertEqual(len(breakdown), 5)
 
         # Each process: thread has the correct numbers for each CPU.
+        # Sorted by descending cpu and descending percent.
+        # Note that neither thread-3 nor thread-4 are logged because
+        # they are idle or there is no duration.
         self.assertEqual(
-            breakdown["big_process: thread-1"], {2: 500.0, 5: 2500.0}
+            breakdown,
+            [
+                {
+                    "process_name": "big_process",
+                    "thread_name": "thread-1",
+                    "cpu": 5,
+                    "percent": 54.545,
+                    "duration": 3000.0,
+                },
+                {
+                    "process_name": "big_process",
+                    "thread_name": "thread-2",
+                    "cpu": 3,
+                    "percent": 33.333,
+                    "duration": 1000.0,
+                },
+                {
+                    "process_name": "big_process",
+                    "thread_name": "thread-2",
+                    "cpu": 2,
+                    "percent": 62.5,
+                    "duration": 5000.0,
+                },
+                {
+                    "process_name": "big_process",
+                    "thread_name": "thread-1",
+                    "cpu": 2,
+                    "percent": 18.75,
+                    "duration": 1500.0,
+                },
+                {
+                    "process_name": "small_process",
+                    "thread_name": "small-thread",
+                    "cpu": 2,
+                    "percent": 6.25,
+                    "duration": 500.0,
+                },
+            ],
         )
-        self.assertEqual(
-            breakdown["big_process: thread-2"], {2: 6000.0, 3: 1000.0}
-        )
-        self.assertEqual(breakdown["small_process: small-thread"], {2: 1000.0})
-        # If thread is idle, don't log it.
-        self.assertNotIn("big_process: thread-3", breakdown)
-        # If there is no duration for the thread, don't log it.
-        self.assertNotIn("big_process: thread-4", breakdown)
