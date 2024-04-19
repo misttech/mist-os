@@ -188,8 +188,13 @@ if (use_bringup_assembly) {
     testonly = true
     visibility = [ ":*" ]
     public_deps = [
+      # The runtime "universe" of packages that's set by the developer.
       "//:developer_universe_packages",
       "//:discoverable_packages",
+
+      # The tests that are added by a developer, and are not verified for their
+      # type.
+      "//:developer_specified_tests",
     ]
   }
 

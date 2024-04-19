@@ -1801,7 +1801,6 @@ group("discoverable_tests") {
     "//build/images/*",
   ]
   public_deps = [
-    "//:developer_specified_tests",
     "//:hermetic_test_packages",
     "//:test_packages",
   ]
@@ -1835,7 +1834,10 @@ validated_test_types_group("host_tests") {
 # by infra or products.
 group("developer_specified_tests") {
   testonly = true
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//build/images/updates:universe_packages",
+  ]
   public_deps = developer_test_labels
 }
 
