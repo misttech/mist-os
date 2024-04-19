@@ -218,6 +218,7 @@ void Device::OnRemoval() {
   codec_client_.reset();
   stream_config_client_.reset();
 
+  LogDeviceRemoval(info());
   LogObjectCounts();
 
   // Regardless of whether device was pending / operational / unhealthy, notify the state watcher.
@@ -253,6 +254,7 @@ void Device::OnError(zx_status_t error) {
   }
   ++unhealthy_count_;
   SetError(error);
+  LogDeviceError(info());
   LogObjectCounts();
 
   if (std::shared_ptr<DevicePresenceWatcher> pw = presence_watcher_.lock(); pw) {
@@ -331,6 +333,7 @@ void Device::OnInitializationResponse() {
   if (IsFullyInitialized()) {
     ++initialized_count_;
     SetDeviceInfo();
+    LogDeviceAddition(*info());
     SetState(State::DeviceInitialized);
     LogObjectCounts();
 

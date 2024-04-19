@@ -33,8 +33,10 @@ class StubProviderServer
   // fuchsia.audio.device.Provider implementation
   void AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sync& completer) override {
     FX_LOGS(INFO) << kClassName << "::" << __FUNCTION__ << ": request to add "
-                  << request.device_type() << " '" << request.device_name().value_or("[missing]")
-                  << "'";
+                  << request.device_type() << " "
+                  << (request.device_name().has_value()
+                          ? std::string("'") + *request.device_name() + "'"
+                          : "");
 
     completer.Reply(fit::success(fuchsia_audio_device::ProviderAddDeviceResponse{}));
   }

@@ -740,17 +740,63 @@ void LogTopologies(
   }
 }
 
-void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
-  if constexpr (kLogSummaryFinalDeviceInfo) {
-    FX_LOGS(INFO) << "Detected " << device_info.device_type() << " device "
+// Signal the successful detection, querying, initialization and addition of a device.
+void LogDeviceAddition(const fuchsia_audio_device::Info& device_info) {
+  if constexpr (kLogDeviceAddErrorRemove) {
+    FX_DCHECK(device_info.device_type().has_value());
+    FX_LOGS(INFO) << device_info.device_type() << " device "
                   << (device_info.device_name()
                           ? std::string("'") + *device_info.device_name() + "'"
-                          : "[nameless]")
-                  << ", assigned token_id "
+                          : "<none>")
+                  << " with token_id "
                   << (device_info.token_id() ? std::to_string(*device_info.token_id())
-                                             : "<none> (non-compliant)");
+                                             : "<none> (non-compliant)")
+                  << " has been added";
   }
-  if constexpr (!kLogDetailedFinalDeviceInfo) {
+}
+
+// Mirror (bookend) the analogous `LogDeviceAddition` for device removal. Removals may be "normal"
+// (USB unplug) or caused by fatal error. The latter can happen before `device_info` is created.
+void LogDeviceRemoval(const std::optional<fuchsia_audio_device::Info>& device_info) {
+  if constexpr (kLogDeviceAddErrorRemove) {
+    if (device_info.has_value()) {
+      FX_DCHECK(device_info->device_type().has_value());
+      FX_LOGS(INFO) << device_info->device_type() << " device "
+                    << (device_info->device_name()
+                            ? std::string("'") + *device_info->device_name() + "'"
+                            : "<none>")
+                    << " with token_id "
+                    << (device_info->token_id() ? std::to_string(*device_info->token_id())
+                                                : "<none> (non-compliant)")
+                    << " has been removed";
+    } else {
+      FX_LOGS(WARNING) << "UNKNOWN (uninitialized) device has encountered a fatal error";
+    }
+  }
+}
+
+// Mirror (bookend) the analogous `LogDeviceAddition`, for a device error.
+// This can also occur before a device has been successfully added: device_info may not be set.
+void LogDeviceError(const std::optional<fuchsia_audio_device::Info>& device_info) {
+  if constexpr (kLogDeviceAddErrorRemove) {
+    if (device_info.has_value()) {
+      FX_DCHECK(device_info->device_type().has_value());
+      FX_LOGS(WARNING) << device_info->device_type() << " device "
+                       << (device_info->device_name().has_value()
+                               ? std::string("'") + *device_info->device_name() + "'"
+                               : "<none>")
+                       << " with token_id "
+                       << (device_info->token_id() ? std::to_string(*device_info->token_id())
+                                                   : "<none> (non-compliant)")
+                       << " has encountered a fatal error";
+    } else {
+      FX_LOGS(WARNING) << "UNKNOWN (uninitialized) device has encountered a fatal error";
+    }
+  }
+}
+
+void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
+  if constexpr (!kLogDeviceInfo) {
     return;
   }
 
@@ -958,9 +1004,9 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
                           : "");
   }
 
-  FX_LOGS(INFO) << "   plug_detect_caps             " << device_info.plug_detect_caps();
+  FX_LOGS(INFO) << "  plug_detect_caps             " << device_info.plug_detect_caps();
 
-  std::string clock_domain_str{"   clock_domain                 "};
+  std::string clock_domain_str{"  clock_domain                 "};
   if (device_info.clock_domain()) {
     clock_domain_str += std::to_string(*device_info.clock_domain());
     if (*device_info.clock_domain() == fuchsia_hardware_audio::kClockDomainMonotonic) {
@@ -979,7 +1025,7 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
   FX_LOGS(INFO) << clock_domain_str;
 
   if (device_info.signal_processing_elements()) {
-    FX_LOGS(INFO) << "   signal_processing_elements ["
+    FX_LOGS(INFO) << "  signal_processing_elements ["
                   << device_info.signal_processing_elements()->size() << "]"
                   << (device_info.signal_processing_elements()->empty() ? " (non-compliant)" : "");
     for (auto idx = 0u; idx < device_info.signal_processing_elements()->size(); ++idx) {
@@ -987,14 +1033,14 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
                          "    ");
     }
   } else {
-    FX_LOGS(INFO) << "   signal_processing_elements   <none>"
+    FX_LOGS(INFO) << "  signal_processing_elements   <none>"
                   << (device_info.device_type() == fuchsia_audio_device::DeviceType::kComposite
                           ? " (non-compliant)"
                           : "");
   }
 
   if (device_info.signal_processing_topologies()) {
-    FX_LOGS(INFO) << "   signal_processing_topologies ["
+    FX_LOGS(INFO) << "  signal_processing_topologies ["
                   << device_info.signal_processing_topologies()->size() << "]"
                   << (device_info.signal_processing_topologies()->empty() ? " (non-compliant)"
                                                                           : "");
