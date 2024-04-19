@@ -142,6 +142,143 @@ TEST_F(ArmDevicetreeGicItemTest, GicV2NoMsi) {
   ASSERT_TRUE(present, "ZBI Driver for GIC V2 missing.");
 }
 
+TEST_F(ArmDevicetreeGicItemTest, GicV3Uint64Stride) {
+  constexpr auto kExpectedMmio = cpp20::to_array<boot_shim::DevicetreeMmioRange>({
+      {
+          .address = 0x8000000,
+          .size = 0x10000,
+      },
+      // Reflects the GICR base and stride
+      {
+          .address = 0x8100000,
+          .size = 0x20000,
+      },
+  });
+
+  std::array<std::byte, 256> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = arm_gic3_stride();
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeGicItem> shim("test", fdt);
+  shim.set_mmio_observer(get_mmio_observer());
+
+  ASSERT_TRUE(shim.Init());
+  boot_shim::testing::CheckMmioRanges(mmio_ranges(), kExpectedMmio);
+  EXPECT_TRUE(shim.AppendItems(image).is_ok());
+
+  // Look for a gic 3 driver.
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_ARM_GIC_V3) {
+      present = true;
+      ASSERT_GE(payload.size(), sizeof(zbi_dcfg_arm_gic_v3_driver_t));
+      auto* dcfg = reinterpret_cast<zbi_dcfg_arm_gic_v3_driver_t*>(payload.data());
+      EXPECT_EQ(dcfg->mmio_phys, 0x08000000);
+      EXPECT_EQ(dcfg->gicd_offset, 0x0);
+      EXPECT_EQ(dcfg->gicr_offset, 0x0100000);
+      EXPECT_EQ(dcfg->gicr_stride, 0x20000);
+      EXPECT_EQ(dcfg->ipi_base, 0x0);
+      EXPECT_FALSE(dcfg->optional);
+      break;
+    }
+  }
+  image.ignore_error();
+  ASSERT_TRUE(present, "ZBI Driver for GIC V3 missing.");
+}
+
+TEST_F(ArmDevicetreeGicItemTest, GicV3FourStride) {
+  constexpr auto kExpectedMmio = cpp20::to_array<boot_shim::DevicetreeMmioRange>({
+      {
+          .address = 0x8000000,
+          .size = 0x10000,
+      },
+      // Reflects the GICR base and aggregate stride (4 regions)
+      {
+          .address = 0x8100000,
+          .size = 0x80000,
+      },
+  });
+
+  std::array<std::byte, 256> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = arm_gic3_four_stride();
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeGicItem> shim("test", fdt);
+  shim.set_mmio_observer(get_mmio_observer());
+
+  ASSERT_TRUE(shim.Init());
+  boot_shim::testing::CheckMmioRanges(mmio_ranges(), kExpectedMmio);
+  EXPECT_TRUE(shim.AppendItems(image).is_ok());
+
+  // Look for a gic 3 driver.
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_ARM_GIC_V3) {
+      present = true;
+      ASSERT_GE(payload.size(), sizeof(zbi_dcfg_arm_gic_v3_driver_t));
+      auto* dcfg = reinterpret_cast<zbi_dcfg_arm_gic_v3_driver_t*>(payload.data());
+      EXPECT_EQ(dcfg->mmio_phys, 0x08000000);
+      EXPECT_EQ(dcfg->gicd_offset, 0x0);
+      EXPECT_EQ(dcfg->gicr_offset, 0x0100000);
+      EXPECT_EQ(dcfg->gicr_stride, 0x20000);
+      EXPECT_EQ(dcfg->ipi_base, 0x0);
+      EXPECT_FALSE(dcfg->optional);
+      break;
+    }
+  }
+  image.ignore_error();
+  ASSERT_TRUE(present, "ZBI Driver for GIC V3 missing.");
+}
+
+TEST_F(ArmDevicetreeGicItemTest, GicV3SubsumedStride) {
+  constexpr auto kExpectedMmio = cpp20::to_array<boot_shim::DevicetreeMmioRange>({
+      {
+          .address = 0x8000000,
+          .size = 0x10000,
+      },
+      // Reflects the GICR base which matches the stride
+      {
+          .address = 0x8100000,
+          .size = 0x20000,
+      },
+  });
+
+  std::array<std::byte, 256> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = arm_gic3_subsumed_stride();
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeGicItem> shim("test", fdt);
+  shim.set_mmio_observer(get_mmio_observer());
+
+  ASSERT_TRUE(shim.Init());
+  boot_shim::testing::CheckMmioRanges(mmio_ranges(), kExpectedMmio);
+  EXPECT_TRUE(shim.AppendItems(image).is_ok());
+
+  // Look for a gic 3 driver.
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_ARM_GIC_V3) {
+      present = true;
+      ASSERT_GE(payload.size(), sizeof(zbi_dcfg_arm_gic_v3_driver_t));
+      auto* dcfg = reinterpret_cast<zbi_dcfg_arm_gic_v3_driver_t*>(payload.data());
+      EXPECT_EQ(dcfg->mmio_phys, 0x08000000);
+      EXPECT_EQ(dcfg->gicd_offset, 0x0);
+      EXPECT_EQ(dcfg->gicr_offset, 0x0100000);
+      EXPECT_EQ(dcfg->gicr_stride, 0x20000);
+      EXPECT_EQ(dcfg->ipi_base, 0x0);
+      EXPECT_FALSE(dcfg->optional);
+      break;
+    }
+  }
+  image.ignore_error();
+  ASSERT_TRUE(present, "ZBI Driver for GIC V3 missing.");
+}
+
+
+
 // We dont support GicV3 with MSI yet, not reflected in the driver configuration.
 TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV3) {
   constexpr auto kExpectedMmio = cpp20::to_array<boot_shim::DevicetreeMmioRange>({

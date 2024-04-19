@@ -116,6 +116,7 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV3(
   auto& reg = *reg_ptr;
 
   auto [redistributor_stride] = decoder.FindProperties("redistributor-stride");
+  auto [redistributor_regions] = decoder.FindProperties("#redistributor-regions");
 
   zbi_dcfg_arm_gic_v3_driver_t dcfg{};
 
@@ -132,7 +133,6 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV3(
       return devicetree::ScanState::kDone;
     }
     (*mmio_observer_)(DevicetreeMmioRange::From(reg[GicV3Regs::kGicd]));
-    (*mmio_observer_)(DevicetreeMmioRange::From(reg[GicV3Regs::kGicr]));
     dcfg.mmio_phys = std::min(*gicd, *gicr);
     dcfg.gicr_offset = *gicr - dcfg.mmio_phys;
     dcfg.gicd_offset = *gicd - dcfg.mmio_phys;
@@ -140,6 +140,10 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV3(
     if (redistributor_stride) {
       if (auto stride = redistributor_stride->AsUint32()) {
         dcfg.gicr_stride = *stride;
+      } else if (auto stride64 = redistributor_stride->AsUint64())  {
+        dcfg.gicr_stride = *stride64;
+      } else {
+        OnError("GIC v3: failed to parse redistributor stride.");
       }
     } else {
       // See:
@@ -153,7 +157,28 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV3(
       dcfg.gicr_stride = 2 * 64 << 10;
     }
   }
-
+  auto regions = 1;
+  if (redistributor_stride && redistributor_regions) {
+      if (auto parsed_regions = redistributor_regions->AsUint32()) {
+        regions = *parsed_regions;
+      }
+  }
+  if (regions < 1 || regions > 256) {
+    OnError("GIC v3: Out of bounds '#redistributor-stride'.");
+    regions = 1;
+  }
+  // N.b., many GICv3 definitions only declare a single redistribution region
+  // rather than one per-cpu.  They instead ensure the reg for the GICR includes
+  // all the redistributors within its range.  We observe the larger of the
+  // definitions for MmioRange purposes.
+  if (reg[GicV3Regs::kGicr].size() > dcfg.gicr_stride * regions) {
+    (*mmio_observer_)(DevicetreeMmioRange::From(reg[GicV3Regs::kGicr]));
+  } else {
+    const size_t total_size = static_cast<size_t>(dcfg.gicr_stride * regions);
+    const DevicetreeMmioRange range = { .address = reg[GicV3Regs::kGicr].address().value(),
+                                        .size = total_size };
+    (*mmio_observer_)(range);
+  }
   dcfg.ipi_base = 0;
   dcfg.optional = false;
   set_payload(dcfg);
