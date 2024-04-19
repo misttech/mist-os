@@ -367,10 +367,7 @@ size_t DLog::RenderToCrashlogLocked(ktl::span<char> target_span) const {
   return target.used_region().size();
 }
 
-void DLog::OutputLogMessage(ktl::string_view log) {
-  console_write(log);
-  dlog_serial_write(log);
-}
+void DLog::OutputLogMessage(ktl::string_view log) { dlog_serial_write(log); }
 
 // The debuglog notifier thread observes when the debuglog is
 // written and calls the notify callback on any readers that
@@ -612,5 +609,4 @@ void dlog_panic_start() { DLOG->PanicStart(); }
 zx_status_t dlog_shutdown(zx_time_t deadline) { return DLOG->Shutdown(deadline); }
 size_t dlog_render_to_crashlog(ktl::span<char> target) { return DLOG->RenderToCrashlog(target); }
 
-LK_INIT_HOOK(
-    debuglog, [](uint level) { DLOG->StartThreads(); }, LK_INIT_LEVEL_PLATFORM)
+LK_INIT_HOOK(debuglog, [](uint level) { DLOG->StartThreads(); }, LK_INIT_LEVEL_PLATFORM)
