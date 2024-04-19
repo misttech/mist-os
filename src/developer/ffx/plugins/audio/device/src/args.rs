@@ -74,12 +74,12 @@ pub struct DeviceCommand {
 pub enum SubCommand {
     List(ListCommand),
     Info(InfoCommand),
-    Play(DevicePlayCommand),
-    Record(DeviceRecordCommand),
-    Gain(DeviceGainCommand),
-    Mute(DeviceMuteCommand),
-    Unmute(DeviceUnmuteCommand),
-    Agc(DeviceAgcCommand),
+    Play(PlayCommand),
+    Record(RecordCommand),
+    Gain(GainCommand),
+    Mute(MuteCommand),
+    Unmute(UnmuteCommmand),
+    Agc(AgcCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -102,7 +102,7 @@ pub struct InfoCommand {}
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "play", description = "Send audio data directly to device ring buffer.")]
-pub struct DevicePlayCommand {
+pub struct PlayCommand {
     #[argh(
         option,
         description = "file in WAV format containing audio signal. \
@@ -120,7 +120,7 @@ pub struct DevicePlayCommand {
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "record", description = "Capture audio data directly from ring buffer.")]
-pub struct DeviceRecordCommand {
+pub struct RecordCommand {
     #[argh(
         option,
         description = "duration of output signal. Examples: 5ms or 3s. \
@@ -146,18 +146,18 @@ pub struct DeviceRecordCommand {
     name = "gain",
     description = "Request to set the gain of the stream, in decibels."
 )]
-pub struct DeviceGainCommand {
+pub struct GainCommand {
     #[argh(option, description = "gain, in decibels, to set the stream to.")]
     pub gain: f32,
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "mute", description = "Request to mute a stream.")]
-pub struct DeviceMuteCommand {}
+pub struct MuteCommand {}
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "unmute", description = "Request to unmute a stream.")]
-pub struct DeviceUnmuteCommand {}
+pub struct UnmuteCommmand {}
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
@@ -165,7 +165,7 @@ pub struct DeviceUnmuteCommand {}
     name = "agc",
     description = "Request to enable or disable automatic gain control for the stream."
 )]
-pub struct DeviceAgcCommand {
+pub struct AgcCommand {
     #[argh(
         positional,
         description = "enable or disable AGC. Accepted values: on, off",

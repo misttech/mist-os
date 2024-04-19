@@ -6,7 +6,7 @@ use crate::list::DeviceQuery;
 use async_trait::async_trait;
 use blocking::Unblock;
 use ffx_audio_common::ffxtool::{exposed_dir, optional_moniker};
-use ffx_audio_device_args::{DeviceCommand, DeviceRecordCommand, SubCommand};
+use ffx_audio_device_args::{DeviceCommand, RecordCommand, SubCommand};
 use ffx_command::user_error;
 use fho::{moniker, FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl::{
@@ -233,7 +233,7 @@ async fn device_play(
 async fn device_record<W, E>(
     recorder: fac::RecorderProxy,
     selector: Selector,
-    record_command: DeviceRecordCommand,
+    record_command: RecordCommand,
     cancel_server: ServerEnd<fac::RecordCancelerMarker>,
     mut output_writer: W,
     mut output_error_writer: E,
@@ -428,7 +428,7 @@ mod tests {
         let test_buffers = TestBuffers::default();
         let mut result_writer: SimpleWriter = SimpleWriter::new_test(&test_buffers);
 
-        let record_command = DeviceRecordCommand {
+        let record_command = RecordCommand {
             duration: Some(std::time::Duration::from_nanos(500)),
             format: Format {
                 sample_type: SampleType::Uint8,
@@ -479,7 +479,7 @@ mod tests {
         let test_buffers = TestBuffers::default();
         let mut result_writer: SimpleWriter = SimpleWriter::new_test(&test_buffers);
 
-        let record_command = DeviceRecordCommand {
+        let record_command = RecordCommand {
             duration: None,
             format: Format {
                 sample_type: SampleType::Uint8,
