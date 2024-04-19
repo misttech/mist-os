@@ -24,6 +24,7 @@
             },
         ],
     },
+    bootfs_file_checks: [],
     package_checks: [
         // Checks involving the system image package.
         {
@@ -33,7 +34,7 @@
                 // tool for use in eng builds.
                 {
                     source: {
-                        MetaContents: "data/static_packages",
+                        PackageMetaContents: "data/static_packages",
                     },
                     state: "Present",
                     content_checks: {
@@ -49,13 +50,13 @@
                 // Ensure that it is absent or empty for user builds.
                 {
                     source: {
-                        MetaContents: "data/cache_packages",
+                        PackageMetaContents: "data/cache_packages",
                     },
                     state: "AbsentOrEmpty",
                 },
                 {
                     source: {
-                        MetaContents: "data/cache_packages.json",
+                        PackageMetaContents: "data/cache_packages.json",
                     },
                     state: "AbsentOrEmpty",
                 },
@@ -64,7 +65,7 @@
                 // The presence of this file disables executability enforcement.
                 {
                     source: {
-                        MetaContents: "data/pkgfs_disable_executability_restrictions",
+                        PackageMetaContents: "data/pkgfs_disable_executability_restrictions",
                     },
                     state: "Absent",
                 },

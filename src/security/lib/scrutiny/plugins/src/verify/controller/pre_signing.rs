@@ -5,6 +5,7 @@
 use {
     crate::{
         additional_boot_args::AdditionalBootConfigCollection, static_pkgs::StaticPkgsCollection,
+        zbi::Zbi,
     },
     anyhow::{anyhow, Context, Result},
     scrutiny::{model::controller::DataController, model::model::*},
@@ -76,12 +77,16 @@ impl DataController for PreSigningController {
             .map(|((name, _variant), hash)| (name.as_ref().to_string(), hash.to_string()))
             .collect();
 
+        let zbi_data = model.get::<Zbi>().context("Failed to get ZbiCollection")?;
+        let bootfs_files = &zbi_data.bootfs_files.bootfs_files;
+
         let mut blobs_artifact_reader: Box<dyn ArtifactReader> =
             Box::new(FileArtifactReader::new(&PathBuf::new(), &model.config().blobs_directory()));
 
         let validation_errors = build_checks::validate_build_checks(
             policy,
             boot_args_data,
+            bootfs_files,
             static_pkgs_map,
             &mut blobs_artifact_reader,
             &pre_signing_request.golden_files_dir,
