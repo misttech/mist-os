@@ -89,70 +89,51 @@ class MockLoaderService {
 // ```
 class MockLoaderServiceForTest {
  public:
+  MockLoaderServiceForTest() = default;
+  MockLoaderServiceForTest(const MockLoaderServiceForTest&) = delete;
+  MockLoaderServiceForTest(MockLoaderServiceForTest&&) = delete;
+
   // Prime the mock loader with the VMOs for the list of dependency names, and
   // add the expectation on the mock loader that it will receive a LoadObject
   // request for each of these dependencies in the order that they are listed.
-  void Needed(std::initializer_list<std::string_view> names) {
-    for (std::string_view name : names) {
-      ExpectDependency(name);
-    }
-  }
+  void Needed(std::initializer_list<std::string_view> names);
 
   // Similar to above, except that a boolean `found` is paired with the
   // dependency name to potentially prime the mock loader to return a 'not found'
   // error when it receives the LoadObject request for that dependency.
-  void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs) {
-    for (auto [name, found] : name_found_pairs) {
-      if (found) {
-        ExpectDependency(name);
-      } else {
-        ExpectMissing(name);
-      }
-    }
-  }
+  void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs);
 
-  // A generic interface that will initialize the mock loader (if it hasn't been
-  // initialized yet) and prime it with the `expected_result` for when it
-  // receives a LoadObject request for the given `name`.
-  void ExpectLoadObject(std::string_view name, zx::result<zx::vmo> expected_result) {
-    ASSERT_NO_FATAL_FAILURE(ReadyMock());
-    mock_loader_->ExpectLoadObject(name, std::move(expected_result));
-  }
+  // A generic interface to prime the mock loader with the `expected_result` for
+  // when it receives a LoadObject request for the given `name`.
+  void ExpectLoadObject(std::string_view name, zx::result<zx::vmo> expected_result);
 
   // This is an overload that will check the validity of the VMO before priming
   // the mock loader with a zx::ok result.
-  void ExpectLoadObject(std::string_view name, zx::vmo vmo) {
-    ASSERT_TRUE(vmo);
-    ExpectLoadObject(name, zx::ok(std::move(vmo)));
-  }
+  void ExpectLoadObject(std::string_view name, zx::vmo vmo);
 
   // Prime the mock loader with a dependency VMO and add the expectation on the
   // mock loader that it will receive a LoadObject request for that dependency.
-  void ExpectDependency(std::string_view name) { ExpectLoadObject(name, GetDepVmo(name)); }
+  void ExpectDependency(std::string_view name);
 
   // Prime the mock loader with a root module VMO and add the expectation on the
   // mock loader that it will receive a LoadObject request for that root module.
-  void ExpectRootModule(std::string_view name) { ExpectLoadObject(name, GetRootModuleVmo(name)); }
+  void ExpectRootModule(std::string_view name);
 
   // Prime the mock loader with a 'not found' error for `name` and add the
   // expectation that it will receive a LoadObject request for a VMO with the
   // given `name`.
-  void ExpectMissing(std::string_view name) { ExpectLoadObject(name, zx::error{ZX_ERR_NOT_FOUND}); }
+  void ExpectMissing(std::string_view name);
 
   // Prime the mock loader with config and add the expectation on the mock loader
   // that it will receive a Config request.
-  void ExpectConfig(std::string_view config) {
-    ASSERT_NO_FATAL_FAILURE(ReadyMock());
-    mock_loader_->ExpectConfig(config, zx::ok());
-  }
+  void ExpectConfig(std::string_view config);
 
-  zx::channel GetLdsvc() {
-    zx::channel ldsvc;
-    if (mock_loader_) {
-      ldsvc = mock_loader_->client().TakeChannel();
-    }
-    return ldsvc;
-  }
+  // TODO(caslyn): rename to TakeLdsvc
+  zx::channel GetLdsvc();
+
+  // TODO(caslyn): Introduce BorrowLdsvc function.
+
+  // TODO(caslyn): Introduce CallWithLoaderService function.
 
  private:
   // Fetch a dependency VMO from a specific path in the test package.
@@ -161,12 +142,7 @@ class MockLoaderServiceForTest {
   // Fetch a the root module VMO from a specific path in the test package.
   static zx::vmo GetRootModuleVmo(std::string_view name);
 
-  void ReadyMock() {
-    if (!mock_loader_) {
-      mock_loader_ = std::make_unique<MockLoaderService>();
-      ASSERT_NO_FATAL_FAILURE(mock_loader_->Init());
-    }
-  }
+  void ReadyMock();
 
   std::unique_ptr<MockLoaderService> mock_loader_;
 };

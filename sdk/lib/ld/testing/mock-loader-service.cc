@@ -96,6 +96,59 @@ void MockLoaderService::ExpectConfig(std::string_view name, zx::result<> expecte
   EXPECT_CALL(*mock_server_, MockConfig(std::string{name})).WillOnce(Return(expected_result));
 }
 
+void MockLoaderServiceForTest::Needed(std::initializer_list<std::string_view> names) {
+  for (std::string_view name : names) {
+    ExpectDependency(name);
+  }
+}
+
+void MockLoaderServiceForTest::Needed(
+    std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs) {
+  for (auto [name, found] : name_found_pairs) {
+    if (found) {
+      ExpectDependency(name);
+    } else {
+      ExpectMissing(name);
+    }
+  }
+}
+
+void MockLoaderServiceForTest::ExpectLoadObject(std::string_view name,
+                                                zx::result<zx::vmo> expected_result) {
+  ASSERT_NO_FATAL_FAILURE(ReadyMock());
+  mock_loader_->ExpectLoadObject(name, std::move(expected_result));
+}
+
+void MockLoaderServiceForTest::ExpectLoadObject(std::string_view name, zx::vmo vmo) {
+  ASSERT_TRUE(vmo);
+  ExpectLoadObject(name, zx::ok(std::move(vmo)));
+}
+
+void MockLoaderServiceForTest::ExpectDependency(std::string_view name) {
+  ExpectLoadObject(name, GetDepVmo(name));
+}
+
+void MockLoaderServiceForTest::ExpectRootModule(std::string_view name) {
+  ExpectLoadObject(name, GetRootModuleVmo(name));
+}
+
+void MockLoaderServiceForTest::ExpectMissing(std::string_view name) {
+  ExpectLoadObject(name, zx::error{ZX_ERR_NOT_FOUND});
+}
+
+void MockLoaderServiceForTest::ExpectConfig(std::string_view config) {
+  ASSERT_NO_FATAL_FAILURE(ReadyMock());
+  mock_loader_->ExpectConfig(config, zx::ok());
+}
+
+zx::channel MockLoaderServiceForTest::GetLdsvc() {
+  zx::channel ldsvc;
+  if (mock_loader_) {
+    ldsvc = mock_loader_->client().TakeChannel();
+  }
+  return ldsvc;
+}
+
 zx::vmo MockLoaderServiceForTest::GetDepVmo(std::string_view name) {
   // TODO(https://fxbug.dev/335737373): use a more direct means to look up the file.
   const std::string path = std::filesystem::path("test") / "lib" / LD_TEST_LIBPREFIX / name;
@@ -105,6 +158,13 @@ zx::vmo MockLoaderServiceForTest::GetDepVmo(std::string_view name) {
 zx::vmo MockLoaderServiceForTest::GetRootModuleVmo(std::string_view name) {
   const std::string path = std::filesystem::path("test") / "lib" / name;
   return elfldltl::testing::GetTestLibVmo(path);
+}
+
+void MockLoaderServiceForTest::ReadyMock() {
+  if (!mock_loader_) {
+    mock_loader_ = std::make_unique<MockLoaderService>();
+    ASSERT_NO_FATAL_FAILURE(mock_loader_->Init());
+  }
 }
 
 }  // namespace ld::testing
