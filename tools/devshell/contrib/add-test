@@ -20,7 +20,11 @@ fx-config-read
 
 set -e
 
+# Cache args in case of typos, bad paths, etc.
 args_gn="${FUCHSIA_BUILD_DIR}/args.gn"
+backup_args_gn="$(mktemp --suffix=.args.gn)"
+cp "${args_gn}" "${backup_args_gn}"
+
 echo "Adding test labels to ${args_gn}"
 
 for arg in "$@"; do
@@ -33,5 +37,10 @@ for arg in "$@"; do
 done
 
 echo "Generating Ninja outputs file"
+if ! fx-gen; then
+    echo "fx gen failed, restoring original args.gn and re-running 'fx gen'"
+    cp "${backup_args_gn}" "${args_gn}"
+    fx-gen
+fi
 
-fx-gen
+rm -f "${backup_args_gn}"
