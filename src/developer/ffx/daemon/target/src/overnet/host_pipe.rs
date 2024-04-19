@@ -353,6 +353,7 @@ impl HostPipeChild {
                     ssh.kill().await?;
                     // Flush any remaining lines, but let's not wait more than one second
                     let mut lb = ffx_ssh::parse::LineBuffer::new();
+                    let mut last_line = "".to_string();
                     while let Ok(line) = read_ssh_line(&mut lb, &mut stderr)
                         .on_timeout(Duration::from_secs(1), || {
                             Err(ParseSshConnectionError::Timeout)
@@ -363,6 +364,7 @@ impl HostPipeChild {
                             write_ssh_log("E", &line).await;
                         }
                         tracing::error!("SSH stderr: {line}");
+                        last_line = line;
                     }
 
                     if let Some(status) = ssh.try_wait()? {
@@ -380,6 +382,11 @@ impl HostPipeChild {
                         fuchsia_async::Timer::new(std::time::Duration::from_secs(2)).await;
                         tracing::error!("ssh child status is {:?}", ssh.try_wait());
                     }
+                    event_queue
+                        .push(TargetEvent::SshHostPipeErr(HostPipeErr::from(last_line)))
+                        .unwrap_or_else(|e| {
+                            tracing::warn!("queueing host pipe err event: {:?}", e)
+                        });
                     return Err(e);
                 }
             };
