@@ -760,5 +760,5 @@ void PrintFrame(FILE* file, const iframe_t& frame) {
   fprintf(file,
           " R12: %#18" PRIx64 " R13: %#18" PRIx64 " R14: %#18" PRIx64 " R15: %#18" PRIx64 "\n",
           frame.r12, frame.r13, frame.r14, frame.r15);
-  fprintf(file, "errc: %#18" PRIx64 "\n", frame.err_code);
+  fprintf(file, " vector: %#15" PRIx64 " errc: %#17" PRIx64 "\n", frame.vector, frame.err_code);
 }
