@@ -57,6 +57,10 @@ llvm_libc_source_set("writer") {
 
 source_set("wrapper") {
   public = [ "wrapper.h" ]
-  public_configs = [ "../..:llvm-libc.config" ]
+
+  # The llvm-libc headers used by wrapper.h need defines and include_dirs as
+  # used for building libc itself.
+  public_configs = [ "../..:llvm-libc-public.config" ]
+
   deps = [ ":printf_core" ]
 }

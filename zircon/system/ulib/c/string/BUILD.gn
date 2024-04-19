@@ -186,12 +186,19 @@ llvm_libc_source_set("strsignalerror") {
     "strsignal",
   ]
 
-  local_deps = [ ":StringUtil" ]
+  deps = [ ":StringUtil" ]
 }
 
-libc_source_set("StringUtil") {
+llvm_libc_source_set("StringUtil") {
   visibility = [ ":*" ]
-  dir = "$llvm_libc/src/__support/StringUtil"
+
+  dir = "__support/StringUtil"
+
+  # This doesn't define any functions with tests of their own, but it's still
+  # an llvm_libc_source_set() to get the dual production and testonly targets.
+  # (There will also be an unused empty unittests subtarget.)
+  functions = []
+
   public = [
     "error_to_string.h",
     "signal_to_string.h",

@@ -67,6 +67,9 @@ group("unittests") {
 
 # libc.gni uses these configs.
 
+# This is used for all libc-related sources, because some of the local code
+# still ties into the old musl implementation.  When the interactions with musl
+# internals are fully replaced, only llvm-libc.config will be needed.
 config("internal.config") {
   visibility = [ "./*" ]
   configs = [
@@ -75,12 +78,11 @@ config("internal.config") {
   ]
 }
 
+# This is needed for the expectations of the llvm-libc source code, whether
+# compiled into libc or just into unit test code.
 config("llvm-libc.config") {
   visibility = [ "./*" ]
-  defines = [
-    "LIBC_COPT_USE_C_ASSERT=1",
-    "LIBC_NAMESPACE=__llvm_libc",
-  ]
+  defines = [ "LIBC_COPT_USE_C_ASSERT=1" ]
   include_dirs = [
     libc,
     llvm_libc,
@@ -93,19 +95,64 @@ config("llvm-libc.config") {
   }
 }
 
+# This is needed when compiling libc-related code for use in unit tests.
 config("testonly.config") {
   visibility = [ "./*" ]
-  defines = [ "LIBC_COPT_TEST_USE_FUCHSIA=1" ]
+  defines = [
+    "LIBC_COPT_TEST_USE_FUCHSIA=1",
+
+    # This namespace is different from the one used below for building libc
+    # itself, mostly just for more visual clarity looking at backtraces from
+    # unit test code and such.  Since the unit test code only ever gets linked
+    # into a program using libc.so and not statically linked with the non-test
+    # libc code, it's not actually ambiguous what it means in the context of
+    # which binary contained the symbol.  But using a separate name is clearer.
+    "LIBC_NAMESPACE=llvm_libc_unittest",
+  ]
+}
+
+# This is needed for compilations of libc-related code to be used in
+# production, not in unit tests.  This applies both to things used outside of
+# libc proper, such as the separate printf_core integrations; and to libc.so
+# itself, which uses llvm-libc-extra.config, below.
+config("llvm-libc-public.config") {
+  configs = [ ":llvm-libc.config" ]
+
+  defines = [
+    # This namespace is invisible to anything outside libc.so, though in an
+    # eventual libc.a for static linking it would be visible at static link
+    # time.  The separate integrations of parts of libc internals, such as
+    # printf_core, also use this namespace because the libc_source_set()s they
+    # depend on are shared targets that also go into libc proper.  In effect,
+    # those separate integrations are using subsets of what an eventual libc.a
+    # could provide to those use cases.
+    #
+    # TODO(mcgrathr): There's no important reason to make it either the same or
+    # different from the upstream default of `__llvm_libc`, but it seems like
+    # `__fuchsia_libc` would be preferable just to make it more clear that this
+    # build is quite different from the llvm-libc source tree's own cmake (or
+    # Bazel) build of the same llvm-libc code.  For now, there are a few places
+    # that hard-code `__llvm_libc` elsewhere in the source tree.  Perhaps
+    # rewire those to use some shared source of truth with this somehow.
+    "LIBC_NAMESPACE=__llvm_libc",
+  ]
 }
 
 config("llvm-libc-export.config") {
   visibility = [ "./*" ]
-  defines = [
-    "LIBC_COPT_PUBLIC_PACKAGING=1",
-    "LIBC_INLINE=inline",
-  ]
+
+  configs = [ ":llvm-libc-public.config" ]
+
+  defines = [ "LIBC_COPT_PUBLIC_PACKAGING=1" ]
+
   if (toolchain_environment == "user.libc") {
-    configs = [ ":llvm-libc-function-attr.config" ]
+    configs += [ ":llvm-libc-function-attr.config" ]
+
+    # libfuzzer also uses libc internally.  By removing the fuzzing
+    # instrumentation we avoid it adding noise to the fuzzing coverage.
+    # TODO(https://fxbug.dev/25073): Once a cleaner solution is found, remove
+    # this.
+    configs += [ "//build/config/zircon:no_fuzzer" ]
   }
 }
 

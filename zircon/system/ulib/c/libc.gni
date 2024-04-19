@@ -28,14 +28,7 @@ libc_configs = [
 libc_testonly_configs = libc_configs + [ "$libc:testonly.config" ]
 
 # These additional configs are needed when compiling for the real libc.
-libc_configs += [
-  "$libc:llvm-libc-export.config",
-
-  # libfuzzer also uses libc internally.  By removing the fuzzing
-  # instrumentation we avoid it adding noise to the fuzzing coverage.
-  # TODO(25073): Once a cleaner solution is found, remove this.
-  "//build/config/zircon:no_fuzzer",
-]
+libc_configs += [ "$libc:llvm-libc-export.config" ]
 
 # Define source_set() targets for some libc code.
 #
@@ -379,9 +372,10 @@ template("llvm_libc_source_set") {
   target_dir = rebase_path(".", libc)
   test_target = "$target_name.unittests"
 
+  source_dir = target_dir
   if (defined(invoker.dir)) {
     # This doesn't affect the logic above, but overrides the subdir used below.
-    target_dir = invoker.dir
+    source_dir = invoker.dir
   }
 
   cpu_functions = []
@@ -419,7 +413,7 @@ template("llvm_libc_source_set") {
                              "visibility",
                            ])
 
-    dir = "$llvm_libc/src/$target_dir"
+    dir = "$llvm_libc/src/$source_dir"
 
     if (!defined(invoker.public)) {
       public = []
@@ -476,7 +470,7 @@ template("llvm_libc_source_set") {
   }
 
   libc_test(test_target) {
-    dir = "$llvm_libc/test/src/$target_dir"
+    dir = "$llvm_libc/test/src/$source_dir"
     deps = [ ":$main_target.testonly" ]
     sources = []
 
