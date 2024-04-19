@@ -15,7 +15,7 @@ pub mod loader;
 pub mod mm;
 pub mod mutable_state;
 pub mod power;
-pub mod selinux;
+pub mod security;
 pub mod signals;
 pub mod syscalls;
 pub mod task;

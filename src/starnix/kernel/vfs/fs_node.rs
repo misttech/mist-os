@@ -5,7 +5,7 @@
 use crate::{
     device::DeviceMode,
     mm::PAGE_SIZE,
-    selinux::hooks::current_task_hooks::{get_fs_node_security_id, post_setxattr},
+    security::{get_fs_node_security_id, post_setxattr},
     signals::{send_standard_signal, SignalInfo},
     task::{CurrentTask, Kernel, WaitQueue, Waiter},
     time::utc,

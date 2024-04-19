@@ -4,7 +4,7 @@
 
 use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt, ProcMapsFile, ProcSmapsFile, PAGE_SIZE},
-    selinux::fs::selinux_proc_attrs,
+    security::fs::selinux_proc_attrs,
     task::{CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -276,6 +276,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
         // owned by the effective user and effective group ID of the process."
         dir.entry_creds(task.creds().euid_as_fscred());
         dir.dir_creds(task.creds().euid_as_fscred());
+        // TODO(b/322850635): Add get/set_procattr hooks and move procattr impl here.
         selinux_proc_attrs(current_task, task, dir);
     });
     dir.entry(current_task, "ns", NsDirectory { task: task.into() }, mode!(IFDIR, 0o777));

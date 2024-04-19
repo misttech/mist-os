@@ -12,7 +12,7 @@ use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 use crate::{
     execution::execute_task,
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, PAGE_SIZE},
-    selinux::hooks::current_task_hooks as selinux_hooks,
+    security,
     task::{
         max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach,
         ptrace_dispatch, ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers,
@@ -73,7 +73,7 @@ where
     L: LockBefore<MmDumpable>,
     L: LockBefore<TaskRelease>,
 {
-    selinux_hooks::check_task_create_access(current_task)?;
+    security::check_task_create_access(current_task)?;
 
     let child_exit_signal = if args.exit_signal == 0 {
         None
@@ -394,7 +394,7 @@ pub fn sys_getpgid(
     let weak = get_task_or_current(current_task, pid);
     let task = Task::from_weak(&weak)?;
 
-    selinux_hooks::check_getpgid_access(current_task, &task)?;
+    security::check_getpgid_access(current_task, &task)?;
     let pgid = task.thread_group.read().process_group.leader;
     Ok(pgid)
 }
@@ -408,7 +408,7 @@ pub fn sys_setpgid(
     let weak = get_task_or_current(current_task, pid);
     let task = Task::from_weak(&weak)?;
 
-    selinux_hooks::check_setpgid_access(current_task, &task)?;
+    security::check_setpgid_access(current_task, &task)?;
     current_task.thread_group.setpgid(locked, &task, pgid)?;
     Ok(())
 }
@@ -734,7 +734,7 @@ pub fn sys_sched_getscheduler(
 
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
-    selinux_hooks::check_getsched_access(current_task, target_task.as_ref())?;
+    security::check_getsched_access(current_task, target_task.as_ref())?;
     let current_policy = target_task.read().scheduler_policy;
     Ok(current_policy.raw_policy())
 }
@@ -754,7 +754,7 @@ pub fn sys_sched_setscheduler(
     let target_task = Task::from_weak(&weak)?;
     let rlimit = target_task.thread_group.get_rlimit(Resource::RTPRIO);
 
-    selinux_hooks::check_setsched_access(current_task, &target_task)?;
+    security::check_setsched_access(current_task, &target_task)?;
     let param: sched_param = current_task.read_object(param.into())?;
     let policy = SchedulerPolicy::from_sched_params(policy, param, rlimit)?;
     target_task.set_scheduler_policy(policy)?;

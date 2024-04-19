@@ -663,20 +663,20 @@ impl BytesFileOps for SeProcAttrNode {
             }
         };
 
-        // SELinux is enabled, so the task must have `selinux_state`. Lock it for writing
+        // SELinux is enabled, so the task must have `security_state`. Lock it for writing
         // and update it.
         let mut tg = task.thread_group.write();
 
         use SeProcAttrNodeType::*;
         match self.attr {
-            Current => tg.selinux_state.current_sid = sid.ok_or(errno!(EINVAL))?,
-            Exec => tg.selinux_state.exec_sid = sid,
-            FsCreate => tg.selinux_state.fscreate_sid = sid,
-            KeyCreate => tg.selinux_state.keycreate_sid = sid,
+            Current => tg.security_state.0.current_sid = sid.ok_or(errno!(EINVAL))?,
+            Exec => tg.security_state.0.exec_sid = sid,
+            FsCreate => tg.security_state.0.fscreate_sid = sid,
+            KeyCreate => tg.security_state.0.keycreate_sid = sid,
             Previous => {
                 return error!(EINVAL);
             }
-            SockCreate => tg.selinux_state.sockcreate_sid = sid,
+            SockCreate => tg.security_state.0.sockcreate_sid = sid,
         };
 
         Ok(())
@@ -693,12 +693,12 @@ impl BytesFileOps for SeProcAttrNode {
                 let sid = {
                     let tg = task.thread_group.read();
                     match self.attr {
-                        Current => Some(tg.selinux_state.current_sid),
-                        Exec => tg.selinux_state.exec_sid,
-                        FsCreate => tg.selinux_state.fscreate_sid,
-                        KeyCreate => tg.selinux_state.keycreate_sid,
-                        Previous => Some(tg.selinux_state.previous_sid),
-                        SockCreate => tg.selinux_state.sockcreate_sid,
+                        Current => Some(tg.security_state.0.current_sid),
+                        Exec => tg.security_state.0.exec_sid,
+                        FsCreate => tg.security_state.0.fscreate_sid,
+                        KeyCreate => tg.security_state.0.keycreate_sid,
+                        Previous => Some(tg.security_state.0.previous_sid),
+                        SockCreate => tg.security_state.0.sockcreate_sid,
                     }
                 };
 

@@ -11,7 +11,7 @@ use crate::{
     fs::proc::pid_directory::TaskDirectory,
     loader::{load_executable, resolve_executable, ResolvedElf},
     mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor},
-    selinux::hooks::current_task_hooks as selinux_hooks,
+    security,
     signals::{send_signal_first, send_standard_signal, RunState, SignalActions, SignalInfo},
     task::{
         ExitStatus, Kernel, PidTable, ProcessGroup, PtraceCoreState, PtraceEvent, PtraceEventData,
@@ -831,7 +831,7 @@ impl CurrentTask {
         // used in the `open` call.
         executable.name.check_access(self, Access::EXEC)?;
 
-        let elf_selinux_state = selinux_hooks::check_exec_access(self, executable.node())?;
+        let elf_security_state = security::check_exec_access(self, executable.node())?;
 
         let resolved_elf = resolve_executable(
             locked,
@@ -840,7 +840,7 @@ impl CurrentTask {
             path.clone(),
             argv,
             environ,
-            elf_selinux_state,
+            elf_security_state,
         )?;
 
         if self.thread_group.read().tasks_count() > 1 {
@@ -878,7 +878,7 @@ impl CurrentTask {
             .map_err(|status| from_status_like_fdio!(status))?;
 
         // Update the SELinux state, if enabled.
-        selinux_hooks::update_state_on_exec(self, &resolved_elf.selinux_state);
+        security::update_state_on_exec(self, &resolved_elf.security_state);
 
         let start_info = load_executable(self, resolved_elf, &path)?;
         let regs: zx_thread_state_general_regs_t = start_info.into();

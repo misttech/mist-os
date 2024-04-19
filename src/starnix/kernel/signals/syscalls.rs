@@ -6,7 +6,7 @@ pub use super::signal_handling::sys_restart_syscall;
 use super::signalfd::SignalFd;
 use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt},
-    selinux::hooks::current_task_hooks as selinux_hooks,
+    security,
     signals::{
         restore_from_signal_handler, send_signal, SignalDetail, SignalInfo, SignalInfoHeader,
         SI_HEADER_SIZE,
@@ -338,7 +338,7 @@ fn send_unchecked_signal(
     }
 
     let signal = Signal::try_from(unchecked_signal)?;
-    selinux_hooks::check_signal_access(current_task, &target, signal)?;
+    security::check_signal_access(current_task, &target, signal)?;
 
     send_signal(
         target,
@@ -371,7 +371,7 @@ fn send_unchecked_signal_info(
     }
 
     let signal = Signal::try_from(unchecked_signal)?;
-    selinux_hooks::check_signal_access(current_task, &target, signal)?;
+    security::check_signal_access(current_task, &target, signal)?;
 
     let siginfo = read_siginfo(current_task, signal, siginfo_ref)?;
     if target.get_pid() != current_task.get_pid() && (siginfo.code >= 0 || siginfo.code == SI_TKILL)

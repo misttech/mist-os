@@ -5,7 +5,7 @@
 use crate::{
     device::terminal::{ControllingSession, Terminal},
     mutable_state::{state_accessor, state_implementation},
-    selinux::hooks::thread_group_hooks,
+    security,
     signals::{
         send_signal, send_standard_signal, syscalls::WaitingOptions, SignalActions, SignalDetail,
         SignalInfo,
@@ -22,7 +22,6 @@ use crate::{
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use macro_rules_attribute::apply;
-use selinux::SecurityId;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{LockBefore, Locked, Mutex, MutexGuard, ProcessGroupState, RwLock};
@@ -112,8 +111,8 @@ pub struct ThreadGroupMutableState {
 
     pub terminating: bool,
 
-    /// The SELinux operations for this thread group.
-    pub selinux_state: thread_group_hooks::SeLinuxThreadGroupState,
+    /// The Linux Security Modules state for this thread group.
+    pub security_state: security::ThreadGroupState,
 
     /// Time statistics accumulated from the children.
     pub children_time_stats: TaskTimeStats,
@@ -376,8 +375,8 @@ impl ThreadGroup {
     {
         let timers = TimerTable::new();
         let itimer_real_id = timers.create(CLOCK_REALTIME as ClockId, None).unwrap();
-        let selinux_state =
-            thread_group_hooks::alloc_security(&kernel, parent.as_ref().map(|p| &p.selinux_state));
+        let security_state =
+            security::alloc_security(&kernel, parent.as_ref().map(|p| &p.security_state));
         let mut thread_group = ThreadGroup {
             kernel,
             process,
@@ -409,7 +408,7 @@ impl ThreadGroup {
                 last_signal: None,
                 leader_exit_info: None,
                 terminating: false,
-                selinux_state,
+                security_state,
                 children_time_stats: Default::default(),
                 personality: parent.as_ref().map(|p| p.personality).unwrap_or(Default::default()),
                 allowed_ptracers: PtraceAllowedPtracers::None,
@@ -1293,15 +1292,6 @@ impl ThreadGroup {
             }
         }
         None
-    }
-
-    /// Get the SELinux security ID of the thread group.
-    /// Returns a placeholder value if SELinux is not enabled.
-    pub fn get_current_sid(&self) -> SecurityId {
-        // TODO(http://b/316181721): to avoid TOCTOU issues, once initial security contexts are
-        // propagated to tasks in the system, in some cases using this API will need to be replaced
-        // with call sites holding the state lock while making updates.
-        self.mutable_state.read().selinux_state.current_sid
     }
 }
 

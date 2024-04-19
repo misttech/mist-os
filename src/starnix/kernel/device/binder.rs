@@ -12,6 +12,7 @@ use crate::{
         MemoryAccessorExt, ProtectionFlags,
     },
     mutable_state::Guard,
+    security,
     task::{
         CurrentTask, EventHandler, Kernel, SchedulerPolicy, SimpleWaiter, Task, WaitCanceler,
         WaitQueue, Waiter,
@@ -3504,15 +3505,10 @@ impl BinderDriver {
                 let target_task = weak_task.upgrade().ok_or_else(|| TransactionError::Dead)?;
                 let security_context: Option<FsString> =
                     if object.flags.contains(BinderObjectFlags::TXN_SECURITY_CTX) {
-                        let security_server = target_task
-                            .kernel()
-                            .security_server
-                            .as_ref()
-                            .expect("SELinux is not enabled");
-                        let sid = target_task.thread_group.read().selinux_state.current_sid.clone();
-                        let mut security_context = security_server
-                            .sid_to_security_context(sid)
-                            .map_or(FsString::default(), FsString::from);
+                        let mut security_context = FsString::from(
+                            security::get_task_context(&current_task, &target_task)
+                                .unwrap_or_default(),
+                        );
                         security_context.push(b'\0');
                         Some(security_context)
                     } else {
