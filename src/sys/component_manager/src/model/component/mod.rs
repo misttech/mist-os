@@ -625,17 +625,17 @@ impl ComponentInstance {
     ) -> Result<(), StopActionError> {
         // If the component is started, we first move it back to the resolved state. We will move
         // it to the shutdown state after the stopping is complete.
-        let mut runtime = None;
+        let mut started = None;
         self.lock_state().await.replace(|instance_state| match instance_state {
             InstanceState::Started(resolved_state, started_state) => {
-                runtime = Some(started_state);
+                started = Some(started_state);
                 InstanceState::Resolved(resolved_state)
             }
             other_state => other_state,
         });
 
         let stop_result = {
-            if let Some(runtime) = &mut runtime {
+            if let Some(started) = started {
                 let stop_timer = Box::pin(async move {
                     let timer = fasync::Timer::new(fasync::Time::after(zx::Duration::from(
                         self.environment.stop_timeout(),
@@ -648,8 +648,8 @@ impl ComponentInstance {
                     )));
                     timer.await;
                 });
-                let ret = runtime
-                    .stop_program(stop_timer, kill_timer)
+                let ret = started
+                    .stop(stop_timer, kill_timer)
                     .await
                     .map_err(StopActionError::ProgramStopError)?;
                 if ret.outcome.request == StopRequestSuccess::KilledAfterTimeout
@@ -672,11 +672,6 @@ impl ComponentInstance {
                         .await
                         .map_err(|_| StopActionError::GetTopInstanceFailed)?;
                     top_instance.trigger_reboot().await;
-                }
-
-                if let Some(execution_controller_task) = runtime.execution_controller_task.as_mut()
-                {
-                    execution_controller_task.set_stop_status(ret.outcome.component_exit_status);
                 }
                 Some(ret)
             } else {

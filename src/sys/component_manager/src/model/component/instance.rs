@@ -1157,7 +1157,7 @@ pub struct StartedInstanceState {
 
     /// This stores the hook for notifying an ExecutionController about stop events for this
     /// component.
-    pub execution_controller_task: Option<controller::ExecutionControllerTask>,
+    execution_controller_task: Option<controller::ExecutionControllerTask>,
 
     /// Logger attributed to this component.
     ///
@@ -1196,20 +1196,20 @@ impl StartedInstanceState {
         self.program = Some(ProgramRuntime::new(program, component));
     }
 
-    /// Stop the program, if any. The timer defines how long the runner is given to stop the
-    /// program gracefully before we request the controller to terminate the program.
+    /// Stops the component. If the component has a program, the timer defines how long
+    /// the runner is given to stop the program gracefully before we request the controller
+    /// to terminate the program.
     ///
     /// Regardless if the runner honored our request, after this method, the [`StartedInstanceState`] is
     /// no longer associated with a [Program].
-    pub async fn stop_program<'a, 'b>(
-        &'a mut self,
+    pub async fn stop<'a, 'b>(
+        mut self,
         stop_timer: BoxFuture<'a, ()>,
         kill_timer: BoxFuture<'b, ()>,
     ) -> Result<StopOutcomeWithEscrow, program::StopError> {
         let program = self.program.take();
-        // Potentially there is no program, perhaps because the component
-        // has no running code. In this case this is a no-op.
-        if let Some(program) = program {
+        // If the component has a program, also stop the program.
+        let ret = if let Some(program) = program {
             program.stop(stop_timer, kill_timer).await
         } else {
             Ok(StopOutcomeWithEscrow {
@@ -1219,7 +1219,11 @@ impl StartedInstanceState {
                 },
                 escrow_request: None,
             })
+        }?;
+        if let Some(execution_controller_task) = self.execution_controller_task.as_mut() {
+            execution_controller_task.set_stop_status(ret.outcome.component_exit_status);
         }
+        Ok(ret)
     }
 
     /// Add a channel scoped to the lifetime of this object.
