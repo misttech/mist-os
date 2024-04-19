@@ -486,7 +486,8 @@ impl RoutingTest {
                 UseDecl::Storage(s) => Some(s.target_path.to_string()),
                 UseDecl::EventStream(s) => Some(s.target_path.parent().to_string()),
                 UseDecl::Runner(s) => Some(s.source_name.to_string().into()),
-                UseDecl::Config(s) => Some(s.source_name.to_string().into()),
+                // Using config doesn't add a namespace path.
+                UseDecl::Config(_) => None,
             })
             .collect();
         let mut expected_paths = vec![];
