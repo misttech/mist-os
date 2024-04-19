@@ -1,5 +1,5 @@
 <!-- mdformat off(templates not supported) -->
-{% set rfcid = "RFC-0241" %} <!-- TODO: DO NOT SUBMIT, update number -->
+{% set rfcid = "RFC-0241" %}
 {% include "docs/contribute/governance/rfcs/_common/_rfc_header.md" %}
 # {{ rfc.name }}: {{ rfc.title }}
 {# Fuchsia RFCs use templates to display various fields from _rfcs.yaml. View the #}
