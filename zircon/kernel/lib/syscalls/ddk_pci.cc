@@ -5,7 +5,6 @@
 // https://opensource.org/licenses/MIT
 
 #include <align.h>
-#include <lib/gfxconsole.h>
 #include <lib/pci/pio.h>
 #include <lib/user_copy/user_ptr.h>
 #include <platform.h>
@@ -44,14 +43,6 @@
 #include <ktl/enforce.h>
 
 #define LOCAL_TRACE 0
-
-// If we were built with the GFX console, make sure that it is un-bound when
-// user mode takes control of PCI.  Note: there should probably be a cleaner way
-// of doing this.  Not all system have PCI, and (eventually) not all systems
-// will attempt to initialize PCI.  Someday, there should be a different way of
-// handing off from early/BSOD kernel mode graphics to user mode.
-#include <lib/gfxconsole.h>
-static inline void shutdown_early_init_console() { gfxconsole_bind_display(nullptr, nullptr); }
 
 #ifdef WITH_KERNEL_PCIE
 namespace {
@@ -434,7 +425,6 @@ zx_status_t sys_pci_init(zx_handle_t handle, user_in_ptr<const zx_pci_init_arg_t
     return ret;
   }
 
-  shutdown_early_init_console();
   return ZX_OK;
 }
 
@@ -789,7 +779,6 @@ zx_status_t sys_pci_set_irq_mode(zx_handle_t dev_handle, uint32_t mode,
 #else   // WITH_KERNEL_PCIE
 // zx_status_t zx_pci_init
 zx_status_t sys_pci_init(zx_handle_t, user_in_ptr<const zx_pci_init_arg_t>, uint32_t) {
-  shutdown_early_init_console();
   return ZX_OK;
 }
 

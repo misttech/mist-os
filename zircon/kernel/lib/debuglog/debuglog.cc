@@ -19,7 +19,6 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <dev/udisplay.h>
 #include <kernel/auto_lock.h>
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
@@ -96,7 +95,7 @@ void DLog::StartThreads() {
     notifier_state_.thread->Resume();
   }
 
-  if (platform_serial_enabled() || platform_early_console_enabled()) {
+  if (platform_serial_enabled()) {
     auto dumper_thunk = [](void* arg) -> int { return static_cast<DLog*>(arg)->DumperThread(); };
     if ((dumper_state_.thread = Thread::Create(kDlogDumperThreadName, dumper_thunk, this,
                                                HIGH_PRIORITY - 2)) != NULL) {
@@ -170,8 +169,6 @@ void DLog::PanicStart() {
 }
 
 void DLog::BluescreenInit() {
-  udisplay_bind_gfxconsole();
-
   // replay debuglog?
 
   // Print panic string.

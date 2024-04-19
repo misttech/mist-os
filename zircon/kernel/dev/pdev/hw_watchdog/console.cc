@@ -163,6 +163,6 @@ static int cmd_watchdog(int argc, const cmd_args* argv, uint32_t flags) {
 
 STATIC_COMMAND_START
 STATIC_COMMAND("wdt", "hardware watchdog commands", &cmd_watchdog)
-STATIC_COMMAND_END(gfx)
+STATIC_COMMAND_END(wdt)
 
 #endif

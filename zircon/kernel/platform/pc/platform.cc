@@ -80,8 +80,6 @@ EfiCrashlog efi;
 }  // namespace crashlog_impls
 }  // namespace
 
-static bool early_console_disabled;
-
 static void platform_save_bootloader_data(void) {
   if (gPhysHandoff->arch_handoff.framebuffer) {
     bootloader.fb = gPhysHandoff->arch_handoff.framebuffer.value();
@@ -113,78 +111,6 @@ static void boot_reserve_zbi() {
   ktl::span zbi = ZbiInPhysmap();
   boot_reserve_add_range(physmap_to_paddr(zbi.data()), ROUNDUP_PAGE_SIZE(zbi.size_bytes()));
 }
-
-#include <lib/gfxconsole.h>
-
-#include <dev/display.h>
-
-zx_status_t display_get_info(struct display_info* info) {
-  return gfxconsole_display_get_info(info);
-}
-
-bool platform_early_console_enabled() { return !early_console_disabled; }
-
-static void platform_early_display_init(void) {
-  display_info info;
-  void* bits;
-
-  if (bootloader.fb.base == 0) {
-    return;
-  }
-
-  if (!gBootOptions->gfx_console_early) {
-    early_console_disabled = true;
-    return;
-  }
-
-  // allocate an offscreen buffer of worst-case size, page aligned
-  bits = boot_alloc_mem(8192 + bootloader.fb.height * bootloader.fb.stride * 4);
-  bits = (void*)((((uintptr_t)bits) + 4095) & (~4095));
-
-  memset(&info, 0, sizeof(info));
-  info.format = bootloader.fb.format;
-  info.width = bootloader.fb.width;
-  info.height = bootloader.fb.height;
-  info.stride = bootloader.fb.stride;
-  info.flags = DISPLAY_FLAG_HW_FRAMEBUFFER;
-  info.framebuffer = (void*)X86_PHYS_TO_VIRT(bootloader.fb.base);
-
-  gfxconsole_bind_display(&info, bits);
-}
-
-/* Ensure the framebuffer is write-combining as soon as we have the VMM.
- * Some system firmware has the MTRRs for the framebuffer set to Uncached.
- * Since dealing with MTRRs is rather complicated, we wait for the VMM to
- * come up so we can use PAT to manage the memory types. */
-static void platform_ensure_display_memtype(uint level) {
-  if (bootloader.fb.base == 0) {
-    return;
-  }
-  if (early_console_disabled) {
-    return;
-  }
-  display_info info;
-  memset(&info, 0, sizeof(info));
-  info.format = bootloader.fb.format;
-  info.width = bootloader.fb.width;
-  info.height = bootloader.fb.height;
-  info.stride = bootloader.fb.stride;
-  info.flags = DISPLAY_FLAG_HW_FRAMEBUFFER;
-
-  void* addr = NULL;
-  zx_status_t status = VmAspace::kernel_aspace()->AllocPhysical(
-      "boot_fb", ROUNDUP(info.stride * info.height * 4, PAGE_SIZE), &addr, PAGE_SIZE_SHIFT,
-      bootloader.fb.base, 0 /* vmm flags */,
-      ARCH_MMU_FLAG_WRITE_COMBINING | ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE);
-  if (status != ZX_OK) {
-    TRACEF("Failed to map boot_fb: %d\n", status);
-    return;
-  }
-
-  info.framebuffer = addr;
-  gfxconsole_bind_display(&info, NULL);
-}
-LK_INIT_HOOK(display_memtype, &platform_ensure_display_memtype, LK_INIT_LEVEL_VM + 1)
 
 static void platform_init_crashlog(void) {
   // Nothing to do if we have already selected a crashlog implementation.
@@ -308,9 +234,6 @@ void platform_early_init(void) {
   /* get the text console working */
   platform_init_console();
 #endif
-
-  /* if the bootloader has framebuffer info, use it for early console */
-  platform_early_display_init();
 
   /* initialize the ACPI parser */
   PlatformInitAcpi(gPhysHandoff->acpi_rsdp.value_or(0));

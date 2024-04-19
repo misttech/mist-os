@@ -42,9 +42,5 @@ source_set("generic-riscv64") {
     "//zircon/system/ulib/ram-crashlog",
   ]
 
-  # TODO-rvbringup: hack to solve a lack of dep from lib/debuglog to dev/udisplay when building
-  # with kernel_no_userabi
-  deps += [ "//zircon/kernel/dev/udisplay" ]
-
   public_deps = [ "//zircon/system/ulib/affine" ]
 }
