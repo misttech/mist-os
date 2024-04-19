@@ -171,7 +171,7 @@ mod tests {
                 "./my_foo".to_string(),
                 ComponentDecl {
                     children: vec![ChildDecl {
-                        name: "my_bar".to_string(),
+                        name: "my_bar".parse().unwrap(),
                         url: "fuchsia-pkg://fuchsia.com/bar#meta/bar.cm".to_string(),
                         startup: fdecl::StartupMode::Lazy,
                         environment: None,
@@ -199,7 +199,7 @@ mod tests {
                         source_name: "fuchsia.foo.bar".parse().unwrap(),
                         source_dictionary: Default::default(),
                         target: OfferTarget::Child(ChildRef {
-                            name: "my_bar".into(),
+                            name: "my_bar".parse().unwrap(),
                             collection: None,
                         }),
                         target_name: "fuchsia.foo.bar".parse().unwrap(),
@@ -261,7 +261,7 @@ mod tests {
                             source_name: "fuchsia.foo.bar".parse().unwrap(),
                             source_dictionary: Default::default(),
                             target: OfferTarget::Child(ChildRef {
-                                name: "my_bar".into(),
+                                name: "my_bar".parse().unwrap(),
                                 collection: None,
                             }),
                             target_name: "fuchsia.foo.bar".parse().unwrap(),

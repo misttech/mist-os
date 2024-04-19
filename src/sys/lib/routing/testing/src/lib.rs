@@ -2484,11 +2484,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("started")
                             .source(OfferSource::Parent)
                             .target(OfferTarget::Child(ChildRef {
-                                name: "b".into(),
+                                name: "b".parse().unwrap(),
                                 collection: None,
                             }))
                             .scope(vec![EventScope::Child(ChildRef {
-                                name: "b".into(),
+                                name: "b".parse().unwrap(),
                                 collection: None,
                             })]),
                     )
@@ -2497,11 +2497,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("started")
                             .source(OfferSource::Parent)
                             .target(OfferTarget::Child(ChildRef {
-                                name: "d".into(),
+                                name: "d".parse().unwrap(),
                                 collection: None,
                             }))
                             .scope(vec![EventScope::Child(ChildRef {
-                                name: "c".into(),
+                                name: "c".parse().unwrap(),
                                 collection: None,
                             })]),
                     )
@@ -2510,11 +2510,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("started")
                             .source(OfferSource::Parent)
                             .target(OfferTarget::Child(ChildRef {
-                                name: "c".into(),
+                                name: "c".parse().unwrap(),
                                 collection: None,
                             }))
                             .scope(vec![EventScope::Child(ChildRef {
-                                name: "d".into(),
+                                name: "d".parse().unwrap(),
                                 collection: None,
                             })]),
                     )
@@ -2644,12 +2644,18 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("started")
                             .source(OfferSource::Parent)
                             .target(OfferTarget::Child(ChildRef {
-                                name: "b".into(),
+                                name: "b".parse().unwrap(),
                                 collection: None,
                             }))
                             .scope(vec![
-                                EventScope::Child(ChildRef { name: "b".into(), collection: None }),
-                                EventScope::Child(ChildRef { name: "c".into(), collection: None }),
+                                EventScope::Child(ChildRef {
+                                    name: "b".parse().unwrap(),
+                                    collection: None,
+                                }),
+                                EventScope::Child(ChildRef {
+                                    name: "c".parse().unwrap(),
+                                    collection: None,
+                                }),
                             ]),
                     )
                     .offer(
@@ -2657,12 +2663,18 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("started")
                             .source(OfferSource::Parent)
                             .target(OfferTarget::Child(ChildRef {
-                                name: "c".into(),
+                                name: "c".parse().unwrap(),
                                 collection: None,
                             }))
                             .scope(vec![
-                                EventScope::Child(ChildRef { name: "b".into(), collection: None }),
-                                EventScope::Child(ChildRef { name: "c".into(), collection: None }),
+                                EventScope::Child(ChildRef {
+                                    name: "b".parse().unwrap(),
+                                    collection: None,
+                                }),
+                                EventScope::Child(ChildRef {
+                                    name: "c".parse().unwrap(),
+                                    collection: None,
+                                }),
                             ]),
                     )
                     .child_default("b")
@@ -2684,11 +2696,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("started")
                             .source(OfferSource::Parent)
                             .target(OfferTarget::Child(ChildRef {
-                                name: "d".into(),
+                                name: "d".parse().unwrap(),
                                 collection: None,
                             }))
                             .scope(vec![EventScope::Child(ChildRef {
-                                name: "e".into(),
+                                name: "e".parse().unwrap(),
                                 collection: None,
                             })]),
                     )
@@ -4292,7 +4304,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("fuchsia.MyConfig")
                             .source(cm_rust::OfferSource::Self_)
                             .target(cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                                name: "b".into(),
+                                name: "b".parse().unwrap(),
                                 collection: None,
                             })),
                     )
@@ -4349,7 +4361,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .source(cm_rust::OfferSource::Void)
                             .availability(cm_rust::Availability::Optional)
                             .target(cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                                name: "b".into(),
+                                name: "b".parse().unwrap(),
                                 collection: None,
                             })),
                     )

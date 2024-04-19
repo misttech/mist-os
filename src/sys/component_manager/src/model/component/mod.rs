@@ -1748,11 +1748,11 @@ pub mod tests {
 
         let example_dynamic_offer = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Child(ChildRef {
-                name: "a".into(),
+                name: "a".parse().unwrap(),
                 collection: Some("coll_1".parse().unwrap()),
             }),
             target: OfferTarget::Child(ChildRef {
-                name: "b".into(),
+                name: "b".parse().unwrap(),
                 collection: Some("coll_1".parse().unwrap()),
             }),
             source_dictionary: Default::default(),
@@ -1841,7 +1841,7 @@ pub mod tests {
             fcomponent::CreateChildArgs {
                 dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                     source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                        name: "a".into(),
+                        name: "a".parse().unwrap(),
                         collection: Some("coll_2".parse().unwrap()),
                     })),
                     source_name: Some("dyn_offer2_source_name".to_string()),
@@ -1857,11 +1857,11 @@ pub mod tests {
 
         let example_dynamic_offer2 = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Child(ChildRef {
-                name: "a".into(),
+                name: "a".parse().unwrap(),
                 collection: Some("coll_2".parse().unwrap()),
             }),
             target: OfferTarget::Child(ChildRef {
-                name: "b".into(),
+                name: "b".parse().unwrap(),
                 collection: Some("coll_1".parse().unwrap()),
             }),
             source_name: "dyn_offer2_source_name".parse().unwrap(),
@@ -2242,7 +2242,7 @@ pub mod tests {
                     Some(offers),
                     None,
                     &ChildDecl {
-                        name: "foo".to_string(),
+                        name: "foo".parse().unwrap(),
                         url: "http://foo".to_string(),
                         startup: fdecl::StartupMode::Lazy,
                         on_terminate: None,
@@ -2279,7 +2279,7 @@ pub mod tests {
                 source_name: "fuchsia.example.Echo".parse().unwrap(),
                 source_dictionary: Default::default(),
                 target: OfferTarget::Child(ChildRef {
-                    name: "foo".into(),
+                    name: "foo".parse().unwrap(),
                     collection: Some("col".parse().unwrap()),
                 }),
                 target_name: "fuchsia.example.Echo".parse().unwrap(),
@@ -2306,7 +2306,7 @@ pub mod tests {
                 source_name: "fuchsia.example.Echo".parse().unwrap(),
                 source_dictionary: Default::default(),
                 target: OfferTarget::Child(ChildRef {
-                    name: "foo".into(),
+                    name: "foo".parse().unwrap(),
                     collection: Some("col".parse().unwrap()),
                 }),
                 target_name: "fuchsia.example.Echo".parse().unwrap(),
@@ -2337,13 +2337,13 @@ pub mod tests {
             if err == DynamicOfferError::SourceNotFound {
                 offer: OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Child(ChildRef {
-                        name: "doesnt-exist".into(),
+                        name: "doesnt-exist".parse().unwrap(),
                         collection: Some("col".parse().unwrap()),
                     }),
                     source_name: "fuchsia.example.Echo".parse().unwrap(),
                     source_dictionary: Default::default(),
                     target: OfferTarget::Child(ChildRef {
-                        name: "foo".into(),
+                        name: "foo".parse().unwrap(),
                         collection: Some("col".parse().unwrap()),
                     }),
                     target_name: "fuchsia.example.Echo".parse().unwrap(),
@@ -2383,7 +2383,7 @@ pub mod tests {
                     None,
                     Some(capabilities),
                     &ChildDecl {
-                        name: "foo".to_string(),
+                        name: "foo".parse().unwrap(),
                         url: "http://foo".to_string(),
                         startup: fdecl::StartupMode::Lazy,
                         on_terminate: None,

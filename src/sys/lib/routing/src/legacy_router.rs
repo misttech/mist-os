@@ -1477,7 +1477,7 @@ impl Expose {
 fn target_matches_moniker(target: &OfferTarget, child_moniker: &ChildName) -> bool {
     match target {
         OfferTarget::Child(target_ref) => {
-            target_ref.name == child_moniker.name()
+            &target_ref.name == child_moniker.name()
                 && target_ref.collection.as_ref() == child_moniker.collection()
         }
         OfferTarget::Collection(target_collection) => {
@@ -1597,9 +1597,7 @@ impl CapabilityVisitor for NoopVisitor {
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        assert_matches::assert_matches,
-        cm_rust::{ChildRef, ExposeServiceDecl},
+        super::*, assert_matches::assert_matches, cm_rust::ExposeServiceDecl, cm_rust_testing::*,
     };
 
     #[test]
@@ -1639,7 +1637,7 @@ mod tests {
             source: OfferSource::Collection("coll".parse().unwrap()),
             source_name: "foo_source".parse().unwrap(),
             source_dictionary: Default::default(),
-            target: OfferTarget::Child(ChildRef { name: "target".into(), collection: None }),
+            target: offer_target_static_child("target"),
             target_name: "foo_target".parse().unwrap(),
             source_instance_filter: None,
             renamed_instances: None,

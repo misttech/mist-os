@@ -432,7 +432,7 @@ pub(crate) mod test {
                 source_name: "test_protocol".parse().unwrap(),
                 source_dictionary: Default::default(),
                 target: cm::OfferTarget::Child(cm::ChildRef {
-                    name: "test_child".into(),
+                    name: "test_child".parse().unwrap(),
                     collection: None,
                 }),
                 target_name: "test_protocol".parse().unwrap(),

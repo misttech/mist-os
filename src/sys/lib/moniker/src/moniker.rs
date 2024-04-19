@@ -240,7 +240,7 @@ mod tests {
         assert_eq!("a/coll:b", format!("{}", m));
         assert_eq!(m, Moniker::try_from(vec!["a", "coll:b"]).unwrap());
         assert_eq!(m.leaf().map(|m| m.collection()).flatten(), Some(&Name::new("coll").unwrap()));
-        assert_eq!(m.leaf().map(|m| m.name()), Some("b"));
+        assert_eq!(m.leaf().map(|m| m.name().as_str()), Some("b"));
         assert_eq!(m.leaf(), Some(&ChildName::try_from("coll:b").unwrap()));
     }
 

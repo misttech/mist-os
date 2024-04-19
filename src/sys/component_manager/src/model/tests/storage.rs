@@ -1457,7 +1457,7 @@ async fn storage_persistence_disablement() {
         &vec!["b"].try_into().unwrap(),
         "persistent_coll",
         ChildDecl {
-            name: "c".into(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,

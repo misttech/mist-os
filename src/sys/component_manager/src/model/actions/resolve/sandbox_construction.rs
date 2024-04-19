@@ -68,7 +68,8 @@ pub fn build_component_sandbox(
             environment = component_input.environment();
         }
         let input = ComponentInput::new(environment);
-        child_inputs.insert(Name::new(&child.name).unwrap(), input).ok();
+        let name = Name::new(child.name.as_str()).expect("child is static so name is not long");
+        child_inputs.insert(name, input).ok();
     }
 
     for collection in &decl.collections {
@@ -109,7 +110,8 @@ pub fn build_component_sandbox(
         let mut target_dict = match offer.target() {
             cm_rust::OfferTarget::Child(child_ref) => {
                 assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
-                let child_name = Name::new(&child_ref.name).unwrap();
+                let child_name = Name::new(child_ref.name.as_str())
+                    .expect("child is static so name is not long");
                 if child_inputs.get(&child_name).is_none() {
                     child_inputs.insert(child_name.clone(), Default::default()).ok();
                 }

@@ -310,7 +310,7 @@ mod tests {
                 "root",
                 ComponentDeclBuilder::new()
                     .child(cm_rust::ChildDecl {
-                        name: "a".to_string(),
+                        name: "a".parse().unwrap(),
                         url: "test:///a".to_string(),
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
@@ -318,7 +318,7 @@ mod tests {
                         config_overrides: None,
                     })
                     .child(cm_rust::ChildDecl {
-                        name: "cant-resolve".to_string(),
+                        name: "cant-resolve".parse().unwrap(),
                         url: "cant-resolve://cant-resolve".to_string(),
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
@@ -331,7 +331,7 @@ mod tests {
                 "a",
                 ComponentDeclBuilder::new()
                     .child(cm_rust::ChildDecl {
-                        name: "b".to_string(),
+                        name: "b".parse().unwrap(),
                         url: "test:///b".to_string(),
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
@@ -386,7 +386,7 @@ mod tests {
                 "root",
                 ComponentDeclBuilder::new()
                     .child(cm_rust::ChildDecl {
-                        name: "a".to_string(),
+                        name: "a".parse().unwrap(),
                         url: "test:///a".to_string(),
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
@@ -399,7 +399,7 @@ mod tests {
                 "a",
                 ComponentDeclBuilder::new()
                     .child(cm_rust::ChildDecl {
-                        name: "b".to_string(),
+                        name: "b".parse().unwrap(),
                         url: "test:///b".to_string(),
                         startup: fdecl::StartupMode::Eager,
                         environment: None,
@@ -508,7 +508,10 @@ mod tests {
             lifecycle_proxy
                 .destroy_instance(
                     "./",
-                    &ChildRef { name: "child".to_string(), collection: Some("coll".to_string()) }
+                    &ChildRef {
+                        name: "child".parse().unwrap(),
+                        collection: Some("coll".to_string())
+                    }
                 )
                 .await
                 .unwrap(),

@@ -360,7 +360,7 @@ async fn use_in_collection() {
         &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -373,7 +373,7 @@ async fn use_in_collection() {
         &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
-            name: "d".to_string(),
+            name: "d".parse().unwrap(),
             url: "test:///d".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -452,7 +452,7 @@ async fn use_in_collection_not_offered() {
         &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -525,7 +525,7 @@ async fn dynamic_offer_from_parent() {
         &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -548,7 +548,7 @@ async fn dynamic_offer_from_parent() {
         &vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
-            name: "d".to_string(),
+            name: "d".parse().unwrap(),
             url: "test:///d".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -611,7 +611,7 @@ async fn dynamic_offer_siblings_same_collection() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "b".to_string(),
+            name: "b".parse().unwrap(),
             url: "test:///b".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -624,7 +624,7 @@ async fn dynamic_offer_siblings_same_collection() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -635,7 +635,7 @@ async fn dynamic_offer_siblings_same_collection() {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                 source_name: Some("hippo".to_string()),
                 source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                    name: "b".to_string(),
+                    name: "b".parse().unwrap(),
                     collection: Some("coll".to_string()),
                 })),
                 target_name: Some("hippo".to_string()),
@@ -693,7 +693,7 @@ async fn dynamic_offer_siblings_cross_collection() {
         &Moniker::root(),
         "source_coll",
         ChildDecl {
-            name: "b".to_string(),
+            name: "b".parse().unwrap(),
             url: "test:///b".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -706,7 +706,7 @@ async fn dynamic_offer_siblings_cross_collection() {
         &Moniker::root(),
         "target_coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -716,7 +716,7 @@ async fn dynamic_offer_siblings_cross_collection() {
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                 source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                    name: "b".to_string(),
+                    name: "b".parse().unwrap(),
                     collection: Some("source_coll".to_string()),
                 })),
                 source_name: Some("hippo".to_string()),
@@ -774,7 +774,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "b".to_string(),
+            name: "b".parse().unwrap(),
             url: "test:///b".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -787,7 +787,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -798,7 +798,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                 source_name: Some("hippo".to_string()),
                 source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                    name: "b".to_string(),
+                    name: "b".parse().unwrap(),
                     collection: Some("coll".to_string()),
                 })),
                 target_name: Some("hippo".to_string()),
@@ -820,7 +820,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "b".to_string(),
+            name: "b".parse().unwrap(),
             url: "test:///b".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -889,7 +889,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "b".to_string(),
+            name: "b".parse().unwrap(),
             url: "test:///b".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -902,7 +902,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -913,7 +913,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
             dynamic_offers: Some(vec![fdecl::Offer::Directory(fdecl::OfferDirectory {
                 source_name: Some("hippo_data".to_string()),
                 source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                    name: "b".to_string(),
+                    name: "b".parse().unwrap(),
                     collection: Some("coll".to_string()),
                 })),
                 target_name: Some("hippo_data".to_string()),
@@ -935,7 +935,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -1013,7 +1013,7 @@ async fn dynamic_offer_to_static_offer() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "c".to_string(),
+            name: "c".parse().unwrap(),
             url: "test:///c".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -1024,7 +1024,7 @@ async fn dynamic_offer_to_static_offer() {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                 source_name: Some("hippo".to_string()),
                 source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                    name: "b".to_string(),
+                    name: "b".parse().unwrap(),
                     collection: None,
                 })),
                 target_name: Some("hippo".to_string()),
@@ -1100,7 +1100,7 @@ async fn create_child_with_dict() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "b".to_string(),
+            name: "b".parse().unwrap(),
             url: "test:///b".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -1359,7 +1359,7 @@ async fn use_runner_from_environment_in_collection() {
             &Moniker::root(),
             "coll",
             ChildDecl {
-                name: "b".to_string(),
+                name: "b".parse().unwrap(),
                 url: "test:///b".to_string(),
                 startup: fdecl::StartupMode::Lazy,
                 environment: None,
@@ -1782,7 +1782,7 @@ async fn use_with_destroyed_parent() {
         &Moniker::root(),
         "coll",
         ChildDecl {
-            name: "b".to_string(),
+            name: "b".parse().unwrap(),
             url: "test:///b".to_string(),
             startup: fdecl::StartupMode::Lazy,
             environment: None,
@@ -2355,8 +2355,12 @@ async fn verify_service_route(
     for child_moniker in &child_monikers {
         let coll = child_moniker.collection().unwrap();
         let name = child_moniker.name();
-        test.create_dynamic_child(&agg_moniker, coll.as_str(), ChildBuilder::new().name(name))
-            .await;
+        test.create_dynamic_child(
+            &agg_moniker,
+            coll.as_str(),
+            ChildBuilder::new().name(name.as_str()),
+        )
+        .await;
         test.start_instance_and_wait_start(&agg_moniker.child(child_moniker.clone()))
             .await
             .unwrap();
@@ -3648,7 +3652,7 @@ async fn build_realm_for_capability_requested_tests(delivery: DeliveryType) -> R
                         .name("capability_requested")
                         .target_name("capability_requested")
                         .scope(vec![EventScope::Child(ChildRef {
-                            name: "consumer".into(),
+                            name: "consumer".parse().unwrap(),
                             collection: None,
                         })])
                         .source(OfferSource::Parent)

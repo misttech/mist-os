@@ -1111,7 +1111,7 @@ mod tests {
         let child = {
             let state = test.component().lock_resolved_state().await.unwrap();
             let child = state.children().next().unwrap();
-            assert_eq!("a", child.0.name());
+            assert_eq!("a", child.0.name().as_str());
             child.1.clone()
         };
 

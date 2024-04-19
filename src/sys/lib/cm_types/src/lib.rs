@@ -165,6 +165,10 @@ impl<const N: usize> BoundedName<N> {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl<const N: usize> AsRef<str> for BoundedName<N> {
@@ -173,9 +177,9 @@ impl<const N: usize> AsRef<str> for BoundedName<N> {
     }
 }
 
-impl<const N: usize> Borrow<str> for BoundedName<N> {
-    fn borrow(&self) -> &str {
-        self.as_str()
+impl<const N: usize> Borrow<FlyStr> for BoundedName<N> {
+    fn borrow(&self) -> &FlyStr {
+        &self.0
     }
 }
 
@@ -690,7 +694,7 @@ impl fmt::Display for RelativePath {
         if self.is_dot() {
             write!(f, ".")
         } else {
-            write!(f, "{}", self.segments.join("/"))
+            write!(f, "{}", self.segments.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("/"))
         }
     }
 }

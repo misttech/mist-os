@@ -5,7 +5,7 @@
 use {
     anyhow::Context,
     cm_rust::{FidlIntoNative, NativeIntoFidl, OfferDeclCommon},
-    cm_types::RelativePath,
+    cm_types::{LongName, RelativePath},
     fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fcdecl,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_test as ftest,
@@ -13,6 +13,7 @@ use {
     fidl_fuchsia_inspect::InspectSinkMarker,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_logger::LogSinkMarker,
+    flyweights::FlyStr,
     fuchsia_async as fasync,
     fuchsia_component::server as fserver,
     fuchsia_zircon_status as zx_status,
@@ -599,10 +600,11 @@ impl Realm {
         url: String,
         options: ftest::ChildOptions,
     ) -> Result<(), RealmBuilderError> {
+        let name = name.parse().map_err(|_| RealmBuilderError::ChildNameInvalid)?;
         if is_fragment_only_url(&url) {
             let child_realm_node =
                 RealmNode2::load_from_pkg(url, Clone::clone(&self.pkg_dir)).await?;
-            self.realm_node.add_child(name.clone(), options, child_realm_node).await
+            self.realm_node.add_child(name, options, child_realm_node).await
         } else {
             self.realm_node.add_child_decl(name, url, options).await
         }
@@ -614,9 +616,10 @@ impl Realm {
         component_decl: fcdecl::Component,
         options: ftest::ChildOptions,
     ) -> Result<(), RealmBuilderError> {
+        let name: LongName = name.parse().map_err(|_| RealmBuilderError::ChildNameInvalid)?;
         if let Err(e) = cm_fidl_validator::validate(&component_decl) {
             return Err(RealmBuilderError::InvalidComponentDeclWithName(
-                name,
+                name.to_string(),
                 to_tabulated_string(e),
             ));
         }
@@ -629,11 +632,12 @@ impl Realm {
         name: String,
         options: ftest::ChildOptions,
     ) -> Result<(), RealmBuilderError> {
+        let name: LongName = name.parse().map_err(|_| RealmBuilderError::ChildNameInvalid)?;
         let local_component_id =
             self.runner.register_local_component(self.runner_proxy_placeholder.clone()).await;
         self.realm_contents.lock().await.add_local_component_id(local_component_id.clone());
         let mut child_path = self.realm_path.clone();
-        child_path.push(name.clone());
+        child_path.push(name.to_string());
         let child_realm_node = RealmNode2::new_from_decl(
             new_decl_with_program_entries(vec![
                 (runner::LOCAL_COMPONENT_ID_KEY.to_string(), local_component_id.into()),
@@ -674,9 +678,10 @@ impl Realm {
         let self_execution_scope = self.execution_scope.clone();
 
         async move {
+            let name: LongName = name.parse().map_err(|_| RealmBuilderError::ChildNameInvalid)?;
             let child_realm_stream = child_realm_server_end
                 .into_stream()
-                .map_err(|e| RealmBuilderError::InvalidChildRealmHandle(name.clone(), e))?;
+                .map_err(|e| RealmBuilderError::InvalidChildRealmHandle(name.to_string(), e))?;
             self_realm_node.add_child(name, options, child_realm_node).await?;
 
             self_execution_scope.spawn(async move {
@@ -780,10 +785,11 @@ impl Realm {
             .await;
         self.realm_contents.lock().await.add_local_component_id(local_component_id.clone());
         let string_id: String = local_component_id.clone().into();
-        let child_name = format!("read-only-directory-{}", string_id);
+        let child_name: LongName =
+            format!("read-only-directory-{}", string_id).parse().expect("should be valid name");
 
         let mut child_path = self.realm_path.clone();
-        child_path.push(child_name.clone());
+        child_path.push(child_name.to_string());
 
         let child_realm_node = RealmNode2::new_from_decl(
             new_decl_with_program_entries(vec![(
@@ -853,20 +859,20 @@ struct RealmNodeState {
     ///
     /// Suitable `ChildDecl`s for the contents of `mutable_children` are generated and added to
     /// `decl.children` when `commit()` is called.
-    mutable_children: HashMap<String, (ftest::ChildOptions, RealmNode2)>,
+    mutable_children: HashMap<LongName, (ftest::ChildOptions, RealmNode2)>,
 }
 
 impl RealmNodeState {
     // Returns true if a child with the given name exists either as a mutable child or as a
     // ChildDecl in this node's ComponentDecl.
-    fn contains_child(&self, child_name: &String) -> bool {
-        self.decl.children.iter().any(|c| &c.name == child_name)
-            || self.mutable_children.contains_key(child_name)
+    fn contains_child(&self, child_name: &LongName) -> bool {
+        self.decl.children.iter().any(|c| c.name.as_str() == child_name.as_str())
+            || self.mutable_children.contains_key(&FlyStr::new(child_name.as_str()))
     }
 
     fn add_child_decl(
         &mut self,
-        child_name: String,
+        child_name: LongName,
         child_url: String,
         child_options: ftest::ChildOptions,
     ) {
@@ -917,7 +923,7 @@ impl RealmNodeState {
                 self.decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                     source: cm_rust::OfferSource::Parent,
                     target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: child.name.clone().into(),
+                        name: child.name.clone(),
                         collection: None,
                     }),
                     source_name: protocol.clone(),
@@ -932,7 +938,7 @@ impl RealmNodeState {
 
     // Returns children whose manifest must be updated during invocations to
     // AddRoute.
-    fn get_updateable_children(&mut self) -> HashMap<String, &mut RealmNode2> {
+    fn get_updateable_children(&mut self) -> HashMap<LongName, &mut RealmNode2> {
         self.mutable_children
             .iter_mut()
             .map(|(key, (_options, child))| (key.clone(), child))
@@ -951,7 +957,7 @@ impl RealmNodeState {
     ) -> Result<(), RealmBuilderError> {
         let child_decls =
             self.mutable_children.iter().map(|(name, _options_and_node)| fcdecl::Child {
-                name: Some(name.clone()),
+                name: Some(name.to_string()),
                 url: Some("invalid://url".to_string()),
                 startup: Some(fcdecl::StartupMode::Lazy),
                 ..Default::default()
@@ -1031,27 +1037,27 @@ impl RealmNode2 {
 
     async fn add_child(
         &self,
-        child_name: String,
+        child_name: LongName,
         child_options: ftest::ChildOptions,
         node: RealmNode2,
     ) -> Result<(), RealmBuilderError> {
         let mut state_guard = self.state.lock().await;
         if state_guard.contains_child(&child_name) {
-            return Err(RealmBuilderError::ChildAlreadyExists(child_name));
+            return Err(RealmBuilderError::ChildAlreadyExists(child_name.to_string()));
         }
-        state_guard.mutable_children.insert(child_name, (child_options, node));
+        state_guard.mutable_children.insert(child_name.clone().into(), (child_options, node));
         Ok(())
     }
 
     async fn add_child_decl(
         &self,
-        child_name: String,
+        child_name: LongName,
         child_url: String,
         child_options: ftest::ChildOptions,
     ) -> Result<(), RealmBuilderError> {
         let mut state_guard = self.state.lock().await;
         if state_guard.contains_child(&child_name) {
-            return Err(RealmBuilderError::ChildAlreadyExists(child_name));
+            return Err(RealmBuilderError::ChildAlreadyExists(child_name.to_string()));
         }
         state_guard.add_child_decl(child_name, child_url, child_options);
         Ok(())
@@ -1135,17 +1141,17 @@ impl RealmNode2 {
         .boxed()
     }
 
-    async fn get_sub_realm(&self, child_name: &String) -> Result<RealmNode2, RealmBuilderError> {
+    async fn get_sub_realm(&self, child_name: &str) -> Result<RealmNode2, RealmBuilderError> {
         let state_guard = self.state.lock().await;
-        if state_guard.decl.children.iter().any(|c| &c.name == child_name) {
-            return Err(RealmBuilderError::ChildDeclNotVisible(child_name.clone()));
+        if state_guard.decl.children.iter().any(|c| c.name.as_str() == child_name) {
+            return Err(RealmBuilderError::ChildDeclNotVisible(child_name.into()));
         }
         state_guard
             .mutable_children
-            .get(child_name)
+            .get(&FlyStr::new(child_name))
             .cloned()
             .map(|(_, r)| r)
-            .ok_or_else(|| RealmBuilderError::NoSuchChild(child_name.clone()))
+            .ok_or_else(|| RealmBuilderError::NoSuchChild(child_name.into()))
     }
 
     async fn add_capability(
@@ -1265,7 +1271,7 @@ impl RealmNode2 {
             mutable_children.sort_unstable_by_key(|t| t.0.clone());
             for (child_name, (child_options, node)) in mutable_children {
                 let mut new_path = walked_path.clone();
-                new_path.push(child_name.clone());
+                new_path.push(child_name.to_string());
 
                 let child_url = node
                     .build(
@@ -1316,7 +1322,7 @@ async fn add_use_decl_if_needed(
     capability: ftest::Capability,
 ) -> Result<(), RealmBuilderError> {
     if let fcdecl::Ref::Child(child) = ref_ {
-        if let Some(child) = realm.get_updateable_children().get(&child.name) {
+        if let Some(child) = realm.get_updateable_children().get(&FlyStr::new(&child.name)) {
             let mut decl = child.get_decl().await;
             push_if_not_present(&mut decl.uses, create_use_decl(capability)?);
             let () = child.replace_decl(decl).await?;
@@ -1332,7 +1338,7 @@ async fn add_expose_decl_if_needed(
     capability: ftest::Capability,
 ) -> Result<(), RealmBuilderError> {
     if let fcdecl::Ref::Child(child) = ref_ {
-        if let Some(child) = realm.get_updateable_children().get(&child.name) {
+        if let Some(child) = realm.get_updateable_children().get(&FlyStr::new(child.name)) {
             let mut decl = child.get_decl().await;
             push_if_not_present(
                 &mut decl.capabilities,
@@ -1805,16 +1811,13 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
 
 fn contains_child(realm: &RealmNodeState, ref_: &fcdecl::Ref) -> bool {
     match ref_ {
-        fcdecl::Ref::Child(child) => {
-            let children = realm
-                .decl
-                .children
-                .iter()
-                .map(|c| c.name.clone())
-                .chain(realm.mutable_children.iter().map(|(name, _)| name.clone()))
-                .collect::<Vec<_>>();
-            children.contains(&child.name)
-        }
+        fcdecl::Ref::Child(child) => realm
+            .decl
+            .children
+            .iter()
+            .map(|c| &c.name)
+            .chain(realm.mutable_children.keys())
+            .any(|name| child.name.as_str() == name.as_str()),
         _ => true,
     }
 }
@@ -1938,6 +1941,9 @@ enum RealmBuilderError {
     #[error("Failed to route capability. {0:?}")]
     CapabilityInvalid(anyhow::Error),
 
+    #[error("Invalid child declaration. Field `name` is not a valid name.")]
+    ChildNameInvalid,
+
     /// The handle the client provided is not usable
     #[error("Handle for child realm \"{0}\" is not usable. {1:?}")]
     InvalidChildRealmHandle(String, fidl::Error),
@@ -1978,6 +1984,7 @@ impl From<RealmBuilderError> for ftest::RealmBuilderError {
             RealmBuilderError::InvalidComponentDecl(_) => Self::InvalidComponentDecl,
             RealmBuilderError::InvalidComponentDeclWithName(_, _) => Self::InvalidComponentDecl,
             RealmBuilderError::NoSuchChild(_) => Self::NoSuchChild,
+            RealmBuilderError::ChildNameInvalid => Self::InvalidChildDecl,
             RealmBuilderError::ChildDeclNotVisible(_) => Self::ChildDeclNotVisible,
             RealmBuilderError::NoSuchSource(_) => Self::NoSuchSource,
             RealmBuilderError::NoSuchTarget(_) => Self::NoSuchTarget,
@@ -2061,7 +2068,7 @@ mod tests {
     #[derive(Debug, Clone, PartialEq)]
     struct ComponentTree {
         decl: cm_rust::ComponentDecl,
-        children: Vec<(String, ftest::ChildOptions, ComponentTree)>,
+        children: Vec<(LongName, ftest::ChildOptions, ComponentTree)>,
     }
 
     impl ComponentTree {
@@ -2123,7 +2130,7 @@ mod tests {
                 cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                     source: cm_rust::OfferSource::Parent,
                     target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: child_name.into(),
+                        name: child_name.parse().unwrap(),
                         collection: None,
                     }),
                     source_name: protocol.clone(),
@@ -2407,7 +2414,7 @@ mod tests {
 
                     // This doesn't exist
                     target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: "a".into(),
+                        name: "a".parse().unwrap(),
                         collection: None,
                     }),
                     availability: cm_rust::Availability::Required,
@@ -2428,7 +2435,7 @@ mod tests {
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Parent,
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "a".into(),
+                            name: "a".parse().unwrap(),
                             collection: None,
                         }),
                         source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
@@ -2440,7 +2447,7 @@ mod tests {
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Parent,
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "a".into(),
+                            name: "a".parse().unwrap(),
                             collection: None,
                         }),
                         source_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
@@ -2452,7 +2459,7 @@ mod tests {
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Parent,
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "b".into(),
+                            name: "b".parse().unwrap(),
                             collection: None,
                         }),
                         source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
@@ -2464,7 +2471,7 @@ mod tests {
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Parent,
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "b".into(),
+                            name: "b".parse().unwrap(),
                             collection: None,
                         }),
                         source_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
@@ -2475,7 +2482,7 @@ mod tests {
                     }),
                 ],
                 children: vec![cm_rust::ChildDecl {
-                    name: "a".to_string(),
+                    name: "a".parse().unwrap(),
                     url: "test://a".to_string(),
                     startup: fcdecl::StartupMode::Lazy,
                     on_terminate: None,
@@ -2485,7 +2492,7 @@ mod tests {
                 ..cm_rust::ComponentDecl::default()
             },
             children: vec![(
-                "b".to_string(),
+                "b".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree {
                     decl: cm_rust::ComponentDecl {
@@ -2493,7 +2500,7 @@ mod tests {
                             cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                                 source: cm_rust::OfferSource::Parent,
                                 target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                                    name: "b_child_static".into(),
+                                    name: "b_child_static".parse().unwrap(),
                                     collection: None,
                                 }),
                                 source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
@@ -2505,7 +2512,7 @@ mod tests {
                             cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                                 source: cm_rust::OfferSource::Parent,
                                 target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                                    name: "b_child_static".into(),
+                                    name: "b_child_static".parse().unwrap(),
                                     collection: None,
                                 }),
                                 source_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
@@ -2517,7 +2524,7 @@ mod tests {
                             cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                                 source: cm_rust::OfferSource::Parent,
                                 target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                                    name: "b_child_dynamic".into(),
+                                    name: "b_child_dynamic".parse().unwrap(),
                                     collection: None,
                                 }),
                                 source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
@@ -2529,7 +2536,7 @@ mod tests {
                             cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                                 source: cm_rust::OfferSource::Parent,
                                 target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                                    name: "b_child_dynamic".into(),
+                                    name: "b_child_dynamic".parse().unwrap(),
                                     collection: None,
                                 }),
                                 source_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
@@ -2540,7 +2547,7 @@ mod tests {
                             }),
                         ],
                         children: vec![cm_rust::ChildDecl {
-                            name: "b_child_static".to_string(),
+                            name: "b_child_static".parse().unwrap(),
                             url: "test://b_child_static".to_string(),
                             startup: fcdecl::StartupMode::Lazy,
                             on_terminate: None,
@@ -2550,7 +2557,7 @@ mod tests {
                         ..cm_rust::ComponentDecl::default()
                     },
                     children: vec![(
-                        "b_child_dynamic".to_string(),
+                        "b_child_dynamic".parse().unwrap(),
                         ftest::ChildOptions::default(),
                         ComponentTree {
                             decl: cm_rust::ComponentDecl { ..cm_rust::ComponentDecl::default() },
@@ -2569,7 +2576,7 @@ mod tests {
             decl: cm_rust::ComponentDecl {
                 offers: vec![],
                 children: vec![cm_rust::ChildDecl {
-                    name: "a".to_string(),
+                    name: "a".parse().unwrap(),
                     url: "test://a".to_string(),
                     startup: fcdecl::StartupMode::Lazy,
                     on_terminate: None,
@@ -2579,13 +2586,13 @@ mod tests {
                 ..cm_rust::ComponentDecl::default()
             },
             children: vec![(
-                "b".to_string(),
+                "b".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree {
                     decl: cm_rust::ComponentDecl {
                         offers: vec![],
                         children: vec![cm_rust::ChildDecl {
-                            name: "b_child_static".to_string(),
+                            name: "b_child_static".parse().unwrap(),
                             url: "test://b_child_static".to_string(),
                             startup: fcdecl::StartupMode::Lazy,
                             on_terminate: None,
@@ -2595,7 +2602,7 @@ mod tests {
                         ..cm_rust::ComponentDecl::default()
                     },
                     children: vec![(
-                        "b_child_dynamic".to_string(),
+                        "b_child_dynamic".parse().unwrap(),
                         ftest::ChildOptions::default(),
                         ComponentTree {
                             decl: cm_rust::ComponentDecl { ..cm_rust::ComponentDecl::default() },
@@ -2616,7 +2623,7 @@ mod tests {
         let mut tree = ComponentTree {
             decl: cm_rust::ComponentDecl {
                 children: vec![cm_rust::ChildDecl {
-                    name: "a".to_string(),
+                    name: "a".parse().unwrap(),
                     url: "test://a".to_string(),
                     startup: fcdecl::StartupMode::Lazy,
                     on_terminate: None,
@@ -2637,7 +2644,7 @@ mod tests {
         let mut tree = ComponentTree {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
-                "a".to_string(),
+                "a".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree { decl: cm_rust::ComponentDecl::default(), children: vec![] },
             )],
@@ -2652,7 +2659,7 @@ mod tests {
         let mut tree = ComponentTree {
             decl: cm_rust::ComponentDecl {
                 children: vec![cm_rust::ChildDecl {
-                    name: "a".to_string(),
+                    name: "a".parse().unwrap(),
                     url: "test://a".to_string(),
                     startup: fcdecl::StartupMode::Lazy,
                     on_terminate: None,
@@ -2662,7 +2669,7 @@ mod tests {
                 ..cm_rust::ComponentDecl::default()
             },
             children: vec![(
-                "b".to_string(),
+                "b".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree { decl: cm_rust::ComponentDecl::default(), children: vec![] },
             )],
@@ -2677,12 +2684,12 @@ mod tests {
         let mut tree = ComponentTree {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
-                "a".to_string(),
+                "a".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree {
                     decl: cm_rust::ComponentDecl::default(),
                     children: vec![(
-                        "b".to_string(),
+                        "b".parse().unwrap(),
                         ftest::ChildOptions::default(),
                         ComponentTree { decl: cm_rust::ComponentDecl::default(), children: vec![] },
                     )],
@@ -2699,7 +2706,7 @@ mod tests {
         let mut tree = ComponentTree {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
-                "a".to_string(),
+                "a".parse().unwrap(),
                 ftest::ChildOptions {
                     startup: Some(fcdecl::StartupMode::Eager),
                     ..Default::default()
@@ -2731,7 +2738,7 @@ mod tests {
                 ..cm_rust::ComponentDecl::default()
             },
             children: vec![(
-                "a".to_string(),
+                "a".parse().unwrap(),
                 ftest::ChildOptions {
                     environment: Some("new-env".to_string()),
                     ..Default::default()
@@ -2749,7 +2756,7 @@ mod tests {
         let mut tree = ComponentTree {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
-                "a".to_string(),
+                "a".parse().unwrap(),
                 ftest::ChildOptions {
                     on_terminate: Some(fcdecl::OnTerminate::Reboot),
                     ..Default::default()
@@ -2860,7 +2867,7 @@ mod tests {
         let mut expected_tree = ComponentTree {
             decl: cm_rust::ComponentDecl {
                 children: vec![cm_rust::ChildDecl {
-                    name: "a".to_string(),
+                    name: "a".parse().unwrap(),
                     url: "test:///a".to_string(),
                     startup: fcdecl::StartupMode::Lazy,
                     on_terminate: None,
@@ -2991,7 +2998,7 @@ mod tests {
         let mut expected_tree = ComponentTree {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
-                "a".to_string(),
+                "a".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree { decl: a_decl, children: vec![] },
             )],
@@ -3031,7 +3038,7 @@ mod tests {
 
         // The "a" child is rewritten by realm builder
         realm_with_child_decl.children =
-            realm_with_child_decl.children.into_iter().filter(|c| &c.name != "a").collect();
+            realm_with_child_decl.children.into_iter().filter(|c| c.name.as_str() != "a").collect();
 
         let a_decl_file =
             fuchsia_fs::file::open_in_namespace("/pkg/meta/a.cm", fio::OpenFlags::RIGHT_READABLE)
@@ -3047,7 +3054,7 @@ mod tests {
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Parent,
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "realm_with_child".into(),
+                            name: "realm_with_child".parse().unwrap(),
                             collection: None,
                         }),
                         source_name: LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
@@ -3059,7 +3066,7 @@ mod tests {
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Parent,
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "realm_with_child".into(),
+                            name: "realm_with_child".parse().unwrap(),
                             collection: None,
                         }),
                         source_name: InspectSinkMarker::PROTOCOL_NAME.parse().unwrap(),
@@ -3072,7 +3079,7 @@ mod tests {
                 ..cm_rust::ComponentDecl::default()
             },
             children: vec![(
-                "realm_with_child".to_string(),
+                "realm_with_child".parse().unwrap(),
                 ftest::ChildOptions {
                     startup: Some(fcdecl::StartupMode::Eager),
                     ..Default::default()
@@ -3080,7 +3087,7 @@ mod tests {
                 ComponentTree {
                     decl: realm_with_child_decl,
                     children: vec![(
-                        "a".to_string(),
+                        "a".parse().unwrap(),
                         ftest::ChildOptions::default(),
                         ComponentTree { decl: a_decl, children: vec![] },
                     )],
@@ -3125,7 +3132,7 @@ mod tests {
         let mut expected_tree = ComponentTree {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
-                "a".to_string(),
+                "a".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree { decl: a_decl, children: vec![] },
             )],
@@ -3216,7 +3223,10 @@ mod tests {
                     ..Default::default()
                 })],
                 fcdecl::Ref::Parent(fcdecl::ParentRef {}),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "a".parse().unwrap(),
+                    collection: None,
+                })],
             )
             .await;
         let resulting_a_decl = realm_and_builder_task
@@ -3260,7 +3270,7 @@ mod tests {
         let mut expected_tree = ComponentTree {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
-                "a".to_string(),
+                "a".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree { decl: a_decl, children: vec![] },
             )],
@@ -3357,7 +3367,10 @@ mod tests {
                     }),
                 ],
                 fcdecl::Ref::Parent(fcdecl::ParentRef {}),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "a".parse().unwrap(),
+                    collection: None,
+                })],
             )
             .await;
 
@@ -3368,8 +3381,14 @@ mod tests {
                     name: Some("fuchsia.examples.Echo".to_owned()),
                     ..Default::default()
                 })],
-                fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".to_owned(), collection: None }),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "b".into(), collection: None })],
+                fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "a".parse().unwrap(),
+                    collection: None,
+                }),
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "b".parse().unwrap(),
+                    collection: None,
+                })],
             )
             .await;
 
@@ -3381,7 +3400,10 @@ mod tests {
                     type_: Some(fcdecl::DependencyType::Weak),
                     ..Default::default()
                 })],
-                fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None }),
+                fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "a".parse().unwrap(),
+                    collection: None,
+                }),
                 vec![fcdecl::Ref::Parent(fcdecl::ParentRef {})],
             )
             .await;
@@ -3391,7 +3413,7 @@ mod tests {
             decl: cm_rust::ComponentDecl {
                 children: vec![
                     cm_rust::ChildDecl {
-                        name: "a".to_string(),
+                        name: "a".parse().unwrap(),
                         url: "test:///a".to_string(),
                         startup: fcdecl::StartupMode::Lazy,
                         on_terminate: None,
@@ -3399,7 +3421,7 @@ mod tests {
                         config_overrides: None,
                     },
                     cm_rust::ChildDecl {
-                        name: "b".to_string(),
+                        name: "b".parse().unwrap(),
                         url: "test:///b".to_string(),
                         startup: fcdecl::StartupMode::Lazy,
                         on_terminate: None,
@@ -3527,8 +3549,14 @@ mod tests {
                 ],
                 fcdecl::Ref::Parent(fcdecl::ParentRef {}),
                 vec![
-                    fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None }),
-                    fcdecl::Ref::Child(fcdecl::ChildRef { name: "b".into(), collection: None }),
+                    fcdecl::Ref::Child(fcdecl::ChildRef {
+                        name: "a".parse().unwrap(),
+                        collection: None,
+                    }),
+                    fcdecl::Ref::Child(fcdecl::ChildRef {
+                        name: "b".parse().unwrap(),
+                        collection: None,
+                    }),
                 ],
             )
             .await;
@@ -3589,7 +3617,7 @@ mod tests {
         let mut expected_tree = ComponentTree {
             decl: cm_rust::ComponentDecl {
                 children: vec![cm_rust::ChildDecl {
-                    name: "a".to_string(),
+                    name: "a".parse().unwrap(),
                     url: "test:///a".to_string(),
                     startup: fcdecl::StartupMode::Lazy,
                     on_terminate: None,
@@ -3675,7 +3703,7 @@ mod tests {
                 ..cm_rust::ComponentDecl::default()
             },
             children: vec![(
-                "b".to_string(),
+                "b".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree { decl: b_decl, children: vec![] },
             )],
@@ -3725,7 +3753,10 @@ mod tests {
                     }),
                 ],
                 fcdecl::Ref::Parent(fcdecl::ParentRef {}),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "a".parse().unwrap(),
+                    collection: None,
+                })],
             )
             .await;
 
@@ -3733,7 +3764,7 @@ mod tests {
         let mut expected_tree = ComponentTree {
             decl: cm_rust::ComponentDecl {
                 children: vec![cm_rust::ChildDecl {
-                    name: "a".to_string(),
+                    name: "a".parse().unwrap(),
                     url: "test:///a".to_string(),
                     startup: fcdecl::StartupMode::Lazy,
                     on_terminate: None,
@@ -3807,7 +3838,10 @@ mod tests {
                     ..Default::default()
                 })],
                 &fcdecl::Ref::Parent(fcdecl::ParentRef {}),
-                &[fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
+                &[fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "a".parse().unwrap(),
+                    collection: None,
+                })],
             )
             .await
             .expect("failed to call add_route")
@@ -3838,8 +3872,14 @@ mod tests {
                     name: Some("fuchsia.examples.Hippo".to_owned()),
                     ..Default::default()
                 })],
-                fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None }),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "b".into(), collection: None })],
+                fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "a".parse().unwrap(),
+                    collection: None,
+                }),
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "b".parse().unwrap(),
+                    collection: None,
+                })],
             )
             .await;
         realm_and_builder_task
@@ -3848,8 +3888,14 @@ mod tests {
                     name: Some("fuchsia.examples.Hippo".to_owned()),
                     ..Default::default()
                 })],
-                fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None }),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "c".into(), collection: None })],
+                fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "a".parse().unwrap(),
+                    collection: None,
+                }),
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "c".parse().unwrap(),
+                    collection: None,
+                })],
             )
             .await;
 
@@ -3858,7 +3904,7 @@ mod tests {
             decl: cm_rust::ComponentDecl {
                 children: vec![
                     cm_rust::ChildDecl {
-                        name: "b".to_string(),
+                        name: "b".parse().unwrap(),
                         url: "test:///b".to_string(),
                         startup: fcdecl::StartupMode::Lazy,
                         on_terminate: None,
@@ -3866,7 +3912,7 @@ mod tests {
                         config_overrides: None,
                     },
                     cm_rust::ChildDecl {
-                        name: "c".to_string(),
+                        name: "c".parse().unwrap(),
                         url: "test:///c".to_string(),
                         startup: fcdecl::StartupMode::Lazy,
                         on_terminate: None,
@@ -3877,13 +3923,13 @@ mod tests {
                 offers: vec![
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                            name: "a".into(),
+                            name: "a".parse().unwrap(),
                             collection: None,
                         }),
                         source_name: "fuchsia.examples.Hippo".parse().unwrap(),
                         source_dictionary: Default::default(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "b".into(),
+                            name: "b".parse().unwrap(),
                             collection: None,
                         }),
                         target_name: "fuchsia.examples.Hippo".parse().unwrap(),
@@ -3892,13 +3938,13 @@ mod tests {
                     }),
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                            name: "a".into(),
+                            name: "a".parse().unwrap(),
                             collection: None,
                         }),
                         source_name: "fuchsia.examples.Hippo".parse().unwrap(),
                         source_dictionary: Default::default(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "c".into(),
+                            name: "c".parse().unwrap(),
                             collection: None,
                         }),
                         target_name: "fuchsia.examples.Hippo".parse().unwrap(),
@@ -3909,7 +3955,7 @@ mod tests {
                 ..cm_rust::ComponentDecl::default()
             },
             children: vec![(
-                "a".to_owned(),
+                "a".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree {
                     decl: cm_rust::ComponentDecl {
@@ -4061,8 +4107,14 @@ mod tests {
                     name: Some("fuchsia.examples.Echo".to_owned()),
                     ..Default::default()
                 })],
-                fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None }),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "b".into(), collection: None })],
+                fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "a".parse().unwrap(),
+                    collection: None,
+                }),
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "b".parse().unwrap(),
+                    collection: None,
+                })],
             )
             .await;
         realm_and_builder_task
@@ -4071,8 +4123,14 @@ mod tests {
                     name: Some("fuchsia.examples.RandonNumberGenerator".to_owned()),
                     ..Default::default()
                 })],
-                fcdecl::Ref::Child(fcdecl::ChildRef { name: "c".to_owned(), collection: None }),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
+                fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "c".parse().unwrap(),
+                    collection: None,
+                }),
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "a".parse().unwrap(),
+                    collection: None,
+                })],
             )
             .await;
 
@@ -4081,7 +4139,7 @@ mod tests {
             decl: cm_rust::ComponentDecl {
                 children: vec![
                     cm_rust::ChildDecl {
-                        name: "b".to_owned(),
+                        name: "b".parse().unwrap(),
                         url: "test:///b".to_owned(),
                         startup: fcdecl::StartupMode::Lazy,
                         on_terminate: None,
@@ -4089,7 +4147,7 @@ mod tests {
                         config_overrides: None,
                     },
                     cm_rust::ChildDecl {
-                        name: "c".to_owned(),
+                        name: "c".parse().unwrap(),
                         url: "test:///c".to_owned(),
                         startup: fcdecl::StartupMode::Lazy,
                         on_terminate: None,
@@ -4100,13 +4158,13 @@ mod tests {
                 offers: vec![
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                            name: "a".into(),
+                            name: "a".parse().unwrap(),
                             collection: None,
                         }),
                         source_name: "fuchsia.examples.Echo".parse().unwrap(),
                         source_dictionary: Default::default(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "b".into(),
+                            name: "b".parse().unwrap(),
                             collection: None,
                         }),
                         target_name: "fuchsia.examples.Echo".parse().unwrap(),
@@ -4115,13 +4173,13 @@ mod tests {
                     }),
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                            name: "c".into(),
+                            name: "c".parse().unwrap(),
                             collection: None,
                         }),
                         source_name: "fuchsia.examples.RandonNumberGenerator".parse().unwrap(),
                         source_dictionary: Default::default(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "a".into(),
+                            name: "a".parse().unwrap(),
                             collection: None,
                         }),
                         target_name: "fuchsia.examples.RandonNumberGenerator".parse().unwrap(),
@@ -4132,7 +4190,7 @@ mod tests {
                 ..cm_rust::ComponentDecl::default()
             },
             children: vec![(
-                "a".to_owned(),
+                "a".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree {
                     decl: cm_rust::ComponentDecl {
@@ -4211,12 +4269,12 @@ mod tests {
         let mut expected_tree = ComponentTree {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
-                "a".to_string(),
+                "a".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree {
                     decl: cm_rust::ComponentDecl {
                         children: vec![cm_rust::ChildDecl {
-                            name: "b".to_string(),
+                            name: "b".parse().unwrap(),
                             url: "test:///b".to_string(),
                             startup: fcdecl::StartupMode::Lazy,
                             on_terminate: None,
@@ -4336,7 +4394,7 @@ mod tests {
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
         let mut expected_tree = ComponentTree {
             children: vec![(
-                "a".to_string(),
+                "a".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree { decl: a_decl, children: vec![] },
             )],
@@ -4348,35 +4406,35 @@ mod tests {
 
     #[test_case(vec![
         create_valid_capability()],
-        fcdecl::Ref::Child(fcdecl::ChildRef { name: "unknown".into(),
+        fcdecl::Ref::Child(fcdecl::ChildRef { name: "unknown".parse().unwrap(),
             collection: None
         }),
         vec![],
         ftest::RealmBuilderError::NoSuchSource ; "no_such_source")]
     #[test_case(vec![
         create_valid_capability()],
-        fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(),
+        fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".parse().unwrap(),
             collection: None
         }),
         vec![
-            fcdecl::Ref::Child(fcdecl::ChildRef { name: "unknown".into(),
+            fcdecl::Ref::Child(fcdecl::ChildRef { name: "unknown".parse().unwrap(),
                 collection: None
             }),
         ],
         ftest::RealmBuilderError::NoSuchTarget ; "no_such_target")]
     #[test_case(vec![
         create_valid_capability()],
-        fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(),
+        fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".parse().unwrap(),
             collection: None
         }),
         vec![
-            fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(),
+            fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".parse().unwrap(),
                 collection: None
             }),
         ],
         ftest::RealmBuilderError::SourceAndTargetMatch ; "source_and_target_match")]
     #[test_case(vec![],
-        fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(),
+        fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".parse().unwrap(),
             collection: None
         }),
         vec![fcdecl::Ref::Parent(fcdecl::ParentRef {})],
@@ -4451,12 +4509,12 @@ mod tests {
         let mut expected_tree = ComponentTree {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
-                "a".to_string(),
+                "a".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree {
                     decl: cm_rust::ComponentDecl::default(),
                     children: vec![(
-                        "b".to_string(),
+                        "b".parse().unwrap(),
                         ftest::ChildOptions::default(),
                         ComponentTree { decl: b_decl, children: vec![] },
                     )],
@@ -4633,7 +4691,10 @@ mod tests {
             .realm_proxy
             .read_only_directory(
                 "data",
-                &[fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
+                &[fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: "a".parse().unwrap(),
+                    collection: None,
+                })],
                 ftest::DirectoryContents {
                     entries: vec![ftest::DirectoryEntry {
                         file_path: "hippos".to_string(),
@@ -4682,7 +4743,7 @@ mod tests {
         let mut expected_tree = ComponentTree {
             decl: cm_rust::ComponentDecl {
                 children: vec![cm_rust::ChildDecl {
-                    name: "a".to_string(),
+                    name: "a".parse().unwrap(),
                     url: "test://a".to_string(),
                     startup: fcdecl::StartupMode::Lazy,
                     environment: None,
@@ -4691,13 +4752,13 @@ mod tests {
                 }],
                 offers: vec![cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
                     source: cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                        name: "read-only-directory-0".into(),
+                        name: "read-only-directory-0".parse().unwrap(),
                         collection: None,
                     }),
                     source_name: "data".parse().unwrap(),
                     source_dictionary: Default::default(),
                     target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: "a".into(),
+                        name: "a".parse().unwrap(),
                         collection: None,
                     }),
                     target_name: "data".parse().unwrap(),
@@ -4709,7 +4770,7 @@ mod tests {
                 ..cm_rust::ComponentDecl::default()
             },
             children: vec![(
-                "read-only-directory-0".to_string(),
+                "read-only-directory-0".parse().unwrap(),
                 ftest::ChildOptions::default(),
                 ComponentTree { decl: read_only_dir_decl, children: vec![] },
             )],

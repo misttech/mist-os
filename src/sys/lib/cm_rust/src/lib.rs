@@ -7,10 +7,9 @@ use {
         ExposeDeclCommon, ExposeDeclCommonAlwaysRequired, FidlDecl, OfferDeclCommon,
         OfferDeclCommonNoAvailability, UseDeclCommon,
     },
-    cm_types::{AllowedOffers, BorrowedSeparatedPath, Name, Path, RelativePath},
+    cm_types::{AllowedOffers, BorrowedSeparatedPath, LongName, Name, Path, RelativePath},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess,
-    flyweights::FlyStr,
     from_enum::FromEnum,
     std::collections::{BTreeMap, HashMap},
     std::fmt,
@@ -59,6 +58,19 @@ impl FidlIntoNative<Name> for String {
 }
 
 impl NativeIntoFidl<String> for Name {
+    fn native_into_fidl(self) -> String {
+        self.to_string()
+    }
+}
+
+impl FidlIntoNative<LongName> for String {
+    fn fidl_into_native(self) -> LongName {
+        // cm_fidl_validator should have already validated this
+        self.parse().unwrap()
+    }
+}
+
+impl NativeIntoFidl<String> for LongName {
     fn native_into_fidl(self) -> String {
         self.to_string()
     }
@@ -1179,7 +1191,7 @@ impl CapabilityDecl {
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::Child")]
 pub struct ChildDecl {
-    pub name: String,
+    pub name: LongName,
     pub url: String,
     pub startup: fdecl::StartupMode,
     pub on_terminate: Option<fdecl::OnTerminate>,
@@ -1190,7 +1202,7 @@ pub struct ChildDecl {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ChildRef {
-    pub name: FlyStr,
+    pub name: LongName,
     pub collection: Option<Name>,
 }
 
@@ -1207,14 +1219,17 @@ impl std::fmt::Display for ChildRef {
 impl FidlIntoNative<ChildRef> for fdecl::ChildRef {
     fn fidl_into_native(self) -> ChildRef {
         // cm_fidl_validator should have already validated this
-        ChildRef { name: self.name.into(), collection: self.collection.map(|c| c.parse().unwrap()) }
+        ChildRef {
+            name: self.name.parse().unwrap(),
+            collection: self.collection.map(|c| c.parse().unwrap()),
+        }
     }
 }
 
 impl NativeIntoFidl<fdecl::ChildRef> for ChildRef {
     fn native_into_fidl(self) -> fdecl::ChildRef {
         fdecl::ChildRef {
-            name: self.name.into(),
+            name: self.name.to_string(),
             collection: self.collection.map(|c| c.to_string()),
         }
     }
@@ -2312,7 +2327,7 @@ impl FidlIntoNative<EventScope> for fdecl::Ref {
                 if let Some(_) = c.collection {
                     panic!("Dynamic children scopes are not supported for EventStreams");
                 } else {
-                    EventScope::Child(ChildRef { name: c.name.into(), collection: None })
+                    EventScope::Child(ChildRef { name: c.name.parse().unwrap(), collection: None })
                 }
             }
             fdecl::Ref::Collection(collection) => {
@@ -2676,11 +2691,11 @@ mod tests {
     use {super::*, difference::Changeset, fidl_fuchsia_component_decl as fdecl};
 
     fn offer_source_static_child(name: &str) -> OfferSource {
-        OfferSource::Child(ChildRef { name: name.into(), collection: None })
+        OfferSource::Child(ChildRef { name: name.parse().unwrap(), collection: None })
     }
 
     fn offer_target_static_child(name: &str) -> OfferTarget {
-        OfferTarget::Child(ChildRef { name: name.into(), collection: None })
+        OfferTarget::Child(ChildRef { name: name.parse().unwrap(), collection: None })
     }
 
     macro_rules! test_try_from_decl {
@@ -3349,7 +3364,7 @@ mod tests {
                         }),
                         UseDecl::EventStream(UseEventStreamDecl {
                             source: UseSource::Child("netstack".to_string()),
-                            scope: Some(vec![EventScope::Child(ChildRef{ name: "a".into(), collection: None}), EventScope::Collection("b".parse().unwrap())]),
+                            scope: Some(vec![EventScope::Child(ChildRef{ name: "a".parse().unwrap(), collection: None}), EventScope::Collection("b".parse().unwrap())]),
                             source_name: "stopped".parse().unwrap(),
                             target_path: "/svc/test".parse().unwrap(),
                             filter: None,
@@ -3551,7 +3566,7 @@ mod tests {
                     ],
                     children: vec![
                         ChildDecl {
-                            name: "netstack".to_string(),
+                            name: "netstack".parse().unwrap(),
                             url: "fuchsia-pkg://fuchsia.com/netstack#meta/netstack.cm".to_string(),
                             startup: fdecl::StartupMode::Lazy,
                             on_terminate: None,
@@ -3559,7 +3574,7 @@ mod tests {
                             config_overrides: None,
                         },
                         ChildDecl {
-                            name: "gtest".to_string(),
+                            name: "gtest".parse().unwrap(),
                             url: "fuchsia-pkg://fuchsia.com/gtest#meta/gtest.cm".to_string(),
                             startup: fdecl::StartupMode::Lazy,
                             on_terminate: Some(fdecl::OnTerminate::None),
@@ -3567,7 +3582,7 @@ mod tests {
                             config_overrides: None,
                         },
                         ChildDecl {
-                            name: "echo".to_string(),
+                            name: "echo".parse().unwrap(),
                             url: "fuchsia-pkg://fuchsia.com/echo#meta/echo.cm".to_string(),
                             startup: fdecl::StartupMode::Eager,
                             on_terminate: Some(fdecl::OnTerminate::Reboot),
@@ -3731,7 +3746,7 @@ mod tests {
             result = vec![
                 DictionarySource::Self_,
                 DictionarySource::Child(ChildRef {
-                    name: "foo".into(),
+                    name: "foo".parse().unwrap(),
                     collection: None,
                 }),
                 DictionarySource::Parent,

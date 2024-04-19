@@ -1276,7 +1276,7 @@ async fn extend_from_child() {
                         .name("self_dict")
                         .source_dictionary(
                             DictionarySource::Child(ChildRef {
-                                name: "leaf".into(),
+                                name: "leaf".parse().unwrap(),
                                 collection: None,
                             }),
                             "origin_dict",
@@ -1955,7 +1955,10 @@ async fn dict_extend_from_self_different_decl_ordering(first: Statement, second:
                 CapabilityBuilder::dictionary()
                     .name("source")
                     .source_dictionary(
-                        DictionarySource::Child(ChildRef { name: "leaf".into(), collection: None }),
+                        DictionarySource::Child(ChildRef {
+                            name: "leaf".parse().unwrap(),
+                            collection: None,
+                        }),
                         "child_dict",
                     )
                     .build(),

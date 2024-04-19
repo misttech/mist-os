@@ -137,6 +137,10 @@ type RealmBuilderError = strict enum : uint32 {
     /// policy.
     @available(added=9)
     CONFIG_OVERRIDE_UNSUPPORTED = 21;
+
+    /// A child declaration failed validation.
+    @available(added=20)
+    INVALID_CHILD_DECL = 22;
 };
 
 closed protocol Builder {

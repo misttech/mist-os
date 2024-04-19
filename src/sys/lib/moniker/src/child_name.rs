@@ -14,7 +14,7 @@ pub trait ChildNameBase: Eq + PartialOrd + Clone + fmt::Display {
     where
         Self: Sized;
 
-    fn name(&self) -> &str;
+    fn name(&self) -> &LongName;
 
     fn collection(&self) -> Option<&Name>;
 }
@@ -46,8 +46,8 @@ impl ChildNameBase for ChildName {
         ChildName::try_new(name, coll)
     }
 
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &LongName {
+        &self.name
     }
 
     fn collection(&self) -> Option<&Name> {
@@ -88,11 +88,15 @@ impl TryFrom<&str> for ChildName {
     }
 }
 
-impl TryFrom<cm_rust::ChildRef> for ChildName {
-    type Error = cm_types::ParseError;
+impl From<cm_rust::ChildRef> for ChildName {
+    fn from(child_ref: cm_rust::ChildRef) -> Self {
+        Self { name: child_ref.name, collection: child_ref.collection }
+    }
+}
 
-    fn try_from(child_ref: cm_rust::ChildRef) -> Result<Self, Self::Error> {
-        Ok(Self { name: child_ref.name.parse()?, collection: child_ref.collection })
+impl From<(LongName, Option<Name>)> for ChildName {
+    fn from(t: (LongName, Option<Name>)) -> Self {
+        Self { name: t.0, collection: t.1 }
     }
 }
 
@@ -130,13 +134,13 @@ mod tests {
     #[test]
     fn child_monikers() {
         let m = ChildName::try_new("test", None).unwrap();
-        assert_eq!("test", m.name());
+        assert_eq!("test", m.name().as_str());
         assert_eq!(None, m.collection());
         assert_eq!("test", format!("{}", m));
         assert_eq!(m, ChildName::try_from("test").unwrap());
 
         let m = ChildName::try_new("test", Some("coll")).unwrap();
-        assert_eq!("test", m.name());
+        assert_eq!("test", m.name().as_str());
         assert_eq!(Some(&Name::new("coll").unwrap()), m.collection());
         assert_eq!("coll:test", format!("{}", m));
         assert_eq!(m, ChildName::try_from("coll:test").unwrap());
@@ -145,7 +149,7 @@ mod tests {
         let max_name_length_part = "f".repeat(MAX_LONG_NAME_LENGTH);
         let max_moniker_length = format!("{}:{}", max_coll_length_part, max_name_length_part);
         let m = ChildName::parse(max_moniker_length).expect("valid moniker");
-        assert_eq!(&max_name_length_part, m.name());
+        assert_eq!(&max_name_length_part, m.name().as_str());
         assert_eq!(Some(&Name::new(max_coll_length_part).unwrap()), m.collection());
 
         assert!(ChildName::parse("").is_err(), "cannot be empty");

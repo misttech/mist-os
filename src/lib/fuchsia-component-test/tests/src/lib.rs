@@ -340,7 +340,7 @@ async fn get_and_replace_realm_decl() -> Result<(), Error> {
     let mut root_decl = builder.get_realm_decl().await?;
     assert_eq!(root_decl, cm_rust::ComponentDecl::default());
     root_decl.children.push(cm_rust::ChildDecl {
-        name: "example-child".to_string(),
+        name: "example-child".parse().unwrap(),
         url: "example://url".to_string(),
         startup: fcdecl::StartupMode::Eager,
         on_terminate: None,
@@ -359,7 +359,7 @@ async fn get_and_replace_component_decl() -> Result<(), Error> {
         builder.add_local_child("child", |_| pending().boxed(), ChildOptions::new()).await?;
     let mut child_decl = builder.get_component_decl(&child).await?;
     child_decl.children.push(cm_rust::ChildDecl {
-        name: "example-grand-child".to_string(),
+        name: "example-grand-child".parse().unwrap(),
         url: "example://url".to_string(),
         startup: fcdecl::StartupMode::Eager,
         on_terminate: None,

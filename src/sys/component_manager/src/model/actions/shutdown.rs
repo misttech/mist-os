@@ -399,9 +399,9 @@ pub trait Component {
     /// possible for multiple children to match a given `name` and `collection`,
     /// but at most one of them can be live.
     fn find_child(&self, name: &str, collection: Option<&Name>) -> Option<Child> {
-        self.children()
-            .into_iter()
-            .find(|child| child.moniker.name() == name && child.moniker.collection() == collection)
+        self.children().into_iter().find(|child| {
+            child.moniker.name().as_str() == name && child.moniker.collection() == collection
+        })
     }
 }
 
@@ -718,7 +718,7 @@ fn find_offer_sources(
 ) -> Vec<ComponentRef> {
     match source {
         OfferSource::Child(ChildRef { name, collection }) => {
-            match instance.find_child(name, collection.as_ref()) {
+            match instance.find_child(name.as_str(), collection.as_ref()) {
                 Some(child) => vec![child.moniker.clone().into()],
                 None => {
                     error!(
@@ -775,7 +775,7 @@ fn find_offer_sources(
 fn find_offer_targets(instance: &impl Component, target: &OfferTarget) -> Vec<ComponentRef> {
     match target {
         OfferTarget::Child(ChildRef { name, collection }) => {
-            match instance.find_child(name, collection.as_ref()) {
+            match instance.find_child(name.as_str(), collection.as_ref()) {
                 Some(child) => vec![child.moniker.into()],
                 None => {
                     error!(
@@ -846,7 +846,7 @@ fn get_dependencies_from_capabilities(instance: &impl Component) -> Dependencies
                 let source = match source {
                     DictionarySource::Parent => None,
                     DictionarySource::Child(ChildRef { name, collection }) => {
-                        match instance.find_child(name, collection.as_ref()) {
+                        match instance.find_child(name.as_str(), collection.as_ref()) {
                             Some(child) => Some(child.moniker.clone().into()),
                             None => {
                                 error!(
@@ -997,7 +997,7 @@ mod tests {
                 .children
                 .iter()
                 .map(|c| Child {
-                    moniker: ChildName::try_new(&c.name, None)
+                    moniker: ChildName::try_new(c.name.as_str(), None)
                         .expect("children should have valid monikers"),
                     environment_name: c.environment.clone(),
                 })
@@ -1161,7 +1161,10 @@ mod tests {
                     .source_dictionary(DictionarySource::Self_, "other_dict"),
             )
             .capability(CapabilityBuilder::dictionary().name("other_dict").source_dictionary(
-                DictionarySource::Child(ChildRef { name: "childA".into(), collection: None }),
+                DictionarySource::Child(ChildRef {
+                    name: "childA".parse().unwrap(),
+                    collection: None,
+                }),
                 "remote/dict",
             ))
             .offer(
@@ -1569,7 +1572,7 @@ mod tests {
                 OfferBuilder::directory()
                     .name("some_dir")
                     .source(OfferSource::Child(ChildRef {
-                        name: "childA".into(),
+                        name: "childA".parse().unwrap(),
                         collection: None,
                     }))
                     .target(OfferTarget::Collection("coll".parse().unwrap())),
@@ -1589,11 +1592,11 @@ mod tests {
                     .name("test.protocol")
                     .target_name("test.protocol")
                     .source(OfferSource::Child(ChildRef {
-                        name: "dyn1".into(),
+                        name: "dyn1".parse().unwrap(),
                         collection: Some("coll".parse().unwrap()),
                     }))
                     .target(OfferTarget::Child(ChildRef {
-                        name: "dyn2".into(),
+                        name: "dyn2".parse().unwrap(),
                         collection: Some("coll".parse().unwrap()),
                     }))
                     .build(),
@@ -1601,11 +1604,11 @@ mod tests {
                     .name("test.protocol")
                     .target_name("test.protocol")
                     .source(OfferSource::Child(ChildRef {
-                        name: "dyn1".into(),
+                        name: "dyn1".parse().unwrap(),
                         collection: Some("coll".parse().unwrap()),
                     }))
                     .target(OfferTarget::Child(ChildRef {
-                        name: "dyn3".into(),
+                        name: "dyn3".parse().unwrap(),
                         collection: Some("coll".parse().unwrap()),
                     }))
                     .build(),
@@ -1655,22 +1658,22 @@ mod tests {
                 OfferBuilder::protocol()
                     .name("test.protocol")
                     .source(OfferSource::Child(ChildRef {
-                        name: "dyn1".into(),
+                        name: "dyn1".parse().unwrap(),
                         collection: Some("coll1".parse().unwrap()),
                     }))
                     .target(OfferTarget::Child(ChildRef {
-                        name: "dyn1".into(),
+                        name: "dyn1".parse().unwrap(),
                         collection: Some("coll2".parse().unwrap()),
                     }))
                     .build(),
                 OfferBuilder::protocol()
                     .name("test.protocol")
                     .source(OfferSource::Child(ChildRef {
-                        name: "dyn2".into(),
+                        name: "dyn2".parse().unwrap(),
                         collection: Some("coll2".parse().unwrap()),
                     }))
                     .target(OfferTarget::Child(ChildRef {
-                        name: "dyn1".into(),
+                        name: "dyn1".parse().unwrap(),
                         collection: Some("coll1".parse().unwrap()),
                     }))
                     .build(),
@@ -1707,7 +1710,7 @@ mod tests {
                 .name("test.protocol")
                 .source(OfferSource::Parent)
                 .target(OfferTarget::Child(ChildRef {
-                    name: "dyn1".into(),
+                    name: "dyn1".parse().unwrap(),
                     collection: Some("coll".parse().unwrap()),
                 }))
                 .build()],
@@ -1739,7 +1742,7 @@ mod tests {
                 .name("test.protocol")
                 .source(OfferSource::Self_)
                 .target(OfferTarget::Child(ChildRef {
-                    name: "dyn1".into(),
+                    name: "dyn1".parse().unwrap(),
                     collection: Some("coll".parse().unwrap()),
                 }))
                 .build()],
@@ -1776,7 +1779,7 @@ mod tests {
                 .name("test.protocol")
                 .source_static_child("childA")
                 .target(OfferTarget::Child(ChildRef {
-                    name: "dyn1".into(),
+                    name: "dyn1".parse().unwrap(),
                     collection: Some("coll".parse().unwrap()),
                 }))
                 .build()],
@@ -2670,7 +2673,7 @@ mod tests {
                             .name("static_offer_source")
                             .target_name("static_offer_target")
                             .source(OfferSource::Child(ChildRef {
-                                name: "c".into(),
+                                name: "c".parse().unwrap(),
                                 collection: None,
                             }))
                             .target(OfferTarget::Collection("coll".parse().unwrap())),

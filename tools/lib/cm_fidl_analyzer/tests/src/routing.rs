@@ -800,26 +800,32 @@ mod tests {
                         OfferBuilder::event_stream()
                             .name("started")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::Child(ChildRef {
-                                name: "b".into(),
-                                collection: None,
-                            }))
+                            .target_static_child("b")
                             .scope(vec![
-                                EventScope::Child(ChildRef { name: "b".into(), collection: None }),
-                                EventScope::Child(ChildRef { name: "c".into(), collection: None }),
+                                EventScope::Child(ChildRef {
+                                    name: "b".parse().unwrap(),
+                                    collection: None,
+                                }),
+                                EventScope::Child(ChildRef {
+                                    name: "c".parse().unwrap(),
+                                    collection: None,
+                                }),
                             ]),
                     )
                     .offer(
                         OfferBuilder::event_stream()
                             .name("started")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::Child(ChildRef {
-                                name: "c".into(),
-                                collection: None,
-                            }))
+                            .target_static_child("c")
                             .scope(vec![
-                                EventScope::Child(ChildRef { name: "b".into(), collection: None }),
-                                EventScope::Child(ChildRef { name: "c".into(), collection: None }),
+                                EventScope::Child(ChildRef {
+                                    name: "b".parse().unwrap(),
+                                    collection: None,
+                                }),
+                                EventScope::Child(ChildRef {
+                                    name: "c".parse().unwrap(),
+                                    collection: None,
+                                }),
                             ]),
                     )
                     .child_default("b")
@@ -840,12 +846,9 @@ mod tests {
                         OfferBuilder::event_stream()
                             .name("started")
                             .source(OfferSource::Parent)
-                            .target(OfferTarget::Child(ChildRef {
-                                name: "d".into(),
-                                collection: None,
-                            }))
+                            .target_static_child("d")
                             .scope(vec![EventScope::Child(ChildRef {
-                                name: "e".into(),
+                                name: "e".parse().unwrap(),
                                 collection: None,
                             })]),
                     )
@@ -988,7 +991,7 @@ mod tests {
                         ResolverRegistration {
                             resolver: "base".parse().unwrap(),
                             source: RegistrationSource::Self_,
-                            scheme: "base".into(),
+                            scheme: "base".parse().unwrap(),
                         },
                     ))
                     .resolver_default("base")
@@ -1032,7 +1035,7 @@ mod tests {
                         ResolverRegistration {
                             resolver: "base".parse().unwrap(),
                             source: RegistrationSource::Self_,
-                            scheme: "base".into(),
+                            scheme: "base".parse().unwrap(),
                         },
                     ))
                     .resolver_default("base")
@@ -1121,7 +1124,7 @@ mod tests {
             .name("foo")
             .target_name("bar")
             .source(OfferSource::Self_)
-            .target(OfferTarget::Child(ChildRef { name: "b".into(), collection: None }))
+            .target_static_child("b")
             .build();
         let protocol_decl = CapabilityBuilder::protocol().name("foo").build();
         let components = vec![
@@ -1166,7 +1169,7 @@ mod tests {
     async fn map_route_use_from_child() {
         let use_decl = UseBuilder::protocol()
             .name("bar")
-            .source(UseSource::Child("b".into()))
+            .source(UseSource::Child("b".parse().unwrap()))
             .path("/svc/hippo")
             .build();
         let expose_decl = ExposeBuilder::protocol()
@@ -1594,7 +1597,7 @@ mod tests {
         let registration_decl = ResolverRegistration {
             resolver: "base".parse().unwrap(),
             source: RegistrationSource::Child("c".to_string()),
-            scheme: "base".into(),
+            scheme: "base".parse().unwrap(),
         };
         let expose_decl =
             ExposeBuilder::resolver().name("base").source(ExposeSource::Self_).build();

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    cm_types::Name,
+    cm_types::{LongName, Name},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_sys2 as fsys,
     fuchsia_url::AbsoluteComponentUrl,
@@ -75,7 +75,7 @@ pub async fn create_instance_in_collection(
     lifecycle_controller: &fsys::LifecycleControllerProxy,
     parent: &Moniker,
     collection: &Name,
-    child_name: &str,
+    child_name: &LongName,
     url: &AbsoluteComponentUrl,
     config_overrides: Vec<fdecl::ConfigOverride>,
     child_args: Option<fcomponent::CreateChildArgs>,
@@ -118,7 +118,7 @@ pub async fn destroy_instance_in_collection(
     lifecycle_controller: &fsys::LifecycleControllerProxy,
     parent: &Moniker,
     collection: &Name,
-    child_name: &str,
+    child_name: &LongName,
 ) -> Result<(), DestroyError> {
     let child =
         fdecl::ChildRef { name: child_name.to_string(), collection: Some(collection.to_string()) };
@@ -433,7 +433,7 @@ mod test {
             &lc,
             &parent,
             &"foo".parse().unwrap(),
-            "bar",
+            &"bar".parse().unwrap(),
             &url,
             vec![],
             None,
@@ -466,7 +466,7 @@ mod test {
             &lc,
             &parent,
             &"foo".parse().unwrap(),
-            "bar",
+            &"bar".parse().unwrap(),
             &url,
             vec![],
             Some(child_args),
@@ -485,7 +485,7 @@ mod test {
             &lc,
             &parent,
             &"foo".parse().unwrap(),
-            "bar",
+            &"bar".parse().unwrap(),
             &url,
             vec![],
             None,
@@ -499,7 +499,14 @@ mod test {
     async fn test_destroy_child() {
         let parent = Moniker::parse_str("core").unwrap();
         let lc = lifecycle_destroy_instance("core", "foo", "bar");
-        destroy_instance_in_collection(&lc, &parent, &"foo".parse().unwrap(), "bar").await.unwrap();
+        destroy_instance_in_collection(
+            &lc,
+            &parent,
+            &"foo".parse().unwrap(),
+            &"bar".parse().unwrap(),
+        )
+        .await
+        .unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

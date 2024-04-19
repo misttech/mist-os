@@ -96,7 +96,7 @@ impl ComponentInstanceForAnalyzer {
         let environment = EnvironmentForAnalyzer::new_for_child(&parent, child)?;
         let instanced_moniker = parent.instanced_moniker.child(
             InstancedChildName::try_new(
-                child.child_moniker.name(),
+                child.child_moniker.name().as_str(),
                 child.child_moniker.collection().map(|c| c.as_str()),
                 0,
             )

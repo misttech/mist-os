@@ -894,11 +894,11 @@ mod tests {
     };
 
     fn offer_source_static_child(name: &str) -> OfferSource {
-        OfferSource::Child(ChildRef { name: name.into(), collection: None })
+        OfferSource::Child(ChildRef { name: name.parse().unwrap(), collection: None })
     }
 
     fn offer_target_static_child(name: &str) -> cm_rust::OfferTarget {
-        OfferTarget::Child(ChildRef { name: name.into(), collection: None })
+        OfferTarget::Child(ChildRef { name: name.parse().unwrap(), collection: None })
     }
 
     async fn assert_realm_contains(builder: &RealmBuilder, child_name: &str) {

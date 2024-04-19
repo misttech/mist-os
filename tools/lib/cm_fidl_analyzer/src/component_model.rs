@@ -293,13 +293,7 @@ impl ModelBuilderForAnalyzer {
     ) {
         let mut children = vec![];
         for child_decl in instance.decl.children.iter() {
-            let child_moniker = match ChildName::try_new(&child_decl.name, None) {
-                Ok(cm) => cm,
-                Err(err) => {
-                    result.errors.push(anyhow!(err));
-                    continue;
-                }
-            };
+            let child_moniker = ChildName::from((child_decl.name.clone(), None));
             match Self::get_absolute_child_url(&child_decl.url, instance) {
                 Ok(url) => {
                     children.push(Child {
@@ -1713,7 +1707,7 @@ mod tests {
                     .source(cm_rust::OfferSource::Void)
                     .name("my_config")
                     .target(cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: "child".into(),
+                        name: "child".parse().unwrap(),
                         collection: None,
                     }))
                     .availability(cm_rust::Availability::Optional),

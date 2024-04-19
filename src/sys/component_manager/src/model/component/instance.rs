@@ -691,12 +691,12 @@ impl ResolvedInstanceState {
         self.dynamic_offers.retain(|offer| {
             let source_matches = offer.source()
                 == &cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                    name: moniker.name().to_string().into(),
+                    name: moniker.name().clone(),
                     collection: moniker.collection().map(|c| c.clone()),
                 });
             let target_matches = offer.target()
                 == &cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                    name: moniker.name().to_string().into(),
+                    name: moniker.name().clone(),
                     collection: moniker.collection().map(|c| c.clone()),
                 });
             if target_matches && offer.source() == &cm_rust::OfferSource::Self_ {
@@ -1018,7 +1018,11 @@ impl ResolvedInstanceState {
 
     async fn discover_static_children(&self, mut child_inputs: StructuredDictMap<ComponentInput>) {
         for (child_name, child_instance) in &self.children {
-            let child_name = Name::new(child_name.name()).unwrap();
+            if let Some(_) = child_name.collection {
+                continue;
+            }
+            let child_name =
+                Name::new(child_name.name.as_str()).expect("child is static so name is not long");
             let child_input = child_inputs.remove(&child_name).expect("missing child dict");
             ActionSet::register(child_instance.clone(), DiscoverAction::new(child_input))
                 .await

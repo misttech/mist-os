@@ -9,11 +9,10 @@ use {
     },
     async_utils::stream::FlattenUnorderedExt,
     cm_rust::{ChildRef, EventScope},
-    cm_types::Name,
+    cm_types::{LongName, Name},
     cm_util::io::clone_dir,
     fidl::endpoints::Proxy,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
-    flyweights::FlyStr,
     fuchsia_zircon::{
         self as zx, sys::ZX_CHANNEL_MAX_MSG_BYTES, sys::ZX_CHANNEL_MAX_MSG_HANDLES, HandleBased,
     },
@@ -68,7 +67,7 @@ fn is_moniker_valid_within_scope(moniker: &ExtendedMoniker, route: &[ComponentEv
 // Returns true if the filter contains a specific Ref
 fn event_filter_contains_ref(
     filter: &Option<Vec<EventScope>>,
-    name: &str,
+    name: &LongName,
     collection: Option<&Name>,
 ) -> bool {
     filter.as_ref().map_or(true, |value| {
@@ -108,10 +107,10 @@ fn validate_component_instance(
                 return false;
             }
             let child_ref = ChildRef {
-                name: FlyStr::new(event_part.name()),
+                name: event_part.name().clone(),
                 collection: event_part.collection().cloned(),
             };
-            if child_ref != component.component {
+            if Some(child_ref) != component.component {
                 // Reject due to path mismatch
                 return false;
             }
@@ -501,12 +500,9 @@ mod tests {
             )
             .unwrap()]));
         let route = vec![
+            ComponentEventRoute { component: None, scope: None },
             ComponentEventRoute {
-                component: ChildRef { name: "<root>".into(), collection: None },
-                scope: None,
-            },
-            ComponentEventRoute {
-                component: ChildRef { name: "root".into(), collection: None },
+                component: Some(ChildRef { name: "root".parse().unwrap(), collection: None }),
                 scope: Some(vec![EventScope::Collection("coll".parse().unwrap())]),
             },
         ];
@@ -520,16 +516,16 @@ mod tests {
     fn test_validate_and_filter_event_empty_moniker() {
         let mut event = ExtendedMoniker::ComponentInstance(Moniker::root());
         let route = vec![
+            ComponentEventRoute { component: None, scope: None },
             ComponentEventRoute {
-                component: ChildRef { name: "<root>".into(), collection: None },
-                scope: None,
-            },
-            ComponentEventRoute {
-                component: ChildRef { name: "core".into(), collection: None },
+                component: Some(ChildRef { name: "core".parse().unwrap(), collection: None }),
                 scope: Some(vec![EventScope::Collection("test_manager".parse().unwrap())]),
             },
             ComponentEventRoute {
-                component: ChildRef { name: "test_manager".into(), collection: None },
+                component: Some(ChildRef {
+                    name: "test_manager".parse().unwrap(),
+                    collection: None,
+                }),
                 scope: None,
             },
         ];
@@ -547,26 +543,23 @@ mod tests {
             ChildName::try_new("c", None).unwrap(),
         ]));
         let route = vec![
+            ComponentEventRoute { component: None, scope: None },
             ComponentEventRoute {
-                component: ChildRef { name: "<root>".into(), collection: None },
-                scope: None,
-            },
-            ComponentEventRoute {
-                component: ChildRef { name: "a".into(), collection: None },
+                component: Some(ChildRef { name: "a".parse().unwrap(), collection: None }),
                 scope: Some(vec![EventScope::Child(ChildRef {
-                    name: "b".into(),
+                    name: "b".parse().unwrap(),
                     collection: None,
                 })]),
             },
             ComponentEventRoute {
-                component: ChildRef { name: "b".into(), collection: None },
+                component: Some(ChildRef { name: "b".parse().unwrap(), collection: None }),
                 scope: Some(vec![EventScope::Child(ChildRef {
-                    name: "c".into(),
+                    name: "c".parse().unwrap(),
                     collection: None,
                 })]),
             },
             ComponentEventRoute {
-                component: ChildRef { name: "c".into(), collection: None },
+                component: Some(ChildRef { name: "c".parse().unwrap(), collection: None }),
                 scope: None,
             },
         ];
@@ -586,26 +579,23 @@ mod tests {
             ChildName::try_new("d", None).unwrap(),
         ]));
         let route = vec![
+            ComponentEventRoute { component: None, scope: None },
             ComponentEventRoute {
-                component: ChildRef { name: "<root>".into(), collection: None },
-                scope: None,
-            },
-            ComponentEventRoute {
-                component: ChildRef { name: "a".into(), collection: None },
+                component: Some(ChildRef { name: "a".parse().unwrap(), collection: None }),
                 scope: Some(vec![EventScope::Child(ChildRef {
-                    name: "b".into(),
+                    name: "b".parse().unwrap(),
                     collection: None,
                 })]),
             },
             ComponentEventRoute {
-                component: ChildRef { name: "b".into(), collection: None },
+                component: Some(ChildRef { name: "b".parse().unwrap(), collection: None }),
                 scope: Some(vec![EventScope::Child(ChildRef {
-                    name: "c".into(),
+                    name: "c".parse().unwrap(),
                     collection: None,
                 })]),
             },
             ComponentEventRoute {
-                component: ChildRef { name: "c".into(), collection: None },
+                component: Some(ChildRef { name: "c".parse().unwrap(), collection: None }),
                 scope: None,
             },
         ];
@@ -628,20 +618,17 @@ mod tests {
                 ChildName::try_new("a", None).unwrap()
             ]));
         let route = vec![
+            ComponentEventRoute { component: None, scope: None },
             ComponentEventRoute {
-                component: ChildRef { name: "<root>".into(), collection: None },
-                scope: None,
-            },
-            ComponentEventRoute {
-                component: ChildRef { name: "a".into(), collection: None },
+                component: Some(ChildRef { name: "a".parse().unwrap(), collection: None }),
                 scope: Some(vec![EventScope::Collection("b".parse().unwrap())]),
             },
             ComponentEventRoute {
-                component: ChildRef { name: "b".into(), collection: None },
+                component: Some(ChildRef { name: "b".parse().unwrap(), collection: None }),
                 scope: Some(vec![EventScope::Collection("c".parse().unwrap())]),
             },
             ComponentEventRoute {
-                component: ChildRef { name: "c".into(), collection: None },
+                component: Some(ChildRef { name: "c".parse().unwrap(), collection: None }),
                 scope: None,
             },
         ];
@@ -664,20 +651,17 @@ mod tests {
             ChildName::try_new("i", None).unwrap(),
         ]));
         let route = vec![
+            ComponentEventRoute { component: None, scope: None },
             ComponentEventRoute {
-                component: ChildRef { name: "<root>".into(), collection: None },
+                component: Some(ChildRef { name: "a".parse().unwrap(), collection: None }),
                 scope: None,
             },
             ComponentEventRoute {
-                component: ChildRef { name: "a".into(), collection: None },
-                scope: None,
-            },
-            ComponentEventRoute {
-                component: ChildRef { name: "b".into(), collection: None },
+                component: Some(ChildRef { name: "b".parse().unwrap(), collection: None }),
                 scope: Some(vec![EventScope::Collection("c".parse().unwrap())]),
             },
             ComponentEventRoute {
-                component: ChildRef { name: "c".into(), collection: None },
+                component: Some(ChildRef { name: "c".parse().unwrap(), collection: None }),
                 scope: None,
             },
         ];
@@ -694,20 +678,23 @@ mod tests {
             ChildName::try_new("feedback", None).unwrap(),
         ]));
         let route = vec![
+            ComponentEventRoute { component: None, scope: None },
             ComponentEventRoute {
-                component: ChildRef { name: "<root>".into(), collection: None },
-                scope: None,
-            },
-            ComponentEventRoute {
-                component: ChildRef { name: "core".into(), collection: None },
+                component: Some(ChildRef { name: "core".parse().unwrap(), collection: None }),
                 scope: Some(vec![EventScope::Collection("test_manager".parse().unwrap())]),
             },
             ComponentEventRoute {
-                component: ChildRef { name: "test_manager".into(), collection: None },
+                component: Some(ChildRef {
+                    name: "test_manager".parse().unwrap(),
+                    collection: None,
+                }),
                 scope: Some(vec![EventScope::Collection("test_wrapper".parse().unwrap())]),
             },
             ComponentEventRoute {
-                component: ChildRef { name: "test_wrapper".into(), collection: None },
+                component: Some(ChildRef {
+                    name: "test_wrapper".parse().unwrap(),
+                    collection: None,
+                }),
                 scope: Some(vec![EventScope::Collection("test_root".parse().unwrap())]),
             },
         ];
@@ -727,47 +714,53 @@ mod tests {
             ChildName::try_new("archivist", None).unwrap(),
         ]));
         let route = vec![
+            ComponentEventRoute { component: None, scope: None },
             ComponentEventRoute {
-                component: ChildRef { name: "<root>".into(), collection: None },
-                scope: None,
-            },
-            ComponentEventRoute {
-                component: ChildRef { name: "core".into(), collection: None },
+                component: Some(ChildRef { name: "core".parse().unwrap(), collection: None }),
                 scope: Some(vec![EventScope::Child(ChildRef {
-                    name: "test_manager".into(),
+                    name: "test_manager".parse().unwrap(),
                     collection: None,
                 })]),
             },
             ComponentEventRoute {
-                component: ChildRef { name: "test_manager".into(), collection: None },
+                component: Some(ChildRef {
+                    name: "test_manager".parse().unwrap(),
+                    collection: None,
+                }),
                 scope: Some(vec![EventScope::Collection("tests".parse().unwrap())]),
             },
             ComponentEventRoute {
-                component: ChildRef {
-                    name: "auto-3fc01a79864c741".into(),
+                component: Some(ChildRef {
+                    name: "auto-3fc01a79864c741".parse().unwrap(),
                     collection: Some("tests".parse().unwrap()),
-                },
+                }),
                 scope: Some(vec![EventScope::Child(ChildRef {
-                    name: "test_wrapper".into(),
+                    name: "test_wrapper".parse().unwrap(),
                     collection: None,
                 })]),
             },
             ComponentEventRoute {
-                component: ChildRef { name: "test_wrapper".into(), collection: None },
+                component: Some(ChildRef {
+                    name: "test_wrapper".parse().unwrap(),
+                    collection: None,
+                }),
                 scope: Some(vec![
                     EventScope::Collection("test".parse().unwrap()),
-                    EventScope::Child(ChildRef { name: "enclosing_env".into(), collection: None }),
                     EventScope::Child(ChildRef {
-                        name: "hermetic_resolver".into(),
+                        name: "enclosing_env".parse().unwrap(),
+                        collection: None,
+                    }),
+                    EventScope::Child(ChildRef {
+                        name: "hermetic_resolver".parse().unwrap(),
                         collection: None,
                     }),
                 ]),
             },
             ComponentEventRoute {
-                component: ChildRef {
-                    name: "test_root".into(),
+                component: Some(ChildRef {
+                    name: "test_root".parse().unwrap(),
                     collection: Some("test".parse().unwrap()),
-                },
+                }),
                 scope: None,
             },
         ];

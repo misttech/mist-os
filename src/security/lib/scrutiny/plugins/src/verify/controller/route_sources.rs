@@ -824,7 +824,7 @@ mod tests {
                 ],
                 children: vec![
                     ChildDecl{
-                        name: "two_dir_user".to_string(),
+                        name: "two_dir_user".parse().unwrap(),
                         url: two_dir_user_url.to_string(),
                         startup: fdecl::StartupMode::Lazy,
                         on_terminate: None,
@@ -832,7 +832,7 @@ mod tests {
                         config_overrides: None,
                     },
                     ChildDecl{
-                        name: "one_dir_provider".to_string(),
+                        name: "one_dir_provider".parse().unwrap(),
                         url: one_dir_provider_url.to_string(),
                         startup: fdecl::StartupMode::Lazy,
                         on_terminate: None,

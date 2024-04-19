@@ -6,7 +6,7 @@ use {
     anyhow::{Context, Error},
     assert_matches::assert_matches,
     cm_rust::{CapabilityTypeName, ComponentDecl, FidlIntoNative},
-    cm_types::{Name, Path, RelativePath},
+    cm_types::{LongName, Name, Path, RelativePath},
     derivative::Derivative,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     std::collections::BTreeMap,
@@ -161,7 +161,7 @@ impl ComponentDeclBuilder {
 #[derive(Debug, Derivative)]
 #[derivative(Default)]
 pub struct ChildBuilder {
-    name: Option<String>,
+    name: Option<LongName>,
     url: Option<String>,
     #[derivative(Default(value = "fdecl::StartupMode::Lazy"))]
     startup: fdecl::StartupMode,
@@ -176,7 +176,7 @@ impl ChildBuilder {
 
     /// Defaults url to `"test:///{name}"`.
     pub fn name(mut self, name: &str) -> Self {
-        self.name = Some(name.into());
+        self.name = Some(name.parse().unwrap());
         if self.url.is_none() {
             self.url = Some(format!("test:///{name}"));
         }
@@ -1037,11 +1037,11 @@ impl From<ExposeBuilder> for cm_rust::ExposeDecl {
 }
 
 pub fn offer_source_static_child(name: &str) -> cm_rust::OfferSource {
-    cm_rust::OfferSource::Child(cm_rust::ChildRef { name: name.into(), collection: None })
+    cm_rust::OfferSource::Child(cm_rust::ChildRef { name: name.parse().unwrap(), collection: None })
 }
 
 pub fn offer_target_static_child(name: &str) -> cm_rust::OfferTarget {
-    cm_rust::OfferTarget::Child(cm_rust::ChildRef { name: name.into(), collection: None })
+    cm_rust::OfferTarget::Child(cm_rust::ChildRef { name: name.parse().unwrap(), collection: None })
 }
 
 /// A convenience builder for constructing [OfferDecl]s.
