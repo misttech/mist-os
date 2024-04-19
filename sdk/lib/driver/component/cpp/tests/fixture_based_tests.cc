@@ -252,3 +252,22 @@ TEST_F(FixtureBasedTestManualStop, ShutdownAndCheckLogger) {
   ShutdownDispatchersAndDestroyDriver();
   ASSERT_EQ(true, g_driver_stopped);
 }
+
+class AddChildFixtureConfig final {
+ public:
+  static constexpr bool kDriverOnForeground = true;
+  static constexpr bool kAutoStartDriver = true;
+  static constexpr bool kAutoStopDriver = true;
+
+  using DriverType = TestDriver;
+  using EnvironmentType = fdf_testing::MinimalEnvironment;
+};
+
+// Checks that adding a child and then managing it by the driver works.
+class FixtureBasedTestAddChild : public fdf_testing::DriverTestFixture<AddChildFixtureConfig> {};
+
+TEST_F(FixtureBasedTestAddChild, AddChild) {
+  EXPECT_EQ(ZX_OK, driver()->InitSyncCompat().status_value());
+  driver()->CreateChildNodeSync();
+  EXPECT_TRUE(driver()->sync_added_child());
+}
