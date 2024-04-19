@@ -22,7 +22,6 @@
 #include <kernel/mp.h>
 #include <kernel/thread.h>
 #include <pretty/cpp/sizes.h>
-#include <vm/bootalloc.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/pmm_checker.h>
@@ -77,45 +76,31 @@ zx_status_t PmmNode::AddArena(const pmm_arena_info_t* info) TA_NO_THREAD_SAFETY_
   DEBUG_ASSERT(IS_PAGE_ALIGNED(info->size));
   DEBUG_ASSERT(info->size > 0);
 
-  // allocate a c++ arena object
-  PmmArena* arena = new (boot_alloc_mem(sizeof(PmmArena))) PmmArena();
+  // Allocate an arena object out of the array inside PmmNode
+  if (used_arena_count_ >= kArenaCount) {
+    printf("PMM: pmm_add_arena failed to allocate arena\n");
+    return ZX_ERR_NO_MEMORY;
+  }
+  PmmArena* arena = &arenas_[used_arena_count_++];
 
-  // initialize the object
+  // Initialize the object.
   auto status = arena->Init(info, this);
   if (status != ZX_OK) {
-    // leaks boot allocator memory
-    arena->~PmmArena();
+    used_arena_count_--;
     printf("PMM: pmm_add_arena failed to initialize arena\n");
     return status;
   }
 
-  // walk the arena list, inserting in ascending order of arena base address
-  for (auto& a : arena_list_) {
-    if (a.base() > arena->base()) {
-      arena_list_.insert(a, arena);
-      goto done_add;
-    }
-  }
-
-  // walked off the end, add it to the end of the list
-  arena_list_.push_back(arena);
-
-done_add:
   arena_cumulative_size_ += info->size;
 
   return ZX_OK;
-}
-
-size_t PmmNode::NumArenas() const {
-  Guard<Mutex> guard{&lock_};
-  return arena_list_.size();
 }
 
 zx_status_t PmmNode::GetArenaInfo(size_t count, uint64_t i, pmm_arena_info_t* buffer,
                                   size_t buffer_size) {
   Guard<Mutex> guard{&lock_};
 
-  if ((count == 0) || (count + i > arena_list_.size()) || (i >= arena_list_.size())) {
+  if ((count == 0) || (count + i > active_arenas().size()) || (i >= active_arenas().size())) {
     return ZX_ERR_OUT_OF_RANGE;
   }
   const size_t size_required = count * sizeof(pmm_arena_info_t);
@@ -124,7 +109,7 @@ zx_status_t PmmNode::GetArenaInfo(size_t count, uint64_t i, pmm_arena_info_t* bu
   }
 
   // Skip the first |i| elements.
-  auto iter = arena_list_.begin();
+  auto iter = active_arenas().begin();
   for (uint64_t j = 0; j < i; j++) {
     iter++;
   }
@@ -434,7 +419,7 @@ zx_status_t PmmNode::AllocRange(paddr_t address, size_t count, list_node* list) 
     free_list_had_fill_pattern = all_free_pages_filled_;
 
     // walk through the arenas, looking to see if the physical page belongs to it
-    for (auto& a : arena_list_) {
+    for (auto& a : active_arenas()) {
       for (; allocated < count && a.address_in_arena(address); address += PAGE_SIZE) {
         vm_page_t* page = a.FindSpecific(address);
         if (!page) {
@@ -507,7 +492,7 @@ zx_status_t PmmNode::AllocContiguous(const size_t count, uint alloc_flags, uint8
   AutoPreemptDisabler preempt_disable;
   Guard<Mutex> guard{&lock_};
 
-  for (auto& a : arena_list_) {
+  for (auto& a : active_arenas()) {
     // FindFreeContiguous will search the arena for FREE pages. As we hold lock_, any pages in the
     // FREE state are assumed to be owned by us, and would only be modified if lock_ were held.
     vm_page_t* p = a.FindFreeContiguous(count, alignment_log2);
@@ -748,7 +733,7 @@ void PmmNode::Dump(bool is_panic) const {
         "%zu\n",
         this, free_count, free_count * PAGE_SIZE, free_loaned_count, free_loaned_count * PAGE_SIZE,
         arena_cumulative_size_);
-    for (auto& a : arena_list_) {
+    for (const auto& a : active_arenas()) {
       a.Dump(false, false);
     }
   };
@@ -1066,7 +1051,7 @@ void PmmNode::ForPagesInPhysRangeLocked(paddr_t start, size_t count, F func) {
   // pmm_node.
   DEBUG_ASSERT(mp_get_active_mask() != 0);
 
-  if (unlikely(arena_list_.is_empty())) {
+  if (unlikely(active_arenas().empty())) {
     // We're in a unit test, using ManagedPmmNode which has no arenas.  So fall back to the global
     // pmm_node (which has at least one arena) to find the actual vm_page_t for each page.
     //
@@ -1080,11 +1065,11 @@ void PmmNode::ForPagesInPhysRangeLocked(paddr_t start, size_t count, F func) {
     return;
   }
 
-  // We have at least one arena, so use arena_list_ directly.
+  // We have at least one arena, so use active_arenas() directly.
   paddr_t end = start + count * PAGE_SIZE;
   DEBUG_ASSERT(start <= end);
   paddr_t page_addr = start;
-  for (auto& a : arena_list_) {
+  for (auto& a : active_arenas()) {
     for (; page_addr < end && a.address_in_arena(page_addr); page_addr += PAGE_SIZE) {
       vm_page_t* page = a.FindSpecific(page_addr);
       DEBUG_ASSERT(page);

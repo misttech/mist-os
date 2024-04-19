@@ -11,6 +11,7 @@
 #include <kernel/event.h>
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
+#include <ktl/span.h>
 #include <vm/compression.h>
 #include <vm/loan_sweeper.h>
 #include <vm/physical_page_borrowing_config.h>
@@ -81,8 +82,11 @@ class PmmNode {
 
   zx_status_t AddArena(const pmm_arena_info_t* info);
 
-  // Returns the number of arenas.
-  size_t NumArenas() const;
+  // Returns the number of active arenas.
+  size_t NumArenas() const {
+    Guard<Mutex> guard{&lock_};
+    return active_arenas().size();
+  }
 
   // Copies |count| pmm_arena_info_t objects into |buffer| starting with the |i|-th arena ordered by
   // base address.  For example, passing an |i| of 1 would skip the 1st arena.
@@ -224,8 +228,6 @@ class PmmNode {
   ktl::atomic<uint64_t> loaned_count_ TA_GUARDED(lock_) = 0;
   ktl::atomic<uint64_t> loan_cancelled_count_ TA_GUARDED(lock_) = 0;
 
-  fbl::SizedDoublyLinkedList<PmmArena*> arena_list_ TA_GUARDED(lock_);
-
   // Free pages where !loaned.
   list_node free_list_ TA_GUARDED(lock_) = LIST_INITIAL_VALUE(free_list_);
   // Free pages where loaned && !loan_cancelled.
@@ -287,12 +289,27 @@ class PmmNode {
   // The rng state for random waiting on allocations. This allows us to use rand_r, which requires
   // no further thread synchronization, unlike rand().
   uintptr_t random_should_wait_seed_ TA_GUARDED(lock_) = 0;
+
+  // Arenas are allocated from the node itself to avoid any boot allocations. Walking linearly
+  // through them at run time should also be fairly efficient.
+  static const size_t kArenaCount = 16;
+  size_t used_arena_count_ TA_GUARDED(lock_) = 0;
+  PmmArena arenas_[kArenaCount] TA_GUARDED(lock_);
+
+  // Return the span of arenas from the built-in array that are known to be active. Used in loops
+  // that iterate across all arenas.
+  ktl::span<PmmArena> active_arenas() TA_REQ(lock_) {
+    return ktl::span<PmmArena>(arenas_, used_arena_count_);
+  }
+  ktl::span<const PmmArena> active_arenas() const TA_REQ(lock_) {
+    return ktl::span<const PmmArena>(arenas_, used_arena_count_);
+  }
 };
 
 // We don't need to hold the arena lock while executing this, since it is
 // only accesses values that are set once during system initialization.
 inline vm_page_t* PmmNode::PaddrToPage(paddr_t addr) TA_NO_THREAD_SAFETY_ANALYSIS {
-  for (auto& a : arena_list_) {
+  for (auto& a : active_arenas()) {
     if (a.address_in_arena(addr)) {
       size_t index = (addr - a.base()) / PAGE_SIZE;
       return a.get_page(index);
