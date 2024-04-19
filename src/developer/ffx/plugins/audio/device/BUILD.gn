@@ -18,6 +18,7 @@ ffx_plugin("ffx_audio_device") {
   args_sources = [ "src/args.rs" ]
 
   sources = [
+    "src/connect.rs",
     "src/info.rs",
     "src/lib.rs",
     "src/list.rs",

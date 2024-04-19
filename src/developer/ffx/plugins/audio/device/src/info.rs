@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::serde_ext;
+use crate::{connect, serde_ext};
 use camino::Utf8PathBuf;
 use ffx_command::{bug, user_error, FfxContext};
-use fidl::endpoints::create_proxy;
 use fidl_fuchsia_audio_device as fadevice;
 use fidl_fuchsia_hardware_audio as fhaudio;
 use fidl_fuchsia_hardware_audio_signalprocessing as fhaudio_sigproc;
@@ -729,22 +728,12 @@ impl Info {
     }
 }
 
-/// Returns information about a Codec device from its hardware protocol in devfs.
-async fn get_hw_codec_info(
-    dev_class: &fio::DirectoryProxy,
-    path: &str,
-) -> fho::Result<HardwareCodecInfo> {
-    let connector_proxy =
-        connect_to_named_protocol_at_dir_root::<fhaudio::CodecConnectorMarker>(dev_class, path)
-            .bug_context("Failed to connect to CodecConnector")?;
-
-    let (proxy, server_end) = create_proxy::<fhaudio::CodecMarker>().unwrap();
-    connector_proxy.connect(server_end).bug_context("Failed to call Connect")?;
-
+/// Returns information about a Codec device from its hardware protocol.
+async fn get_hw_codec_info(codec: &fhaudio::CodecProxy) -> fho::Result<HardwareCodecInfo> {
     let properties =
-        proxy.get_properties().await.bug_context("Failed to call Codec.GetProperties")?;
+        codec.get_properties().await.bug_context("Failed to call Codec.GetProperties")?;
 
-    let dai_formats = proxy
+    let dai_formats = codec
         .get_dai_formats()
         .await
         .bug_context("Failed to call Codec.GetDaiFormats")?
@@ -752,34 +741,23 @@ async fn get_hw_codec_info(
         .bug_context("Failed to get DAI formats")?;
 
     let plug_state =
-        proxy.watch_plug_state().await.bug_context("Failed to call Codec.WatchPlugState")?;
+        codec.watch_plug_state().await.bug_context("Failed to call Codec.WatchPlugState")?;
 
     Ok(HardwareCodecInfo { properties, dai_formats, plug_state })
 }
 
-/// Returns information about a Dai device from its hardware protocol in devfs.
-async fn get_hw_dai_info(
-    dev_class: &fio::DirectoryProxy,
-    path: &str,
-) -> fho::Result<HardwareDaiInfo> {
-    let connector_proxy =
-        connect_to_named_protocol_at_dir_root::<fhaudio::DaiConnectorMarker>(dev_class, path)
-            .bug_context("Failed to connect to DaiConnector")?;
+/// Returns information about a Dai device from its hardware protocol.
+async fn get_hw_dai_info(dai: &fhaudio::DaiProxy) -> fho::Result<HardwareDaiInfo> {
+    let properties = dai.get_properties().await.bug_context("Failed to call Dai.GetProperties")?;
 
-    let (proxy, server_end) = create_proxy::<fhaudio::DaiMarker>().unwrap();
-    connector_proxy.connect(server_end).bug_context("Failed to call Connect")?;
-
-    let properties =
-        proxy.get_properties().await.bug_context("Failed to call Dai.GetProperties")?;
-
-    let dai_formats = proxy
+    let dai_formats = dai
         .get_dai_formats()
         .await
         .bug_context("Failed to call Dai.GetDaiFormats")?
         .map_err(|status| Status::from_raw(status))
         .bug_context("Failed to get DAI formats")?;
 
-    let ring_buffer_formats = proxy
+    let ring_buffer_formats = dai
         .get_ring_buffer_formats()
         .await
         .bug_context("Failed to call Dai.GetRingBufferFormats")?
@@ -789,18 +767,12 @@ async fn get_hw_dai_info(
     Ok(HardwareDaiInfo { properties, dai_formats, ring_buffer_formats })
 }
 
-/// Returns information about a Composite device from its hardware protocol in devfs.
+/// Returns information about a Composite device from its hardware protocol.
 async fn get_hw_composite_info(
-    dev_class: &fio::DirectoryProxy,
-    path: &str,
+    composite: &fhaudio::CompositeProxy,
 ) -> fho::Result<HardwareCompositeInfo> {
-    // DFv2 Composite drivers do not use a connector/trampoline as StreamConfig above.
-    // TODO(https://fxbug.dev/326339971): Fall back to CompositeConnector for DFv1 drivers
-    let proxy = connect_to_named_protocol_at_dir_root::<fhaudio::CompositeMarker>(dev_class, path)
-        .bug_context("Failed to connect to Composite")?;
-
     let properties =
-        proxy.get_properties().await.bug_context("Failed to call Composite.GetProperties")?;
+        composite.get_properties().await.bug_context("Failed to call Composite.GetProperties")?;
 
     // TODO(https://fxbug.dev/333120537): Support fetching DAI formats for hardware Composite
     let dai_formats = BTreeMap::new();
@@ -811,32 +783,29 @@ async fn get_hw_composite_info(
     Ok(HardwareCompositeInfo { properties, dai_formats, ring_buffer_formats })
 }
 
-/// Returns information about a StreamConfig device from its hardware protocol in devfs.
+/// Returns information about a StreamConfig device from its hardware protocol.
 async fn get_hw_stream_config_info(
-    dev_class: &fio::DirectoryProxy,
-    path: &str,
+    stream_config: &fhaudio::StreamConfigProxy,
 ) -> fho::Result<HardwareStreamConfigInfo> {
-    let connector_proxy = connect_to_named_protocol_at_dir_root::<
-        fhaudio::StreamConfigConnectorMarker,
-    >(dev_class, path)
-    .bug_context("Failed to connect to StreamConfigConnector")?;
+    let properties = stream_config
+        .get_properties()
+        .await
+        .bug_context("Failed to call StreamConfig.GetProperties")?;
 
-    let (proxy, server_end) = create_proxy::<fhaudio::StreamConfigMarker>().unwrap();
-    connector_proxy.connect(server_end).bug_context("Failed to call Connect")?;
-
-    let properties =
-        proxy.get_properties().await.bug_context("Failed to call StreamConfig.GetProperties")?;
-
-    let supported_formats = proxy
+    let supported_formats = stream_config
         .get_supported_formats()
         .await
         .bug_context("Failed to call StreamConfig.GetSupportedFormats")?;
 
-    let gain_state =
-        proxy.watch_gain_state().await.bug_context("Failed to call StreamConfig.WatchGainState")?;
+    let gain_state = stream_config
+        .watch_gain_state()
+        .await
+        .bug_context("Failed to call StreamConfig.WatchGainState")?;
 
-    let plug_state =
-        proxy.watch_plug_state().await.bug_context("Failed to call StreamConfig.WatchPlugState")?;
+    let plug_state = stream_config
+        .watch_plug_state()
+        .await
+        .bug_context("Failed to call StreamConfig.WatchPlugState")?;
 
     Ok(HardwareStreamConfigInfo { properties, supported_formats, gain_state, plug_state })
 }
@@ -850,20 +819,24 @@ async fn get_hardware_info(
 
     match selector.device_type().0 {
         fadevice::DeviceType::Codec => {
-            let codec_info = get_hw_codec_info(dev_class, protocol_path.as_str()).await?;
+            let codec = connect::connect_hw_codec(dev_class, protocol_path.as_str())?;
+            let codec_info = get_hw_codec_info(&codec).await?;
             Ok(HardwareInfo::Codec(codec_info))
         }
         fadevice::DeviceType::Composite => {
-            let composite_info = get_hw_composite_info(dev_class, protocol_path.as_str()).await?;
+            let composite = connect::connect_hw_composite(dev_class, protocol_path.as_str())?;
+            let composite_info = get_hw_composite_info(&composite).await?;
             Ok(HardwareInfo::Composite(composite_info))
         }
         fadevice::DeviceType::Dai => {
-            let dai_info = get_hw_dai_info(dev_class, protocol_path.as_str()).await?;
+            let dai = connect::connect_hw_dai(dev_class, protocol_path.as_str())?;
+            let dai_info = get_hw_dai_info(&dai).await?;
             Ok(HardwareInfo::Dai(dai_info))
         }
         fadevice::DeviceType::Input | fadevice::DeviceType::Output => {
-            let stream_config_info =
-                get_hw_stream_config_info(dev_class, protocol_path.as_str()).await?;
+            let stream_config =
+                connect::connect_hw_streamconfig(dev_class, protocol_path.as_str())?;
+            let stream_config_info = get_hw_stream_config_info(&stream_config).await?;
             Ok(HardwareInfo::StreamConfig(stream_config_info))
         }
         _ => Err(bug!("Unsupported device type")),
@@ -899,25 +872,6 @@ pub async fn get_info(
             Ok(Info::Registry(registry_info))
         }
     }
-}
-
-/// Connect to an instance of a FIDL protocol hosted in `directory` using the given `path`.
-// This is essentially the same as `fuchsia_component::client::connect_to_named_protocol_at_dir_root`.
-// We can't use the `fuchsia_component` library in ffx because it doesn't build on host.
-pub fn connect_to_named_protocol_at_dir_root<P: fidl::endpoints::ProtocolMarker>(
-    directory: &fio::DirectoryProxy,
-    path: &str,
-) -> fho::Result<P::Proxy> {
-    let (proxy, server_end) = create_proxy::<P>().unwrap();
-    directory
-        .open(
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            path,
-            server_end.into_channel().into(),
-        )
-        .bug_context("Failed to call Directory.Open")?;
-    Ok(proxy)
 }
 
 #[cfg(test)]

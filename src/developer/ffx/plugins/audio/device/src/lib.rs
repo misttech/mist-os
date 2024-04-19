@@ -25,6 +25,7 @@ use prettytable::Table;
 use serde::Serialize;
 use std::io::Read;
 
+mod connect;
 mod info;
 pub mod list;
 mod serde_ext;
