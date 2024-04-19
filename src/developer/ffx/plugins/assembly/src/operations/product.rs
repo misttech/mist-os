@@ -64,6 +64,8 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         // Because serde_json and serde_json5 deserialize enums differently, we need to bounce the
         // serde_json::Value of the platform config through a string so that we can re-parse it
         // using serde_json5.
+        // TODO: Remove this after the following issue is fixed:
+        // https://github.com/google/serde_json5/issues/10
         let merged_platform_json5 = serde_json::to_string_pretty(&merged_platform)
             .context("Creating temporary json5 from merged config")?;
 
