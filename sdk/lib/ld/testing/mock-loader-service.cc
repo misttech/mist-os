@@ -8,6 +8,8 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/dispatcher.h>
 #include <lib/elfldltl/testing/get-test-data.h>
+#include <lib/fit/defer.h>
+#include <zircon/dlfcn.h>
 
 #include <filesystem>
 
@@ -141,12 +143,35 @@ void MockLoaderServiceForTest::ExpectConfig(std::string_view config) {
   mock_loader_->ExpectConfig(config, zx::ok());
 }
 
-zx::channel MockLoaderServiceForTest::GetLdsvc() {
+zx::channel MockLoaderServiceForTest::TakeLdsvc() {
   zx::channel ldsvc;
   if (mock_loader_) {
     ldsvc = mock_loader_->client().TakeChannel();
   }
   return ldsvc;
+}
+
+zx::unowned_channel MockLoaderServiceForTest::BorrowLdsvc() {
+  zx::unowned_channel ldsvc;
+  if (mock_loader_) {
+    ldsvc = mock_loader_->client().channel().borrow();
+  }
+  return ldsvc;
+}
+
+void MockLoaderServiceForTest::CallWithLoaderInstalled(fit::function<void()> func) {
+  // Install the mock loader as the system loader.
+  auto mock_ldsvc = BorrowLdsvc();
+  ASSERT_TRUE(mock_ldsvc->is_valid());
+
+  // Restore the loader to the previous system loader at the close of function scope.
+  auto restore_system_ldsvc =
+      fit::defer([system_ldsvc = zx::channel{dl_set_loader_service(mock_ldsvc->get())}]() mutable {
+        dl_set_loader_service(system_ldsvc.release());
+      });
+
+  // Now that the mock loader service is installed, call the function.
+  func();
 }
 
 zx::vmo MockLoaderServiceForTest::GetDepVmo(std::string_view name) {

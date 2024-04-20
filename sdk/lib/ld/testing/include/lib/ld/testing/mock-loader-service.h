@@ -128,12 +128,15 @@ class MockLoaderServiceForTest {
   // that it will receive a Config request.
   void ExpectConfig(std::string_view config);
 
-  // TODO(caslyn): rename to TakeLdsvc
-  zx::channel GetLdsvc();
+  // Take ownership of the client end to the MockLoader's FIDL server.
+  zx::channel TakeLdsvc();
 
-  // TODO(caslyn): Introduce BorrowLdsvc function.
+  // Borrow the client end to the MockLoader's FIDL server.
+  zx::unowned_channel BorrowLdsvc();
 
-  // TODO(caslyn): Introduce CallWithLoaderService function.
+  // Call `func` with the mock loader installed as the system loader so it will
+  // handle fuchsia.ldsvc.Loader requests made during the duration of `func()`.
+  void CallWithLoaderInstalled(fit::function<void()> func);
 
  private:
   // Fetch a dependency VMO from a specific path in the test package.
