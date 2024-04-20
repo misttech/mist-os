@@ -863,7 +863,7 @@ template("clang_toolchain") {
         }
         command += " -o $rlib"
         if (rustc_use_response_files) {
-          rspfile = "{{output}}.rsp"
+          rspfile = "$rlib.rsp"
           rspfile_content = "{{rustdeps}} {{externs}}"
           command += " -Zshell-argfiles @shell:" + rspfile
         } else {
@@ -981,7 +981,7 @@ template("clang_toolchain") {
         command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link{{EMIT_RMETA}} -Zdep-info-omit-d-target {{rustflags}}"
         command += " -o $_main_output --extern proc_macro"
         if (rustc_use_response_files) {
-          rspfile = "{{output}}.rsp"
+          rspfile = "$_main_output.rsp"
           rspfile_content = "{{rustdeps}} {{externs}}"
           command += " -Zshell-argfiles @shell:" + rspfile
         } else {
