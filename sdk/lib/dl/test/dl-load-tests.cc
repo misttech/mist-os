@@ -19,6 +19,12 @@
 
 namespace {
 
+// This is a convenience function to specify that a specific dependency should
+// not be found in a Needed set.
+constexpr std::pair<std::string_view, bool> NotFound(std::string_view name) {
+  return {name, false};
+}
+
 using ::testing::MatchesRegex;
 
 template <class Fixture>
@@ -47,17 +53,24 @@ using TestTypes = ::testing::Types<
 TYPED_TEST_SUITE(DlTests, TestTypes);
 
 TYPED_TEST(DlTests, NotFound) {
-  auto result = this->DlOpen("does_not_exist.so", RTLD_NOW | RTLD_LOCAL);
+  constexpr const char* kNotFoundFile = "does-not-exist.so";
+
+  this->ExpectMissing(kNotFoundFile);
+
+  auto result = this->DlOpen(kNotFoundFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
   if constexpr (TestFixture::kCanMatchExactError) {
-    EXPECT_EQ(result.error_value().take_str(), "cannot open does_not_exist.so");
+    EXPECT_EQ(result.error_value().take_str(), "cannot open " + std::string{kNotFoundFile});
   } else {
     EXPECT_THAT(result.error_value().take_str(),
-                MatchesRegex(".*does_not_exist.so:.*(No such file or directory|ZX_ERR_NOT_FOUND)"));
+                MatchesRegex(".*" + std::string{kNotFoundFile} +
+                             ":.*(No such file or directory|ZX_ERR_NOT_FOUND)"));
   }
 }
 
 TYPED_TEST(DlTests, InvalidMode) {
+  constexpr const char* kBasicFile = "ret17.module.so";
+
   if constexpr (!TestFixture::kCanValidateMode) {
     GTEST_SKIP() << "test requires dlopen to validate mode argment";
   }
@@ -71,14 +84,19 @@ TYPED_TEST(DlTests, InvalidMode) {
   bad_mode &= ~RTLD_DEEPBIND;
 #endif
 
-  auto result = this->DlOpen("ret17.module.so", bad_mode);
+  auto result = this->DlOpen(kBasicFile, bad_mode);
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value().take_str(), "invalid mode parameter")
       << "for mode argument " << bad_mode;
 }
 
+// Load a basic file with no dependencies.
 TYPED_TEST(DlTests, Basic) {
-  auto result = this->DlOpen("ret17.module.so", RTLD_NOW | RTLD_LOCAL);
+  constexpr const char* kBasicFile = "ret17.module.so";
+
+  this->ExpectRootModule(kBasicFile);
+
+  auto result = this->DlOpen(kBasicFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
   // Look up the "TestStart" function and call it, expecting it to return 17.
@@ -96,7 +114,13 @@ TYPED_TEST(DlTests, BasicDep) {
     GTEST_SKIP()
         << "TODO(https://fxbug.dev/324650368): test requires dlopen to locate dependencies.";
   }
-  auto result = this->DlOpen("basic-dep.module.so", RTLD_NOW | RTLD_LOCAL);
+
+  constexpr const char* kBasicDepFile = "basic-dep.module.so";
+
+  this->ExpectRootModule(kBasicDepFile);
+  this->Needed({"libld-dep-a.so"});
+
+  auto result = this->DlOpen(kBasicDepFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 }
@@ -108,7 +132,12 @@ TYPED_TEST(DlTests, IndirectDeps) {
         << "TODO(https://fxbug.dev/324650368): test requires dlopen to locate dependencies.";
   }
 
-  auto result = this->DlOpen("indirect-deps.module.so", RTLD_NOW | RTLD_LOCAL);
+  constexpr const char* kIndirectDepsFile = "indirect-deps.module.so";
+
+  this->ExpectRootModule(kIndirectDepsFile);
+  this->Needed({"libindirect-deps-a.so", "libindirect-deps-b.so", "libindirect-deps-c.so"});
+
+  auto result = this->DlOpen(kIndirectDepsFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 }
@@ -121,7 +150,12 @@ TYPED_TEST(DlTests, MissingDependency) {
         << "TODO(https://fxbug.dev/324650368): test requires dlopen to locate dependencies.";
   }
 
-  auto result = this->DlOpen("missing-dep.module.so", RTLD_NOW | RTLD_LOCAL);
+  constexpr const char* kMissingDepFile = "missing-dep.module.so";
+
+  this->ExpectRootModule(kMissingDepFile);
+  this->Needed({NotFound("libmissing-dep-dep.so")});
+
+  auto result = this->DlOpen(kMissingDepFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
   // Expect that the dependency lib to missing-dep.module.so cannot be found.
   if constexpr (TestFixture::kCanMatchExactError) {

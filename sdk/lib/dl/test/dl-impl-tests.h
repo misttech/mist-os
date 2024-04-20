@@ -12,12 +12,13 @@
 
 #include "../diagnostics.h"
 #include "../runtime-dynamic-linker.h"
-#include "dl-tests-base.h"
 
 #ifdef __Fuchsia__
 #include <lib/elfldltl/vmar-loader.h>
 #include <lib/elfldltl/vmo.h>
 #endif
+
+#include "dl-load-posix-tests-base.h"
 
 namespace dl::testing {
 
@@ -39,8 +40,14 @@ class TestPosix {
   static std::optional<File> RetrieveFile(Diagnostics& diag, std::string_view filename);
 };
 
+// TODO(https://fxbug.dev/323419430): For now, both versions of dl-impl-tests
+// will use DlLoadPosixTestsBase, which is just a class of empty hooks so that
+// dl-load-tests.cc can compile. Eventually, DlImplTests may use another base
+// class to verify that module/dep files were loaded as expected.
+using DlImplLoadTestsBase = DlLoadPosixTestsBase;
+
 template <class TestOS>
-class DlImplTests : public DlTestsBase {
+class DlImplTests : public DlImplLoadTestsBase {
  public:
   // Error messages in tests can be matched exactly with this test fixture,
   // since the error message returned from the libdl implementation will be the

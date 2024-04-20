@@ -30,6 +30,7 @@ test("dl-unittests") {
     sources += [
       "dl-impl-tests.cc",
       "dl-impl-tests.h",
+      "dl-load-posix-tests-base.h",
       "dl-load-tests.cc",
       "dl-system-tests.cc",
       "dl-system-tests.h",
@@ -40,6 +41,10 @@ test("dl-unittests") {
       "//sdk/lib/ld/testing",
       "//src/lib/elfldltl/testing",
     ]
+
+    if (is_fuchsia) {
+      sources += [ "dl-load-zircon-tests-base.h" ]
+    }
 
     # Plumb in the switch to set cflags, such as the libprefix for test files.
     deps += [ "//sdk/lib/ld/test:load-test-modules-info" ]

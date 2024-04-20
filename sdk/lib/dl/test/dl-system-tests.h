@@ -5,11 +5,21 @@
 #ifndef LIB_DL_TEST_DL_SYSTEM_TESTS_H_
 #define LIB_DL_TEST_DL_SYSTEM_TESTS_H_
 
-#include "dl-tests-base.h"
+#ifdef __Fuchsia__
+#include "dl-load-zircon-tests-base.h"
+#else
+#include "dl-load-posix-tests-base.h"
+#endif
 
 namespace dl::testing {
 
-class DlSystemTests : public DlTestsBase {
+#ifdef __Fuchsia__
+using DlSystemLoadTestsBase = DlLoadZirconTestsBase;
+#else
+using DlSystemLoadTestsBase = DlLoadPosixTestsBase;
+#endif
+
+class DlSystemTests : public DlSystemLoadTestsBase {
  public:
   // This test fixture does not need to match on exact error text, since the
   // error message can vary between different system implementations.
