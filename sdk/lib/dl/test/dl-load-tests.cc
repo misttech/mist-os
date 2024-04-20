@@ -71,23 +71,23 @@ TYPED_TEST(DlTests, InvalidMode) {
   bad_mode &= ~RTLD_DEEPBIND;
 #endif
 
-  auto result = this->DlOpen("libld-dep-a.so", bad_mode);
+  auto result = this->DlOpen("ret17.module.so", bad_mode);
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value().take_str(), "invalid mode parameter")
       << "for mode argument " << bad_mode;
 }
 
 TYPED_TEST(DlTests, Basic) {
-  auto result = this->DlOpen("libld-dep-c.so", RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen("ret17.module.so", RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
-  // Look up the "c" function and call it, expecting its return value of 2.
-  auto sym_result = this->DlSym(result.value(), "c");
+  // Look up the "TestStart" function and call it, expecting it to return 17.
+  auto sym_result = this->DlSym(result.value(), "TestStart");
   ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
   ASSERT_TRUE(sym_result.value());
   int64_t (*func_ptr)();
   func_ptr = reinterpret_cast<int64_t (*)()>(reinterpret_cast<uintptr_t>(sym_result.value()));
-  EXPECT_EQ(func_ptr(), 2);
+  EXPECT_EQ(func_ptr(), 17);
 }
 
 // TODO(https://fxrev.dev/323419430): expect that libld-dep-a.so was needed.
