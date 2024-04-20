@@ -32,8 +32,13 @@ class FakeAmlPwmDevice : public AmlPwmDevice {
       zxlogf(ERROR, "%s: device object alloc failed", __func__);
       return nullptr;
     }
-    device->Init(std::move(mmio0), std::move(mmio1), std::move(mmio2), std::move(mmio3),
-                 std::move(mmio4), ids);
+    std::vector<fdf::MmioBuffer> mmios;
+    mmios.push_back(std::move(mmio0));
+    mmios.push_back(std::move(mmio1));
+    mmios.push_back(std::move(mmio2));
+    mmios.push_back(std::move(mmio3));
+    mmios.push_back(std::move(mmio4));
+    device->Init(std::move(mmios), ids);
 
     return device;
   }
@@ -96,8 +101,9 @@ class AmlPwmDeviceTest : public zxtest::Test {
     fdf::MmioBuffer mmio3(mock_mmio3_->GetMmioBuffer());
     fdf::MmioBuffer mmio4(mock_mmio4_->GetMmioBuffer());
     // Protect channel 3 for protect tests
-    std::vector<pwm_id_t> ids = {{0}, {1}, {2}, {3, /* init = */ false}, {4}, {5}, {6},
-                                 {7}, {8}, {9}};
+    std::vector<pwm_id_t> ids = {{.id = 0}, {.id = 1}, {.id = 2}, {.id = 3, .init = false},
+                                 {.id = 4}, {.id = 5}, {.id = 6}, {.id = 7},
+                                 {.id = 8}, {.id = 9}};
     pwm_ = FakeAmlPwmDevice::Create(std::move(mmio0), std::move(mmio1), std::move(mmio2),
                                     std::move(mmio3), std::move(mmio4), ids);
     ASSERT_NOT_NULL(pwm_);
