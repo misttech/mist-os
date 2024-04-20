@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2016 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -26,3 +27,36 @@ static_assert(HEAP_DEFAULT_ALIGNMENT >= __STDCPP_DEFAULT_NEW_ALIGNMENT__);
 #endif
 
 }  // namespace fbl
+
+#if _KERNEL_MISTOS
+// mist-os: Replacement function 'operator new' to be used in
+// the kernel with implicit AllocChecker
+void* operator new(size_t size) {
+  fbl::AllocChecker ac;
+  auto ptr = fbl::internal::checked(size, ac, malloc(size));
+  ZX_ASSERT(ac.check());
+  return ptr;
+}
+
+void* operator new(size_t size, std::align_val_t align) {
+  fbl::AllocChecker ac;
+  auto ptr = fbl::internal::checked(size, ac, memalign(static_cast<size_t>(align), size));
+  ZX_ASSERT(ac.check());
+  return ptr;
+}
+
+void* operator new[](size_t size) {
+  fbl::AllocChecker ac;
+  auto ptr = fbl::internal::checked(size, ac, malloc(size));
+  ZX_ASSERT(ac.check());
+  return ptr;
+}
+
+void* operator new[](size_t size, std::align_val_t align) {
+  fbl::AllocChecker ac;
+  auto ptr = fbl::internal::checked(size, ac, memalign(static_cast<size_t>(align), size));
+  ZX_ASSERT(ac.check());
+  return ptr;
+}
+
+#endif
