@@ -7,10 +7,10 @@
 import os
 import subprocess
 import unittest
-from typing import Any, Callable
+from typing import Any
 from unittest import mock
 
-from parameterized import parameterized, param
+from parameterized import parameterized
 
 from honeydew.auxiliary_devices import power_switch_dmc
 from honeydew.interfaces.auxiliary_devices import power_switch
@@ -18,9 +18,7 @@ from honeydew.interfaces.auxiliary_devices import power_switch
 _MOCK_OS_ENVIRON: dict[str, str] = {"DMC_PATH": "/tmp/foo/bar"}
 
 
-def _custom_test_name_func(
-    testcase_func: Callable[..., None], _: str, param: param
-) -> str:
+def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
@@ -62,7 +60,7 @@ class PowerSwitchDmcTests(unittest.TestCase):
         return_value=b"some output",
         autospec=True,
     )
-    def test_power_off(self, mock_subprocess_check_output: mock.Mock) -> None:
+    def test_power_off(self, mock_subprocess_check_output) -> None:
         """Test case for PowerSwitchDmc.power_off() success case."""
         self.power_switch_dmc_obj.power_off()
         mock_subprocess_check_output.assert_called_once()
@@ -107,9 +105,7 @@ class PowerSwitchDmcTests(unittest.TestCase):
         autospec=True,
     )
     def test_power_off_error(
-        self,
-        parameterized_dict: dict[str, Any],
-        mock_subprocess_check_output: mock.Mock,
+        self, parameterized_dict, mock_subprocess_check_output
     ) -> None:
         """Test case for PowerSwitchDmc.power_off() error case."""
         mock_subprocess_check_output.side_effect = parameterized_dict[
@@ -127,7 +123,7 @@ class PowerSwitchDmcTests(unittest.TestCase):
         return_value=b"some output",
         autospec=True,
     )
-    def test_power_on(self, mock_subprocess_check_output: mock.Mock) -> None:
+    def test_power_on(self, mock_subprocess_check_output) -> None:
         """Test case for PowerSwitchDmc.power_on() success case."""
         self.power_switch_dmc_obj.power_on()
         mock_subprocess_check_output.assert_called_once()
@@ -172,9 +168,7 @@ class PowerSwitchDmcTests(unittest.TestCase):
         autospec=True,
     )
     def test_power_on_error(
-        self,
-        parameterized_dict: dict[str, Any],
-        mock_subprocess_check_output: mock.Mock,
+        self, parameterized_dict, mock_subprocess_check_output
     ) -> None:
         """Test case for PowerSwitchDmc.power_on() error case."""
         mock_subprocess_check_output.side_effect = parameterized_dict[

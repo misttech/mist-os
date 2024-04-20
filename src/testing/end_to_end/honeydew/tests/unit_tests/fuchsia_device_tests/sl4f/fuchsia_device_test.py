@@ -6,11 +6,11 @@
 
 import base64
 import unittest
-from typing import Any, Callable
+from typing import Any
 from unittest import mock
 
 import fuchsia_controller_py as fuchsia_controller
-from parameterized import parameterized, param
+from parameterized import parameterized
 
 from honeydew.fuchsia_device import base_fuchsia_device
 from honeydew.fuchsia_device.sl4f import fuchsia_device
@@ -50,9 +50,7 @@ _MOCK_DEVICE_PROPERTIES: dict[str, dict[str, str]] = {
 _BASE64_ENCODED_STR: str = "some base64 encoded string=="
 
 
-def _custom_test_name_func(
-    testcase_func: Callable[..., None], _: str, param: param
-) -> str:
+def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom test name function method."""
     test_func_name: str = testcase_func.__name__
 
@@ -126,9 +124,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         autospec=True,
         return_value=None,
     )
-    def test_bluetooth_avrcp(
-        self, mock_bluetooth_common_init: mock.Mock
-    ) -> None:
+    def test_bluetooth_avrcp(self, mock_bluetooth_common_init) -> None:
         """Test case to make sure sl4f_fuchsia_device supports
         bluetooth_avrcp affordance implemented using SL4F transport."""
         self.assertIsInstance(
@@ -143,7 +139,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         autospec=True,
         return_value=None,
     )
-    def test_bluetooth_gap(self, mock_bluetooth_common_init: mock.Mock) -> None:
+    def test_bluetooth_gap(self, mock_bluetooth_common_init) -> None:
         """Test case to make sure sl4f_fuchsia_device supports
         bluetooth_gap affordance implemented using SL4F transport."""
         self.assertIsInstance(
@@ -206,9 +202,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         autospec=True,
     )
     def test_health_check(
-        self,
-        mock_base_fuchsia_device_health_check: mock.Mock,
-        mock_sl4f_check_connection: mock.Mock,
+        self, mock_base_fuchsia_device_health_check, mock_sl4f_check_connection
     ) -> None:
         """Testcase for FuchsiaDevice.health_check()"""
         self.fd_obj.health_check()
@@ -232,9 +226,9 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
     )
     def test_on_device_boot(
         self,
-        mock_sl4f_start_server: mock.Mock,
-        mock_sl4f_based_health_check: mock.Mock,
-        mock_base_fuchsia_device_on_device_boot: mock.Mock,
+        mock_sl4f_start_server,
+        mock_sl4f_based_health_check,
+        mock_base_fuchsia_device_on_device_boot,
     ) -> None:
         """Testcase for FuchsiaDevice.on_device_boot()"""
         self.fd_obj.on_device_boot()
@@ -252,7 +246,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         return_value={"result": _MOCK_DEVICE_PROPERTIES["build_info"]},
         autospec=True,
     )
-    def test_build_info(self, mock_sl4f_run: mock.Mock) -> None:
+    def test_build_info(self, mock_sl4f_run) -> None:
         """Testcase for FuchsiaDevice._build_info property"""
         # pylint: disable=protected-access
         self.assertEqual(
@@ -267,7 +261,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         return_value={"result": _MOCK_DEVICE_PROPERTIES["device_info"]},
         autospec=True,
     )
-    def test_device_info(self, mock_sl4f_run: mock.Mock) -> None:
+    def test_device_info(self, mock_sl4f_run) -> None:
         """Testcase for FuchsiaDevice._device_info property"""
         # pylint: disable=protected-access
         self.assertEqual(
@@ -281,7 +275,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         return_value={"result": _MOCK_DEVICE_PROPERTIES["product_info"]},
         autospec=True,
     )
-    def test_product_info(self, mock_sl4f_run: mock.Mock) -> None:
+    def test_product_info(self, mock_sl4f_run) -> None:
         """Testcase for FuchsiaDevice._product_info property"""
         # pylint: disable=protected-access
         self.assertEqual(
@@ -316,9 +310,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(fuchsia_device.sl4f_transport.SL4F, "run", autospec=True)
-    def test_send_log_command(
-        self, parameterized_dict: dict[str, Any], mock_sl4f_run: mock.Mock
-    ) -> None:
+    def test_send_log_command(self, parameterized_dict, mock_sl4f_run) -> None:
         """Testcase for FuchsiaDevice._send_log_command()"""
         # pylint: disable=protected-access
         self.fd_obj._send_log_command(
@@ -330,7 +322,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         mock_sl4f_run.assert_called()
 
     @mock.patch.object(fuchsia_device.sl4f_transport.SL4F, "run", autospec=True)
-    def test_send_reboot_command(self, mock_sl4f_run: mock.Mock) -> None:
+    def test_send_reboot_command(self, mock_sl4f_run) -> None:
         """Testcase for FuchsiaDevice._send_reboot_command()"""
         # pylint: disable=protected-access
         self.fd_obj._send_reboot_command()
@@ -350,10 +342,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         fuchsia_device.sl4f_transport.SL4F, "start_server", autospec=True
     )
     def test_send_snapshot_command(
-        self,
-        mock_sl4f_start_server: mock.Mock,
-        mock_health_check: mock.Mock,
-        mock_sl4f_run: mock.Mock,
+        self, mock_sl4f_start_server, mock_health_check, mock_sl4f_run
     ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command()"""
         # pylint: disable=protected-access

@@ -8,10 +8,10 @@ import base64
 import os
 import tempfile
 import unittest
-from typing import Any, Callable
+from typing import Any
 from unittest import mock
 
-from parameterized import parameterized, param
+from parameterized import parameterized
 
 from honeydew import errors
 from honeydew.affordances.sl4f import tracing as sl4f_tracing
@@ -19,9 +19,7 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import sl4f as sl4f_transport
 
 
-def _custom_test_name_func(
-    testcase_func: Callable[..., None], _: str, param: param
-) -> str:
+def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
@@ -71,7 +69,7 @@ class TracingSL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_initialize(self, parameterized_dict: dict[str, Any]) -> None:
+    def test_initialize(self, parameterized_dict) -> None:
         """Test for Tracing.initialize() method."""
         self.tracing_obj.initialize(
             categories=parameterized_dict.get("categories"),
@@ -102,7 +100,7 @@ class TracingSL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_start(self, parameterized_dict: dict[str, Any]) -> None:
+    def test_start(self, parameterized_dict) -> None:
         """Test for Tracing.start() method."""
         if not parameterized_dict.get("session_initialized"):
             with self.assertRaises(errors.FuchsiaStateError):
@@ -137,7 +135,7 @@ class TracingSL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_stop(self, parameterized_dict: dict[str, Any]) -> None:
+    def test_stop(self, parameterized_dict) -> None:
         """Test for Tracing.stop() method."""
         if not parameterized_dict.get("session_initialized"):
             with self.assertRaises(errors.FuchsiaStateError):
@@ -168,7 +166,7 @@ class TracingSL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_terminate(self, parameterized_dict: dict[str, Any]) -> None:
+    def test_terminate(self, parameterized_dict) -> None:
         """Test for Tracing.terminate() method."""
 
         if not parameterized_dict.get("session_initialized"):
@@ -217,9 +215,7 @@ class TracingSL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_terminate_and_download(
-        self, parameterized_dict: dict[str, Any]
-    ) -> None:
+    def test_terminate_and_download(self, parameterized_dict) -> None:
         """Test for Tracing.terminate_and_download() method."""
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -227,10 +223,10 @@ class TracingSL4FTests(unittest.TestCase):
                 with self.assertRaises(errors.FuchsiaStateError):
                     self.tracing_obj.terminate_and_download(directory=tmpdir)
             else:
-                trace_file: str = parameterized_dict.get("trace_file", "")
+                trace_file: str = parameterized_dict.get("trace_file")
                 # Initialize the tracing session.
                 self.tracing_obj.initialize()
-                return_value: str = parameterized_dict.get("return_value", "")
+                return_value: str = parameterized_dict.get("return_value")
                 self.sl4f_obj.run.return_value = return_value
 
                 trace_path: str = self.tracing_obj.terminate_and_download(
@@ -275,19 +271,17 @@ class TracingSL4FTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_trace_session(self, parameterized_dict: dict[str, Any]) -> None:
+    def test_trace_session(self, parameterized_dict) -> None:
         """Test for Tracing.trace_session() method."""
         if parameterized_dict.get("session_initialized"):
             self.tracing_obj.initialize()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            return_value: str = parameterized_dict.get("return_value", "")
+            return_value: str = parameterized_dict.get("return_value")
             self.sl4f_obj.run.return_value = return_value
 
-            trace_file: str = parameterized_dict.get("trace_file", "")
-            download_trace: bool = parameterized_dict.get(
-                "download_trace", False
-            )
+            trace_file: str = parameterized_dict.get("trace_file")
+            download_trace: bool = parameterized_dict.get("download_trace")
             with self.tracing_obj.trace_session(
                 download=download_trace, directory=tmpdir, trace_file=trace_file
             ):

@@ -47,9 +47,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         "suspend_resume",
         autospec=True,
     )
-    def test_idle_suspend_auto_resume(
-        self, mock_suspend_resume: mock.Mock
-    ) -> None:
+    def test_idle_suspend_auto_resume(self, mock_suspend_resume) -> None:
         """Test case for SystemPowerStateController.idle_suspend_auto_resume()"""
 
         self.system_power_state_controller_obj.idle_suspend_auto_resume()
@@ -70,9 +68,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         autospec=True,
     )
     def test_suspend_resume_to_do_idle_suspend_auto_resume(
-        self,
-        mock_run_starnix_console_shell_cmd: mock.Mock,
-        mock_verify_suspend_resume: mock.Mock,
+        self, mock_run_starnix_console_shell_cmd, mock_verify_suspend_resume
     ) -> None:
         """Test case for SystemPowerStateController.suspend_resume()"""
         self.system_power_state_controller_obj.suspend_resume(
@@ -98,7 +94,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         autospec=True,
     )
     def test_verify_suspend_resume_for_idle_suspend_auto_resume(
-        self, mock_run_starnix_console_shell_cmd: mock.Mock
+        self, mock_run_starnix_console_shell_cmd
     ) -> None:
         """Test case for SystemPowerStateController._verify_suspend_resume()
         raising an exception."""
@@ -149,7 +145,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         autospec=True,
     )
     def test_run_starnix_console_shell_cmd(
-        self, mock_openpty: mock.Mock, mock_os_read: mock.Mock
+        self, mock_openpty, mock_os_read
     ) -> None:
         """Test case for SystemPowerStateController._run_starnix_console_shell_cmd()"""
         self.system_power_state_controller_obj._run_starnix_console_shell_cmd(
@@ -169,7 +165,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         autospec=True,
     )
     def test_run_starnix_console_shell_cmd_raises_not_supported_error(
-        self, mock_openpty: mock.Mock, mock_os_read: mock.Mock
+        self, mock_openpty, mock_os_read
     ) -> None:
         """Test case for SystemPowerStateController._run_starnix_console_shell_cmd()
         raising NotSupportedError"""
@@ -191,7 +187,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         autospec=True,
     )
     def test_run_starnix_console_shell_cmd_raises_starnix_error(
-        self, mock_openpty: mock.Mock, mock_os_read: mock.Mock
+        self, mock_openpty, mock_os_read
     ) -> None:
         """Test case for SystemPowerStateController._run_starnix_console_shell_cmd()
         raising StarnixError"""

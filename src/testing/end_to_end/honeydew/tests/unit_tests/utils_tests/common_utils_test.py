@@ -22,9 +22,7 @@ class CommonUtilsTests(unittest.TestCase):
 
     @mock.patch("time.sleep", autospec=True)
     @mock.patch("time.time", side_effect=[0, 1, 2, 3, 4, 5], autospec=True)
-    def test_wait_for_state_fail(
-        self, mock_time: mock.Mock, mock_sleep: mock.Mock
-    ) -> None:
+    def test_wait_for_state_fail(self, mock_time, mock_sleep) -> None:
         """Test case for common.wait_for_state() failure case where state_fn
         never returns the expected state."""
         with self.assertRaises(errors.HoneydewTimeoutError):
@@ -37,9 +35,7 @@ class CommonUtilsTests(unittest.TestCase):
 
     @mock.patch("time.sleep", autospec=True)
     @mock.patch("time.time", side_effect=[0, 1, 2, 3, 4, 5], autospec=True)
-    def test_wait_for_state_fail_2(
-        self, mock_time: mock.Mock, mock_sleep: mock.Mock
-    ) -> None:
+    def test_wait_for_state_fail_2(self, mock_time, mock_sleep) -> None:
         """Test case for common.wait_for_state() failure case where state_fn
         keeps raising exception."""
 
@@ -78,9 +74,7 @@ class CommonUtilsTests(unittest.TestCase):
     @mock.patch(
         "time.time", side_effect=[0, 5, 10, 15, 20, 25, 30, 35], autospec=True
     )
-    def test_retry_fail(
-        self, mock_time: mock.Mock, mock_sleep: mock.Mock
-    ) -> None:
+    def test_retry_fail(self, mock_time, mock_sleep) -> None:
         """Test case for common.retry() failure case where fn never succeeds."""
 
         def _fn() -> None:
