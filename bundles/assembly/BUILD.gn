@@ -1023,20 +1023,12 @@ assembly_input_bundle("core_realm_eng") {
     },
   ]
 
-  # Included with //bundles/tools.
+  # Moved here from //bundles/packages/prod:cmdutils
+  on_demand += [
+    "//src/zircon/bin/time",
+    "//src/zircon/bin/uname",
+  ]
   shell_commands += [
-    {
-      package = "sched"
-      components = [ "sched" ]
-    },
-    {
-      package = "cowsay"
-      components = [ "cowsay" ]
-    },
-    {
-      package = "hwstress-cli"
-      components = [ "hwstress" ]
-    },
     {
       package = "time"
       components = [ "time" ]
@@ -1044,6 +1036,14 @@ assembly_input_bundle("core_realm_eng") {
     {
       package = "uname"
       components = [ "uname" ]
+    },
+  ]
+
+  # Included with //bundles/tools.
+  shell_commands += [
+    {
+      package = "sched"
+      components = [ "sched" ]
     },
     {
       package = "far"
@@ -1205,6 +1205,18 @@ assembly_input_bundle("core_realm_eng") {
     {
       package = "ssh"
       components = [ "ssh" ]
+    },
+  ]
+
+  # Other manually-included shell commands
+  shell_commands += [
+    {
+      package = "cowsay"
+      components = [ "cowsay" ]
+    },
+    {
+      package = "hwstress-cli"
+      components = [ "hwstress" ]
     },
   ]
 

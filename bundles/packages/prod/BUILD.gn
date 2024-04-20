@@ -90,12 +90,7 @@ group("bluetooth_profiles") {
 
 group("cmdutils") {
   testonly = true
-  public_deps = [
-    "//examples/cowsay",
-    "//src/zircon/bin/hwstress",
-    "//src/zircon/bin/time",
-    "//src/zircon/bin/uname",
-  ]
+  public_deps = []
 }
 
 group("cobalt_client") {
