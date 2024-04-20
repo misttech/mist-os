@@ -15,7 +15,6 @@ from honeydew.interfaces.device_classes import fuchsia_device
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-# TODO(b/328778702): Run this test in infra once test groups are updated per <PRODUCT>.<BOARD>
 class SystemPowerStateControllerAffordanceTests(
     fuchsia_base_test.FuchsiaBaseTest
 ):
@@ -33,10 +32,6 @@ class SystemPowerStateControllerAffordanceTests(
         else:
             with asserts.assert_raises(errors.NotSupportedError):
                 self.device.system_power_state_controller.idle_suspend_auto_resume()
-
-        # TODO (b/330594505): Add checks either here or in affordance
-        # implementation to make sure device is indeed suspend-resumed by doing
-        # `ffx log` parsing
 
 
 if __name__ == "__main__":

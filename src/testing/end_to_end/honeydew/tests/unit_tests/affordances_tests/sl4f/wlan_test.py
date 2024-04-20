@@ -4,7 +4,6 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.affordances.sl4f.wlan.py."""
 
-import logging
 import unittest
 from unittest import mock
 

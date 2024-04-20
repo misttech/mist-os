@@ -8,7 +8,10 @@ if (is_host) {
   python_host_test("system_power_state_controller_starnix_test") {
     enable_mypy = true
     main_source = "system_power_state_controller_test.py"
-    libraries = [ "//src/testing/end_to_end/honeydew" ]
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/parameterized",
+    ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
