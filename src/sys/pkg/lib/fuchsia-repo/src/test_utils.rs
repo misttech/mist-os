@@ -319,6 +319,10 @@ pub async fn make_repo_dir(metadata_dir: &Path, blobs_dir: &Path) {
                 meta_far_merkle = Some(merkle.clone());
             }
 
+            let mut src = std::fs::File::open(&blob.source_path).unwrap();
+            let mut dst = std::fs::File::create(blobs_dir.join(&merkle)).unwrap();
+            std::io::copy(&mut src, &mut dst).unwrap();
+
             let blob_type = delivery_blob::DeliveryBlobType::Type1;
             crate::repository::file_system::generate_delivery_blob(
                 blob.source_path.as_str().into(),

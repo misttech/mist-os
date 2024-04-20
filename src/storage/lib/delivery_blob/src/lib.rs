@@ -26,7 +26,6 @@ use {
         compression::{ChunkedArchive, ChunkedDecompressor},
         format::SerializedType1Blob,
     },
-    serde::{Deserialize, Serialize},
     static_assertions::assert_eq_size,
     thiserror::Error,
     zerocopy::{AsBytes, Ref},
@@ -74,32 +73,6 @@ pub fn decompressed_size(delivery_blob: &[u8]) -> Result<u64, DecompressError> {
     }
 }
 
-/// Returns the decompressed size of the delivery blob from `reader`.
-pub fn decompressed_size_from_reader(
-    mut reader: impl std::io::Read,
-) -> Result<u64, DecompressError> {
-    let mut buf = vec![];
-    loop {
-        let already_read = buf.len();
-        let new_size = already_read + 4096;
-        buf.resize(new_size, 0);
-        let new_size = already_read + reader.read(&mut buf[already_read..new_size])?;
-        if new_size == already_read {
-            return Err(DecompressError::NeedMoreData);
-        }
-        buf.truncate(new_size);
-        match decompressed_size(&buf) {
-            Ok(size) => {
-                return Ok(size);
-            }
-            Err(DecompressError::NeedMoreData) => {}
-            Err(e) => {
-                return Err(e);
-            }
-        }
-    }
-}
-
 /// Decompress a delivery blob in `delivery_blob`, delivery blob type is auto detected.
 pub fn decompress(delivery_blob: &[u8]) -> Result<Vec<u8>, DecompressError> {
     let header = DeliveryBlobHeader::parse(delivery_blob)?.ok_or(DecompressError::NeedMoreData)?;
@@ -136,9 +109,6 @@ pub enum DecompressError {
 
     #[error("Need more data")]
     NeedMoreData,
-
-    #[error("io error")]
-    IoError(#[from] std::io::Error),
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -180,7 +150,7 @@ impl DeliveryBlobHeader {
 ///
 /// **WARNING**: These constants are used when generating delivery blobs and should not be changed.
 /// Non backwards-compatible changes to delivery blob formats should be made by creating a new type.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u32)]
 pub enum DeliveryBlobType {
     /// Reserved for internal use.
@@ -388,16 +358,5 @@ mod tests {
         assert!(header.is_compressed);
         assert!(header.payload_length < data.len());
         assert_eq!(Type1Blob::decompress(&delivery_blob).unwrap(), data);
-    }
-
-    #[test]
-    fn get_decompressed_size() {
-        let data: Vec<u8> = {
-            let range = rand::distributions::Uniform::<u8>::new_inclusive(0, 255);
-            rand::thread_rng().sample_iter(&range).take(DATA_LEN).collect()
-        };
-        let delivery_blob = Type1Blob::generate(&data, CompressionMode::Always);
-        assert_eq!(decompressed_size(&delivery_blob).unwrap(), DATA_LEN as u64);
-        assert_eq!(decompressed_size_from_reader(&delivery_blob[..]).unwrap(), DATA_LEN as u64);
     }
 }

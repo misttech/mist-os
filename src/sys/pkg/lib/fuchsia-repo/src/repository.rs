@@ -131,14 +131,6 @@ pub trait RepoStorage: TufRepositoryStorage<Pouf1> + Send + Sync {
         len: u64,
         path: &Utf8Path,
     ) -> BoxFuture<'a, Result<()>>;
-
-    /// Store a delivery blob in this repository.
-    fn store_delivery_blob<'a>(
-        &'a self,
-        hash: &Hash,
-        path: &Utf8Path,
-        delivery_blob_type: DeliveryBlobType,
-    ) -> BoxFuture<'a, Result<()>>;
 }
 
 pub trait RepoStorageProvider: RepoStorage + RepoProvider {}
@@ -212,15 +204,6 @@ macro_rules! impl_storage {
         impl <$($desc)+ {
             fn store_blob<'a>(&'a self, hash: &Hash, len: u64, path: &Utf8Path) -> BoxFuture<'a, Result<()>> {
                 (**self).store_blob(hash, len, path)
-            }
-
-            fn store_delivery_blob<'a>(
-                &'a self,
-                hash: &Hash,
-                path: &Utf8Path,
-                delivery_blob_type: DeliveryBlobType,
-            ) -> BoxFuture<'a, Result<()>> {
-                (**self).store_delivery_blob(hash, path, delivery_blob_type)
             }
         }
     };
