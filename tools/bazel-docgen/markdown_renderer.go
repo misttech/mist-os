@@ -17,19 +17,19 @@ func NewMarkdownRenderer() MarkdownRenderer {
 	return MarkdownRenderer{}
 }
 
-func (r *MarkdownRenderer) RenderRuleInfo(rule *pb.RuleInfo, out io.Writer) error {
+func (r MarkdownRenderer) RenderRuleInfo(rule *pb.RuleInfo, out io.Writer) error {
 	return render(rule, out, tmpls.NewRuleTemplate)
 }
 
-func (r *MarkdownRenderer) RenderProviderInfo(rule *pb.ProviderInfo, out io.Writer) error {
+func (r MarkdownRenderer) RenderProviderInfo(rule *pb.ProviderInfo, out io.Writer) error {
 	return render(rule, out, tmpls.NewProviderTemplate)
 }
 
-func (r *MarkdownRenderer) RenderStarlarkFunctionInfo(rule *pb.StarlarkFunctionInfo, out io.Writer) error {
+func (r MarkdownRenderer) RenderStarlarkFunctionInfo(rule *pb.StarlarkFunctionInfo, out io.Writer) error {
 	return render(rule, out, tmpls.NewStarlarkFunctionTemplate)
 }
 
-func (r *MarkdownRenderer) RenderRepositoryRuleInfo(rule *pb.RepositoryRuleInfo, out io.Writer) error {
+func (r MarkdownRenderer) RenderRepositoryRuleInfo(rule *pb.RepositoryRuleInfo, out io.Writer) error {
 	return render(rule, out, tmpls.NewRepositoryRuleTemplate)
 }
 

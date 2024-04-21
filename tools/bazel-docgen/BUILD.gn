@@ -29,6 +29,7 @@ if (is_host) {
   go_library("bazel_docgen_lib") {
     sources = [
       "doc_generator.go",
+      "file_provider.go",
       "markdown_renderer.go",
       "markdown_renderer_test.go",
       "renderer.go",

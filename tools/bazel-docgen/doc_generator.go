@@ -5,20 +5,9 @@
 package bazel_docgen
 
 import (
-	"io"
-
 	pb "go.fuchsia.dev/fuchsia/tools/bazel-docgen/third_party/stardoc"
 	"gopkg.in/yaml.v2"
 )
-
-type DocGenerator struct {
-}
-
-type MakeWriterFn func(name string) io.Writer
-
-func NewDocGenerator() DocGenerator {
-	return DocGenerator{}
-}
 
 type tocEntry struct {
 	Title    string     `yaml:",omitempty"`
@@ -27,13 +16,14 @@ type tocEntry struct {
 	Sections []tocEntry `yaml:"section,omitempty"`
 }
 
-func (dc DocGenerator) RenderModuleInfo(moduleInfo pb.ModuleInfo, renderer Renderer, writerFn MakeWriterFn) error {
+func RenderModuleInfo(moduleInfo pb.ModuleInfo, renderer Renderer, fileProvider FileProvider) {
+	fileProvider.Open()
 
 	// Render all of our rules
 	var ruleEntries []tocEntry
 	for _, rule := range moduleInfo.GetRuleInfo() {
 		file_name := "rule_" + rule.RuleName + ".md"
-		if err := renderer.RenderRuleInfo(rule, writerFn(file_name)); err != nil {
+		if err := renderer.RenderRuleInfo(rule, fileProvider.NewFile(file_name)); err != nil {
 			panic(err)
 		}
 		ruleEntries = append(ruleEntries, tocEntry{
@@ -46,7 +36,7 @@ func (dc DocGenerator) RenderModuleInfo(moduleInfo pb.ModuleInfo, renderer Rende
 	var providerEntries []tocEntry
 	for _, provider := range moduleInfo.GetProviderInfo() {
 		file_name := "provider_" + provider.ProviderName + ".md"
-		if err := renderer.RenderProviderInfo(provider, writerFn(file_name)); err != nil {
+		if err := renderer.RenderProviderInfo(provider, fileProvider.NewFile(file_name)); err != nil {
 			panic(err)
 		}
 		providerEntries = append(providerEntries, tocEntry{
@@ -59,7 +49,7 @@ func (dc DocGenerator) RenderModuleInfo(moduleInfo pb.ModuleInfo, renderer Rende
 	var starlarkFunctionEntries []tocEntry
 	for _, funcInfo := range moduleInfo.GetFuncInfo() {
 		file_name := "func_" + funcInfo.FunctionName + ".md"
-		if err := renderer.RenderStarlarkFunctionInfo(funcInfo, writerFn(file_name)); err != nil {
+		if err := renderer.RenderStarlarkFunctionInfo(funcInfo, fileProvider.NewFile(file_name)); err != nil {
 			panic(err)
 		}
 		starlarkFunctionEntries = append(starlarkFunctionEntries, tocEntry{
@@ -72,7 +62,7 @@ func (dc DocGenerator) RenderModuleInfo(moduleInfo pb.ModuleInfo, renderer Rende
 	var repoRuleEntries []tocEntry
 	for _, repo_rule := range moduleInfo.GetRepositoryRuleInfo() {
 		file_name := "repo_rule_" + repo_rule.RuleName + ".md"
-		if err := renderer.RenderRepositoryRuleInfo(repo_rule, writerFn(file_name)); err != nil {
+		if err := renderer.RenderRepositoryRuleInfo(repo_rule, fileProvider.NewFile(file_name)); err != nil {
 			panic(err)
 		}
 		repoRuleEntries = append(repoRuleEntries, tocEntry{
@@ -82,7 +72,7 @@ func (dc DocGenerator) RenderModuleInfo(moduleInfo pb.ModuleInfo, renderer Rende
 	}
 
 	// Render our README.md
-	readmeWriter := writerFn("README.md")
+	readmeWriter := fileProvider.NewFile("README.md")
 	readmeWriter.Write([]byte(""))
 
 	toc := []tocEntry{
@@ -116,9 +106,9 @@ func (dc DocGenerator) RenderModuleInfo(moduleInfo pb.ModuleInfo, renderer Rende
 	}
 	// Make our table of contents
 	if yamlData, err := yaml.Marshal(&map[string]interface{}{"toc": toc}); err == nil {
-		tocWriter := writerFn("_toc.yaml")
+		tocWriter := fileProvider.NewFile("_toc.yaml")
 		tocWriter.Write(yamlData)
 	}
 
-	return nil
+	fileProvider.Close()
 }
