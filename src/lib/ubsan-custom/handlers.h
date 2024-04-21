@@ -4,13 +4,13 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_LIB_INSTRUMENTATION_UBSAN_UBSAN_HANDLERS_H_
-#define ZIRCON_KERNEL_LIB_INSTRUMENTATION_UBSAN_UBSAN_HANDLERS_H_
+#ifndef SRC_LIB_UBSAN_CUSTOM_HANDLERS_H_
+#define SRC_LIB_UBSAN_CUSTOM_HANDLERS_H_
 
 #include <stdint.h>
 
-#include "ubsan-report.h"
-#include "ubsan-types.h"
+#include "report.h"
+#include "types.h"
 
 // This implements a minimal ubsan runtime.  This header should be included by
 // one and only one translation unit (source file).  The including code must
@@ -186,4 +186,4 @@ UBSAN_HANDLER __ubsan_handle_alignment_assumption(AlignmentAssumptionData* Data,
 }  // extern "C"
 }  // namespace ubsan
 
-#endif  // ZIRCON_KERNEL_LIB_INSTRUMENTATION_UBSAN_UBSAN_HANDLERS_H_
+#endif  // SRC_LIB_UBSAN_CUSTOM_HANDLERS_H_

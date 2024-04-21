@@ -4,12 +4,12 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_LIB_INSTRUMENTATION_UBSAN_UBSAN_REPORT_H_
-#define ZIRCON_KERNEL_LIB_INSTRUMENTATION_UBSAN_UBSAN_REPORT_H_
+#ifndef SRC_LIB_UBSAN_CUSTOM_REPORT_H_
+#define SRC_LIB_UBSAN_CUSTOM_REPORT_H_
 
 #include <stdarg.h>
 
-#include "ubsan-types.h"
+#include "types.h"
 
 // This file declares the interfaces that must be supplied by the embedder.
 // The ubsan-handlers.h implementations use these things to report specific
@@ -75,4 +75,4 @@ inline void VPrintf(const char* fmt, va_list args);
 
 }  // namespace ubsan
 
-#endif  // ZIRCON_KERNEL_LIB_INSTRUMENTATION_UBSAN_UBSAN_REPORT_H_
+#endif  // SRC_LIB_UBSAN_CUSTOM_REPORT_H_

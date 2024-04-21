@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_LIB_INSTRUMENTATION_UBSAN_UBSAN_TYPES_H_
-#define ZIRCON_KERNEL_LIB_INSTRUMENTATION_UBSAN_UBSAN_TYPES_H_
+#ifndef SRC_LIB_UBSAN_CUSTOM_TYPES_H_
+#define SRC_LIB_UBSAN_CUSTOM_TYPES_H_
 
 #include <stdint.h>
 
@@ -183,4 +183,4 @@ struct PointerOverflowData {
 
 }  // namespace ubsan
 
-#endif  // ZIRCON_KERNEL_LIB_INSTRUMENTATION_UBSAN_UBSAN_TYPES_H_
+#endif  // SRC_LIB_UBSAN_CUSTOM_TYPES_H_

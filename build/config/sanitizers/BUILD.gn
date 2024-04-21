@@ -194,13 +194,7 @@ variant("lsan") {
 variant("ubsan") {
   common_flags = []
   if (toolchain_environment == "kernel") {
-    configs = [
-      # Zircon uses kernel-specific ubsan flags.
-      "//zircon/kernel/lib/instrumentation/ubsan",
-
-      # The ubsan variant adds rtti, but that is not used by the kernel variant.
-      "//build/config:no_rtti",
-    ]
+    configs = [ "//src/lib/ubsan-custom:ubsan" ]
   } else {
     common_flags = [ "-fsanitize=undefined" ]
   }

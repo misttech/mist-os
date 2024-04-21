@@ -10,3 +10,10 @@ This may be upstreamed into LLVM in the future, removing the need
 for this separate header library.
 
 [ubsan]: https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
+
+## Embedder API
+
+The `<lib/ubsan-custom/ubsan-report.h>` header file describes the few functions
+that the embedder must define.  These have to take care of printing messages
+via a `printf`-style API; and whatever it should look to prepare for a problem
+report or panic before printing details and to panic afterwards.

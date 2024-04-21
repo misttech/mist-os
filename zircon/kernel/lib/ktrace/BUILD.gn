@@ -41,6 +41,7 @@ config("suppress-warning.config") {
     "//sdk/lib/zbi-format/*",
     "//src/lib/elfldltl/*",
     "//src/lib/llvm-profdata/*",
+    "//src/lib/ubsan-custom/*",
     "//src/lib/zbitl/*",
     "//src/performance/lib/fxt/*",
     "//third_party/zstd/*",
