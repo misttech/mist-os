@@ -5,99 +5,9 @@
 # WARNING: This file was machine-generated from previous json files and
 # will eventually be deleted.
 
-group("all") {
-  # The buildbot groups are not allowed to add platform features, only tests and
-  # tools.
-  assert_no_deps = [ "//bundles/platform/*" ]
-
-  testonly = true
-  public_deps = [
-    ":bluetooth_a2dp",
-    ":bluetooth_all",
-    ":bluetooth_avrcp",
-    ":bluetooth_core",
-    ":bluetooth_hci",
-    ":bluetooth_intel",
-    ":bluetooth_profiles",
-    ":cmdutils",
-    ":cobalt_client",
-    ":cpuperf",
-    ":debug_agent",
-    ":far",
-    ":telephony",
-    ":terminal",
-    ":tiles",
-    ":tracing",
-    "//src/connectivity/network/mdns/bundles:services",
-    "//src/connectivity/network/mdns/bundles:utils",
-    "//src/connectivity/telephony/drivers",
-    "//src/connectivity/wlan:packages",
-    "//src/connectivity/wlan:tools",
-    "//src/fonts",
-    "//src/power:battery",
-    "//src/zircon/bin/hwstress",
-  ]
-}
-
-group("bluetooth_a2dp") {
-  testonly = true
-  public_deps = [ "//src/connectivity/bluetooth/profiles/bt-a2dp" ]
-}
-
-group("bluetooth_all") {
-  testonly = true
-  public_deps = [
-    ":bluetooth_hci",
-    ":bluetooth_intel",
-    ":bluetooth_profiles",
-  ]
-}
-
-group("bluetooth_avrcp") {
-  testonly = true
-  public_deps = [ "//src/connectivity/bluetooth/profiles/bt-avrcp" ]
-}
-
-group("bluetooth_hci") {
-  testonly = true
-  public_deps = [ "//src/connectivity/bluetooth/hci/passthrough" ]
-}
-
-group("bluetooth_intel") {
-  testonly = true
-  public_deps = [
-    ":bluetooth_hci",
-    "//src/connectivity/bluetooth/hci/vendor/intel",
-  ]
-}
-
-group("bluetooth_profiles") {
-  testonly = true
-  public_deps = [
-    ":bluetooth_a2dp",
-    ":bluetooth_avrcp",
-  ]
-}
-
 group("cmdutils") {
   testonly = true
   public_deps = []
-}
-
-group("cobalt_client") {
-  testonly = true
-  public_deps = [
-    "//src/cobalt/bin/app:cobalt",
-    "//src/cobalt/bin/system-metrics:cobalt_system_metrics",
-  ]
-}
-
-group("cpuperf") {
-  testonly = true
-  public_deps = [
-    "//src/performance/cpuperf",
-    "//src/performance/cpuperf/print:host_cpuperf_print",
-  ]
 }
 
 group("debug_agent") {
@@ -111,19 +21,6 @@ group("far") {
     "//src/sys/pkg/bin/far",
     "//src/sys/pkg/bin/far:host",
   ]
-}
-
-group("telephony") {
-  testonly = true
-  public_deps = [
-    "//src/connectivity/telephony/drivers/qmi-fake-transport:fake_qmi_driver",
-    "//src/connectivity/telephony/drivers/qmi-usb-transport",
-  ]
-}
-
-group("terminal") {
-  testonly = true
-  public_deps = [ "//src/ui/bin/terminal" ]
 }
 
 group("tiles") {
@@ -140,23 +37,7 @@ group("tracing") {
   ]
 }
 
-group("wlan_fullmac_core_drivers") {
-  public_deps = [
-    "//src/connectivity/wlan/drivers/wlanif",
-    "//src/connectivity/wlan/drivers/wlanphy:wlanphy",
-  ]
-}
-
-group("wlan_softmac_core_drivers") {
-  public_deps = [
-    "//src/connectivity/wlan/drivers/wlanphy:wlanphy",
-    "//src/connectivity/wlan/drivers/wlansoftmac",
-  ]
-}
-
-group("wifi_intel") {
-  public_deps = [
-    ":wlan_softmac_core_drivers",
-    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi",
-  ]
+group("bluetooth_a2dp") {
+  testonly = true
+  public_deps = [ "//src/connectivity/bluetooth/profiles/bt-a2dp" ]
 }
