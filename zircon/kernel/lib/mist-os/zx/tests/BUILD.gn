@@ -1,0 +1,15 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+source_set("tests") {
+  sources = [
+    "object-test.cc",
+    "zx-test.cc",
+  ]
+  deps = [
+    "//zircon/kernel/lib/mist-os/zx",
+    "//zircon/kernel/object",
+    "//zircon/system/ulib/zxtest:zxtest-mistos",
+  ]
+}
