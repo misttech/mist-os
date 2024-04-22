@@ -9,7 +9,7 @@ use {
         volume::FxVolume,
     },
     anyhow::Error,
-    arrayref::array_refs,
+    arrayref::{array_refs, mut_array_refs},
     event_listener::EventListener,
     fuchsia_async as fasync,
     fuchsia_hash::Hash,
@@ -33,6 +33,7 @@ use {
     },
 };
 
+const FILE_OPEN_MARKER: u64 = u64::MAX;
 const REPLAY_THREADS: usize = 2;
 // The number of messages to buffer before sending to record. They are chunked up to reduce the
 // number of allocations in the serving threads.
@@ -46,7 +47,7 @@ pub struct Recorder {
     buffer: Vec<Message>,
 }
 
-#[derive(Eq, std::hash::Hash, PartialEq)]
+#[derive(Debug, Eq, std::hash::Hash, PartialEq)]
 struct Message {
     hash: Hash,
     // Don't bother with offset+length. The kernel is going split up and align it one way and then
@@ -55,10 +56,10 @@ struct Message {
 }
 
 impl Message {
-    fn encode_to(&self, dest: &mut [u8]) {
-        dest[..size_of::<Hash>()].clone_from_slice(self.hash.as_bytes());
-        dest[size_of::<Hash>()..size_of::<Message>()]
-            .clone_from_slice(self.offset.to_le_bytes().as_ref());
+    fn encode_to(&self, dest: &mut [u8; size_of::<Message>()]) {
+        let (first, second) = mut_array_refs![dest, size_of::<Hash>(), size_of::<u64>()];
+        *first = self.hash.into();
+        *second = self.offset.to_le_bytes();
     }
 
     fn decode_from(src: &[u8; size_of::<Message>()]) -> Self {
@@ -84,18 +85,26 @@ impl Recorder {
         }
         Ok(())
     }
-}
 
-impl Drop for Recorder {
-    fn drop(&mut self) {
-        // Recorder should be dropped to flush entries first, if the channel is closed then we've
-        // already shut down the receiver.
+    /// Record file opens to gather what files were actually used during the recording.
+    pub fn record_open(&mut self, hash: &Hash) -> Result<(), Error> {
+        self.record(hash, FILE_OPEN_MARKER)
+    }
+
+    fn flush(&mut self) {
+        // If the channel is closed then we've already shut down the receiver.
         debug_assert!(!self.sender.is_closed());
         // Best effort sending what messages have already been queued.
         if self.buffer.len() > 0 {
             let buffer = std::mem::take(&mut self.buffer);
             let _ = self.sender.try_send(buffer);
         }
+    }
+}
+
+impl Drop for Recorder {
+    fn drop(&mut self) {
+        self.flush();
     }
 }
 
@@ -141,7 +150,6 @@ impl ProfileState {
         self.stop_profiler();
         let finished_event = DropEvent::new();
         let (sender, receiver) = async_channel::unbounded::<Vec<Message>>();
-        let sender_clone = sender.clone();
         let stopped_listener = (*finished_event).listen();
         fasync::Task::spawn(async move {
             // DropEvent should fire when this task is done.
@@ -156,7 +164,16 @@ impl ProfileState {
             let block_size = handle.block_size() as usize;
             let mut offset = 0;
             let mut io_buf = handle.allocate_buffer(block_size).await;
-            for (message, _) in recording {
+            for (message, _) in &recording {
+                // If this is a file opening marker or a file opening was never recorded, drop the
+                // message.
+                if message.offset == FILE_OPEN_MARKER
+                    || !recording
+                        .contains_key(&Message { hash: message.hash, offset: FILE_OPEN_MARKER })
+                {
+                    continue;
+                }
+
                 let mut next_offset = offset + size_of::<Message>();
                 // The buffer is full.
                 if next_offset >= block_size {
@@ -170,7 +187,9 @@ impl ProfileState {
                     offset = 0;
                     next_offset = size_of::<Message>();
                 }
-                message.encode_to(&mut io_buf.as_mut_slice()[offset..]);
+                message.encode_to(
+                    (&mut io_buf.as_mut_slice()[offset..next_offset]).try_into().unwrap(),
+                );
                 offset = next_offset;
             }
             if offset > 0 {
@@ -183,9 +202,12 @@ impl ProfileState {
         })
         .detach();
 
-        self.0 = State::Recording(RecordingState { stopped_listener, sender_clone });
-
-        Recorder { sender, buffer: Vec::with_capacity(MESSAGE_CHUNK_SIZE) }
+        let recorder = Recorder { sender, buffer: Vec::with_capacity(MESSAGE_CHUNK_SIZE) };
+        self.0 = State::Recording(RecordingState {
+            stopped_listener,
+            sender_clone: recorder.sender.clone(),
+        });
+        recorder
     }
 
     /// Stop in-flight recording and replaying. This method will block until the resources have been
@@ -456,7 +478,17 @@ mod tests {
     }
 
     #[fuchsia::test(threads = 10)]
+    async fn test_encode_decode() {
+        let mut buf = [0u8; size_of::<Message>()];
+        let m = Message { hash: [88u8; 32].into(), offset: 77 };
+        m.encode_to(&mut buf);
+        let m2 = Message::decode_from(&buf);
+        assert_eq!(m, m2);
+    }
+
+    #[fuchsia::test(threads = 10)]
     async fn test_recording_basic() {
+        let myhash = Hash::from_array([88u8; size_of::<Hash>()]);
         let mut state = ProfileState::new();
 
         let handle = FakeReaderWriter::new();
@@ -465,10 +497,28 @@ mod tests {
         {
             // Drop recorder when finished writing to flush data.
             let mut recorder = state.record_new(handle);
-            recorder.record(&Hash::from_array([88u8; size_of::<Hash>()]), 0).unwrap();
+            recorder.record(&myhash, 0).unwrap();
+            recorder.record_open(&myhash).unwrap();
         }
         state.stop_profiler();
         assert_eq!(inner.lock().unwrap().data.len(), BLOCK_SIZE);
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_recording_filtered_without_open() {
+        let myhash = Hash::from_array([88u8; size_of::<Hash>()]);
+        let mut state = ProfileState::new();
+
+        let handle = FakeReaderWriter::new();
+        let inner = handle.inner.clone();
+        assert_eq!(inner.lock().unwrap().data.len(), 0);
+        {
+            // Drop recorder when finished writing to flush data.
+            let mut recorder = state.record_new(handle);
+            recorder.record(&myhash, 0).unwrap();
+        }
+        state.stop_profiler();
+        assert_eq!(inner.lock().unwrap().data.len(), 0);
     }
 
     #[fuchsia::test(threads = 10)]
@@ -486,6 +536,7 @@ mod tests {
             hash = fixture.write_blob(&[88u8], CompressionMode::Never).await;
             // Drop recorder when finished writing to flush data.
             let mut recorder = state.record_new(handle);
+            recorder.record_open(&hash).unwrap();
             for i in 0..message_count {
                 recorder.record(&hash, 4096 * i as u64).unwrap();
             }
@@ -537,6 +588,7 @@ mod tests {
             for i in 0..message_count {
                 let hash =
                     fixture.write_blob(i.to_le_bytes().as_slice(), CompressionMode::Never).await;
+                recorder.record_open(&hash).unwrap();
                 hashes.push(hash);
                 recorder.record(&hash, 0).unwrap();
             }
@@ -596,6 +648,7 @@ mod tests {
         {
             let hash = fixture.write_blob(&[0, 1, 2, 3], CompressionMode::Never).await;
             let mut recorder = state.record_new(recording_handle);
+            recorder.record_open(&hash).unwrap();
             assert_eq!(BLOCK_SIZE as u64, fixture.fs().block_size());
             let message_count = (fixture.fs().block_size() as usize / size_of::<Message>()) * 2 + 1;
             for _ in 0..message_count {

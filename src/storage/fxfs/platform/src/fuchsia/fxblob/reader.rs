@@ -18,6 +18,12 @@ impl BlobDirectory {
     /// cannot be purged until all VMOs returned by this function are destroyed.
     pub async fn get_blob_vmo(self: &Arc<Self>, hash: Hash) -> Result<zx::Vmo, Error> {
         let blob = self.open_blob(&hash.into()).await?.ok_or(FxfsError::NotFound)?;
+        {
+            let mut guard = self.volume().pager().recorder();
+            if let Some(recorder) = &mut (*guard) {
+                let _ = recorder.record_open(&hash);
+            }
+        }
         let vmo = blob.create_child_vmo()?;
         Ok(vmo)
     }
