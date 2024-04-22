@@ -1,0 +1,16 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+image: atlassian/default-image:3
+
+pipelines:
+  default:
+    - step:
+        name: "Build It"
+        script:
+          - apt-get update && apt-get install -y rsync
+          - curl -s "https://fuchsia.googlesource.com/jiri/+/HEAD/scripts/bootstrap_jiri?format=TEXT" | base64 --decode | bash -s .
+          - export PATH=$PWD/.jiri_root/bin:$PATH
+          - jiri update -v -vv
+          - make it
