@@ -62,7 +62,13 @@ impl From<VerifyRouteResult> for ResultBySeverity {
                     )
                     | AnalyzerModelError::RoutingError(
                         RoutingError::UseFromChildInstanceNotFound { .. },
-                    ) => WarningResult {
+                    )
+                    | AnalyzerModelError::RoutingError(RoutingError::DictionariesNotSupported {
+                        // TODO(https://fxbug.dev/314347639): support bedrock in
+                        // scrutiny and remove this dictionaries error
+                        // suppression.
+                        ..
+                    }) => WarningResult {
                         using_node: verify_route_result.using_node,
                         capability: verify_route_result.capability,
                         warning: CapabilityRouteError::AnalyzerModelError(error).into(),

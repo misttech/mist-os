@@ -73,5 +73,12 @@
             to: "#session-manager",
             source_availability: "unknown",
         },
+        {
+            from: "#smart-trusted-apps",
+            as: "smart-trusted-apps",
+            to: "#session-manager",
+            dictionary: "trusted-app-capabilities",
+            source_availability: "unknown",
+        },
     ],
 }
