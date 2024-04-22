@@ -30,9 +30,10 @@ use crate::{
     inspect::{Inspectable, InspectableValue, Inspector},
     ip::{
         device::{
-            route_discovery::Ipv6RouteDiscoveryState, router_solicitation::RsState,
-            slaac::SlaacConfiguration, IpAddressId, IpDeviceAddr, IpDeviceTimerId, Ipv6DeviceAddr,
-            Ipv6DeviceTimerId,
+            route_discovery::Ipv6RouteDiscoveryState,
+            router_solicitation::RsState,
+            slaac::{SlaacConfiguration, SlaacState},
+            IpAddressId, IpDeviceAddr, IpDeviceTimerId, Ipv6DeviceAddr, Ipv6DeviceTimerId,
         },
         gmp::{igmp::IgmpGroupState, mld::MldGroupState, MulticastGroupSet},
         types::{IpTypesIpExt, RawMetric},
@@ -208,6 +209,18 @@ impl<BT: IpDeviceStateBindingsTypes> LockFor<crate::lock_ordering::IpDeviceFlags
             Self: 'l;
     fn lock(&self) -> Self::Guard<'_> {
         self.ipv4.ip_state.flags.lock()
+    }
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockFor<crate::lock_ordering::Ipv6DeviceSlaac>
+    for DualStackIpDeviceState<BT>
+{
+    type Data = SlaacState<BT>;
+    type Guard<'l> = crate::sync::LockGuard<'l, SlaacState<BT>>
+        where
+            Self: 'l;
+    fn lock(&self) -> Self::Guard<'_> {
+        self.ipv6.slaac_state.lock()
     }
 }
 
@@ -666,6 +679,7 @@ pub struct Ipv6DeviceState<BT: IpDeviceStateBindingsTypes> {
     pub(super) router_solicitations: Mutex<RsState<BT>>,
     pub(crate) ip_state: IpDeviceState<Ipv6, BT>,
     pub(crate) config: RwLock<Ipv6DeviceConfiguration>,
+    pub(crate) slaac_state: Mutex<SlaacState<BT>>,
 }
 
 impl<BC: IpDeviceStateBindingsTypes + TimerContext2> Ipv6DeviceState<BC> {
@@ -681,10 +695,14 @@ impl<BC: IpDeviceStateBindingsTypes + TimerContext2> Ipv6DeviceState<BC> {
             >(bindings_ctx, device_id.clone())),
             router_solicitations: Mutex::new(RsState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(
                 bindings_ctx,
-                device_id,
+                device_id.clone(),
             )),
             ip_state: Default::default(),
             config: Default::default(),
+            slaac_state: Mutex::new(SlaacState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(
+                bindings_ctx,
+                device_id,
+            )),
         }
     }
 }

@@ -50,7 +50,7 @@ use crate::{
             router_solicitation::{RsContext, RsHandler, RsState},
             slaac::{
                 SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig,
-                SlaacContext, SlaacCounters,
+                SlaacContext, SlaacCounters, SlaacState,
             },
             state::{
                 DualStackIpDeviceState, IpDeviceConfiguration, IpDeviceFlags,
@@ -76,11 +76,11 @@ use crate::{
 
 use super::state::Ipv6NetworkLearnedParameters;
 
-pub(crate) struct SlaacAddrs<'a, BC: BindingsContext> {
+pub struct SlaacAddrs<'a, BC: BindingsContext> {
     pub(crate) core_ctx: CoreCtxWithIpDeviceConfiguration<
         'a,
         &'a Ipv6DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        crate::lock_ordering::Ipv6DeviceSlaac,
         BC,
     >,
     pub(crate) device_id: DeviceId<BC>,
@@ -92,7 +92,7 @@ pub(crate) struct SlaacAddrs<'a, BC: BindingsContext> {
 /// Note that we use concrete types here instead of going through traits because
 /// it's the only way to satisfy the GAT bounds on `SlaacAddresses`' associated
 /// type.
-pub(crate) struct SlaacAddrsIter<'x, BC: BindingsContext> {
+pub struct SlaacAddrsIter<'x, BC: BindingsContext> {
     core_ctx: CoreCtx<'x, BC, crate::lock_ordering::IpDeviceAddresses<Ipv6>>,
     addrs: ip::device::state::AddressIdIter<'x, BC::Instant, Ipv6>,
     device_id: &'x DeviceId<BC>,
@@ -188,7 +188,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
     ) -> Result<O, ExistsError> {
         let SlaacAddrs { core_ctx, device_id, config } = self;
 
-        add_ip_addr_subnet_with_config(
+        add_ip_addr_subnet_with_config::<Ipv6, _, _>(
             core_ctx,
             bindings_ctx,
             device_id,
@@ -224,7 +224,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
     ) -> Result<(AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, SlaacConfig<BC::Instant>), NotFoundError>
     {
         let SlaacAddrs { core_ctx, device_id, config } = self;
-        del_ip_addr_inner(
+        del_ip_addr_inner::<Ipv6, _, _>(
             core_ctx,
             bindings_ctx,
             device_id,
@@ -700,7 +700,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
 
     fn with_slaac_addrs_mut_and_configs<
         O,
-        F: FnOnce(SlaacAddrsMutAndConfig<'_, BC, Self::SlaacAddrs<'_>>) -> O,
+        F: FnOnce(SlaacAddrsMutAndConfig<'_, BC, Self::SlaacAddrs<'_>>, &mut SlaacState<BC>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -728,18 +728,31 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
             ip_config: _,
         } = *config;
 
-        let core_ctx = CoreCtxWithIpDeviceConfiguration { config, core_ctx: core_ctx.as_owned() };
+        crate::device::integration::with_ip_device_state_and_core_ctx(
+            core_ctx,
+            device_id,
+            |mut core_ctx_and_resource| {
+                let (mut state, mut locked) =
+                    core_ctx_and_resource
+                        .lock_with_and::<crate::lock_ordering::Ipv6DeviceSlaac, _>(|x| x.right());
+                let core_ctx =
+                    CoreCtxWithIpDeviceConfiguration { config, core_ctx: locked.cast_core_ctx() };
 
-        let mut addrs = SlaacAddrs { core_ctx, device_id: device_id.clone(), config };
+                let mut addrs = SlaacAddrs { core_ctx, device_id: device_id.clone(), config };
 
-        cb(SlaacAddrsMutAndConfig {
-            addrs: &mut addrs,
-            config: slaac_config,
-            dad_transmits,
-            retrans_timer,
-            interface_identifier,
-            _marker: PhantomData,
-        })
+                cb(
+                    SlaacAddrsMutAndConfig {
+                        addrs: &mut addrs,
+                        config: slaac_config,
+                        dad_transmits,
+                        retrans_timer,
+                        interface_identifier,
+                        _marker: PhantomData,
+                    },
+                    &mut state,
+                )
+            },
+        )
     }
 }
 
@@ -797,13 +810,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>
     }
 }
 
-impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> DadContext<BC>
-    for CoreCtxWithIpDeviceConfiguration<
+impl<
         'a,
-        Config,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
-        BC,
-    >
+        Config: Borrow<Ipv6DeviceConfiguration>,
+        BC: BindingsContext,
+        L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressDad>,
+    > DadContext<BC> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
     type DadAddressCtx<'b> = CoreCtxWithIpDeviceConfiguration<
         'b,
