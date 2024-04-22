@@ -11,6 +11,11 @@ GN ?= $(MISTOSROOT)/prebuilt/third_party/gn/$(HOST_OS)-$(HOST_ARCH)/gn
 NINJA ?= $(MISTOSROOT)/prebuilt/third_party/ninja/$(HOST_OS)-$(HOST_ARCH)/ninja
 NOECHO ?= @
 
+export NINJA_STATUS_MAX_COMMANDS=4
+export NINJA_STATUS_REFRESH_MILLIS=100
+export NINJA_PERSISTENT_MODE=0
+export NINJA_STATUS=[%f/%t](%r)
+
 info: gen ## Print build info
 	@echo "HOST_OS=$(HOST_OS)"
 	@echo "HOST_ARCH=$(HOST_ARCH)"
