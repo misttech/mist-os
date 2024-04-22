@@ -9,6 +9,7 @@ use crate::model::routing::router::Request;
 use crate::model::routing::router::Routable;
 use crate::model::routing::router::Router;
 use crate::model::routing::router::WeakComponentToken;
+use crate::model::routing::router::WeakComponentTokenAny;
 use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
 use async_trait::async_trait;
 use bedrock_error::BedrockError;
@@ -113,5 +114,11 @@ impl From<WeakComponentInstance> for WeakComponentToken {
 impl From<WeakComponentToken> for WeakComponentInstance {
     fn from(instance: WeakComponentToken) -> Self {
         instance.as_ref().clone()
+    }
+}
+
+impl WeakComponentTokenAny for WeakComponentInstance {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }

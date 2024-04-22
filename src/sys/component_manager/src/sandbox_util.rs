@@ -340,6 +340,7 @@ impl<T: Routable + 'static> RoutableExt for T {
                 let entry = self.router.clone().into_directory_entry(
                     request,
                     self.entry_type,
+                    target.execution_scope.clone(),
                     move |err| {
                         // TODO(https://fxbug.dev/319754472): Improve the fidelity of error logging.
                         // This should log into the component's log sink using the proper

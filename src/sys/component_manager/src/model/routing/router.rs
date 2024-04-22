@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::model::routing::router_ext::WeakComponentTokenExt;
-use crate::model::routing::WeakComponentInstance;
 use ::routing::error::RoutingError;
 use async_trait::async_trait;
 use bedrock_error::{BedrockError, Explain};
@@ -17,16 +15,11 @@ use sandbox::{AnyCapability, Capability, CapabilityTrait, Dict, Open};
 use std::fmt::Debug;
 use std::{any::Any, fmt, sync::Arc};
 use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo};
+use vfs::execution_scope::ExecutionScope;
 
 /// The trait that `WeakComponentToken` holds.
 pub trait WeakComponentTokenAny: Debug + Send + Sync {
     fn as_any(&self) -> &dyn Any;
-}
-
-impl WeakComponentTokenAny for WeakComponentInstance {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
 }
 
 /// A type representing a weak pointer to a component.
@@ -160,14 +153,18 @@ impl Router {
     ///
     /// This is an alternative to [Dict::try_into_open] when the [Dict] contains [Router]s, since
     /// [Router] is not currently a type defined by the sandbox library.
-    pub fn dict_routers_to_open(weak_component: &WeakComponentToken, dict: &Dict) -> Dict {
+    pub fn dict_routers_to_open(
+        weak_component: &WeakComponentToken,
+        scope: &ExecutionScope,
+        dict: &Dict,
+    ) -> Dict {
         let entries = dict.lock_entries();
         let out = Dict::new();
         let mut out_entries = out.lock_entries();
         for (key, value) in entries.iter() {
             let value = match value {
                 Capability::Dictionary(dict) => {
-                    Capability::Dictionary(Self::dict_routers_to_open(weak_component, dict))
+                    Capability::Dictionary(Self::dict_routers_to_open(weak_component, scope, dict))
                 }
                 Capability::Router(r) => {
                     let router = Router::from_any(r.clone());
@@ -182,6 +179,7 @@ impl Router {
                     Capability::Open(Open::new(router.into_directory_entry(
                         request,
                         fio::DirentType::Service,
+                        scope.clone(),
                         |_| None,
                     )))
                 }
@@ -199,7 +197,7 @@ impl Router {
     /// `entry_type` is the type of the entry when the DirectoryEntry is accessed through a `fuchsia.io`
     /// connection.
     ///
-    /// Tasks are spawned on the component's execution scope.
+    /// Routing and open tasks are spawned on `scope`.
     ///
     /// When routing failed while exercising the returned DirectoryEntry, errors will be
     /// sent to `errors_fn`.
@@ -207,6 +205,7 @@ impl Router {
         self,
         request: Request,
         entry_type: fio::DirentType,
+        scope: ExecutionScope,
         errors_fn: F,
     ) -> Arc<dyn DirectoryEntry>
     where
@@ -216,6 +215,7 @@ impl Router {
             router: Router,
             request: Request,
             entry_type: fio::DirentType,
+            scope: ExecutionScope,
             errors_fn: F,
         }
 
@@ -231,15 +231,9 @@ impl Router {
                 self: Arc<Self>,
                 mut request: entry::OpenRequest<'_>,
             ) -> Result<(), zx::Status> {
-                if let Ok(target) = self.request.target.clone().to_instance().upgrade() {
-                    // Spawn this request on the component's execution scope so that it doesn't
-                    // block the namespace.
-                    request.set_scope(target.execution_scope.clone());
-                    request.spawn(self);
-                    Ok(())
-                } else {
-                    Err(zx::Status::NOT_FOUND)
-                }
+                request.set_scope(self.scope.clone());
+                request.spawn(self);
+                Ok(())
             }
         }
 
@@ -263,7 +257,8 @@ impl Router {
                         // is unaware of [Router].
                         let capability = match capability {
                             Capability::Dictionary(d) => {
-                                Router::dict_routers_to_open(&self.request.target, &d).into()
+                                Router::dict_routers_to_open(&self.request.target, &self.scope, &d)
+                                    .into()
                             }
                             cap => cap,
                         };
@@ -281,7 +276,7 @@ impl Router {
             }
         }
 
-        Arc::new(RouterEntry { router: self.clone(), request, entry_type, errors_fn })
+        Arc::new(RouterEntry { router: self.clone(), request, entry_type, scope, errors_fn })
     }
 }
 

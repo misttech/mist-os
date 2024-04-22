@@ -622,6 +622,7 @@ impl ResolvedInstanceState {
     pub async fn make_exposed_dict(&self) -> Dict {
         let dict = Router::dict_routers_to_open(
             &self.weak_component.clone().into(),
+            &self.weak_component.upgrade().unwrap().execution_scope,
             &self.component_output_dict,
         );
         Self::extend_exposed_dict_with_legacy(&self.weak_component, self.decl(), &dict);

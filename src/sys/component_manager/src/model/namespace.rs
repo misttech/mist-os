@@ -333,6 +333,7 @@ fn service_or_protocol_use(
             Open::new(router.into_directory_entry(
                 request,
                 fio::DirentType::Service,
+                component.execution_scope.clone(),
                 move |error: &BedrockError| {
                     let Ok(target) = weak_component.upgrade() else {
                         return None;
