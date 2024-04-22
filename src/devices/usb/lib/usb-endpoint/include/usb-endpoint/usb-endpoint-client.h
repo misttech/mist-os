@@ -63,6 +63,10 @@ class UsbEndpointBase {
   std::optional<zx_vaddr_t> GetMappedAddr(const fuchsia_hardware_usb_request::Request& request,
                                           size_t idx) {
     fbl::AutoLock _(&mutex_);
+    return GetMappedAddrLocked(request, idx);
+  }
+  std::optional<zx_vaddr_t> GetMappedAddrLocked(
+      const fuchsia_hardware_usb_request::Request& request, size_t idx) __TA_REQUIRES(mutex_) {
     auto mapped = get_mapped(*request.data()->at(idx).buffer());
     return mapped.is_ok() ? std::make_optional<zx_vaddr_t>(mapped->addr) : std::nullopt;
   }

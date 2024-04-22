@@ -84,8 +84,11 @@ class UsbAdbDevice : public UsbAdb,
   void QueueTx(QueueTxRequest& request, QueueTxCompleter::Sync& completer) override;
   void Receive(ReceiveCompleter::Sync& completer) override;
 
-  // Used for synchronizing the order of Stop() and Shutdown() in tests.
-  libsync::Completion test_stop_sync_;
+  // Public for testing
+  void SetShutdownCallback(fit::callback<void()> cb) {
+    fbl::AutoLock _(&lock_);
+    shutdown_callback_ = std::move(cb);
+  }
 
  private:
   const uint32_t bulk_tx_count_;
@@ -105,6 +108,8 @@ class UsbAdbDevice : public UsbAdb,
 
   // Helper method to get free request buffer and queue the request for transmitting.
   zx::result<> SendLocked() __TA_REQUIRES(bulk_in_ep_.mutex_);
+  // Helper method to get free request buffer and queue the request for receiving.
+  void ReceiveLocked() __TA_REQUIRES(bulk_out_ep_.mutex_);
 
   // USB request completion callback methods.
   void TxComplete(fendpoint::Completion completion);
@@ -121,51 +126,46 @@ class UsbAdbDevice : public UsbAdb,
     return (status_ == fadb::StatusFlags::kOnline) && !shutdown_callback_;
   }
 
-  // Shutdown operations by disabling endpoints, releasing requests and stop further queueing of
-  // requests.
-  void Shutdown();
   // Called when shutdown is in progress and all pending requests are completed. Invokes shutdown
   // completion callback.
   void ShutdownComplete() __TA_REQUIRES(lock_);
 
   ddk::UsbFunctionProtocolClient function_;
-  usb_speed_t speed_ = 0;
 
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   async_dispatcher_t* dispatcher_;
 
   // UsbAdbImpl service binding. This is created when client calls Start.
-  std::optional<fidl::ServerBinding<fadb::UsbAdbImpl>> adb_binding_ __TA_GUARDED(adb_mutex_);
+  std::optional<fidl::ServerBinding<fadb::UsbAdbImpl>> adb_binding_;
 
   // Set once the interface is configured.
   fadb::StatusFlags status_ __TA_GUARDED(lock_) = fadb::StatusFlags(0);
 
   // Holds suspend/unbind DDK callback to be invoked once shutdown is complete.
   fit::callback<void()> shutdown_callback_ __TA_GUARDED(lock_);
+  // `stop_completed_` ensures that `shutdown_callback_` is only called after `Stop()` has finished
+  // all its necessary operations including deconfiguring endpoints, etc. In practice, this is not
+  // important, but this facilitates orderly shutdown which avoids flakes in tests.
+  std::atomic_bool stop_completed_ __TA_GUARDED(lock_) = false;
 
   // This driver uses 4 locks to avoid race conditions in different sub-parts of the driver. The
   // OUT/IN endpoints each contain one mutex, where bulk_in_ep_.mutex_ is used to avoid race
   // conditions w.r.t transmit buffers. bulk_out_ep_.mutex_ is used to avoid race conditions w.r.t
-  // receive buffers. adb_mutex_ is used to serialize concurrent access to adb_binding_ which is
-  // set/unset by a higher level component during the lifetime of the driver. lock_ is used for all
-  // driver internal states. Alternatively a single lock (lock_) could have been used for TX, RX and
-  // driver states, but that will serialize TX methods w.r.t RX. Hence the separation of locks.
+  // receive buffers. lock_ is used for all driver internal states. Alternatively a single lock
+  // (lock_) could have been used for TX, RX and driver states, but that will serialize TX methods
+  // w.r.t RX. Hence the separation of locks.
   //
   // NOTE: In order to maintain reentrancy, do not hold any lock when invoking callbacks/methods
   // that can reenter the driver methods.
   //
   // As for lock ordering, IN/OUT mutex_s must be the highest order lock i.e. it must be
-  // acquired before lock_ (and adb_mutex_) when both locks are held. IN/OUT mutex_s are
+  // acquired before lock_ when both locks are held. IN/OUT mutex_s are
   // never acquired together.
 
-  // adb_mutex_ must be acquired after IN/OUT mutex_s and before lock_(lock_ should be the inner
-  // most lock in all cases), when multiple locks are held. Alternatively, a reader writer lock
-  // could have be used.
-  fbl::Mutex adb_mutex_ __TA_ACQUIRED_AFTER(bulk_in_ep_.mutex_)
-      __TA_ACQUIRED_AFTER(bulk_out_ep_.mutex_) __TA_ACQUIRED_BEFORE(lock_);
   // Lock for guarding driver states. This should be held for only a short duration and is the inner
   // most lock in all cases.
-  mutable fbl::Mutex lock_;
+  mutable fbl::Mutex lock_ __TA_ACQUIRED_AFTER(bulk_in_ep_.mutex_)
+      __TA_ACQUIRED_AFTER(bulk_out_ep_.mutex_);
 
   // USB ADB interface descriptor.
   struct {
@@ -213,7 +213,7 @@ class UsbAdbDevice : public UsbAdb,
   usb_endpoint::UsbEndpoint<UsbAdbDevice> bulk_out_ep_{usb::EndpointType::BULK, this,
                                                        std::mem_fn(&UsbAdbDevice::RxComplete)};
   // Queue of pending Receive requests from client.
-  std::queue<ReceiveCompleter::Async> rx_requests_ __TA_GUARDED(adb_mutex_);
+  std::queue<ReceiveCompleter::Async> rx_requests_ __TA_GUARDED(bulk_out_ep_.mutex_);
   // pending_replies_ only used for bulk_out_ep_
   std::queue<fendpoint::Completion> pending_replies_ __TA_GUARDED(bulk_out_ep_.mutex_);
 
