@@ -57,6 +57,8 @@ enumerable_enum! {
         Fifo,
         /// The SELinux "sock_file" object class.
         Socket,
+        /// The SELinux "dir" object class.
+        Directory,
     }
 }
 
@@ -70,6 +72,7 @@ impl ObjectClass {
             Self::Link => "lnk_file",
             Self::Fifo => "fifo_file",
             Self::Socket => "sock_file",
+            Self::Directory => "dir",
         }
     }
 }
@@ -103,6 +106,8 @@ enumerable_enum! {
         Fifo,
         /// The SELinux "sock_file" object class.
         Socket,
+        /// The SELinux "dir" object class.
+        Directory,
     }
 }
 
@@ -115,6 +120,7 @@ impl From<FileClass> for ObjectClass {
             FileClass::Link => Self::Link,
             FileClass::Fifo => Self::Fifo,
             FileClass::Socket => Self::Socket,
+            FileClass::Directory => Self::Directory,
         }
     }
 }

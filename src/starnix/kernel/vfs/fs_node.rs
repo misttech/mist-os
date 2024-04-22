@@ -1755,6 +1755,16 @@ impl FsNode {
         self.info().mode.is_lnk()
     }
 
+    /// Whether this node is a character file.
+    pub fn is_chr(&self) -> bool {
+        self.info().mode.is_chr()
+    }
+
+    /// Whether this node is a block file.
+    pub fn is_blk(&self) -> bool {
+        self.info().mode.is_blk()
+    }
+
     pub fn dev(&self) -> DeviceType {
         self.fs().dev_id
     }
@@ -2312,6 +2322,8 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
+        // Directory entry creation computes SID. Clear it for test.
+        node.clear_cached_sid();
         assert_eq!(None, node.info().sid.0);
         assert_eq!(None, node.cached_sid());
 
