@@ -13,6 +13,7 @@ use std::{
     pin::pin,
 };
 
+use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
@@ -176,35 +177,91 @@ async fn test_oir<M: Manager, N: Netstack>(name: &str, config: ManagerConfig, pr
     );
 }
 
-// Create two realms with one netstack each, managed by netcfg. Each realm
-// has an endpoint, which are both on the same network. Send a UDP packet
-// between Realm1 and Realm2, where Realm1 and Realm2 can be initialized
-// with a predefined ManagerConfig.
+// Create two realms with predefined port classes and one netstack each, managed
+// by netcfg. Each realm has an endpoint, which are both on the same network.
+// Send a UDP packet between Realm1 and Realm2, where Realm1 and Realm2 can be
+// initialized with a predefined ManagerConfig.
 #[netstack_test]
 #[test_case(
     ManagerConfig::Empty,
     ManagerConfig::PacketFilterEthernet,
-    false; "receiver_eth_enabled")]
+    fhardware_network::PortClass::Ethernet,
+    false; "receiver_eth_enabled__both_ports_eth")]
 #[test_case(
     ManagerConfig::PacketFilterEthernet,
     ManagerConfig::Empty,
-    false; "sender_eth_enabled")]
+    fhardware_network::PortClass::Ethernet,
+    false; "sender_eth_enabled__both_ports_eth")]
 #[test_case(
     ManagerConfig::PacketFilterEthernet,
     ManagerConfig::PacketFilterEthernet,
-    false; "both_eth_enabled")]
+    fhardware_network::PortClass::Ethernet,
+    false; "both_eth_enabled__both_ports_eth")]
 #[test_case(
     ManagerConfig::PacketFilterWlan,
     ManagerConfig::PacketFilterWlan,
-    true; "both_wlan_enabled")]
+    fhardware_network::PortClass::Ethernet,
+    true; "both_wlan_enabled__both_ports_eth")]
 #[test_case(
     ManagerConfig::Empty,
     ManagerConfig::Empty,
-    true; "both_no_filter")]
+    fhardware_network::PortClass::Ethernet,
+    true; "both_no_filter__both_ports_eth")]
+#[test_case(
+    ManagerConfig::Empty,
+    ManagerConfig::PacketFilterWlan,
+    fhardware_network::PortClass::Wlan,
+    false; "receiver_wlan_enabled__both_ports_wlan")]
+#[test_case(
+    ManagerConfig::PacketFilterWlan,
+    ManagerConfig::Empty,
+    fhardware_network::PortClass::Wlan,
+    false; "sender_wlan_enabled__both_ports_wlan")]
+#[test_case(
+    ManagerConfig::PacketFilterWlan,
+    ManagerConfig::PacketFilterWlan,
+    fhardware_network::PortClass::Wlan,
+    false; "both_wlan_enabled__both_ports_wlan")]
+#[test_case(
+    ManagerConfig::PacketFilterEthernet,
+    ManagerConfig::PacketFilterEthernet,
+    fhardware_network::PortClass::Wlan,
+    true; "both_eth_enabled__both_ports_wlan")]
+#[test_case(
+    ManagerConfig::Empty,
+    ManagerConfig::Empty,
+    fhardware_network::PortClass::Wlan,
+    true; "both_no_filter__both_ports_wlan")]
+#[test_case(
+    ManagerConfig::Empty,
+    ManagerConfig::PacketFilterWlan,
+    fhardware_network::PortClass::WlanAp,
+    false; "receiver_wlan_enabled__both_ports_wlan_ap")]
+#[test_case(
+    ManagerConfig::PacketFilterWlan,
+    ManagerConfig::Empty,
+    fhardware_network::PortClass::WlanAp,
+    false; "sender_wlan_enabled__both_ports_wlan_ap")]
+#[test_case(
+    ManagerConfig::PacketFilterWlan,
+    ManagerConfig::PacketFilterWlan,
+    fhardware_network::PortClass::WlanAp,
+    false; "both_wlan_enabled__both_ports_wlan_ap")]
+#[test_case(
+    ManagerConfig::PacketFilterEthernet,
+    ManagerConfig::PacketFilterEthernet,
+    fhardware_network::PortClass::WlanAp,
+    true; "both_eth_enabled__both_ports_wlan_ap")]
+#[test_case(
+    ManagerConfig::Empty,
+    ManagerConfig::Empty,
+    fhardware_network::PortClass::WlanAp,
+    true; "both_no_filter__both_ports_wlan_ap")]
 async fn test_filtering_udp<M: Manager, N: Netstack>(
     name: &str,
     realm1_manager: ManagerConfig,
     realm2_manager: ManagerConfig,
+    port_class: fhardware_network::PortClass,
     message_expected: bool,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
@@ -220,18 +277,24 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
         realm: &'a netemul::TestRealm<'a>,
         port: u16,
         name: String,
+        port_class: fhardware_network::PortClass,
     ) -> (netemul::TestEndpoint<'a>, SocketAddr) {
         // Install a new device via devfs so netcfg can pick it up and install filtering rules.
-        let ep = network.create_endpoint(format!("{name}-eth-ep")).await.expect("create endpoint");
+        let ep = network
+            .create_endpoint_with(
+                format!("{name}-eth-ep"),
+                fnetemul_network::EndpointConfig {
+                    mtu: netemul::DEFAULT_MTU,
+                    mac: None,
+                    port_class,
+                },
+            )
+            .await
+            .expect("create endpoint");
         ep.set_link_up(true).await.expect("set link up");
         let endpoint_mount_path = netemul::devfs_device_path(format!("{name}-eth-ep").as_str());
         let endpoint_mount_path = endpoint_mount_path.as_path();
 
-        // TODO(https://fxbug.dev/42177261): The Virtual device type is treated as
-        // Ethernet for the purposes of netcfg's `filter_enabled_interface_types`
-        // config parameter. When implemented, insert this as a device with the
-        // Ethernet device class instead of Virtual. Additionally, add another
-        // device to exercise packet filtering with the Wlan device class.
         realm.add_virtual_device(&ep, endpoint_mount_path).await.unwrap_or_else(|e| {
             panic!("add virtual device {}: {:?}", endpoint_mount_path.display(), e)
         });
@@ -286,10 +349,13 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
             &[
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
-                    use_dhcp_server: false,
+                    use_dhcp_server: true,
                     use_out_of_stack_dhcp_client: false,
                     config: realm1_manager,
                 },
+                // Include the DHCP server because we bring up a WLAN_AP device
+                // in some test cases.
+                KnownServiceProvider::DhcpServer { persistent: false },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
             ],
@@ -300,6 +366,7 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
         &sender_realm,
         SENDER_PORT,
         format!("sender-eth-ep"),
+        port_class,
     )
     .await;
 
@@ -309,10 +376,13 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
             &[
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
-                    use_dhcp_server: false,
+                    use_dhcp_server: true,
                     use_out_of_stack_dhcp_client: false,
                     config: realm2_manager,
                 },
+                // Include the DHCP server because we bring up a WLAN_AP device
+                // in some test cases.
+                KnownServiceProvider::DhcpServer { persistent: false },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
             ],
@@ -323,6 +393,7 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
         &receiver_realm,
         RECEIVER_PORT,
         format!("receiver-eth-ep"),
+        port_class,
     )
     .await;
 
@@ -840,7 +911,7 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
                 fnetemul_network::EndpointConfig {
                     mtu: netemul::DEFAULT_MTU,
                     mac: None,
-                    port_class: fidl_fuchsia_hardware_network::PortClass::WlanAp,
+                    port_class: fhardware_network::PortClass::WlanAp,
                 },
             )
             .await
@@ -1964,7 +2035,7 @@ async fn dhcpv4_client_restarts_after_delay() {
                             mac: Some(Box::new(
                                 fnet_ext::MacAddress { octets: SERVER_MAC.bytes() }.into(),
                             )),
-                            port_class: fidl_fuchsia_hardware_network::PortClass::Virtual,
+                            port_class: fhardware_network::PortClass::Virtual,
                         },
                         netemul::InterfaceConfig {
                             name: Some("serveriface".into()),
