@@ -3179,3 +3179,16 @@
   reviewers: ['haydennix@google.com', 'karthikrish@google.com', 'sbalana@google.com', 'silberst@google.com', 'swiggett@google.com']
   submitted: '2023-12-15'
   reviewed: '2024-04-11'
+
+- name: 'RFC-0244'
+  title: 'Raise user-defined Zircon exception'
+  short_description: 'Introduces a syscall for raising a user-defined Zircon exception'
+  authors: ['abarth@google.com']
+  file: '0244_raise_exception.md'
+  area: ['Kernel']
+  issue: ['']
+  gerrit_change_id: ['1013525']
+  status: 'Accepted'
+  reviewers: ['cpu@google.com', 'jamesr@google.com', 'jruthe@google.com']
+  submitted: '2024-03-22'
+  reviewed: '2024-04-22'
