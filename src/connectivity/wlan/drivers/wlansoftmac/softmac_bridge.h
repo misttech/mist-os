@@ -63,8 +63,8 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
   void CancelScan(CancelScanRequestView request, CancelScanCompleter::Sync& completer) final;
   void UpdateWmmParameters(UpdateWmmParametersRequestView request,
                            UpdateWmmParametersCompleter::Sync& completer) final;
-  static zx_status_t WlanTx(const void* ctx, const uint8_t* payload, size_t payload_size);
-  static zx_status_t EthernetRx(const void* ctx, const uint8_t* payload, size_t payload_size);
+  static zx_status_t WlanTx(void* ctx, const uint8_t* payload, size_t payload_size);
+  static zx_status_t EthernetRx(void* ctx, const uint8_t* payload, size_t payload_size);
 
  private:
   explicit SoftmacBridge(DeviceInterface* device_interface,

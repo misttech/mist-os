@@ -11,10 +11,16 @@ use {
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
     futures::channel::mpsc,
     ieee80211::MacAddr,
-    std::{ffi::c_void, fmt::Display, marker::PhantomPinned, pin::Pin, sync::Arc},
+    std::{
+        ffi::c_void,
+        fmt::Display,
+        marker::PhantomPinned,
+        pin::Pin,
+        sync::{atomic::AtomicPtr, Arc},
+    },
     trace::Id as TraceId,
     tracing::error,
-    wlan_common::{mac::FrameControl, pointers::SendPtr, tx_vector, TimeUnit},
+    wlan_common::{mac::FrameControl, tx_vector, TimeUnit},
     wlan_fidl_ext::{TryUnpack, WithName},
     wlan_trace as wtrace,
 };
@@ -400,12 +406,9 @@ impl DeviceOps for Device {
         // Safety: This call to `self.raw_device.start` is safe because `frame_processor` was
         // constructed in accordance with the safety documentation of
         // `FrameProcessor::to_c_binding`.
-        //
-        // Safety: This call to `SendPtr::clone()` is safe because the original will not be used
-        // while the copy is still in scope.
         let status = unsafe {
             (self.raw_device.start)(
-                self.raw_device.device.clone().as_ptr(),
+                *self.raw_device.device.get_mut(),
                 wlan_softmac_ifc_bridge_client_handle,
                 &frame_processor,
                 &mut out_channel as *mut u32,
@@ -524,12 +527,7 @@ impl DeviceOps for Device {
     }
 
     fn set_ethernet_status(&mut self, status: LinkStatus) -> Result<(), zx::Status> {
-        zx::ok((self.raw_device.set_ethernet_status)(
-            // Safety: This is safe because the original will not be used while the copy
-            // is still in scope.
-            unsafe { self.raw_device.device.clone().as_ptr() },
-            status.0,
-        ))
+        zx::ok((self.raw_device.set_ethernet_status)(*self.raw_device.device.get_mut(), status.0))
     }
 
     fn set_channel(&mut self, channel: fidl_common::WlanChannel) -> Result<(), zx::Status> {
@@ -896,7 +894,7 @@ pub struct CFrameProcessor {
 
 #[repr(C)]
 pub struct CFrameSender {
-    ctx: *const c_void,
+    ctx: *mut c_void,
     /// Sends a WLAN MAC frame to the C++ portion of wlansoftmac.
     ///
     /// # Safety
@@ -904,7 +902,7 @@ pub struct CFrameSender {
     /// Behavior is undefined unless `payload` contains a persisted `FrameSender.WlanTx` request
     /// and `payload_len` is the length of the persisted byte array.
     wlan_tx: unsafe extern "C" fn(
-        ctx: *const c_void,
+        ctx: *mut c_void,
         payload: *const u8,
         payload_len: usize,
     ) -> zx::zx_status_t,
@@ -915,14 +913,14 @@ pub struct CFrameSender {
     /// Behavior is undefined unless `payload` contains a persisted `FrameSender.EthernetRx` request
     /// and `payload_len` is the length of the persisted byte array.
     ethernet_rx: unsafe extern "C" fn(
-        ctx: *const c_void,
+        ctx: *mut c_void,
         payload: *const u8,
         payload_len: usize,
     ) -> zx::zx_status_t,
 }
 
 pub struct FrameSender {
-    ctx: SendPtr<*const c_void>,
+    ctx: AtomicPtr<c_void>,
     /// Sends a WLAN MAC frame to the C++ portion of wlansoftmac.
     ///
     /// # Safety
@@ -930,7 +928,7 @@ pub struct FrameSender {
     /// Behavior is undefined unless `payload` contains a persisted `FrameSender.WlanTx` request
     /// and `payload_len` is the length of the persisted byte array.
     wlan_tx: unsafe extern "C" fn(
-        ctx: *const c_void,
+        ctx: *mut c_void,
         payload: *const u8,
         payload_len: usize,
     ) -> zx::zx_status_t,
@@ -941,7 +939,7 @@ pub struct FrameSender {
     /// Behavior is undefined unless `payload` contains a persisted `FrameSender.EthernetRx` request
     /// and `payload_len` is the length of the persisted byte array.
     ethernet_rx: unsafe extern "C" fn(
-        ctx: *const c_void,
+        ctx: *mut c_void,
         payload: *const u8,
         payload_len: usize,
     ) -> zx::zx_status_t,
@@ -950,9 +948,7 @@ pub struct FrameSender {
 impl From<CFrameSender> for FrameSender {
     fn from(frame_sender: CFrameSender) -> Self {
         Self {
-            // Safety: This is safe because `frame_sender.ctx` will never become
-            // any other type than `*const c_void`.
-            ctx: unsafe { SendPtr::from_always_const_void(frame_sender.ctx) },
+            ctx: AtomicPtr::new(frame_sender.ctx),
             wlan_tx: frame_sender.wlan_tx,
             ethernet_rx: frame_sender.ethernet_rx,
         }
@@ -960,7 +956,10 @@ impl From<CFrameSender> for FrameSender {
 }
 
 impl FrameSender {
-    fn wlan_tx(&self, request: &fidl_softmac::FrameSenderWlanTxRequest) -> Result<(), zx::Status> {
+    fn wlan_tx(
+        &mut self,
+        request: &fidl_softmac::FrameSenderWlanTxRequest,
+    ) -> Result<(), zx::Status> {
         let payload = fidl::persist(request);
         match payload {
             Err(e) => {
@@ -970,15 +969,8 @@ impl FrameSender {
             Ok(payload) => {
                 // Safety: The `self.wlan_tx` call is safe because the payload is a persisted
                 // `FrameSender.EthernetRx` request.
-                //
-                // Safety: The `SendPtr::clone()` call is safe because the copy of `self.ctx` is
-                // temporary and the original cannot be used until `self.wlan_tx` returns.
                 zx::Status::from_raw(unsafe {
-                    (self.wlan_tx)(
-                        self.ctx.clone().as_ptr(),
-                        payload.as_slice().as_ptr(),
-                        payload.len(),
-                    )
+                    (self.wlan_tx)(*self.ctx.get_mut(), payload.as_slice().as_ptr(), payload.len())
                 })
                 .into()
             }
@@ -986,7 +978,7 @@ impl FrameSender {
     }
 
     fn ethernet_rx(
-        &self,
+        &mut self,
         request: &fidl_softmac::FrameSenderEthernetRxRequest,
     ) -> Result<(), zx::Status> {
         let payload = fidl::persist(request);
@@ -999,11 +991,8 @@ impl FrameSender {
                 let payload = payload.as_slice();
                 // Safety: The `self.ethernet_rx` call is safe because the payload is a persisted
                 // `FrameSender.EthernetRx` request.
-                //
-                // Safety: The `SendPtr::clone()` call is safe because the copy of `self.ctx` is
-                // temporary and the original cannot be used until `self.ethernet_rx` returns.
                 zx::Status::from_raw(unsafe {
-                    (self.ethernet_rx)(self.ctx.clone().as_ptr(), payload.as_ptr(), payload.len())
+                    (self.ethernet_rx)(*self.ctx.get_mut(), payload.as_ptr(), payload.len())
                 })
                 .into()
             }
@@ -1028,16 +1017,16 @@ impl FrameSender {
 /// caller only calls one of them at a time.
 #[repr(C)]
 pub struct CDeviceInterface {
-    device: *const c_void,
+    device: *mut c_void,
     /// Start operations on the underlying device and return the SME channel.
     start: extern "C" fn(
-        device: *const c_void,
+        device: *mut c_void,
         wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
         frame_processor: *const CFrameProcessor,
         out_sme_channel: *mut zx::sys::zx_handle_t,
     ) -> i32,
     /// Reports the current status to the ethernet driver.
-    set_ethernet_status: extern "C" fn(device: *const c_void, status: u32) -> i32,
+    set_ethernet_status: extern "C" fn(device: *mut c_void, status: u32) -> i32,
 }
 
 /// Type that represents the FFI from the bridged wlansoftmac to wlansoftmac itself.
@@ -1045,7 +1034,7 @@ pub struct CDeviceInterface {
 /// Each of the functions in this FFI are safe to call from another thread but not
 /// safe to call concurrently, i.e., they can only be called one at a time.
 pub struct DeviceInterface {
-    device: SendPtr<*const c_void>,
+    device: AtomicPtr<c_void>,
     /// Start operations on the underlying device and return the SME channel.
     ///
     /// # Lifetime
@@ -1061,21 +1050,21 @@ pub struct DeviceInterface {
     /// of the bridged wlansoftmac driver. Otherwise, `ifc` might cause a `DriverEvent` to be
     /// written to a dropped `DriverEventSink`.
     start: unsafe extern "C" fn(
-        device: *const c_void,
+        device: *mut c_void,
         wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
         frame_processor: *const CFrameProcessor,
         out_sme_channel: *mut zx::sys::zx_handle_t,
     ) -> i32,
     /// Reports the current status to the ethernet driver.
-    set_ethernet_status: extern "C" fn(device: *const c_void, status: u32) -> i32,
+    set_ethernet_status: extern "C" fn(device: *mut c_void, status: u32) -> i32,
 }
 
 impl From<CDeviceInterface> for DeviceInterface {
     fn from(device_interface: CDeviceInterface) -> Self {
         Self {
             // Safety: This is safe because `device_interface.device` will never become
-            // any other type than `*const c_void`.
-            device: unsafe { SendPtr::from_always_const_void(device_interface.device) },
+            // any other type than `*mut c_void`.
+            device: AtomicPtr::new(device_interface.device),
             start: device_interface.start,
             set_ethernet_status: device_interface.set_ethernet_status,
         }

@@ -11,8 +11,8 @@ use {
         ops::{Deref, DerefMut},
         ptr::NonNull,
         slice,
+        sync::atomic::AtomicPtr,
     },
-    wlan_common::pointers::SendPtr,
 };
 
 #[repr(C)]
@@ -103,7 +103,16 @@ pub struct Buffer {
     free: unsafe extern "C" fn(raw: *mut c_void),
     /// Pointer to the buffer allocated in the C++ portion of wlansoftmac and owned by the Rust
     /// portion of wlansoftmac.
-    raw: SendPtr<NonNull<c_void>>,
+    ///
+    /// The `ManuallyDrop` type wraps the pointer to allow the drop implementation to move
+    /// the `AtomicPtr` out of self in both `Buffer::release` and `drop`.
+    ///
+    /// The `AtomicPtr` type wraps the pointer so this field, and thus `Buffer`, implements
+    /// `Send` and `Sync`. Note that `AtomicPtr` only wraps the pointer and dereferencing the pointer
+    /// is still unsafe. However, Rust code cannot meaningfully dereference a `*mut c_void`
+    /// and the `CBufferProvider` FFI contract supports sending the `*mut c_void` between
+    /// threads. Thus, wrapping this field so that it implements `Send` and `Sync` is safe.
+    raw: ManuallyDrop<AtomicPtr<c_void>>,
     /// Boxed slice containing a buffer of bytes available to read and write.
     data: ManuallyDrop<Box<[u8]>>,
 }
@@ -124,12 +133,9 @@ impl TryFrom<CBuffer> for Buffer {
             (Some(raw), Some(data), capacity) => (raw, data, capacity),
         };
 
-        // Safety: This call is safe because the pointee of `raw` will always be a `c_void`.
-        let raw = unsafe { SendPtr::from_always_non_null_void(raw) };
-
         Ok(Self {
             free: buffer.free,
-            raw,
+            raw: ManuallyDrop::new(AtomicPtr::new(raw.as_ptr())),
             // Safety: Forming a boxed slice from `data` and `capacity` is safe because
             // `data` is non-null and `capacity` defines the number of bytes beyond the
             // `data` pointer that are allocated for reading and writing.
@@ -174,11 +180,10 @@ impl Buffer {
     /// By calling the returned free function, the caller promises the pointer it's called with is
     /// the same pointer it was returned with.
     unsafe fn release(self) -> (*mut c_void, unsafe extern "C" fn(raw: *mut c_void)) {
-        let me = ManuallyDrop::new(self);
+        let mut me = ManuallyDrop::new(self);
         (
-            // Safety: This call to `SendPtr::clone` is safe because the original and copy will not
-            // exist after this function returns.
-            unsafe { me.raw.clone().as_ptr().as_ptr() },
+            // Safety: This call is safe because `me.raw` will not be used again.
+            unsafe { ManuallyDrop::take(&mut me.raw) }.into_inner(),
             me.free,
         )
     }
@@ -186,13 +191,12 @@ impl Buffer {
 
 impl Drop for Buffer {
     fn drop(&mut self) {
+        // Safety: This call is safe because `self.raw` will not be used again.
+        let raw = unsafe { ManuallyDrop::take(&mut self.raw) }.into_inner();
+
         // Safety: This call of `self.free` is safe because it's called on the `raw` field
         // of this struct.
-        //
-        // Safety: This call to `SendPtr::clone` is safe because the original and copy are
-        // both dropped after this call to `self.free`, i.e., neither can be sent to another
-        // thread after this point.
-        unsafe { (self.free)(self.raw.clone().as_ptr().as_ptr()) };
+        unsafe { (self.free)(raw) };
     }
 }
 
@@ -253,6 +257,16 @@ impl Deref for FinalizedBuffer {
         &self.inner[..self.written]
     }
 }
+
+// Assert both `Buffer` and `FinalizedBuffer` implement `Send` and `Sync` here to
+// provide an obvious compile-time error when either of them does not. When using
+// a multi-threaded executor, these two types are generally required to be `Send`
+// and `Sync`.
+const _: () = {
+    fn assert_send_sync<T: Send + Sync>() {}
+    let _ = assert_send_sync::<Buffer>;
+    let _ = assert_send_sync::<FinalizedBuffer>;
+};
 
 pub struct FakeCBufferProvider;
 

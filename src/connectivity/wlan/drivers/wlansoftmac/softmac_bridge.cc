@@ -67,8 +67,8 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
   // Safety: Each of the functions initialized in `wlansoftmac_rust_ops` is safe to call
   // from any thread as long they are never called concurrently.
   rust_device_interface_t wlansoftmac_rust_ops = {
-      .device = static_cast<const void*>(softmac_bridge->device_interface_),
-      .start = [](const void* device_interface, zx_handle_t softmac_ifc_bridge_client_handle,
+      .device = static_cast<void*>(softmac_bridge->device_interface_),
+      .start = [](void* device_interface, zx_handle_t softmac_ifc_bridge_client_handle,
                   const frame_processor_t* frame_processor,
                   zx_handle_t* out_sme_channel) -> zx_status_t {
         WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.start");
@@ -79,7 +79,7 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
         *out_sme_channel = channel.release();
         return result;
       },
-      .set_ethernet_status = [](const void* device_interface, uint32_t status) -> zx_status_t {
+      .set_ethernet_status = [](void* device_interface, uint32_t status) -> zx_status_t {
         WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.set_ethernet_status");
         return DeviceInterface::from(device_interface)->SetEthernetStatus(status);
       },
@@ -349,7 +349,7 @@ void SoftmacBridge::UpdateWmmParameters(UpdateWmmParametersRequestView request,
   DispatchAndComplete(__func__, dispatcher, completer);
 }
 
-zx_status_t SoftmacBridge::WlanTx(const void* ctx, const uint8_t* payload, size_t payload_size) {
+zx_status_t SoftmacBridge::WlanTx(void* ctx, const uint8_t* payload, size_t payload_size) {
   auto self = static_cast<const SoftmacBridge*>(ctx);
 
   WLAN_TRACE_DURATION();
@@ -413,8 +413,7 @@ zx_status_t SoftmacBridge::WlanTx(const void* ctx, const uint8_t* payload, size_
   return ZX_OK;
 }
 
-zx_status_t SoftmacBridge::EthernetRx(const void* ctx, const uint8_t* payload,
-                                      size_t payload_size) {
+zx_status_t SoftmacBridge::EthernetRx(void* ctx, const uint8_t* payload, size_t payload_size) {
   auto self = static_cast<const SoftmacBridge*>(ctx);
 
   WLAN_TRACE_DURATION();
