@@ -305,7 +305,7 @@ fn service_or_protocol_use(
         UseDecl::Protocol(use_protocol_decl) => {
             let request = Request {
                 availability: use_protocol_decl.availability.clone(),
-                target: component.as_weak(),
+                target: component.as_weak().into(),
             };
             let Some(capability) =
                 program_input_dict.get_capability(&use_protocol_decl.target_path)

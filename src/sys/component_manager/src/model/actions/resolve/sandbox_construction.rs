@@ -336,8 +336,10 @@ fn make_dict_extending_router(
             }
 
             // Otherwise combine the two.
-            let source_request =
-                Request { availability: cm_types::Availability::Required, target: component };
+            let source_request = Request {
+                availability: cm_types::Availability::Required,
+                target: component.into(),
+            };
             let source_dict = match source_dict_router.route(source_request).await? {
                 Capability::Dictionary(d) => d,
                 _ => panic!("source_dict_router must return a Dict"),

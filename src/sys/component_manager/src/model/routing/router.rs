@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::model::component::WeakComponentInstance;
+use crate::model::routing::router_ext::WeakComponentTokenExt;
+use crate::model::routing::WeakComponentInstance;
 use ::routing::error::RoutingError;
 use async_trait::async_trait;
 use bedrock_error::{BedrockError, Explain};
@@ -13,8 +14,28 @@ use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use sandbox::{AnyCapability, Capability, CapabilityTrait, Dict, Open};
-use std::{fmt, sync::Arc};
+use std::fmt::Debug;
+use std::{any::Any, fmt, sync::Arc};
 use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo};
+
+/// The trait that `WeakComponentToken` holds.
+pub trait WeakComponentTokenAny: Debug + Send + Sync {
+    fn as_any(&self) -> &dyn Any;
+}
+
+impl WeakComponentTokenAny for WeakComponentInstance {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+/// A type representing a weak pointer to a component.
+/// This is type erased because the bedrock library shouldn't depend on
+/// Component Manager types.
+#[derive(Clone, Debug)]
+pub struct WeakComponentToken {
+    pub inner: Arc<dyn WeakComponentTokenAny>,
+}
 
 /// Types that implement [`Routable`] let the holder asynchronously request
 /// capabilities from them.
@@ -30,7 +51,7 @@ pub struct Request {
     pub availability: Availability,
 
     /// A reference to the requesting component.
-    pub target: WeakComponentInstance,
+    pub target: WeakComponentToken,
 }
 
 /// A [`Router`] is a capability that lets the holder obtain other capabilities
@@ -139,7 +160,7 @@ impl Router {
     ///
     /// This is an alternative to [Dict::try_into_open] when the [Dict] contains [Router]s, since
     /// [Router] is not currently a type defined by the sandbox library.
-    pub fn dict_routers_to_open(weak_component: &WeakComponentInstance, dict: &Dict) -> Dict {
+    pub fn dict_routers_to_open(weak_component: &WeakComponentToken, dict: &Dict) -> Dict {
         let entries = dict.lock_entries();
         let out = Dict::new();
         let mut out_entries = out.lock_entries();
@@ -210,7 +231,7 @@ impl Router {
                 self: Arc<Self>,
                 mut request: entry::OpenRequest<'_>,
             ) -> Result<(), zx::Status> {
-                if let Ok(target) = self.request.target.upgrade() {
+                if let Ok(target) = self.request.target.clone().to_instance().upgrade() {
                     // Spawn this request on the component's execution scope so that it doesn't
                     // block the namespace.
                     request.set_scope(target.execution_scope.clone());
@@ -301,6 +322,21 @@ mod tests {
     use bedrock_error::DowncastErrorForTest;
     use sandbox::{Data, Message, Receiver};
 
+    #[derive(Debug)]
+    struct FakeComponentToken {}
+
+    impl FakeComponentToken {
+        fn new() -> WeakComponentToken {
+            WeakComponentToken { inner: Arc::new(FakeComponentToken {}) }
+        }
+    }
+
+    impl WeakComponentTokenAny for FakeComponentToken {
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+    }
+
     #[fuchsia::test]
     async fn availability_good() {
         let source: Capability = Data::String("hello".to_string()).into();
@@ -309,7 +345,7 @@ mod tests {
         let capability = proxy
             .route(Request {
                 availability: Availability::Optional,
-                target: WeakComponentInstance::invalid(),
+                target: FakeComponentToken::new(),
             })
             .await
             .unwrap();
@@ -328,7 +364,7 @@ mod tests {
         let error = proxy
             .route(Request {
                 availability: Availability::Required,
-                target: WeakComponentInstance::invalid(),
+                target: FakeComponentToken::new(),
             })
             .await
             .unwrap_err();
@@ -355,7 +391,7 @@ mod tests {
         let capability = router
             .route(Request {
                 availability: Availability::Required,
-                target: WeakComponentInstance::invalid(),
+                target: FakeComponentToken::new(),
             })
             .await
             .unwrap();

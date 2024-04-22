@@ -2,15 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::capability::CapabilitySource;
+use crate::model::component::ComponentInstance;
+use crate::model::component::WeakComponentInstance;
 use crate::model::routing::router::Request;
 use crate::model::routing::router::Routable;
 use crate::model::routing::router::Router;
-
-use crate::capability::CapabilitySource;
+use crate::model::routing::router::WeakComponentToken;
 use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
 use async_trait::async_trait;
 use bedrock_error::BedrockError;
+use routing::error::ComponentInstanceError;
 use sandbox::Capability;
+use std::sync::Arc;
 
 /// A trait to add functions to Router that know about the component manager
 /// types.
@@ -55,10 +59,59 @@ impl Routable for PolicyCheckRouter {
     async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
         match self
             .policy_checker
-            .can_route_capability(&self.capability_source, &request.target.moniker)
+            .can_route_capability(&self.capability_source, &request.target.moniker())
         {
             Ok(()) => self.router.route(request).await,
             Err(policy_error) => Err(RoutingError::PolicyError(policy_error).into()),
         }
+    }
+}
+
+/// A trait to add functions WeakComponentInstancethat know about the component
+/// manager types.
+pub trait WeakComponentTokenExt {
+    /// Upgrade this token to the underlying instance.
+    fn to_instance(self) -> WeakComponentInstance;
+
+    /// Get a reference to the underlying instance.
+    fn as_ref(&self) -> &WeakComponentInstance;
+
+    /// Get a strong reference to the underlying instance.
+    fn upgrade(&self) -> Result<Arc<ComponentInstance>, ComponentInstanceError>;
+
+    /// Get the moniker for this component.
+    fn moniker(&self) -> moniker::Moniker;
+}
+
+impl WeakComponentTokenExt for WeakComponentToken {
+    fn to_instance(self) -> WeakComponentInstance {
+        self.into()
+    }
+
+    fn as_ref(&self) -> &WeakComponentInstance {
+        match self.inner.as_any().downcast_ref::<WeakComponentInstance>() {
+            Some(instance) => instance,
+            None => panic!(),
+        }
+    }
+
+    fn upgrade(&self) -> Result<Arc<ComponentInstance>, ComponentInstanceError> {
+        self.as_ref().upgrade()
+    }
+
+    fn moniker(&self) -> moniker::Moniker {
+        self.as_ref().moniker.clone()
+    }
+}
+
+impl From<WeakComponentInstance> for WeakComponentToken {
+    fn from(instance: WeakComponentInstance) -> Self {
+        WeakComponentToken { inner: Arc::new(instance) }
+    }
+}
+
+impl From<WeakComponentToken> for WeakComponentInstance {
+    fn from(instance: WeakComponentToken) -> Self {
+        instance.as_ref().clone()
     }
 }

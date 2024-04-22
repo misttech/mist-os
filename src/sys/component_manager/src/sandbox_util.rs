@@ -6,6 +6,7 @@ use {
     crate::model::{
         component::{ComponentInstance, WeakComponentInstance},
         routing::router::{Request, Routable, Router},
+        routing::router_ext::WeakComponentTokenExt,
     },
     ::routing::{
         capability_source::CapabilitySource, component_instance::ComponentInstanceInterface,
@@ -303,7 +304,7 @@ impl LaunchTaskOnReceive {
 #[async_trait]
 impl Routable for Arc<LaunchTaskOnReceive> {
     async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
-        Ok(self.clone().into_sender(request.target).into())
+        Ok(self.clone().into_sender(request.target.into()).into())
     }
 }
 
@@ -334,7 +335,8 @@ impl<T: Routable + 'static> RoutableExt for T {
         #[async_trait]
         impl Routable for OnReadableRouter {
             async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
-                let target = request.target.upgrade().map_err(RoutingError::from)?;
+                let target =
+                    request.target.clone().to_instance().upgrade().map_err(RoutingError::from)?;
                 let entry = self.router.clone().into_directory_entry(
                     request,
                     self.entry_type,
@@ -533,7 +535,7 @@ pub mod tests {
                 &RelativePath::new("foo/bar/data").unwrap(),
                 Request {
                     availability: Availability::Required,
-                    target: WeakComponentInstance::invalid(),
+                    target: WeakComponentInstance::invalid().into(),
                 },
             )
             .await;
@@ -550,7 +552,7 @@ pub mod tests {
                 &RelativePath::new("foo/bar").unwrap(),
                 Request {
                     availability: Availability::Required,
-                    target: WeakComponentInstance::invalid(),
+                    target: WeakComponentInstance::invalid().into(),
                 },
             )
             .await;
@@ -572,7 +574,7 @@ pub mod tests {
                 &RelativePath::new("foo/bar").unwrap(),
                 Request {
                     availability: Availability::Required,
-                    target: WeakComponentInstance::invalid(),
+                    target: WeakComponentInstance::invalid().into(),
                 },
             )
             .await;
@@ -592,7 +594,7 @@ pub mod tests {
                 &RelativePath::new("foo").unwrap(),
                 Request {
                     availability: Availability::Required,
-                    target: WeakComponentInstance::invalid(),
+                    target: WeakComponentInstance::invalid().into(),
                 },
             )
             .await;
@@ -603,7 +605,7 @@ pub mod tests {
                 &RelativePath::new("foo/bar").unwrap(),
                 Request {
                     availability: Availability::Required,
-                    target: WeakComponentInstance::invalid(),
+                    target: WeakComponentInstance::invalid().into(),
                 },
             )
             .await;
@@ -654,7 +656,10 @@ pub mod tests {
         )
         .await;
         let capability = router
-            .route(Request { availability: Availability::Required, target: component.as_weak() })
+            .route(Request {
+                availability: Availability::Required,
+                target: component.as_weak().into(),
+            })
             .await
             .unwrap();
 
@@ -702,7 +707,10 @@ pub mod tests {
         )
         .await;
         let capability = router
-            .route(Request { availability: Availability::Required, target: component.as_weak() })
+            .route(Request {
+                availability: Availability::Required,
+                target: component.as_weak().into(),
+            })
             .await
             .unwrap();
 
@@ -749,7 +757,7 @@ pub mod tests {
         let capability = downscoped_router
             .route(Request {
                 availability: Availability::Optional,
-                target: WeakComponentInstance::invalid(),
+                target: WeakComponentInstance::invalid().into(),
             })
             .await
             .unwrap();
@@ -793,7 +801,7 @@ pub mod tests {
         let capability = downscoped_router
             .route(Request {
                 availability: Availability::Optional,
-                target: WeakComponentInstance::invalid(),
+                target: WeakComponentInstance::invalid().into(),
             })
             .await
             .unwrap();

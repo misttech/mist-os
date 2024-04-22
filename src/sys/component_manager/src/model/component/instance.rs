@@ -29,6 +29,7 @@ use {
             routing::{
                 self,
                 router::{Request, Routable, Router},
+                router_ext::WeakComponentTokenExt,
                 service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
                 RoutingError,
             },
@@ -619,7 +620,10 @@ impl ResolvedInstanceState {
     /// [`Router`]s. This [`Dict`] is used to generate the `exposed_dir`. This function creates a new [`Dict`],
     /// so allocation cost is paid only when called.
     pub async fn make_exposed_dict(&self) -> Dict {
-        let dict = Router::dict_routers_to_open(&self.weak_component, &self.component_output_dict);
+        let dict = Router::dict_routers_to_open(
+            &self.weak_component.clone().into(),
+            &self.component_output_dict,
+        );
         Self::extend_exposed_dict_with_legacy(&self.weak_component, self.decl(), &dict);
         dict
     }
@@ -1250,7 +1254,7 @@ impl Routable for CapabilityRequestedHook {
     async fn route(&self, request: Request) -> Result<Capability, bedrock_error::BedrockError> {
         self.source
             .ensure_started(&StartReason::AccessCapability {
-                target: request.target.moniker.clone(),
+                target: request.target.moniker().clone(),
                 name: self.name.clone(),
             })
             .await?;
