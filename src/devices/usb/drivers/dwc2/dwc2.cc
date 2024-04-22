@@ -1226,7 +1226,7 @@ zx_status_t Dwc2::UsbDciConfigEp(const usb_endpoint_descriptor_t* ep_desc,
 zx_status_t Dwc2::UsbDciDisableEp(uint8_t ep_address) {
   auto* mmio = get_mmio();
 
-  unsigned ep_num = DWC_ADDR_TO_INDEX(ep_address);
+  uint8_t ep_num = DWC_ADDR_TO_INDEX(ep_address);
   if (ep_num == DWC_EP0_IN || ep_num == DWC_EP0_OUT || ep_num >= std::size(endpoints_)) {
     zxlogf(ERROR, "Dwc2::UsbDciConfigEp: bad ep address 0x%02X", ep_address);
     return ZX_ERR_INVALID_ARGS;
@@ -1236,7 +1236,8 @@ zx_status_t Dwc2::UsbDciDisableEp(uint8_t ep_address) {
 
   fbl::AutoLock lock(&ep->lock);
 
-  DEPCTL::Get(ep_num).ReadFrom(mmio).set_usbactep(0).WriteTo(mmio);
+  DEPCTL::Get(ep_num).ReadFrom(mmio).set_epena(0).set_usbactep(0).set_snak(1).WriteTo(mmio);
+  EnableEp(ep_num, false);
   ep->enabled = false;
 
   return ZX_OK;
