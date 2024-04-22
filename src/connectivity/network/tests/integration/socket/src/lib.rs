@@ -129,13 +129,14 @@ async fn run_ip_endpoint_packet_socket_test(
     client: &netemul::TestRealm<'_>,
     client_iface_id: u64,
     ip_version: IpVersion,
+    kind: fpacket::Kind,
 ) {
     async fn new_packet_socket_in_realm(
         realm: &netemul::TestRealm<'_>,
         addr: PureIpSockaddr,
+        kind: fpacket::Kind,
     ) -> Result<fasync::net::DatagramSocket> {
-        let socket =
-            realm.packet_socket(fpacket::Kind::Network).await.context("creating packet socket")?;
+        let socket = realm.packet_socket(kind).await.context("creating packet socket")?;
         let sockaddr = libc::sockaddr_ll::from(addr).into_sockaddr();
         let () = socket.bind(&sockaddr).context("binding packet_socket")?;
         let socket = fasync::net::DatagramSocket::new_from_socket(socket)
@@ -149,6 +150,7 @@ async fn run_ip_endpoint_packet_socket_test(
     let client_sock = new_packet_socket_in_realm(
         client,
         PureIpSockaddr { interface_id: Some(client_iface_id), protocol: ip_version },
+        kind,
     )
     .await
     .expect("failed to create client socket");
@@ -156,6 +158,7 @@ async fn run_ip_endpoint_packet_socket_test(
     let server_sock = new_packet_socket_in_realm(
         server,
         PureIpSockaddr { interface_id: Some(server_iface_id), protocol: ip_version },
+        kind,
     )
     .await
     .expect("failed to create server socket");
@@ -2012,13 +2015,14 @@ fn base_ip_device_port_config() -> fnet_tun::BasePortConfig {
 enum IpEndpointsSocketTestCase {
     Udp,
     Tcp,
-    Packet,
+    Packet(fpacket::Kind),
 }
 
 #[netstack_test]
 #[test_case(IpEndpointsSocketTestCase::Udp; "udp_socket")]
 #[test_case(IpEndpointsSocketTestCase::Tcp; "tcp_socket")]
-#[test_case(IpEndpointsSocketTestCase::Packet; "packet_socket")]
+#[test_case(IpEndpointsSocketTestCase::Packet(fpacket::Kind::Network); "packet_dgram_socket")]
+#[test_case(IpEndpointsSocketTestCase::Packet(fpacket::Kind::Link); "packet_raw_socket")]
 async fn ip_endpoints_socket<N: Netstack, I: net_types::ip::Ip>(
     name: &str,
     socket_type: IpEndpointsSocketTestCase,
@@ -2069,9 +2073,16 @@ async fn ip_endpoints_socket<N: Netstack, I: net_types::ip::Ip>(
         IpEndpointsSocketTestCase::Tcp => {
             run_tcp_socket_test(&server, server_addr.addr, &client, client_addr.addr).await
         }
-        IpEndpointsSocketTestCase::Packet => {
-            run_ip_endpoint_packet_socket_test(&server, server_id, &client, client_id, I::VERSION)
-                .await
+        IpEndpointsSocketTestCase::Packet(kind) => {
+            run_ip_endpoint_packet_socket_test(
+                &server,
+                server_id,
+                &client,
+                client_id,
+                I::VERSION,
+                kind,
+            )
+            .await
         }
     }
 }
