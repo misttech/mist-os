@@ -260,6 +260,7 @@ _sdk_partner_internal_fidl_libraries = [
   "fuchsia.power.metrics",
   "fuchsia.starnix.container",
   "fuchsia.sys2",
+  "fuchsia.testing.harness",
   "fuchsia.vulkan.loader",
 
   # keep-sorted: end
